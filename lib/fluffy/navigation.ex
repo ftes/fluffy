@@ -1,107 +1,59 @@
-defmodule Fluffy.Navigation.Link do
-  @moduledoc false
-  @enforce_keys [:destination]
-  defstruct [:destination, :download]
-
-  @type t :: %__MODULE__{
-          destination: String.t(),
-          download: String.t() | nil
-        }
-end
-
-defmodule Fluffy.Navigation.Submission do
-  @moduledoc false
-  @enforce_keys [:submission]
-  defstruct [:submission]
-  @type t :: %__MODULE__{submission: map()}
-end
-
-defmodule Fluffy.Navigation.Redirect do
-  @moduledoc false
-  @enforce_keys [:destination]
-  defstruct [:destination, :flash]
-  @type t :: %__MODULE__{destination: String.t(), flash: map() | String.t() | nil}
-end
-
-defmodule Fluffy.Navigation.Patch do
-  @moduledoc false
-  @enforce_keys [:destination, :state]
-  defstruct [:destination, :state]
-  @type t :: %__MODULE__{destination: String.t(), state: term()}
-end
-
-defmodule Fluffy.Navigation.BrowserCommitted do
-  @moduledoc false
-  @enforce_keys [:state, :url]
-  defstruct [:live_navigation_cursor, :response, :state, :url]
-
-  @type t :: %__MODULE__{
-          live_navigation_cursor: non_neg_integer() | nil,
-          response: map() | nil,
-          state: term(),
-          url: String.t()
-        }
-end
-
-defmodule Fluffy.Navigation.BrowserPatch do
-  @moduledoc false
-  @enforce_keys [:state, :url]
-  defstruct [:state, :url]
-  @type t :: %__MODULE__{state: term(), url: String.t()}
-end
-
-defmodule Fluffy.Navigation.StaticConn do
-  @moduledoc false
-  @enforce_keys [:conn]
-  defstruct [:conn]
-  @type t :: %__MODULE__{conn: Plug.Conn.t()}
-end
-
 defmodule Fluffy.Navigation do
-  @moduledoc false
+  @moduledoc """
+  Assertions for navigation results captured by `Fluffy.Event.navigation/2`.
 
-  alias Fluffy.Navigation.BrowserCommitted
-  alias Fluffy.Navigation.BrowserPatch
-  alias Fluffy.Navigation.Link
-  alias Fluffy.Navigation.Patch
-  alias Fluffy.Navigation.Redirect
-  alias Fluffy.Navigation.StaticConn
-  alias Fluffy.Navigation.Submission
+  Pass the capture key as the first argument and execute the returned assertion
+  with `Fluffy.expect/2`. Capture waits for the event; assertions inspect its
+  retained result. Options follow `Fluffy.Expect`.
+  """
 
-  @type t ::
-          Link.t()
-          | Submission.t()
-          | Redirect.t()
-          | Patch.t()
-          | BrowserCommitted.t()
-          | BrowserPatch.t()
-          | StaticConn.t()
+  alias Fluffy.Expect
+  alias Fluffy.URLMatcher
 
-  def link(destination, options \\ []) do
-    options = Keyword.validate!(options, [:download])
-    %Link{destination: destination, download: options[:download]}
+  @doc group: "Assertions"
+  @doc """
+  Expects the captured navigation URL to match a string, regex, or structured components.
+
+  Strings match exactly and regexes match against the complete captured URL.
+  Relative strings are not resolved. Structured keywords use the same path,
+  query, and fragment rules as `Fluffy.Page.to_have_url/2`.
+  """
+  @spec to_have_url(term(), Fluffy.Page.url_expectation(), [Expect.option()]) :: Expect.t()
+  def to_have_url(key, expected, options \\ [])
+
+  def to_have_url(key, expected, options) when is_binary(expected) or is_struct(expected, Regex) do
+    Expect.new({:navigation, key}, :navigation_url, expected, options)
   end
 
-  def submission(submission), do: %Submission{submission: submission}
-
-  def redirect(destination, options \\ []) do
-    options = Keyword.validate!(options, [:flash])
-    %Redirect{destination: destination, flash: options[:flash]}
+  def to_have_url(key, components, options) when is_list(components) do
+    Expect.new({:navigation, key}, :navigation_url, URLMatcher.new!(components), options)
   end
 
-  def patch(destination, state), do: %Patch{destination: destination, state: state}
+  @doc group: "Assertions"
+  @doc """
+  Expects the captured navigation source URL to match a string, regex, or structured components.
 
-  def browser_committed(url, state, options \\ []) do
-    options = Keyword.validate!(options, [:live_navigation_cursor, :response])
+  Strings match exactly and regexes match against the complete captured URL.
+  Relative strings are not resolved. Structured keywords use the same path,
+  query, and fragment rules as `Fluffy.Page.to_have_url/2`.
+  """
+  @spec to_have_from_url(term(), Fluffy.Page.url_expectation(), [Expect.option()]) :: Expect.t()
+  def to_have_from_url(key, expected, options \\ [])
 
-    %BrowserCommitted{
-      live_navigation_cursor: options[:live_navigation_cursor],
-      response: options[:response],
-      state: state,
-      url: url
-    }
+  def to_have_from_url(key, expected, options) when is_binary(expected) or is_struct(expected, Regex) do
+    Expect.new({:navigation, key}, :navigation_from_url, expected, options)
   end
 
-  def browser_patch(url, state), do: %BrowserPatch{state: state, url: url}
-  def static_conn(%Plug.Conn{} = conn), do: %StaticConn{conn: conn}
+  def to_have_from_url(key, components, options) when is_list(components) do
+    Expect.new({:navigation, key}, :navigation_from_url, URLMatcher.new!(components), options)
+  end
+
+  @doc group: "Assertions"
+  @doc """
+  Expects the captured navigation's status to equal the supplied value.
+  """
+  @spec to_have_status(term(), integer(), [Expect.option()]) :: Expect.t()
+  def to_have_status(key, expected, options \\ []) when is_integer(expected) do
+    Expect.new({:navigation, key}, :navigation_status, expected, options)
+  end
 end

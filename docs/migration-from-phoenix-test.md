@@ -28,7 +28,7 @@ explained below:
 | `uncheck("Ready to brew")` | `uncheck(by_label("Ready to brew", exact: true))` |
 | `click_button("Brew potion")` | `click(by_role(:button, name: "Brew potion"))` |
 | `click_link("Potions")` | `click(by_role(:link, name: "Potions"))` |
-| `assert_has("#notice")` | `expect(by_css("#notice") |> to_be_visible())` |
+| `assert_has("#notice")` | `expect(to_be_visible(by_css("#notice")))` |
 | `assert_path("/potions")` | `expect(Page.to_have_url(path: "/potions"))` |
 | `assert_path("/potions", query_params: params)` | `expect(Page.to_have_url(path: "/potions", query: params))` |
 | `assert_has("title", text: "Potions", exact: true)` | `expect(Page.to_have_title("Potions"))` |
@@ -279,11 +279,13 @@ listener is installed before the callback runs, and the captured result stays
 in the pipe:
 
 ```elixir
+alias Fluffy.Download
+
 session
 |> wait_for(Event.download(:report), fn session ->
   click(session, by_role(:button, name: "Download potion ledger"))
 end)
-|> expect(to_have_download_suggested_filename(:report, "potions.csv"))
+|> expect(Download.to_have_suggested_filename(:report, "potions.csv"))
 ```
 
 For popups, use `Event.popup` with `switch_page` and `close_page` instead of

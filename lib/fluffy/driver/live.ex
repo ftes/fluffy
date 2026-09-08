@@ -13,10 +13,10 @@ defmodule Fluffy.Driver.Live do
   alias Fluffy.Expect
   alias Fluffy.Form
   alias Fluffy.HTML.Semantics
+  alias Fluffy.Internal.Navigation
   alias Fluffy.LiveViewTest.UploadCompat
   alias Fluffy.Locator
   alias Fluffy.Locator.Static, as: StaticLocator
-  alias Fluffy.Navigation
   alias Fluffy.Page
   alias Fluffy.Session
   alias Fluffy.TestScope

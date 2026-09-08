@@ -6,9 +6,9 @@ defmodule Fluffy.Driver.Static do
   alias Fluffy.ClientDOM
   alias Fluffy.Expect
   alias Fluffy.Expectation
+  alias Fluffy.Internal.Navigation
   alias Fluffy.Locator
   alias Fluffy.Locator.Static, as: StaticLocator
-  alias Fluffy.Navigation
   alias Fluffy.Session
   alias Fluffy.URLMatcher
 

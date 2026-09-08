@@ -7,6 +7,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
   import Phoenix.ConnTest, only: [get: 2]
 
   alias Fluffy.Event
+  alias Fluffy.Navigation
   alias Fluffy.Page
   alias Fluffy.Playwright.Handle
   alias Fluffy.Session
@@ -396,13 +397,13 @@ defmodule Fluffy.Conformance.UnwrapTest do
 
       session
       |> expect(
-        to_have_navigation_from_url(
+        Navigation.to_have_from_url(
           :native_navigation,
           Fluffy.TestServer.base_url() <> "/harness"
         )
       )
-      |> expect(to_have_navigation_url(:native_navigation, Fluffy.TestServer.base_url() <> "/chamber"))
-      |> expect(to_have_navigation_status(:native_navigation, 200))
+      |> expect(Navigation.to_have_url(:native_navigation, Fluffy.TestServer.base_url() <> "/chamber"))
+      |> expect(Navigation.to_have_status(:native_navigation, 200))
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
     end
 

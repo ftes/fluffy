@@ -17,12 +17,12 @@ defmodule Fluffy.Backend.Phoenix do
   alias Fluffy.Driver.Live.UploadState
   alias Fluffy.Driver.Static.State, as: StaticState
   alias Fluffy.Driver.Unvisited.State, as: UnvisitedState
+  alias Fluffy.Internal.Navigation.Link
+  alias Fluffy.Internal.Navigation.Patch
+  alias Fluffy.Internal.Navigation.Redirect
+  alias Fluffy.Internal.Navigation.StaticConn
+  alias Fluffy.Internal.Navigation.Submission
   alias Fluffy.LiveViewWatcher
-  alias Fluffy.Navigation.Link
-  alias Fluffy.Navigation.Patch
-  alias Fluffy.Navigation.Redirect
-  alias Fluffy.Navigation.StaticConn
-  alias Fluffy.Navigation.Submission
   alias Fluffy.NavigationEvent
   alias Fluffy.Page
   alias Fluffy.PageLifecycle

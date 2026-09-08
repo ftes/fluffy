@@ -2,8 +2,8 @@ defmodule Fluffy.Driver.Contract do
   @moduledoc false
 
   alias Fluffy.Expect
+  alias Fluffy.Internal.Navigation
   alias Fluffy.Locator
-  alias Fluffy.Navigation
   alias Fluffy.Session
 
   @type result ::

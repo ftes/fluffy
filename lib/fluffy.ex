@@ -452,6 +452,11 @@ defmodule Fluffy do
     assert_expectation_truth!(expectation, passed?, actual)
   end
 
+  defp assert_expected!(%Expect{kind: kind} = expectation, actual)
+       when kind in [:download_url, :navigation_url, :navigation_from_url, :request_url, :response_url] do
+    assert_expectation_truth!(expectation, Fluffy.URLMatcher.matches?(expectation.expected, actual), actual)
+  end
+
   defp assert_expected!(%Expect{} = expectation, actual) do
     assert_expectation_truth!(expectation, Expect.matches?(expectation.expected, actual), actual)
   end

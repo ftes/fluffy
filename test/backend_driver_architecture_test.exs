@@ -10,7 +10,7 @@ defmodule Fluffy.BackendDriverArchitectureTest do
   alias Fluffy.Driver.Live
   alias Fluffy.Driver.Registry, as: DriverRegistry
   alias Fluffy.Driver.Static
-  alias Fluffy.Navigation
+  alias Fluffy.Internal.Navigation
   alias Fluffy.Page
   alias Fluffy.Session
 

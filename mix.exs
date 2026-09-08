@@ -94,6 +94,9 @@ defmodule Fluffy.MixProject do
           Fluffy.Expect,
           Fluffy.Page,
           Fluffy.Event,
+          Fluffy.Navigation,
+          Fluffy.Request,
+          Fluffy.Response,
           Fluffy.Playwright,
           Fluffy.Sandbox
         ],

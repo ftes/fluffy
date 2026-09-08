@@ -1,7 +1,17 @@
 # Advanced events and pages
 
-The examples use the standard test-module convention from the usage guide:
-`import Fluffy.Expect`, plus aliases for `Fluffy.Event` and `Fluffy.Page`.
+The examples use these imports and aliases:
+
+```elixir
+import Fluffy
+import Fluffy.Locator
+import Fluffy.Expect
+
+alias Fluffy.{Dialog, Download, Event, Navigation, Page, Response}
+```
+
+Locator expectations remain imported from `Fluffy.Expect`; captured-result
+expectations live on the corresponding subject module, like page expectations.
 
 `wait_for(Event.*(...), action)` installs the listener before running the
 action. Return the updated session from the callback. Captured results can be
@@ -14,8 +24,8 @@ session
 |> wait_for(Event.download(:report), fn session ->
   click(session, by_role(:button, name: "Download potion ledger"))
 end)
-|> expect(to_have_download_suggested_filename(:report, "potions.csv"))
-|> expect(to_have_download_content_type(:report, "text/csv"))
+|> expect(Download.to_have_suggested_filename(:report, "potions.csv"))
+|> expect(Download.to_have_content_type(:report, "text/csv"))
 ```
 
 `download(session, :report)` returns `%Fluffy.Download{}` with `filename`,
@@ -54,9 +64,28 @@ session
 |> wait_for(Event.navigation(:forbidden_forest), fn session ->
   click(session, by_role(:link, name: "Follow the spiders"))
 end)
-|> expect(to_have_navigation_url(:forbidden_forest, forbidden_forest_url))
-|> expect(to_have_navigation_status(:forbidden_forest, 200))
+|> expect(Navigation.to_have_url(:forbidden_forest, forbidden_forest_url))
+|> expect(Navigation.to_have_status(:forbidden_forest, 200))
 ```
+
+Captured URL assertions on `Download`, `Navigation`, `Request`, and `Response`
+accept exact strings, regexes, or structured path, query, and fragment matchers.
+This also applies to `Navigation.to_have_from_url/3`. Strings are compared as
+captured, without resolving relative URLs. Structured matching follows the
+[same rules as page URL assertions](usage.md#page-assertions): query matching is
+exact by default; use `query_mode: :subset` to allow additional parameter names.
+
+```elixir
+session
+|> expect(Navigation.to_have_url(:forbidden_forest,
+  path: "/forest",
+  query: %{"guide" => "spiders"},
+  query_mode: :subset
+))
+```
+
+These assertions inspect the retained event result; they do not wait for the
+active page to change. `wait_for/3` handles waiting for the event.
 
 ## Dialogs
 
@@ -68,9 +97,9 @@ session
 |> wait_for(Event.dialog(:release_basilisk, accept: true), fn session ->
   click(session, by_role(:button, name: "Release basilisk"))
 end)
-|> expect(to_have_dialog_type(:release_basilisk, :confirm))
-|> expect(to_have_dialog_message(:release_basilisk, "Release the basilisk?"))
-|> expect(to_have_dialog_action(:release_basilisk, :accept))
+|> expect(Dialog.to_have_type(:release_basilisk, :confirm))
+|> expect(Dialog.to_have_message(:release_basilisk, "Release the basilisk?"))
+|> expect(Dialog.to_have_action(:release_basilisk, :accept))
 ```
 
 Use `:dismiss`, `{:accept, "prompt text"}`, or a decision function receiving
@@ -83,8 +112,8 @@ session
 |> wait_for(Event.response(:potions, ~r{/api/potions}), fn session ->
   click(session, by_role(:button, name: "Refresh potions"))
 end)
-|> expect(to_have_response_status(:potions, 200))
-|> expect(to_have_response_resource_type(:potions, "fetch"))
+|> expect(Response.to_have_status(:potions, 200))
+|> expect(Response.to_have_resource_type(:potions, "fetch"))
 ```
 
 Matchers can be an exact URL, regex, or normalized-event predicate. These are

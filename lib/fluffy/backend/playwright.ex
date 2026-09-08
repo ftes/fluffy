@@ -11,8 +11,8 @@ defmodule Fluffy.Backend.Playwright do
   alias Fluffy.FailureArtifact
   alias Fluffy.FileChooser
   alias Fluffy.HTTPEvent
-  alias Fluffy.Navigation.BrowserCommitted
-  alias Fluffy.Navigation.BrowserPatch
+  alias Fluffy.Internal.Navigation.BrowserCommitted
+  alias Fluffy.Internal.Navigation.BrowserPatch
   alias Fluffy.NavigationEvent
   alias Fluffy.Page
   alias Fluffy.PageLifecycle

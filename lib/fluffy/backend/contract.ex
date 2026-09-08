@@ -1,7 +1,7 @@
 defmodule Fluffy.Backend.Contract do
   @moduledoc false
 
-  alias Fluffy.Navigation
+  alias Fluffy.Internal.Navigation
   alias Fluffy.Session
   alias Fluffy.TestScope
 

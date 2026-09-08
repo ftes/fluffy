@@ -10,10 +10,10 @@ defmodule Fluffy.Driver.Playwright do
   alias Fluffy.Expect
   alias Fluffy.Expectation
   alias Fluffy.FileChooser
+  alias Fluffy.Internal.Navigation
   alias Fluffy.Locator
   alias Fluffy.Locator.Playwright, as: PlaywrightLocator
   alias Fluffy.Locator.Static, as: StaticLocator
-  alias Fluffy.Navigation
   alias Fluffy.Playwright.Handle
   alias Fluffy.Playwright.NavigationObserver
   alias Fluffy.Session

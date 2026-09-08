@@ -24,10 +24,10 @@ defmodule Fluffy.Conformance.DialogEventTest do
         Event.dialog(:confirmation, accept: true),
         &click(&1, by_role(:button, name: "Confirm"))
       )
-      |> expect(to_have_dialog_type(:confirmation, :confirm))
-      |> expect(to_have_dialog_message(:confirmation, "Proceed?"))
-      |> expect(to_have_dialog_default_value(:confirmation, ""))
-      |> expect(to_have_dialog_action(:confirmation, :accept))
+      |> expect(Dialog.to_have_type(:confirmation, :confirm))
+      |> expect(Dialog.to_have_message(:confirmation, "Proceed?"))
+      |> expect(Dialog.to_have_default_value(:confirmation, ""))
+      |> expect(Dialog.to_have_action(:confirmation, :accept))
       |> expect("accepted" |> by_text() |> to_be_visible())
 
     assert %Dialog{type: :confirm, action: :accept} = dialog(session, :confirmation)
@@ -46,7 +46,7 @@ defmodule Fluffy.Conformance.DialogEventTest do
       Event.dialog(:confirmation, dismiss: true),
       &click(&1, by_role(:button, name: "Confirm"))
     )
-    |> expect(to_have_dialog_action(:confirmation, :dismiss))
+    |> expect(Dialog.to_have_action(:confirmation, :dismiss))
     |> expect("dismissed" |> by_text() |> to_be_visible())
   end
 
@@ -65,11 +65,11 @@ defmodule Fluffy.Conformance.DialogEventTest do
       ),
       &click(&1, by_role(:button, name: "Prompt"))
     )
-    |> expect(to_have_dialog_type(:name, :prompt))
-    |> expect(to_have_dialog_message(:name, "Your name?"))
-    |> expect(to_have_dialog_default_value(:name, "Anonymous"))
-    |> expect(to_have_dialog_action(:name, :accept))
-    |> expect(to_have_dialog_prompt_text(:name, "Fluffy"))
+    |> expect(Dialog.to_have_type(:name, :prompt))
+    |> expect(Dialog.to_have_message(:name, "Your name?"))
+    |> expect(Dialog.to_have_default_value(:name, "Anonymous"))
+    |> expect(Dialog.to_have_action(:name, :accept))
+    |> expect(Dialog.to_have_prompt_text(:name, "Fluffy"))
     |> expect("Fluffy" |> by_text() |> to_be_visible())
   end
 

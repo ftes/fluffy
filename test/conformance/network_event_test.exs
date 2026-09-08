@@ -2,11 +2,12 @@ defmodule Fluffy.Conformance.NetworkEventTest do
   use Fluffy.TestCase, async: true
 
   import Fluffy
-  import Fluffy.Expect
   import Fluffy.Locator
 
   alias Fluffy.Event
   alias Fluffy.HTTPEvent
+  alias Fluffy.Request
+  alias Fluffy.Response
   alias Fluffy.TestHTTPFixtures
 
   @tag driver: :playwright
@@ -24,12 +25,12 @@ defmodule Fluffy.Conformance.NetworkEventTest do
         ),
         &click(&1, by_role(:button, name: "Save"))
       )
-      |> expect(to_have_request_method(:save_request, "POST"))
-      |> expect(to_have_request_url(:save_request, TestHTTPFixtures.url(fixture, "/api?source=button")))
-      |> expect(to_have_request_headers(:save_request, %{"x-fluffy" => "network-test"}))
-      |> expect(to_have_request_resource_type(:save_request, "fetch"))
-      |> expect(to_have_request_post_data(:save_request, "payload"))
-      |> expect(to_have_request_page(:save_request, :main))
+      |> expect(Request.to_have_method(:save_request, "POST"))
+      |> expect(Request.to_have_url(:save_request, TestHTTPFixtures.url(fixture, "/api?source=button")))
+      |> expect(Request.to_have_headers(:save_request, %{"x-fluffy" => "network-test"}))
+      |> expect(Request.to_have_resource_type(:save_request, "fetch"))
+      |> expect(Request.to_have_post_data(:save_request, "payload"))
+      |> expect(Request.to_have_page(:save_request, :main))
 
     assert %HTTPEvent{kind: :request, status: nil} = request(session, :save_request)
   end
@@ -46,13 +47,13 @@ defmodule Fluffy.Conformance.NetworkEventTest do
         Event.response(:save_response, ~r{/api\?source=button$}),
         &click(&1, by_role(:button, name: "Save"))
       )
-      |> expect(to_have_response_method(:save_response, "POST"))
-      |> expect(to_have_response_url(:save_response, TestHTTPFixtures.url(fixture, "/api?source=button")))
-      |> expect(to_have_response_headers(:save_response, %{"content-type" => "application/json"}))
-      |> expect(to_have_response_resource_type(:save_response, "fetch"))
-      |> expect(to_have_response_status(:save_response, 207))
-      |> expect(to_have_response_status_text(:save_response, "Multi-Status"))
-      |> expect(to_have_response_page(:save_response, :main))
+      |> expect(Response.to_have_request_method(:save_response, "POST"))
+      |> expect(Response.to_have_url(:save_response, TestHTTPFixtures.url(fixture, "/api?source=button")))
+      |> expect(Response.to_have_headers(:save_response, %{"content-type" => "application/json"}))
+      |> expect(Response.to_have_resource_type(:save_response, "fetch"))
+      |> expect(Response.to_have_status(:save_response, 207))
+      |> expect(Response.to_have_status_text(:save_response, "Multi-Status"))
+      |> expect(Response.to_have_page(:save_response, :main))
 
     assert %HTTPEvent{kind: :response, status: 207} = response(session, :save_response)
   end
