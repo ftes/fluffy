@@ -9,6 +9,17 @@ defmodule Fluffy.Conformance.LiveFormTest do
 
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
+    test "unchanged sticky LiveView renders preserve entered form values with #{driver}", %{driver: driver} do
+      driver
+      |> start_test_session()
+      |> visit("/live/potions?sticky=true")
+      |> fill(by_label("Uncontrolled email"), "ada@example.test")
+      |> fill(by_label("Uncontrolled name"), "Ada")
+      |> expect(value(by_label("Uncontrolled email"), "ada@example.test"))
+      |> expect(value(by_label("Uncontrolled name"), "Ada"))
+    end
+
+    @tag driver: driver
     test "Live changes use current properties and latest server DOM with #{driver}", %{
       driver: driver
     } do
@@ -230,9 +241,10 @@ defmodule Fluffy.Conformance.LiveFormTest do
 
       session
       |> visit("/live/potions")
-      |> fill(by_label("First ingredient"), "moonstone")
+      |> fill(by_label("Cauldron controlled"), "silver dust")
       |> click(by_role(:button, name: "Send potion over HTTP"))
       |> expect(visible(by_text("The guardian sleeps")))
+      |> expect(Page.to_have_url(query: %{"profile[stubborn]" => "silver dust"}, query_mode: :subset))
     end
 
     @tag driver: driver

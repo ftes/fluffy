@@ -55,7 +55,7 @@ defmodule Fluffy.ClientDOM do
 
     old_by_id = Map.new(old_nodes, &{&1.id, &1})
     new_by_id = Map.new(new_nodes, &{&1.id, &1})
-    patched? = old_nodes != new_nodes
+    patched? = patch_tree(LazyHTML.to_tree(client_dom.document)) != patch_tree(LazyHTML.to_tree(new_document))
 
     properties =
       Enum.reduce(client_dom.properties, initial_radio_properties(new_index), fn
@@ -70,7 +70,7 @@ defmodule Fluffy.ClientDOM do
                    new,
                    old_id == client_dom.focused,
                    old_to_new,
-                   patched?
+                   patched? and not triggered_form_control?(new, new_index)
                  ) do
             Map.put(properties, new_id, reconciled)
           else
@@ -684,6 +684,26 @@ defmodule Fluffy.ClientDOM do
   defp tree_text({_tag, _attributes, children}), do: tree_text(children)
   defp tree_text(text) when is_binary(text), do: text
   defp tree_text(_comment), do: ""
+
+  # LiveViewTest regenerates signed child-session tokens when rendering, even
+  # when the server sent no DOM changes. They must not reset client input values.
+  defp patch_tree(nodes) when is_list(nodes), do: Enum.map(nodes, &patch_tree/1)
+
+  defp patch_tree({tag, attributes, children}) do
+    attributes = Enum.reject(attributes, fn {name, _value} -> name == "data-phx-session" end)
+    {tag, attributes, patch_tree(children)}
+  end
+
+  defp patch_tree(node), do: node
+
+  # LiveView skips input property updates inside a form that is being handed
+  # off to HTTP by phx-trigger-action, preserving the user's current values.
+  defp triggered_form_control?(entry, index) do
+    case DocumentIndex.form_owner(index, %Target{id: entry.id, attributes: entry.attributes, tag: entry.tag}) do
+      nil -> false
+      form -> has_attribute?(form.attributes, "phx-trigger-action")
+    end
+  end
 
   defp reconcile_properties(properties, old, new, focused?, old_to_new, patched?) do
     %{}

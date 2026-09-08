@@ -4,9 +4,10 @@ defmodule Fluffy.TestWeb.FormLive do
   use Phoenix.LiveView
 
   @impl true
-  def mount(_params, _session, socket) do
+  def mount(params, _session, socket) do
     {:ok,
      assign(socket,
+       sticky?: params["sticky"] == "true",
        colours: ["red"],
        checkbox_clicks: 0,
        debounced: "",
@@ -67,6 +68,8 @@ defmodule Fluffy.TestWeb.FormLive do
        version: version
      )}
   end
+
+  def handle_event("rotate-child-session", _params, socket), do: {:noreply, update(socket, :version, &(&1 + 1))}
 
   def handle_event("remove-second", _params, socket) do
     {:noreply, update(socket, :rows, &Enum.reject(&1, fn row -> row.id == "b" end))}
@@ -170,6 +173,14 @@ defmodule Fluffy.TestWeb.FormLive do
   def render(assigns) do
     ~H"""
     <main>
+      <section :if={@sticky?}>
+        {live_render(@socket, Fluffy.TestWeb.CounterLive,
+          id: "sticky-counter",
+          sticky: true,
+          session: %{"version" => @version}
+        )}
+        <.uncontrolled_form />
+      </section>
       <form id="constraint-form" phx-submit="constraint-save">
         <label>Required ingredient <input name="required_value" required /></label>
         <button>Seal required potion</button>
@@ -369,5 +380,14 @@ defmodule Fluffy.TestWeb.FormLive do
     params
     |> Map.get("profile", %{})
     |> Map.has_key?("_unused_#{name}")
+  end
+
+  defp uncontrolled_form(assigns) do
+    ~H"""
+    <form id="uncontrolled-form" phx-change="rotate-child-session">
+      <label>Uncontrolled email <input name="email" value="" /></label>
+      <label>Uncontrolled name <input name="name" value="" /></label>
+    </form>
+    """
   end
 end
