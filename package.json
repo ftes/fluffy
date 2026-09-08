@@ -1,0 +1,19 @@
+{
+  "name": "fluffy-test-browser",
+  "private": true,
+  "packageManager": "pnpm@11.19.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build:test": "esbuild assets/js/test_browser.js --bundle --format=esm --target=es2022 --outfile=priv/static/assets/test_browser.js",
+    "playwright:install": "playwright install chromium"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.9",
+    "phoenix": "1.8.13",
+    "phoenix_html": "4.3.0",
+    "phoenix_live_view": "1.2.11",
+    "playwright": "1.63.0"
+  }
+}

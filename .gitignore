@@ -1,0 +1,14 @@
+/_build/
+/cover/
+/deps/
+/doc/
+/docs/.plan/
+/node_modules/
+/.pnpm-store/
+/priv/static/assets/test_browser.js
+/.elixir_ls/
+/.expert/
+/tmp/
+/integration/.consumer-build-*/
+/.pg/
+.DS_Store

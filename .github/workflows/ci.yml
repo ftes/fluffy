@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # Temporary workaround for mise.jdx.dev/VERSION racing GitHub release assets.
+  # Remove once upstream guarantees that advertised versions are downloadable.
+  MISE_VERSION: "2026.8.14"
+
+jobs:
+  quality:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - lane: oldest
+            elixir: "1.18.5-otp-27"
+            erlang: "27.3.4.17"
+          - lane: newest
+            elixir: "1.20.4-otp-29"
+            erlang: "29.0.6"
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      FLUFFY_ARTIFACT_DIR: tmp/fluffy-artifacts
+      FLUFFY_BROWSER: chromium
+      MIX_ENV: test
+    steps:
+      - uses: actions/checkout@v7
+      - name: Setup toolchain
+        uses: jdx/mise-action@v4.3.0
+        with:
+          version: ${{ env.MISE_VERSION }}
+          tool_versions: |
+            erlang ${{ matrix.erlang }}
+            elixir ${{ matrix.elixir }}
+            nodejs 20.20.2
+            pnpm 11.19.0
+      - name: Restore Dialyzer PLTs
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.mix/dialyxir*.plt*
+            _build/test/dialyxir*.plt*
+          key: dialyzer-${{ runner.os }}-erlang-${{ matrix.erlang }}-elixir-${{ matrix.elixir }}-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            dialyzer-${{ runner.os }}-erlang-${{ matrix.erlang }}-elixir-${{ matrix.elixir }}-
+      - name: Restore Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-chromium
+      - run: mix deps.get
+      - run: pnpm install --frozen-lockfile
+      - if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install --with-deps chromium
+      - if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium
+      - run: pnpm run build:test
+      - run: mix check --max-cases 4
+      - run: mix dialyzer --format short --list-unused-filters
+      - name: Build documentation without warnings
+        env:
+          MIX_ENV: dev
+        run: mix docs --warnings-as-errors
+      - name: Verify external consumer fixture
+        if: matrix.lane == 'newest'
+        working-directory: integration/consumer
+        run: |
+          mix deps.get
+          mix test
+      - name: Upload browser failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-failures-${{ matrix.lane }}-elixir-${{ matrix.elixir }}-erlang-${{ matrix.erlang }}
+          path: tmp/fluffy-artifacts
+          if-no-files-found: ignore
