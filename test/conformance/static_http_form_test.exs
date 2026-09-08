@@ -40,7 +40,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
       |> fill(by_label("Query"), "fluffy test")
       |> click(by_role(:button, name: "Search"))
-      |> expect(visible(by_text("Search results")))
+      |> expect("Search results" |> by_text() |> to_be_visible())
       |> expect(
         Page.to_have_url(
           TestHTTPFixtures.url(
@@ -82,7 +82,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
       |> fill(by_label("Query"), "fluffy test")
       |> submit(by_css("#search-form"))
-      |> expect(visible(by_text("Search results")))
+      |> expect("Search results" |> by_text() |> to_be_visible())
 
       [_source, submission] = TestHTTPFixtures.requests(fixture)
       assert submission.method == "GET"
@@ -116,7 +116,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       |> fill(by_label("First"), "updated")
       |> fill(by_label("Notes"), "line one")
       |> click(by_role(:button, name: "Save order"))
-      |> expect(visible(by_text("Order saved")))
+      |> expect("Order saved" |> by_text() |> to_be_visible())
       |> expect(Page.to_have_url(TestHTTPFixtures.url(fixture, "/forms/submit?source=form#receipt")))
 
       [_source, submission] = TestHTTPFixtures.requests(fixture)
@@ -156,7 +156,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
       |> fill(by_label("First"), "updated")
       |> click(by_role(:button, name: "Save order"))
-      |> expect(visible(by_text("Order saved")))
+      |> expect("Order saved" |> by_text() |> to_be_visible())
 
       [_source, submission] = TestHTTPFixtures.requests(fixture)
 
@@ -199,7 +199,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       session
       |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
       |> click(by_role(:button, name: "Save"))
-      |> expect(visible(by_text("Saved")))
+      |> expect("Saved" |> by_text() |> to_be_visible())
 
       [_source, submission] = TestHTTPFixtures.requests(fixture)
       assert submission.body == "confirmed=yes"
@@ -247,7 +247,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
       |> fill(by_label("Notes"), "first\nsecond")
       |> click(by_role(:button, name: "Save"))
-      |> expect(visible(by_text("Saved")))
+      |> expect("Saved" |> by_text() |> to_be_visible())
 
       [_source, submission] = TestHTTPFixtures.requests(fixture)
 
@@ -280,7 +280,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
       |> uncheck(by_role(:checkbox, name: "One"))
       |> click(by_role(:button, name: "Save"))
-      |> expect(visible(by_text("Saved")))
+      |> expect("Saved" |> by_text() |> to_be_visible())
 
       [_source, submission] = TestHTTPFixtures.requests(fixture)
       assert submission.body == "items%5B%5D=two&commit=Save"
@@ -315,7 +315,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       session
       |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
       |> click(by_role(:button, name: "Search"))
-      |> expect(visible(by_text("Overridden")))
+      |> expect("Overridden" |> by_text() |> to_be_visible())
 
       [_source, submission] = TestHTTPFixtures.requests(fixture)
       assert submission.method == "POST"
@@ -345,7 +345,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       session
       |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
       |> click(by_role(:button, name: "Save"))
-      |> expect(visible(by_text("Saved")))
+      |> expect("Saved" |> by_text() |> to_be_visible())
 
       [_source, submission] = TestHTTPFixtures.requests(fixture)
       assert submission.body == "symbols=a+b%2Bc%7Ed%21*%28%29%C3%A9"
@@ -383,7 +383,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       session
       |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
       |> click(by_role(:button, name: "Save"))
-      |> expect(visible(by_text("Saved")))
+      |> expect("Saved" |> by_text() |> to_be_visible())
 
       [_source, submission] = TestHTTPFixtures.requests(fixture)
       assert submission.body == "_charset_=UTF-8&plan=current&label=Gold+plan"
@@ -414,7 +414,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
         session
         |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
         |> click(by_role(:button, name: "Save"))
-        |> expect(visible(by_text("Redirected receipt")))
+        |> expect("Redirected receipt" |> by_text() |> to_be_visible())
         |> expect(Page.to_have_url(TestHTTPFixtures.url(fixture, "/forms/receipt")))
 
         [_source, submission, redirected] = TestHTTPFixtures.requests(fixture)
@@ -460,7 +460,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
     |> fill(by_label("Number"), "many")
     |> fill(by_label("URL"), "not a url")
     |> click(by_role(:button, name: "Save"))
-    |> expect(visible(by_text("Saved")))
+    |> expect("Saved" |> by_text() |> to_be_visible())
 
     [_source, submission] = TestHTTPFixtures.requests(fixture)
 

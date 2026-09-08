@@ -20,11 +20,11 @@ defmodule Fluffy.Conformance.SelectOptionActionTest do
 
       with_html(unquote(driver), html, fn session ->
         session
-        |> expect(value(field, "us"))
+        |> expect(to_have_value(field, "us"))
         |> select_option(field, "gb")
-        |> expect(value(field, "gb"))
+        |> expect(to_have_value(field, "gb"))
         |> select_option(field, "United States")
-        |> expect(value(field, "us"))
+        |> expect(to_have_value(field, "us"))
       end)
     end
 
@@ -43,9 +43,9 @@ defmodule Fluffy.Conformance.SelectOptionActionTest do
 
       with_html(unquote(driver), html, fn session ->
         session
-        |> expect(values(field, ["red"]))
+        |> expect(to_have_values(field, ["red"]))
         |> select_option(field, ["blue", "green"])
-        |> expect(values(field, ["green", "blue"]))
+        |> expect(to_have_values(field, ["green", "blue"]))
       end)
     end
 
@@ -65,9 +65,9 @@ defmodule Fluffy.Conformance.SelectOptionActionTest do
       with_html(unquote(driver), html, fn session ->
         session
         |> select_option(field, ["elf", "dwarf"])
-        |> expect(values(field, ["elf", "dwarf"]))
+        |> expect(to_have_values(field, ["elf", "dwarf"]))
         |> select_option(field, "human")
-        |> expect(values(field, ["human"]))
+        |> expect(to_have_values(field, ["human"]))
       end)
     end
 
@@ -79,7 +79,7 @@ defmodule Fluffy.Conformance.SelectOptionActionTest do
       with_html(unquote(driver), html, fn session ->
         session
         |> select_option(field, %{label: "Professional"})
-        |> expect(value(field, "pro"))
+        |> expect(to_have_value(field, "pro"))
       end)
     end
 
@@ -111,8 +111,8 @@ defmodule Fluffy.Conformance.SelectOptionActionTest do
 
       with_html(unquote(driver), html, fn session ->
         session
-        |> expect(value(by_label("Plan"), "current"))
-        |> expect(value(by_label("Queue"), ""))
+        |> expect("Plan" |> by_label() |> to_have_value("current"))
+        |> expect("Queue" |> by_label() |> to_have_value(""))
       end)
     end
 
@@ -144,7 +144,7 @@ defmodule Fluffy.Conformance.SelectOptionActionTest do
     with_html(:playwright, html, fn session ->
       session
       |> select_option(by_label("Plan"), "pro")
-      |> expect(value(by_label("Events"), "input:pro|change:pro|"))
+      |> expect("Events" |> by_label() |> to_have_value("input:pro|change:pro|"))
     end)
   end
 

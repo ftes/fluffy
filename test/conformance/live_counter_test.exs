@@ -17,7 +17,7 @@ defmodule Fluffy.Conformance.LiveCounterTest do
       session
       |> visit("/live/three-heads")
       |> click(by_role(:button, name: "Play the flute"))
-      |> expect(visible(by_text("Sleeping heads: 1")))
+      |> expect("Sleeping heads: 1" |> by_text() |> to_be_visible())
     end
   end
 end

@@ -34,7 +34,7 @@ defmodule Fluffy.Conformance.AttributeLocatorTest do
           {:test_id, value, options} -> by_test_id(value, options)
         end
 
-      expect(session, count(locator, unquote(expected)))
+      expect(session, to_have_count(locator, unquote(expected)))
     end
   end
 
@@ -48,7 +48,7 @@ defmodule Fluffy.Conformance.AttributeLocatorTest do
           base_url: Fluffy.TestServer.base_url()
         )
 
-      expect(session, count(by_placeholder(by_css(".wanted"), "Email", exact: true), 1))
+      expect(session, ".wanted" |> by_css() |> by_placeholder("Email", exact: true) |> to_have_count(1))
     end
   end
 end

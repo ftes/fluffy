@@ -49,7 +49,7 @@ defmodule Fluffy.Conformance.RoleLocatorTest do
       session =
         session_for_html(unquote(driver), unquote(html), base_url: Fluffy.TestServer.base_url())
 
-      expect(session, count(by_role(unquote(role), unquote(options)), unquote(expected)))
+      expect(session, unquote(role) |> by_role(unquote(options)) |> to_have_count(unquote(expected)))
     end
   end
 end

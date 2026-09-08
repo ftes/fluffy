@@ -22,10 +22,10 @@ defmodule Fluffy.Conformance.LiveSessionTransitionTest do
       session
       |> visit("/session/start?identity=flute-keeper")
       |> expect(Page.to_have_url("/live/session"))
-      |> expect(visible(by_text("Live identity: flute-keeper")))
+      |> expect("Live identity: flute-keeper" |> by_text() |> to_be_visible())
       |> click(by_role(:link, name: "Show static identity", exact: true))
       |> expect(Page.to_have_url("/session/show"))
-      |> expect(visible(by_text("Static identity: flute-keeper")))
+      |> expect("Static identity: flute-keeper" |> by_text() |> to_be_visible())
     end
 
     @tag driver: driver
@@ -40,13 +40,13 @@ defmodule Fluffy.Conformance.LiveSessionTransitionTest do
 
       session
       |> visit("/actions/live")
-      |> expect(visible(by_text("Enter the live chamber")))
+      |> expect("Enter the live chamber" |> by_text() |> to_be_visible())
       |> click(by_role(:link, name: "Enter the live chamber", exact: true))
       |> expect(Page.to_have_url("/live/chamber-map"))
-      |> expect(visible(by_text("Map position: initial")))
+      |> expect("Map position: initial" |> by_text() |> to_be_visible())
       |> click(by_role(:link, name: "Sleeping chamber", exact: true))
       |> expect(Page.to_have_url("/chamber"))
-      |> expect(visible(by_text("The guardian sleeps")))
+      |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
     end
 
     @tag driver: driver
@@ -61,7 +61,7 @@ defmodule Fluffy.Conformance.LiveSessionTransitionTest do
       |> visit("/live/chamber-map")
       |> click(by_role(:button, name: "Open secret passage", exact: true))
       |> expect(Page.to_have_url("/live/secret-chamber"))
-      |> expect(visible(by_text("The secret passage opened")))
+      |> expect("The secret passage opened" |> by_text() |> to_be_visible())
     end
   end
 end

@@ -29,7 +29,7 @@ defmodule Fluffy.EctoSandboxLifecycleTest do
 
     session
     |> visit("/databases")
-    |> expect(visible(by_text("Repos: #{database_name()}, #{database_name()}")))
+    |> expect("Repos: #{database_name()}, #{database_name()}" |> by_text() |> to_be_visible())
   end
 
   @tag :capture_log
@@ -134,8 +134,8 @@ defmodule Fluffy.EctoSandboxSharedModeTest do
     first = browser_session()
     second = browser_session()
 
-    first |> visit("/database") |> expect(visible(by_text("Static values: shared")))
-    second |> visit("/database") |> expect(visible(by_text("Static values: shared")))
+    first |> visit("/database") |> expect("Static values: shared" |> by_text() |> to_be_visible())
+    second |> visit("/database") |> expect("Static values: shared" |> by_text() |> to_be_visible())
   end
 
   defp browser_session do

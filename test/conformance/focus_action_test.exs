@@ -15,10 +15,10 @@ defmodule Fluffy.Conformance.FocusActionTest do
       with_html(unquote(driver), html, fn session ->
         session
         |> focus(first)
-        |> expect(focused(first))
+        |> expect(to_be_focused(first))
         |> focus(second)
-        |> expect(not_(focused(first)))
-        |> expect(focused(second))
+        |> expect(not_(to_be_focused(first)))
+        |> expect(to_be_focused(second))
       end)
     end
 
@@ -32,9 +32,9 @@ defmodule Fluffy.Conformance.FocusActionTest do
         session
         |> focus(first)
         |> blur(second)
-        |> expect(focused(first))
+        |> expect(to_be_focused(first))
         |> blur(first)
-        |> expect(not_(focused(first)))
+        |> expect(not_(to_be_focused(first)))
       end)
     end
 
@@ -48,8 +48,8 @@ defmodule Fluffy.Conformance.FocusActionTest do
         session
         |> focus(field)
         |> focus(note)
-        |> expect(focused(field))
-        |> expect(not_(focused(note)))
+        |> expect(to_be_focused(field))
+        |> expect(not_(to_be_focused(note)))
       end)
     end
 
@@ -67,8 +67,8 @@ defmodule Fluffy.Conformance.FocusActionTest do
         session
         |> focus(field)
         |> select_option(plan, "Pro")
-        |> expect(focused(field))
-        |> expect(not_(focused(plan)))
+        |> expect(to_be_focused(field))
+        |> expect(not_(to_be_focused(plan)))
       end)
     end
 
@@ -83,8 +83,8 @@ defmodule Fluffy.Conformance.FocusActionTest do
         session
         |> focus(by_label("Current"))
         |> focus(by_label("Blocked"))
-        |> expect(focused(by_label("Current")))
-        |> expect(not_(focused(by_label("Blocked"))))
+        |> expect("Current" |> by_label() |> to_be_focused())
+        |> expect("Blocked" |> by_label() |> to_be_focused() |> not_())
       end)
     end
   end

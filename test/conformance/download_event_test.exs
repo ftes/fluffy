@@ -46,10 +46,10 @@ defmodule Fluffy.Conformance.DownloadEventTest do
         |> wait_for(Event.download(:report), fn session ->
           click(session, by_role(:link, name: "Download report"))
         end)
-        |> expect(download_suggested_filename(:report, "orders.csv"))
-        |> expect(download_content_type(:report, "text/csv"))
-        |> expect(download_content(:report, "id,total\n1,42\n"))
-        |> expect(visible(by_text("Download source")))
+        |> expect(to_have_download_suggested_filename(:report, "orders.csv"))
+        |> expect(to_have_download_content_type(:report, "text/csv"))
+        |> expect(to_have_download_content(:report, "id,total\n1,42\n"))
+        |> expect("Download source" |> by_text() |> to_be_visible())
         |> expect(Page.to_have_url(TestHTTPFixtures.url(fixture, "/start")))
 
       assert %Download{
@@ -89,9 +89,9 @@ defmodule Fluffy.Conformance.DownloadEventTest do
       |> wait_for(Event.download(:redirected), fn session ->
         click(session, by_role(:link, name: "Download redirected report"))
       end)
-      |> expect(download_suggested_filename(:redirected, "final.csv"))
-      |> expect(download_content(:redirected, "final bytes"))
-      |> expect(visible(by_text("Download redirected report")))
+      |> expect(to_have_download_suggested_filename(:redirected, "final.csv"))
+      |> expect(to_have_download_content(:redirected, "final bytes"))
+      |> expect("Download redirected report" |> by_text() |> to_be_visible())
     end
 
     @tag driver: driver
@@ -112,9 +112,9 @@ defmodule Fluffy.Conformance.DownloadEventTest do
       session
       |> visit(TestHTTPFixtures.path(fixture, "/start"))
       |> wait_for(Event.download(:raw), &click(&1, by_role(:link, name: "Save locally")))
-      |> expect(download_suggested_filename(:raw, "renamed.txt"))
-      |> expect(download_content_type(:raw, "text/plain"))
-      |> expect(download_content(:raw, "plain bytes"))
+      |> expect(to_have_download_suggested_filename(:raw, "renamed.txt"))
+      |> expect(to_have_download_content_type(:raw, "text/plain"))
+      |> expect(to_have_download_content(:raw, "plain bytes"))
     end
   end
 
@@ -154,8 +154,8 @@ defmodule Fluffy.Conformance.DownloadEventTest do
 
       session
       |> wait_for(Event.download(:after_timeout), &click(&1, by_role(:link, name: "Download")))
-      |> expect(download_suggested_filename(:after_timeout, "after-timeout.txt"))
-      |> expect(download_content(:after_timeout, "still works"))
+      |> expect(to_have_download_suggested_filename(:after_timeout, "after-timeout.txt"))
+      |> expect(to_have_download_content(:after_timeout, "still works"))
     end
   end
 
@@ -186,9 +186,9 @@ defmodule Fluffy.Conformance.DownloadEventTest do
     |> wait_for(Event.download(:report), fn session ->
       click(session, by_role(:link, name: "Download report"))
     end)
-    |> expect(download_suggested_filename(:report, "orders.csv"))
-    |> expect(download_content(:report, "id,total\n1,42\n"))
-    |> expect(visible(by_text("Download source")))
+    |> expect(to_have_download_suggested_filename(:report, "orders.csv"))
+    |> expect(to_have_download_content(:report, "id,total\n1,42\n"))
+    |> expect("Download source" |> by_text() |> to_be_visible())
     |> expect(Page.to_have_url(TestHTTPFixtures.url(fixture, "/start")))
   end
 

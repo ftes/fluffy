@@ -14,7 +14,7 @@ defmodule Fluffy.Conformance.LiveStructuralActionRetryTest do
       |> live_session()
       |> click(by_role(:button, name: "Release appearing button"))
       |> click(by_role(:button, name: "Appearing action"), timeout: @action_timeout)
-      |> expect(visible(by_text("Appearing result: activated", exact: true)))
+      |> expect("Appearing result: activated" |> by_text(exact: true) |> to_be_visible())
     end
 
     @tag driver: driver
@@ -23,7 +23,7 @@ defmodule Fluffy.Conformance.LiveStructuralActionRetryTest do
       |> live_session()
       |> click(by_role(:button, name: "Release fieldset button"))
       |> click(by_role(:button, name: "Fieldset action"), timeout: @action_timeout)
-      |> expect(visible(by_text("Fieldset result: activated", exact: true)))
+      |> expect("Fieldset result: activated" |> by_text(exact: true) |> to_be_visible())
     end
 
     @tag driver: driver
@@ -32,7 +32,7 @@ defmodule Fluffy.Conformance.LiveStructuralActionRetryTest do
       |> live_session()
       |> click(by_role(:button, name: "Release ARIA button"))
       |> click(by_role(:button, name: "ARIA action"), timeout: @action_timeout)
-      |> expect(visible(by_text("ARIA result: activated", exact: true)))
+      |> expect("ARIA result: activated" |> by_text(exact: true) |> to_be_visible())
     end
 
     @tag driver: driver
@@ -41,7 +41,7 @@ defmodule Fluffy.Conformance.LiveStructuralActionRetryTest do
       |> live_session()
       |> click(by_role(:button, name: "Release hidden button"))
       |> click(by_css("#hidden-action"), timeout: @action_timeout)
-      |> expect(visible(by_text("Hidden result: activated", exact: true)))
+      |> expect("Hidden result: activated" |> by_text(exact: true) |> to_be_visible())
     end
 
     @tag driver: driver
@@ -50,8 +50,8 @@ defmodule Fluffy.Conformance.LiveStructuralActionRetryTest do
       |> live_session()
       |> click(by_role(:button, name: "Release readonly field"))
       |> fill(by_label("Name"), "Ada", timeout: @action_timeout)
-      |> expect(value(by_label("Name"), "Ada"))
-      |> expect(visible(by_text("Name result: Ada", exact: true)))
+      |> expect("Name" |> by_label() |> to_have_value("Ada"))
+      |> expect("Name result: Ada" |> by_text(exact: true) |> to_be_visible())
     end
 
     @tag driver: driver
@@ -60,8 +60,8 @@ defmodule Fluffy.Conformance.LiveStructuralActionRetryTest do
       |> live_session()
       |> click(by_role(:button, name: "Release checkbox"))
       |> check(by_label("Updates"), timeout: @action_timeout)
-      |> expect(checked(by_label("Updates")))
-      |> expect(visible(by_text("Updates result: checked", exact: true)))
+      |> expect("Updates" |> by_label() |> to_be_checked())
+      |> expect("Updates result: checked" |> by_text(exact: true) |> to_be_visible())
     end
 
     @tag driver: driver
@@ -70,8 +70,8 @@ defmodule Fluffy.Conformance.LiveStructuralActionRetryTest do
       |> live_session()
       |> check(by_label("Reveal Phoenix Tonic"))
       |> select_option(by_label("Potion", exact: true), "pro", timeout: @action_timeout)
-      |> expect(value(by_label("Potion", exact: true), "pro"))
-      |> expect(visible(by_text("Potion result: pro", exact: true)))
+      |> expect("Potion" |> by_label(exact: true) |> to_have_value("pro"))
+      |> expect("Potion result: pro" |> by_text(exact: true) |> to_be_visible())
     end
   end
 
@@ -81,7 +81,7 @@ defmodule Fluffy.Conformance.LiveStructuralActionRetryTest do
     |> live_session()
     |> click(by_role(:button, name: "Release by navigation"))
     |> click(by_css("#retry-across-navigation"), timeout: @action_timeout)
-    |> expect(visible(by_text("Navigation retry result: activated", exact: true)))
+    |> expect("Navigation retry result: activated" |> by_text(exact: true) |> to_be_visible())
   end
 
   @tag driver: :phoenix

@@ -12,8 +12,8 @@ defmodule Fluffy.Conformance.LiveRetryTest do
 
       session
       |> visit("/live/async?delay=40")
-      |> expect(visible(by_text("Status: ready")), timeout: 1_000)
-      |> expect(count(by_role(:button, name: "Appeared"), 1), timeout: 1_000)
+      |> expect("Status: ready" |> by_text() |> to_be_visible(), timeout: 1_000)
+      |> expect(:button |> by_role(name: "Appeared") |> to_have_count(1), timeout: 1_000)
     end
 
     @tag driver: driver
@@ -23,7 +23,7 @@ defmodule Fluffy.Conformance.LiveRetryTest do
       session
       |> visit("/live/async?delay=40")
       |> click(by_role(:button, name: "Appeared"), timeout: 1_000)
-      |> expect(visible(by_text("Activated")), timeout: 1_000)
+      |> expect("Activated" |> by_text() |> to_be_visible(), timeout: 1_000)
     end
   end
 
@@ -34,7 +34,7 @@ defmodule Fluffy.Conformance.LiveRetryTest do
       assert_raise ExUnit.AssertionError, fn ->
         session
         |> visit("/live/async?delay=1000")
-        |> expect(visible(by_text("Status: impossible")), timeout: 20)
+        |> expect("Status: impossible" |> by_text() |> to_be_visible(), timeout: 20)
       end
 
     assert error.message =~ "Status: impossible"

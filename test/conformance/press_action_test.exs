@@ -14,10 +14,10 @@ defmodule Fluffy.Conformance.PressActionTest do
       with_html(unquote(driver), html, fn session ->
         session
         |> press(checkbox, "Space")
-        |> expect(checked(checkbox))
-        |> expect(focused(checkbox))
+        |> expect(to_be_checked(checkbox))
+        |> expect(to_be_focused(checkbox))
         |> press(checkbox, "Space")
-        |> expect(not_(checked(checkbox)))
+        |> expect(not_(to_be_checked(checkbox)))
       end)
     end
 
@@ -30,8 +30,8 @@ defmodule Fluffy.Conformance.PressActionTest do
       with_html(unquote(driver), html, fn session ->
         session
         |> press(first, "Tab")
-        |> expect(not_(focused(first)))
-        |> expect(focused(second))
+        |> expect(not_(to_be_focused(first)))
+        |> expect(to_be_focused(second))
       end)
     end
 
@@ -49,8 +49,8 @@ defmodule Fluffy.Conformance.PressActionTest do
       with_html(unquote(driver), html, fn session ->
         session
         |> press(first, "Tab")
-        |> expect(not_(focused(first)))
-        |> expect(focused(third))
+        |> expect(not_(to_be_focused(first)))
+        |> expect(to_be_focused(third))
       end)
     end
 
@@ -77,7 +77,7 @@ defmodule Fluffy.Conformance.PressActionTest do
     with_html(:playwright, html, fn session ->
       session
       |> press(by_label("Name"), "Enter")
-      |> expect(value(by_label("Result"), "submitted"))
+      |> expect("Result" |> by_label() |> to_have_value("submitted"))
     end)
   end
 
@@ -86,7 +86,7 @@ defmodule Fluffy.Conformance.PressActionTest do
 
     session = press(session, by_label("Name"), "Enter")
     assert %Fluffy.Session{} = session
-    assert expect(session, focused(by_label("Name")))
+    assert expect(session, "Name" |> by_label() |> to_be_focused())
   end
 
   defp with_html(driver, html, fun) do

@@ -21,7 +21,7 @@ defmodule Fluffy.Conformance.StaticHTTPCookieTest do
       session = visit(session, TestHTTPFixtures.path(fixture, "/delete"))
       session = visit(session, TestHTTPFixtures.path(fixture, "/after-delete"))
 
-      expect(session, visible(by_text("Cookie observation")))
+      expect(session, "Cookie observation" |> by_text() |> to_be_visible())
 
       [_set, outside, account, replace, replaced, delete, deleted] =
         TestHTTPFixtures.requests(fixture)

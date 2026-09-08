@@ -25,6 +25,6 @@ defmodule Fluffy.Conformance.LivePopupReadinessTest do
 
     session
     |> switch_page(:ready)
-    |> expect(Expect.visible(by_text("Broadcast: #{message}", exact: true)))
+    |> expect("Broadcast: #{message}" |> by_text(exact: true) |> Expect.to_be_visible())
   end
 end

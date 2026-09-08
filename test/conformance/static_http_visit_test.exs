@@ -25,7 +25,7 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
       session =
         session
         |> visit(TestHTTPFixtures.path(fixture, "/orders?state=open#summary"))
-        |> expect(visible(by_text("Dynamic order page")))
+        |> expect("Dynamic order page" |> by_text() |> to_be_visible())
         |> expect(Page.to_have_url(TestHTTPFixtures.url(fixture, "/orders?state=open#summary")))
         |> expect(Page.to_have_url(~r|/orders\?state=open#summary$|))
         |> expect(not_(Page.to_have_url(~r|/orders\?state=closed|)))
@@ -55,7 +55,7 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
 
       session
       |> visit(TestHTTPFixtures.path(fixture, "/start?from=visit#original"))
-      |> expect(visible(by_text("Redirect destination")))
+      |> expect("Redirect destination" |> by_text() |> to_be_visible())
       |> expect(Page.to_have_url(TestHTTPFixtures.url(fixture, "/final?done=yes#result")))
 
       assert Enum.map(TestHTTPFixtures.requests(fixture), fn request ->
@@ -81,7 +81,7 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
 
       session
       |> visit(TestHTTPFixtures.path(fixture, "/source#details"))
-      |> expect(visible(by_text("Inherited fragment")))
+      |> expect("Inherited fragment" |> by_text() |> to_be_visible())
       |> expect(Page.to_have_url(TestHTTPFixtures.url(fixture, "/destination#details")))
     end
 

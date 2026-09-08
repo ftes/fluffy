@@ -25,7 +25,7 @@ defmodule Fluffy.Conformance.TextLocatorTest do
       session =
         session_for_html(unquote(driver), unquote(html), base_url: Fluffy.TestServer.base_url())
 
-      expect(session, count(by_text(unquote(text), unquote(options)), unquote(expected)))
+      expect(session, unquote(text) |> by_text(unquote(options)) |> to_have_count(unquote(expected)))
     end
   end
 end

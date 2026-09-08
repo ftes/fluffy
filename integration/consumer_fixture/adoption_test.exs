@@ -18,9 +18,9 @@ defmodule FluffyConsumer.AdoptionTest do
 
       session
       |> visit("/")
-      |> expect(count(by_role(:heading, name: "External consumer"), 1))
+      |> expect(by_role(:heading, name: "External consumer") |> to_have_count(1))
       |> click(by_role(:link, name: "Continue"))
-      |> expect(visible(by_text("Consumer complete")))
+      |> expect(by_text("Consumer complete") |> to_be_visible())
       |> expect(Page.to_have_url("/complete"))
     end
 
@@ -45,7 +45,7 @@ defmodule FluffyConsumer.AdoptionTest do
               timeout: handle.timeout
             )
       end)
-      |> expect(visible(by_text("Native result")))
+      |> expect(by_text("Native result") |> to_be_visible())
     end
   end
 end

@@ -81,19 +81,19 @@ transport configuration.
 ## Name collisions
 
 Expectation constructors are deliberately unqualified inside `expect(...)`;
-write `expect(visible(by_text("Potion brewed")))`, not
-`expect(Expect.visible(by_text("Potion brewed")))`. Keep event constructors
+write `expect(by_text("Potion brewed") |> to_be_visible())`, not
+`expect(by_text("Potion brewed") |> Expect.to_be_visible())`. Keep event constructors
 qualified because their names overlap actions and result accessors.
 
 If the application already imports a conflicting helper, keep the collision
 explicit instead of renaming unrelated application code. For example:
 
 ```elixir
-import Fluffy.Expect, except: [count: 2]
+import Fluffy.Expect, except: [to_have_count: 2]
 alias Fluffy.Expect
 
 session
-|> expect(Expect.count(by_role(:row), 3))
+|> expect(by_role(:row) |> Expect.to_have_count(3))
 ```
 
 ## Common rewrites
@@ -110,7 +110,7 @@ PhoenixTest matching differences:
 | `uncheck("Ready to brew")` | `uncheck(by_label("Ready to brew", exact: true))` |
 | `click_button("Brew potion")` | `click(by_role(:button, name: "Brew potion"))` |
 | `click_link("Potions")` | `click(by_role(:link, name: "Potions"))` |
-| `assert_has("#notice")` | `expect(visible(by_css("#notice")))` |
+| `assert_has("#notice")` | `expect(by_css("#notice") |> to_be_visible())` |
 | `assert_path("/potions")` | `expect(Page.to_have_url(path: "/potions"))` |
 | `assert_path("/potions", query_params: params)` | `expect(Page.to_have_url(path: "/potions", query: params))` |
 | `assert_has("title", text: "Potions", exact: true)` | `expect(Page.to_have_title("Potions"))` |
@@ -155,10 +155,10 @@ For assertions, put exactness on the locator rather than the expectation:
 
 ```elixir
 # assert_has("p", text: "Potion brewed", exact: true)
-expect(visible(by_text(by_css("p"), "Potion brewed", exact: true)))
+expect(by_text(by_css("p"), "Potion brewed", exact: true) |> to_be_visible())
 
 # assert_has("p", text: "Potion brewed")
-expect(visible(by_text(by_css("p"), "Potion brewed", [])))
+expect(by_text(by_css("p"), "Potion brewed", []) |> to_be_visible())
 ```
 
 Preserve a source CSS selector unless changing to accessibility semantics is
@@ -190,7 +190,7 @@ session
 |> wait_for(Event.download(:report), fn session ->
   click(session, by_role(:button, name: "Download potion ledger"))
 end)
-|> expect(download_suggested_filename(:report, "potions.csv"))
+|> expect(to_have_download_suggested_filename(:report, "potions.csv"))
 ```
 
 Name new pages instead of mutating a Playwright page/frame id manually:
@@ -202,7 +202,7 @@ session
 end)
 |> switch_page(:secret_chamber)
 |> expect(Page.to_have_opener(:main))
-|> expect(visible(by_role(:heading, name: "Chamber of Secrets")))
+|> expect(by_role(:heading, name: "Chamber of Secrets") |> to_be_visible())
 |> close_page()
 ```
 
@@ -247,7 +247,7 @@ Playwright's zero-based indexing:
 
 ```elixir
 # PhoenixTest: assert_has(".creature", at: 1)
-expect(session, visible(nth(by_css(".creature"), 0)))
+expect(session, nth(by_css(".creature"), 0) |> to_be_visible())
 ```
 
 Do not assume `click_link` always becomes `by_role(:link)`. Explicit ARIA
@@ -263,19 +263,19 @@ Choose whether the old assertion meant DOM absence or user-visible state:
 
 ```elixir
 # The node must not exist.
-session |> expect(count(by_css("#flash"), 0))
+session |> expect(by_css("#flash") |> to_have_count(0))
 
 # The node may exist but must not be visible.
-session |> expect(not_(visible(by_css("#flash"))))
+session |> expect(not_(by_css("#flash") |> to_be_visible()))
 ```
 
-These are deliberately different. `not_(visible(...))` follows Playwright
-visibility; `count(..., 0)` asserts absence. Prefer semantic locators and use
+These are deliberately different. `not_(to_be_visible(...))` follows Playwright
+visibility; `to_have_count(..., 0)` asserts absence. Prefer semantic locators and use
 `filter(has_text: ...)` when migrating a selector-plus-text assertion:
 
 ```elixir
 notice = by_css("#notice") |> filter(has_text: "Potion brewed")
-session |> expect(visible(notice))
+session |> expect(to_be_visible(notice))
 ```
 
 Page title is not an element-title locator. Migrate PhoenixTest's special
@@ -473,7 +473,7 @@ session
 |> unwrap(fn view ->
   Phoenix.LiveViewTest.render_change(view, "validate", %{"name" => "Basilisk"})
 end)
-|> expect(visible(by_text("Basilisk")))
+|> expect(by_text("Basilisk") |> to_be_visible())
 ```
 
 Do not call `assert_patch` or `assert_redirect` inside the callback: Fluffy

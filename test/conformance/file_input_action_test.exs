@@ -37,7 +37,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       |> fill(by_label("Title"), "Release notes")
       |> set_input_files(by_label("Attachment"), file)
       |> click(by_role(:button, name: "Save"))
-      |> expect(visible(by_text("Uploaded")))
+      |> expect("Uploaded" |> by_text() |> to_be_visible())
 
       [_source, submission] = TestHTTPFixtures.requests(fixture)
 
@@ -75,7 +75,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       |> visit(TestHTTPFixtures.path(fixture, "/upload/start"))
       |> set_input_files(by_label("Attachment"), payload)
       |> click(by_role(:button, name: "Save"))
-      |> expect(visible(by_text("Uploaded")))
+      |> expect("Uploaded" |> by_text() |> to_be_visible())
 
       [_source, submission] = TestHTTPFixtures.requests(fixture)
 
@@ -95,7 +95,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       |> visit(TestHTTPFixtures.path(fixture, "/upload/start"))
       |> set_input_files(by_label("Attachment"), payload)
       |> click(by_role(:button, name: "Save"))
-      |> expect(visible(by_text("Uploaded")))
+      |> expect("Uploaded" |> by_text() |> to_be_visible())
 
       [_source, submission] = TestHTTPFixtures.requests(fixture)
       assert submission.body =~ "Content-Type: text/csv\r\n"
@@ -115,7 +115,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       |> visit(TestHTTPFixtures.path(fixture, "/upload/start"))
       |> set_input_files(by_label("Attachment"), payload)
       |> click(by_role(:button, name: "Save"))
-      |> expect(visible(by_text("Uploaded")))
+      |> expect("Uploaded" |> by_text() |> to_be_visible())
 
       [_source, submission] = TestHTTPFixtures.requests(fixture)
       assert submission.body =~ "Content-Type: text/plain\r\n"
@@ -136,7 +136,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       |> visit(TestHTTPFixtures.path(fixture, "/upload/start"))
       |> set_input_files(by_label("Attachment"), payload)
       |> click(by_role(:button, name: "Save"))
-      |> expect(visible(by_text("Uploaded")))
+      |> expect("Uploaded" |> by_text() |> to_be_visible())
 
       [_source, submission] = TestHTTPFixtures.requests(fixture)
       assert submission.body =~ "Content-Type: application/octet-stream\r\n"
@@ -157,7 +157,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       |> visit(TestHTTPFixtures.path(fixture, "/upload/start"))
       |> set_input_files(by_label("Attachment"), payload)
       |> click(by_role(:button, name: "Save"))
-      |> expect(visible(by_text("Uploaded")))
+      |> expect("Uploaded" |> by_text() |> to_be_visible())
 
       [_source, submission] = TestHTTPFixtures.requests(fixture)
       assert submission.body =~ ~s(filename="report%22%0D%0Anext.txt")
@@ -173,7 +173,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       |> visit(TestHTTPFixtures.path(fixture, "/upload/start"))
       |> set_input_files(by_label("Attachments"), files)
       |> click(by_role(:button, name: "Save"))
-      |> expect(visible(by_text("Uploaded")))
+      |> expect("Uploaded" |> by_text() |> to_be_visible())
 
       [_source, submission] = TestHTTPFixtures.requests(fixture)
 
@@ -193,7 +193,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       |> visit(TestHTTPFixtures.path(fixture, "/upload/start"))
       |> set_input_files(by_label("Attachments"), payloads)
       |> click(by_role(:button, name: "Save"))
-      |> expect(visible(by_text("Uploaded")))
+      |> expect("Uploaded" |> by_text() |> to_be_visible())
 
       [_source, submission] = TestHTTPFixtures.requests(fixture)
       first = :binary.match(submission.body, ~s(filename="first.txt"))
@@ -213,7 +213,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       |> set_input_files(by_label("Attachments"), files)
       |> set_input_files(by_label("Attachments"), [])
       |> click(by_role(:button, name: "Save"))
-      |> expect(visible(by_text("Uploaded")))
+      |> expect("Uploaded" |> by_text() |> to_be_visible())
 
       [_source, submission] = TestHTTPFixtures.requests(fixture)
 
@@ -247,7 +247,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       |> set_input_files(by_label("Attachment"), file)
       |> click(by_role(:button, name: "Reset"))
       |> click(by_role(:button, name: "Save"))
-      |> expect(visible(by_text("Uploaded")))
+      |> expect("Uploaded" |> by_text() |> to_be_visible())
 
       [_source, submission] = TestHTTPFixtures.requests(fixture)
       assert submission.body =~ ~s(name="attachment"; filename="")
@@ -275,7 +275,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
 
       session
       |> click(by_role(:button, name: "Save"))
-      |> expect(visible(by_text("Uploaded")))
+      |> expect("Uploaded" |> by_text() |> to_be_visible())
 
       [_source, submission] = TestHTTPFixtures.requests(fixture)
       assert_file_parts_in_order(submission.body, [file])
@@ -293,7 +293,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       |> set_input_files(by_label("Attachment"), file)
       |> mutate_file_control(unquote(driver), :disable)
       |> click(by_role(:button, name: "Save"))
-      |> expect(visible(by_text("Uploaded")))
+      |> expect("Uploaded" |> by_text() |> to_be_visible())
 
       assert_file_omitted(TestHTTPFixtures.requests(fixture), file)
     end
@@ -321,7 +321,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       |> visit(TestHTTPFixtures.path(fixture, "/upload/start"))
       |> set_input_files(by_label("Attachment"), file)
       |> click(by_role(:button, name: "Save"))
-      |> expect(visible(by_text("Uploaded")))
+      |> expect("Uploaded" |> by_text() |> to_be_visible())
 
       assert_file_omitted(TestHTTPFixtures.requests(fixture), file)
     end
@@ -338,7 +338,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       |> set_input_files(by_label("Attachment"), file)
       |> mutate_file_control(unquote(driver), :remove)
       |> click(by_role(:button, name: "Save"))
-      |> expect(visible(by_text("Uploaded")))
+      |> expect("Uploaded" |> by_text() |> to_be_visible())
 
       assert_file_omitted(TestHTTPFixtures.requests(fixture), file)
     end
@@ -355,7 +355,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       |> set_input_files(by_label("Attachment"), file)
       |> mutate_file_control(unquote(driver), :replace)
       |> click(by_role(:button, name: "Save"))
-      |> expect(visible(by_text("Uploaded")))
+      |> expect("Uploaded" |> by_text() |> to_be_visible())
 
       [_source, submission] = TestHTTPFixtures.requests(fixture)
 
@@ -385,7 +385,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
         |> visit(TestHTTPFixtures.path(fixture, "/upload/start"))
         |> set_input_files(by_label("Attachment"), file)
         |> click(by_role(:button, name: "Save"))
-        |> expect(visible(by_text("Redirected upload")))
+        |> expect("Redirected upload" |> by_text() |> to_be_visible())
 
         [_source, submission, redirected] = TestHTTPFixtures.requests(fixture)
         assert submission.method == "POST"

@@ -25,7 +25,7 @@ defmodule Fluffy.Conformance.LiveEventNavigationReadinessTest do
 
       :ok = Phoenix.PubSub.broadcast(Fluffy.TestPubSub, topic, {:redirect_ready, message})
 
-      expect(session, Expect.visible(by_text("Broadcast: #{message}", exact: true)))
+      expect(session, "Broadcast: #{message}" |> by_text(exact: true) |> Expect.to_be_visible())
     end
 
     @tag driver: driver
@@ -37,7 +37,7 @@ defmodule Fluffy.Conformance.LiveEventNavigationReadinessTest do
       |> visit("/live/chamber-map")
       |> click(by_role(:link, name: "Reveal passage", exact: true))
       |> expect(Page.to_have_url("/live/chamber-map?step=patched"))
-      |> expect(Expect.visible(by_text("Map position: patched", exact: true)))
+      |> expect("Map position: patched" |> by_text(exact: true) |> Expect.to_be_visible())
     end
   end
 

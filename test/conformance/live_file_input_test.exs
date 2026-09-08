@@ -20,7 +20,7 @@ defmodule Fluffy.Conformance.LiveFileInputTest do
       |> visit("/live/file-navigation?action=#{URI.encode_www_form(action)}")
       |> set_input_files(by_label("Attachment"), file)
       |> click(by_role(:button, name: "Save"))
-      |> expect(visible(by_text("Uploaded from Live")))
+      |> expect("Uploaded from Live" |> by_text() |> to_be_visible())
 
       [submission] = TestHTTPFixtures.requests(fixture)
 
@@ -40,7 +40,7 @@ defmodule Fluffy.Conformance.LiveFileInputTest do
       |> visit("/live/file-navigation?action=#{URI.encode_www_form(action)}&multiple=true")
       |> set_input_files(by_label("Attachment"), files)
       |> click(by_role(:button, name: "Save"))
-      |> expect(visible(by_text("Uploaded from Live")))
+      |> expect("Uploaded from Live" |> by_text() |> to_be_visible())
 
       [submission] = TestHTTPFixtures.requests(fixture)
 
@@ -62,7 +62,7 @@ defmodule Fluffy.Conformance.LiveFileInputTest do
       |> set_input_files(by_label("Attachment"), fixture_path())
       |> set_input_files(by_label("Attachment"), [])
       |> click(by_role(:button, name: "Save"))
-      |> expect(visible(by_text("Uploaded from Live")))
+      |> expect("Uploaded from Live" |> by_text() |> to_be_visible())
 
       [submission] = TestHTTPFixtures.requests(fixture)
       assert submission.body =~ ~s(name="attachment"; filename="")

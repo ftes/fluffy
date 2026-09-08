@@ -15,8 +15,8 @@ session
 |> wait_for(Event.download(:report), fn session ->
   click(session, by_role(:button, name: "Download potion ledger"))
 end)
-|> expect(download_suggested_filename(:report, "potions.csv"))
-|> expect(download_content_type(:report, "text/csv"))
+|> expect(to_have_download_suggested_filename(:report, "potions.csv"))
+|> expect(to_have_download_content_type(:report, "text/csv"))
 ```
 
 `download(session, :report)` returns `%Fluffy.Download{}` with `filename`,
@@ -33,9 +33,9 @@ end)
 |> switch_page(:secret_chamber)
 |> expect(Page.to_have_opener(:main))
 |> expect(Page.to_have_url(path: "/chambers/secrets"))
-|> expect(visible(by_role(:heading, name: "Secret chamber")))
+|> expect(by_role(:heading, name: "Secret chamber") |> to_be_visible())
 |> close_page()
-|> expect(visible(by_text("Creature index")))
+|> expect(by_text("Creature index") |> to_be_visible())
 ```
 
 Multiple pages and tabs require Playwright. Phoenix follows links and submits
@@ -55,8 +55,8 @@ session
 |> wait_for(Event.navigation(:forbidden_forest), fn session ->
   click(session, by_role(:link, name: "Follow the spiders"))
 end)
-|> expect(navigation_url(:forbidden_forest, forbidden_forest_url))
-|> expect(navigation_status(:forbidden_forest, 200))
+|> expect(to_have_navigation_url(:forbidden_forest, forbidden_forest_url))
+|> expect(to_have_navigation_status(:forbidden_forest, 200))
 ```
 
 ## Dialogs
@@ -69,9 +69,9 @@ session
 |> wait_for(Event.dialog(:release_basilisk, accept: true), fn session ->
   click(session, by_role(:button, name: "Release basilisk"))
 end)
-|> expect(dialog_type(:release_basilisk, :confirm))
-|> expect(dialog_message(:release_basilisk, "Release the basilisk?"))
-|> expect(dialog_action(:release_basilisk, :accept))
+|> expect(to_have_dialog_type(:release_basilisk, :confirm))
+|> expect(to_have_dialog_message(:release_basilisk, "Release the basilisk?"))
+|> expect(to_have_dialog_action(:release_basilisk, :accept))
 ```
 
 Use `:dismiss`, `{:accept, "prompt text"}`, or a decision function receiving
@@ -84,8 +84,8 @@ session
 |> wait_for(Event.response(:potions, ~r{/api/potions}), fn session ->
   click(session, by_role(:button, name: "Refresh potions"))
 end)
-|> expect(response_status(:potions, 200))
-|> expect(response_resource_type(:potions, "fetch"))
+|> expect(to_have_response_status(:potions, 200))
+|> expect(to_have_response_resource_type(:potions, "fetch"))
 ```
 
 Matchers can be an exact URL, regex, or normalized-event predicate. These are

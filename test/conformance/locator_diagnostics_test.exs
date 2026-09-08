@@ -19,7 +19,7 @@ defmodule Fluffy.Conformance.LocatorDiagnosticsTest do
 
       error =
         assert_raise ExUnit.AssertionError, fn ->
-          expect(session, count(by_role(:button, name: "Save"), 1), timeout: 0)
+          expect(session, :button |> by_role(name: "Save") |> to_have_count(1), timeout: 0)
         end
 
       assert error.message =~ "by_role(:button, name: \"Save\")"
@@ -34,7 +34,7 @@ defmodule Fluffy.Conformance.LocatorDiagnosticsTest do
         session_for_html(unquote(driver), "<button>Save</button>", base_url: Fluffy.TestServer.base_url())
 
       assert_raise NimbleOptions.ValidationError, ~r/unknown options.*:eventually/, fn ->
-        expect(session, count(by_role(:button, name: "Save"), 1), eventually: true)
+        expect(session, :button |> by_role(name: "Save") |> to_have_count(1), eventually: true)
       end
     end
   end
@@ -79,6 +79,6 @@ defmodule Fluffy.Conformance.LocatorDiagnosticsTest do
 
     static_session = session_for_html(:static, html)
 
-    expect(static_session, count(locator, 1))
+    expect(static_session, to_have_count(locator, 1))
   end
 end

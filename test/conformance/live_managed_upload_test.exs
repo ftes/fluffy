@@ -20,11 +20,15 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       |> start_test_session()
       |> visit("/live/scrolls")
       |> set_input_files(by_label("Attachment"), file)
-      |> expect(visible(by_text("Validated: true")))
-      |> expect(visible(by_text("Progress: 0")))
+      |> expect("Validated: true" |> by_text() |> to_be_visible())
+      |> expect("Progress: 0" |> by_text() |> to_be_visible())
       |> click(by_role(:button, name: "Save"))
-      |> expect(visible(by_text("Progress: 100")))
-      |> expect(visible(by_text("Consumed: fluffy-upload.txt / Fluffy's first chamber secret, sealed for upload.")))
+      |> expect("Progress: 100" |> by_text() |> to_be_visible())
+      |> expect(
+        "Consumed: fluffy-upload.txt / Fluffy's first chamber secret, sealed for upload."
+        |> by_text()
+        |> to_be_visible()
+      )
     end
 
     test "uploads and consumes one in-memory payload with #{driver}" do
@@ -38,9 +42,9 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       |> start_test_session()
       |> visit("/live/scrolls")
       |> set_input_files(by_label("Attachment"), payload)
-      |> expect(visible(by_text("Validated: true")))
+      |> expect("Validated: true" |> by_text() |> to_be_visible())
       |> click(by_role(:button, name: "Save"))
-      |> expect(visible(by_text("Consumed: generated.txt / Generated in memory.")))
+      |> expect("Consumed: generated.txt / Generated in memory." |> by_text() |> to_be_visible())
     end
 
     test "preserves a clicked submitter through a managed upload with #{driver}" do
@@ -49,8 +53,12 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       |> visit("/live/scrolls")
       |> set_input_files(by_label("Attachment"), fixture_path())
       |> click(by_role(:button, name: "Draft"))
-      |> expect(visible(by_text("Submitted action: draft")))
-      |> expect(visible(by_text("Consumed: fluffy-upload.txt / Fluffy's first chamber secret, sealed for upload.")))
+      |> expect("Submitted action: draft" |> by_text() |> to_be_visible())
+      |> expect(
+        "Consumed: fluffy-upload.txt / Fluffy's first chamber secret, sealed for upload."
+        |> by_text()
+        |> to_be_visible()
+      )
     end
 
     test "follows an ordinary link from a form with a tracked upload with #{driver}" do
@@ -59,7 +67,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       |> visit("/live/scrolls")
       |> set_input_files(by_label("Attachment"), fixture_path())
       |> click(by_role(:link, name: "Leave upload form"))
-      |> expect(visible(by_text("The guardian sleeps")))
+      |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
       |> expect(Page.to_have_url(Fluffy.TestServer.base_url() <> "/chamber?from=upload-link"))
     end
 
@@ -69,7 +77,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       |> visit("/live/scrolls/redirect")
       |> set_input_files(by_label("Attachment"), fixture_path())
       |> click(by_role(:button, name: "Save", exact: true))
-      |> expect(visible(by_text("The guardian sleeps")))
+      |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
       |> expect(Page.to_have_url(Fluffy.TestServer.base_url() <> "/chamber?from=upload-redirect"))
     end
 
@@ -78,7 +86,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       |> start_test_session()
       |> visit("/live/scrolls/progress-redirect")
       |> set_input_files(by_label("Attachment"), fixture_path())
-      |> expect(visible(by_text("The guardian sleeps")))
+      |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
       |> expect(Page.to_have_url(Fluffy.TestServer.base_url() <> "/chamber?from=upload-progress"))
     end
 
@@ -93,7 +101,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       |> visit("/live/nested")
       |> set_input_files(by_label(child, "Child attachment", exact: true), fixture_path())
       |> click(by_role(child, :button, name: "Upload child attachment", exact: true))
-      |> expect(visible(by_text(child, "Child uploaded: fluffy-upload.txt", exact: true)))
+      |> expect(child |> by_text("Child uploaded: fluffy-upload.txt", exact: true) |> to_be_visible())
     end
 
     test "hands a managed upload form to HTTP after phx-trigger-action with #{driver}" do
@@ -102,7 +110,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       |> visit("/live/scrolls/trigger")
       |> set_input_files(by_label("Attachment"), fixture_path())
       |> click(by_role(:button, name: "Save", exact: true))
-      |> expect(visible(by_text("The guardian sleeps")))
+      |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
     end
 
     test "submits the title captured when a managed upload starts with #{driver}" do
@@ -112,7 +120,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       |> fill(by_label("Title"), "Ada")
       |> set_input_files(by_label("Attachment"), fixture_path())
       |> click(by_role(:button, name: "Save", exact: true))
-      |> expect(visible(by_text("Saved title: Ada")))
+      |> expect("Saved title: Ada" |> by_text() |> to_be_visible())
     end
 
     test "auto uploads one local file before submit with #{driver}" do
@@ -122,12 +130,16 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       |> start_test_session()
       |> visit("/live/scrolls/auto")
       |> set_input_files(by_label("Attachment"), file)
-      |> expect(visible(by_text("Validated: true")))
-      |> expect(visible(by_text("Progress: 100")))
-      |> expect(visible(by_text("Completed uploads: 1")))
+      |> expect("Validated: true" |> by_text() |> to_be_visible())
+      |> expect("Progress: 100" |> by_text() |> to_be_visible())
+      |> expect("Completed uploads: 1" |> by_text() |> to_be_visible())
       |> click(by_role(:button, name: "Save"))
-      |> expect(visible(by_text("Consumed: fluffy-upload.txt / Fluffy's first chamber secret, sealed for upload.")))
-      |> expect(visible(by_text("Completed uploads: 1")))
+      |> expect(
+        "Consumed: fluffy-upload.txt / Fluffy's first chamber secret, sealed for upload."
+        |> by_text()
+        |> to_be_visible()
+      )
+      |> expect("Completed uploads: 1" |> by_text() |> to_be_visible())
     end
 
     test "auto uploads two selected files before submit with #{driver}" do
@@ -135,13 +147,19 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       |> start_test_session()
       |> visit("/live/scrolls/auto-multiple")
       |> set_input_files(by_label("Attachment"), [fixture_path(), second_fixture_path()])
-      |> expect(visible(by_text("Completed uploads: 2")))
+      |> expect("Completed uploads: 2" |> by_text() |> to_be_visible())
       |> click(by_role(:button, name: "Save"))
-      |> expect(visible(by_text("Consumed: fluffy-upload.txt / Fluffy's first chamber secret, sealed for upload.")))
       |> expect(
-        visible(by_text("Consumed: fluffy-upload-second.txt / Fluffy's second chamber secret, sealed for upload."))
+        "Consumed: fluffy-upload.txt / Fluffy's first chamber secret, sealed for upload."
+        |> by_text()
+        |> to_be_visible()
       )
-      |> expect(visible(by_text("Completed uploads: 2")))
+      |> expect(
+        "Consumed: fluffy-upload-second.txt / Fluffy's second chamber secret, sealed for upload."
+        |> by_text()
+        |> to_be_visible()
+      )
+      |> expect("Completed uploads: 2" |> by_text() |> to_be_visible())
     end
 
     test "auto uploads files selected in separate changes with #{driver}" do
@@ -149,13 +167,19 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       |> start_test_session()
       |> visit("/live/scrolls/auto-multiple")
       |> set_input_files(by_label("Attachment"), fixture_path())
-      |> expect(visible(by_text("Completed uploads: 1")))
+      |> expect("Completed uploads: 1" |> by_text() |> to_be_visible())
       |> set_input_files(by_label("Attachment"), second_fixture_path())
-      |> expect(visible(by_text("Completed uploads: 2")))
+      |> expect("Completed uploads: 2" |> by_text() |> to_be_visible())
       |> click(by_role(:button, name: "Save"))
-      |> expect(visible(by_text("Consumed: fluffy-upload.txt / Fluffy's first chamber secret, sealed for upload.")))
       |> expect(
-        visible(by_text("Consumed: fluffy-upload-second.txt / Fluffy's second chamber secret, sealed for upload."))
+        "Consumed: fluffy-upload.txt / Fluffy's first chamber secret, sealed for upload."
+        |> by_text()
+        |> to_be_visible()
+      )
+      |> expect(
+        "Consumed: fluffy-upload-second.txt / Fluffy's second chamber secret, sealed for upload."
+        |> by_text()
+        |> to_be_visible()
       )
     end
 
@@ -166,13 +190,19 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       |> start_test_session()
       |> visit("/live/scrolls/multiple")
       |> set_input_files(by_label("Attachment"), files)
-      |> expect(visible(by_text("Validated: true")))
-      |> expect(visible(by_text("Pending uploads: 2")))
+      |> expect("Validated: true" |> by_text() |> to_be_visible())
+      |> expect("Pending uploads: 2" |> by_text() |> to_be_visible())
       |> click(by_role(:button, name: "Save"))
-      |> expect(visible(by_text("Completed uploads: 2")))
-      |> expect(visible(by_text("Consumed: fluffy-upload.txt / Fluffy's first chamber secret, sealed for upload.")))
+      |> expect("Completed uploads: 2" |> by_text() |> to_be_visible())
       |> expect(
-        visible(by_text("Consumed: fluffy-upload-second.txt / Fluffy's second chamber secret, sealed for upload."))
+        "Consumed: fluffy-upload.txt / Fluffy's first chamber secret, sealed for upload."
+        |> by_text()
+        |> to_be_visible()
+      )
+      |> expect(
+        "Consumed: fluffy-upload-second.txt / Fluffy's second chamber secret, sealed for upload."
+        |> by_text()
+        |> to_be_visible()
       )
     end
 
@@ -183,8 +213,8 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       |> start_test_session()
       |> visit("/live/scrolls/multiple")
       |> set_input_files(by_label("Attachment"), files ++ [fixture_path()])
-      |> expect(visible(by_text("Upload errors: 1")))
-      |> expect(visible(by_text("Completed uploads: 0")))
+      |> expect("Upload errors: 1" |> by_text() |> to_be_visible())
+      |> expect("Completed uploads: 0" |> by_text() |> to_be_visible())
     end
 
     test "accumulates files selected in separate changes with #{driver}" do
@@ -192,14 +222,20 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       |> start_test_session()
       |> visit("/live/scrolls/multiple")
       |> set_input_files(by_label("Attachment"), fixture_path())
-      |> expect(visible(by_text("Pending uploads: 1")))
+      |> expect("Pending uploads: 1" |> by_text() |> to_be_visible())
       |> set_input_files(by_label("Attachment"), second_fixture_path())
-      |> expect(visible(by_text("Pending uploads: 2")))
+      |> expect("Pending uploads: 2" |> by_text() |> to_be_visible())
       |> click(by_role(:button, name: "Save"))
-      |> expect(visible(by_text("Completed uploads: 2")))
-      |> expect(visible(by_text("Consumed: fluffy-upload.txt / Fluffy's first chamber secret, sealed for upload.")))
+      |> expect("Completed uploads: 2" |> by_text() |> to_be_visible())
       |> expect(
-        visible(by_text("Consumed: fluffy-upload-second.txt / Fluffy's second chamber secret, sealed for upload."))
+        "Consumed: fluffy-upload.txt / Fluffy's first chamber secret, sealed for upload."
+        |> by_text()
+        |> to_be_visible()
+      )
+      |> expect(
+        "Consumed: fluffy-upload-second.txt / Fluffy's second chamber secret, sealed for upload."
+        |> by_text()
+        |> to_be_visible()
       )
     end
 
@@ -208,9 +244,9 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       |> start_test_session()
       |> visit("/live/scrolls/remove-on-validate")
       |> set_input_files(by_label("Attachment"), fixture_path())
-      |> expect(count(by_css("#upload-form"), 0))
-      |> expect(visible(by_text("Validated: true")))
-      |> expect(visible(by_text("Completed uploads: 0")))
+      |> expect("#upload-form" |> by_css() |> to_have_count(0))
+      |> expect("Validated: true" |> by_text() |> to_be_visible())
+      |> expect("Completed uploads: 0" |> by_text() |> to_be_visible())
     end
 
     test "rejects one invalid-extension file with #{driver}" do
@@ -218,8 +254,8 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       |> start_test_session()
       |> visit("/live/scrolls")
       |> set_input_files(by_label("Attachment"), invalid_fixture_path())
-      |> expect(visible(by_text("Upload errors: 1")))
-      |> expect(visible(by_text("Completed uploads: 0")))
+      |> expect("Upload errors: 1" |> by_text() |> to_be_visible())
+      |> expect("Completed uploads: 0" |> by_text() |> to_be_visible())
     end
 
     test "valid selection replaces rejected selection with #{driver}" do
@@ -227,12 +263,16 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       |> start_test_session()
       |> visit("/live/scrolls")
       |> set_input_files(by_label("Attachment"), invalid_fixture_path())
-      |> expect(visible(by_text("Upload errors: 1")))
+      |> expect("Upload errors: 1" |> by_text() |> to_be_visible())
       |> set_input_files(by_label("Attachment"), fixture_path())
-      |> expect(visible(by_text("Upload errors: 0")))
+      |> expect("Upload errors: 0" |> by_text() |> to_be_visible())
       |> click(by_role(:button, name: "Save"))
-      |> expect(visible(by_text("Completed uploads: 1")))
-      |> expect(visible(by_text("Consumed: fluffy-upload.txt / Fluffy's first chamber secret, sealed for upload.")))
+      |> expect("Completed uploads: 1" |> by_text() |> to_be_visible())
+      |> expect(
+        "Consumed: fluffy-upload.txt / Fluffy's first chamber secret, sealed for upload."
+        |> by_text()
+        |> to_be_visible()
+      )
     end
 
     test "rejects one oversized file with #{driver}" do
@@ -240,8 +280,8 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       |> start_test_session()
       |> visit("/live/scrolls/oversized")
       |> set_input_files(by_label("Attachment"), fixture_path())
-      |> expect(visible(by_text("Upload errors: 1")))
-      |> expect(visible(by_text("Completed uploads: 0")))
+      |> expect("Upload errors: 1" |> by_text() |> to_be_visible())
+      |> expect("Completed uploads: 0" |> by_text() |> to_be_visible())
     end
 
     test "rejects each oversized file in a multi-entry selection with #{driver}" do
@@ -249,8 +289,8 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       |> start_test_session()
       |> visit("/live/scrolls/multiple-oversized")
       |> set_input_files(by_label("Attachment"), [fixture_path(), second_fixture_path()])
-      |> expect(visible(by_text("Upload errors: 2")))
-      |> expect(visible(by_text("Completed uploads: 0")))
+      |> expect("Upload errors: 2" |> by_text() |> to_be_visible())
+      |> expect("Completed uploads: 0" |> by_text() |> to_be_visible())
     end
 
     test "uploads the valid entry after cancelling an invalid sibling with #{driver}" do
@@ -258,13 +298,17 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       |> start_test_session()
       |> visit("/live/scrolls/multiple")
       |> set_input_files(by_label("Attachment"), [fixture_path(), invalid_fixture_path()])
-      |> expect(visible(by_text("Upload errors: 1")))
-      |> expect(visible(by_text("Pending uploads: 2")))
+      |> expect("Upload errors: 1" |> by_text() |> to_be_visible())
+      |> expect("Pending uploads: 2" |> by_text() |> to_be_visible())
       |> click(:button |> by_role(name: "Cancel upload", exact: true) |> nth(1))
-      |> expect(visible(by_text("Pending uploads: 1")))
+      |> expect("Pending uploads: 1" |> by_text() |> to_be_visible())
       |> click(by_role(:button, name: "Save"))
-      |> expect(visible(by_text("Completed uploads: 1")))
-      |> expect(visible(by_text("Consumed: fluffy-upload.txt / Fluffy's first chamber secret, sealed for upload.")))
+      |> expect("Completed uploads: 1" |> by_text() |> to_be_visible())
+      |> expect(
+        "Consumed: fluffy-upload.txt / Fluffy's first chamber secret, sealed for upload."
+        |> by_text()
+        |> to_be_visible()
+      )
     end
 
     test "leaves a mixed selection pending when submitted before its invalid entry is cancelled with #{driver}" do
@@ -272,10 +316,10 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       |> start_test_session()
       |> visit("/live/scrolls/multiple")
       |> set_input_files(by_label("Attachment"), [fixture_path(), invalid_fixture_path()])
-      |> expect(visible(by_text("Upload errors: 1")))
+      |> expect("Upload errors: 1" |> by_text() |> to_be_visible())
       |> click(by_role(:button, name: "Save"))
-      |> expect(visible(by_text("Pending uploads: 2")))
-      |> expect(visible(by_text("Completed uploads: 0")))
+      |> expect("Pending uploads: 2" |> by_text() |> to_be_visible())
+      |> expect("Completed uploads: 0" |> by_text() |> to_be_visible())
     end
 
     test "cancels one selected upload before submit with #{driver}" do
@@ -283,12 +327,12 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       |> start_test_session()
       |> visit("/live/scrolls")
       |> set_input_files(by_label("Attachment"), fixture_path())
-      |> expect(visible(by_text("Pending uploads: 1")))
+      |> expect("Pending uploads: 1" |> by_text() |> to_be_visible())
       |> click(by_role(:button, name: "Cancel upload", exact: true))
-      |> expect(visible(by_text("Pending uploads: 0")))
+      |> expect("Pending uploads: 0" |> by_text() |> to_be_visible())
       |> click(by_role(:button, name: "Save"))
-      |> expect(visible(by_text("Submitted without input: true")))
-      |> expect(visible(by_text("Completed uploads: 0")))
+      |> expect("Submitted without input: true" |> by_text() |> to_be_visible())
+      |> expect("Completed uploads: 0" |> by_text() |> to_be_visible())
     end
 
     test "clearing the file input does not cancel its pending LiveView entry with #{driver}" do
@@ -296,12 +340,16 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       |> start_test_session()
       |> visit("/live/scrolls")
       |> set_input_files(by_label("Attachment"), fixture_path())
-      |> expect(visible(by_text("Pending uploads: 1")))
+      |> expect("Pending uploads: 1" |> by_text() |> to_be_visible())
       |> set_input_files(by_label("Attachment"), [])
-      |> expect(visible(by_text("Pending uploads: 1")))
+      |> expect("Pending uploads: 1" |> by_text() |> to_be_visible())
       |> click(by_role(:button, name: "Save"))
-      |> expect(visible(by_text("Completed uploads: 1")))
-      |> expect(visible(by_text("Consumed: fluffy-upload.txt / Fluffy's first chamber secret, sealed for upload.")))
+      |> expect("Completed uploads: 1" |> by_text() |> to_be_visible())
+      |> expect(
+        "Consumed: fluffy-upload.txt / Fluffy's first chamber secret, sealed for upload."
+        |> by_text()
+        |> to_be_visible()
+      )
     end
 
     test "cancels one of two selected uploads without discarding the other with #{driver}" do
@@ -309,15 +357,17 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       |> start_test_session()
       |> visit("/live/scrolls/multiple")
       |> set_input_files(by_label("Attachment"), [fixture_path(), second_fixture_path()])
-      |> expect(visible(by_text("Pending uploads: 2")))
+      |> expect("Pending uploads: 2" |> by_text() |> to_be_visible())
       |> click(:button |> by_role(name: "Cancel upload", exact: true) |> nth(0))
-      |> expect(visible(by_text("Pending uploads: 1")))
+      |> expect("Pending uploads: 1" |> by_text() |> to_be_visible())
       |> click(by_role(:button, name: "Save"))
-      |> expect(visible(by_text("Completed uploads: 1")))
+      |> expect("Completed uploads: 1" |> by_text() |> to_be_visible())
       |> expect(
-        visible(by_text("Consumed: fluffy-upload-second.txt / Fluffy's second chamber secret, sealed for upload."))
+        "Consumed: fluffy-upload-second.txt / Fluffy's second chamber secret, sealed for upload."
+        |> by_text()
+        |> to_be_visible()
       )
-      |> expect(not_(visible(by_text("Consumed: fluffy-upload.txt"))))
+      |> expect("Consumed: fluffy-upload.txt" |> by_text() |> to_be_visible() |> not_())
     end
 
     for mode <- [:remove, :replace] do
@@ -331,8 +381,8 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
         |> set_input_files(by_label("Attachment"), file)
         |> click(by_role(:button, name: input_mutation_label(unquote(mode))))
         |> click(by_role(:button, name: "Save"))
-        |> expect(visible(by_text("Submitted without input: true")))
-        |> expect(visible(by_text("Completed uploads: 0")))
+        |> expect("Submitted without input: true" |> by_text() |> to_be_visible())
+        |> expect("Completed uploads: 0" |> by_text() |> to_be_visible())
       end
     end
   end
@@ -376,7 +426,11 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
 
     session
     |> click(by_role(:button, name: "Save"))
-    |> expect(visible(by_text("Consumed: fluffy-upload.txt / Fluffy's first chamber secret, sealed for upload.")))
+    |> expect(
+      "Consumed: fluffy-upload.txt / Fluffy's first chamber secret, sealed for upload."
+      |> by_text()
+      |> to_be_visible()
+    )
 
     assert upload_clients(session) == []
     refute Process.alive?(upload_client)
@@ -393,7 +447,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
 
     session
     |> click(by_role(:button, name: "Save", exact: true))
-    |> expect(visible(by_text("The guardian sleeps")))
+    |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
 
     refute Process.alive?(upload_client)
   end
@@ -410,7 +464,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
     session =
       session
       |> click(by_role(:button, name: "Cancel upload", exact: true))
-      |> expect(visible(by_text("Pending uploads: 0")))
+      |> expect("Pending uploads: 0" |> by_text() |> to_be_visible())
 
     assert upload_clients(session) == []
     refute Process.alive?(upload_client)
@@ -429,14 +483,14 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
     session =
       session
       |> click(:button |> by_role(name: "Cancel upload", exact: true) |> nth(0))
-      |> expect(visible(by_text("Pending uploads: 1")))
+      |> expect("Pending uploads: 1" |> by_text() |> to_be_visible())
 
     assert upload_clients(session) == [upload_client]
     assert Process.alive?(upload_client)
 
     session
     |> click(by_role(:button, name: "Save"))
-    |> expect(visible(by_text("Completed uploads: 1")))
+    |> expect("Completed uploads: 1" |> by_text() |> to_be_visible())
 
     assert upload_clients(session) == []
     refute Process.alive?(upload_client)
@@ -456,7 +510,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
 
     session
     |> click(by_role(:button, name: "Save"))
-    |> expect(visible(by_text("Completed uploads: 2")))
+    |> expect("Completed uploads: 2" |> by_text() |> to_be_visible())
 
     assert upload_clients(session) == []
     refute Process.alive?(first_client)
@@ -489,7 +543,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
     scope = TestScope.current()
 
     assert_raise ExUnit.AssertionError, fn ->
-      expect(session, visible(by_text("not rendered")), timeout: 0)
+      expect(session, "not rendered" |> by_text() |> to_be_visible(), timeout: 0)
     end
 
     trap_exits? = Process.flag(:trap_exit, true)

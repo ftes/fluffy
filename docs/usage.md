@@ -36,7 +36,7 @@ defmodule MyAppWeb.ChamberAccessTest do
     |> fill(by_label("Student"), "Hermione Granger")
     |> fill(by_label("Password"), "parseltongue")
     |> click(by_role(:button, name: "Open chamber"))
-    |> expect(visible(by_text("The chamber is open")))
+    |> expect(by_text("The chamber is open") |> to_be_visible())
     |> expect(Page.to_have_url("/chambers/secrets"))
   end
 end
@@ -117,7 +117,7 @@ test "updates the preview rendered by a JavaScript hook" do
   start_app_session(:playwright)
   |> visit("/creatures/new")
   |> fill(by_label("Name"), "Basilisk")
-  |> expect(visible(by_text("Preview: Basilisk")))
+  |> expect(by_text("Preview: Basilisk") |> to_be_visible())
 end
 ```
 
@@ -146,7 +146,7 @@ Prefer locators that describe the interface as a user experiences it:
 session
 |> fill(by_label("Creature name"), "Basilisk")
 |> click(by_role(:button, name: "Register"))
-|> expect(visible(by_text("Creature registered")))
+|> expect(by_text("Creature registered") |> to_be_visible())
 ```
 
 Locators are values, so they can be scoped and reused:
@@ -165,7 +165,7 @@ Refine a locator with `filter`, `first`, `last`, or zero-based `nth`.
 
 Single-target actions are strict: if a locator matches more than one element,
 Fluffy reports the ambiguity instead of choosing for you. Narrow the
-locator, or use `expect(count(locator, n))` when multiple matches are
+locator, or use `expect(to_have_count(locator, n))` when multiple matches are
 the intended assertion.
 
 ## Actions and expectations
@@ -179,20 +179,20 @@ session
 |> check(by_label("Flute ready"))
 |> select_option(by_label("Status"), "Asleep")
 |> click(by_role(:button, name: "Save creature"))
-|> expect(enabled(by_role(:button, name: "Save creature")))
-|> expect(disabled(by_label("Species")))
-|> expect(value(by_label("Keeper"), "Rubeus Hagrid"))
-|> expect(editable(by_label("Keeper")))
-|> expect(checked(by_label("Flute ready")))
-|> expect(visible(by_text("Creature saved")))
+|> expect(by_role(:button, name: "Save creature") |> to_be_enabled())
+|> expect(by_label("Species") |> to_be_disabled())
+|> expect(by_label("Keeper") |> to_have_value("Rubeus Hagrid"))
+|> expect(by_label("Keeper") |> to_be_editable())
+|> expect(by_label("Flute ready") |> to_be_checked())
+|> expect(by_text("Creature saved") |> to_be_visible())
 ```
 
-Use `checked(locator, checked: false)` for an unchecked control. The
+Use `to_be_checked(locator, checked: false)` for an unchecked control. The
 browser-owned indeterminate state is Playwright-only:
 
 ```elixir
 session
-|> expect(checked(by_label("All ingredients"), indeterminate: true))
+|> expect(by_label("All ingredients") |> to_be_checked(indeterminate: true))
 ```
 
 Static and LiveView raise `Fluffy.CapabilityError` for indeterminate state
@@ -263,9 +263,9 @@ Use `reload/1` to reload the active document:
 ```elixir
 session
 |> visit("/chambers/secrets")
-|> expect(visible(by_role(:heading, name: "Chamber of Secrets")))
+|> expect(by_role(:heading, name: "Chamber of Secrets") |> to_be_visible())
 |> reload()
-|> expect(visible(by_role(:heading, name: "Chamber of Secrets")))
+|> expect(by_role(:heading, name: "Chamber of Secrets") |> to_be_visible())
 |> expect(Page.to_have_url("/chambers/secrets"))
 ```
 
@@ -326,7 +326,7 @@ Save an explicit PNG while retaining the pipeline with:
 ```elixir
 session
 |> Playwright.screenshot("tmp/screenshots/polyjuice.png", full_page: true)
-|> expect(visible(by_text("Potion ready")))
+|> expect(by_text("Potion ready") |> to_be_visible())
 ```
 
 The configured Playwright console logger reports browser console messages and
@@ -351,7 +351,7 @@ session
 |> unwrap(fn %Phoenix.LiveViewTest.View{} = view ->
   Phoenix.LiveViewTest.render_hook(view, "open-chamber", %{"phrase" => "open"})
 end)
-|> expect(visible(by_text("Chamber opened")))
+|> expect(by_text("Chamber opened") |> to_be_visible())
 ```
 
 The callback receives the current `%Plug.Conn{}` on a Static page, a

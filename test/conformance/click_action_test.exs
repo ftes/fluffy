@@ -13,7 +13,7 @@ defmodule Fluffy.Conformance.ClickActionTest do
       with_html(unquote(driver), "<button>Save</button>", fn session ->
         session
         |> click(by_role(:button, name: "Save"))
-        |> expect(focused(by_role(:button, name: "Save")))
+        |> expect(:button |> by_role(name: "Save") |> to_be_focused())
       end)
     end
 
@@ -24,11 +24,11 @@ defmodule Fluffy.Conformance.ClickActionTest do
 
       with_html(unquote(driver), html, fn session ->
         session
-        |> expect(not_(checked(checkbox)))
+        |> expect(not_(to_be_checked(checkbox)))
         |> click(checkbox)
-        |> expect(checked(checkbox))
+        |> expect(to_be_checked(checkbox))
         |> click(checkbox)
-        |> expect(not_(checked(checkbox)))
+        |> expect(not_(to_be_checked(checkbox)))
       end)
     end
 
@@ -69,7 +69,7 @@ defmodule Fluffy.Conformance.ClickActionTest do
 
     session
     |> click(by_css("button"))
-    |> expect(focused(by_css("button")))
+    |> expect("button" |> by_css() |> to_be_focused())
   end
 
   test "Static ignores data-confirm before its structural click action" do
@@ -77,7 +77,7 @@ defmodule Fluffy.Conformance.ClickActionTest do
 
     session
     |> click(by_role(:button, name: "Confirm", exact: true))
-    |> expect(focused(by_role(:button, name: "Confirm", exact: true)))
+    |> expect(:button |> by_role(name: "Confirm", exact: true) |> to_be_focused())
   end
 
   for driver <- [:phoenix, :playwright] do
@@ -92,7 +92,7 @@ defmodule Fluffy.Conformance.ClickActionTest do
       session
       |> visit("/actions/click")
       |> click(by_role(:link, name: "Enter the chamber"))
-      |> expect(visible(by_text("The guardian sleeps")))
+      |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
     end
   end
 

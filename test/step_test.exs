@@ -22,7 +22,7 @@ defmodule Fluffy.StepTest do
           click(session, by_role(:button, name: "Play the flute"))
         end)
 
-      expect(session, visible(by_text("Sleeping heads: 1")))
+      expect(session, "Sleeping heads: 1" |> by_text() |> to_be_visible())
     end
   end
 

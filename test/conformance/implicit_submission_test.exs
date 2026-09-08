@@ -35,7 +35,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
         |> visit(TestHTTPFixtures.path(fixture, "/start"))
         |> fill(by_label("Name"), "Ada")
         |> press(by_label("Name"), "Enter")
-        |> expect(visible(by_text("Submitted")))
+        |> expect("Submitted" |> by_text() |> to_be_visible())
         |> expect(Page.to_have_status(201))
 
       assert Fluffy.Session.current_page(session).url == destination
@@ -65,7 +65,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
       |> start_test_session()
       |> visit(TestHTTPFixtures.path(fixture, "/start"))
       |> press(by_label("Name"), "Enter")
-      |> expect(visible(by_text("Submitted invalid type")))
+      |> expect("Submitted invalid type" |> by_text() |> to_be_visible())
 
       [_source, submission] = TestHTTPFixtures.requests(fixture)
       assert submission.body == "name=Ada"
@@ -79,8 +79,8 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
       |> visit("/live/potions")
       |> fill(by_label("First"), "Ada")
       |> press(by_label("First"), "Enter")
-      |> expect(visible(by_text("Saved commit: save")))
-      |> expect(visible(by_text("Last first: Ada")))
+      |> expect("Saved commit: save" |> by_text() |> to_be_visible())
+      |> expect("Last first: Ada" |> by_text() |> to_be_visible())
     end
 
     @tag driver: driver
@@ -91,9 +91,9 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
       |> visit("/live/potions")
       |> fill(by_label("Debounced", exact: true), "before Enter")
       |> press(by_label("First"), "Enter")
-      |> expect(visible(by_text("Last debounced: before Enter")))
-      |> expect(visible(by_text("Event targets: profile/debounced")))
-      |> expect(visible(by_text("Saved commit: save")))
+      |> expect("Last debounced: before Enter" |> by_text() |> to_be_visible())
+      |> expect("Event targets: profile/debounced" |> by_text() |> to_be_visible())
+      |> expect("Saved commit: save" |> by_text() |> to_be_visible())
     end
 
     @tag driver: driver
@@ -119,7 +119,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
       |> visit(TestHTTPFixtures.path(fixture, "/start"))
       |> fill(by_label("Name"), "Ada")
       |> press(by_label("Name"), "Enter")
-      |> expect(visible(by_text("Submitted")))
+      |> expect("Submitted" |> by_text() |> to_be_visible())
 
       [_source, submission] = TestHTTPFixtures.requests(fixture)
       assert submission.body == "name=Ada"
@@ -147,7 +147,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
       session
       |> visit(TestHTTPFixtures.path(fixture, "/start"))
       |> press(by_label("Name"), "Enter")
-      |> expect(visible(by_text("Still here")))
+      |> expect("Still here" |> by_text() |> to_be_visible())
 
       assert [_source] = TestHTTPFixtures.requests(fixture)
     end
@@ -177,7 +177,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
       |> visit(TestHTTPFixtures.path(fixture, "/start"))
       |> fill(by_label("Name"), "Ada")
       |> press(by_label("Name"), "Enter")
-      |> expect(visible(by_text("Submitted")))
+      |> expect("Submitted" |> by_text() |> to_be_visible())
 
       [_source, submission] = TestHTTPFixtures.requests(fixture)
       assert submission.body == "commit=external&name=Ada"
@@ -204,7 +204,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
       session
       |> visit(TestHTTPFixtures.path(fixture, "/start"))
       |> press(by_label("First"), "Enter")
-      |> expect(visible(by_text("Still here")))
+      |> expect("Still here" |> by_text() |> to_be_visible())
 
       assert [_source] = TestHTTPFixtures.requests(fixture)
     end
@@ -228,7 +228,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
       session
       |> visit(TestHTTPFixtures.path(fixture, "/start"))
       |> press(by_label("Notes"), "Enter")
-      |> expect(visible(by_text("Still here")))
+      |> expect("Still here" |> by_text() |> to_be_visible())
 
       assert [_source] = TestHTTPFixtures.requests(fixture)
     end
@@ -246,7 +246,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
       fn session ->
         session
         |> press(by_label("Name"), "Enter")
-        |> expect(value(by_label("Result"), "none"))
+        |> expect("Result" |> by_label() |> to_have_value("none"))
       end
     )
   end
@@ -265,7 +265,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
       fn session ->
         session
         |> press(by_label("Name"), "Enter")
-        |> expect(value(by_label("Result"), "first"))
+        |> expect("Result" |> by_label() |> to_have_value("first"))
       end
     )
   end
@@ -284,7 +284,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
       fn session ->
         session
         |> press(by_label("Name"), "Enter")
-        |> expect(value(by_label("Result"), "waiting"))
+        |> expect("Result" |> by_label() |> to_have_value("waiting"))
       end
     )
   end
@@ -303,7 +303,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
       fn session ->
         session
         |> press(by_label("Name"), "Enter")
-        |> expect(value(by_label("Result"), "external"))
+        |> expect("Result" |> by_label() |> to_have_value("external"))
       end
     )
   end
@@ -321,7 +321,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
       fn session ->
         session
         |> press(by_label("First"), "Enter")
-        |> expect(value(by_label("Result"), "waiting"))
+        |> expect("Result" |> by_label() |> to_have_value("waiting"))
       end
     )
   end
@@ -339,7 +339,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
       fn session ->
         session
         |> press(by_label("Notes"), "Enter")
-        |> expect(value(by_label("Result"), "waiting"))
+        |> expect("Result" |> by_label() |> to_have_value("waiting"))
       end
     )
   end
@@ -357,7 +357,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
       fn session ->
         session
         |> press(by_label("Name"), "Enter")
-        |> expect(value(by_label("Result"), "waiting"))
+        |> expect("Result" |> by_label() |> to_have_value("waiting"))
       end
     )
   end
@@ -375,7 +375,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
       fn session ->
         session
         |> press(by_label("Name"), "Enter")
-        |> expect(value(by_label("Result"), "waiting"))
+        |> expect("Result" |> by_label() |> to_have_value("waiting"))
       end
     )
   end
@@ -409,7 +409,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
     |> start_test_session()
     |> visit(TestHTTPFixtures.path(fixture, "/start"))
     |> press(by_label("Name"), "Enter")
-    |> expect(visible(by_text("Submitted")))
+    |> expect("Submitted" |> by_text() |> to_be_visible())
   end
 
   defp with_html(html, fun) do

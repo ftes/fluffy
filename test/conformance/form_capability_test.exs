@@ -24,7 +24,7 @@ defmodule Fluffy.Conformance.FormCapabilityTest do
     )
     |> visit(TestHTTPFixtures.path(fixture, "/start"))
     |> click(by_role(:button, name: "Save"))
-    |> expect(visible(by_text("Submitted")))
+    |> expect("Submitted" |> by_text() |> to_be_visible())
   end
 
   test "Live bypasses native constraint validation and submits structurally" do
@@ -35,7 +35,7 @@ defmodule Fluffy.Conformance.FormCapabilityTest do
     )
     |> visit("/live/potions")
     |> click(by_role(:button, name: "Seal required potion"))
-    |> expect(visible(by_text("Constrained form submitted")))
+    |> expect("Constrained form submitted" |> by_text() |> to_be_visible())
   end
 
   @tag driver: :playwright
@@ -54,10 +54,10 @@ defmodule Fluffy.Conformance.FormCapabilityTest do
 
     session
     |> submit(by_css("#profile"))
-    |> expect(value(by_label("Result"), "waiting"))
+    |> expect("Result" |> by_label() |> to_have_value("waiting"))
     |> fill(by_label("Email"), "person@example.test")
     |> submit(by_css("#profile"))
-    |> expect(value(by_label("Result"), "submitted"))
+    |> expect("Result" |> by_label() |> to_have_value("submitted"))
   end
 
   test "Static names computed dirname submission as unsupported" do

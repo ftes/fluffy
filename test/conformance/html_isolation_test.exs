@@ -16,8 +16,8 @@ defmodule Fluffy.Conformance.HTMLIsolationTest do
 
           try do
             session
-            |> expect(count(by_role(:button, name: present), 1))
-            |> expect(count(by_role(:button, name: absent), 0))
+            |> expect(:button |> by_role(name: present) |> to_have_count(1))
+            |> expect(:button |> by_role(name: absent) |> to_have_count(0))
           after
             Fluffy.Backend.close_session(session)
           end

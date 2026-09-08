@@ -5,7 +5,7 @@
 ```elixir
 defp deps do
   [
-    {:fluffy, "~> 0.1", only: :test}
+    {:fluffy, "~> 0.2.0", only: :test}
   ]
 end
 ```

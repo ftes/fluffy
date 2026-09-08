@@ -15,7 +15,7 @@ defmodule Fluffy.Conformance.ComposedLocatorTest do
 
       locator = "#billing" |> by_css() |> by_role(:button, name: "Save")
 
-      with_html(driver, html, fn session -> expect(session, count(locator, 1)) end)
+      with_html(driver, html, fn session -> expect(session, to_have_count(locator, 1)) end)
     end
 
     @tag driver: driver
@@ -23,7 +23,7 @@ defmodule Fluffy.Conformance.ComposedLocatorTest do
       html = "<section id=empty></section><button>Outside</button>"
       locator = "#empty" |> by_css() |> by_role(:button, name: "Outside")
 
-      with_html(driver, html, fn session -> expect(session, count(locator, 0)) end)
+      with_html(driver, html, fn session -> expect(session, to_have_count(locator, 0)) end)
     end
 
     @tag driver: driver
@@ -31,7 +31,7 @@ defmodule Fluffy.Conformance.ComposedLocatorTest do
       html = "<ul><li>Product 1</li><li>Product 2</li></ul>"
       locator = "li" |> by_css() |> filter(has_text: "Product 2")
 
-      with_html(driver, html, fn session -> expect(session, count(locator, 1)) end)
+      with_html(driver, html, fn session -> expect(session, to_have_count(locator, 1)) end)
     end
 
     @tag driver: driver
@@ -43,7 +43,7 @@ defmodule Fluffy.Conformance.ComposedLocatorTest do
 
       locator = "article" |> by_css() |> filter(has: by_role(:button, name: "Buy"))
 
-      with_html(driver, html, fn session -> expect(session, count(locator, 1)) end)
+      with_html(driver, html, fn session -> expect(session, to_have_count(locator, 1)) end)
     end
 
     @tag driver: driver
@@ -52,10 +52,10 @@ defmodule Fluffy.Conformance.ComposedLocatorTest do
 
       with_html(driver, html, fn session ->
         session
-        |> expect("li" |> by_css() |> first() |> by_text("Zero", exact: true) |> count(1))
-        |> expect("li" |> by_css() |> nth(1) |> by_text("One", exact: true) |> count(1))
-        |> expect("li" |> by_css() |> last() |> by_text("Two", exact: true) |> count(1))
-        |> expect("li" |> by_css() |> nth(9) |> count(0))
+        |> expect("li" |> by_css() |> first() |> by_text("Zero", exact: true) |> to_have_count(1))
+        |> expect("li" |> by_css() |> nth(1) |> by_text("One", exact: true) |> to_have_count(1))
+        |> expect("li" |> by_css() |> last() |> by_text("Two", exact: true) |> to_have_count(1))
+        |> expect("li" |> by_css() |> nth(9) |> to_have_count(0))
       end)
     end
 
@@ -75,9 +75,9 @@ defmodule Fluffy.Conformance.ComposedLocatorTest do
 
       with_html(driver, html, fn session ->
         session
-        |> expect(count(shared_order_row, 1))
-        |> expect(shared_order_row |> by_text("Order 42", exact: true) |> count(1))
-        |> expect(shared_order_row |> by_text("Invoice 9", exact: true) |> count(0))
+        |> expect(to_have_count(shared_order_row, 1))
+        |> expect(shared_order_row |> by_text("Order 42", exact: true) |> to_have_count(1))
+        |> expect(shared_order_row |> by_text("Invoice 9", exact: true) |> to_have_count(0))
       end)
     end
   end

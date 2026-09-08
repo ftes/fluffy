@@ -17,13 +17,11 @@ LiveView, and a real browser.
 ## This is what it looks like
 
 ```elixir
-alias Fluffy.Page
-
 start_session(:phoenix)
 |> visit("/creatures")
 |> fill(by_label("Name"), "Basilisk")
 |> click(by_role(:button, name: "Register"))
-|> expect(visible(by_role(:heading, name: "Basilisk")))
+|> expect(by_role(:heading, name: "Basilisk") |> to_be_visible())
 |> expect(Page.to_have_url("/creatures/basilisk"))
 ```
 
@@ -39,7 +37,7 @@ can verify JavaScript hooks, layout, and browser behavior:
 start_session(:playwright)
 |> visit("/creatures/fluffy")
 |> click(by_role(:button, name: "Play flute"))
-|> expect(visible(by_text("Fluffy is asleep")))
+|> expect(by_text("Fluffy is asleep") |> to_be_visible())
 ```
 
 An extensive browser-backed conformance suite verifies that the Phoenix
@@ -81,7 +79,7 @@ Add the dependency:
 # mix.exs
 defp deps do
   [
-    {:fluffy, "~> 0.1", only: :test}
+    {:fluffy, "~> 0.2.0", only: :test}
   ]
 end
 ```
@@ -155,7 +153,7 @@ Playwright's locator model:
 | `click_link("Creatures")` | `click(by_role(:link, name: "Creatures"))` |
 | `click_button("Register")` | `click(by_role(:button, name: "Register"))` |
 | `fill_in("Name", with: "Basilisk")` | `fill(by_label("Name"), "Basilisk")` |
-| `assert_has(".creature", "Basilisk")` | `expect(visible(by_text("Basilisk")))` |
+| `assert_has(".creature", "Basilisk")` | `expect(by_text("Basilisk") |> to_be_visible())` |
 | `within("#potions", fn session -> ... end)` | compose a child locator under `by_css("#potions")` |
 | `submit()` | `submit(form_locator)` or click the intended submit button |
 | `reload_page()` | `reload()` |
@@ -203,7 +201,7 @@ session
 |> wait_for(Event.download(:report), fn session ->
   click(session, by_role(:button, name: "Download potion ledger"))
 end)
-|> expect(download_suggested_filename(:report, "potions.csv"))
+|> expect(to_have_download_suggested_filename(:report, "potions.csv"))
 ```
 
 See [Advanced events and pages](docs/advanced-events.md) for downloads,

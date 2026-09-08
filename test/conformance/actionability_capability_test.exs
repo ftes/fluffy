@@ -17,7 +17,7 @@ defmodule Fluffy.Conformance.ActionabilityCapabilityTest do
       with_html(unquote(driver), html, fn session ->
         session
         |> click(by_role(:button, name: "Save"))
-        |> expect(focused(by_role(:button, name: "Save")))
+        |> expect(:button |> by_role(name: "Save") |> to_be_focused())
       end)
     end
   end
@@ -27,7 +27,7 @@ defmodule Fluffy.Conformance.ActionabilityCapabilityTest do
 
     session
     |> click(by_role(:button, name: "Save"))
-    |> expect(focused(by_role(:button, name: "Save")))
+    |> expect(:button |> by_role(name: "Save") |> to_be_focused())
   end
 
   test "Static ignores ancestor inline height when filling structurally" do
@@ -39,7 +39,7 @@ defmodule Fluffy.Conformance.ActionabilityCapabilityTest do
 
     session
     |> fill(by_label("Name"), "Ada")
-    |> expect(value(by_label("Name"), "Ada"))
+    |> expect("Name" |> by_label() |> to_have_value("Ada"))
   end
 
   test "Static ignores matching stylesheet rules when clicking structurally" do
@@ -51,7 +51,7 @@ defmodule Fluffy.Conformance.ActionabilityCapabilityTest do
 
     session
     |> click(by_role(:button, name: "Save"))
-    |> expect(focused(by_role(:button, name: "Save")))
+    |> expect(:button |> by_role(name: "Save") |> to_be_focused())
   end
 
   test "Static ignores unparsed stylesheet rules when clicking structurally" do
@@ -63,7 +63,7 @@ defmodule Fluffy.Conformance.ActionabilityCapabilityTest do
 
     session
     |> click(by_role(:button, name: "Save"))
-    |> expect(focused(by_role(:button, name: "Save")))
+    |> expect(:button |> by_role(name: "Save") |> to_be_focused())
   end
 
   for driver <- [:phoenix, :playwright] do
@@ -78,7 +78,7 @@ defmodule Fluffy.Conformance.ActionabilityCapabilityTest do
       session
       |> visit("/live/mystic-creatures")
       |> fill(by_label("Search bestiary"), "phoenix")
-      |> expect(visible(by_text("Bestiary search: phoenix", exact: true)))
+      |> expect("Bestiary search: phoenix" |> by_text(exact: true) |> to_be_visible())
     end
 
     @tag driver: driver
@@ -94,8 +94,8 @@ defmodule Fluffy.Conformance.ActionabilityCapabilityTest do
       session
       |> visit("/live/mystic-creatures")
       |> check(checkbox)
-      |> expect(checked(checkbox))
-      |> expect(visible(by_text("Accounts: checked", exact: true)))
+      |> expect(to_be_checked(checkbox))
+      |> expect("Accounts: checked" |> by_text(exact: true) |> to_be_visible())
     end
   end
 
@@ -110,7 +110,7 @@ defmodule Fluffy.Conformance.ActionabilityCapabilityTest do
       with_html(unquote(driver), html, fn session ->
         session
         |> check(checkbox)
-        |> expect(checked(checkbox))
+        |> expect(to_be_checked(checkbox))
       end)
     end
   end

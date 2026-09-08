@@ -34,7 +34,7 @@ defmodule Fluffy.EctoSandboxStressOneTest do
       endpoint: Fluffy.TestWeb.Endpoint
     )
     |> visit("/database")
-    |> expect(count(by_text("Static values: #{value}", exact: true), 1))
+    |> expect("Static values: #{value}" |> by_text(exact: true) |> to_have_count(1))
   end
 end
 
@@ -50,7 +50,7 @@ defmodule Fluffy.EctoSandboxStressTwoTest do
       endpoint: Fluffy.TestWeb.Endpoint
     )
     |> visit("/database")
-    |> expect(count(by_text("Static values: #{value}", exact: true), 1))
+    |> expect("Static values: #{value}" |> by_text(exact: true) |> to_have_count(1))
   end
 end
 
@@ -66,7 +66,7 @@ defmodule Fluffy.EctoSandboxStressThreeTest do
       endpoint: Fluffy.TestWeb.Endpoint
     )
     |> visit("/database")
-    |> expect(count(by_text("Static values: #{value}", exact: true), 1))
+    |> expect("Static values: #{value}" |> by_text(exact: true) |> to_have_count(1))
   end
 end
 
@@ -82,6 +82,6 @@ defmodule Fluffy.EctoSandboxStressFourTest do
       endpoint: Fluffy.TestWeb.Endpoint
     )
     |> visit("/database")
-    |> expect(count(by_text("Static values: #{value}", exact: true), 1))
+    |> expect("Static values: #{value}" |> by_text(exact: true) |> to_have_count(1))
   end
 end

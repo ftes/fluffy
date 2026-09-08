@@ -22,7 +22,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
       session
       |> visit("/live/fluffy")
       |> click(parent_button)
-      |> expect(visible(by_text("Guardian head count: 1")))
+      |> expect("Guardian head count: 1" |> by_text() |> to_be_visible())
     end
 
     @tag driver: driver
@@ -32,7 +32,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
       session
       |> visit("/live/fluffy")
       |> click(by_role(:button, name: "Summon phoenix", exact: true))
-      |> expect(visible(by_text("Phoenix count: 1")))
+      |> expect("Phoenix count: 1" |> by_text() |> to_be_visible())
     end
 
     @tag driver: driver
@@ -48,10 +48,10 @@ defmodule Fluffy.Conformance.LiveActionTest do
       session
       |> visit("/live/nested")
       |> fill(child_email, "child@example.test")
-      |> expect(visible(by_text(child, "Child current: child@example.test", exact: true)))
+      |> expect(child |> by_text("Child current: child@example.test", exact: true) |> to_be_visible())
       |> click(save_child)
-      |> expect(visible(by_text(child, "Child saved: child@example.test", exact: true)))
-      |> expect(visible(by_text("Parent saved: none", exact: true)))
+      |> expect(child |> by_text("Child saved: child@example.test", exact: true) |> to_be_visible())
+      |> expect("Parent saved: none" |> by_text(exact: true) |> to_be_visible())
     end
 
     @tag driver: driver
@@ -62,8 +62,8 @@ defmodule Fluffy.Conformance.LiveActionTest do
       |> live_session()
       |> visit("/live/nested")
       |> click(by_role(child, :button, name: "Increment child", exact: true))
-      |> expect(visible(by_text(child, "Child count: 1", exact: true)))
-      |> expect(visible(by_text("Parent count: 0", exact: true)))
+      |> expect(child |> by_text("Child count: 1", exact: true) |> to_be_visible())
+      |> expect("Parent count: 0" |> by_text(exact: true) |> to_be_visible())
     end
 
     @tag driver: driver
@@ -77,8 +77,8 @@ defmodule Fluffy.Conformance.LiveActionTest do
       |> visit("/live/nested")
       |> click(by_role(child, :button, name: "Schedule child action", exact: true))
       |> click(by_role(child, :button, name: "Delayed child action", exact: true))
-      |> expect(visible(by_text(child, "Child count: 1", exact: true)))
-      |> expect(visible(by_text("Parent count: 0", exact: true)))
+      |> expect(child |> by_text("Child count: 1", exact: true) |> to_be_visible())
+      |> expect("Parent count: 0" |> by_text(exact: true) |> to_be_visible())
     end
 
     @tag driver: driver
@@ -89,7 +89,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
       |> live_session()
       |> visit("/live/nested")
       |> click(by_role(child, :button, name: "Navigate from child", exact: true))
-      |> expect(visible(by_text("The secret chamber is open")))
+      |> expect("The secret chamber is open" |> by_text() |> to_be_visible())
       |> expect(Page.to_have_url(Fluffy.TestServer.base_url() <> "/live/secret-chamber"))
     end
 
@@ -110,7 +110,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
     |> live_session()
     |> visit("/live/mystic-creatures")
     |> click(by_role(:button, name: "Confirm", exact: true))
-    |> expect(visible(by_text("confirmed", exact: true)))
+    |> expect("confirmed" |> by_text(exact: true) |> to_be_visible())
   end
 
   for driver <- [:phoenix, :playwright] do
@@ -120,7 +120,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
       |> live_session()
       |> visit("/live/mystic-creatures")
       |> click(by_role(:button, name: "Reset via change", exact: true))
-      |> expect(visible(by_text("Dispatched action: reset", exact: true)))
+      |> expect("Dispatched action: reset" |> by_text(exact: true) |> to_be_visible())
     end
 
     @tag driver: driver
@@ -134,13 +134,13 @@ defmodule Fluffy.Conformance.LiveActionTest do
       |> live_session()
       |> visit("/live/mystic-creatures")
       |> check(attrs)
-      |> expect(visible(by_text("Attribute payload state: checked", exact: true)))
+      |> expect("Attribute payload state: checked" |> by_text(exact: true) |> to_be_visible())
       |> uncheck(attrs)
-      |> expect(visible(by_text("Attribute payload state: unchecked", exact: true)))
+      |> expect("Attribute payload state: unchecked" |> by_text(exact: true) |> to_be_visible())
       |> check(js)
-      |> expect(visible(by_text("JS payload state: checked", exact: true)))
+      |> expect("JS payload state: checked" |> by_text(exact: true) |> to_be_visible())
       |> uncheck(js)
-      |> expect(visible(by_text("JS payload state: unchecked", exact: true)))
+      |> expect("JS payload state: unchecked" |> by_text(exact: true) |> to_be_visible())
     end
 
     @tag driver: driver
@@ -149,7 +149,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
       |> live_session()
       |> visit("/live/mystic-creatures")
       |> check(by_label("Griffin", exact: true))
-      |> expect(visible(by_text("Selected creature: griffin", exact: true)))
+      |> expect("Selected creature: griffin" |> by_text(exact: true) |> to_be_visible())
     end
   end
 

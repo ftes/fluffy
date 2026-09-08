@@ -15,12 +15,12 @@ defmodule Fluffy.Conformance.InitialConnTest do
     session = visit(session, "/initial-connection/chamber")
 
     assert Session.current_driver(session) == :static
-    expect(session, visible(by_text("Static initial principal: chamber-keeper")))
+    expect(session, "Static initial principal: chamber-keeper" |> by_text() |> to_be_visible())
 
     session = visit(session, "/initial-connection/chamber")
 
     expect(session, Page.to_have_status(403))
-    expect(session, visible(by_text("Initial authorization required")))
+    expect(session, "Initial authorization required" |> by_text() |> to_be_visible())
   end
 
   test "uses an initial connection's authorization assign for a first Live visit" do
@@ -29,7 +29,7 @@ defmodule Fluffy.Conformance.InitialConnTest do
     session = visit(session, "/live/initial-connection")
 
     assert Session.current_driver(session) == :live
-    expect(session, visible(by_text("Live initial authorization accepted")))
+    expect(session, "Live initial authorization accepted" |> by_text() |> to_be_visible())
   end
 
   test "uses connect params prepared on the initial connection for the first Live mount" do
@@ -43,7 +43,7 @@ defmodule Fluffy.Conformance.InitialConnTest do
       |> phoenix_session()
       |> visit("/live/initial-connection")
 
-    expect(session, visible(by_text("Live timezone: Europe/Berlin")))
+    expect(session, "Live timezone: Europe/Berlin" |> by_text() |> to_be_visible())
   end
 
   test "an ordinary Phoenix session receives the application's authorization denial" do
@@ -53,13 +53,13 @@ defmodule Fluffy.Conformance.InitialConnTest do
 
     assert Session.current_driver(session) == :static
     expect(session, Page.to_have_status(403))
-    expect(session, visible(by_text("Initial authorization required")))
+    expect(session, "Initial authorization required" |> by_text() |> to_be_visible())
   end
 
   test "consumes the initial connection before following redirect response cookies" do
     session = visit(initial_session(), "/initial-connection/redirect")
 
-    expect(session, visible(by_text("Redirected cookie principal: chamber-keeper")))
+    expect(session, "Redirected cookie principal: chamber-keeper" |> by_text() |> to_be_visible())
   end
 
   test "rejects invalid initial connections and the Playwright backend precisely" do

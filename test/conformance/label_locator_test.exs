@@ -31,7 +31,7 @@ defmodule Fluffy.Conformance.LabelLocatorTest do
       session =
         session_for_html(unquote(driver), unquote(html), base_url: Fluffy.TestServer.base_url())
 
-      expect(session, count(by_label(unquote(label), unquote(options)), unquote(expected)))
+      expect(session, unquote(label) |> by_label(unquote(options)) |> to_have_count(unquote(expected)))
     end
   end
 
@@ -48,9 +48,9 @@ defmodule Fluffy.Conformance.LabelLocatorTest do
         session_for_html(unquote(driver), html, base_url: Fluffy.TestServer.base_url())
 
       session
-      |> expect(count(by_label("ARIA Labelled Search", exact: true), 1))
-      |> expect(count(by_label("ARIA Search", exact: true), 0))
-      |> expect(count(by_label("HTML Search", exact: true), 0))
+      |> expect("ARIA Labelled Search" |> by_label(exact: true) |> to_have_count(1))
+      |> expect("ARIA Search" |> by_label(exact: true) |> to_have_count(0))
+      |> expect("HTML Search" |> by_label(exact: true) |> to_have_count(0))
     end
 
     @tag driver: driver
@@ -65,9 +65,9 @@ defmodule Fluffy.Conformance.LabelLocatorTest do
         session_for_html(unquote(driver), html, base_url: Fluffy.TestServer.base_url())
 
       session
-      |> expect(count(by_label("Billing", exact: true), 1))
-      |> expect(count(by_label("address", exact: true), 1))
-      |> expect(count(by_label("Billing address", exact: true), 0))
+      |> expect("Billing" |> by_label(exact: true) |> to_have_count(1))
+      |> expect("address" |> by_label(exact: true) |> to_have_count(1))
+      |> expect("Billing address" |> by_label(exact: true) |> to_have_count(0))
     end
   end
 end

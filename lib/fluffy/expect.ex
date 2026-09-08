@@ -5,14 +5,14 @@ defmodule Fluffy.Expect do
 
   Active page expectations live on `Fluffy.Page`.
 
-  The module intentionally keeps a flat Elixir API while preserving
-  Playwright's target and matcher concepts internally.
+  Assertion constructors use fluent `to_be_*` names for states and `to_have_*`
+  names for properties, matching the page assertions in `Fluffy.Page`.
 
   Every expectation constructor accepts the shared timeout option:
 
   #{NimbleOptions.docs(Fluffy.Options.expectation_schema())}
 
-  `checked/2` additionally accepts:
+  `to_be_checked/2` additionally accepts:
 
   #{NimbleOptions.docs(Fluffy.Options.checked_expectation_schema())}
   """
@@ -94,38 +94,38 @@ defmodule Fluffy.Expect do
   @type checked_option :: unquote(NimbleOptions.option_typespec(Options.checked_expectation_schema()))
 
   @doc group: "Locator assertions"
-  @spec count(Locator.t(), non_neg_integer(), [option()]) :: t()
-  def count(%Locator{} = locator, expected, options \\ []) when is_integer(expected) and expected >= 0 do
+  @spec to_have_count(Locator.t(), non_neg_integer(), [option()]) :: t()
+  def to_have_count(%Locator{} = locator, expected, options \\ []) when is_integer(expected) and expected >= 0 do
     new({:locator, locator}, :count, expected, options)
   end
 
   @doc group: "Locator assertions"
-  @spec visible(Locator.t(), [option()]) :: t()
-  def visible(%Locator{} = locator, options \\ []) do
+  @spec to_be_visible(Locator.t(), [option()]) :: t()
+  def to_be_visible(%Locator{} = locator, options \\ []) do
     new({:locator, locator}, :visible, true, options)
   end
 
   @doc group: "Locator assertions"
-  @spec disabled(Locator.t(), [option()]) :: t()
-  def disabled(%Locator{} = locator, options \\ []) do
+  @spec to_be_disabled(Locator.t(), [option()]) :: t()
+  def to_be_disabled(%Locator{} = locator, options \\ []) do
     new({:locator, locator}, :disabled, true, options)
   end
 
   @doc group: "Locator assertions"
-  @spec editable(Locator.t(), [option()]) :: t()
-  def editable(%Locator{} = locator, options \\ []) do
+  @spec to_be_editable(Locator.t(), [option()]) :: t()
+  def to_be_editable(%Locator{} = locator, options \\ []) do
     new({:locator, locator}, :editable, true, options)
   end
 
   @doc group: "Locator assertions"
-  @spec enabled(Locator.t(), [option()]) :: t()
-  def enabled(%Locator{} = locator, options \\ []) do
+  @spec to_be_enabled(Locator.t(), [option()]) :: t()
+  def to_be_enabled(%Locator{} = locator, options \\ []) do
     new({:locator, locator}, :enabled, true, options)
   end
 
   @doc group: "Locator assertions"
-  @spec focused(Locator.t(), [option()]) :: t()
-  def focused(%Locator{} = locator, options \\ []) do
+  @spec to_be_focused(Locator.t(), [option()]) :: t()
+  def to_be_focused(%Locator{} = locator, options \\ []) do
     new({:locator, locator}, :focused, true, options)
   end
 
@@ -138,8 +138,8 @@ defmodule Fluffy.Expect do
   state requires Playwright because it is a DOM property rather than HTML
   state available to the Static or LiveView drivers.
   """
-  @spec checked(Locator.t(), [checked_option()]) :: t()
-  def checked(%Locator{} = locator, options \\ []) do
+  @spec to_be_checked(Locator.t(), [checked_option()]) :: t()
+  def to_be_checked(%Locator{} = locator, options \\ []) do
     options = Options.validate_checked_expectation!(options)
     checked = Keyword.get(options, :checked, :unset)
     indeterminate = Keyword.get(options, :indeterminate, :unset)
@@ -159,14 +159,14 @@ defmodule Fluffy.Expect do
   end
 
   @doc group: "Locator assertions"
-  @spec value(Locator.t(), String.t(), [option()]) :: t()
-  def value(%Locator{} = locator, expected, options \\ []) when is_binary(expected) do
+  @spec to_have_value(Locator.t(), String.t(), [option()]) :: t()
+  def to_have_value(%Locator{} = locator, expected, options \\ []) when is_binary(expected) do
     new({:locator, locator}, :value, expected, options)
   end
 
   @doc group: "Locator assertions"
-  @spec values(Locator.t(), [term()], [option()]) :: t()
-  def values(%Locator{} = locator, expected, options \\ []) when is_list(expected) do
+  @spec to_have_values(Locator.t(), [term()], [option()]) :: t()
+  def to_have_values(%Locator{} = locator, expected, options \\ []) when is_list(expected) do
     new({:locator, locator}, :values, expected, options)
   end
 
@@ -188,164 +188,164 @@ defmodule Fluffy.Expect do
   def title_matches?(_expected, _actual), do: false
 
   @doc group: "Downloads"
-  @spec download_suggested_filename(term(), String.t(), [option()]) :: t()
-  def download_suggested_filename(key, expected, options \\ []) when is_binary(expected) do
+  @spec to_have_download_suggested_filename(term(), String.t(), [option()]) :: t()
+  def to_have_download_suggested_filename(key, expected, options \\ []) when is_binary(expected) do
     new({:download, key}, :download_suggested_filename, expected, options)
   end
 
   @doc group: "Downloads"
-  @spec download_content_type(term(), String.t(), [option()]) :: t()
-  def download_content_type(key, expected, options \\ []) when is_binary(expected) do
+  @spec to_have_download_content_type(term(), String.t(), [option()]) :: t()
+  def to_have_download_content_type(key, expected, options \\ []) when is_binary(expected) do
     new({:download, key}, :download_content_type, expected, options)
   end
 
   @doc group: "Downloads"
-  @spec download_content(term(), String.t(), [option()]) :: t()
-  def download_content(key, expected, options \\ []) when is_binary(expected) do
+  @spec to_have_download_content(term(), String.t(), [option()]) :: t()
+  def to_have_download_content(key, expected, options \\ []) when is_binary(expected) do
     new({:download, key}, :download_content, expected, options)
   end
 
   @doc group: "Downloads"
-  @spec download_size(term(), non_neg_integer(), [option()]) :: t()
-  def download_size(key, expected, options \\ []) when is_integer(expected) and expected >= 0 do
+  @spec to_have_download_size(term(), non_neg_integer(), [option()]) :: t()
+  def to_have_download_size(key, expected, options \\ []) when is_integer(expected) and expected >= 0 do
     new({:download, key}, :download_size, expected, options)
   end
 
   @doc group: "Downloads"
-  @spec download_url(term(), String.t(), [option()]) :: t()
-  def download_url(key, expected, options \\ []) when is_binary(expected) do
+  @spec to_have_download_url(term(), String.t(), [option()]) :: t()
+  def to_have_download_url(key, expected, options \\ []) when is_binary(expected) do
     new({:download, key}, :download_url, expected, options)
   end
 
   @doc group: "Dialogs"
-  @spec dialog_type(term(), term(), [option()]) :: t()
-  def dialog_type(key, expected, options \\ []) do
+  @spec to_have_dialog_type(term(), term(), [option()]) :: t()
+  def to_have_dialog_type(key, expected, options \\ []) do
     new({:dialog, key}, :dialog_type, expected, options)
   end
 
   @doc group: "Dialogs"
-  @spec dialog_message(term(), String.t(), [option()]) :: t()
-  def dialog_message(key, expected, options \\ []) when is_binary(expected) do
+  @spec to_have_dialog_message(term(), String.t(), [option()]) :: t()
+  def to_have_dialog_message(key, expected, options \\ []) when is_binary(expected) do
     new({:dialog, key}, :dialog_message, expected, options)
   end
 
   @doc group: "Dialogs"
-  @spec dialog_default_value(term(), String.t(), [option()]) :: t()
-  def dialog_default_value(key, expected, options \\ []) when is_binary(expected) do
+  @spec to_have_dialog_default_value(term(), String.t(), [option()]) :: t()
+  def to_have_dialog_default_value(key, expected, options \\ []) when is_binary(expected) do
     new({:dialog, key}, :dialog_default_value, expected, options)
   end
 
   @doc group: "Dialogs"
-  @spec dialog_action(term(), term(), [option()]) :: t()
-  def dialog_action(key, expected, options \\ []) do
+  @spec to_have_dialog_action(term(), term(), [option()]) :: t()
+  def to_have_dialog_action(key, expected, options \\ []) do
     new({:dialog, key}, :dialog_action, expected, options)
   end
 
   @doc group: "Dialogs"
-  @spec dialog_prompt_text(term(), term(), [option()]) :: t()
-  def dialog_prompt_text(key, expected, options \\ []) do
+  @spec to_have_dialog_prompt_text(term(), term(), [option()]) :: t()
+  def to_have_dialog_prompt_text(key, expected, options \\ []) do
     new({:dialog, key}, :dialog_prompt_text, expected, options)
   end
 
   @doc group: "Navigations"
-  @spec navigation_url(term(), String.t(), [option()]) :: t()
-  def navigation_url(key, expected, options \\ []) when is_binary(expected) do
+  @spec to_have_navigation_url(term(), String.t(), [option()]) :: t()
+  def to_have_navigation_url(key, expected, options \\ []) when is_binary(expected) do
     new({:navigation, key}, :navigation_url, expected, options)
   end
 
   @doc group: "Navigations"
-  @spec navigation_from_url(term(), String.t(), [option()]) :: t()
-  def navigation_from_url(key, expected, options \\ []) when is_binary(expected) do
+  @spec to_have_navigation_from_url(term(), String.t(), [option()]) :: t()
+  def to_have_navigation_from_url(key, expected, options \\ []) when is_binary(expected) do
     new({:navigation, key}, :navigation_from_url, expected, options)
   end
 
   @doc group: "Navigations"
-  @spec navigation_status(term(), integer(), [option()]) :: t()
-  def navigation_status(key, expected, options \\ []) when is_integer(expected) do
+  @spec to_have_navigation_status(term(), integer(), [option()]) :: t()
+  def to_have_navigation_status(key, expected, options \\ []) when is_integer(expected) do
     new({:navigation, key}, :navigation_status, expected, options)
   end
 
   @doc group: "Requests"
-  @spec request_method(term(), String.t(), [option()]) :: t()
-  def request_method(key, expected, options \\ []) when is_binary(expected) do
+  @spec to_have_request_method(term(), String.t(), [option()]) :: t()
+  def to_have_request_method(key, expected, options \\ []) when is_binary(expected) do
     new({:request, key}, :request_method, expected, options)
   end
 
   @doc group: "Requests"
-  @spec request_url(term(), String.t(), [option()]) :: t()
-  def request_url(key, expected, options \\ []) when is_binary(expected) do
+  @spec to_have_request_url(term(), String.t(), [option()]) :: t()
+  def to_have_request_url(key, expected, options \\ []) when is_binary(expected) do
     new({:request, key}, :request_url, expected, options)
   end
 
   @doc group: "Requests"
-  @spec request_headers(term(), map(), [option()]) :: t()
-  def request_headers(key, expected, options \\ []) when is_map(expected) do
+  @spec to_have_request_headers(term(), map(), [option()]) :: t()
+  def to_have_request_headers(key, expected, options \\ []) when is_map(expected) do
     new({:request, key}, :request_headers, expected, options)
   end
 
   @doc group: "Requests"
-  @spec request_resource_type(term(), String.t(), [option()]) :: t()
-  def request_resource_type(key, expected, options \\ []) when is_binary(expected) do
+  @spec to_have_request_resource_type(term(), String.t(), [option()]) :: t()
+  def to_have_request_resource_type(key, expected, options \\ []) when is_binary(expected) do
     new({:request, key}, :request_resource_type, expected, options)
   end
 
   @doc group: "Requests"
-  @spec request_post_data(term(), String.t(), [option()]) :: t()
-  def request_post_data(key, expected, options \\ []) when is_binary(expected) do
+  @spec to_have_request_post_data(term(), String.t(), [option()]) :: t()
+  def to_have_request_post_data(key, expected, options \\ []) when is_binary(expected) do
     new({:request, key}, :request_post_data, expected, options)
   end
 
   @doc group: "Requests"
-  @spec request_page(term(), term(), [option()]) :: t()
-  def request_page(key, expected, options \\ []) do
+  @spec to_have_request_page(term(), term(), [option()]) :: t()
+  def to_have_request_page(key, expected, options \\ []) do
     new({:request, key}, :request_page, expected, options)
   end
 
   @doc group: "Responses"
-  @spec response_method(term(), String.t(), [option()]) :: t()
-  def response_method(key, expected, options \\ []) when is_binary(expected) do
+  @spec to_have_response_method(term(), String.t(), [option()]) :: t()
+  def to_have_response_method(key, expected, options \\ []) when is_binary(expected) do
     new({:response, key}, :response_method, expected, options)
   end
 
   @doc group: "Responses"
-  @spec response_url(term(), String.t(), [option()]) :: t()
-  def response_url(key, expected, options \\ []) when is_binary(expected) do
+  @spec to_have_response_url(term(), String.t(), [option()]) :: t()
+  def to_have_response_url(key, expected, options \\ []) when is_binary(expected) do
     new({:response, key}, :response_url, expected, options)
   end
 
   @doc group: "Responses"
-  @spec response_headers(term(), map(), [option()]) :: t()
-  def response_headers(key, expected, options \\ []) when is_map(expected) do
+  @spec to_have_response_headers(term(), map(), [option()]) :: t()
+  def to_have_response_headers(key, expected, options \\ []) when is_map(expected) do
     new({:response, key}, :response_headers, expected, options)
   end
 
   @doc group: "Responses"
-  @spec response_resource_type(term(), String.t(), [option()]) :: t()
-  def response_resource_type(key, expected, options \\ []) when is_binary(expected) do
+  @spec to_have_response_resource_type(term(), String.t(), [option()]) :: t()
+  def to_have_response_resource_type(key, expected, options \\ []) when is_binary(expected) do
     new({:response, key}, :response_resource_type, expected, options)
   end
 
   @doc group: "Responses"
-  @spec response_post_data(term(), String.t(), [option()]) :: t()
-  def response_post_data(key, expected, options \\ []) when is_binary(expected) do
+  @spec to_have_response_post_data(term(), String.t(), [option()]) :: t()
+  def to_have_response_post_data(key, expected, options \\ []) when is_binary(expected) do
     new({:response, key}, :response_post_data, expected, options)
   end
 
   @doc group: "Responses"
-  @spec response_status(term(), integer(), [option()]) :: t()
-  def response_status(key, expected, options \\ []) when is_integer(expected) do
+  @spec to_have_response_status(term(), integer(), [option()]) :: t()
+  def to_have_response_status(key, expected, options \\ []) when is_integer(expected) do
     new({:response, key}, :response_status, expected, options)
   end
 
   @doc group: "Responses"
-  @spec response_status_text(term(), String.t(), [option()]) :: t()
-  def response_status_text(key, expected, options \\ []) when is_binary(expected) do
+  @spec to_have_response_status_text(term(), String.t(), [option()]) :: t()
+  def to_have_response_status_text(key, expected, options \\ []) when is_binary(expected) do
     new({:response, key}, :response_status_text, expected, options)
   end
 
   @doc group: "Responses"
-  @spec response_page(term(), term(), [option()]) :: t()
-  def response_page(key, expected, options \\ []) do
+  @spec to_have_response_page(term(), term(), [option()]) :: t()
+  def to_have_response_page(key, expected, options \\ []) do
     new({:response, key}, :response_page, expected, options)
   end
 

@@ -16,7 +16,7 @@ defmodule Fluffy.Conformance.StaticVisitTest do
 
       session
       |> visit("/chamber")
-      |> expect(visible(by_text("The guardian sleeps")))
+      |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
     end
   end
 end

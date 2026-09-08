@@ -24,11 +24,11 @@ defmodule Fluffy.Conformance.DialogEventTest do
         Event.dialog(:confirmation, accept: true),
         &click(&1, by_role(:button, name: "Confirm"))
       )
-      |> expect(dialog_type(:confirmation, :confirm))
-      |> expect(dialog_message(:confirmation, "Proceed?"))
-      |> expect(dialog_default_value(:confirmation, ""))
-      |> expect(dialog_action(:confirmation, :accept))
-      |> expect(visible(by_text("accepted")))
+      |> expect(to_have_dialog_type(:confirmation, :confirm))
+      |> expect(to_have_dialog_message(:confirmation, "Proceed?"))
+      |> expect(to_have_dialog_default_value(:confirmation, ""))
+      |> expect(to_have_dialog_action(:confirmation, :accept))
+      |> expect("accepted" |> by_text() |> to_be_visible())
 
     assert %Dialog{type: :confirm, action: :accept} = dialog(session, :confirmation)
   end
@@ -46,8 +46,8 @@ defmodule Fluffy.Conformance.DialogEventTest do
       Event.dialog(:confirmation, dismiss: true),
       &click(&1, by_role(:button, name: "Confirm"))
     )
-    |> expect(dialog_action(:confirmation, :dismiss))
-    |> expect(visible(by_text("dismissed")))
+    |> expect(to_have_dialog_action(:confirmation, :dismiss))
+    |> expect("dismissed" |> by_text() |> to_be_visible())
   end
 
   @tag driver: :playwright
@@ -65,12 +65,12 @@ defmodule Fluffy.Conformance.DialogEventTest do
       ),
       &click(&1, by_role(:button, name: "Prompt"))
     )
-    |> expect(dialog_type(:name, :prompt))
-    |> expect(dialog_message(:name, "Your name?"))
-    |> expect(dialog_default_value(:name, "Anonymous"))
-    |> expect(dialog_action(:name, :accept))
-    |> expect(dialog_prompt_text(:name, "Fluffy"))
-    |> expect(visible(by_text("Fluffy")))
+    |> expect(to_have_dialog_type(:name, :prompt))
+    |> expect(to_have_dialog_message(:name, "Your name?"))
+    |> expect(to_have_dialog_default_value(:name, "Anonymous"))
+    |> expect(to_have_dialog_action(:name, :accept))
+    |> expect(to_have_dialog_prompt_text(:name, "Fluffy"))
+    |> expect("Fluffy" |> by_text() |> to_be_visible())
   end
 
   test "reports dialogs as browser-only before running a Phoenix action" do

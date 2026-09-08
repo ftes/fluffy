@@ -28,10 +28,10 @@ defmodule Fluffy.Conformance.NavigationEventTest do
         session
         |> visit(TestHTTPFixtures.path(fixture, "/start"))
         |> wait_for(Event.navigation(:continue), &click(&1, by_role(:link, name: "Continue")))
-        |> expect(navigation_from_url(:continue, from_url))
-        |> expect(navigation_url(:continue, destination))
-        |> expect(navigation_status(:continue, 202))
-        |> expect(visible(by_text("Arrived")))
+        |> expect(to_have_navigation_from_url(:continue, from_url))
+        |> expect(to_have_navigation_url(:continue, destination))
+        |> expect(to_have_navigation_status(:continue, 202))
+        |> expect("Arrived" |> by_text() |> to_be_visible())
 
       assert %NavigationEvent{url: ^destination, status: 202} =
                navigation(session, :continue)
@@ -65,9 +65,9 @@ defmodule Fluffy.Conformance.NavigationEventTest do
       |> visit(TestHTTPFixtures.path(fixture, "/start"))
       |> fill(by_label("Query"), "fluffy")
       |> wait_for(Event.navigation(:submit), &click(&1, by_role(:button, name: "Search")))
-      |> expect(navigation_url(:submit, destination))
-      |> expect(navigation_status(:submit, 201))
-      |> expect(visible(by_text("Submitted")))
+      |> expect(to_have_navigation_url(:submit, destination))
+      |> expect(to_have_navigation_status(:submit, 201))
+      |> expect("Submitted" |> by_text() |> to_be_visible())
 
       [request] =
         fixture
@@ -95,9 +95,9 @@ defmodule Fluffy.Conformance.NavigationEventTest do
       session
       |> visit(TestHTTPFixtures.path(fixture, "/start"))
       |> wait_for(Event.navigation(:redirect), &click(&1, by_role(:link, name: "Continue")))
-      |> expect(navigation_url(:redirect, destination))
-      |> expect(navigation_status(:redirect, 203))
-      |> expect(visible(by_text("Final")))
+      |> expect(to_have_navigation_url(:redirect, destination))
+      |> expect(to_have_navigation_status(:redirect, 203))
+      |> expect("Final" |> by_text() |> to_be_visible())
     end
   end
 

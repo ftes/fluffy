@@ -16,9 +16,9 @@ defmodule Fluffy.Conformance.CSSLocatorTest do
         session_for_html(driver, ~s(<div class="item">First</div>), base_url: Fluffy.TestServer.base_url())
 
       session
-      |> expect(count(item, 1))
+      |> expect(to_have_count(item, 1))
       |> set_html(~s(<div class="item">First</div><div class="item">Second</div>))
-      |> expect(count(item, 2))
+      |> expect(to_have_count(item, 2))
     end
   end
 end

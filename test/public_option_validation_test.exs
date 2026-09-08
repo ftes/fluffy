@@ -42,11 +42,11 @@ defmodule Fluffy.PublicOptionValidationTest do
 
   test "expectation option values are validated when the expectation is constructed", %{button: button} do
     assert_raise NimbleOptions.ValidationError, ~r/:timeout.*non[- ]negative integer/, fn ->
-      Expect.visible(button, timeout: -1)
+      Expect.to_be_visible(button, timeout: -1)
     end
 
     assert_raise NimbleOptions.ValidationError, ~r/:checked.*boolean/, fn ->
-      Expect.checked(button, checked: :yes)
+      Expect.to_be_checked(button, checked: :yes)
     end
   end
 

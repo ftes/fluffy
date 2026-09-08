@@ -23,9 +23,9 @@ defmodule Fluffy.Conformance.ReloadTest do
 
       session
       |> visit(TestHTTPFixtures.path(fixture))
-      |> expect(visible(by_text("First render")))
+      |> expect("First render" |> by_text() |> to_be_visible())
       |> reload()
-      |> expect(visible(by_text("Second render")))
+      |> expect("Second render" |> by_text() |> to_be_visible())
       |> expect(Page.to_have_url(TestHTTPFixtures.url(fixture)))
 
       assert length(TestHTTPFixtures.requests(fixture)) == 2

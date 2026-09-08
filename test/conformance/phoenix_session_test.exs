@@ -14,16 +14,16 @@ defmodule Fluffy.Conformance.PhoenixSessionTest do
 
     session = visit(session, "/chamber")
     assert Session.current_driver(session) == :static
-    expect(session, visible(by_text("The guardian sleeps")))
+    expect(session, "The guardian sleeps" |> by_text() |> to_be_visible())
 
     session = visit(session, "/live/three-heads")
     assert Session.current_driver(session) == :live
-    expect(session, visible(by_text("Sleeping heads: 0")))
+    expect(session, "Sleeping heads: 0" |> by_text() |> to_be_visible())
 
     session = click(session, by_role(:button, name: "Play the flute"))
     assert Session.current_driver(session) == :live
     assert Session.current_page(session).revision == 2
-    expect(session, visible(by_text("Sleeping heads: 1")))
+    expect(session, "Sleeping heads: 1" |> by_text() |> to_be_visible())
 
     session = visit(session, "/chamber")
     assert Session.current_driver(session) == :static

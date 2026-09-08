@@ -31,7 +31,7 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
       |> start_test_session()
       |> visit(TestHTTPFixtures.path(fixture, "/links/start"))
       |> click(by_text("Delete order", exact: true))
-      |> expect(visible(by_role(:heading, name: "Deleted", exact: true)))
+      |> expect(:heading |> by_role(name: "Deleted", exact: true) |> to_be_visible())
       |> expect(Page.to_have_url(TestHTTPFixtures.url(fixture, "/links/delete?from=link#done")))
 
       [_source, submission] = TestHTTPFixtures.requests(fixture)
@@ -64,7 +64,7 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
       |> start_test_session()
       |> visit(TestHTTPFixtures.path(fixture, "/links/start"))
       |> click(by_css("#nested-action-target"))
-      |> expect(visible(by_role(:heading, name: "Inner action", exact: true)))
+      |> expect(:heading |> by_role(name: "Inner action", exact: true) |> to_be_visible())
 
       [_source, submission] = TestHTTPFixtures.requests(fixture)
       assert submission.method == "POST"
@@ -89,7 +89,7 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
       |> start_test_session()
       |> visit(TestHTTPFixtures.path(fixture, "/links/start"))
       |> click(by_text("Search", exact: true))
-      |> expect(visible(by_role(:heading, name: "Results", exact: true)))
+      |> expect(:heading |> by_role(name: "Results", exact: true) |> to_be_visible())
       |> expect(Page.to_have_url(TestHTTPFixtures.url(fixture, "/links/search?_csrf_token=csrf-token&_method=get")))
 
       [_source, submission] = TestHTTPFixtures.requests(fixture)
@@ -113,7 +113,7 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
       |> start_test_session()
       |> visit(TestHTTPFixtures.path(fixture, "/links/start"))
       |> click(by_text("Update", exact: true))
-      |> expect(visible(by_role(:heading, name: "Updated", exact: true)))
+      |> expect(:heading |> by_role(name: "Updated", exact: true) |> to_be_visible())
 
       [_source, submission] = TestHTTPFixtures.requests(fixture)
       assert submission.method == "POST"
@@ -140,7 +140,7 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
       |> start_test_session()
       |> visit(TestHTTPFixtures.path(fixture, "/links/start"))
       |> click(by_text("Delete", exact: true))
-      |> expect(visible(by_role(:heading, name: "Redirect complete", exact: true)))
+      |> expect(:heading |> by_role(name: "Redirect complete", exact: true) |> to_be_visible())
 
       [_source, submission, redirected] = TestHTTPFixtures.requests(fixture)
       assert submission.method == "POST"
@@ -167,7 +167,7 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
     |> wait_for(Event.popup(:deletion), &click(&1, by_text("Delete", exact: true)))
     |> expect(Page.to_have_url(opener_url))
     |> switch_page(:deletion)
-    |> expect(visible(by_role(:heading, name: "Deleted in popup", exact: true)))
+    |> expect(:heading |> by_role(name: "Deleted in popup", exact: true) |> to_be_visible())
 
     [_source, submission] = TestHTTPFixtures.requests(fixture)
     assert submission.method == "POST"
@@ -185,7 +185,7 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
       |> start_test_session()
       |> visit("/live/phoenix-html-link?action=#{URI.encode_www_form(action)}")
       |> click(by_text("Delete from LiveView", exact: true))
-      |> expect(visible(by_role(:heading, name: "Deleted from LiveView", exact: true)))
+      |> expect(:heading |> by_role(name: "Deleted from LiveView", exact: true) |> to_be_visible())
 
       [submission] = TestHTTPFixtures.requests(fixture)
       assert submission.method == "POST"
@@ -234,8 +234,8 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
       Event.dialog(:confirmation, accept: true),
       &click(&1, by_text("Delete with confirmation", exact: true))
     )
-    |> expect(dialog_message(:confirmation, "Delete?\nThis cannot be undone."))
-    |> expect(visible(by_role(:heading, name: "Deleted after confirmation", exact: true)))
+    |> expect(to_have_dialog_message(:confirmation, "Delete?\nThis cannot be undone."))
+    |> expect(:heading |> by_role(name: "Deleted after confirmation", exact: true) |> to_be_visible())
 
     assert [_source, submission] = TestHTTPFixtures.requests(fixture)
     assert submission.path == "/links/delete"
@@ -265,9 +265,9 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
       Event.dialog(:confirmation, dismiss: true),
       &click(&1, by_text("Delete with confirmation", exact: true))
     )
-    |> expect(dialog_action(:confirmation, :dismiss))
+    |> expect(to_have_dialog_action(:confirmation, :dismiss))
     |> expect(Page.to_have_url(source_url))
-    |> expect(visible(by_role(:heading, name: "Before confirmation", exact: true)))
+    |> expect(:heading |> by_role(name: "Before confirmation", exact: true) |> to_be_visible())
 
     assert [_source] = TestHTTPFixtures.requests(fixture)
   end
@@ -290,7 +290,7 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
     |> start_test_session()
     |> visit(TestHTTPFixtures.path(fixture, "/links/start"))
     |> click(by_text("Delete without a browser", exact: true))
-    |> expect(visible(by_role(:heading, name: "Deleted structurally", exact: true)))
+    |> expect(:heading |> by_role(name: "Deleted structurally", exact: true) |> to_be_visible())
 
     assert [_source, submission] = TestHTTPFixtures.requests(fixture)
     assert submission.path == "/links/delete"
@@ -307,7 +307,7 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
     |> start_test_session()
     |> visit(TestHTTPFixtures.path(fixture, "/links/start"))
     |> click(by_role(:link, name: "Next", exact: true))
-    |> expect(visible(by_role(:heading, name: "Next", exact: true)))
+    |> expect(:heading |> by_role(name: "Next", exact: true) |> to_be_visible())
 
     [_source, navigation] = TestHTTPFixtures.requests(fixture)
     assert navigation.method == "GET"

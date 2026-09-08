@@ -30,7 +30,7 @@ defmodule Fluffy.SessionConfigurationTest do
 
     session
     |> visit("/chamber")
-    |> expect(visible(by_text("The guardian sleeps")))
+    |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
   end
 
   test "an active endpoint listener supplies the default base URL port" do
@@ -63,7 +63,7 @@ defmodule Fluffy.SessionConfigurationTest do
 
     session
     |> visit("/chamber")
-    |> expect(visible(by_text("The guardian sleeps")))
+    |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
   end
 
   test "a configured base URL overrides the endpoint URL" do

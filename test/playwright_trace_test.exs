@@ -31,7 +31,7 @@ defmodule Fluffy.PlaywrightTraceTest do
     |> visit(TestHTTPFixtures.path(fixture, "/start"))
     |> wait_for(Event.popup(:popup), &click(&1, by_role(:button, name: "Open popup")))
     |> switch_page(:popup)
-    |> expect(visible(by_text("Traced popup")))
+    |> expect("Traced popup" |> by_text() |> to_be_visible())
 
     :ok = GenServer.stop(TestScope.current())
 

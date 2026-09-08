@@ -18,24 +18,10 @@ defmodule Fluffy.Conformance.LiveKeyboardActionTest do
       |> visit("/live/keyboard")
       |> fill(input, "Ada")
       |> press(input, "Enter")
-      |> expect(focused(input))
-      |> expect(visible(by_text("Event count: 2", exact: true)))
-      |> expect(
-        visible(
-          by_text(
-            "element-keydown:key=Enter;value=Ada;scope=element",
-            exact: true
-          )
-        )
-      )
-      |> expect(
-        visible(
-          by_text(
-            "element-keyup:key=Enter;value=Ada;scope=element",
-            exact: true
-          )
-        )
-      )
+      |> expect(to_be_focused(input))
+      |> expect("Event count: 2" |> by_text(exact: true) |> to_be_visible())
+      |> expect("element-keydown:key=Enter;value=Ada;scope=element" |> by_text(exact: true) |> to_be_visible())
+      |> expect("element-keyup:key=Enter;value=Ada;scope=element" |> by_text(exact: true) |> to_be_visible())
     end
 
     @tag driver: driver
@@ -45,7 +31,7 @@ defmodule Fluffy.Conformance.LiveKeyboardActionTest do
       |> live_session()
       |> visit("/live/keyboard")
       |> press(by_label("Mismatched key", exact: true), "Enter")
-      |> expect(visible(by_text("Event count: 0", exact: true)))
+      |> expect("Event count: 0" |> by_text(exact: true) |> to_be_visible())
     end
 
     @tag driver: driver
@@ -55,9 +41,9 @@ defmodule Fluffy.Conformance.LiveKeyboardActionTest do
       |> live_session()
       |> visit("/live/keyboard")
       |> press(by_label("Window key", exact: true), "Enter")
-      |> expect(visible(by_text("Event count: 2", exact: true)))
-      |> expect(visible(by_text("window-keydown:key=Enter;value=none;scope=window", exact: true)))
-      |> expect(visible(by_text("window-keyup:key=Enter;value=none;scope=window", exact: true)))
+      |> expect("Event count: 2" |> by_text(exact: true) |> to_be_visible())
+      |> expect("window-keydown:key=Enter;value=none;scope=window" |> by_text(exact: true) |> to_be_visible())
+      |> expect("window-keyup:key=Enter;value=none;scope=window" |> by_text(exact: true) |> to_be_visible())
     end
 
     @tag driver: driver
@@ -70,12 +56,9 @@ defmodule Fluffy.Conformance.LiveKeyboardActionTest do
       |> fill(input, "targeted")
       |> press(input, "Enter")
       |> expect(
-        visible(
-          by_text(
-            "Component event: component-keydown:key=Enter;value=targeted;scope=component",
-            exact: true
-          )
-        )
+        "Component event: component-keydown:key=Enter;value=targeted;scope=component"
+        |> by_text(exact: true)
+        |> to_be_visible()
       )
     end
 
@@ -89,25 +72,25 @@ defmodule Fluffy.Conformance.LiveKeyboardActionTest do
       |> visit("/live/keyboard")
       |> fill(input, "fluffy")
       |> press(input, "Enter")
-      |> expect(visible(by_text("Submitted: query=fluffy;commit=search", exact: true)))
-      |> expect(visible(by_text("Event count: 3", exact: true)))
+      |> expect("Submitted: query=fluffy;commit=search" |> by_text(exact: true) |> to_be_visible())
+      |> expect("Event count: 3" |> by_text(exact: true) |> to_be_visible())
       |> expect(
         "#keyboard-events > li:nth-child(1)"
         |> by_css()
         |> filter(has_text: "form-keydown:key=Enter;value=fluffy;scope=form")
-        |> visible()
+        |> to_be_visible()
       )
       |> expect(
         "#keyboard-events > li:nth-child(2)"
         |> by_css()
         |> filter(has_text: "submit:key=none;value=fluffy;scope=search")
-        |> visible()
+        |> to_be_visible()
       )
       |> expect(
         "#keyboard-events > li:nth-child(3)"
         |> by_css()
         |> filter(has_text: "window-keyup:key=Enter;value=none;scope=window")
-        |> visible()
+        |> to_be_visible()
       )
     end
 
@@ -119,7 +102,7 @@ defmodule Fluffy.Conformance.LiveKeyboardActionTest do
       |> visit("/live/keyboard")
       |> press(by_label("Patch key", exact: true), "Enter")
       |> expect(Page.to_have_url(Fluffy.TestServer.base_url() <> "/live/keyboard?step=patched"))
-      |> expect(visible(by_text("Step: patched", exact: true)))
+      |> expect("Step: patched" |> by_text(exact: true) |> to_be_visible())
     end
 
     @tag driver: driver
@@ -132,19 +115,19 @@ defmodule Fluffy.Conformance.LiveKeyboardActionTest do
       |> live_session()
       |> visit("/live/keyboard")
       |> press(first, "Tab")
-      |> expect(focused(second))
-      |> expect(visible(by_text("Event count: 2", exact: true)))
+      |> expect(to_be_focused(second))
+      |> expect("Event count: 2" |> by_text(exact: true) |> to_be_visible())
       |> expect(
         "#keyboard-events > li:nth-child(1)"
         |> by_css()
         |> filter(has_text: "tab-keydown:key=Tab;value=;scope=none")
-        |> visible()
+        |> to_be_visible()
       )
       |> expect(
         "#keyboard-events > li:nth-child(2)"
         |> by_css()
         |> filter(has_text: "tab-keyup:key=Tab;value=;scope=none")
-        |> visible()
+        |> to_be_visible()
       )
     end
 
@@ -159,19 +142,19 @@ defmodule Fluffy.Conformance.LiveKeyboardActionTest do
       |> live_session()
       |> visit("/live/keyboard")
       |> press(button, "Space")
-      |> expect(focused(button))
-      |> expect(visible(by_text("Event count: 2", exact: true)))
+      |> expect(to_be_focused(button))
+      |> expect("Event count: 2" |> by_text(exact: true) |> to_be_visible())
       |> expect(
         "#keyboard-events > li:nth-child(1)"
         |> by_css()
         |> filter(has_text: "space-keydown:key= ;value=;scope=space")
-        |> visible()
+        |> to_be_visible()
       )
       |> expect(
         "#keyboard-events > li:nth-child(2)"
         |> by_css()
         |> filter(has_text: "space-keyup:key= ;value=;scope=space")
-        |> visible()
+        |> to_be_visible()
       )
     end
 
@@ -184,7 +167,7 @@ defmodule Fluffy.Conformance.LiveKeyboardActionTest do
       |> live_session()
       |> visit("/live/keyboard")
       |> press(checkbox, "Space")
-      |> expect(checked(checkbox))
+      |> expect(to_be_checked(checkbox))
     end
 
     @tag driver: driver
@@ -197,7 +180,7 @@ defmodule Fluffy.Conformance.LiveKeyboardActionTest do
       |> visit("/live/keyboard")
       |> fill(input, "metadata")
       |> press(input, "Enter")
-      |> expect(visible(by_text("Payload keys: key,scope,value", exact: true)))
+      |> expect("Payload keys: key,scope,value" |> by_text(exact: true) |> to_be_visible())
     end
 
     @tag driver: driver
@@ -209,7 +192,7 @@ defmodule Fluffy.Conformance.LiveKeyboardActionTest do
       |> visit("/live/keyboard")
       |> press(by_label("Navigate key", exact: true), "Enter")
       |> expect(Page.to_have_url(Fluffy.TestServer.base_url() <> "/live/secret-chamber"))
-      |> expect(visible(by_text("The secret chamber is open", exact: true)))
+      |> expect("The secret chamber is open" |> by_text(exact: true) |> to_be_visible())
     end
   end
 

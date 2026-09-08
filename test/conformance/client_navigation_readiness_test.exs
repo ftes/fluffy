@@ -27,7 +27,7 @@ defmodule Fluffy.Conformance.ClientNavigationReadinessTest do
 
       :ok = Phoenix.PubSub.broadcast(Fluffy.TestPubSub, topic, {:redirect_ready, message})
 
-      expect(session, Expect.visible(by_text("Broadcast: #{message}", exact: true)))
+      expect(session, "Broadcast: #{message}" |> by_text(exact: true) |> Expect.to_be_visible())
     end
   end
 
@@ -43,7 +43,7 @@ defmodule Fluffy.Conformance.ClientNavigationReadinessTest do
     |> expect(Page.to_have_url("/actions/history-target"))
     |> click(by_role(:button, name: "Back to chamber entrance"))
     |> expect(Page.to_have_url("/actions/history-source"))
-    |> expect(Expect.visible(by_role(:button, name: "Open secret passage")))
+    |> expect(:button |> by_role(name: "Open secret passage") |> Expect.to_be_visible())
   end
 
   @tag driver: :playwright

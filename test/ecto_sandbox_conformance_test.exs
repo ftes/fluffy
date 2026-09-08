@@ -36,18 +36,18 @@ defmodule Fluffy.EctoSandboxConformanceTest do
 
       session
       |> visit("/database")
-      |> expect(visible(by_text("Static values: #{value}")))
+      |> expect("Static values: #{value}" |> by_text() |> to_be_visible())
       |> click(by_role(:link, name: "Open database LiveView", exact: true))
-      |> expect(visible(by_text("Live values: #{value}")))
-      |> expect(visible(by_text("Component count: 1")))
-      |> expect(visible(by_text("Async count: 1")), timeout: 1_000)
-      |> expect(visible(by_text("Delayed count: 1")), timeout: 1_000)
-      |> expect(visible(by_text("Nested count: 1")), timeout: 1_000)
+      |> expect("Live values: #{value}" |> by_text() |> to_be_visible())
+      |> expect("Component count: 1" |> by_text() |> to_be_visible())
+      |> expect("Async count: 1" |> by_text() |> to_be_visible(), timeout: 1_000)
+      |> expect("Delayed count: 1" |> by_text() |> to_be_visible(), timeout: 1_000)
+      |> expect("Nested count: 1" |> by_text() |> to_be_visible(), timeout: 1_000)
       |> click(by_role(:button, name: "Insert event", exact: true))
-      |> expect(visible(by_text("Live values: event, #{value}")))
-      |> expect(visible(by_text("Component count: 2")))
+      |> expect("Live values: event, #{value}" |> by_text() |> to_be_visible())
+      |> expect("Component count: 2" |> by_text() |> to_be_visible())
       |> click(by_role(:link, name: "Back to database page", exact: true))
-      |> expect(visible(by_text("Static values: event, #{value}")))
+      |> expect("Static values: event, #{value}" |> by_text() |> to_be_visible())
 
       assert_receive {:fluffy_test_sandbox_allow, TestRepo, child} when is_pid(child)
     end
@@ -67,11 +67,11 @@ defmodule Fluffy.EctoSandboxConformanceTest do
     refute Map.has_key?(second.context, :browser_id)
     refute first.context.context_id == second.context.context_id
 
-    first |> visit("/database") |> expect(visible(by_text(value)))
-    second |> visit("/database") |> expect(visible(by_text(value)))
+    first |> visit("/database") |> expect(value |> by_text() |> to_be_visible())
+    second |> visit("/database") |> expect(value |> by_text() |> to_be_visible())
 
-    first |> visit("/database") |> expect(visible(by_text(value)))
-    second |> visit("/database") |> expect(visible(by_text(value)))
+    first |> visit("/database") |> expect(value |> by_text() |> to_be_visible())
+    second |> visit("/database") |> expect(value |> by_text() |> to_be_visible())
   end
 
   defp browser_session do
@@ -115,7 +115,7 @@ defmodule Fluffy.EctoSandboxAdoptionTest do
       endpoint: Endpoint
     )
     |> visit("/database")
-    |> expect(visible(by_text("Static values: adopted")))
+    |> expect("Static values: adopted" |> by_text() |> to_be_visible())
   end
 
   test "adopts an existing sandbox allowance without starting another owner", context do
@@ -135,6 +135,6 @@ defmodule Fluffy.EctoSandboxAdoptionTest do
       endpoint: Endpoint
     )
     |> visit("/database")
-    |> expect(visible(by_text("Static values: allowed")))
+    |> expect("Static values: allowed" |> by_text() |> to_be_visible())
   end
 end

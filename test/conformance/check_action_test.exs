@@ -17,15 +17,15 @@ defmodule Fluffy.Conformance.CheckActionTest do
 
       with_html(unquote(driver), html, fn session ->
         session
-        |> expect(checked(checkbox, checked: true))
+        |> expect(to_be_checked(checkbox, checked: true))
         |> check(checkbox)
-        |> expect(checked(checkbox))
+        |> expect(to_be_checked(checkbox))
         |> uncheck(checkbox)
-        |> expect(checked(checkbox, checked: false))
+        |> expect(to_be_checked(checkbox, checked: false))
         |> uncheck(checkbox)
-        |> expect(not_(checked(checkbox)))
+        |> expect(not_(to_be_checked(checkbox)))
         |> check(checkbox)
-        |> expect(checked(checkbox))
+        |> expect(to_be_checked(checkbox))
       end)
     end
 
@@ -41,13 +41,13 @@ defmodule Fluffy.Conformance.CheckActionTest do
 
       with_html(unquote(driver), html, fn session ->
         session
-        |> expect(checked(email))
-        |> expect(not_(checked(sms)))
+        |> expect(to_be_checked(email))
+        |> expect(not_(to_be_checked(sms)))
         |> check(sms)
-        |> expect(not_(checked(email)))
-        |> expect(checked(sms))
+        |> expect(not_(to_be_checked(email)))
+        |> expect(to_be_checked(sms))
         |> check(sms)
-        |> expect(checked(sms))
+        |> expect(to_be_checked(sms))
       end)
     end
 
@@ -70,8 +70,8 @@ defmodule Fluffy.Conformance.CheckActionTest do
       with_html(unquote(driver), html, fn session ->
         session
         |> check(second)
-        |> expect(checked(first))
-        |> expect(checked(second))
+        |> expect(to_be_checked(first))
+        |> expect(to_be_checked(second))
       end)
     end
 
@@ -84,8 +84,8 @@ defmodule Fluffy.Conformance.CheckActionTest do
 
       with_html(unquote(driver), html, fn session ->
         session
-        |> expect(not_(checked(by_role(:radio, name: "Email"))))
-        |> expect(checked(by_role(:radio, name: "SMS")))
+        |> expect(:radio |> by_role(name: "Email") |> to_be_checked() |> not_())
+        |> expect(:radio |> by_role(name: "SMS") |> to_be_checked())
       end)
     end
 
@@ -124,7 +124,7 @@ defmodule Fluffy.Conformance.CheckActionTest do
           "document.querySelector('#construction').indeterminate = true"
         )
       end)
-      |> expect(checked(checkbox, indeterminate: true))
+      |> expect(to_be_checked(checkbox, indeterminate: true))
     end)
   end
 
@@ -134,14 +134,14 @@ defmodule Fluffy.Conformance.CheckActionTest do
 
     with_html(:static, html, fn session ->
       assert_raise Fluffy.CapabilityError, ~r/browser-owned DOM property/, fn ->
-        expect(session, checked(checkbox, indeterminate: true))
+        expect(session, to_be_checked(checkbox, indeterminate: true))
       end
     end)
   end
 
   test "checked options reject Playwright's conflicting state request" do
     assert_raise ArgumentError, ~r/cannot be used together/, fn ->
-      checked(by_role(:checkbox), checked: false, indeterminate: true)
+      :checkbox |> by_role() |> to_be_checked(checked: false, indeterminate: true)
     end
   end
 

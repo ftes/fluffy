@@ -23,7 +23,7 @@ defmodule Fluffy.Conformance.StaticHTTPLinkTest do
       session
       |> visit(TestHTTPFixtures.path(fixture, "/orders/current"))
       |> click(by_role(:link, name: "Next order"))
-      |> expect(visible(by_text("Next order page")))
+      |> expect("Next order page" |> by_text() |> to_be_visible())
       |> expect(Page.to_have_url(TestHTTPFixtures.url(fixture, "/orders/next?state=open#details")))
 
       assert Enum.map(TestHTTPFixtures.requests(fixture), &{&1.path, &1.query}) == [
@@ -46,7 +46,7 @@ defmodule Fluffy.Conformance.StaticHTTPLinkTest do
       session
       |> visit(TestHTTPFixtures.path(fixture, "/absolute"))
       |> click(by_role(:link, name: "Absolute destination"))
-      |> expect(visible(by_text("The guardian sleeps")))
+      |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
       |> expect(Page.to_have_url(destination))
     end
 
@@ -64,7 +64,7 @@ defmodule Fluffy.Conformance.StaticHTTPLinkTest do
       session
       |> visit(TestHTTPFixtures.path(fixture, "/orders/current?state=open"))
       |> click(by_role(:link, name: "Details"))
-      |> expect(visible(by_text("Order details")))
+      |> expect("Order details" |> by_text() |> to_be_visible())
       |> expect(Page.to_have_url(TestHTTPFixtures.url(fixture, "/orders/current?state=open#details")))
 
       assert [_request] = TestHTTPFixtures.requests(fixture)
@@ -100,7 +100,7 @@ defmodule Fluffy.Conformance.StaticHTTPLinkTest do
     session = click(session, by_role(:link, name: "Open counter"))
 
     assert Session.current_driver(session) == :live
-    expect(session, visible(by_text("Sleeping heads: 0")))
+    expect(session, "Sleeping heads: 0" |> by_text() |> to_be_visible())
   end
 
   defp start_test_session(driver) do

@@ -34,7 +34,7 @@ defmodule Fluffy.BackendDriverArchitectureTest do
 
     assert Session.current_driver(navigated_session) == :static
     assert Session.current_page(navigated_session).revision == revision + 1
-    expect(navigated_session, visible(by_text("The guardian sleeps")))
+    expect(navigated_session, "The guardian sleeps" |> by_text() |> to_be_visible())
   end
 
   test "a Live driver reports patches and the Phoenix backend commits them" do
@@ -51,7 +51,7 @@ defmodule Fluffy.BackendDriverArchitectureTest do
     assert Session.current_driver(navigated_session) == :live
     assert Session.current_page(navigated_session).revision == revision + 1
     expect(navigated_session, Page.to_have_url("/live/chamber-map?step=patched"))
-    expect(navigated_session, visible(by_text("Map position: patched")))
+    expect(navigated_session, "Map position: patched" |> by_text() |> to_be_visible())
   end
 
   test "a Static driver reports a returned native conn for backend reconciliation" do
@@ -63,7 +63,7 @@ defmodule Fluffy.BackendDriverArchitectureTest do
     session = Backend.navigate(session, intent)
 
     assert Session.current_driver(session) == :static
-    expect(session, visible(by_text("Native body")))
+    expect(session, "Native body" |> by_text() |> to_be_visible())
   end
 
   defp phoenix_session do

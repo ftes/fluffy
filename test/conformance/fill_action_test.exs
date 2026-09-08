@@ -23,10 +23,10 @@ defmodule Fluffy.Conformance.FillActionTest do
 
       with_html(unquote(driver), html, fn session ->
         session
-        |> expect(value(field, "old@example.com"))
+        |> expect(to_have_value(field, "old@example.com"))
         |> fill(field, "new@example.com")
-        |> expect(value(field, "new@example.com"))
-        |> expect(focused(field))
+        |> expect(to_have_value(field, "new@example.com"))
+        |> expect(to_be_focused(field))
       end)
     end
 
@@ -37,9 +37,9 @@ defmodule Fluffy.Conformance.FillActionTest do
 
       with_html(unquote(driver), html, fn session ->
         session
-        |> expect(value(field, "Initial notes"))
+        |> expect(to_have_value(field, "Initial notes"))
         |> fill(field, "")
-        |> expect(value(field, ""))
+        |> expect(to_have_value(field, ""))
       end)
     end
 
@@ -50,9 +50,9 @@ defmodule Fluffy.Conformance.FillActionTest do
 
       with_html(unquote(driver), html, fn session ->
         session
-        |> expect(editable(editor))
+        |> expect(to_be_editable(editor))
         |> fill(editor, "Updated")
-        |> expect(focused(editor))
+        |> expect(to_be_focused(editor))
       end)
     end
 
@@ -105,9 +105,9 @@ defmodule Fluffy.Conformance.FillActionTest do
 
       with_html(unquote(driver), html, fn session ->
         session
-        |> expect(editable(by_label("Writable")))
-        |> expect(not_(editable(by_label("Readonly"))))
-        |> expect(not_(editable(by_label("Disabled"))))
+        |> expect("Writable" |> by_label() |> to_be_editable())
+        |> expect("Readonly" |> by_label() |> to_be_editable() |> not_())
+        |> expect("Disabled" |> by_label() |> to_be_editable() |> not_())
       end)
     end
 
@@ -122,12 +122,12 @@ defmodule Fluffy.Conformance.FillActionTest do
 
       with_html(unquote(driver), html, fn session ->
         session
-        |> expect(enabled(by_role(:button, name: "Enabled")))
-        |> expect(not_(disabled(by_role(:button, name: "Enabled"))))
-        |> expect(disabled(by_role(:button, name: "Native disabled")))
-        |> expect(disabled(by_role(:button, name: "Fieldset disabled")))
-        |> expect(disabled(by_role(:button, name: "ARIA disabled")))
-        |> expect(not_(enabled(by_role(:button, name: "ARIA disabled"))))
+        |> expect(:button |> by_role(name: "Enabled") |> to_be_enabled())
+        |> expect(:button |> by_role(name: "Enabled") |> to_be_disabled() |> not_())
+        |> expect(:button |> by_role(name: "Native disabled") |> to_be_disabled())
+        |> expect(:button |> by_role(name: "Fieldset disabled") |> to_be_disabled())
+        |> expect(:button |> by_role(name: "ARIA disabled") |> to_be_disabled())
+        |> expect(:button |> by_role(name: "ARIA disabled") |> to_be_enabled() |> not_())
       end)
     end
 
@@ -136,7 +136,7 @@ defmodule Fluffy.Conformance.FillActionTest do
       with_html(unquote(driver), ~s(<input aria-label="Name" aria-readonly="true">), fn session ->
         session
         |> fill(by_label("Name"), "Ada")
-        |> expect(value(by_label("Name"), "Ada"))
+        |> expect("Name" |> by_label() |> to_have_value("Ada"))
       end)
     end
 
@@ -145,7 +145,7 @@ defmodule Fluffy.Conformance.FillActionTest do
       with_html(unquote(driver), ~s(<input type="check" aria-label="Fallback">), fn session ->
         session
         |> fill(by_label("Fallback"), "updated")
-        |> expect(value(by_label("Fallback"), "updated"))
+        |> expect("Fallback" |> by_label() |> to_have_value("updated"))
       end)
     end
 
@@ -158,7 +158,7 @@ defmodule Fluffy.Conformance.FillActionTest do
         with_html(unquote(driver), html, fn session ->
           session
           |> fill(by_label("Specialized"), unquote(value))
-          |> expect(value(by_label("Specialized"), unquote(value)))
+          |> expect("Specialized" |> by_label() |> to_have_value(unquote(value)))
         end)
       end
     end
@@ -175,7 +175,7 @@ defmodule Fluffy.Conformance.FillActionTest do
       with_html(unquote(driver), html, fn session ->
         session
         |> fill(by_label("Allowed"), "new")
-        |> expect(value(by_label("Allowed"), "new"))
+        |> expect("Allowed" |> by_label() |> to_have_value("new"))
 
         assert_raise Fluffy.ActionabilityError, ~r/disabled/, fn ->
           fill(session, by_label("Blocked"), "new", timeout: 5)
@@ -207,10 +207,10 @@ defmodule Fluffy.Conformance.FillActionTest do
         |> fill(by_label("Notes"), "changed")
         |> select_option(by_label("Plan"), "pro")
         |> click(by_role(:button, name: "Reset"))
-        |> expect(value(by_label("Name"), "initial"))
-        |> expect(checked(by_role(:checkbox, name: "Enabled")))
-        |> expect(value(by_label("Notes"), "original"))
-        |> expect(value(by_label("Plan"), "free"))
+        |> expect("Name" |> by_label() |> to_have_value("initial"))
+        |> expect(:checkbox |> by_role(name: "Enabled") |> to_be_checked())
+        |> expect("Notes" |> by_label() |> to_have_value("original"))
+        |> expect("Plan" |> by_label() |> to_have_value("free"))
       end)
     end
 
@@ -230,10 +230,10 @@ defmodule Fluffy.Conformance.FillActionTest do
       with_html(unquote(driver), html, fn session ->
         session
         |> check(first)
-        |> expect(checked(first))
+        |> expect(to_be_checked(first))
         |> click(by_role(:button, name: "Reset"))
-        |> expect(not_(checked(first)))
-        |> expect(checked(second))
+        |> expect(not_(to_be_checked(first)))
+        |> expect(to_be_checked(second))
       end)
     end
   end
@@ -255,9 +255,9 @@ defmodule Fluffy.Conformance.FillActionTest do
 
       session
       |> fill(name, "new")
-      |> expect(value(events, "focus:old|input:new|"))
+      |> expect(to_have_value(events, "focus:old|input:new|"))
       |> blur(name)
-      |> expect(value(events, "focus:old|input:new|change:new|blur:new|"))
+      |> expect(to_have_value(events, "focus:old|input:new|change:new|blur:new|"))
     end)
   end
 

@@ -28,7 +28,7 @@ defmodule Fluffy.Conformance.LiveRedirectReadinessTest do
 
       :ok = Phoenix.PubSub.broadcast(Fluffy.TestPubSub, topic, {:redirect_ready, message})
 
-      expect(session, Expect.visible(by_text("Broadcast: #{message}", exact: true)))
+      expect(session, "Broadcast: #{message}" |> by_text(exact: true) |> Expect.to_be_visible())
     end
   end
 end
