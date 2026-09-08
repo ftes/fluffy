@@ -3,10 +3,9 @@
 The examples use the standard test-module convention from the usage guide:
 `import Fluffy.Expect`, plus aliases for `Fluffy.Event` and `Fluffy.Page`.
 
-Every `wait_for(Event.*(...), action)` call is listener-before-action and
-pipeable. The action callback must return its updated session. Captured keys
-are immutable and results are non-consuming. Fluffy installs the listener
-before it invokes the action callback.
+`wait_for(Event.*(...), action)` installs the listener before running the
+action. Return the updated session from the callback. Captured results can be
+read repeatedly through their keys.
 
 ## Downloads
 
@@ -120,10 +119,5 @@ are Playwright-only because Static and LiveView do not execute application
 JavaScript. This API sets files programmatically; it does not operate the OS
 picker UI.
 
-## Failure artifacts
-
-Setting `FLUFFY_ARTIFACT_DIR` through the Playwright `artifact_dir`
-configuration is recommended. It captures full-page PNG, HTML, and formatted
-exception text when a public Playwright driver operation fails; configure CI
-to upload that directory on failure. A capture error never replaces the actual
-test failure. Artifacts are evidence for debugging, not conformance input.
+See [Browser diagnostics](usage.md#browser-diagnostics) for traces, screenshots,
+and failure artifacts.

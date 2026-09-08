@@ -1,26 +1,12 @@
 # Capability matrix
 
-Version 1 describes Fluffy's initial public compatibility surface. The table
-uses the two backends selected at session startup. The Phoenix backend chooses
-the Static or LiveView driver for every page; the Playwright backend uses the
-Playwright driver.
+The table compares Fluffy's Phoenix and Playwright backends within the
+boundaries described below.
 
-The matrix records which backend provides each feature and where its drivers
-have explicit boundaries.
-
-A status applies only to the feature as described here and in its conformance
-tests; it is not a claim that an Elixir DOM is a complete browser
-implementation.
-
-- **equivalent** — the paired oracle corpus demonstrates the supported public
-  contract;
-- **structural subset** — Phoenix implements DOM-represented facts and names
-  the excluded browser facts;
-- **-** — this backend does not provide the behavior;
-- **experimental** — no stable initial-release contract is advertised.
-
-`-` covers both features that require a browser and features that do not apply
-to that backend.
+- **equivalent** — matching behavior verified against Playwright;
+- **structural subset** — supports HTML-represented state, with browser-only
+  behavior excluded;
+- **-** — unavailable or not applicable.
 
 <!-- capability-matrix:start -->
 | Feature | Phoenix | Playwright |
@@ -60,13 +46,9 @@ to that backend.
 
 ### When to choose Playwright
 
-The Phoenix backend operates on parsed HTML plus Fluffy-owned mutable
-properties. Its drivers deliberately ignore layout, generated content, and
-computed visibility rather than attempting partial CSS analysis; use
-Playwright when a test asserts those facts. Native-validation behavior,
-arbitrary JavaScript, browser network streams, and JavaScript-created events
-are Playwright territory too. The matrix uses `-` for those boundaries rather
-than pretending that server-rendered HTML can bark like a browser.
+Use Playwright for computed style, layout, browser accessibility, native
+validation, arbitrary JavaScript, and browser network events. Phoenix operates
+on parsed HTML and mutable form state.
 
 ### LiveView timing and keyboard events
 
@@ -82,24 +64,15 @@ listeners, and client-side `JS` commands remain Playwright-only.
 
 ### LiveView document and patch boundaries
 
-On a LiveView page, the in-process locator and action surface is limited to the
-DOM owned by the current `Phoenix.LiveViewTest.View`. The dead layout
-surrounding `[data-phx-main]` is part of the browser document but not the
-LiveViewTest event tree, so Fluffy does not merge it into the in-process
-LiveView DOM. Initial outer-layout rendering assertions remain direct
-`Phoenix.ConnTest` response coverage; interactions with that layout use
-Playwright. This prevents a locator from resolving an element that the
-selected in-process driver cannot act upon.
-LiveView `unwrap/2` exposes only the View and therefore does not bypass this
-boundary.
+LiveView locators and actions see the current `Phoenix.LiveViewTest.View`,
+not the surrounding dead layout. Use `Phoenix.ConnTest` for initial
+outer-layout HTML assertions or Playwright for full-document interactions.
+LiveView `unwrap/2` receives only the View.
 
 ### Browser baseline
 
-The stable compatibility baseline is pinned Chromium. Firefox and WebKit
-support is inherited from Playwright rather than verified by a duplicate
-Fluffy engine matrix. Known platform differences remain tagged in the
-conformance corpus so applications selecting another engine have explicit
-boundaries without weakening the shared Chromium contract.
+Fluffy verifies compatibility against pinned Chromium. Firefox and WebKit are
+available through Playwright but are not covered by Fluffy's conformance suite.
 
 ### Phoenix.HTML actions and dialogs
 
@@ -114,41 +87,22 @@ remain browser-only.
 
 ### Forms and files
 
-An `equivalent` form claim applies to the supported form model, not general
-native constraint validation. Static and LiveView bypass native validation and
-submit structurally; only Playwright models invalid events and blocking. The
-claim also excludes browser sanitization/defaults for specialized scalar input
-states and custom/form-associated elements. Static does reproduce multipart
-text entries and browser-shaped empty-file entries when no file has been
-selected. The file-selection row covers bounded local paths and typed in-memory
-payloads, ordered multiple selection, clearing, ordinary multipart forms, and
-the paired managed-LiveView validation, progress, cancellation, replacement,
-auto-upload, and submission lifecycle. Native picker UI, external uploaders,
-directories, drag-and-drop, and arbitrary `FileList` mutation remain outside
-that contract. `Event.file_chooser/2` is separately Playwright-only because it
-depends on application JavaScript opening a browser chooser. Static and LiveView
-retain specialized scalar input values as supplied strings; Playwright remains
-the browser-semantics oracle.
+Static and LiveView bypass native validation and retain specialized scalar
+input values as supplied strings. Use Playwright for validation events and
+blocking, browser sanitization/defaults, and custom or form-associated elements.
 
-### URL matching
+File selection supports bounded local paths and typed in-memory payloads,
+ordered multiple selection, clearing, and ordinary multipart forms, including
+empty-file entries. Managed LiveView uploads support validation, progress,
+cancellation, replacement, auto-upload, and submission.
 
-`Page.to_have_url/1` runs one matcher against the canonical serialized page URL
-for Static, LiveView, and Playwright. Exact strings include query serialization
-and fragment; relative strings resolve against the session base URL. Elixir
-regular expressions see the same complete string on every driver.
-
-The structured form can select `:path`, `:query`, and `:fragment`. Omitted
-components are ignored. Query matching decodes names and values with
-URLSearchParams semantics, ignores distinct-name order, and retains repeated
-value order and duplicates. Exact mode rejects unrelated names; subset mode
-allows them while requiring the complete ordered values for every requested
-name.
+Native picker UI, external uploaders, directories, drag-and-drop, and arbitrary
+`FileList` mutation are unsupported. `Event.file_chooser/2` requires Playwright
+because application JavaScript opens the chooser.
 
 ### Native escape hatch
 
-`Fluffy.unwrap/2` is deliberately absent from the equivalence rows. It is one
-public entry point to three driver-native APIs, not a portable behavior:
-Static receives a `Plug.Conn`, LiveView receives a LiveViewTest `View`, and
-Playwright receives a `Fluffy.Playwright.Handle`. Conformance checks only
-the resulting state through ordinary shared assertions. Lifecycle and
-listener-before-action behaviors remain owned by the named Fluffy APIs.
+`Fluffy.unwrap/2` exposes driver-specific APIs: `Plug.Conn`,
+`Phoenix.LiveViewTest.View`, or `Fluffy.Playwright.Handle`. Use the shared event
+and page APIs for lifecycle operations. See
+[Native escape hatch](usage.md#native-escape-hatch) for callback behavior.

@@ -10,58 +10,6 @@ defp deps do
 end
 ```
 
-## JavaScript and browser
-
-The browser process uses the JavaScript Playwright package installed by the
-consumer application. The initial pinned contract is Playwright 1.63.0:
-
-```bash
-pnpm add --save-dev playwright@1.63.0
-pnpm exec playwright install chromium
-```
-
-Configure its CLI path in `config/test.exs`:
-
-```elixir
-config :fluffy,
-  file_input_max_bytes: 10_000_000,
-  playwright: [
-    enabled: true,
-    engine: :chromium,
-    executable: Path.expand("../node_modules/playwright/cli.js", __DIR__),
-    timeout: 15_000,
-    launch_options: [headless: true],
-    artifact_dir: System.get_env("FLUFFY_ARTIFACT_DIR"),
-    trace_dir: System.get_env("FLUFFY_TRACE_DIR", "traces"),
-    js_logger: Fluffy.Playwright.ConsoleLogger
-  ]
-```
-
-`file_input_max_bytes` bounds the aggregate bytes Fluffy will snapshot for
-one `set_input_files/3,4` action. It applies to local paths and in-memory
-payloads on all three drivers and can be overridden with the action's
-`max_bytes:` option. Fluffy checks path metadata before reading file bytes
-and checks the actual snapshot again afterward.
-
-Setting `artifact_dir` is recommended for every project that runs Playwright
-tests. Fluffy writes HTML, a full-page screenshot, and the formatted error
-there when a public browser operation fails. Use a writable per-run directory
-locally and configure CI to upload it when the test job fails; artifact capture
-does not run for successful operations.
-
-The default console logger sends browser `console` messages and uncaught page
-errors through Elixir's `Logger`; set `js_logger: false` to disable it or
-configure another module implementing `PlaywrightEx.JsLogger`. Trace files are
-created only when a test calls `Fluffy.Playwright.trace/1,2`.
-
-Use `:firefox` or `:webkit` only after installing the corresponding browser.
-Playwright provides cross-engine compatibility; Fluffy uses pinned Chromium
-as its browser-backed conformance baseline.
-Fluffy launches one browser lazily per configured runtime lane and creates a
-fresh isolated `BrowserContext` for each session. ExUnit `max_cases` is the
-default concurrency bound; Fluffy does not add a second pool limiter.
-Lower it when browser startup or the host becomes resource-constrained.
-
 ## Phoenix endpoint
 
 Configure your application endpoint once in `config/test.exs`. Fluffy uses
@@ -85,6 +33,51 @@ global values for multi-endpoint or dynamic-server tests.
 The application's normal browser bundle must connect its LiveSocket. A
 Playwright visit containing a LiveView root waits for `phx-connected` before it
 returns.
+
+## Playwright setup
+
+Only the Playwright backend needs JavaScript and a browser. Install the tested
+Playwright version in your application:
+
+```bash
+pnpm add --save-dev playwright@1.63.0
+pnpm exec playwright install chromium
+```
+
+Configure its CLI path in `config/test.exs`:
+
+```elixir
+config :fluffy,
+  playwright: [
+    enabled: true,
+    engine: :chromium,
+    executable: Path.expand("../node_modules/playwright/cli.js", __DIR__),
+    timeout: 15_000,
+    launch_options: [headless: true],
+    artifact_dir: System.get_env("FLUFFY_ARTIFACT_DIR"),
+    trace_dir: System.get_env("FLUFFY_TRACE_DIR", "traces"),
+    js_logger: Fluffy.Playwright.ConsoleLogger
+  ]
+```
+
+Setting `artifact_dir` is recommended for every project that runs Playwright
+tests. Fluffy writes HTML, a full-page screenshot, and the formatted error
+there when a public browser operation fails. Use a writable per-run directory
+locally and configure CI to upload it when the test job fails; artifact capture
+does not run for successful operations.
+
+The default console logger sends browser `console` messages and uncaught page
+errors through Elixir's `Logger`; set `js_logger: false` to disable it or
+configure another module implementing `PlaywrightEx.JsLogger`. Trace files are
+created only when a test calls `Fluffy.Playwright.trace/1,2`.
+
+Use `:firefox` or `:webkit` only after installing the corresponding browser.
+Playwright provides cross-engine compatibility; Fluffy uses pinned Chromium
+as its browser-backed conformance baseline.
+Fluffy launches one browser lazily per configured runtime lane and creates a
+fresh isolated `BrowserContext` for each session. ExUnit `max_cases` is the
+default concurrency bound; Fluffy does not add a second pool limiter.
+Lower it when browser startup or the host becomes resource-constrained.
 
 ## Ecto sandbox
 
@@ -160,3 +153,14 @@ header and allowance value must be passed to the endpoint plug, and
 application may instead retain its own LiveView/channel hook when additional
 ownership rules require application state; use the same encoded metadata and
 call `Phoenix.Ecto.SQL.Sandbox.allow/2` there.
+
+## Upload limits
+
+```elixir
+config :fluffy, file_input_max_bytes: 10_000_000
+```
+
+`file_input_max_bytes` bounds the aggregate bytes Fluffy will snapshot for
+one `set_input_files/3,4` action. It applies to local paths and in-memory
+payloads on all three drivers and can be overridden with the action's
+`max_bytes:` option.

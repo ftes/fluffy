@@ -1,17 +1,14 @@
 # Usage
 
 Start each test with the Phoenix (`:phoenix`) or Playwright (`:playwright`)
-backend and keep the rest focused on the user's journey. Most application
-tests should run once. The Phoenix backend automatically selects the Static
+backend. The Phoenix backend automatically selects the Static
 (`Phoenix.ConnTest`) or LiveView (`Phoenix.LiveViewTest`) driver for each page
 and can transition between them as the user navigates. Use Playwright when the
 behavior depends on JavaScript or other browser-owned capabilities.
 
 ## Your first test
 
-Import the actions, locators, and expectation constructors, and keep session
-startup in a small test helper. Always import `Fluffy.Expect`: the enclosing
-`expect(...)` call makes an additional `Expect.` prefix redundant.
+Import the actions, locators, and expectation constructors:
 
 ```elixir
 defmodule MyAppWeb.ChamberAccessTest do
@@ -22,16 +19,13 @@ defmodule MyAppWeb.ChamberAccessTest do
   import Fluffy.Locator
 
   alias Fluffy.Page
-  alias Fluffy.Playwright
 
   setup context do
     Fluffy.Test.setup(context)
   end
 
-  defp start_app_session(backend \\ :phoenix), do: start_session(backend)
-
   test "opens the Chamber of Secrets" do
-    start_app_session()
+    start_session(:phoenix)
     |> visit("/chamber")
     |> fill(by_label("Student"), "Hermione Granger")
     |> fill(by_label("Password"), "parseltongue")
@@ -41,42 +35,6 @@ defmodule MyAppWeb.ChamberAccessTest do
   end
 end
 ```
-
-Page-specific assertions live on `Fluffy.Page`, which keeps them
-discoverable separately from locator expectations:
-
-```elixir
-alias Fluffy.Page
-
-session
-|> expect(Page.to_have_title("Chamber of Secrets"))
-|> expect(Page.to_have_title(~r/^Chamber/))
-|> expect(not_(Page.to_have_title("Chamber sealed")))
-```
-
-Title expectations follow Playwright's retrying, whitespace-normalized
-`toHaveTitle` behavior. On LiveViews they also observe later `@page_title`
-updates.
-
-URL expectations use the same page namespace. Strings and regular expressions
-match the complete canonical URL. Use the structured form when query
-serialization order is not part of the contract:
-
-```elixir
-session
-|> expect(Page.to_have_url(path: "/potions"))
-|> expect(
-  Page.to_have_url(
-    path: "/potions",
-    query: %{"state" => "brewing", "ingredient" => ["lacewing", "boomslang"]},
-    query_mode: :subset
-  )
-)
-```
-
-The path-only form ignores query and fragment. Structured queries decode like
-`URLSearchParams`: distinct parameter-name order is ignored, repeated values
-remain ordered, and subset mode permits unrelated names.
 
 Every operation returns the updated `Fluffy.Session`, so an ordinary Elixir
 pipeline represents the user's journey. The lifecycle established by
@@ -109,12 +67,12 @@ throttle suppression rather than the resulting application state.
 
 Use `:playwright` when the behavior depends on JavaScript, browser layout,
 native-validation events or blocking, dialogs, request/response events, or
-another capability shown as unavailable on Phoenix. With the helper above,
-the choice is local to the test:
+another capability shown as unavailable on Phoenix. Choose the backend when
+starting the session:
 
 ```elixir
 test "updates the preview rendered by a JavaScript hook" do
-  start_app_session(:playwright)
+  start_session(:playwright)
   |> visit("/creatures/new")
   |> fill(by_label("Name"), "Basilisk")
   |> expect(by_text("Preview: Basilisk") |> to_be_visible())
@@ -125,12 +83,56 @@ A Playwright session owns an isolated BrowserContext. Create another session
 for another isolated user; pages opened inside one session share that user's
 cookies and storage.
 
-Application suites run each scenario once. Give it the backend its behavior
-requires. Paired Phoenix and Playwright runs belong to Fluffy's internal
-conformance suite; they prove the library's portability contract without
-duplicating consumer tests.
+See the [capability matrix](capabilities.md) for backend differences.
 
-The full boundary is listed in the [capability matrix](capabilities.md).
+### Shared test case
+
+Put shared imports and session setup in an application-owned `FluffyCase`.
+Keep your ordinary `ConnCase` for fixtures, routes, and sandbox setup, then
+start the Fluffy session after it:
+
+```elixir
+# test/support/fluffy_case.ex
+defmodule MyAppWeb.FluffyCase do
+  use ExUnit.CaseTemplate
+
+  using do
+    quote do
+      use MyAppWeb.ConnCase
+
+      import Fluffy
+      import Fluffy.Locator
+      import Fluffy.Expect
+
+      alias Fluffy.Event
+      alias Fluffy.Page
+
+      setup context do
+        :ok = Fluffy.Test.setup(context)
+        %{session: Fluffy.start_session(Map.get(context, :backend, :phoenix))}
+      end
+    end
+  end
+end
+```
+
+Tests receive `session` in their context and default to Phoenix. Use
+`@moduletag backend: :playwright` for an entire module, `@describetag` for a
+describe block, or `@tag` for one test—without a separate browser test module:
+
+```elixir
+defmodule MyAppWeb.PotionTest do
+  use MyAppWeb.FluffyCase, async: true
+
+  @tag backend: :playwright
+  test "brews a potion through a JavaScript hook", %{session: session} do
+    session
+    |> visit("/potions")
+    |> click(by_role(:button, name: "Brew potion"))
+    |> expect(by_text("Potion brewed") |> to_be_visible())
+  end
+end
+```
 
 ## Locators
 
@@ -195,9 +197,7 @@ session
 |> expect(by_label("All ingredients") |> to_be_checked(indeterminate: true))
 ```
 
-Static and LiveView raise `Fluffy.CapabilityError` for indeterminate state
-instead of guessing about a DOM property that only application JavaScript can
-set.
+Static and LiveView raise `Fluffy.CapabilityError` for indeterminate state.
 
 LiveView expectations observe fresh renders and retry transient missing or
 actionability failures until their deadline. Static expectations are
@@ -213,12 +213,70 @@ The Playwright driver applies native constraint validation; the Static and
 LiveView drivers deliberately bypass it and submit the current structural form
 state.
 
-On a LiveView page, the shared `Enter`, `Space`, and `Tab` actions also deliver
-plain or `JS.push`-only `phx-keydown`/`phx-keyup` bindings. `phx-key` filtering,
-window bindings, `phx-target`, current values, and default-action ordering are
-covered by the paired browser corpus. Use Playwright for modified key chords,
-repeat or debounce timing, custom LiveSocket metadata, inline listeners, and
-bindings that run client-side `JS` commands such as `JS.dispatch`.
+LiveView supports declarative Enter, Space, and Tab handlers. Use Playwright
+for more complex keyboard behavior; see
+[LiveView timing and keyboard events](capabilities.md#liveview-timing-and-keyboard-events).
+
+## Page assertions
+
+Page-specific assertions live on `Fluffy.Page`, which keeps them
+discoverable separately from locator expectations:
+
+```elixir
+alias Fluffy.Page
+
+session
+|> expect(Page.to_have_title("Chamber of Secrets"))
+|> expect(Page.to_have_title(~r/^Chamber/))
+|> expect(not_(Page.to_have_title("Chamber sealed")))
+```
+
+Title expectations follow Playwright's retrying, whitespace-normalized
+`toHaveTitle` behavior. On LiveViews they also observe later `@page_title`
+updates.
+
+URL expectations use the same page namespace. Strings and regular expressions
+match the complete canonical URL. Use the structured form when query
+serialization order is not part of the contract:
+
+```elixir
+session
+|> expect(Page.to_have_url(path: "/potions"))
+|> expect(
+  Page.to_have_url(
+    path: "/potions",
+    query: %{"state" => "brewing", "ingredient" => ["lacewing", "boomslang"]},
+    query_mode: :subset
+  )
+)
+```
+
+Exact URL strings include the query and fragment; relative strings resolve
+against the session base URL. Structured matching can select `:path`, `:query`,
+and `:fragment`; omitted components are ignored.
+
+Structured queries decode like `URLSearchParams`: distinct parameter-name
+order is ignored, and repeated values retain their order and duplicates.
+Exact query mode rejects unrelated names; `query_mode: :subset` allows them
+while requiring all values for each requested name.
+
+### Reloading
+
+Use `reload/1` to reload the active document:
+
+```elixir
+session
+|> visit("/chambers/secrets")
+|> expect(by_role(:heading, name: "Chamber of Secrets") |> to_be_visible())
+|> reload()
+|> expect(by_role(:heading, name: "Chamber of Secrets") |> to_be_visible())
+|> expect(Page.to_have_url("/chambers/secrets"))
+```
+
+The Phoenix backend dispatches the current URL again and selects the driver for
+the returned document. The Playwright backend uses the page's native reload.
+`reload/1` promises a fresh document, not preservation of unsaved client-side
+state.
 
 ## Files and uploads
 
@@ -256,55 +314,14 @@ Playwright can also capture a script-opened chooser before the triggering
 click. Pass its result key to `set_input_files/4`; see
 [Advanced events and pages](advanced-events.md#file-choosers).
 
-## Reloading
-
-Use `reload/1` to reload the active document:
-
-```elixir
-session
-|> visit("/chambers/secrets")
-|> expect(by_role(:heading, name: "Chamber of Secrets") |> to_be_visible())
-|> reload()
-|> expect(by_role(:heading, name: "Chamber of Secrets") |> to_be_visible())
-|> expect(Page.to_have_url("/chambers/secrets"))
-```
-
-The Phoenix backend dispatches the current URL again and selects the driver for
-the returned document. The Playwright backend uses the page's native reload.
-`reload/1` promises a fresh document, not preservation of unsaved client-side
-state.
-
-## Browser-only evaluation
-
-Use `Fluffy.Playwright.evaluate/2` when a Playwright test needs a value from
-the active page:
-
-```elixir
-session
-|> then(fn session ->
-  data_url =
-    Playwright.evaluate(
-      session,
-      "document.querySelector('canvas').toDataURL()"
-    )
-
-  assert data_url =~ "data:image/png"
-  session
-end)
-|> click(by_role(:button, name: "Reveal diary message"))
-```
-
-`evaluate/2` returns the JavaScript result, not the session. Use `then/2`, as
-above, to continue a pipeline. Function-style expressions can pass
-`is_function: true` and `arg:`. Phoenix sessions raise a capability error
-instead of pretending to execute client code.
-
 ## Browser diagnostics
 
 Start a context-wide trace explicitly when debugging a Playwright scenario:
 
 ```elixir
-start_app_session(:playwright)
+alias Fluffy.Playwright
+
+start_session(:playwright)
 |> Playwright.trace(open: false)
 |> visit("/potions/polyjuice")
 |> step("Brew Polyjuice Potion", fn session ->
@@ -333,12 +350,40 @@ The configured Playwright console logger reports browser console messages and
 uncaught page errors without turning them into assertions. Separately,
 `artifact_dir` enables best-effort HTML, screenshot, and formatted-error files
 when a public browser operation fails. Diagnostic capture never replaces the
-original operation error.
+original operation error. See [Playwright setup](installation.md#playwright-setup)
+for artifact, trace, and logger configuration.
 
 Downloads, popups, navigation metadata, dialogs, and network events require a
 listener to be installed before the triggering action. Use the pipeable
 `wait_for(Event.*(...))` APIs described in
 [Advanced events and pages](advanced-events.md).
+
+## Browser-only evaluation
+
+Use `Fluffy.Playwright.evaluate/2` when a Playwright test needs a value from
+the active page:
+
+```elixir
+alias Fluffy.Playwright
+
+session
+|> then(fn session ->
+  data_url =
+    Playwright.evaluate(
+      session,
+      "document.querySelector('canvas').toDataURL()"
+    )
+
+  assert data_url =~ "data:image/png"
+  session
+end)
+|> click(by_role(:button, name: "Reveal diary message"))
+```
+
+`evaluate/2` returns the JavaScript result, not the session. Use `then/2`, as
+above, to continue a pipeline. Function-style expressions can pass
+`is_function: true` and `arg:`. Phoenix sessions raise a capability error
+instead of pretending to execute client code.
 
 ## Native escape hatch
 
@@ -371,17 +416,3 @@ navigation, pages, downloads, dialogs, requests, and responses with
 `wait_for(Event.*(...))`; manage named pages with `switch_page` and
 `close_page`. Closing a tracked page/context or creating an untracked page
 through `unwrap/2` is unsupported.
-
-Native callbacks do not promise portability between drivers. If an operation is
-repeated often—or Fluffy must own its timing, cleanup, or result—it is a good
-candidate for a small first-class API.
-
-## One backend per scenario
-
-Choose the backend at session startup and keep the rest of the test focused on
-the user journey. Use Phoenix unless the behavior under test depends on a real
-browser. In that case, run the scenario with Playwright—not once with each.
-
-Fluffy's own conformance corpus is parameterized across drivers because the
-library must prove its shared semantics. That machinery is deliberately not a
-consumer testing pattern.
