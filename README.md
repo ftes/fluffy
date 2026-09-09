@@ -15,7 +15,9 @@ documented in the [capability matrix](docs/capabilities.md).
 
 **Coming from PhoenixTest? Keep Phoenix and browser tests in the same module.**
 Fluffy adds strict, composable locators and
-assertion retries and action waiting for LiveView and browser tests. Switch to browser within the same test module simply by adding `@tag backend: :playwright`. 
+assertion retries and action waiting for LiveView and browser tests.
+Mix non-browser and browser tests in a single test module -
+simply add `@tag backend: :playwright` to select tests.
 [See the mixed-module example and differences →](docs/migration-from-phoenix-test.md)
 
 ```elixir
@@ -137,9 +139,7 @@ The pipeline stays familiar; actions and expectations use composable locators:
 
 See [Migrating from PhoenixTest](docs/migration-from-phoenix-test.md) for the
 full translation table and behavior differences.
-
-Even `:phoenix` checks structural visibility. See
-[Visibility and DOM presence](docs/usage.md#visibility-and-dom-presence) before
+See [Visibility and DOM presence](docs/usage.md#visibility-and-dom-presence) before
 translating `assert_has` or `refute_has` into visibility assertions.
 
 ## Beyond page interactions
