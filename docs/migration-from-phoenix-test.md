@@ -4,7 +4,40 @@ Fluffy replaces PhoenixTest helpers with composable locators, explicit form
 submission, and a shared Phoenix/Playwright API. This guide covers the setup
 and behavior differences that matter when converting tests.
 
-## Test-module setup
+## Phoenix and browser tests in the same module
+
+Keep related tests together, sharing fixtures, helpers, and the same actions
+and assertions. Run ordinary Phoenix tests in process and choose a real
+browser only for the tests that need JavaScript or browser behavior.
+
+With the shared [`FluffyCase` recipe](usage.md#shared-test-case), Phoenix is
+the default; one tag selects Playwright for an individual test:
+
+```elixir
+defmodule MyAppWeb.PotionTest do
+  use MyAppWeb.FluffyCase, async: true
+
+  test "lists the available potions", %{session: session} do
+    session
+    |> visit("/potions")
+    |> assert(visible(by_text("Polyjuice Potion")))
+  end
+
+  @tag backend: :playwright
+  test "brews a potion through a JavaScript hook", %{session: session} do
+    session
+    |> visit("/potions")
+    |> click(by_role(:button, name: "Brew potion"))
+    |> assert(visible(by_text("Potion brewed")))
+  end
+end
+```
+
+The first test uses ConnTest or LiveViewTest; the second uses Playwright.
+The backend tag is interpreted by your shared `FluffyCase` setup. You can
+also select a backend for a describe block or an entire module.
+
+### Test-module setup
 
 Replace PhoenixTest-specific setup with the shared
 [`FluffyCase` recipe](usage.md#shared-test-case). It imports the API, creates a

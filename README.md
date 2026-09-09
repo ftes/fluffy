@@ -13,9 +13,10 @@ Fluffy runs tests through ConnTest, LiveViewTest, or a real browser. Its
 in-process drivers are checked against Playwright. Driver differences are
 documented in the [capability matrix](docs/capabilities.md).
 
-**Coming from PhoenixTest?** Fluffy adds strict, composable locators, per-test
-backend selection within one module, and assertion retries and action waiting
-for LiveView and browser tests. [See the differences →](docs/migration-from-phoenix-test.md)
+**Coming from PhoenixTest? Keep Phoenix and browser tests in the same module.**
+Fluffy adds strict, composable locators and
+assertion retries and action waiting for LiveView and browser tests. Switch to browser within the same test module simply by adding `@tag backend: :playwright`. 
+[See the mixed-module example and differences →](docs/migration-from-phoenix-test.md)
 
 ```elixir
 creature_row =

@@ -125,6 +125,12 @@ describe block, or `@tag` for one test—without a separate browser test module:
 defmodule MyAppWeb.PotionTest do
   use MyAppWeb.FluffyCase, async: true
 
+  test "lists the available potions", %{session: session} do
+    session
+    |> visit("/potions")
+    |> assert(visible(by_text("Polyjuice Potion")))
+  end
+
   @tag backend: :playwright
   test "brews a potion through a JavaScript hook", %{session: session} do
     session
