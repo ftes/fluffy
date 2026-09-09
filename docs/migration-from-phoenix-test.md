@@ -47,6 +47,34 @@ ordinary `ConnCase` for fixtures, routes, and sandbox setup.
 See [Installation and runtime](installation.md) for endpoint, Playwright, and
 Ecto sandbox configuration.
 
+## Actionability checks and waiting, even without a browser
+
+Fluffy's Phoenix backend checks each action's prerequisites: for example,
+`click` rejects disabled or structurally hidden targets, and `fill` requires
+an enabled, editable control. For clicks, fills, checks, and selections,
+LiveView retries temporarily missing targets and applicable state changes:
+disabled controls, hidden click targets, readonly fill targets, and missing
+select options. Static checks immediately.
+
+PhoenixTest already rejects disabled buttons in its LiveView driver, but does
+not provide these structural click checks and LiveView action retries.
+Separate assertions that only establish an action's prerequisites are usually
+redundant. Perform the action and assert its outcome instead:
+
+```elixir
+session
+|> fill(by_label("Potion name"), "Polyjuice Potion")
+|> click(by_role(:button, name: "Save potion"))
+|> assert(page_url(path: "/potions"))
+```
+
+Keep explicit state assertions when visibility, enablement, or editability is
+itself the behavior under test. The checks differ by action: Phoenix `fill`
+does not check visibility, and file uploads allow hidden or disabled inputs.
+Phoenix does not compute CSS layout or detect overlapping elements. See
+[Actionability checks and waiting](usage.md#actionability-checks-and-waiting)
+for the per-action rules and browser differences.
+
 ## Common rewrites
 
 Start with these common translations; matching and form differences are

@@ -212,6 +212,52 @@ immediate. Playwright uses the browser's native waiting behavior. Pass
 `timeout:` to an action or expectation when a particular operation needs a
 different deadline.
 
+### Actionability checks and waiting
+
+Playwright already checks each action's prerequisites and waits automatically
+for the target to be ready. As elsewhere in Fluffy, Playwright is the model we
+follow, with the Phoenix-specific limits described below. Usually you can act
+directly and assert the result, without first asserting that the target is ready:
+
+```elixir
+session
+|> fill(by_label("Potion name"), "Polyjuice Potion")
+|> click(by_role(:button, name: "Save potion"))
+|> assert(page_url(path: "/potions"))
+```
+
+The Phoenix backend checks HTML structure and control state. Each action
+requires exactly one matching target, with these additional checks:
+
+| Action | Phoenix checks | LiveView also retries while… |
+| --- | --- | --- |
+| `click` | enabled; no `hidden` attribute on the target | the target is disabled or hidden |
+| `fill` | enabled, supported editable control, not readonly | the target is disabled or readonly |
+| `check` / `uncheck` | checkbox/radio type; enabled when changing state | the target is disabled and needs changing |
+| `select_option` | enabled select; requested options exist and are enabled | the select is disabled or a requested option is missing |
+| `set_input_files` | file input; multiple files require `multiple` | checks immediately, including target lookup |
+
+For `click`, `fill`, `check` / `uncheck`, and `select_option`, LiveView also
+retries missing targets until the action deadline. Ambiguous locators and invalid control types fail immediately. Static checks immediately
+without waiting for later changes. A checkbox already in the requested state
+needs no mutation; unchecking a checked radio is invalid.
+
+These are action-specific rules, not a blanket visibility requirement. Phoenix
+`fill` does not check visibility, and `set_input_files` intentionally accepts
+hidden or disabled file inputs. Locator matching may itself exclude hidden
+elements; see [Visibility and DOM presence](#visibility-and-dom-presence).
+
+Phoenix does not compute CSS layout or detect overlapping elements.
+Playwright uses the browser's action-specific checks: for example, `fill`
+waits for rendered visibility, enablement, and editability, while `click`
+also waits for stability and the target to receive pointer events.
+
+Keep separate assertions when the state itself is the behavior under test,
+such as a button becoming enabled after a required field is filled.
+`assert(enabled(locator))` does not imply visibility, and neither does
+`refute(disabled(locator))`; the latter is the same negation as
+`assert(not_(disabled(locator)))` with `not_/1` imported from `Fluffy.Expect`.
+
 ### Form submission and keyboard actions
 
 Use `submit(form_locator)` when the intent is native form submission without a
