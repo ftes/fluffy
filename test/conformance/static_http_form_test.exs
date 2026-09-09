@@ -5,7 +5,6 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.Page
   alias Fluffy.TestHTTPFixtures
 
   for driver <- [:phoenix, :playwright] do
@@ -42,7 +41,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       |> click(by_role(:button, name: "Search"))
       |> expect("Search results" |> by_text() |> to_be_visible())
       |> expect(
-        Page.to_have_url(
+        Fluffy.Expect.page_to_have_url(
           TestHTTPFixtures.url(
             fixture,
             "/forms/search?token=abc&query=fluffy+test&scope=open&sort=newest&commit=Search#results"
@@ -117,7 +116,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       |> fill(by_label("Notes"), "line one")
       |> click(by_role(:button, name: "Save order"))
       |> expect("Order saved" |> by_text() |> to_be_visible())
-      |> expect(Page.to_have_url(TestHTTPFixtures.url(fixture, "/forms/submit?source=form#receipt")))
+      |> expect(Fluffy.Expect.page_to_have_url(TestHTTPFixtures.url(fixture, "/forms/submit?source=form#receipt")))
 
       [_source, submission] = TestHTTPFixtures.requests(fixture)
       assert submission.method == "POST"
@@ -415,7 +414,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
         |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
         |> click(by_role(:button, name: "Save"))
         |> expect("Redirected receipt" |> by_text() |> to_be_visible())
-        |> expect(Page.to_have_url(TestHTTPFixtures.url(fixture, "/forms/receipt")))
+        |> expect(Fluffy.Expect.page_to_have_url(TestHTTPFixtures.url(fixture, "/forms/receipt")))
 
         [_source, submission, redirected] = TestHTTPFixtures.requests(fixture)
         assert submission.method == "POST"

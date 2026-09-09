@@ -2,10 +2,10 @@ defmodule Fluffy.Conformance.LiveRedirectReadinessTest do
   use Fluffy.TestCase, async: true
 
   import Fluffy
+  import Fluffy.Expect
   import Fluffy.Locator
 
   alias Fluffy.Expect
-  alias Fluffy.Page
 
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
@@ -24,7 +24,7 @@ defmodule Fluffy.Conformance.LiveRedirectReadinessTest do
       session =
         session
         |> visit("/redirect/live-ready?topic=#{topic}")
-        |> expect(Page.to_have_url("/live/redirect-ready?topic=#{topic}"))
+        |> expect(Expect.page_to_have_url("/live/redirect-ready?topic=#{topic}"))
 
       :ok = Phoenix.PubSub.broadcast(Fluffy.TestPubSub, topic, {:redirect_ready, message})
 

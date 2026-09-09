@@ -2,10 +2,10 @@ defmodule Fluffy.Conformance.LiveEventNavigationReadinessTest do
   use Fluffy.TestCase, async: true
 
   import Fluffy
+  import Fluffy.Expect
   import Fluffy.Locator
 
   alias Fluffy.Expect
-  alias Fluffy.Page
 
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
@@ -21,7 +21,7 @@ defmodule Fluffy.Conformance.LiveEventNavigationReadinessTest do
         session
         |> visit("/live/chamber-map?topic=#{topic}")
         |> click(by_role(:button, name: "Navigate ready", exact: true))
-        |> expect(Page.to_have_url("/live/redirect-ready?topic=#{topic}"))
+        |> expect(Expect.page_to_have_url("/live/redirect-ready?topic=#{topic}"))
 
       :ok = Phoenix.PubSub.broadcast(Fluffy.TestPubSub, topic, {:redirect_ready, message})
 
@@ -36,7 +36,7 @@ defmodule Fluffy.Conformance.LiveEventNavigationReadinessTest do
       |> start_test_session()
       |> visit("/live/chamber-map")
       |> click(by_role(:link, name: "Reveal passage", exact: true))
-      |> expect(Page.to_have_url("/live/chamber-map?step=patched"))
+      |> expect(Expect.page_to_have_url("/live/chamber-map?step=patched"))
       |> expect("Map position: patched" |> by_text(exact: true) |> Expect.to_be_visible())
     end
   end

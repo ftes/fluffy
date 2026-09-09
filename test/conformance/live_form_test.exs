@@ -5,8 +5,6 @@ defmodule Fluffy.Conformance.LiveFormTest do
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.Page
-
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
     test "unchanged sticky LiveView renders preserve entered form values with #{driver}", %{driver: driver} do
@@ -217,7 +215,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
       |> visit("/live/potions")
       |> click(by_role(:button, name: "Bottle and enter chamber"))
       |> expect("The secret chamber is open" |> by_text() |> to_be_visible())
-      |> expect(Page.to_have_url(Fluffy.TestServer.base_url() <> "/live/secret-chamber"))
+      |> expect(Fluffy.Expect.page_to_have_url(Fluffy.TestServer.base_url() <> "/live/secret-chamber"))
     end
 
     @tag driver: driver
@@ -230,7 +228,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
       |> visit("/live/potions")
       |> click(by_role(:button, name: "Leave potion lab"))
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
-      |> expect(Page.to_have_url(Fluffy.TestServer.base_url() <> "/chamber?from=live-form"))
+      |> expect(Fluffy.Expect.page_to_have_url(Fluffy.TestServer.base_url() <> "/chamber?from=live-form"))
     end
 
     @tag driver: driver
@@ -244,7 +242,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
       |> fill(by_label("Cauldron controlled"), "silver dust")
       |> click(by_role(:button, name: "Send potion over HTTP"))
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
-      |> expect(Page.to_have_url(query: %{"profile[stubborn]" => "silver dust"}, query_mode: :subset))
+      |> expect(Fluffy.Expect.page_to_have_url(query: %{"profile[stubborn]" => "silver dust"}, query_mode: :subset))
     end
 
     @tag driver: driver
@@ -256,7 +254,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
       |> visit("/live/potions")
       |> click(by_role(:button, name: "Trigger from elsewhere", exact: true))
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
-      |> expect(Page.to_have_url(Fluffy.TestServer.base_url() <> "/chamber?from=external-trigger"))
+      |> expect(Fluffy.Expect.page_to_have_url(Fluffy.TestServer.base_url() <> "/chamber?from=external-trigger"))
     end
 
     @tag driver: driver
@@ -266,7 +264,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
       |> visit("/live/potions")
       |> click(by_role(:button, name: "Patch and trigger", exact: true))
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
-      |> expect(Page.to_have_url(Fluffy.TestServer.base_url() <> "/chamber?from=external-trigger"))
+      |> expect(Fluffy.Expect.page_to_have_url(Fluffy.TestServer.base_url() <> "/chamber?from=external-trigger"))
     end
 
     @tag driver: driver
@@ -276,7 +274,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
       |> visit("/live/potions")
       |> click(by_role(:button, name: "Redirect and trigger", exact: true))
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
-      |> expect(Page.to_have_url(Fluffy.TestServer.base_url() <> "/chamber?from=trigger-redirect"))
+      |> expect(Fluffy.Expect.page_to_have_url(Fluffy.TestServer.base_url() <> "/chamber?from=trigger-redirect"))
     end
 
     @tag driver: driver
@@ -286,7 +284,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
       |> visit("/live/potions")
       |> click(by_role(:button, name: "Navigate and trigger", exact: true))
       |> expect("The secret chamber is open" |> by_text() |> to_be_visible())
-      |> expect(Page.to_have_url(Fluffy.TestServer.base_url() <> "/live/secret-chamber"))
+      |> expect(Fluffy.Expect.page_to_have_url(Fluffy.TestServer.base_url() <> "/live/secret-chamber"))
     end
 
     @tag driver: driver
@@ -296,7 +294,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
       |> visit("/live/potions")
       |> click(by_role(:button, name: "Trigger multiple", exact: true))
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
-      |> expect(Page.to_have_url(Fluffy.TestServer.base_url() <> "/chamber?from=second-trigger"))
+      |> expect(Fluffy.Expect.page_to_have_url(Fluffy.TestServer.base_url() <> "/chamber?from=second-trigger"))
     end
 
     @tag driver: driver
@@ -306,7 +304,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
       |> visit("/live/potions")
       |> click(by_role(:button, name: "Show trigger form", exact: true))
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
-      |> expect(Page.to_have_url(Fluffy.TestServer.base_url() <> "/chamber?from=dynamic-trigger"))
+      |> expect(Fluffy.Expect.page_to_have_url(Fluffy.TestServer.base_url() <> "/chamber?from=dynamic-trigger"))
     end
   end
 

@@ -1,11 +1,9 @@
 defmodule FluffyConsumer.AdoptionTest do
   use ExUnit.Case, async: true
+  use Fluffy.Assert
 
   import Fluffy
-  import Fluffy.Expect
   import Fluffy.Locator
-
-  alias Fluffy.Page
 
   setup context do
     Fluffy.Test.setup(context)
@@ -18,10 +16,10 @@ defmodule FluffyConsumer.AdoptionTest do
 
       session
       |> visit("/")
-      |> expect(by_role(:heading, name: "External consumer") |> to_have_count(1))
+      |> assert(by_role(:heading, name: "External consumer") |> count(1))
       |> click(by_role(:link, name: "Continue"))
-      |> expect(by_text("Consumer complete") |> to_be_visible())
-      |> expect(Page.to_have_url("/complete"))
+      |> assert(by_text("Consumer complete") |> visible())
+      |> assert(page_url("/complete"))
     end
 
     @tag backend: backend
@@ -45,7 +43,7 @@ defmodule FluffyConsumer.AdoptionTest do
               timeout: handle.timeout
             )
       end)
-      |> expect(by_text("Native result") |> to_be_visible())
+      |> assert(by_text("Native result") |> visible())
     end
   end
 end

@@ -1,14 +1,15 @@
 defmodule Fluffy.Expect do
   @moduledoc """
   Typed locator, active-page, and captured-result assertion values executed by
-  `Fluffy.expect/2`.
+  `Fluffy.Expect.expect/2`.
 
-  Active page expectations live on `Fluffy.Page`. Captured-result expectations
-  live on `Fluffy.Download`, `Fluffy.Dialog`, `Fluffy.Navigation`,
-  `Fluffy.Request`, and `Fluffy.Response`.
+  Page and captured-result constructors use target prefixes such as
+  `page_to_have_url/2` and `response_to_have_status/3`.
+  Import this module to use `expect/2`, `not_/1`, and all constructors.
+  For ExUnit-style names, use `Fluffy.Assert`.
 
   Assertion constructors use fluent `to_be_*` names for states and `to_have_*`
-  names for properties, matching the page assertions in `Fluffy.Page`.
+  names for properties.
 
   Every expectation constructor accepts the shared timeout option. Captured-result
   assertions inspect an already retained result immediately; their timeout option
@@ -22,11 +23,16 @@ defmodule Fluffy.Expect do
   """
   @moduledoc groups: ["Locator assertions"]
 
+  alias Fluffy.Expect
   alias Fluffy.Locator
   alias Fluffy.Options
+  alias Fluffy.Session
+  alias Fluffy.URLMatcher
 
   @enforce_keys [:target, :kind]
   defstruct [:target, :kind, :expected, options: [], negated?: false]
+
+  @dialyzer {:nowarn_function, expect: 3}
 
   @type target ::
           {:locator, Locator.t()}
@@ -89,6 +95,30 @@ defmodule Fluffy.Expect do
 
   @type option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema()))
   @type checked_option :: unquote(NimbleOptions.option_typespec(Options.checked_expectation_schema()))
+
+  @doc "Executes an expectation and returns the unchanged or reconciled session."
+  @spec expect(Session.t(), t(), [option()]) :: Session.t()
+  def expect(%Session{} = session, %Expect{} = expectation, options \\ []) do
+    expectation =
+      expectation
+      |> Expect.merge_options(options)
+      |> normalize_expectation(session)
+
+    case expectation.target do
+      {:locator, _locator} ->
+        Fluffy.__expect__(session, expectation)
+
+      :page ->
+        expect_active_page(session, expectation)
+
+      {type, key} when type in [:download, :dialog, :navigation, :request, :response] ->
+        expect_captured_result(session, type, key, expectation)
+    end
+  end
+
+  @doc "Negates an expectation while preserving its target and options."
+  @spec not_(t()) :: t()
+  def not_(%__MODULE__{} = expectation), do: negate(expectation)
 
   @doc group: "Locator assertions"
   @spec to_have_count(Locator.t(), non_neg_integer(), [option()]) :: t()
@@ -165,6 +195,374 @@ defmodule Fluffy.Expect do
   @spec to_have_values(Locator.t(), [term()], [option()]) :: t()
   def to_have_values(%Locator{} = locator, expected, options \\ []) when is_list(expected) do
     new({:locator, locator}, :values, expected, options)
+  end
+
+  @doc group: "Assertions"
+  @doc """
+  Expects the active page title to equal a string or match a regular expression.
+
+  Like Playwright's `toHaveTitle`, the assertion retries on Live and Playwright
+  pages and normalizes whitespace before matching.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.expectation_schema())}
+  """
+  @spec page_to_have_title(Fluffy.Page.title_expectation()) :: Expect.t()
+  @spec page_to_have_title(Fluffy.Page.title_expectation(), [Expect.option()]) :: Expect.t()
+  def page_to_have_title(expected, options \\ [])
+      when (is_binary(expected) or is_struct(expected, Regex)) and is_list(options) do
+    Expect.new(:page, :title, expected, options)
+  end
+
+  @doc group: "Assertions"
+  @doc """
+  Expects the active page to have the requested URL.
+
+  A string matches the complete canonical absolute URL after resolving a
+  relative value against the session base URL. A regular expression matches
+  that complete serialized URL.
+
+  A keyword list selects structured components. `:path` and `:fragment` are
+  exact serialized component values; omit either to ignore it. `:fragment`
+  excludes the leading `#`, and `fragment: nil` requires no fragment.
+
+  `:query` is a map from decoded parameter names to one value or an ordered
+  list of repeated values. Ordering between distinct names is ignored while
+  repeated-value order is retained. Bare names and names with an empty value
+  both decode to `""`; `+` and `%20` both decode to a space. Exact mode is the
+  default. `query_mode: :subset` permits unrelated names but still requires
+  the complete ordered value list for each requested name.
+
+  ## Structured components
+
+  #{NimbleOptions.docs(Options.url_matcher_schema())}
+
+  ## Assertion options
+
+  #{NimbleOptions.docs(Options.expectation_schema())}
+  """
+  @spec page_to_have_url(Fluffy.Page.url_expectation()) :: Expect.t()
+  @spec page_to_have_url(Fluffy.Page.url_expectation(), [Expect.option()]) :: Expect.t()
+  def page_to_have_url(expected, options \\ [])
+
+  def page_to_have_url(expected, options) when (is_binary(expected) or is_struct(expected, Regex)) and is_list(options) do
+    Expect.new(:page, :url, expected, options)
+  end
+
+  def page_to_have_url(components, options) when is_list(components) and is_list(options) do
+    Expect.new(:page, :url, URLMatcher.new!(components), options)
+  end
+
+  @doc group: "Assertions"
+  @doc "Expects the active page's normalized main-resource status."
+  @spec page_to_have_status(non_neg_integer(), [Expect.option()]) :: Expect.t()
+  def page_to_have_status(expected, options \\ []) when is_integer(expected) and expected >= 0 do
+    Expect.new(:page, :status, expected, options)
+  end
+
+  @doc group: "Assertions"
+  @doc "Expects the active page to name the requested opener page."
+  @spec page_to_have_opener(term(), [Expect.option()]) :: Expect.t()
+  def page_to_have_opener(expected, options \\ []) when is_list(options) do
+    Expect.new(:page, :opener, expected, options)
+  end
+
+  @doc group: "Assertions"
+  @doc """
+  Expects the captured download's suggested filename to equal the supplied value.
+  """
+  @spec download_to_have_suggested_filename(term(), String.t(), [Expect.option()]) :: Expect.t()
+  def download_to_have_suggested_filename(key, expected, options \\ []) when is_binary(expected) do
+    Expect.new({:download, key}, :download_suggested_filename, expected, options)
+  end
+
+  @doc group: "Assertions"
+  @doc """
+  Expects the captured download's content type to equal the supplied value.
+  """
+  @spec download_to_have_content_type(term(), String.t(), [Expect.option()]) :: Expect.t()
+  def download_to_have_content_type(key, expected, options \\ []) when is_binary(expected) do
+    Expect.new({:download, key}, :download_content_type, expected, options)
+  end
+
+  @doc group: "Assertions"
+  @doc """
+  Expects the complete downloaded bytes to equal the supplied binary; no text decoding is
+  performed.
+  """
+  @spec download_to_have_content(term(), binary(), [Expect.option()]) :: Expect.t()
+  def download_to_have_content(key, expected, options \\ []) when is_binary(expected) do
+    Expect.new({:download, key}, :download_content, expected, options)
+  end
+
+  @doc group: "Assertions"
+  @doc """
+  Expects the download size in bytes.
+  """
+  @spec download_to_have_size(term(), non_neg_integer(), [Expect.option()]) :: Expect.t()
+  def download_to_have_size(key, expected, options \\ []) when is_integer(expected) and expected >= 0 do
+    Expect.new({:download, key}, :download_size, expected, options)
+  end
+
+  @doc group: "Assertions"
+  @doc """
+  Expects the captured download URL to match a string, regex, or structured components.
+
+  Strings match exactly and regexes match against the complete captured URL.
+  Relative strings are not resolved. Structured keywords use the same path,
+  query, and fragment rules as `Fluffy.Expect.page_to_have_url/2`.
+  """
+  @spec download_to_have_url(term(), Fluffy.Page.url_expectation(), [Expect.option()]) :: Expect.t()
+  def download_to_have_url(key, expected, options \\ [])
+
+  def download_to_have_url(key, expected, options) when is_binary(expected) or is_struct(expected, Regex) do
+    Expect.new({:download, key}, :download_url, expected, options)
+  end
+
+  def download_to_have_url(key, components, options) when is_list(components) do
+    Expect.new({:download, key}, :download_url, URLMatcher.new!(components), options)
+  end
+
+  @doc group: "Assertions"
+  @doc """
+  Expects the captured dialog's type to equal the supplied value.
+  """
+  @spec dialog_to_have_type(term(), term(), [Expect.option()]) :: Expect.t()
+  def dialog_to_have_type(key, expected, options \\ []) do
+    Expect.new({:dialog, key}, :dialog_type, expected, options)
+  end
+
+  @doc group: "Assertions"
+  @doc """
+  Expects the captured dialog's message to equal the supplied value.
+  """
+  @spec dialog_to_have_message(term(), String.t(), [Expect.option()]) :: Expect.t()
+  def dialog_to_have_message(key, expected, options \\ []) when is_binary(expected) do
+    Expect.new({:dialog, key}, :dialog_message, expected, options)
+  end
+
+  @doc group: "Assertions"
+  @doc """
+  Expects the captured dialog's default value to equal the supplied value.
+  """
+  @spec dialog_to_have_default_value(term(), String.t(), [Expect.option()]) :: Expect.t()
+  def dialog_to_have_default_value(key, expected, options \\ []) when is_binary(expected) do
+    Expect.new({:dialog, key}, :dialog_default_value, expected, options)
+  end
+
+  @doc group: "Assertions"
+  @doc """
+  Expects the captured dialog's action to equal the supplied value.
+  """
+  @spec dialog_to_have_action(term(), term(), [Expect.option()]) :: Expect.t()
+  def dialog_to_have_action(key, expected, options \\ []) do
+    Expect.new({:dialog, key}, :dialog_action, expected, options)
+  end
+
+  @doc group: "Assertions"
+  @doc """
+  Expects the captured dialog's prompt text to equal the supplied value.
+  """
+  @spec dialog_to_have_prompt_text(term(), term(), [Expect.option()]) :: Expect.t()
+  def dialog_to_have_prompt_text(key, expected, options \\ []) do
+    Expect.new({:dialog, key}, :dialog_prompt_text, expected, options)
+  end
+
+  @doc group: "Assertions"
+  @doc """
+  Expects the captured navigation URL to match a string, regex, or structured components.
+
+  Strings match exactly and regexes match against the complete captured URL.
+  Relative strings are not resolved. Structured keywords use the same path,
+  query, and fragment rules as `Fluffy.Expect.page_to_have_url/2`.
+  """
+  @spec navigation_to_have_url(term(), Fluffy.Page.url_expectation(), [Expect.option()]) :: Expect.t()
+  def navigation_to_have_url(key, expected, options \\ [])
+
+  def navigation_to_have_url(key, expected, options) when is_binary(expected) or is_struct(expected, Regex) do
+    Expect.new({:navigation, key}, :navigation_url, expected, options)
+  end
+
+  def navigation_to_have_url(key, components, options) when is_list(components) do
+    Expect.new({:navigation, key}, :navigation_url, URLMatcher.new!(components), options)
+  end
+
+  @doc group: "Assertions"
+  @doc """
+  Expects the captured navigation source URL to match a string, regex, or structured components.
+
+  Strings match exactly and regexes match against the complete captured URL.
+  Relative strings are not resolved. Structured keywords use the same path,
+  query, and fragment rules as `Fluffy.Expect.page_to_have_url/2`.
+  """
+  @spec navigation_to_have_from_url(term(), Fluffy.Page.url_expectation(), [Expect.option()]) :: Expect.t()
+  def navigation_to_have_from_url(key, expected, options \\ [])
+
+  def navigation_to_have_from_url(key, expected, options) when is_binary(expected) or is_struct(expected, Regex) do
+    Expect.new({:navigation, key}, :navigation_from_url, expected, options)
+  end
+
+  def navigation_to_have_from_url(key, components, options) when is_list(components) do
+    Expect.new({:navigation, key}, :navigation_from_url, URLMatcher.new!(components), options)
+  end
+
+  @doc group: "Assertions"
+  @doc """
+  Expects the captured navigation's status to equal the supplied value.
+  """
+  @spec navigation_to_have_status(term(), integer(), [Expect.option()]) :: Expect.t()
+  def navigation_to_have_status(key, expected, options \\ []) when is_integer(expected) do
+    Expect.new({:navigation, key}, :navigation_status, expected, options)
+  end
+
+  @doc group: "Assertions"
+  @doc """
+  Expects the captured request's method to equal the supplied value.
+  """
+  @spec request_to_have_method(term(), String.t(), [Expect.option()]) :: Expect.t()
+  def request_to_have_method(key, expected, options \\ []) when is_binary(expected) do
+    Expect.new({:request, key}, :request_method, expected, options)
+  end
+
+  @doc group: "Assertions"
+  @doc """
+  Expects the captured request URL to match a string, regex, or structured components.
+
+  Strings match exactly and regexes match against the complete captured URL.
+  Relative strings are not resolved. Structured keywords use the same path,
+  query, and fragment rules as `Fluffy.Expect.page_to_have_url/2`.
+  """
+  @spec request_to_have_url(term(), Fluffy.Page.url_expectation(), [Expect.option()]) :: Expect.t()
+  def request_to_have_url(key, expected, options \\ [])
+
+  def request_to_have_url(key, expected, options) when is_binary(expected) or is_struct(expected, Regex) do
+    Expect.new({:request, key}, :request_url, expected, options)
+  end
+
+  def request_to_have_url(key, components, options) when is_list(components) do
+    Expect.new({:request, key}, :request_url, URLMatcher.new!(components), options)
+  end
+
+  @doc group: "Assertions"
+  @doc """
+  Expects the captured request headers to include every supplied key/value pair. Additional
+  headers are allowed.
+  """
+  @spec request_to_have_headers(term(), map(), [Expect.option()]) :: Expect.t()
+  def request_to_have_headers(key, expected, options \\ []) when is_map(expected) do
+    Expect.new({:request, key}, :request_headers, expected, options)
+  end
+
+  @doc group: "Assertions"
+  @doc """
+  Expects the captured request's resource type to equal the supplied value.
+  """
+  @spec request_to_have_resource_type(term(), String.t(), [Expect.option()]) :: Expect.t()
+  def request_to_have_resource_type(key, expected, options \\ []) when is_binary(expected) do
+    Expect.new({:request, key}, :request_resource_type, expected, options)
+  end
+
+  @doc group: "Assertions"
+  @doc """
+  Expects the captured request's post data to equal the supplied value.
+  """
+  @spec request_to_have_post_data(term(), String.t(), [Expect.option()]) :: Expect.t()
+  def request_to_have_post_data(key, expected, options \\ []) when is_binary(expected) do
+    Expect.new({:request, key}, :request_post_data, expected, options)
+  end
+
+  @doc group: "Assertions"
+  @doc """
+  Expects the captured request's page to equal the supplied value.
+  """
+  @spec request_to_have_page(term(), term(), [Expect.option()]) :: Expect.t()
+  def request_to_have_page(key, expected, options \\ []) do
+    Expect.new({:request, key}, :request_page, expected, options)
+  end
+
+  @doc group: "Assertions"
+  @doc """
+  Expects the HTTP method of the request that produced this response.
+  """
+  @spec response_to_have_request_method(term(), String.t(), [Expect.option()]) :: Expect.t()
+  def response_to_have_request_method(key, expected, options \\ []) when is_binary(expected) do
+    Expect.new({:response, key}, :response_method, expected, options)
+  end
+
+  @doc group: "Assertions"
+  @doc """
+  Expects the captured response URL to match a string, regex, or structured components.
+
+  Strings match exactly and regexes match against the complete captured URL.
+  Relative strings are not resolved. Structured keywords use the same path,
+  query, and fragment rules as `Fluffy.Expect.page_to_have_url/2`.
+  """
+  @spec response_to_have_url(term(), Fluffy.Page.url_expectation(), [Expect.option()]) :: Expect.t()
+  def response_to_have_url(key, expected, options \\ [])
+
+  def response_to_have_url(key, expected, options) when is_binary(expected) or is_struct(expected, Regex) do
+    Expect.new({:response, key}, :response_url, expected, options)
+  end
+
+  def response_to_have_url(key, components, options) when is_list(components) do
+    Expect.new({:response, key}, :response_url, URLMatcher.new!(components), options)
+  end
+
+  @doc group: "Assertions"
+  @doc """
+  Expects the captured response headers to include every supplied key/value pair. Additional
+  headers are allowed.
+  """
+  @spec response_to_have_headers(term(), map(), [Expect.option()]) :: Expect.t()
+  def response_to_have_headers(key, expected, options \\ []) when is_map(expected) do
+    Expect.new({:response, key}, :response_headers, expected, options)
+  end
+
+  @doc group: "Assertions"
+  @doc """
+  Expects the captured response's resource type to equal the supplied value.
+  """
+  @spec response_to_have_resource_type(term(), String.t(), [Expect.option()]) :: Expect.t()
+  def response_to_have_resource_type(key, expected, options \\ []) when is_binary(expected) do
+    Expect.new({:response, key}, :response_resource_type, expected, options)
+  end
+
+  @doc group: "Assertions"
+  @doc """
+  Expects the associated request payload to equal the supplied string. This does not inspect the
+  response body.
+  """
+  @spec response_to_have_request_post_data(term(), String.t(), [Expect.option()]) :: Expect.t()
+  def response_to_have_request_post_data(key, expected, options \\ []) when is_binary(expected) do
+    Expect.new({:response, key}, :response_post_data, expected, options)
+  end
+
+  @doc group: "Assertions"
+  @doc """
+  Expects the captured response's status to equal the supplied value.
+  """
+  @spec response_to_have_status(term(), integer(), [Expect.option()]) :: Expect.t()
+  def response_to_have_status(key, expected, options \\ []) when is_integer(expected) do
+    Expect.new({:response, key}, :response_status, expected, options)
+  end
+
+  @doc group: "Assertions"
+  @doc """
+  Expects the captured response's status text to equal the supplied value.
+  """
+  @spec response_to_have_status_text(term(), String.t(), [Expect.option()]) :: Expect.t()
+  def response_to_have_status_text(key, expected, options \\ []) when is_binary(expected) do
+    Expect.new({:response, key}, :response_status_text, expected, options)
+  end
+
+  @doc group: "Assertions"
+  @doc """
+  Expects the captured response's page to equal the supplied value.
+  """
+  @spec response_to_have_page(term(), term(), [Expect.option()]) :: Expect.t()
+  def response_to_have_page(key, expected, options \\ []) do
+    Expect.new({:response, key}, :response_page, expected, options)
   end
 
   @doc false
@@ -247,7 +645,7 @@ defmodule Fluffy.Expect do
   end
 
   defp positive_description(%__MODULE__{target: :page, kind: :url, expected: expected}) do
-    "active page to have URL #{Fluffy.URLMatcher.describe(expected)}"
+    "active page to have URL #{URLMatcher.describe(expected)}"
   end
 
   defp positive_description(%__MODULE__{target: :page, kind: :status, expected: expected}) do
@@ -286,7 +684,7 @@ defmodule Fluffy.Expect do
         _ -> kind |> Atom.to_string() |> String.split("_", parts: 2) |> List.last() |> String.replace("_", " ")
       end
 
-    "to have #{property} #{Fluffy.URLMatcher.describe(expected)}"
+    "to have #{property} #{URLMatcher.describe(expected)}"
   end
 
   defp maybe_negated(description, false), do: description
@@ -298,4 +696,75 @@ defmodule Fluffy.Expect do
     |> String.replace(~r/\s+/u, " ")
     |> String.trim()
   end
+
+  defp expect_active_page(%Session{} = session, %Expect{kind: :url} = expectation) do
+    Fluffy.__expect__(session, expectation)
+  end
+
+  defp expect_active_page(%Session{} = session, %Expect{kind: :title} = expectation) do
+    Fluffy.__expect__(session, expectation)
+  end
+
+  defp expect_active_page(%Session{} = session, %Expect{kind: :status} = expectation) do
+    actual = Session.current_page(session).status
+    assert_expected!(expectation, actual)
+    session
+  end
+
+  defp expect_active_page(%Session{} = session, %Expect{kind: :opener} = expectation) do
+    actual = Session.current_page(session).opener
+    assert_expected!(expectation, actual)
+    session
+  end
+
+  defp expect_active_page(_session, %Expect{} = expectation) do
+    raise ArgumentError, "unsupported active page expectation: #{Expect.describe(expectation)}"
+  end
+
+  defp expect_captured_result(%Session{} = session, type, key, %Expect{} = expectation) do
+    result = Session.fetch_result!(session, key, type)
+    field = Expect.result_field(expectation)
+    actual = Map.fetch!(result, field)
+    actual = if expectation.kind == :download_size, do: byte_size(actual), else: actual
+
+    assert_expected!(expectation, actual)
+    session
+  end
+
+  defp assert_expected!(%Expect{kind: :request_headers} = expectation, actual) do
+    expected = expectation.expected
+    passed? = Map.take(actual, Map.keys(expected)) == expected
+    assert_expectation_truth!(expectation, passed?, actual)
+  end
+
+  defp assert_expected!(%Expect{kind: :response_headers} = expectation, actual) do
+    expected = expectation.expected
+    passed? = Map.take(actual, Map.keys(expected)) == expected
+    assert_expectation_truth!(expectation, passed?, actual)
+  end
+
+  defp assert_expected!(%Expect{kind: kind} = expectation, actual)
+       when kind in [:download_url, :navigation_url, :navigation_from_url, :request_url, :response_url] do
+    assert_expectation_truth!(expectation, URLMatcher.matches?(expectation.expected, actual), actual)
+  end
+
+  defp assert_expected!(%Expect{} = expectation, actual) do
+    assert_expectation_truth!(expectation, Expect.matches?(expectation.expected, actual), actual)
+  end
+
+  defp assert_expectation_truth!(%Expect{} = expectation, passed?, actual) do
+    if passed? == expectation.negated? do
+      raise ExUnit.AssertionError,
+        message: "Expected #{Expect.describe(expectation)}, got #{inspect(actual)}"
+    end
+
+    :ok
+  end
+
+  defp normalize_expectation(%Expect{target: :page, kind: :url, expected: expected} = expectation, session)
+       when is_binary(expected) do
+    %{expectation | expected: Fluffy.Backend.absolute_url(session, expected)}
+  end
+
+  defp normalize_expectation(%Expect{} = expectation, _session), do: expectation
 end

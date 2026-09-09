@@ -143,17 +143,21 @@ defmodule Fluffy.Playwright do
   rather than the Fluffy session. Use Elixir's `then/2` when a pipeline needs
   the value and then should continue with the session:
 
+      import Fluffy
+      import Fluffy.Locator
+      alias Fluffy.Playwright
+
       session
       |> then(fn session ->
-        title = Fluffy.Playwright.evaluate(session, "document.title")
-        assert title == "Settings"
+        title = Playwright.evaluate(session, "document.title")
+        assert title == "Potions classroom"
         session
       end)
-      |> Fluffy.click(Fluffy.Locator.by_role(:button, name: "Continue"))
+      |> click(by_role(:button, name: "Continue"))
 
   For function-style expressions, pass `is_function: true` and `arg:`:
 
-      Fluffy.Playwright.evaluate(session, "selector => document.querySelector(selector).textContent",
+      Playwright.evaluate(session, "selector => document.querySelector(selector).textContent",
         is_function: true,
         arg: "#status"
       )

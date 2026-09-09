@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.0 — 2026-09-09
+
+### Changed
+
+- **Breaking:** consolidate assertion execution, negation, and constructors in `Fluffy.Expect`. Import it for `expect` and `not_`. Page and captured-result constructors now use target prefixes, such as `page_to_have_url` and `response_to_have_status`; the old constructors on subject modules are removed.
+- Add `use Fluffy.Assert` for pipeable `assert` and `refute`, with short constructors such as `visible`, `page_url`, and `response_status`. Ordinary ExUnit assertions remain available.
+
+### Fixed
+
+- Correct negated count expectations in the Static driver.
+
 ## 0.2.0 — 2026-09-08
 
 ### Changed

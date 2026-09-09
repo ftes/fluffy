@@ -46,16 +46,16 @@ defmodule Fluffy.Conformance.PageEventTest do
       session
       |> switch_page(:details)
       |> expect("Details page" |> by_text() |> to_be_visible())
-      |> expect(Page.to_have_url(details_url))
-      |> expect(Page.to_have_status(202))
-      |> expect(Page.to_have_opener(:main))
+      |> expect(Fluffy.Expect.page_to_have_url(details_url))
+      |> expect(Fluffy.Expect.page_to_have_status(202))
+      |> expect(Fluffy.Expect.page_to_have_opener(:main))
       |> close_page()
 
     assert page_names(session) == [:main]
 
     session
     |> expect("Opener" |> by_text() |> to_be_visible())
-    |> expect(Page.to_have_url(opener_url))
+    |> expect(Fluffy.Expect.page_to_have_url(opener_url))
   end
 
   @tag driver: :playwright
@@ -89,10 +89,10 @@ defmodule Fluffy.Conformance.PageEventTest do
       |> visit(TestHTTPFixtures.path(fixture, "/start"))
       |> wait_for(Event.popup(:receipt), &click(&1, by_role(:button, name: "Buy now")))
       |> expect("Opener" |> by_text() |> to_be_visible())
-      |> expect(Page.to_have_url(opener_url))
+      |> expect(Fluffy.Expect.page_to_have_url(opener_url))
       |> switch_page(:receipt)
       |> expect("Receipt page" |> by_text() |> to_be_visible())
-      |> expect(Page.to_have_url(receipt_url))
+      |> expect(Fluffy.Expect.page_to_have_url(receipt_url))
 
     [_source, submission] = TestHTTPFixtures.requests(fixture)
     assert submission.method == "POST"
@@ -100,7 +100,7 @@ defmodule Fluffy.Conformance.PageEventTest do
 
     session
     |> close_page()
-    |> expect(Page.to_have_url(opener_url))
+    |> expect(Fluffy.Expect.page_to_have_url(opener_url))
   end
 
   for driver <- [:static, :live] do

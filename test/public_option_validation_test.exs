@@ -4,7 +4,6 @@ defmodule Fluffy.PublicOptionValidationTest do
   alias Fluffy.Event
   alias Fluffy.Expect
   alias Fluffy.Locator
-  alias Fluffy.Page
   alias Fluffy.Playwright
 
   setup do
@@ -52,19 +51,19 @@ defmodule Fluffy.PublicOptionValidationTest do
 
   test "page expectation options share expectation validation" do
     assert_raise NimbleOptions.ValidationError, ~r/:timeout.*non[- ]negative integer/, fn ->
-      Page.to_have_title("Accounts", timeout: -1)
+      Expect.page_to_have_title("Accounts", timeout: -1)
     end
 
     assert_raise NimbleOptions.ValidationError, ~r/:query_mode.*:exact.*:subset/, fn ->
-      Page.to_have_url(path: "/accounts", query_mode: :some)
+      Expect.page_to_have_url(path: "/accounts", query_mode: :some)
     end
 
     assert_raise NimbleOptions.ValidationError, ~r/:query.*map/, fn ->
-      Page.to_have_url(query: [{"id", "5"}])
+      Expect.page_to_have_url(query: [{"id", "5"}])
     end
 
     assert_raise NimbleOptions.ValidationError, ~r/:timeout.*non[- ]negative integer/, fn ->
-      Page.to_have_opener(:main, timeout: -1)
+      Expect.page_to_have_opener(:main, timeout: -1)
     end
   end
 
@@ -76,9 +75,9 @@ defmodule Fluffy.PublicOptionValidationTest do
     refute function_exported?(Expect, :page_opener, 2)
     refute function_exported?(Event, :page, 1)
 
-    assert %Expect{target: :page, kind: :url} = Page.to_have_url("/accounts")
-    assert %Expect{target: :page, kind: :status} = Page.to_have_status(200)
-    assert %Expect{target: :page, kind: :opener} = Page.to_have_opener(:main)
+    assert %Expect{target: :page, kind: :url} = Expect.page_to_have_url("/accounts")
+    assert %Expect{target: :page, kind: :status} = Expect.page_to_have_status(200)
+    assert %Expect{target: :page, kind: :opener} = Expect.page_to_have_opener(:main)
   end
 
   test "action options fail before reaching a driver", %{session: session, button: button} do

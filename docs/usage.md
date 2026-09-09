@@ -8,39 +8,41 @@ behavior depends on JavaScript or other browser-owned capabilities.
 
 ## Your first test
 
-Import the actions, locators, and expectation constructors:
+Import the actions and locators; `use Fluffy.Assert` imports the assertion vocabulary:
 
 ```elixir
-defmodule MyAppWeb.ChamberAccessTest do
+defmodule MyAppWeb.CreatureTest do
   use ExUnit.Case, async: true
+  use Fluffy.Assert
 
   import Fluffy
-  import Fluffy.Expect
   import Fluffy.Locator
-
-  alias Fluffy.Page
 
   setup context do
     Fluffy.Test.setup(context)
   end
 
-  test "opens the Chamber of Secrets" do
+  test "puts Fluffy to sleep" do
     start_session(:phoenix)
-    |> visit("/chamber")
-    |> fill(by_label("Student"), "Hermione Granger")
-    |> fill(by_label("Password"), "parseltongue")
-    |> click(by_role(:button, name: "Open chamber"))
-    |> expect(by_text("The chamber is open") |> to_be_visible())
-    |> expect(Page.to_have_url("/chambers/secrets"))
+    |> visit("/creatures/fluffy")
+    |> fill(by_label("Keeper"), "Rubeus Hagrid")
+    |> click(by_role(:button, name: "Play flute"))
+    |> assert(visible(by_text("Asleep")))
+    |> assert(page_url("/creatures/fluffy"))
   end
 end
 ```
 
-Every operation returns the updated `Fluffy.Session`, so an ordinary Elixir
+Actions and assertions return the updated `Fluffy.Session`, so an ordinary Elixir
 pipeline represents the user's journey. The lifecycle established by
 `Fluffy.Test.setup/1` closes every session when the test finishes.
 
-The example assumes `config :fluffy, endpoint: MyAppWeb.Endpoint` in
+The examples describe an illustrative Hogwarts application; routes, controls,
+and event handlers must exist in the application under test. Later snippets
+assume the same imports and an initialized `session`. Upload examples also
+require the named fixture files.
+
+The first example assumes `config :fluffy, endpoint: MyAppWeb.Endpoint` in
 `config/test.exs`. Fluffy derives the base URL from the endpoint. Explicit
 session options remain available for tests that target another endpoint or
 origin.
@@ -75,7 +77,7 @@ test "updates the preview rendered by a JavaScript hook" do
   start_session(:playwright)
   |> visit("/creatures/new")
   |> fill(by_label("Name"), "Basilisk")
-  |> expect(by_text("Preview: Basilisk") |> to_be_visible())
+  |> assert(visible(by_text("Preview: Basilisk")))
 end
 ```
 
@@ -85,7 +87,7 @@ cookies and storage.
 
 See the [capability matrix](capabilities.md) for backend differences.
 
-### Shared test case
+## Shared test case
 
 Put shared imports and session setup in an application-owned `FluffyCase`.
 Keep your ordinary `ConnCase` for fixtures, routes, and sandbox setup, then
@@ -99,17 +101,16 @@ defmodule MyAppWeb.FluffyCase do
   using do
     quote do
       use MyAppWeb.ConnCase
+      use Fluffy.Assert
 
       import Fluffy
       import Fluffy.Locator
-      import Fluffy.Expect
 
       alias Fluffy.Event
-      alias Fluffy.Page
 
       setup context do
         :ok = Fluffy.Test.setup(context)
-        %{session: Fluffy.start_session(Map.get(context, :backend, :phoenix))}
+        %{session: start_session(Map.get(context, :backend, :phoenix))}
       end
     end
   end
@@ -129,7 +130,7 @@ defmodule MyAppWeb.PotionTest do
     session
     |> visit("/potions")
     |> click(by_role(:button, name: "Brew potion"))
-    |> expect(by_text("Potion brewed") |> to_be_visible())
+    |> assert(visible(by_text("Potion brewed")))
   end
 end
 ```
@@ -140,15 +141,15 @@ Prefer locators that describe the interface as a user experiences it:
 
 1. Use a label for a form control.
 2. Use a role and accessible name for an interactive element.
-3. Use visible text for rendered content.
+3. Use text for rendered content, with a visibility assertion when needed.
 4. Use a test ID when user-facing names are ambiguous.
 5. Use CSS for structure that has no user-facing identity.
 
 ```elixir
 session
-|> fill(by_label("Creature name"), "Basilisk")
+|> fill(by_label("Name"), "Basilisk")
 |> click(by_role(:button, name: "Register"))
-|> expect(by_text("Creature registered") |> to_be_visible())
+|> assert(visible(by_text("Creature registered")))
 ```
 
 Locators are values, so they can be scoped and reused:
@@ -167,7 +168,7 @@ Refine a locator with `filter`, `first`, `last`, or zero-based `nth`.
 
 Single-target actions are strict: if a locator matches more than one element,
 Fluffy reports the ambiguity instead of choosing for you. Narrow the
-locator, or use `expect(to_have_count(locator, n))` when multiple matches are
+locator, or use `assert(count(locator, n))` when multiple matches are
 the intended assertion.
 
 ## Actions and expectations
@@ -179,22 +180,22 @@ session
 |> visit("/creatures/fluffy")
 |> fill(by_label("Keeper"), "Rubeus Hagrid")
 |> check(by_label("Flute ready"))
-|> select_option(by_label("Status"), "Asleep")
+|> select_option(by_label("Status"), %{label: "Asleep"})
 |> click(by_role(:button, name: "Save creature"))
-|> expect(by_role(:button, name: "Save creature") |> to_be_enabled())
-|> expect(by_label("Species") |> to_be_disabled())
-|> expect(by_label("Keeper") |> to_have_value("Rubeus Hagrid"))
-|> expect(by_label("Keeper") |> to_be_editable())
-|> expect(by_label("Flute ready") |> to_be_checked())
-|> expect(by_text("Creature saved") |> to_be_visible())
+|> assert(enabled(by_role(:button, name: "Save creature")))
+|> assert(disabled(by_label("Species")))
+|> assert(value(by_label("Keeper"), "Rubeus Hagrid"))
+|> assert(editable(by_label("Keeper")))
+|> assert(checked(by_label("Flute ready")))
+|> assert(visible(by_text("Creature saved")))
 ```
 
-Use `to_be_checked(locator, checked: false)` for an unchecked control. The
+Use `checked(locator, checked: false)` for an unchecked control. The
 browser-owned indeterminate state is Playwright-only:
 
 ```elixir
 session
-|> expect(by_label("All ingredients") |> to_be_checked(indeterminate: true))
+|> assert(checked(by_label("All ingredients"), indeterminate: true))
 ```
 
 Static and LiveView raise `Fluffy.CapabilityError` for indeterminate state.
@@ -204,6 +205,8 @@ actionability failures until their deadline. Static expectations are
 immediate. Playwright uses the browser's native waiting behavior. Pass
 `timeout:` to an action or expectation when a particular operation needs a
 different deadline.
+
+### Form submission and keyboard actions
 
 Use `submit(form_locator)` when the intent is native form submission without a
 specific submitter. Click the intended submit button when its `name=value` or
@@ -217,33 +220,71 @@ LiveView supports declarative Enter, Space, and Tab handlers. Use Playwright
 for more complex keyboard behavior; see
 [LiveView timing and keyboard events](capabilities.md#liveview-timing-and-keyboard-events).
 
-## Page assertions
+## Assertions
 
-Page-specific assertions live on `Fluffy.Page`, which keeps them
-discoverable separately from locator expectations:
+The examples use `use Fluffy.Assert`, which imports `assert`, `refute`, and
+all assertion constructors. Place it after your ExUnit case module to preserve
+ordinary ExUnit assertions without import clashes. See
+[Assertion styles](assertion-styles.md) for the equivalent `expect` vocabulary,
+constructor names, options, and negation semantics.
+
+## Visibility and DOM presence
+
+Even the `:phoenix` backend checks **structural visibility**, rather than just
+DOM presence. Its Static and LiveView drivers treat a matched element with a
+`hidden` attribute or `aria-hidden="true"` as invisible. This differs from
+PhoenixTest's `assert_has` and `refute_has`, which check for matching DOM
+elements rather than their visibility.
+
+Phoenix does not compute CSS or browser layout: a CSS class or inline
+`display: none` alone does not make an element structurally invisible. Use
+`:playwright` to test rendered visibility. Its browser visibility rules also
+differ from structural checks: `aria-hidden="true"` alone does not visually
+hide an element.
+
+Choose the assertion that expresses the intended behavior:
 
 ```elixir
-alias Fluffy.Page
+# Require a visible element.
+session |> assert(visible(by_css("#notice")))
 
-session
-|> expect(Page.to_have_title("Chamber of Secrets"))
-|> expect(Page.to_have_title(~r/^Chamber/))
-|> expect(not_(Page.to_have_title("Chamber sealed")))
+# Allow the element to be absent or invisible.
+session |> refute(visible(by_css("#notice")))
+
+# Require DOM absence, including hidden elements.
+session |> assert(count(by_css("#notice"), 0))
 ```
 
-Title expectations follow Playwright's retrying, whitespace-normalized
-`toHaveTitle` behavior. On LiveViews they also observe later `@page_title`
-updates.
+To require an element to remain in the DOM but be invisible, assert
+`count(by_css("#notice"), 1)` before refuting its visibility. Use a CSS locator
+for these presence checks; role locators can exclude structurally hidden
+elements before the assertion runs.
 
-URL expectations use the same page namespace. Strings and regular expressions
+## Page assertions
+
+Page assertion constructors use a `page_` prefix and target
+the active page:
+
+```elixir
+session
+|> assert(page_title("Chamber of Secrets"))
+|> assert(page_title(~r/^Chamber/))
+|> refute(page_title("Chamber sealed"))
+```
+
+Title assertions normalize whitespace. LiveView and Playwright retry until
+the title matches; Static checks immediately. LiveView also observes later
+`@page_title` updates.
+
+URL assertions use the same `page_` prefix. Strings and regular expressions
 match the complete canonical URL. Use the structured form when query
 serialization order is not part of the contract:
 
 ```elixir
 session
-|> expect(Page.to_have_url(path: "/potions"))
-|> expect(
-  Page.to_have_url(
+|> assert(page_url(path: "/potions"))
+|> assert(
+  page_url(
     path: "/potions",
     query: %{"state" => "brewing", "ingredient" => ["lacewing", "boomslang"]},
     query_mode: :subset
@@ -260,17 +301,17 @@ order is ignored, and repeated values retain their order and duplicates.
 Exact query mode rejects unrelated names; `query_mode: :subset` allows them
 while requiring all values for each requested name.
 
-### Reloading
+## Reloading
 
 Use `reload/1` to reload the active document:
 
 ```elixir
 session
 |> visit("/chambers/secrets")
-|> expect(by_role(:heading, name: "Chamber of Secrets") |> to_be_visible())
+|> assert(visible(by_role(:heading, name: "Chamber of Secrets")))
 |> reload()
-|> expect(by_role(:heading, name: "Chamber of Secrets") |> to_be_visible())
-|> expect(Page.to_have_url("/chambers/secrets"))
+|> assert(visible(by_role(:heading, name: "Chamber of Secrets")))
+|> assert(page_url("/chambers/secrets"))
 ```
 
 The Phoenix backend dispatches the current URL again and selects the driver for
@@ -295,7 +336,7 @@ typed in-memory payload for generated bytes or a remote browser:
 ```elixir
 payload = %Fluffy.FilePayload{
   name: "potion-ledger.csv",
-  bytes: "potion,vials\nSleeping Draught,3\n",
+  bytes: "potion,vials\nPolyjuice Potion,3\n",
   content_type: "text/csv"
 }
 
@@ -311,7 +352,7 @@ page. The aggregate default is 10 MB; configure `:file_input_max_bytes` or pass
 copy payload contents.
 
 Playwright can also capture a script-opened chooser before the triggering
-click. Pass its result key to `set_input_files/4`; see
+click. Pass its result key to `set_input_files/3`; see
 [Advanced events and pages](advanced-events.md#file-choosers).
 
 ## Browser diagnostics
@@ -326,7 +367,7 @@ start_session(:playwright)
 |> visit("/potions/polyjuice")
 |> step("Brew Polyjuice Potion", fn session ->
   session
-  |> fill(by_label("Boomslang skin"), "3 measures")
+  |> fill(by_label("Boomslang skin"), "3")
   |> click(by_role(:button, name: "Brew"))
 end)
 ```
@@ -343,7 +384,7 @@ Save an explicit PNG while retaining the pipeline with:
 ```elixir
 session
 |> Playwright.screenshot("tmp/screenshots/polyjuice.png", full_page: true)
-|> expect(by_text("Potion ready") |> to_be_visible())
+|> assert(visible(by_text("Potion ready")))
 ```
 
 The configured Playwright console logger reports browser console messages and
@@ -368,11 +409,7 @@ alias Fluffy.Playwright
 
 session
 |> then(fn session ->
-  data_url =
-    Playwright.evaluate(
-      session,
-      "document.querySelector('canvas').toDataURL()"
-    )
+  data_url = Playwright.evaluate(session, "document.querySelector('canvas').toDataURL()")
 
   assert data_url =~ "data:image/png"
   session
@@ -383,7 +420,7 @@ end)
 `evaluate/2` returns the JavaScript result, not the session. Use `then/2`, as
 above, to continue a pipeline. Function-style expressions can pass
 `is_function: true` and `arg:`. Phoenix sessions raise a capability error
-instead of pretending to execute client code.
+because Phoenix does not execute client code.
 
 ## Native escape hatch
 
@@ -396,7 +433,7 @@ session
 |> unwrap(fn %Phoenix.LiveViewTest.View{} = view ->
   Phoenix.LiveViewTest.render_hook(view, "open-chamber", %{"phrase" => "open"})
 end)
-|> expect(by_text("Chamber opened") |> to_be_visible())
+|> assert(visible(by_text("Chamber opened")))
 ```
 
 The callback receives the current `%Plug.Conn{}` on a Static page, a

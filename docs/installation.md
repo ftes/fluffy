@@ -1,11 +1,15 @@
 # Installation and runtime
 
+Add Fluffy and configure your Phoenix endpoint first. Complete Playwright setup
+if you need browser tests, and Ecto sandbox setup if your application uses a
+database. Then follow [Usage](usage.md) for your first test and shared test case.
+
 ## Elixir dependency
 
 ```elixir
 defp deps do
   [
-    {:fluffy, "~> 0.2.0", only: :test}
+    {:fluffy, "~> 0.3.0", only: :test}
   ]
 end
 ```
@@ -71,7 +75,8 @@ errors through Elixir's `Logger`; set `js_logger: false` to disable it or
 configure another module implementing `PlaywrightEx.JsLogger`. Trace files are
 created only when a test calls `Fluffy.Playwright.trace/1,2`.
 
-Use `:firefox` or `:webkit` only after installing the corresponding browser.
+Set `engine: :firefox` or `engine: :webkit` after installing the corresponding
+browser.
 Playwright provides cross-engine compatibility; Fluffy uses pinned Chromium
 as its browser-backed conformance baseline.
 Fluffy launches one browser lazily per configured runtime lane and creates a
@@ -85,14 +90,16 @@ Add the standard Phoenix Ecto sandbox plug before the rest of the endpoint and
 expose request headers to the LiveView socket:
 
 ```elixir
-plug Phoenix.Ecto.SQL.Sandbox,
+plug(Phoenix.Ecto.SQL.Sandbox,
   header: Fluffy.Sandbox.header(),
   sandbox: Fluffy.Sandbox.allowance()
+)
 
-socket "/live", Phoenix.LiveView.Socket,
+socket("/live", Phoenix.LiveView.Socket,
   websocket: [
     connect_info: [Fluffy.Sandbox.connect_info(), session: @session_options]
   ]
+)
 ```
 
 Add the Fluffy mount hook before application hooks:

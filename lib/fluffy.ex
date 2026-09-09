@@ -3,7 +3,9 @@ defmodule Fluffy do
   Pipeable feature testing for Phoenix applications.
 
   Start a session with the Phoenix (`:phoenix`) or Playwright (`:playwright`)
-  backend, then compose locators, actions, expectations, and event capture. The
+  backend, then compose locators, actions, expectations, and event capture.
+  Import `Fluffy.Expect` for expectations, or use `Fluffy.Assert` for
+  ExUnit-style assertions. The
   Phoenix backend selects its Static (`Phoenix.ConnTest`) or LiveView
   (`Phoenix.LiveViewTest`) driver for each page; the Playwright backend uses the
   Playwright driver.
@@ -16,7 +18,6 @@ defmodule Fluffy do
   @moduledoc groups: [
                "Lifecycle and navigation",
                "Actions",
-               "Assertions",
                "Event capture and results",
                "Diagnostics and native access"
              ]
@@ -57,7 +58,6 @@ defmodule Fluffy do
   @dialyzer {:nowarn_function,
              reload: 2,
              page: 2,
-             expect: 3,
              click: 3,
              submit: 3,
              fill: 4,
@@ -226,32 +226,8 @@ defmodule Fluffy do
   @doc "Returns a previously captured response without consuming it."
   def response(%Session{} = session, key), do: Session.fetch_result!(session, key, :response)
 
-  @doc group: "Assertions"
-  @doc """
-  Executes a typed assertion value and returns the unchanged or reconciled
-  session.
-  """
-  @spec expect(Session.t(), Expect.t(), [Expect.option()]) :: Session.t()
-  def expect(%Session{} = session, %Expect{} = expectation, options \\ []) do
-    expectation =
-      expectation
-      |> Expect.merge_options(options)
-      |> normalize_expectation(session)
-
-    case expectation.target do
-      {:locator, _locator} ->
-        dispatch_driver(session, :expect, [expectation])
-
-      :page ->
-        expect_active_page(session, expectation)
-
-      {type, key} when type in [:download, :dialog, :navigation, :request, :response] ->
-        expect_captured_result(session, type, key, expectation)
-    end
-  end
-
-  @doc group: "Assertions"
-  def not_(%Expect{} = expectation), do: Expect.negate(expectation)
+  @doc false
+  def __expect__(session, expectation), do: dispatch_driver(session, :expect, [expectation])
 
   @doc false
   def set_html(%Session{} = session, html) do
@@ -406,77 +382,6 @@ defmodule Fluffy do
     dispatch_driver(session, :set_checked, [locator, desired, options])
   end
 
-  defp expect_active_page(%Session{} = session, %Expect{kind: :url} = expectation) do
-    dispatch_driver(session, :expect, [expectation])
-  end
-
-  defp expect_active_page(%Session{} = session, %Expect{kind: :title} = expectation) do
-    dispatch_driver(session, :expect, [expectation])
-  end
-
-  defp expect_active_page(%Session{} = session, %Expect{kind: :status} = expectation) do
-    actual = Session.current_page(session).status
-    assert_expected!(expectation, actual)
-    session
-  end
-
-  defp expect_active_page(%Session{} = session, %Expect{kind: :opener} = expectation) do
-    actual = Session.current_page(session).opener
-    assert_expected!(expectation, actual)
-    session
-  end
-
-  defp expect_active_page(_session, %Expect{} = expectation) do
-    raise ArgumentError, "unsupported active page expectation: #{Expect.describe(expectation)}"
-  end
-
-  defp expect_captured_result(%Session{} = session, type, key, %Expect{} = expectation) do
-    result = Session.fetch_result!(session, key, type)
-    field = Expect.result_field(expectation)
-    actual = Map.fetch!(result, field)
-    actual = if expectation.kind == :download_size, do: byte_size(actual), else: actual
-
-    assert_expected!(expectation, actual)
-    session
-  end
-
-  defp assert_expected!(%Expect{kind: :request_headers} = expectation, actual) do
-    expected = expectation.expected
-    passed? = Map.take(actual, Map.keys(expected)) == expected
-    assert_expectation_truth!(expectation, passed?, actual)
-  end
-
-  defp assert_expected!(%Expect{kind: :response_headers} = expectation, actual) do
-    expected = expectation.expected
-    passed? = Map.take(actual, Map.keys(expected)) == expected
-    assert_expectation_truth!(expectation, passed?, actual)
-  end
-
-  defp assert_expected!(%Expect{kind: kind} = expectation, actual)
-       when kind in [:download_url, :navigation_url, :navigation_from_url, :request_url, :response_url] do
-    assert_expectation_truth!(expectation, Fluffy.URLMatcher.matches?(expectation.expected, actual), actual)
-  end
-
-  defp assert_expected!(%Expect{} = expectation, actual) do
-    assert_expectation_truth!(expectation, Expect.matches?(expectation.expected, actual), actual)
-  end
-
-  defp assert_expectation_truth!(%Expect{} = expectation, passed?, actual) do
-    if passed? == expectation.negated? do
-      raise ExUnit.AssertionError,
-        message: "Expected #{Expect.describe(expectation)}, got #{inspect(actual)}"
-    end
-
-    :ok
-  end
-
-  defp normalize_expectation(%Expect{target: :page, kind: :url, expected: expected} = expectation, session)
-       when is_binary(expected) do
-    %{expectation | expected: absolute_url(session, expected)}
-  end
-
-  defp normalize_expectation(%Expect{} = expectation, _session), do: expectation
-
   defp validate_event!(%Event{type: :dialog, options: options}) do
     options |> Keyword.fetch!(:decision) |> validate_dialog_decision!()
   end
@@ -520,10 +425,6 @@ defmodule Fluffy do
       %Expect{} = expectation -> Expect.merge_options(expectation, timeout: remaining)
       options -> Keyword.put(options, :timeout, remaining)
     end)
-  end
-
-  defp absolute_url(session, path) do
-    Backend.absolute_url(session, path)
   end
 
   defp validate_dialog_decision!(decision) when decision in [:accept, :dismiss] or is_function(decision, 1), do: :ok

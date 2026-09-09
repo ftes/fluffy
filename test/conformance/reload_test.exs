@@ -5,7 +5,6 @@ defmodule Fluffy.Conformance.ReloadTest do
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.Page
   alias Fluffy.TestHTTPFixtures
 
   for driver <- [:phoenix, :playwright] do
@@ -26,7 +25,7 @@ defmodule Fluffy.Conformance.ReloadTest do
       |> expect("First render" |> by_text() |> to_be_visible())
       |> reload()
       |> expect("Second render" |> by_text() |> to_be_visible())
-      |> expect(Page.to_have_url(TestHTTPFixtures.url(fixture)))
+      |> expect(Fluffy.Expect.page_to_have_url(TestHTTPFixtures.url(fixture)))
 
       assert length(TestHTTPFixtures.requests(fixture)) == 2
     end

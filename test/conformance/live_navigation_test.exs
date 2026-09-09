@@ -5,8 +5,6 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.Page
-
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
     test "commits a Live patch with #{driver}", %{driver: driver} do
@@ -15,8 +13,8 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
       session
       |> visit("/live/chamber-map")
       |> click(by_role(:link, name: "Reveal passage", exact: true))
-      |> expect(Page.to_have_url("/live/chamber-map?step=patched"))
-      |> expect(Page.to_have_url(~r|/live/chamber-map\?step=patched$|))
+      |> expect(Fluffy.Expect.page_to_have_url("/live/chamber-map?step=patched"))
+      |> expect(Fluffy.Expect.page_to_have_url(~r|/live/chamber-map\?step=patched$|))
       |> expect("Map position: patched" |> by_text() |> to_be_visible())
     end
 
@@ -27,7 +25,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
       session
       |> visit("/live/chamber-map")
       |> click(by_role(:link, name: "Secret chamber", exact: true))
-      |> expect(Page.to_have_url("/live/secret-chamber"))
+      |> expect(Fluffy.Expect.page_to_have_url("/live/secret-chamber"))
       |> expect("The secret chamber is open" |> by_text() |> to_be_visible())
     end
 
@@ -38,7 +36,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
       session
       |> visit("/live/chamber-map")
       |> click(by_role(:link, name: "Sleeping chamber", exact: true))
-      |> expect(Page.to_have_url("/chamber"))
+      |> expect(Fluffy.Expect.page_to_have_url("/chamber"))
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
     end
 
@@ -51,7 +49,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
       session
       |> visit("/live/chamber-map")
       |> click(by_role(:button, name: "Lull guardian", exact: true))
-      |> expect(Page.to_have_url("/chamber"))
+      |> expect(Fluffy.Expect.page_to_have_url("/chamber"))
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
     end
 
@@ -64,7 +62,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
       session
       |> visit("/live/chamber-map?async=true")
       |> expect("The secret chamber is open" |> by_text() |> to_be_visible(), timeout: 1_000)
-      |> expect(Page.to_have_url("/live/secret-chamber"))
+      |> expect(Fluffy.Expect.page_to_have_url("/live/secret-chamber"))
     end
 
     @tag driver: driver
@@ -76,7 +74,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
       session
       |> visit("/live/chamber-map")
       |> click(by_role(:button, name: "Enter chamber after event", exact: true))
-      |> expect(Page.to_have_url("/live/secret-chamber"))
+      |> expect(Fluffy.Expect.page_to_have_url("/live/secret-chamber"))
       |> expect("The secret chamber is open" |> by_text() |> to_be_visible())
     end
 
@@ -89,7 +87,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
       session
       |> visit("/live/chamber-map")
       |> click(by_role(:button, name: "Reveal passage after event", exact: true))
-      |> expect(Page.to_have_url("/live/chamber-map?step=late-patched"))
+      |> expect(Fluffy.Expect.page_to_have_url("/live/chamber-map?step=late-patched"))
       |> expect("Map position: late-patched" |> by_text(exact: true) |> to_be_visible())
     end
   end
@@ -109,7 +107,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     assert_receive {:DOWN, ^proxy_reference, :process, ^proxy_pid, _reason}
 
     session
-    |> expect(Page.to_have_url("/live/secret-chamber"))
+    |> expect(Fluffy.Expect.page_to_have_url("/live/secret-chamber"))
     |> expect("The secret chamber is open" |> by_text() |> to_be_visible())
   end
 

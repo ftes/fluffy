@@ -218,7 +218,7 @@ defmodule Fluffy.Capability do
       feature: "Structured path, query, and fragment URL matching",
       drivers: %{static: :equivalent, live: :equivalent, playwright: :equivalent},
       detail:
-        "Page.to_have_url/1 supports path-only and exact/subset decoded query matching. Distinct-name order is ignored, repeated-value order is retained, and every driver uses the same matcher."
+        "Fluffy.Expect.page_to_have_url/1 supports path-only and exact/subset decoded query matching. Distinct-name order is ignored, repeated-value order is retained, and every driver uses the same matcher."
     },
     %{
       id: :file_uploads,

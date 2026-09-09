@@ -5,7 +5,6 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.Page
   alias Fluffy.Session
   alias Fluffy.TestHTTPFixtures
   alias Fluffy.TestWeb.Endpoint
@@ -26,9 +25,9 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
         session
         |> visit(TestHTTPFixtures.path(fixture, "/orders?state=open#summary"))
         |> expect("Dynamic order page" |> by_text() |> to_be_visible())
-        |> expect(Page.to_have_url(TestHTTPFixtures.url(fixture, "/orders?state=open#summary")))
-        |> expect(Page.to_have_url(~r|/orders\?state=open#summary$|))
-        |> expect(not_(Page.to_have_url(~r|/orders\?state=closed|)))
+        |> expect(Fluffy.Expect.page_to_have_url(TestHTTPFixtures.url(fixture, "/orders?state=open#summary")))
+        |> expect(Fluffy.Expect.page_to_have_url(~r|/orders\?state=open#summary$|))
+        |> expect(not_(Fluffy.Expect.page_to_have_url(~r|/orders\?state=closed|)))
 
       assert Session.current_page(session).url ==
                TestHTTPFixtures.url(fixture, "/orders?state=open#summary")
@@ -56,7 +55,7 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
       session
       |> visit(TestHTTPFixtures.path(fixture, "/start?from=visit#original"))
       |> expect("Redirect destination" |> by_text() |> to_be_visible())
-      |> expect(Page.to_have_url(TestHTTPFixtures.url(fixture, "/final?done=yes#result")))
+      |> expect(Fluffy.Expect.page_to_have_url(TestHTTPFixtures.url(fixture, "/final?done=yes#result")))
 
       assert Enum.map(TestHTTPFixtures.requests(fixture), fn request ->
                {request.method, request.path, request.query}
@@ -82,7 +81,7 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
       session
       |> visit(TestHTTPFixtures.path(fixture, "/source#details"))
       |> expect("Inherited fragment" |> by_text() |> to_be_visible())
-      |> expect(Page.to_have_url(TestHTTPFixtures.url(fixture, "/destination#details")))
+      |> expect(Fluffy.Expect.page_to_have_url(TestHTTPFixtures.url(fixture, "/destination#details")))
     end
 
     @tag driver: driver

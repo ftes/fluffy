@@ -2,9 +2,9 @@ defmodule Fluffy.Conformance.PageTitleTest do
   use Fluffy.TestCase, async: true
 
   import Fluffy
+  import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.Page
   alias Fluffy.TestWeb.Endpoint
 
   for driver <- [:phoenix, :playwright] do
@@ -16,9 +16,9 @@ defmodule Fluffy.Conformance.PageTitleTest do
         endpoint: Endpoint
       )
       |> visit("/chamber")
-      |> expect(Page.to_have_title("  Sleeping\n chamber  "))
-      |> expect(Page.to_have_title(~r/^Sleeping chamber$/))
-      |> expect(not_(Page.to_have_title("Another title")))
+      |> expect(Fluffy.Expect.page_to_have_title("  Sleeping\n chamber  "))
+      |> expect(Fluffy.Expect.page_to_have_title(~r/^Sleeping chamber$/))
+      |> expect(not_(Fluffy.Expect.page_to_have_title("Another title")))
     end
 
     @tag driver: driver
@@ -29,9 +29,9 @@ defmodule Fluffy.Conformance.PageTitleTest do
         endpoint: Endpoint
       )
       |> visit("/live/enchanted-title")
-      |> expect(Page.to_have_title("Sealed chamber"))
+      |> expect(Fluffy.Expect.page_to_have_title("Sealed chamber"))
       |> click(by_role(:button, name: "Change title"))
-      |> expect(Page.to_have_title(~r/^Revealed chamber$/))
+      |> expect(Fluffy.Expect.page_to_have_title(~r/^Revealed chamber$/))
     end
   end
 end

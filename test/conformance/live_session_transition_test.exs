@@ -5,7 +5,6 @@ defmodule Fluffy.Conformance.LiveSessionTransitionTest do
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.Page
   alias Fluffy.TestWeb.Endpoint
 
   for driver <- [:phoenix, :playwright] do
@@ -21,10 +20,10 @@ defmodule Fluffy.Conformance.LiveSessionTransitionTest do
 
       session
       |> visit("/session/start?identity=flute-keeper")
-      |> expect(Page.to_have_url("/live/session"))
+      |> expect(Fluffy.Expect.page_to_have_url("/live/session"))
       |> expect("Live identity: flute-keeper" |> by_text() |> to_be_visible())
       |> click(by_role(:link, name: "Show static identity", exact: true))
-      |> expect(Page.to_have_url("/session/show"))
+      |> expect(Fluffy.Expect.page_to_have_url("/session/show"))
       |> expect("Static identity: flute-keeper" |> by_text() |> to_be_visible())
     end
 
@@ -42,10 +41,10 @@ defmodule Fluffy.Conformance.LiveSessionTransitionTest do
       |> visit("/actions/live")
       |> expect("Enter the live chamber" |> by_text() |> to_be_visible())
       |> click(by_role(:link, name: "Enter the live chamber", exact: true))
-      |> expect(Page.to_have_url("/live/chamber-map"))
+      |> expect(Fluffy.Expect.page_to_have_url("/live/chamber-map"))
       |> expect("Map position: initial" |> by_text() |> to_be_visible())
       |> click(by_role(:link, name: "Sleeping chamber", exact: true))
-      |> expect(Page.to_have_url("/chamber"))
+      |> expect(Fluffy.Expect.page_to_have_url("/chamber"))
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
     end
 
@@ -60,7 +59,7 @@ defmodule Fluffy.Conformance.LiveSessionTransitionTest do
       session
       |> visit("/live/chamber-map")
       |> click(by_role(:button, name: "Open secret passage", exact: true))
-      |> expect(Page.to_have_url("/live/secret-chamber"))
+      |> expect(Fluffy.Expect.page_to_have_url("/live/secret-chamber"))
       |> expect("The secret passage opened" |> by_text() |> to_be_visible())
     end
   end

@@ -1,17 +1,17 @@
 defmodule Fluffy.CapturedURLAssertionTest do
   use ExUnit.Case, async: true
 
-  import Fluffy, only: [expect: 2, not_: 1]
+  import Fluffy.Expect, only: [expect: 2, not_: 1]
 
   alias Fluffy.Backend.Phoenix
   alias Fluffy.Session
 
   for {module, constructor, type, field} <- [
-        {Fluffy.Download, :to_have_url, :download, :url},
-        {Fluffy.Navigation, :to_have_url, :navigation, :url},
-        {Fluffy.Navigation, :to_have_from_url, :navigation, :from_url},
-        {Fluffy.Request, :to_have_url, :request, :url},
-        {Fluffy.Response, :to_have_url, :response, :url}
+        {Fluffy.Expect, :download_to_have_url, :download, :url},
+        {Fluffy.Expect, :navigation_to_have_url, :navigation, :url},
+        {Fluffy.Expect, :navigation_to_have_from_url, :navigation, :from_url},
+        {Fluffy.Expect, :request_to_have_url, :request, :url},
+        {Fluffy.Expect, :response_to_have_url, :response, :url}
       ] do
     test "#{inspect(module)}.#{constructor} matches structured URL components" do
       url = "https://example.test/reports?tag=one&tag=two&q=hello+world#summary"

@@ -6,7 +6,6 @@ defmodule Fluffy.Conformance.NavigationEventTest do
   import Fluffy.Locator
 
   alias Fluffy.Event
-  alias Fluffy.Navigation
   alias Fluffy.NavigationEvent
   alias Fluffy.TestHTTPFixtures
 
@@ -29,9 +28,9 @@ defmodule Fluffy.Conformance.NavigationEventTest do
         session
         |> visit(TestHTTPFixtures.path(fixture, "/start"))
         |> wait_for(Event.navigation(:continue), &click(&1, by_role(:link, name: "Continue")))
-        |> expect(Navigation.to_have_from_url(:continue, from_url))
-        |> expect(Navigation.to_have_url(:continue, destination))
-        |> expect(Navigation.to_have_status(:continue, 202))
+        |> expect(Fluffy.Expect.navigation_to_have_from_url(:continue, from_url))
+        |> expect(Fluffy.Expect.navigation_to_have_url(:continue, destination))
+        |> expect(Fluffy.Expect.navigation_to_have_status(:continue, 202))
         |> expect("Arrived" |> by_text() |> to_be_visible())
 
       assert %NavigationEvent{url: ^destination, status: 202} =
@@ -66,8 +65,8 @@ defmodule Fluffy.Conformance.NavigationEventTest do
       |> visit(TestHTTPFixtures.path(fixture, "/start"))
       |> fill(by_label("Query"), "fluffy")
       |> wait_for(Event.navigation(:submit), &click(&1, by_role(:button, name: "Search")))
-      |> expect(Navigation.to_have_url(:submit, destination))
-      |> expect(Navigation.to_have_status(:submit, 201))
+      |> expect(Fluffy.Expect.navigation_to_have_url(:submit, destination))
+      |> expect(Fluffy.Expect.navigation_to_have_status(:submit, 201))
       |> expect("Submitted" |> by_text() |> to_be_visible())
 
       [request] =
@@ -96,8 +95,8 @@ defmodule Fluffy.Conformance.NavigationEventTest do
       session
       |> visit(TestHTTPFixtures.path(fixture, "/start"))
       |> wait_for(Event.navigation(:redirect), &click(&1, by_role(:link, name: "Continue")))
-      |> expect(Navigation.to_have_url(:redirect, destination))
-      |> expect(Navigation.to_have_status(:redirect, 203))
+      |> expect(Fluffy.Expect.navigation_to_have_url(:redirect, destination))
+      |> expect(Fluffy.Expect.navigation_to_have_status(:redirect, 203))
       |> expect("Final" |> by_text() |> to_be_visible())
     end
   end

@@ -6,7 +6,6 @@ defmodule Fluffy.Conformance.InitialConnTest do
   import Fluffy.Locator
   import Phoenix.ConnTest
 
-  alias Fluffy.Page
   alias Fluffy.Session
 
   test "uses an initial connection's authorization assign for a first Static visit only" do
@@ -19,7 +18,7 @@ defmodule Fluffy.Conformance.InitialConnTest do
 
     session = visit(session, "/initial-connection/chamber")
 
-    expect(session, Page.to_have_status(403))
+    expect(session, Fluffy.Expect.page_to_have_status(403))
     expect(session, "Initial authorization required" |> by_text() |> to_be_visible())
   end
 
@@ -52,7 +51,7 @@ defmodule Fluffy.Conformance.InitialConnTest do
     session = visit(session, "/initial-connection/chamber")
 
     assert Session.current_driver(session) == :static
-    expect(session, Page.to_have_status(403))
+    expect(session, Fluffy.Expect.page_to_have_status(403))
     expect(session, "Initial authorization required" |> by_text() |> to_be_visible())
   end
 

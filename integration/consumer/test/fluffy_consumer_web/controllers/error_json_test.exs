@@ -2,7 +2,9 @@ defmodule FluffyConsumerWeb.ErrorJSONTest do
   use FluffyConsumerWeb.ConnCase, async: true
 
   test "renders 404" do
-    assert FluffyConsumerWeb.ErrorJSON.render("404.json", %{}) == %{errors: %{detail: "Not Found"}}
+    assert FluffyConsumerWeb.ErrorJSON.render("404.json", %{}) == %{
+             errors: %{detail: "Not Found"}
+           }
   end
 
   test "renders 500" do

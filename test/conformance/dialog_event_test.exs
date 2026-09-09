@@ -24,10 +24,10 @@ defmodule Fluffy.Conformance.DialogEventTest do
         Event.dialog(:confirmation, accept: true),
         &click(&1, by_role(:button, name: "Confirm"))
       )
-      |> expect(Dialog.to_have_type(:confirmation, :confirm))
-      |> expect(Dialog.to_have_message(:confirmation, "Proceed?"))
-      |> expect(Dialog.to_have_default_value(:confirmation, ""))
-      |> expect(Dialog.to_have_action(:confirmation, :accept))
+      |> expect(Fluffy.Expect.dialog_to_have_type(:confirmation, :confirm))
+      |> expect(Fluffy.Expect.dialog_to_have_message(:confirmation, "Proceed?"))
+      |> expect(Fluffy.Expect.dialog_to_have_default_value(:confirmation, ""))
+      |> expect(Fluffy.Expect.dialog_to_have_action(:confirmation, :accept))
       |> expect("accepted" |> by_text() |> to_be_visible())
 
     assert %Dialog{type: :confirm, action: :accept} = dialog(session, :confirmation)
@@ -46,7 +46,7 @@ defmodule Fluffy.Conformance.DialogEventTest do
       Event.dialog(:confirmation, dismiss: true),
       &click(&1, by_role(:button, name: "Confirm"))
     )
-    |> expect(Dialog.to_have_action(:confirmation, :dismiss))
+    |> expect(Fluffy.Expect.dialog_to_have_action(:confirmation, :dismiss))
     |> expect("dismissed" |> by_text() |> to_be_visible())
   end
 
@@ -65,11 +65,11 @@ defmodule Fluffy.Conformance.DialogEventTest do
       ),
       &click(&1, by_role(:button, name: "Prompt"))
     )
-    |> expect(Dialog.to_have_type(:name, :prompt))
-    |> expect(Dialog.to_have_message(:name, "Your name?"))
-    |> expect(Dialog.to_have_default_value(:name, "Anonymous"))
-    |> expect(Dialog.to_have_action(:name, :accept))
-    |> expect(Dialog.to_have_prompt_text(:name, "Fluffy"))
+    |> expect(Fluffy.Expect.dialog_to_have_type(:name, :prompt))
+    |> expect(Fluffy.Expect.dialog_to_have_message(:name, "Your name?"))
+    |> expect(Fluffy.Expect.dialog_to_have_default_value(:name, "Anonymous"))
+    |> expect(Fluffy.Expect.dialog_to_have_action(:name, :accept))
+    |> expect(Fluffy.Expect.dialog_to_have_prompt_text(:name, "Fluffy"))
     |> expect("Fluffy" |> by_text() |> to_be_visible())
   end
 

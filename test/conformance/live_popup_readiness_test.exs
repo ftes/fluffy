@@ -2,6 +2,7 @@ defmodule Fluffy.Conformance.LivePopupReadinessTest do
   use Fluffy.TestCase, async: true
 
   import Fluffy
+  import Fluffy.Expect
   import Fluffy.Locator
 
   alias Fluffy.Event

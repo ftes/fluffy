@@ -7,7 +7,6 @@ defmodule Fluffy.Conformance.UnwrapTest do
   import Phoenix.ConnTest, only: [get: 2]
 
   alias Fluffy.Event
-  alias Fluffy.Navigation
   alias Fluffy.Page
   alias Fluffy.Playwright.Handle
   alias Fluffy.Session
@@ -39,7 +38,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
       session
       |> visit("/chamber")
       |> unwrap(fn %Plug.Conn{} = conn -> conn end)
-      |> expect(Page.to_have_status(200))
+      |> expect(Fluffy.Expect.page_to_have_status(200))
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
     end
 
@@ -56,7 +55,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
               resp_body: "<!doctype html><html><body><p>Native replacement</p></body></html>"
           }
         end)
-        |> expect(Page.to_have_status(202))
+        |> expect(Fluffy.Expect.page_to_have_status(202))
         |> expect("Native replacement" |> by_text() |> to_be_visible())
 
       assert Session.page_state(session).conn.status == 202
@@ -83,7 +82,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
           assert set_cookie =~ "_fluffy_test="
           conn
         end)
-        |> expect(Page.to_have_url("/live/session"))
+        |> expect(Fluffy.Expect.page_to_have_url("/live/session"))
         |> expect("Live identity: Native" |> by_text() |> to_be_visible())
         |> unwrap(fn %View{} -> send(test_pid, :unwrapped_live_destination) end)
 
@@ -153,7 +152,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
         _html = Phoenix.LiveViewTest.render_patch(view, "/live/chamber-map?step=native")
         :ignored
       end)
-      |> expect(Page.to_have_url("/live/chamber-map?step=native"))
+      |> expect(Fluffy.Expect.page_to_have_url("/live/chamber-map?step=native"))
       |> expect("Map position: native" |> by_text() |> to_be_visible())
     end
 
@@ -187,7 +186,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
 
           :ignored
         end)
-        |> expect(Page.to_have_url("/live/secret-chamber"))
+        |> expect(Fluffy.Expect.page_to_have_url("/live/secret-chamber"))
         |> expect("The secret chamber is open" |> by_text() |> to_be_visible())
 
       assert Session.current_driver(session) == :live
@@ -218,7 +217,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
           _redirect = Phoenix.LiveViewTest.render_click(view, "redirect_static")
           :ignored
         end)
-        |> expect(Page.to_have_url("/chamber"))
+        |> expect(Fluffy.Expect.page_to_have_url("/chamber"))
         |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
 
       assert Session.current_driver(session) == :static
@@ -233,7 +232,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
         _redirect = Phoenix.LiveViewTest.render_click(view, "redirect_with_flash")
         :ignored
       end)
-      |> expect(Page.to_have_url("/live/secret-chamber"))
+      |> expect(Fluffy.Expect.page_to_have_url("/live/secret-chamber"))
       |> expect("The secret passage opened" |> by_text() |> to_be_visible())
     end
 
@@ -355,7 +354,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
               timeout: handle.timeout
             )
         end)
-        |> expect(Page.to_have_url("/harness#native"))
+        |> expect(Fluffy.Expect.page_to_have_url("/harness#native"))
 
       assert Session.current_page(session).revision == before_revision + 1
     end
@@ -374,7 +373,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
             timeout: handle.timeout
           )
       end)
-      |> expect(Page.to_have_url("/chamber"))
+      |> expect(Fluffy.Expect.page_to_have_url("/chamber"))
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
     end
 
@@ -397,13 +396,13 @@ defmodule Fluffy.Conformance.UnwrapTest do
 
       session
       |> expect(
-        Navigation.to_have_from_url(
+        Fluffy.Expect.navigation_to_have_from_url(
           :native_navigation,
           Fluffy.TestServer.base_url() <> "/harness"
         )
       )
-      |> expect(Navigation.to_have_url(:native_navigation, Fluffy.TestServer.base_url() <> "/chamber"))
-      |> expect(Navigation.to_have_status(:native_navigation, 200))
+      |> expect(Fluffy.Expect.navigation_to_have_url(:native_navigation, Fluffy.TestServer.base_url() <> "/chamber"))
+      |> expect(Fluffy.Expect.navigation_to_have_status(:native_navigation, 200))
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
     end
 
@@ -432,8 +431,8 @@ defmodule Fluffy.Conformance.UnwrapTest do
 
       session
       |> switch_page(:native_child)
-      |> expect(Page.to_have_url(Fluffy.TestServer.base_url() <> "/chamber"))
-      |> expect(Page.to_have_opener(:main))
+      |> expect(Fluffy.Expect.page_to_have_url(Fluffy.TestServer.base_url() <> "/chamber"))
+      |> expect(Fluffy.Expect.page_to_have_opener(:main))
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
     end
 
@@ -456,7 +455,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
 
       session
       |> switch_page(:blank_child)
-      |> expect(Page.to_have_url("about:blank"))
+      |> expect(Fluffy.Expect.page_to_have_url("about:blank"))
     end
 
     @tag driver: :playwright

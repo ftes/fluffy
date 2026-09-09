@@ -5,7 +5,6 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.Page
   alias Fluffy.TestHTTPFixtures
 
   for driver <- [:phoenix, :playwright] do
@@ -36,7 +35,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
         |> fill(by_label("Name"), "Ada")
         |> press(by_label("Name"), "Enter")
         |> expect("Submitted" |> by_text() |> to_be_visible())
-        |> expect(Page.to_have_status(201))
+        |> expect(Fluffy.Expect.page_to_have_status(201))
 
       assert Fluffy.Session.current_page(session).url == destination
 

@@ -1,17 +1,20 @@
 # Advanced events and pages
 
-The examples use these imports and aliases:
+The examples assume the [test setup](usage.md#your-first-test), an initialized
+`session`, and application routes and controls matching each scenario. Use
+these imports and aliases after your ExUnit case module:
 
 ```elixir
+use Fluffy.Assert
+
 import Fluffy
 import Fluffy.Locator
-import Fluffy.Expect
 
-alias Fluffy.{Dialog, Download, Event, Navigation, Page, Response}
+alias Fluffy.{Event, FileChooser, Page}
 ```
 
-Locator expectations remain imported from `Fluffy.Expect`; captured-result
-expectations live on the corresponding subject module, like page expectations.
+`use Fluffy.Assert` imports the assertion vocabulary. Page and captured-result
+constructors use target prefixes, such as `page_url` and `response_status`.
 
 `wait_for(Event.*(...), action)` installs the listener before running the
 action. Return the updated session from the callback. Captured results can be
@@ -24,8 +27,8 @@ session
 |> wait_for(Event.download(:report), fn session ->
   click(session, by_role(:button, name: "Download potion ledger"))
 end)
-|> expect(Download.to_have_suggested_filename(:report, "potions.csv"))
-|> expect(Download.to_have_content_type(:report, "text/csv"))
+|> assert(download_suggested_filename(:report, "potions.csv"))
+|> assert(download_content_type(:report, "text/csv"))
 ```
 
 `download(session, :report)` returns `%Fluffy.Download{}` with `filename`,
@@ -40,19 +43,20 @@ session
   click(session, by_role(:button, name: "Open chamber in new tab"))
 end)
 |> switch_page(:secret_chamber)
-|> expect(Page.to_have_opener(:main))
-|> expect(Page.to_have_url(path: "/chambers/secrets"))
-|> expect(by_role(:heading, name: "Secret chamber") |> to_be_visible())
+|> assert(page_opener(:main))
+|> assert(page_url(path: "/chambers/secrets"))
+|> assert(visible(by_role(:heading, name: "Chamber of Secrets")))
 |> close_page()
-|> expect(by_text("Creature index") |> to_be_visible())
+|> assert(visible(by_text("Creature index")))
 ```
 
 Multiple pages and tabs require Playwright. Phoenix follows links and submits
 forms in its current page, ignoring `target` and `formtarget`, including
 `_blank`. Popup capture, page switching, and closing pages raise a capability
 error in Phoenix. Multiple isolated sessions remain supported by both backends.
-All pages inside one Playwright session share cookies/storage; independent
+All pages inside one Playwright session share cookies and storage; independent
 sessions do not.
+
 `page(session, :secret_chamber)` returns the captured opaque `Fluffy.Page`; use
 `Page.name/1`, `Page.url/1`, `Page.status/1`, `Page.opener/1`, and
 `Page.revision/1` to inspect its metadata without switching.
@@ -64,24 +68,26 @@ session
 |> wait_for(Event.navigation(:forbidden_forest), fn session ->
   click(session, by_role(:link, name: "Follow the spiders"))
 end)
-|> expect(Navigation.to_have_url(:forbidden_forest, forbidden_forest_url))
-|> expect(Navigation.to_have_status(:forbidden_forest, 200))
+|> assert(navigation_url(:forbidden_forest, path: "/forest"))
+|> assert(navigation_status(:forbidden_forest, 200))
 ```
 
-Captured URL assertions on `Download`, `Navigation`, `Request`, and `Response`
+Captured download, navigation, request, and response URL assertions
 accept exact strings, regexes, or structured path, query, and fragment matchers.
-This also applies to `Navigation.to_have_from_url/3`. Strings are compared as
+This also applies to `navigation_from_url/3`. Strings are compared as
 captured, without resolving relative URLs. Structured matching follows the
 [same rules as page URL assertions](usage.md#page-assertions): query matching is
 exact by default; use `query_mode: :subset` to allow additional parameter names.
 
 ```elixir
 session
-|> expect(Navigation.to_have_url(:forbidden_forest,
-  path: "/forest",
-  query: %{"guide" => "spiders"},
-  query_mode: :subset
-))
+|> assert(
+  navigation_url(:forbidden_forest,
+    path: "/forest",
+    query: %{"guide" => "spiders"},
+    query_mode: :subset
+  )
+)
 ```
 
 These assertions inspect the retained event result; they do not wait for the
@@ -94,16 +100,16 @@ action so an unhandled modal cannot deadlock the click:
 
 ```elixir
 session
-|> wait_for(Event.dialog(:release_basilisk, accept: true), fn session ->
-  click(session, by_role(:button, name: "Release basilisk"))
+|> wait_for(Event.dialog(:delete_recipe, decision: :accept), fn session ->
+  click(session, by_role(:button, name: "Delete recipe"))
 end)
-|> expect(Dialog.to_have_type(:release_basilisk, :confirm))
-|> expect(Dialog.to_have_message(:release_basilisk, "Release the basilisk?"))
-|> expect(Dialog.to_have_action(:release_basilisk, :accept))
+|> assert(dialog_type(:delete_recipe, :confirm))
+|> assert(dialog_message(:delete_recipe, "Delete this recipe?"))
+|> assert(dialog_action(:delete_recipe, :accept))
 ```
 
-Use `:dismiss`, `{:accept, "prompt text"}`, or a decision function receiving
-the unhandled `%Fluffy.Dialog{}`.
+Set `decision:` to `:accept`, `:dismiss`, `{:accept, "prompt text"}`, or a
+function receiving the unhandled `%Fluffy.Dialog{}`.
 
 ## Requests and responses
 
@@ -112,8 +118,8 @@ session
 |> wait_for(Event.response(:potions, ~r{/api/potions}), fn session ->
   click(session, by_role(:button, name: "Refresh potions"))
 end)
-|> expect(Response.to_have_status(:potions, 200))
-|> expect(Response.to_have_resource_type(:potions, "fetch"))
+|> assert(response_status(:potions, 200))
+|> assert(response_resource_type(:potions, "fetch"))
 ```
 
 Matchers can be an exact URL, regex, or normalized-event predicate. These are
@@ -135,13 +141,13 @@ session
 end)
 |> set_input_files(:portrait, %Fluffy.FilePayload{
   name: "fluffy.png",
-  bytes: png_bytes,
+  bytes: File.read!("test/support/fixtures/fluffy.png"),
   content_type: "image/png"
 })
 ```
 
 `file_chooser(session, :portrait)` returns the opaque
-`%Fluffy.FileChooser{}`; `Fluffy.FileChooser.multiple?/1` exposes whether
+`%Fluffy.FileChooser{}`; `FileChooser.multiple?/1` exposes whether
 it accepts multiple files. The chooser result is non-consuming and lives with
 the session, but it belongs to the page that opened it. Scripted chooser events
 are Playwright-only because Static and LiveView do not execute application

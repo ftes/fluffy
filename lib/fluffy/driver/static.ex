@@ -261,7 +261,7 @@ defmodule Fluffy.Driver.Static do
 
   defp assert_count_expectation!(%Expect{} = expectation, _locator, expected, candidates) do
     actual = length(candidates)
-    assert_truth!(expectation, actual != expected, actual)
+    assert_truth!(expectation, actual == expected, actual)
   end
 
   defp structurally_visible?(element) do

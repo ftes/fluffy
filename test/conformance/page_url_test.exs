@@ -2,8 +2,8 @@ defmodule Fluffy.Conformance.PageURLTest do
   use Fluffy.TestCase, async: true
 
   import Fluffy
+  import Fluffy.Expect
 
-  alias Fluffy.Page
   alias Fluffy.TestWeb.Endpoint
 
   @query "b=2&a=1&tag=a&tag=b&empty=&bare&space=hello+world&unicode=%C3%A4&plus=%2B"
@@ -14,9 +14,9 @@ defmodule Fluffy.Conformance.PageURLTest do
       driver
       |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
       |> visit("/chamber?#{@query}#summary")
-      |> expect(Page.to_have_url(path: "/chamber"))
+      |> expect(Fluffy.Expect.page_to_have_url(path: "/chamber"))
       |> expect(
-        Page.to_have_url(
+        Fluffy.Expect.page_to_have_url(
           path: "/chamber",
           query: %{
             "a" => "1",
@@ -32,14 +32,14 @@ defmodule Fluffy.Conformance.PageURLTest do
         )
       )
       |> expect(
-        Page.to_have_url(
+        Fluffy.Expect.page_to_have_url(
           path: "/chamber",
           query: %{"space" => "hello world", "tag" => ["a", "b"]},
           query_mode: :subset
         )
       )
-      |> expect(not_(Page.to_have_url(query: %{"tag" => ["b", "a"]}, query_mode: :subset)))
-      |> expect(not_(Page.to_have_url(fragment: nil)))
+      |> expect(not_(Fluffy.Expect.page_to_have_url(query: %{"tag" => ["b", "a"]}, query_mode: :subset)))
+      |> expect(not_(Fluffy.Expect.page_to_have_url(fragment: nil)))
     end
 
     @tag driver: driver
@@ -49,9 +49,9 @@ defmodule Fluffy.Conformance.PageURLTest do
       driver
       |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
       |> visit("/chamber?#{@query}#summary")
-      |> expect(Page.to_have_url(exact))
-      |> expect(Page.to_have_url(~r{/chamber\?b=2&a=1&tag=a&tag=b&}))
-      |> expect(not_(Page.to_have_url("/chamber?a=1&b=2")))
+      |> expect(Fluffy.Expect.page_to_have_url(exact))
+      |> expect(Fluffy.Expect.page_to_have_url(~r{/chamber\?b=2&a=1&tag=a&tag=b&}))
+      |> expect(not_(Fluffy.Expect.page_to_have_url("/chamber?a=1&b=2")))
     end
 
     @tag driver: driver
@@ -60,7 +60,7 @@ defmodule Fluffy.Conformance.PageURLTest do
       |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
       |> visit("/live/chamber-map?b=2&a=1&tag=a&tag=b#summary")
       |> expect(
-        Page.to_have_url(
+        Fluffy.Expect.page_to_have_url(
           path: "/live/chamber-map",
           query: %{"a" => "1", "b" => "2", "tag" => ["a", "b"]},
           fragment: "summary"

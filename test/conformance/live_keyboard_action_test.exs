@@ -5,8 +5,6 @@ defmodule Fluffy.Conformance.LiveKeyboardActionTest do
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.Page
-
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
     test "press dispatches matching keydown and keyup with browser payload and focus using #{driver}",
@@ -101,7 +99,7 @@ defmodule Fluffy.Conformance.LiveKeyboardActionTest do
       |> live_session()
       |> visit("/live/keyboard")
       |> press(by_label("Patch key", exact: true), "Enter")
-      |> expect(Page.to_have_url(Fluffy.TestServer.base_url() <> "/live/keyboard?step=patched"))
+      |> expect(Fluffy.Expect.page_to_have_url(Fluffy.TestServer.base_url() <> "/live/keyboard?step=patched"))
       |> expect("Step: patched" |> by_text(exact: true) |> to_be_visible())
     end
 
@@ -191,7 +189,7 @@ defmodule Fluffy.Conformance.LiveKeyboardActionTest do
       |> live_session()
       |> visit("/live/keyboard")
       |> press(by_label("Navigate key", exact: true), "Enter")
-      |> expect(Page.to_have_url(Fluffy.TestServer.base_url() <> "/live/secret-chamber"))
+      |> expect(Fluffy.Expect.page_to_have_url(Fluffy.TestServer.base_url() <> "/live/secret-chamber"))
       |> expect("The secret chamber is open" |> by_text(exact: true) |> to_be_visible())
     end
   end

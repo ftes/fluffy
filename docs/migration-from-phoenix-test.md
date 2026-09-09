@@ -17,7 +17,8 @@ Ecto sandbox configuration.
 ## Common rewrites
 
 Start with these common translations; matching and form differences are
-explained below:
+explained below. Each call is a pipeline step with the session supplied by
+`|>`:
 
 | PhoenixTest | Fluffy |
 | --- | --- |
@@ -28,13 +29,17 @@ explained below:
 | `uncheck("Ready to brew")` | `uncheck(by_label("Ready to brew", exact: true))` |
 | `click_button("Brew potion")` | `click(by_role(:button, name: "Brew potion"))` |
 | `click_link("Potions")` | `click(by_role(:link, name: "Potions"))` |
-| `assert_has("#notice")` | `expect(to_be_visible(by_css("#notice")))` |
-| `assert_path("/potions")` | `expect(Page.to_have_url(path: "/potions"))` |
-| `assert_path("/potions", query_params: params)` | `expect(Page.to_have_url(path: "/potions", query: params))` |
-| `assert_has("title", text: "Potions", exact: true)` | `expect(Page.to_have_title("Potions"))` |
+| `refute_has("#notice")` | `assert(count(by_css("#notice"), 0))` |
+| `assert_path("/potions")` | `assert(page_url(path: "/potions"))` |
+| `assert_path("/potions", query_params: params)` | `assert(page_url(path: "/potions", query: params))` |
+| `assert_has("title", text: "Potions", exact: true)` | `assert(page_title("Potions"))` |
 | `reload_page()` | `reload()` |
 | `upload("Recipe", path)` | `set_input_files(by_label("Recipe", exact: true), path)` |
 | `submit()` | `submit(by_css("#potion-form"))` |
+
+For a positive `assert_has`, choose visibility or an explicit count according
+to [Assertion intent](#assertion-intent). A visibility assertion also requires
+the matched element to be visible; it is not a direct DOM-presence equivalent.
 
 Use `%{value: value}`, `%{label: label}`, or `%{index: zero_based_index}` when
 the selection criterion must be explicit. One `select_option` call replaces
@@ -61,7 +66,7 @@ mutable scope and lets the same locator be reused:
 potion = by_css("#polyjuice-potion")
 
 session
-|> fill(by_label(potion, "Brewer"), "Hermione Granger")
+|> fill(by_label(potion, "Brewer", exact: true), "Hermione Granger")
 |> click(by_role(potion, :button, name: "Brew"))
 ```
 
@@ -70,7 +75,7 @@ Playwright's zero-based indexing:
 
 ```elixir
 # PhoenixTest: assert_has(".creature", at: 1)
-expect(session, nth(by_css(".creature"), 0) |> to_be_visible())
+assert(session, visible(nth(by_css(".creature"), 0)))
 ```
 
 Explicit ARIA roles override the element's default role:
@@ -96,21 +101,27 @@ For assertions, put exactness on the locator rather than the expectation:
 
 ```elixir
 # assert_has("p", text: "Potion brewed", exact: true)
-expect(by_text(by_css("p"), "Potion brewed", exact: true) |> to_be_visible())
+session |> assert(visible(by_text("Potion brewed", exact: true)))
 
 # assert_has("p", text: "Potion brewed")
-expect(by_text(by_css("p"), "Potion brewed", []) |> to_be_visible())
+session |> assert(visible(by_text("Potion brewed")))
 ```
+
+These examples express visible text rather than preserve the `p` selector.
+A text locator finds the smallest matching element; scoping `by_text` under
+`by_css("p")` searches within that paragraph, rather than filtering the
+paragraph itself. For a substring check that must retain the paragraph
+selector, use `filter(by_css("p"), has_text: "Potion brewed")`.
 
 Prefer labels and roles over generated IDs or CSS tied to implementation
 details. Compose locators to identify the intended row, section, or control;
 keep CSS when the test specifically checks structure or no suitable semantic
 locator exists.
 
-Prefer direct state assertions too: `to_be_enabled(by_label("Potion name"))`
+Prefer direct state assertions too: `assert(enabled(by_label("Potion name")))`
 requires the field to exist and be enabled, whereas checking that no disabled
-input matches can pass when the field is missing. Use `to_have_value` for
-field values and `to_be_checked` for checkbox state.
+input matches can pass when the field is missing. Use `value` for
+field values and `checked` for checkbox state.
 
 PhoenixTest's `exact:` on a `value:` or `selected:` assertion applies to its
 optional field label, not to the value or selected option itself. Preserve
@@ -123,22 +134,27 @@ Choose whether the old assertion meant DOM absence or user-visible state:
 
 ```elixir
 # The node must not exist.
-session |> expect(by_css("#flash") |> to_have_count(0))
+session |> assert(count(by_css("#flash"), 0))
 
 # The node may exist but must not be visible.
-session |> expect(not_(by_css("#flash") |> to_be_visible()))
+session |> refute(visible(by_css("#flash")))
 ```
 
-`not_(to_be_visible(...))` checks visibility; `to_have_count(..., 0)` checks
-absence.
+`refute(visible(locator))` checks visibility; `assert(count(locator, 0))` checks
+absence. Even `:phoenix` respects structural hiddenness, unlike PhoenixTest's
+DOM-presence assertions. See
+[Visibility and DOM presence](usage.md#visibility-and-dom-presence) for the
+structural checks and their differences from browser rendering.
+
+### Page titles
 
 Page title is not an element-title locator. Migrate PhoenixTest's special
 `"title"` assertion through the page API:
 
 ```elixir
 session
-|> expect(Page.to_have_title("Potions classroom"))
-|> expect(Page.to_have_title(~r/^Potions/))
+|> assert(page_title("Potions classroom"))
+|> assert(page_title(~r/^Potions/))
 ```
 
 A string is an exact Playwright-style title expectation. PhoenixTest's
@@ -219,14 +235,11 @@ chooser, use Playwright's `Event.file_chooser`. See
 
 ## Navigation, retries, and JavaScript
 
-`expect(Page.to_have_url(...))` compares an exact canonical absolute URL, a
+### URL matching
+
+`assert(page_url(...))` compares an exact canonical absolute URL, a
 regular expression over that complete URL, or selected structured components.
-Root-relative exact strings are resolved against `base_url`. LiveView expectations
-retry fresh renders under one deadline and wake on redirects/process exits.
-LiveView actions also resolve afresh while a target is
-absent, disabled, structurally hidden for a click, readonly for a fill, or
-missing the requested select option. Multiple matches and semantically wrong
-control types still fail immediately, and Static actions remain immediate.
+Root-relative exact strings are resolved against `base_url`.
 
 PhoenixTest's `assert_path(path)` compares only `URI.path`; it ignores an
 existing query unless the source assertion supplies `query_params:`. A
@@ -240,7 +253,7 @@ query:
 assert_path(session, "/chambers/secrets")
 
 # Fluffy: keep the path-only assertion
-expect(session, Page.to_have_url(path: "/chambers/secrets"))
+assert(session, page_url(path: "/chambers/secrets"))
 ```
 
 Use an exact string when the absence of a query or its serialized order is part
@@ -248,9 +261,9 @@ of the assertion. When the original specifies `query_params:`, use exact query
 mode (the default) to preserve PhoenixTest's complete decoded-map comparison:
 
 ```elixir
-expect(
+assert(
   session,
-  Page.to_have_url(
+  page_url(
     path: "/chambers/secrets",
     query: %{"state" => "open", "clues[]" => ["diary", "basilisk"]}
   )
@@ -263,6 +276,15 @@ duplicates of repeated values for each name. Query names and values are
 strings; bracketed names such as `clues[]` remain literal URLSearchParams names
 rather than being converted into nested Plug data. Bare parameters and empty
 values both decode to `""`; `+` and `%20` both decode to a space.
+
+### Retries
+
+LiveView expectations retry fresh renders under one deadline and wake on redirects/process exits.
+LiveView actions also resolve afresh while a target is absent, disabled, structurally hidden for a click, readonly for a fill, or
+missing the requested select option. Multiple matches and semantically wrong
+control types still fail immediately, and Static actions remain immediate.
+
+### JavaScript
 
 Phoenix supports declarative server/HTML actions, including stock
 Phoenix.HTML `data-method`/`data-to` behavior and a form button's
@@ -279,13 +301,13 @@ listener is installed before the callback runs, and the captured result stays
 in the pipe:
 
 ```elixir
-alias Fluffy.Download
+alias Fluffy.Event
 
 session
 |> wait_for(Event.download(:report), fn session ->
   click(session, by_role(:button, name: "Download potion ledger"))
 end)
-|> expect(Download.to_have_suggested_filename(:report, "potions.csv"))
+|> assert(download_suggested_filename(:report, "potions.csv"))
 ```
 
 For popups, use `Event.popup` with `switch_page` and `close_page` instead of
@@ -318,7 +340,7 @@ session
 |> unwrap(fn view ->
   Phoenix.LiveViewTest.render_change(view, "validate", %{"name" => "Basilisk"})
 end)
-|> expect(by_text("Basilisk") |> to_be_visible())
+|> assert(visible(by_text("Basilisk")))
 ```
 
 Do not call `assert_patch` or `assert_redirect` inside the callback: Fluffy

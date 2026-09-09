@@ -2,10 +2,10 @@ defmodule Fluffy.Conformance.ClientNavigationReadinessTest do
   use Fluffy.TestCase, async: true
 
   import Fluffy
+  import Fluffy.Expect
   import Fluffy.Locator
 
   alias Fluffy.Expect
-  alias Fluffy.Page
   alias Fluffy.TestWeb.Endpoint
 
   for {operation, button} <- [assign: "Assign ready", replace: "Replace ready"] do
@@ -23,7 +23,7 @@ defmodule Fluffy.Conformance.ClientNavigationReadinessTest do
         )
         |> visit("/actions/client-navigation?topic=#{topic}")
         |> click(by_role(:button, name: unquote(button)))
-        |> expect(Page.to_have_url(destination))
+        |> expect(Expect.page_to_have_url(destination))
 
       :ok = Phoenix.PubSub.broadcast(Fluffy.TestPubSub, topic, {:redirect_ready, message})
 
@@ -40,9 +40,9 @@ defmodule Fluffy.Conformance.ClientNavigationReadinessTest do
     )
     |> visit("/actions/history-source")
     |> click(by_role(:button, name: "Open secret passage"))
-    |> expect(Page.to_have_url("/actions/history-target"))
+    |> expect(Expect.page_to_have_url("/actions/history-target"))
     |> click(by_role(:button, name: "Back to chamber entrance"))
-    |> expect(Page.to_have_url("/actions/history-source"))
+    |> expect(Expect.page_to_have_url("/actions/history-source"))
     |> expect(:button |> by_role(name: "Open secret passage") |> Expect.to_be_visible())
   end
 
@@ -56,6 +56,6 @@ defmodule Fluffy.Conformance.ClientNavigationReadinessTest do
     )
     |> visit("/actions/history-push-state")
     |> click(by_role(:button, name: "Reveal secret passage"))
-    |> expect(Page.to_have_url("/actions/history-push-state?step=pushed"))
+    |> expect(Expect.page_to_have_url("/actions/history-push-state?step=pushed"))
   end
 end

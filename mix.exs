@@ -1,7 +1,7 @@
 defmodule Fluffy.MixProject do
   use Mix.Project
 
-  @version "0.2.0"
+  @version "0.3.0"
   @description "Phoenix feature tests. Three drivers, one Playwright-shaped API."
   @source_url "https://github.com/ftes/fluffy"
   @hex_url "https://hex.pm/packages/fluffy"
@@ -9,6 +9,7 @@ defmodule Fluffy.MixProject do
   @guides [
     "docs/installation.md",
     "docs/usage.md",
+    "docs/assertion-styles.md",
     "docs/advanced-events.md"
   ]
 
@@ -92,11 +93,9 @@ defmodule Fluffy.MixProject do
           Fluffy.Test,
           Fluffy.Locator,
           Fluffy.Expect,
+          Fluffy.Assert,
           Fluffy.Page,
           Fluffy.Event,
-          Fluffy.Navigation,
-          Fluffy.Request,
-          Fluffy.Response,
           Fluffy.Playwright,
           Fluffy.Sandbox
         ],

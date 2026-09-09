@@ -5,8 +5,6 @@ defmodule Fluffy.Conformance.LiveActionTest do
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.Page
-
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
     test "resolves a composed locator before dispatching a Live event with #{driver}", %{
@@ -90,7 +88,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
       |> visit("/live/nested")
       |> click(by_role(child, :button, name: "Navigate from child", exact: true))
       |> expect("The secret chamber is open" |> by_text() |> to_be_visible())
-      |> expect(Page.to_have_url(Fluffy.TestServer.base_url() <> "/live/secret-chamber"))
+      |> expect(Fluffy.Expect.page_to_have_url(Fluffy.TestServer.base_url() <> "/live/secret-chamber"))
     end
 
     @tag driver: driver
@@ -101,7 +99,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
       |> live_session()
       |> visit("/live/nested")
       |> click(by_role(child, :button, name: "Patch from child", exact: true))
-      |> expect(Page.to_have_url(Fluffy.TestServer.base_url() <> "/live/nested?from=child"))
+      |> expect(Fluffy.Expect.page_to_have_url(Fluffy.TestServer.base_url() <> "/live/nested?from=child"))
     end
   end
 

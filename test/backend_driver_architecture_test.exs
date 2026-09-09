@@ -11,7 +11,6 @@ defmodule Fluffy.BackendDriverArchitectureTest do
   alias Fluffy.Driver.Registry, as: DriverRegistry
   alias Fluffy.Driver.Static
   alias Fluffy.Internal.Navigation
-  alias Fluffy.Page
   alias Fluffy.Session
 
   test "a durable session selects a backend separately from its active page driver" do
@@ -50,7 +49,7 @@ defmodule Fluffy.BackendDriverArchitectureTest do
 
     assert Session.current_driver(navigated_session) == :live
     assert Session.current_page(navigated_session).revision == revision + 1
-    expect(navigated_session, Page.to_have_url("/live/chamber-map?step=patched"))
+    expect(navigated_session, Fluffy.Expect.page_to_have_url("/live/chamber-map?step=patched"))
     expect(navigated_session, "Map position: patched" |> by_text() |> to_be_visible())
   end
 
