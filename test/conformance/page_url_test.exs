@@ -10,6 +10,23 @@ defmodule Fluffy.Conformance.PageURLTest do
 
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
+    test "immediate URL assertions read the current URL and report mismatches with #{driver}", %{driver: driver} do
+      session =
+        driver
+        |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+        |> visit("/chamber")
+        |> expect(page_to_have_url(path: "/chamber"), timeout: 0)
+
+      error =
+        assert_raise ExUnit.AssertionError, fn ->
+          expect(session, page_to_have_url(path: "/missing"), timeout: 0)
+        end
+
+      assert error.message =~ "/chamber"
+      expect(session, not_(page_to_have_url(path: "/missing")), timeout: 0)
+    end
+
+    @tag driver: driver
     test "matches structured URLs on a Static document with #{driver}", %{driver: driver} do
       driver
       |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)

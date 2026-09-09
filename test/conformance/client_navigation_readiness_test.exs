@@ -51,8 +51,7 @@ defmodule Fluffy.Conformance.ClientNavigationReadinessTest do
     :playwright
     |> start_session(
       base_url: Fluffy.TestServer.base_url(),
-      endpoint: Endpoint,
-      timeout: 500
+      endpoint: Endpoint
     )
     |> visit("/actions/history-push-state")
     |> click(by_role(:button, name: "Reveal secret passage"))

@@ -29,7 +29,7 @@ defmodule Fluffy.Conformance.AssertAPITest do
         |> refute(visible(by_css("#absent")))
         |> assert(count(by_css("#hidden"), 1))
         |> refute(count(by_css("#visible"), 2))
-        |> refute(page_title("Error"), timeout: 20)
+        |> refute(page_title("Error"))
 
       assert returned == session
 
@@ -41,6 +41,15 @@ defmodule Fluffy.Conformance.AssertAPITest do
         refute(session, count(by_css("#visible"), 1), timeout: 20)
       end
     end
+  end
+
+  @tag driver: :playwright
+  test "immediate browser assertions return a usable session" do
+    :playwright
+    |> session_for_html("<p>Saved</p>", base_url: Fluffy.TestServer.base_url())
+    |> assert(visible(by_text("Saved")), timeout: 0)
+    |> refute(page_title("Error"), timeout: 0)
+    |> assert(visible(by_text("Saved")))
   end
 
   for driver <- [:phoenix, :playwright] do

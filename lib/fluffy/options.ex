@@ -4,7 +4,9 @@ defmodule Fluffy.Options do
   @timeout_options [
     timeout: [
       type: :non_neg_integer,
-      doc: "Maximum time in milliseconds to wait for the operation."
+      doc:
+        "Maximum time in milliseconds to wait for the operation. " <>
+          "Playwright browser bookkeeping and navigation synchronization use the session timeout separately."
     ]
   ]
 

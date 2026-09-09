@@ -9,7 +9,7 @@ defmodule Fluffy.Conformance.LiveReadinessErrorTest do
       start_session(:playwright,
         base_url: Fluffy.TestServer.base_url(),
         endpoint: Fluffy.TestWeb.Endpoint,
-        timeout: 100
+        timeout: 1_000
       )
 
     error =

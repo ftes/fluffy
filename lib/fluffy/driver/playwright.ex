@@ -485,11 +485,12 @@ defmodule Fluffy.Driver.Playwright do
     timeout = expectation.options |> Keyword.get(:timeout, timeout()) |> max(1)
     deadline = System.monotonic_time(:millisecond) + timeout
 
-    poll_url_expectation!(state, expectation, expected, deadline)
+    poll_url_expectation!(state, expectation, expected, deadline, session.context.timeout)
   end
 
-  defp poll_url_expectation!(state, expectation, expected, deadline) do
-    actual = current_url(state, remaining(deadline))
+  defp poll_url_expectation!(state, expectation, expected, deadline, read_timeout) do
+    # Reading the current value must work even for an immediate assertion.
+    actual = current_url(state, read_timeout)
     passed? = URLMatcher.matches?(expected, actual)
 
     cond do
@@ -504,13 +505,15 @@ defmodule Fluffy.Driver.Playwright do
         receive do
         after
           min(10, remaining(deadline)) ->
-            poll_url_expectation!(state, expectation, expected, deadline)
+            poll_url_expectation!(state, expectation, expected, deadline, read_timeout)
         end
     end
   end
 
   defp navigation_aware_action(session, operation_timeout, action) do
-    deadline = System.monotonic_time(:millisecond) + max(operation_timeout, 1)
+    # Browser bookkeeping has its own budget; it must not consume a short
+    # action/assertion timeout or silently leave navigation state stale.
+    deadline = System.monotonic_time(:millisecond) + max(session.context.timeout, 1)
     state = Session.page_state(session)
 
     observer =
@@ -526,7 +529,7 @@ defmodule Fluffy.Driver.Playwright do
     navigation_cursor = live_navigation_cursor(state, remaining(deadline))
 
     try do
-      case action.(remaining(deadline)) do
+      case action.(max(operation_timeout, 1)) do
         {:ok, value} ->
           outcome =
             reconcile_action_navigation(
@@ -535,7 +538,7 @@ defmodule Fluffy.Driver.Playwright do
               previous_url,
               navigation_cursor,
               observer,
-              deadline
+              System.monotonic_time(:millisecond) + max(session.context.timeout, 1)
             )
 
           {:ok, value, outcome}
@@ -552,12 +555,7 @@ defmodule Fluffy.Driver.Playwright do
   defp reconcile_action_navigation(session, state, previous_url, navigation_cursor, observer, deadline) do
     case read_current_url(state, deadline) do
       {:error, error} ->
-        if System.monotonic_time(:millisecond) >= deadline and
-             String.contains?(playwright_error_message(error), "Timeout") do
-          session
-        else
-          raise "Could not read the current browser URL: #{inspect(error)}"
-        end
+        raise "Could not read the current browser URL: #{inspect(error)}"
 
       {:ok, ^previous_url} ->
         Session.put_page_state(session, %{state | navigation_observer: observer})
