@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.1 — 2026-09-14
+
+### Fixed
+
+- Correct the session type declaration to reflect its shared implementation across backend modules. Consumer tracing, screenshot, and evaluation pipelines now pass Dialyzer without suppressions; session fields remain internal.
+- Improve Playwright assertion reliability with short timeouts.
+
 ## 0.3.0 — 2026-09-09
 
 ### Changed

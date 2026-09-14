@@ -1,6 +1,6 @@
 defmodule Fluffy.Session do
   @moduledoc """
-  The opaque state threaded through Fluffy test pipelines.
+  The session state threaded through Fluffy test pipelines.
 
   Sessions are created and operated through the functions in `Fluffy` and
   backend-specific public helpers such as `Fluffy.Playwright`. Their fields
@@ -8,22 +8,21 @@ defmodule Fluffy.Session do
   """
 
   alias Fluffy.Backend.Phoenix
-  alias Fluffy.Backend.Phoenix.Context
   alias Fluffy.Backend.Playwright
   alias Fluffy.Page
 
   @enforce_keys [:backend, :context, :pages, :active_page]
   defstruct [:backend, :context, :pages, :active_page, :pending_event, results: %{}]
 
-  @typedoc "An opaque Fluffy session handle."
-  @opaque t :: %__MODULE__{
-            backend: Phoenix | Playwright,
-            context: Context.t() | Fluffy.Backend.Playwright.Context.t(),
-            pages: %{required(term()) => Page.t()},
-            active_page: term(),
-            pending_event: map() | nil,
-            results: map()
-          }
+  @typedoc "A Fluffy session handle. Its fields are internal implementation details."
+  @type t :: %__MODULE__{
+          backend: Phoenix | Playwright,
+          context: map(),
+          pages: %{required(term()) => Page.t()},
+          active_page: term(),
+          pending_event: map() | nil,
+          results: map()
+        }
 
   @doc false
   def new(backend, context, %Page{id: page_id} = page) do

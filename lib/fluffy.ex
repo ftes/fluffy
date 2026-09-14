@@ -51,24 +51,6 @@ defmodule Fluffy do
   @type session_option ::
           unquote(NimbleOptions.option_typespec(Fluffy.Options.session_schema()))
 
-  # Session is deliberately opaque to consumers, while this public facade is
-  # one of the modules that implements that handle. Dialyzer in Elixir 1.18
-  # has no friend-module concept and otherwise rejects every annotated facade
-  # function whose implementation matches the private struct.
-  @dialyzer {:nowarn_function,
-             reload: 2,
-             page: 2,
-             click: 3,
-             submit: 3,
-             fill: 4,
-             set_input_files: 4,
-             check: 3,
-             uncheck: 3,
-             select_option: 4,
-             focus: 3,
-             blur: 3,
-             press: 4}
-
   @spec start_session(backend(), [session_option()]) :: Session.t()
   def start_session(backend, options \\ []), do: Backend.start_session(backend, options)
 
@@ -173,9 +155,6 @@ defmodule Fluffy do
   The listener is installed before the action runs. The returned session keeps
   the captured result so the call remains pipeable.
   """
-  # Session is consumer-opaque but passed through internal event orchestration.
-  # Dialyzer has no friend-module concept for that callback boundary.
-  @dialyzer {:nowarn_function, wait_for: 4}
   @spec wait_for(Session.t(), Event.t(), (Session.t() -> Session.t()), [Event.option()]) :: Session.t()
   def wait_for(%Session{} = session, %Event{} = event, action, options \\ []) when is_function(action, 1) do
     event = Event.merge_options(event, options)

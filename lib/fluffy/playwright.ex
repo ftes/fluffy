@@ -68,14 +68,6 @@ defmodule Fluffy.Playwright do
 
   @type screenshot_option :: unquote(NimbleOptions.option_typespec(@screenshot_schema))
 
-  # Session is deliberately opaque to consumers but shared across Fluffy's
-  # backend modules. Dialyzer has no friend-module concept, so these three
-  # session-preserving public wrappers otherwise report only that internal
-  # implementation access as an opaque-contract violation.
-  @dialyzer {:nowarn_function, trace: 2}
-  @dialyzer {:nowarn_function, screenshot: 3}
-  @dialyzer {:nowarn_function, evaluate: 3}
-
   @doc """
   Starts a Playwright trace for this session's BrowserContext.
 
