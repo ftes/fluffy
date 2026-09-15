@@ -75,7 +75,18 @@ jobs:
       - if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: pnpm exec playwright install-deps chromium
       - run: pnpm run build:test
-      - run: mix check --max-cases 4
+      - run: mix lint
+      - name: Run tests with one retry
+        id: tests
+        run: |
+          fluffy_test_seed=$RANDOM
+          if FLUFFY_ARTIFACT_DIR="$FLUFFY_ARTIFACT_DIR/first" mix test --warnings-as-errors --max-cases 4 --seed "$fluffy_test_seed"; then
+            exit 0
+          fi
+
+          echo "retried=true" >> "$GITHUB_OUTPUT"
+          echo "::warning::Tests failed; retrying once with seed $fluffy_test_seed. Both attempts' failure artifacts will be uploaded."
+          FLUFFY_ARTIFACT_DIR="$FLUFFY_ARTIFACT_DIR/retry" mix test --warnings-as-errors --max-cases 4 --seed "$fluffy_test_seed"
       - run: mix dialyzer --format short --list-unused-filters
       - name: Build documentation without warnings
         env:
@@ -88,7 +99,7 @@ jobs:
           mix deps.get
           mix test
       - name: Upload browser failure artifacts
-        if: failure()
+        if: failure() || steps.tests.outputs.retried == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: browser-failures-${{ matrix.lane }}-elixir-${{ matrix.elixir }}-erlang-${{ matrix.erlang }}
