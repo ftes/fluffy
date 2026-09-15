@@ -59,6 +59,33 @@ defmodule Fluffy.Conformance.PageEventTest do
   end
 
   @tag driver: :playwright
+  test "initializes a captured popup after the action outlives the capture deadline" do
+    fixture =
+      TestHTTPFixtures.register(fn request ->
+        case request.path do
+          "/start" -> %{body: html(~s(<a href="redirect" target="_blank">Open details</a>))}
+          "/redirect" -> %{status: 302, headers: [{"location", "details"}], body: ""}
+          "/details" -> %{status: 202, body: html("<h1>Details page</h1>")}
+        end
+      end)
+
+    session =
+      :playwright
+      |> start_test_session()
+      |> visit(TestHTTPFixtures.path(fixture, "/start"))
+      |> wait_for(Event.popup(:details, timeout: 1_000), fn session ->
+        session = click(session, by_role(:link, name: "Open details"))
+        Process.sleep(1_000)
+        session
+      end)
+
+    assert Page.url(page(session, :details)) == TestHTTPFixtures.url(fixture, "/details")
+    assert Page.status(page(session, :details)) == 202
+    assert Page.opener(page(session, :details)) == :main
+    session |> switch_page(:details) |> expect("Details page" |> by_text() |> to_be_visible())
+  end
+
+  @tag driver: :playwright
   test "captures a formtarget new page and preserves its submitter with Playwright" do
     fixture =
       TestHTTPFixtures.register(fn request ->
@@ -136,4 +163,43 @@ defmodule Fluffy.Conformance.PageEventTest do
   end
 
   defp html(body), do: "<!doctype html><html><body>#{body}</body></html>"
+
+  @tag driver: :playwright
+  test "associates the first popup with its final redirect response when another page also loads" do
+    fixture =
+      TestHTTPFixtures.register(fn request ->
+        case request.path do
+          "/start" ->
+            %{
+              body:
+                html(
+                  ~s(<a href="redirect" target="_blank">First popup</a><a href="other" target="_blank">Other popup</a>)
+                )
+            }
+
+          "/redirect" ->
+            %{status: 302, headers: [{"location", "final"}], body: ""}
+
+          "/final" ->
+            %{status: 203, body: html("<script>history.replaceState({}, '', 'patched')</script><h1>Selected popup</h1>")}
+
+          "/other" ->
+            %{status: 202, body: html("<h1>Other popup</h1>")}
+        end
+      end)
+
+    session =
+      :playwright
+      |> start_test_session()
+      |> visit(TestHTTPFixtures.path(fixture, "/start"))
+      |> wait_for(Event.popup(:selected), fn session ->
+        session
+        |> click(by_role(:link, name: "First popup"))
+        |> click(by_role(:link, name: "Other popup"))
+      end)
+
+    assert Page.url(page(session, :selected)) == TestHTTPFixtures.url(fixture, "/patched")
+    assert Page.status(page(session, :selected)) == 203
+    session |> switch_page(:selected) |> expect("Selected popup" |> by_text() |> to_be_visible())
+  end
 end

@@ -4,7 +4,6 @@ defmodule Fluffy.TestScope do
   use GenServer
 
   alias Ecto.Adapters.SQL.Sandbox
-  alias Fluffy.Playwright.NavigationObserver
   alias Fluffy.Playwright.Trace
   alias PlaywrightEx.BrowserContext
 
@@ -77,19 +76,6 @@ defmodule Fluffy.TestScope do
 
   def register_trace(scope, session_id, trace) do
     GenServer.call(scope, {:register, session_id, {:trace, trace}})
-  end
-
-  def register_navigation_observer(nil, _session_id, _observer), do: :ok
-
-  def register_navigation_observer(scope, session_id, observer) do
-    GenServer.call(scope, {:register, session_id, {:navigation_observer, observer}})
-  end
-
-  @doc false
-  def release_navigation_observer(nil, _session_id, _observer), do: :ok
-
-  def release_navigation_observer(scope, session_id, observer) do
-    release_resource(scope, session_id, {:navigation_observer, observer})
   end
 
   def register_live_view(nil, _session_id, _view_pid), do: :ok
@@ -229,12 +215,6 @@ defmodule Fluffy.TestScope do
     resources
     |> Enum.filter(&match?({:trace, _trace}, &1))
     |> Enum.each(fn {:trace, trace} -> safely(fn -> Trace.stop(trace) end) end)
-
-    resources
-    |> Enum.filter(&match?({:navigation_observer, _observer}, &1))
-    |> Enum.each(fn {:navigation_observer, observer} ->
-      safely(fn -> NavigationObserver.stop(observer) end)
-    end)
 
     resources
     |> Enum.filter(&match?({:browser_context, _context_id}, &1))

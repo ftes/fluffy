@@ -31,7 +31,7 @@ defmodule Fluffy.URLMatcher do
     }
   end
 
-  @spec matches?(String.t() | Regex.t() | t(), String.t()) :: boolean()
+  @spec matches?(String.t() | Regex.t() | t() | (URI.t() -> boolean()), String.t()) :: boolean()
   def matches?(expected, actual) when is_binary(expected) and is_binary(actual), do: actual == expected
   def matches?(%Regex{} = expected, actual) when is_binary(actual), do: Regex.match?(expected, actual)
 
@@ -43,9 +43,13 @@ defmodule Fluffy.URLMatcher do
       component_matches?(matcher.fragment, uri.fragment)
   end
 
+  def matches?(predicate, actual) when is_function(predicate, 1) and is_binary(actual) do
+    !!predicate.(URI.parse(actual))
+  end
+
   def matches?(_expected, _actual), do: false
 
-  @spec describe(String.t() | Regex.t() | t()) :: String.t()
+  @spec describe(String.t() | Regex.t() | t() | (URI.t() -> boolean())) :: String.t()
   def describe(%__MODULE__{source: source}), do: inspect(source)
   def describe(expected), do: inspect(expected)
 

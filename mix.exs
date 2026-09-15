@@ -52,7 +52,7 @@ defmodule Fluffy.MixProject do
   end
 
   def cli do
-    [preferred_envs: [check: :test, quality: :test]]
+    [preferred_envs: [lint: :test, check: :test, quality: :test]]
   end
 
   defp elixirc_paths(:test), do: ["lib", "test/support"]
@@ -64,7 +64,7 @@ defmodule Fluffy.MixProject do
       {:lazy_html, "~> 0.1"},
       {:phoenix, "~> 1.7"},
       {:phoenix_live_view, "~> 1.0"},
-      {:playwright_ex, "~> 0.9"},
+      {:playwright_ex, "~> 0.11"},
       {:phoenix_ecto, "~> 4.7", optional: true},
       {:ecto_sql, "~> 3.10", optional: true},
       {:ex_doc, "~> 0.40.3", only: :dev, runtime: false},
@@ -139,12 +139,12 @@ defmodule Fluffy.MixProject do
       ],
       "consumer.regenerate": "run --no-start integration/regenerate_consumer.exs",
       "assets.build": ["cmd pnpm run build:test"],
-      check: [
+      lint: [
         "format --check-formatted",
         "compile --warnings-as-errors",
-        "credo --format oneline",
-        "test --warnings-as-errors"
+        "credo --format oneline"
       ],
+      check: ["lint", "test --warnings-as-errors"],
       quality: ["check", "dialyzer --format short --list-unused-filters"]
     ]
   end

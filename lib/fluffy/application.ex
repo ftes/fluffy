@@ -20,7 +20,6 @@ defmodule Fluffy.Application do
           timeout = Keyword.fetch!(config, :timeout)
 
           [
-            Fluffy.Playwright.SubscriptionRegistry,
             {DynamicSupervisor, strategy: :one_for_one, name: Fluffy.BrowserRuntime.Supervisor},
             {Fluffy.BrowserRuntime,
              timeout: timeout,

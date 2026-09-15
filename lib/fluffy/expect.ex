@@ -221,7 +221,8 @@ defmodule Fluffy.Expect do
 
   A string matches the complete canonical absolute URL after resolving a
   relative value against the session base URL. A regular expression matches
-  that complete serialized URL.
+  that complete serialized URL. A function receives a `%URI{}` and returns a boolean.
+  Keep predicates quick and nonblocking.
 
   A keyword list selects structured components. `:path` and `:fragment` are
   exact serialized component values; omit either to ignore it. `:fragment`
@@ -246,7 +247,8 @@ defmodule Fluffy.Expect do
   @spec page_to_have_url(Fluffy.Page.url_expectation(), [Expect.option()]) :: Expect.t()
   def page_to_have_url(expected, options \\ [])
 
-  def page_to_have_url(expected, options) when (is_binary(expected) or is_struct(expected, Regex)) and is_list(options) do
+  def page_to_have_url(expected, options)
+      when (is_binary(expected) or is_struct(expected, Regex) or is_function(expected, 1)) and is_list(options) do
     Expect.new(:page, :url, expected, options)
   end
 
@@ -307,16 +309,18 @@ defmodule Fluffy.Expect do
 
   @doc group: "Assertions"
   @doc """
-  Expects the captured download URL to match a string, regex, or structured components.
+  Expects the captured download URL to match a string, regex, URI predicate, or structured components.
 
   Strings match exactly and regexes match against the complete captured URL.
   Relative strings are not resolved. Structured keywords use the same path,
   query, and fragment rules as `Fluffy.Expect.page_to_have_url/2`.
+  Function predicates receive a `%URI{}`.
   """
   @spec download_to_have_url(term(), Fluffy.Page.url_expectation(), [Expect.option()]) :: Expect.t()
   def download_to_have_url(key, expected, options \\ [])
 
-  def download_to_have_url(key, expected, options) when is_binary(expected) or is_struct(expected, Regex) do
+  def download_to_have_url(key, expected, options)
+      when is_binary(expected) or is_struct(expected, Regex) or is_function(expected, 1) do
     Expect.new({:download, key}, :download_url, expected, options)
   end
 
@@ -371,16 +375,18 @@ defmodule Fluffy.Expect do
 
   @doc group: "Assertions"
   @doc """
-  Expects the captured navigation URL to match a string, regex, or structured components.
+  Expects the captured navigation URL to match a string, regex, URI predicate, or structured components.
 
   Strings match exactly and regexes match against the complete captured URL.
   Relative strings are not resolved. Structured keywords use the same path,
   query, and fragment rules as `Fluffy.Expect.page_to_have_url/2`.
+  Function predicates receive a `%URI{}`.
   """
   @spec navigation_to_have_url(term(), Fluffy.Page.url_expectation(), [Expect.option()]) :: Expect.t()
   def navigation_to_have_url(key, expected, options \\ [])
 
-  def navigation_to_have_url(key, expected, options) when is_binary(expected) or is_struct(expected, Regex) do
+  def navigation_to_have_url(key, expected, options)
+      when is_binary(expected) or is_struct(expected, Regex) or is_function(expected, 1) do
     Expect.new({:navigation, key}, :navigation_url, expected, options)
   end
 
@@ -390,16 +396,18 @@ defmodule Fluffy.Expect do
 
   @doc group: "Assertions"
   @doc """
-  Expects the captured navigation source URL to match a string, regex, or structured components.
+  Expects the captured navigation source URL to match a string, regex, URI predicate, or structured components.
 
   Strings match exactly and regexes match against the complete captured URL.
   Relative strings are not resolved. Structured keywords use the same path,
   query, and fragment rules as `Fluffy.Expect.page_to_have_url/2`.
+  Function predicates receive a `%URI{}`.
   """
   @spec navigation_to_have_from_url(term(), Fluffy.Page.url_expectation(), [Expect.option()]) :: Expect.t()
   def navigation_to_have_from_url(key, expected, options \\ [])
 
-  def navigation_to_have_from_url(key, expected, options) when is_binary(expected) or is_struct(expected, Regex) do
+  def navigation_to_have_from_url(key, expected, options)
+      when is_binary(expected) or is_struct(expected, Regex) or is_function(expected, 1) do
     Expect.new({:navigation, key}, :navigation_from_url, expected, options)
   end
 
@@ -427,16 +435,18 @@ defmodule Fluffy.Expect do
 
   @doc group: "Assertions"
   @doc """
-  Expects the captured request URL to match a string, regex, or structured components.
+  Expects the captured request URL to match a string, regex, URI predicate, or structured components.
 
   Strings match exactly and regexes match against the complete captured URL.
   Relative strings are not resolved. Structured keywords use the same path,
   query, and fragment rules as `Fluffy.Expect.page_to_have_url/2`.
+  Function predicates receive a `%URI{}`.
   """
   @spec request_to_have_url(term(), Fluffy.Page.url_expectation(), [Expect.option()]) :: Expect.t()
   def request_to_have_url(key, expected, options \\ [])
 
-  def request_to_have_url(key, expected, options) when is_binary(expected) or is_struct(expected, Regex) do
+  def request_to_have_url(key, expected, options)
+      when is_binary(expected) or is_struct(expected, Regex) or is_function(expected, 1) do
     Expect.new({:request, key}, :request_url, expected, options)
   end
 
@@ -492,16 +502,18 @@ defmodule Fluffy.Expect do
 
   @doc group: "Assertions"
   @doc """
-  Expects the captured response URL to match a string, regex, or structured components.
+  Expects the captured response URL to match a string, regex, URI predicate, or structured components.
 
   Strings match exactly and regexes match against the complete captured URL.
   Relative strings are not resolved. Structured keywords use the same path,
   query, and fragment rules as `Fluffy.Expect.page_to_have_url/2`.
+  Function predicates receive a `%URI{}`.
   """
   @spec response_to_have_url(term(), Fluffy.Page.url_expectation(), [Expect.option()]) :: Expect.t()
   def response_to_have_url(key, expected, options \\ [])
 
-  def response_to_have_url(key, expected, options) when is_binary(expected) or is_struct(expected, Regex) do
+  def response_to_have_url(key, expected, options)
+      when is_binary(expected) or is_struct(expected, Regex) or is_function(expected, 1) do
     Expect.new({:response, key}, :response_url, expected, options)
   end
 

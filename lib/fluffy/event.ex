@@ -19,6 +19,7 @@ defmodule Fluffy.Event do
   import ExUnit.Assertions
 
   alias Fluffy.Backend
+  alias Fluffy.Deadline
   alias Fluffy.Options
   alias Fluffy.Session
 
@@ -34,6 +35,11 @@ defmodule Fluffy.Event do
   @type network_option :: unquote(NimbleOptions.option_typespec(Options.network_event_schema()))
   @type option :: timeout_option() | download_option() | dialog_option() | network_option()
 
+  @doc """
+  Captures the first download matching the optional filename and URL filters.
+
+  Playwright uses the session timeout separately to save the captured download.
+  """
   @spec download(term(), [download_option()]) :: t()
   def download(key, options \\ []) do
     new(:download, key, Options.validate_event_constructor!(:download, options))
@@ -45,12 +51,17 @@ defmodule Fluffy.Event do
     new(:file_chooser, key, Options.validate_event_constructor!(:file_chooser, options))
   end
 
-  @doc "Captures a new page opened by the action. Requires Playwright."
+  @doc """
+  Captures a new page opened by the action. Requires Playwright.
+
+  The session timeout applies separately to initializing the captured page.
+  """
   @spec popup(term(), [timeout_option()]) :: t()
   def popup(key, options \\ []) do
     new(:page, key, Options.validate_event_constructor!(:page, options))
   end
 
+  @doc "Captures the first document navigation or URL change. HTTP redirects resolve to their final URL and status."
   @spec navigation(term(), [timeout_option()]) :: t()
   def navigation(key, options \\ []) do
     new(:navigation, key, Options.validate_event_constructor!(:navigation, options))
@@ -97,26 +108,26 @@ defmodule Fluffy.Event do
     options = Options.validate_event!(type, options)
     timeout = Keyword.get(options, :timeout, default_timeout(session))
 
-    deadline = System.monotonic_time(:millisecond) + timeout
-    {session, token} = Session.arm_event(session, type, key, options)
+    deadline = Deadline.new(timeout)
 
     arm_options =
       options
       |> Keyword.put(:deadline, deadline)
-      |> Keyword.put(:timeout, remaining(deadline))
+      |> Keyword.put(:timeout, Deadline.remaining(deadline))
 
+    {session, token} = Session.arm_event(session, type, key, arm_options)
     {:ok, armed_session, resource} = Backend.arm_event(session, type, arm_options)
 
     try do
       action_session = action.(armed_session)
       ensure_action_session!(action_session, armed_session.backend, token)
-      remaining = remaining(deadline)
+      remaining = Deadline.remaining(deadline)
 
       case Backend.await_event(action_session, resource, remaining) do
         {:ok, updated_session, value} ->
           Session.put_result(updated_session, token, value)
 
-        {:error, :timeout} ->
+        {:error, reason} when reason == :timeout or (is_map(reason) and reason.reason == :timeout) ->
           flunk("Expected #{inspect(type)} event #{inspect(key)} within #{timeout} ms, but no matching event occurred")
 
         {:error, reason} ->
@@ -142,8 +153,6 @@ defmodule Fluffy.Event do
   defp default_timeout(session) do
     Map.get(session.context, :timeout, Application.get_env(:fluffy, :timeout, 1_000))
   end
-
-  defp remaining(deadline), do: max(deadline - System.monotonic_time(:millisecond), 0)
 
   defp default_options(:download), do: [max_bytes: 10_000_000]
   defp default_options(_type), do: []

@@ -82,4 +82,20 @@ defmodule Fluffy.URLMatcherTest do
     assert_raise NimbleOptions.ValidationError, fn -> URLMatcher.new!(query: %{id: "5"}) end
     assert_raise NimbleOptions.ValidationError, fn -> URLMatcher.new!(query: %{"tag" => ["a", 2]}) end
   end
+
+  test "URI predicates receive parsed components and propagate failures" do
+    assert URLMatcher.matches?(
+             fn %URI{host: host, query: query} ->
+               host == "example.test" and URI.decode_query(query)["q"] == "a b"
+             end,
+             "https://example.test/search?q=a+b"
+           )
+
+    refute URLMatcher.matches?(&(&1.fragment == "missing"), "https://example.test/")
+    refute URLMatcher.matches?(fn _uri -> nil end, "https://example.test/")
+
+    assert_raise ArgumentError, "matcher failed", fn ->
+      URLMatcher.matches?(fn _uri -> raise ArgumentError, "matcher failed" end, "https://example.test/")
+    end
+  end
 end

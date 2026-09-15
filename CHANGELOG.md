@@ -1,5 +1,37 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Filter download capture by `filename:` (string or regex) and `url:` (absolute string, regex, or URI predicate) on both backends.
+- Accept `fn %URI{} -> boolean end` in page and captured-result URL assertions, including negation.
+
+### Changed
+
+- Centralize deadline calculations across event capture, browser navigation, and LiveView retries while preserving their timeout behavior.
+- Retry failed CI tests once with the same seed, reporting the retry and retaining browser failure artifacts from both attempts. Formatting, compilation, and lint checks must pass before tests run.
+- Require `playwright_ex` 0.11 or newer for `Frame.snapshot/2`, `Request.response/2`, and managed event waiters.
+- Delegate browser URL waiting to `Frame.wait_for_url/2` and event capture to `EventWaiter`. Captures retain the first matching event, even when several arrive before the action returns; the capture timeout starts when arming.
+- Save browser downloads through `PlaywrightEx.Download`. Temporary copies are removed after reading; source artifacts remain available until the browser context closes.
+- Use waiter transforms for captured metadata and dialog decisions, removing Fluffy’s event listener, dialog handler process, subscription registry, and snapshot messages. The connection manages event subscriptions.
+- Unexpected predicate and handler failures propagate instead of being converted into event errors.
+
+### Fixed
+
+- Read browser URLs and document identity from atomic frame snapshots. Same-URL reloads adopt their new response; requestless documents clear the previous HTTP status.
+
+- Preserve zero-timeout URL assertions as a single current-state check instead of a one-millisecond wait.
+- Keep captured navigation and HTTP metadata readable after the action closes its page.
+- Retrieve navigation responses directly from their requests, avoiding the response-cache handoff race. Read committed document requests from `playwright_ex` for automatic navigation and popup initialization, removing Fluffy’s navigation recorder and its subscriptions.
+- Give captured popups a separate session timeout for initialization, even when the action outlives the capture deadline.
+- Use the session timeout to save a captured browser download, including when the callback returns after the event deadline.
+- Ignore Phoenix navigation and download events arriving after the armed capture deadline, before applying download filters or byte limits.
+- Load browser download metadata before decoding the first download event.
+- Retain the first navigation on Phoenix's Static and LiveView drivers, including patches and fragment changes, when the callback continues navigating.
+- Ignore history metadata updates that leave the URL unchanged when capturing navigation; same-URL document reloads still count.
+- Associate navigation results with the committed request and popup responses with the captured page, preserving final redirect status. Capturing an earlier navigation no longer overwrites a later page's status.
+
 ## 0.3.1 — 2026-09-14
 
 ### Fixed

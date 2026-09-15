@@ -145,7 +145,8 @@ translating `assert_has` or `refute_has` into visibility assertions.
 ## Beyond page interactions
 
 Capture downloads, open new tabs, handle dialogs, and observe network events
-with Fluffy's event API. See [Advanced events and pages](docs/advanced-events.md)
+with Fluffy's event API. Download captures can filter by filename and URL; URL
+assertions also accept URI predicates. See [Advanced events and pages](docs/advanced-events.md)
 for examples and the [Capability matrix](docs/capabilities.md) for what each
 backend supports.
 
@@ -164,6 +165,8 @@ backend supports.
 - [Capability matrix](docs/capabilities.md) — backend differences and limitations
 
 ## Developing Fluffy
+
+Fluffy requires `playwright_ex` 0.11 or newer.
 
 The project pins the current local-development toolchain in `.tool-versions`.
 Fluffy's compatibility floor remains Elixir 1.18 and Node.js 20; development

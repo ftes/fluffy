@@ -108,6 +108,16 @@ defmodule Fluffy.Options do
   @download_event_schema NimbleOptions.new!(
                            @timeout_options ++
                              [
+                               filename: [
+                                 type: {:or, [:string, {:struct, Regex}]},
+                                 doc:
+                                   "Only capture downloads whose suggested filename matches this exact string or regex."
+                               ],
+                               url: [
+                                 type: {:or, [:string, {:struct, Regex}, {:fun, 1}]},
+                                 doc:
+                                   "Only capture downloads whose URL matches this absolute string, regex, or URI predicate."
+                               ],
                                max_bytes: [
                                  type: :non_neg_integer,
                                  doc: "Maximum number of response bytes to retain; defaults to 10,000,000."

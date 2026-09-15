@@ -17,14 +17,15 @@ alias Fluffy.{Event, FileChooser, Page}
 constructors use target prefixes, such as `page_url` and `response_status`.
 
 `wait_for(Event.*(...), action)` installs the listener before running the
-action. Return the updated session from the callback. Captured results can be
-read repeatedly through their keys.
+action. The capture timeout starts when arming; events arriving after it
+expires are ignored. Return the updated session from the callback. Captured
+results can be read repeatedly through their keys.
 
 ## Downloads
 
 ```elixir
 session
-|> wait_for(Event.download(:report), fn session ->
+|> wait_for(Event.download(:report, filename: "potions.csv"), fn session ->
   click(session, by_role(:button, name: "Download potion ledger"))
 end)
 |> assert(download_suggested_filename(:report, "potions.csv"))
@@ -33,7 +34,13 @@ end)
 
 `download(session, :report)` returns `%Fluffy.Download{}` with `filename`,
 `content_type`, `bytes`, and `url`. Override the default retained-byte limit
-with `max_bytes:` on `Event.download/2` or `wait_for/4`.
+with `max_bytes:` on `Event.download/2` or `wait_for/4`. Playwright uses the
+session timeout separately to save the captured download.
+
+Use `filename:` (exact string or regex) and `url:` (absolute string, regex, or
+`fn %URI{} -> boolean end`) to select a download. Both filters must match;
+the first matching download is retained. Filtering happens before reading
+bytes or enforcing `max_bytes:`.
 
 ## New pages and tabs (Playwright only)
 
@@ -50,6 +57,9 @@ end)
 |> assert(visible(by_text("Creature index")))
 ```
 
+Captured popups get the session timeout to load and connect before they become
+available.
+
 Multiple pages and tabs require Playwright. Phoenix follows links and submits
 forms in its current page, ignoring `target` and `formtarget`, including
 `_blank`. Popup capture, page switching, and closing pages raise a capability
@@ -63,6 +73,11 @@ sessions do not.
 
 ## Navigation
 
+Captures the first document navigation or URL change on both backends. Later
+navigations in the callback still update the active page. HTTP redirects
+contribute their final URL and status. Reloads count even when the URL stays
+the same. Requestless documents, such as `about:blank`, have no HTTP status.
+
 ```elixir
 session
 |> wait_for(Event.navigation(:forbidden_forest), fn session ->
@@ -74,7 +89,7 @@ end)
 
 Captured download, navigation, request, and response URL assertions
 accept exact strings, regexes, or structured path, query, and fragment matchers.
-This also applies to `navigation_from_url/3`. Strings are compared as
+Function predicates receive a `%URI{}`. This also applies to `navigation_from_url/3`. Strings are compared as
 captured, without resolving relative URLs. Structured matching follows the
 [same rules as page URL assertions](usage.md#page-assertions): query matching is
 exact by default; use `query_mode: :subset` to allow additional parameter names.
