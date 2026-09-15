@@ -4,147 +4,121 @@ defmodule Fluffy.PlaywrightEventListener do
   use GenServer
 
   alias Fluffy.Playwright.SubscriptionRegistry
-  alias PlaywrightEx.Connection
+  alias PlaywrightEx.EventWaiter
 
   def start_link(options) do
-    GenServer.start_link(__MODULE__, Keyword.put_new(options, :owner, self()))
+    options = Keyword.put(options, :owner, self())
+    {:ok, listener} = GenServer.start_link(__MODULE__, options)
+
+    case GenServer.call(listener, :ready, :infinity) do
+      :ok ->
+        {:ok, listener}
+
+      {:error, _reason} = error ->
+        stop(listener)
+        error
+    end
   end
 
-  def await(listener, timeout) do
-    GenServer.call(listener, {:await, timeout}, :infinity)
-  end
+  def await(listener), do: GenServer.call(listener, :await, :infinity)
 
   def stop(listener) do
-    if Process.alive?(listener), do: GenServer.stop(listener, :normal, :infinity)
-    :ok
+    GenServer.stop(listener, :normal, :infinity)
   catch
-    :exit, _reason -> :ok
+    :exit, {reason, {GenServer, :stop, _}} when reason in [:noproc, :normal] -> :ok
   end
 
   @impl true
   def init(options) do
-    options =
-      Keyword.validate!(options, [
-        :filter,
-        :guid,
-        :handler,
-        :owner,
-        :subscription,
-        :timeout
-      ])
-
+    Process.flag(:trap_exit, true)
+    options = Keyword.validate!(options, [:connection, :event, :filter, :guid, :handler, :owner, :subscription, :timeout])
+    connection = Keyword.fetch!(options, :connection)
     guid = Keyword.fetch!(options, :guid)
-    owner = Keyword.fetch!(options, :owner)
     timeout = Keyword.fetch!(options, :timeout)
     subscription = Keyword.get(options, :subscription)
-    owner_reference = Process.monitor(owner)
+    owner_reference = Process.monitor(Keyword.fetch!(options, :owner))
+    deadline = System.monotonic_time(:millisecond) + timeout
 
-    :ok = PlaywrightEx.subscribe(guid, pid: self())
-    enable_subscription!(guid, subscription, timeout)
+    if subscription, do: SubscriptionRegistry.acquire(guid, subscription, max(timeout, 1), connection)
 
-    # The subscription call and this initializer call reach the same
-    # Connection process from this process in order. The latter is the barrier
-    # that makes listener-before-action deterministic.
-    _initializer = Connection.initializer!(PlaywrightEx.Supervisor.Connection, guid)
+    listener = self()
+
+    # The worker handles blocking dialogs while the caller is still in its action.
+    # EventWaiter owns event selection, the deadline, and protocol lifecycle errors.
+    task = Task.async(fn -> capture(listener, options, deadline) end)
 
     {:ok,
      %{
-       event: nil,
-       filter: Keyword.fetch!(options, :filter),
+       connection: connection,
        guid: guid,
-       handler: Keyword.get(options, :handler),
-       owner: owner,
-       owner_reference: owner_reference,
        subscription: subscription,
        timeout: timeout,
-       timer: nil,
-       waiter: nil
+       owner_reference: owner_reference,
+       task: task,
+       ready: nil,
+       ready_from: nil,
+       result: nil,
+       await_from: nil
      }}
   end
 
   @impl true
-  def handle_call({:await, _timeout}, _from, %{event: event} = state) when not is_nil(event) do
-    {:reply, event, %{state | event: nil}}
-  end
-
-  def handle_call({:await, timeout}, from, %{waiter: nil} = state) do
-    timer = Process.send_after(self(), :await_timeout, timeout)
-    {:noreply, %{state | timer: timer, waiter: from}}
-  end
-
-  def handle_call({:await, _timeout}, _from, state) do
-    {:reply, {:error, :already_waiting}, state}
-  end
+  def handle_call(:ready, from, %{ready: nil} = state), do: {:noreply, %{state | ready_from: from}}
+  def handle_call(:ready, _from, state), do: {:reply, state.ready, state}
+  def handle_call(:await, from, %{result: nil} = state), do: {:noreply, %{state | await_from: from}}
+  def handle_call(:await, _from, state), do: {:reply, state.result, state}
 
   @impl true
-  def handle_info(
-        {:DOWN, owner_reference, :process, owner, _reason},
-        %{owner: owner, owner_reference: owner_reference} = state
-      ) do
+  def handle_info({:armed, result}, state) do
+    if state.ready_from, do: GenServer.reply(state.ready_from, result)
+    {:noreply, %{state | ready: result, ready_from: nil}}
+  end
+
+  def handle_info({reference, result}, %{task: %Task{ref: reference}} = state) do
+    Process.demonitor(reference, [:flush])
+    if state.await_from, do: GenServer.reply(state.await_from, result)
+    {:noreply, %{state | result: result, await_from: nil}}
+  end
+
+  def handle_info({:DOWN, reference, :process, _owner, _reason}, %{owner_reference: reference} = state) do
     {:stop, :normal, state}
   end
 
-  def handle_info({:playwright_msg, event}, state) do
-    case filter_event(state.filter, event) do
-      {:ok, true} -> record(handle_event(state.handler, event), state)
-      {:ok, false} -> {:noreply, state}
-      {:ok, other} -> record({:error, {:invalid_event_filter_result, other}}, state)
-      {:error, reason} -> record({:error, reason}, state)
-    end
-  end
+  def handle_info({:EXIT, _pid, :normal}, state), do: {:noreply, state}
+  def handle_info({:EXIT, _pid, reason}, state), do: {:stop, reason, state}
 
-  def handle_info(:await_timeout, %{waiter: nil} = state), do: {:noreply, state}
-
-  def handle_info(:await_timeout, %{waiter: waiter} = state) do
-    GenServer.reply(waiter, {:error, :timeout})
-    {:noreply, %{state | timer: nil, waiter: nil}}
-  end
+  def handle_info({:DOWN, reference, :process, _pid, reason}, %{task: %Task{ref: reference}} = state),
+    do: {:stop, reason, state}
 
   @impl true
   def terminate(_reason, state) do
-    disable_subscription(state.guid, state.subscription, state.timeout)
-    PlaywrightEx.unsubscribe(state.guid, pid: self())
+    Task.shutdown(state.task, :brutal_kill)
+
+    if state.subscription,
+      do: SubscriptionRegistry.release(state.guid, state.subscription, max(state.timeout, 1), state.connection)
+
     :ok
   end
 
-  defp record(result, %{waiter: nil} = state) do
-    {:noreply, %{state | event: result}}
-  end
+  defp capture(listener, options, deadline) do
+    result =
+      EventWaiter.arm(Keyword.fetch!(options, :guid), Keyword.fetch!(options, :event),
+        connection: Keyword.fetch!(options, :connection),
+        predicate: Keyword.get(options, :filter, fn _event -> true end),
+        timeout: max(deadline - System.monotonic_time(:millisecond), 0)
+      )
 
-  defp record(result, %{waiter: waiter, timer: timer} = state) do
-    if timer, do: Process.cancel_timer(timer)
-    GenServer.reply(waiter, result)
-    {:noreply, %{state | timer: nil, waiter: nil}}
+    case result do
+      {:ok, waiter} ->
+        send(listener, {:armed, :ok})
+        with {:ok, event} <- EventWaiter.await(waiter), do: handle_event(options[:handler], event)
+
+      {:error, _reason} = error ->
+        send(listener, {:armed, error})
+        error
+    end
   end
 
   defp handle_event(nil, event), do: {:ok, event}
-
-  defp handle_event(handler, event) do
-    case handler.(event) do
-      :ok -> {:ok, event}
-      {:ok, value} -> {:ok, value}
-      {:error, reason} -> {:error, reason}
-      other -> {:error, {:invalid_event_handler_result, other}}
-    end
-  rescue
-    error -> {:error, {error, __STACKTRACE__}}
-  end
-
-  defp filter_event(filter, event) do
-    {:ok, filter.(event)}
-  rescue
-    error -> {:error, {error, __STACKTRACE__}}
-  end
-
-  defp enable_subscription!(_guid, nil, _timeout), do: :ok
-
-  defp enable_subscription!(guid, event, timeout) do
-    SubscriptionRegistry.acquire(guid, event, timeout)
-  end
-
-  defp disable_subscription(_guid, nil, _timeout), do: :ok
-
-  defp disable_subscription(guid, event, timeout) do
-    SubscriptionRegistry.release(guid, event, timeout)
-  end
+  defp handle_event(handler, event), do: handler.(event)
 end

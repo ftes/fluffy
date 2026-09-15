@@ -482,31 +482,23 @@ defmodule Fluffy.Driver.Playwright do
 
   defp page_url_expect!(%Session{} = session, %Expect{} = expectation, expected) do
     state = Session.page_state(session)
-    timeout = expectation.options |> Keyword.get(:timeout, timeout()) |> max(1)
-    deadline = System.monotonic_time(:millisecond) + timeout
+    timeout = Keyword.get(expectation.options, :timeout, timeout())
+    matcher = fn uri -> URLMatcher.matches?(expected, URI.to_string(uri)) != expectation.negated? end
 
-    poll_url_expectation!(state, expectation, expected, deadline, session.context.timeout)
-  end
-
-  defp poll_url_expectation!(state, expectation, expected, deadline, read_timeout) do
-    # Reading the current value must work even for an immediate assertion.
-    actual = current_url(state, read_timeout)
-    passed? = URLMatcher.matches?(expected, actual)
-
-    cond do
-      passed? != expectation.negated? ->
+    case Frame.wait_for_url(state.frame_id,
+           connection: session.context.connection,
+           url: matcher,
+           wait_until: "commit",
+           timeout: timeout
+         ) do
+      {:ok, _result} ->
         :ok
 
-      System.monotonic_time(:millisecond) >= deadline ->
+      {:error, _error} ->
+        actual = current_url(state, session.context.timeout)
+
         raise ExUnit.AssertionError,
           message: "Expected #{Expect.describe(expectation)}, got #{inspect(actual)}"
-
-      true ->
-        receive do
-        after
-          min(10, remaining(deadline)) ->
-            poll_url_expectation!(state, expectation, expected, deadline, read_timeout)
-        end
     end
   end
 
@@ -522,7 +514,8 @@ defmodule Fluffy.Driver.Playwright do
           session.context.context_id,
           state.page_id,
           state.frame_id,
-          remaining(deadline)
+          remaining(deadline),
+          session.context.connection
         )
 
     previous_url = Session.current_page(session).url || current_url(state, remaining(deadline))

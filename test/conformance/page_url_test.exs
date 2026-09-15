@@ -85,4 +85,39 @@ defmodule Fluffy.Conformance.PageURLTest do
       )
     end
   end
+
+  for driver <- [:phoenix, :playwright], path <- ["/chamber", "/live/chamber-map"] do
+    @tag driver: driver
+    test "URI predicates and negation work on #{path} with #{driver}", %{driver: driver} do
+      path = unquote(path)
+
+      session =
+        driver
+        |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+        |> visit(path <> "?answer=42#summary")
+        |> expect(
+          page_to_have_url(fn %URI{path: actual, query: query, fragment: fragment} ->
+            actual == path and URI.decode_query(query)["answer"] == "42" and fragment == "summary"
+          end),
+          timeout: 0
+        )
+        |> expect(not_(page_to_have_url(&(&1.path == "/missing"))), timeout: 0)
+
+      error =
+        assert_raise ExUnit.AssertionError, fn ->
+          expect(session, page_to_have_url(&(&1.path == "/missing")), timeout: 0)
+        end
+
+      assert error.message =~ path
+    end
+  end
+
+  @tag driver: :playwright
+  test "waits for a future same-document URL change with a URI predicate" do
+    session = session_for_html(:playwright, "<h1>URL changes</h1>")
+    Fluffy.Playwright.evaluate(session, "setTimeout(() => location.hash = 'ready', 100)")
+    expect(session, page_to_have_url(&(&1.fragment == "ready")), timeout: 1_000)
+    Fluffy.Playwright.evaluate(session, "setTimeout(() => location.hash = 'finished', 100)")
+    expect(session, not_(page_to_have_url(&(&1.fragment == "ready"))), timeout: 1_000)
+  end
 end

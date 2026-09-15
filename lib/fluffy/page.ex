@@ -34,7 +34,7 @@ defmodule Fluffy.Page do
           | {:query, %{String.t() => query_value()}}
           | {:query_mode, :exact | :subset}
           | {:fragment, String.t() | nil}
-  @type url_expectation :: String.t() | Regex.t() | [url_component()]
+  @type url_expectation :: String.t() | Regex.t() | (URI.t() -> boolean()) | [url_component()]
 
   @doc group: "Metadata"
   @doc "Returns the session-local name of a captured page."

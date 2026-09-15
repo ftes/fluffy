@@ -1,98 +1,143 @@
 defmodule Fluffy.Playwright.NavigationObserver do
   @moduledoc false
 
+  use GenServer
+
+  alias Fluffy.Playwright.SubscriptionRegistry
   alias Fluffy.PlaywrightEventListener
   alias PlaywrightEx.Connection
+  alias PlaywrightEx.EventWaiter
 
-  @enforce_keys [:listener]
-  defstruct [:listener]
+  @enforce_keys [:listener, :connection, :context_id, :frame_id]
+  defstruct @enforce_keys
 
-  @opaque t :: %__MODULE__{listener: pid()}
+  @opaque t :: %__MODULE__{listener: pid(), connection: atom(), context_id: String.t(), frame_id: String.t() | nil}
 
-  def arm(context_id, page_id, frame_id, timeout) do
+  def arm(context_id, page_id, frame_id, timeout, connection \\ PlaywrightEx.Supervisor.Connection) do
+    start(context_id, page_id, frame_id, timeout, connection)
+  end
+
+  def arm_popup(context_id, timeout, connection) do
+    start(context_id, nil, nil, timeout, connection)
+  end
+
+  defp start(context_id, page_id, frame_id, timeout, connection) do
     {:ok, listener} =
-      PlaywrightEventListener.start_link(
-        guid: context_id,
-        filter: &main_document_response?(&1, page_id, frame_id),
-        handler: &normalize_response/1,
-        subscription: :response,
-        timeout: timeout
-      )
+      GenServer.start_link(__MODULE__, %{
+        connection: connection,
+        context_id: context_id,
+        page_id: page_id,
+        frame_id: frame_id,
+        timeout: timeout,
+        owner: self()
+      })
 
-    %__MODULE__{listener: listener}
+    %__MODULE__{listener: listener, connection: connection, context_id: context_id, frame_id: frame_id}
   end
 
-  def arm_popup(context_id, opener_frame_id, timeout) do
-    {:ok, listener} =
-      PlaywrightEventListener.start_link(
-        guid: context_id,
-        filter: &popup_document_response?(&1, opener_frame_id),
-        handler: &normalize_response/1,
-        subscription: :response,
-        timeout: timeout
-      )
+  def await(observer, timeout, selection \\ []) do
+    request_id = Keyword.get_lazy(selection, :request_id, fn -> GenServer.call(observer.listener, :request_id) end)
+    selection = selection |> Keyword.put(:request_id, request_id) |> Keyword.put_new(:frame_id, observer.frame_id)
+    predicate = &matches?(normalize_response(&1, observer.connection), selection)
 
-    %__MODULE__{listener: listener}
-  end
+    with {:ok, waiter} <-
+           EventWaiter.arm(observer.context_id, :response,
+             connection: observer.connection,
+             timeout: timeout,
+             predicate: predicate
+           ) do
+      try do
+        # Subscribe before reading the cache so a response cannot fall between them.
+        case GenServer.call(observer.listener, {:response, selection}) do
+          nil ->
+            with {:ok, event} <- EventWaiter.await(waiter), do: {:ok, normalize_response(event, observer.connection)}
 
-  def await(%__MODULE__{listener: listener}, timeout) do
-    PlaywrightEventListener.await(listener, timeout)
-  end
-
-  def stop(%__MODULE__{listener: listener}) do
-    PlaywrightEventListener.stop(listener)
-  end
-
-  defp main_document_response?(%{method: :response} = event, page_id, frame_id) do
-    case response_context(event) do
-      %{page_id: response_page_id, frame_id: ^frame_id, resource_type: "document"}
-      when response_page_id in [nil, page_id] ->
-        true
-
-      _other ->
-        false
+          response ->
+            {:ok, response}
+        end
+      after
+        EventWaiter.cancel(waiter)
+      end
     end
   end
 
-  defp main_document_response?(_event, _page_id, _frame_id), do: false
+  def stop(%__MODULE__{listener: listener}), do: PlaywrightEventListener.stop(listener)
 
-  defp popup_document_response?(%{method: :response} = event, opener_frame_id) do
-    case response_context(event) do
-      %{frame_id: frame_id, resource_type: "document"} when frame_id != opener_frame_id -> true
-      _other -> false
+  @impl true
+  def init(state) do
+    reference = Process.monitor(state.owner)
+    SubscriptionRegistry.acquire(state.context_id, :response, max(state.timeout, 1), state.connection)
+    :ok = Connection.subscribe_sync(state.connection, self(), state.context_id)
+    if state.frame_id, do: Connection.subscribe_sync(state.connection, self(), state.frame_id)
+    {:ok, Map.merge(state, %{owner_reference: reference, request_id: nil, responses: []})}
+  end
+
+  @impl true
+  def handle_call(:request_id, _from, state), do: {:reply, state.request_id, state}
+
+  def handle_call({:response, selection}, _from, state) do
+    {:reply, Enum.find(state.responses, &matches?(&1, selection)), state}
+  end
+
+  @impl true
+  def handle_info({:playwright_msg, %{method: :response} = event}, state) do
+    response = normalize_response(event, state.connection)
+
+    if document_response?(response, state) do
+      {:noreply, %{state | responses: [response | state.responses]}}
+    else
+      {:noreply, state}
     end
   end
 
-  defp popup_document_response?(_event, _opener_frame_id), do: false
+  def handle_info(
+        {:playwright_msg, %{method: :navigated, params: %{new_document: %{request: %{guid: request_id}}}}},
+        state
+      ) do
+    {:noreply, %{state | request_id: request_id}}
+  end
 
-  defp response_context(%{params: %{response: %{guid: response_id}} = params}) do
-    response = initializer!(response_id)
-    request = initializer!(response.request.guid)
+  def handle_info({:DOWN, reference, :process, _owner, _reason}, %{owner_reference: reference} = state) do
+    {:stop, :normal, state}
+  end
+
+  def handle_info({:playwright_msg, _event}, state), do: {:noreply, state}
+
+  @impl true
+  def terminate(_reason, state) do
+    Connection.unsubscribe(state.connection, self(), state.context_id)
+    if state.frame_id, do: Connection.unsubscribe(state.connection, self(), state.frame_id)
+    SubscriptionRegistry.release(state.context_id, :response, max(state.timeout, 1), state.connection)
+  end
+
+  defp document_response?(response, state) do
+    response.resource_type == "document" and
+      (is_nil(state.frame_id) or response.frame_id == state.frame_id) and
+      (is_nil(state.page_id) or response.page_id in [nil, state.page_id])
+  end
+
+  defp matches?(response, selection) do
+    response.resource_type == "document" and not response.redirect? and
+      Enum.all?(selection, fn
+        {_key, nil} -> true
+        {key, expected} -> Map.fetch!(response, key) == expected
+      end)
+  end
+
+  defp normalize_response(%{params: %{response: %{guid: response_id}} = params}, connection) do
+    response = Connection.initializer!(connection, response_id)
+    request = Connection.initializer!(connection, response.request.guid)
 
     %{
       frame_id: get_in(request, [:frame, :guid]),
       page_id: get_in(params, [:page, :guid]),
+      request_id: response.request.guid,
       resource_type: request.resource_type,
-      response: response
+      status: response.status,
+      redirect?:
+        response.status in [301, 302, 303, 307, 308] and
+          Enum.any?(response.headers, &(String.downcase(&1.name) == "location")),
+      url: response.url
     }
-  end
-
-  defp response_context(_event), do: nil
-
-  defp normalize_response(%{params: %{response: %{guid: response_id}} = params}) do
-    response = initializer!(response_id)
-    request = initializer!(response.request.guid)
-
-    {:ok,
-     %{
-       frame_id: get_in(request, [:frame, :guid]),
-       page_id: get_in(params, [:page, :guid]),
-       status: response.status,
-       url: response.url
-     }}
-  end
-
-  defp initializer!(guid) do
-    Connection.initializer!(PlaywrightEx.Supervisor.Connection, guid)
   end
 end

@@ -346,7 +346,14 @@ session
 
 Exact URL strings include the query and fragment; relative strings resolve
 against the session base URL. Structured matching can select `:path`, `:query`,
-and `:fragment`; omitted components are ignored.
+and `:fragment`; omitted components are ignored. A function receives a `%URI{}`:
+
+```elixir
+session |> assert(page_url(fn uri -> uri.path == "/potions" and uri.fragment == "ready" end))
+```
+
+Predicates work with both backends and with negated assertions. Keep them quick
+and nonblocking.
 
 Structured queries decode like `URLSearchParams`: distinct parameter-name
 order is ignored, and repeated values retain their order and duplicates.

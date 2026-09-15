@@ -24,7 +24,7 @@ read repeatedly through their keys.
 
 ```elixir
 session
-|> wait_for(Event.download(:report), fn session ->
+|> wait_for(Event.download(:report, filename: "potions.csv"), fn session ->
   click(session, by_role(:button, name: "Download potion ledger"))
 end)
 |> assert(download_suggested_filename(:report, "potions.csv"))
@@ -34,6 +34,11 @@ end)
 `download(session, :report)` returns `%Fluffy.Download{}` with `filename`,
 `content_type`, `bytes`, and `url`. Override the default retained-byte limit
 with `max_bytes:` on `Event.download/2` or `wait_for/4`.
+
+Use `filename:` (exact string or regex) and `url:` (absolute string, regex, or
+`fn %URI{} -> boolean end`) to select a download. Both filters must match;
+the first matching download is retained. Filtering happens before reading
+bytes or enforcing `max_bytes:`.
 
 ## New pages and tabs (Playwright only)
 
@@ -74,7 +79,7 @@ end)
 
 Captured download, navigation, request, and response URL assertions
 accept exact strings, regexes, or structured path, query, and fragment matchers.
-This also applies to `navigation_from_url/3`. Strings are compared as
+Function predicates receive a `%URI{}`. This also applies to `navigation_from_url/3`. Strings are compared as
 captured, without resolving relative URLs. Structured matching follows the
 [same rules as page URL assertions](usage.md#page-assertions): query matching is
 exact by default; use `query_mode: :subset` to allow additional parameter names.

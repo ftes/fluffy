@@ -109,4 +109,27 @@ defmodule Fluffy.Conformance.NavigationEventTest do
   end
 
   defp html(body), do: "<!doctype html><html><body>#{body}</body></html>"
+
+  @tag driver: :playwright
+  test "capturing the first navigation does not overwrite a later page's status" do
+    fixture =
+      TestHTTPFixtures.register(fn request ->
+        case request.path do
+          "/start" -> %{body: html(~s(<a href="first">First</a>))}
+          "/first" -> %{status: 201, body: html(~s(<a href="second">Second</a>))}
+          "/second" -> %{status: 202, body: html("<h1>Second document</h1>")}
+        end
+      end)
+
+    :playwright
+    |> start_test_session()
+    |> visit(TestHTTPFixtures.path(fixture, "/start"))
+    |> wait_for(Event.navigation(:first), fn session ->
+      session |> click(by_role(:link, name: "First")) |> click(by_role(:link, name: "Second"))
+    end)
+    |> expect(navigation_to_have_url(:first, TestHTTPFixtures.url(fixture, "/first")))
+    |> expect(navigation_to_have_status(:first, 201))
+    |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/second")))
+    |> expect(page_to_have_status(202))
+  end
 end

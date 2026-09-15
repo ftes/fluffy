@@ -34,6 +34,7 @@ defmodule Fluffy.Event do
   @type network_option :: unquote(NimbleOptions.option_typespec(Options.network_event_schema()))
   @type option :: timeout_option() | download_option() | dialog_option() | network_option()
 
+  @doc "Captures the first download matching the optional filename and URL filters."
   @spec download(term(), [download_option()]) :: t()
   def download(key, options \\ []) do
     new(:download, key, Options.validate_event_constructor!(:download, options))
@@ -116,7 +117,7 @@ defmodule Fluffy.Event do
         {:ok, updated_session, value} ->
           Session.put_result(updated_session, token, value)
 
-        {:error, :timeout} ->
+        {:error, reason} when reason == :timeout or (is_map(reason) and reason.reason == :timeout) ->
           flunk("Expected #{inspect(type)} event #{inspect(key)} within #{timeout} ms, but no matching event occurred")
 
         {:error, reason} ->

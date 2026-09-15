@@ -425,24 +425,16 @@ defmodule Fluffy.Backend.Phoenix do
     if not is_nil(download_name) or attachment?(disposition) do
       case Session.pending_event(session) do
         %{type: :download, token: token, options: options} ->
-          bytes = conn.resp_body
-          max_bytes = Keyword.fetch!(options, :max_bytes)
-
-          if byte_size(bytes) > max_bytes do
-            raise ExUnit.AssertionError,
-              message: "Downloaded #{byte_size(bytes)} bytes, exceeding the configured :max_bytes limit of #{max_bytes}"
-          end
-
           filename = suggested_filename(disposition, download_name, url)
 
           download = %Download{
             filename: filename,
             content_type: content_type(conn, filename),
-            bytes: bytes,
+            bytes: conn.resp_body,
             url: URI.to_string(url)
           }
 
-          {:ok, Session.capture_pending_event(session, token, download)}
+          {:ok, capture_matching_download(session, token, download, options)}
 
         _no_download_expectation ->
           # A browser keeps the source document when a response is downloaded.
@@ -451,6 +443,24 @@ defmodule Fluffy.Backend.Phoenix do
       end
     else
       :not_a_download
+    end
+  end
+
+  defp capture_matching_download(session, token, download, options) do
+    already_captured? = Map.has_key?(Session.pending_event(session), :captured)
+
+    if not already_captured? and Download.matches?(download.filename, download.url, options) do
+      max_bytes = Keyword.fetch!(options, :max_bytes)
+      size = byte_size(download.bytes)
+
+      if size > max_bytes do
+        raise ExUnit.AssertionError,
+          message: "Downloaded #{size} bytes, exceeding the configured :max_bytes limit of #{max_bytes}"
+      end
+
+      Session.capture_pending_event(session, token, download)
+    else
+      session
     end
   end
 

@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Filter download capture by `filename:` (string or regex) and `url:` (absolute string, regex, or URI predicate) on both backends.
+- Accept `fn %URI{} -> boolean end` in page and captured-result URL assertions, including negation.
+
+### Changed
+
+- Use `playwright_ex` from its GitHub `main` branch, locked in `mix.lock`.
+- Delegate browser URL waiting to `Frame.wait_for_url/2` and event capture to `EventWaiter`. Captures retain the first matching event, even when several arrive before the action returns; the capture timeout starts when arming.
+- Save browser downloads through `PlaywrightEx.Download`. Temporary copies are removed after reading; source artifacts remain available until the browser context closes.
+- Unexpected predicate and handler failures propagate instead of being converted into event errors.
+
+### Fixed
+
+- Associate navigation results with the committed request and popup responses with the captured page, preserving final redirect status. Capturing an earlier navigation no longer overwrites a later page's status.
+
 ## 0.3.1 — 2026-09-14
 
 ### Fixed
