@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.4.0 — 2026-09-15
+
 ### Added
 
 - Filter download capture by `filename:` (string or regex) and `url:` (absolute string, regex, or URI predicate) on both backends.
