@@ -152,8 +152,9 @@ defmodule Fluffy do
   Captures an event caused by `action` and stores the normalized result under
   the event's key.
 
-  The listener is installed before the action runs. The returned session keeps
-  the captured result so the call remains pipeable.
+  The listener is installed before the action runs. The capture timeout starts
+  when arming; events arriving after it expires are ignored. The returned
+  session keeps the captured result so the call remains pipeable.
   """
   @spec wait_for(Session.t(), Event.t(), (Session.t() -> Session.t()), [Event.option()]) :: Session.t()
   def wait_for(%Session{} = session, %Event{} = event, action, options \\ []) when is_function(action, 1) do

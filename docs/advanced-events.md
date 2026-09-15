@@ -17,8 +17,9 @@ alias Fluffy.{Event, FileChooser, Page}
 constructors use target prefixes, such as `page_url` and `response_status`.
 
 `wait_for(Event.*(...), action)` installs the listener before running the
-action. Return the updated session from the callback. Captured results can be
-read repeatedly through their keys.
+action. The capture timeout starts when arming; events arriving after it
+expires are ignored. Return the updated session from the callback. Captured
+results can be read repeatedly through their keys.
 
 ## Downloads
 

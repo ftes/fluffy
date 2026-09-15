@@ -211,10 +211,17 @@ defmodule Fluffy.Backend.Phoenix do
 
   defp capture_navigation(%Session{pending_event: %{captured: _value}} = session, _from_url), do: session
 
-  defp capture_navigation(%Session{pending_event: %{type: :navigation, token: token}} = session, from_url) do
-    page = Session.current_page(session)
-    navigation = %NavigationEvent{from_url: from_url, url: page.url, status: page.status}
-    Session.capture_pending_event(session, token, navigation)
+  defp capture_navigation(
+         %Session{pending_event: %{type: :navigation, token: token, options: options}} = session,
+         from_url
+       ) do
+    if before_deadline?(options) do
+      page = Session.current_page(session)
+      navigation = %NavigationEvent{from_url: from_url, url: page.url, status: page.status}
+      Session.capture_pending_event(session, token, navigation)
+    else
+      session
+    end
   end
 
   defp capture_navigation(session, _from_url), do: session
@@ -441,7 +448,7 @@ defmodule Fluffy.Backend.Phoenix do
   defp capture_matching_download(session, token, download, options) do
     already_captured? = Map.has_key?(Session.pending_event(session), :captured)
 
-    if not already_captured? and Download.matches?(download.filename, download.url, options) do
+    if not already_captured? and before_deadline?(options) and Download.matches?(download.filename, download.url, options) do
       max_bytes = Keyword.fetch!(options, :max_bytes)
       size = byte_size(download.bytes)
 
@@ -455,6 +462,8 @@ defmodule Fluffy.Backend.Phoenix do
       session
     end
   end
+
+  defp before_deadline?(options), do: System.monotonic_time(:millisecond) < Keyword.fetch!(options, :deadline)
 
   defp attachment?(nil), do: false
 

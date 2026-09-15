@@ -223,6 +223,9 @@ defmodule Fluffy.Backend.Playwright do
 
   @impl true
   def arm_event(%Session{} = session, :download, options) do
+    # The protocol decoder uses existing atoms for download metadata keys.
+    Code.ensure_loaded!(BrowserDownload)
+
     {:ok, waiter} =
       BrowserPage.expect_download(Session.page_state(session).page_id,
         connection: session.context.connection,

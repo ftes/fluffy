@@ -16,6 +16,8 @@
 
 ### Fixed
 
+- Ignore Phoenix navigation and download events arriving after the armed capture deadline, before applying download filters or byte limits.
+- Load browser download metadata before decoding the first download event.
 - Retain the first navigation on Phoenix's Static and LiveView drivers, including patches and fragment changes, when the callback continues navigating.
 - Ignore history metadata updates that leave the URL unchanged when capturing navigation; same-URL document reloads still count.
 - Associate navigation results with the committed request and popup responses with the captured page, preserving final redirect status. Capturing an earlier navigation no longer overwrites a later page's status.

@@ -100,13 +100,13 @@ defmodule Fluffy.Event do
     timeout = Keyword.get(options, :timeout, default_timeout(session))
 
     deadline = System.monotonic_time(:millisecond) + timeout
-    {session, token} = Session.arm_event(session, type, key, options)
 
     arm_options =
       options
       |> Keyword.put(:deadline, deadline)
       |> Keyword.put(:timeout, remaining(deadline))
 
+    {session, token} = Session.arm_event(session, type, key, arm_options)
     {:ok, armed_session, resource} = Backend.arm_event(session, type, arm_options)
 
     try do
