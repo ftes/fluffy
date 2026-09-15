@@ -132,7 +132,10 @@ defmodule Fluffy.Backend.Phoenix do
 
   def navigate(%Session{backend: __MODULE__} = session, %Patch{} = navigation) do
     url = resolve_url(Session.current_page(session).url, navigation.destination, session)
-    Session.commit_page(session, :live, navigation.state, URI.to_string(url))
+
+    session
+    |> Session.commit_page(:live, navigation.state, URI.to_string(url))
+    |> capture_url_change(Session.current_page(session).url)
   end
 
   def navigate(%Session{backend: __MODULE__} = session, %StaticConn{conn: conn}) do
@@ -153,22 +156,9 @@ defmodule Fluffy.Backend.Phoenix do
   end
 
   @impl true
-  def arm_event(%Session{} = session, :download, options) do
+  def arm_event(%Session{} = session, type, options) when type in [:download, :navigation] do
     %{token: token} = Session.pending_event(session)
-    {:ok, session, %{type: :download, token: token, options: options}}
-  end
-
-  def arm_event(%Session{} = session, :navigation, options) do
-    page = Session.current_page(session)
-
-    {:ok, session,
-     %{
-       type: :navigation,
-       page_id: page.id,
-       revision: page.revision,
-       from_url: page.url,
-       options: options
-     }}
+    {:ok, session, %{type: type, token: token, options: options}}
   end
 
   def arm_event(%Session{} = session, :page, _options) do
@@ -203,25 +193,11 @@ defmodule Fluffy.Backend.Phoenix do
   @impl true
   def await_event(
         %Session{pending_event: %{token: token, captured: value}} = session,
-        %{type: :download, token: token},
+        %{type: type, token: token},
         _timeout
-      ) do
+      )
+      when type in [:download, :navigation] do
     {:ok, session, value}
-  end
-
-  def await_event(%Session{} = session, %{type: :navigation} = resource, _timeout) do
-    page = Map.fetch!(session.pages, resource.page_id)
-
-    if page.revision > resource.revision do
-      {:ok, session,
-       %NavigationEvent{
-         from_url: resource.from_url,
-         url: page.url,
-         status: page.status
-       }}
-    else
-      {:error, :timeout}
-    end
   end
 
   def await_event(%Session{} = _session, _resource, _timeout), do: {:error, :timeout}
@@ -229,17 +205,32 @@ defmodule Fluffy.Backend.Phoenix do
   @impl true
   def disarm_event(_resource), do: :ok
 
+  defp capture_url_change(session, from_url) do
+    if Session.current_page(session).url == from_url, do: session, else: capture_navigation(session, from_url)
+  end
+
+  defp capture_navigation(%Session{pending_event: %{captured: _value}} = session, _from_url), do: session
+
+  defp capture_navigation(%Session{pending_event: %{type: :navigation, token: token}} = session, from_url) do
+    page = Session.current_page(session)
+    navigation = %NavigationEvent{from_url: from_url, url: page.url, status: page.status}
+    Session.capture_pending_event(session, token, navigation)
+  end
+
+  defp capture_navigation(session, _from_url), do: session
+
   defp follow_link(%Session{} = session, href, download_name) do
     current_url = Session.current_page(session).url
     url = resolve_url(current_url || session.context.http.base_url, href, session)
 
     if same_document_navigation?(current_url, url) do
-      Session.commit_page(
-        session,
+      session
+      |> Session.commit_page(
         Session.current_driver(session),
         Session.page_state(session),
         URI.to_string(url)
       )
+      |> capture_url_change(current_url)
     else
       request(session, url, :get, nil, download_name)
     end
@@ -316,14 +307,15 @@ defmodule Fluffy.Backend.Phoenix do
       watcher: watcher
     }
 
-    PageLifecycle.replace_document(
-      session,
+    session
+    |> PageLifecycle.replace_document(
       :live,
       state,
       URI.to_string(url),
       [status: conn.status],
       &release_page/3
     )
+    |> capture_navigation(Session.current_page(session).url)
   end
 
   @doc false
@@ -539,14 +531,15 @@ defmodule Fluffy.Backend.Phoenix do
       client_dom: ClientDOM.from_document(conn.resp_body)
     }
 
-    PageLifecycle.replace_document(
-      session,
+    session
+    |> PageLifecycle.replace_document(
       :static,
       state,
       URI.to_string(url),
       [status: conn.status],
       &release_page/3
     )
+    |> capture_navigation(Session.current_page(session).url)
   end
 
   defp release_page(session, %Page{driver: :live} = page, _reason) do

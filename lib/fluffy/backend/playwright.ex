@@ -235,15 +235,16 @@ defmodule Fluffy.Backend.Playwright do
 
   def arm_event(%Session{} = session, :navigation, options) do
     state = Session.page_state(session)
+    from_url = Session.current_page(session).url
 
     {:ok, navigation_listener} =
       PlaywrightEventListener.start_link(
         connection: session.context.connection,
         guid: state.frame_id,
         event: :navigated,
-        filter: fn
-          %{method: :navigated, params: params} -> not is_binary(params[:error])
-          _event -> false
+        filter: fn %{params: params} ->
+          not is_binary(params[:error]) and
+            (Map.has_key?(params, :new_document) or params.url != from_url)
         end,
         timeout: Keyword.fetch!(options, :timeout)
       )
@@ -262,7 +263,7 @@ defmodule Fluffy.Backend.Playwright do
        type: :navigation,
        navigation_listener: navigation_listener,
        response_observer: response_observer,
-       from_url: Session.current_page(session).url,
+       from_url: from_url,
        from_status: Session.current_page(session).status,
        options: options
      }}

@@ -68,6 +68,10 @@ sessions do not.
 
 ## Navigation
 
+Captures the first document navigation or URL change on both backends. Later
+navigations in the callback still update the active page. HTTP redirects
+contribute their final URL and status.
+
 ```elixir
 session
 |> wait_for(Event.navigation(:forbidden_forest), fn session ->

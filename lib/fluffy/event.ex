@@ -52,6 +52,7 @@ defmodule Fluffy.Event do
     new(:page, key, Options.validate_event_constructor!(:page, options))
   end
 
+  @doc "Captures the first document navigation or URL change. HTTP redirects resolve to their final URL and status."
   @spec navigation(term(), [timeout_option()]) :: t()
   def navigation(key, options \\ []) do
     new(:navigation, key, Options.validate_event_constructor!(:navigation, options))
