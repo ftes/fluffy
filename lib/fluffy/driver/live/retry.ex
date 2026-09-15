@@ -1,19 +1,20 @@
 defmodule Fluffy.Driver.Live.Retry do
   @moduledoc false
 
+  alias Fluffy.Deadline
   alias Fluffy.Session
 
   def run(%Session{} = session, options, attempt, refresh, wait_for_retry)
       when is_list(options) and is_function(attempt, 1) and is_function(refresh, 1) and is_function(wait_for_retry, 2) do
     timeout = Keyword.get(options, :timeout, session.context.timeout)
-    deadline = System.monotonic_time(:millisecond) + timeout
+    deadline = Deadline.new(timeout)
     do_run(session, deadline, attempt, refresh, wait_for_retry, nil)
   end
 
   def run_current(%Session{} = session, options, attempt, refresh, wait_for_retry)
       when is_list(options) and is_function(attempt, 1) and is_function(refresh, 1) and is_function(wait_for_retry, 2) do
     timeout = Keyword.get(options, :timeout, session.context.timeout)
-    deadline = System.monotonic_time(:millisecond) + timeout
+    deadline = Deadline.new(timeout)
     run_attempt(session, deadline, attempt, refresh, wait_for_retry)
   end
 
@@ -35,9 +36,9 @@ defmodule Fluffy.Driver.Live.Retry do
   end
 
   defp retry_or_raise(session, deadline, attempt, refresh, wait_for_retry, failure) do
-    remaining = deadline - System.monotonic_time(:millisecond)
+    remaining = Deadline.remaining(deadline)
 
-    if remaining <= 0 do
+    if remaining == 0 do
       raise_failure(failure)
     else
       wait_and_retry(session, deadline, attempt, refresh, wait_for_retry, failure, remaining)
@@ -55,7 +56,7 @@ defmodule Fluffy.Driver.Live.Retry do
   end
 
   defp retry_after_navigation(session, navigation, deadline) do
-    remaining = max(deadline - System.monotonic_time(:millisecond), 0)
+    remaining = Deadline.remaining(deadline)
     {:navigate, session, navigation, {:retry, remaining}}
   end
 

@@ -5,6 +5,7 @@ defmodule Fluffy.Backend.Playwright do
 
   alias Fluffy.Backend.Playwright.Context
   alias Fluffy.BrowserRuntime
+  alias Fluffy.Deadline
   alias Fluffy.Dialog, as: DialogResult
   alias Fluffy.Download
   alias Fluffy.Driver.Playwright.State
@@ -16,8 +17,7 @@ defmodule Fluffy.Backend.Playwright do
   alias Fluffy.NavigationEvent
   alias Fluffy.Page
   alias Fluffy.PageLifecycle
-  alias Fluffy.Playwright.NavigationObserver
-  alias Fluffy.PlaywrightEventListener
+  alias Fluffy.Playwright.Response
   alias Fluffy.Session
   alias Fluffy.TestScope
   alias PlaywrightEx.Browser
@@ -98,8 +98,6 @@ defmodule Fluffy.Backend.Playwright do
 
   @impl true
   def close_session(%Session{} = session) do
-    Enum.each(session.pages, fn {_name, page} -> stop_navigation_observer(session, page.state) end)
-
     case TestScope.close_session(session.context.resource_scope, session.context.resource_id) do
       :ok ->
         :ok
@@ -239,37 +237,19 @@ defmodule Fluffy.Backend.Playwright do
   def arm_event(%Session{} = session, :navigation, options) do
     state = Session.page_state(session)
     from_url = Session.current_page(session).url
+    from_status = Session.current_page(session).status
 
-    {:ok, navigation_listener} =
-      PlaywrightEventListener.start_link(
-        connection: session.context.connection,
-        guid: state.frame_id,
-        event: :navigated,
-        filter: fn %{params: params} ->
-          not is_binary(params[:error]) and
-            (Map.has_key?(params, :new_document) or params.url != from_url)
-        end,
-        timeout: Keyword.fetch!(options, :timeout)
-      )
+    predicate = fn %{params: params} ->
+      not is_binary(params[:error]) and (Map.has_key?(params, :new_document) or params.url != from_url)
+    end
 
-    response_observer =
-      NavigationObserver.arm(
-        session.context.context_id,
-        state.page_id,
-        state.frame_id,
-        Keyword.fetch!(options, :timeout),
-        session.context.connection
-      )
+    transform = fn %{params: params} ->
+      with {:ok, status} <- navigation_status(session, from_status, params) do
+        {:ok, %NavigationEvent{from_url: from_url, url: params.url, status: status}}
+      end
+    end
 
-    {:ok, session,
-     %{
-       type: :navigation,
-       navigation_listener: navigation_listener,
-       response_observer: response_observer,
-       from_url: from_url,
-       from_status: Session.current_page(session).status,
-       options: options
-     }}
+    arm_waiter(session, :navigation, state.frame_id, :navigated, options, predicate: predicate, transform: transform)
   end
 
   def arm_event(%Session{} = session, :page, options) do
@@ -279,26 +259,16 @@ defmodule Fluffy.Backend.Playwright do
       raise ArgumentError, "page name #{inspect(name)} is already in use"
     end
 
-    {:ok, listener} =
-      PlaywrightEventListener.start_link(
+    {:ok, waiter} =
+      EventWaiter.arm(session.context.context_id, :page,
         connection: session.context.connection,
-        guid: session.context.context_id,
-        event: :page,
         timeout: Keyword.fetch!(options, :timeout)
-      )
-
-    response_observer =
-      NavigationObserver.arm_popup(
-        session.context.context_id,
-        Keyword.fetch!(options, :timeout),
-        session.context.connection
       )
 
     {:ok, session,
      %{
        type: :page,
-       listener: listener,
-       response_observer: response_observer,
+       waiter: waiter,
        name: name,
        opener: session.active_page,
        options: options
@@ -307,63 +277,28 @@ defmodule Fluffy.Backend.Playwright do
 
   def arm_event(%Session{} = session, :dialog, options) do
     decision = Keyword.fetch!(options, :decision)
-    event_timeout = Keyword.fetch!(options, :timeout)
     deadline = Keyword.fetch!(options, :deadline)
 
-    {:ok, listener} =
-      PlaywrightEventListener.start_link(
-        connection: session.context.connection,
-        guid: Session.page_state(session).page_id,
-        event: :__create__,
-        filter: &match?(%{params: %{type: "Dialog"}}, &1),
-        handler: &handle_dialog(&1, decision, deadline, session.context.connection),
-        subscription: :dialog,
-        timeout: event_timeout
-      )
-
-    {:ok, session, %{type: :dialog, listener: listener, options: options}}
+    arm_waiter(session, :dialog, Session.page_state(session).page_id, :__create__, options,
+      subscription: :dialog,
+      predicate: &match?(%{params: %{type: "Dialog"}}, &1),
+      transform: &handle_dialog(&1, decision, deadline, session.context.connection)
+    )
   end
 
   def arm_event(%Session{} = session, :file_chooser, options) do
-    {:ok, listener} =
-      PlaywrightEventListener.start_link(
-        connection: session.context.connection,
-        guid: Session.page_state(session).page_id,
-        event: :file_chooser,
-        handler: fn
-          %{
-            guid: page_id,
-            params: %{element: %{guid: element_id}, is_multiple: multiple?}
-          } ->
-            {:ok,
-             %FileChooser{
-               element_id: element_id,
-               page_id: page_id,
-               multiple?: multiple?
-             }}
-        end,
-        subscription: :file_chooser,
-        timeout: Keyword.fetch!(options, :timeout)
-      )
-
-    {:ok, session, %{type: :file_chooser, listener: listener, options: options}}
+    arm_waiter(session, :file_chooser, Session.page_state(session).page_id, :file_chooser, options)
   end
 
   def arm_event(%Session{} = session, type, options) when type in [:request, :response] do
     matcher = Keyword.fetch!(options, :matcher)
+    normalize = &normalize_http_event(session, &1, type)
+    predicate = &matches_network?(normalize.(&1), matcher, session.context.base_url)
 
-    {:ok, listener} =
-      PlaywrightEventListener.start_link(
-        connection: session.context.connection,
-        guid: session.context.context_id,
-        event: type,
-        filter: &network_event_matches?(session, &1, type, matcher),
-        handler: fn event -> {:ok, normalize_http_event(session, event, type)} end,
-        subscription: type,
-        timeout: Keyword.fetch!(options, :timeout)
-      )
-
-    {:ok, session, %{type: type, listener: listener, options: options}}
+    arm_waiter(session, type, session.context.context_id, type, options,
+      predicate: predicate,
+      transform: &{:ok, normalize.(&1)}
+    )
   end
 
   def arm_event(%Session{} = session, type, options) do
@@ -377,21 +312,15 @@ defmodule Fluffy.Backend.Playwright do
     end
   end
 
-  def await_event(%Session{} = session, %{type: :navigation} = resource, _timeout) do
-    with {:ok, navigation_event} <- PlaywrightEventListener.await(resource.navigation_listener) do
-      finish_navigation_event(session, resource, navigation_event)
-    end
-  end
-
   def await_event(%Session{} = session, %{type: :page} = resource, _timeout) do
-    deadline = Keyword.fetch!(resource.options, :deadline)
-
-    case PlaywrightEventListener.await(resource.listener) do
+    case EventWaiter.await(resource.waiter) do
       {:ok, %{params: %{page: %{guid: page_id}}}} ->
+        deadline = Deadline.new(session.context.timeout)
+
         initializer =
           Connection.initializer!(session.context.connection, page_id)
 
-        subscribe_to_console!(page_id, session.context.connection, remaining(deadline))
+        subscribe_to_console!(page_id, session.context.connection, Deadline.remaining(deadline, 1))
         frame_id = initializer.main_frame.guid
 
         state = %State{
@@ -400,23 +329,23 @@ defmodule Fluffy.Backend.Playwright do
           frame_id: frame_id
         }
 
-        url = current_url(state, remaining(deadline))
+        {:ok, snapshot} = Frame.snapshot(frame_id, connection: session.context.connection)
 
-        response =
-          if http_document?(url) do
-            case Frame.wait_for_load_state(frame_id,
-                   connection: session.context.connection,
-                   state: "load",
-                   timeout: remaining(deadline)
-                 ) do
-              {:ok, _result} -> :ok
-              {:error, error} -> raise "Captured Playwright page did not load: #{inspect(error)}"
-            end
-
-            await_popup_response!(resource.response_observer, frame_id, deadline)
+        if http_document?(snapshot.url) do
+          case Frame.wait_for_load_state(frame_id,
+                 connection: session.context.connection,
+                 state: "load",
+                 timeout: Deadline.remaining(deadline, 1)
+               ) do
+            {:ok, _result} -> :ok
+            {:error, error} -> raise "Captured Playwright page did not load: #{inspect(error)}"
           end
+        end
 
-        {state, url} = ready_navigated_document(session, state, url, remaining(deadline))
+        {:ok, snapshot} = Frame.snapshot(frame_id, connection: session.context.connection)
+        response = await_popup_response!(session, snapshot.document_request, deadline)
+        state = %{state | document_identity: snapshot.document_ref}
+        {state, url} = ready_navigated_document(state, snapshot.url, Deadline.remaining(deadline, 1))
 
         page = %Page{
           id: resource.name,
@@ -439,9 +368,17 @@ defmodule Fluffy.Backend.Playwright do
   end
 
   def await_event(%Session{} = session, %{type: type} = resource, _timeout)
-      when type in [:dialog, :file_chooser, :request, :response] do
-    with {:ok, event} <- PlaywrightEventListener.await(resource.listener) do
+      when type in [:dialog, :navigation, :request, :response] do
+    with {:ok, result} <- EventWaiter.await(resource.waiter),
+         {:ok, event} <- result do
       {:ok, session, event}
+    end
+  end
+
+  def await_event(%Session{} = session, %{type: :file_chooser} = resource, _timeout) do
+    with {:ok, %{guid: page_id, params: %{element: %{guid: element_id}, is_multiple: multiple?}}} <-
+           EventWaiter.await(resource.waiter) do
+      {:ok, session, %FileChooser{element_id: element_id, page_id: page_id, multiple?: multiple?}}
     end
   end
 
@@ -449,24 +386,17 @@ defmodule Fluffy.Backend.Playwright do
 
   @impl true
   def disarm_event(%{waiter: waiter}), do: EventWaiter.cancel(waiter)
-
-  def disarm_event(%{navigation_listener: navigation_listener, response_observer: response_observer}) do
-    PlaywrightEventListener.stop(navigation_listener)
-    NavigationObserver.stop(response_observer)
-    :ok
-  end
-
-  def disarm_event(%{listener: listener, response_observer: response_observer}) do
-    PlaywrightEventListener.stop(listener)
-    NavigationObserver.stop(response_observer)
-    :ok
-  end
-
-  def disarm_event(%{listener: listener}) do
-    PlaywrightEventListener.stop(listener)
-  end
-
   def disarm_event(_resource), do: :ok
+
+  defp arm_waiter(session, type, guid, event, options, callbacks \\ []) do
+    timeout = Keyword.fetch!(options, :timeout)
+    deadline = Keyword.get_lazy(options, :deadline, fn -> Deadline.new(timeout) end)
+    waiter_options = [connection: session.context.connection, timeout: Deadline.remaining(deadline)]
+
+    with {:ok, waiter} <- EventWaiter.arm(guid, event, Keyword.merge(waiter_options, callbacks)) do
+      {:ok, session, %{type: type, waiter: waiter, options: options}}
+    end
+  end
 
   defp normalize_download(download, options, timeout) do
     filename = download.suggested_filename
@@ -497,33 +427,24 @@ defmodule Fluffy.Backend.Playwright do
     end
   end
 
-  defp finish_navigation_event(session, resource, %{params: params}) do
-    with {:ok, status} <- navigation_status(resource, params) do
-      {:ok, session, %NavigationEvent{from_url: resource.from_url, url: params.url, status: status}}
+  defp navigation_status(session, _from_status, %{new_document: %{request: request}}) do
+    with {:ok, response} <-
+           Response.for_request(request, connection: session.context.connection, timeout: session.context.timeout) do
+      {:ok, response_status(response)}
     end
   end
 
-  defp navigation_status(resource, %{new_document: %{request: %{guid: request_id}}}) do
-    timeout = remaining(Keyword.fetch!(resource.options, :deadline))
+  defp navigation_status(_session, _from_status, %{new_document: _document}), do: {:ok, nil}
+  defp navigation_status(_session, from_status, _same_document), do: {:ok, from_status}
 
-    with {:ok, response} <- NavigationObserver.await(resource.response_observer, timeout, request_id: request_id) do
-      {:ok, response.status}
-    end
-  end
-
-  defp navigation_status(_resource, %{new_document: _document}), do: {:ok, nil}
-  defp navigation_status(resource, _same_document), do: {:ok, resource.from_status}
-
-  defp await_popup_response!(observer, frame_id, deadline) do
-    case NavigationObserver.await(observer, remaining(deadline), frame_id: frame_id) do
+  defp await_popup_response!(session, request, deadline) do
+    case Response.for_request(request, connection: session.context.connection, timeout: Deadline.remaining(deadline, 1)) do
       {:ok, response} -> response
       {:error, reason} -> raise "Could not capture the popup main-document response: #{inspect(reason)}"
     end
   end
 
   defp release_page(session, page, :page_closed) do
-    stop_navigation_observer(session, page.state)
-
     case BrowserPage.close(page.state.page_id, timeout: session.context.timeout) do
       {:ok, _result} ->
         :ok
@@ -547,20 +468,20 @@ defmodule Fluffy.Backend.Playwright do
     dialog = normalize_dialog(params.initializer)
     decision = if is_function(decision, 1), do: decision.(dialog), else: decision
     {action, prompt_text} = normalize_dialog_decision!(decision)
-    timeout = remaining(deadline)
+    timeout = Deadline.remaining(deadline, 1)
 
     result =
       case action do
         :accept ->
           accept_options =
-            then([connection: connection, timeout: max(timeout, 1)], fn options ->
+            then([connection: connection, timeout: timeout], fn options ->
               if prompt_text, do: Keyword.put(options, :prompt_text, prompt_text), else: options
             end)
 
           BrowserDialog.accept(params.guid, accept_options)
 
         :dismiss ->
-          BrowserDialog.dismiss(params.guid, connection: connection, timeout: max(timeout, 1))
+          BrowserDialog.dismiss(params.guid, connection: connection, timeout: timeout)
       end
 
     case result do
@@ -596,14 +517,6 @@ defmodule Fluffy.Backend.Playwright do
     raise ArgumentError,
           "dialog decision callback returned invalid decision: #{inspect(decision)}"
   end
-
-  defp network_event_matches?(session, %{method: type} = event, type, matcher) do
-    session
-    |> normalize_http_event(event, type)
-    |> matches_network?(matcher, session.context.base_url)
-  end
-
-  defp network_event_matches?(_session, _event, _type, _matcher), do: false
 
   defp normalize_http_event(session, %{params: params}, :request) do
     request = Connection.initializer!(session.context.connection, params.request.guid)
@@ -666,19 +579,6 @@ defmodule Fluffy.Backend.Playwright do
     event.url == expected
   end
 
-  defp remaining(deadline), do: max(deadline - System.monotonic_time(:millisecond), 1)
-
-  defp current_url(state, timeout) do
-    case Frame.evaluate(state.frame_id,
-           expression: "() => location.href",
-           is_function: true,
-           timeout: timeout
-         ) do
-      {:ok, path} -> path
-      {:error, error} -> raise "Could not read the current browser URL: #{inspect(error)}"
-    end
-  end
-
   defp response_metadata(%{response: %{guid: guid}}) do
     Connection.initializer!(PlaywrightEx.Supervisor.Connection, guid)
   end
@@ -687,27 +587,30 @@ defmodule Fluffy.Backend.Playwright do
 
   defp adopt_navigated_document(session, state, response, url, timeout, live_navigation_cursor \\ nil) do
     {state, url} =
-      ready_navigated_document(session, state, url, timeout, live_navigation_cursor)
+      if url do
+        {state, url}
+      else
+        {:ok, snapshot} = Frame.snapshot(state.frame_id, connection: session.context.connection)
+        {%{state | document_identity: snapshot.document_ref}, snapshot.url}
+      end
+
+    {state, url} = ready_navigated_document(state, url, timeout, live_navigation_cursor)
 
     metadata =
-      case response_status(response) do
-        nil -> []
-        status -> [status: status]
+      if response || state.document_identity != Session.page_state(session).document_identity do
+        [status: response_status(response)]
+      else
+        []
       end
 
     Session.commit_page(session, :playwright, state, url, metadata)
   end
 
-  defp ready_navigated_document(session, state, url, timeout, live_navigation_cursor \\ nil) do
-    deadline = System.monotonic_time(:millisecond) + timeout
-    destination = url || current_url(state, remaining(deadline))
-    wait_for_live_view(state, destination, remaining(deadline), live_navigation_cursor)
+  defp ready_navigated_document(state, destination, timeout, live_navigation_cursor \\ nil) do
+    deadline = Deadline.new(timeout)
+    wait_for_live_view(state, destination, Deadline.remaining(deadline, 1), live_navigation_cursor)
 
-    state =
-      state
-      |> Map.put(:document_identity, document_identity(state, remaining(deadline)))
-      |> tap(&install_live_navigation_listener(&1, destination, remaining(deadline)))
-      |> refresh_navigation_observer(session, remaining(deadline))
+    install_live_navigation_listener(state, destination, Deadline.remaining(deadline, 1))
 
     {state, destination}
   end
@@ -727,54 +630,20 @@ defmodule Fluffy.Backend.Playwright do
     }
   end
 
-  defp refresh_navigation_observer(state, session, timeout) do
-    stop_navigation_observer(session, state)
-
-    observer =
-      NavigationObserver.arm(
-        state.context_id,
-        state.page_id,
-        state.frame_id,
-        timeout,
-        session.context.connection
-      )
-
-    :ok =
-      TestScope.register_navigation_observer(
-        session.context.resource_scope,
-        session.context.resource_id,
-        observer
-      )
-
-    %{state | navigation_observer: observer}
-  end
-
-  defp stop_navigation_observer(_session, %{navigation_observer: nil}), do: :ok
-
-  defp stop_navigation_observer(session, %{navigation_observer: observer}) do
-    NavigationObserver.stop(observer)
-
-    TestScope.release_navigation_observer(
-      session.context.resource_scope,
-      session.context.resource_id,
-      observer
-    )
-  end
-
   defp wait_for_live_view(state, destination, timeout, live_navigation_cursor) do
-    deadline = System.monotonic_time(:millisecond) + timeout
+    deadline = Deadline.new(timeout)
 
     wait_for_live_navigation_completion(
       state,
       destination,
       live_navigation_cursor,
-      remaining(deadline)
+      Deadline.remaining(deadline, 1)
     )
 
     case Frame.evaluate(state.frame_id,
            expression: "() => document.querySelector('[data-phx-main]') !== null",
            is_function: true,
-           timeout: remaining(deadline)
+           timeout: Deadline.remaining(deadline, 1)
          ) do
       {:ok, true} ->
         result =
@@ -782,7 +651,7 @@ defmodule Fluffy.Backend.Playwright do
             selector: "css=[data-phx-main].phx-connected",
             state: "attached",
             strict: true,
-            timeout: remaining(deadline)
+            timeout: Deadline.remaining(deadline, 1)
           )
 
         case result do
@@ -858,17 +727,6 @@ defmodule Fluffy.Backend.Playwright do
 
       {:error, error} ->
         raise "LiveView browser navigation failed for #{navigation_target(state, destination)}: expected redirect completion before [data-phx-main].phx-connected, got #{inspect(error)}"
-    end
-  end
-
-  defp document_identity(state, timeout) do
-    case Frame.evaluate(state.frame_id,
-           expression: "() => performance.timeOrigin",
-           is_function: true,
-           timeout: timeout
-         ) do
-      {:ok, identity} -> identity
-      {:error, error} -> raise "Could not identify the navigated document: #{inspect(error)}"
     end
   end
 

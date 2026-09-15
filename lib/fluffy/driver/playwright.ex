@@ -7,6 +7,7 @@ defmodule Fluffy.Driver.Playwright do
 
   alias Fluffy.Actionability
   alias Fluffy.ClientDOM
+  alias Fluffy.Deadline
   alias Fluffy.Expect
   alias Fluffy.Expectation
   alias Fluffy.FileChooser
@@ -15,7 +16,7 @@ defmodule Fluffy.Driver.Playwright do
   alias Fluffy.Locator.Playwright, as: PlaywrightLocator
   alias Fluffy.Locator.Static, as: StaticLocator
   alias Fluffy.Playwright.Handle
-  alias Fluffy.Playwright.NavigationObserver
+  alias Fluffy.Playwright.Response
   alias Fluffy.Session
   alias Fluffy.URLMatcher
   alias PlaywrightEx.BrowserContext
@@ -467,9 +468,6 @@ defmodule Fluffy.Driver.Playwright do
 
     assert result == expected_result,
            "Expected #{Expect.describe(expectation)}, got #{inspect(result)}"
-  rescue
-    error in ExUnit.AssertionError ->
-      reraise(error, __STACKTRACE__)
   end
 
   defp frame_expect(%Session{} = session, %Expect{} = expectation, options) do
@@ -495,7 +493,7 @@ defmodule Fluffy.Driver.Playwright do
         :ok
 
       {:error, _error} ->
-        actual = current_url(state, session.context.timeout)
+        {:ok, %{url: actual}} = Frame.snapshot(state.frame_id, connection: session.context.connection)
 
         raise ExUnit.AssertionError,
           message: "Expected #{Expect.describe(expectation)}, got #{inspect(actual)}"
@@ -505,146 +503,57 @@ defmodule Fluffy.Driver.Playwright do
   defp navigation_aware_action(session, operation_timeout, action) do
     # Browser bookkeeping has its own budget; it must not consume a short
     # action/assertion timeout or silently leave navigation state stale.
-    deadline = System.monotonic_time(:millisecond) + max(session.context.timeout, 1)
+    deadline = Deadline.new(max(session.context.timeout, 1))
     state = Session.page_state(session)
 
-    observer =
-      state.navigation_observer ||
-        NavigationObserver.arm(
-          session.context.context_id,
-          state.page_id,
-          state.frame_id,
-          remaining(deadline),
-          session.context.connection
-        )
+    previous_url = Session.current_page(session).url
+    navigation_cursor = live_navigation_cursor(state, Deadline.remaining(deadline, 1))
 
-    previous_url = Session.current_page(session).url || current_url(state, remaining(deadline))
-    navigation_cursor = live_navigation_cursor(state, remaining(deadline))
+    case action.(operation_timeout) do
+      {:ok, value} ->
+        outcome =
+          reconcile_action_navigation(
+            session,
+            state,
+            previous_url,
+            navigation_cursor,
+            Deadline.new(max(session.context.timeout, 1))
+          )
 
-    try do
-      case action.(max(operation_timeout, 1)) do
-        {:ok, value} ->
-          outcome =
-            reconcile_action_navigation(
-              session,
-              state,
-              previous_url,
-              navigation_cursor,
-              observer,
-              System.monotonic_time(:millisecond) + max(session.context.timeout, 1)
-            )
+        {:ok, value, outcome}
 
-          {:ok, value, outcome}
+      {:error, error} ->
+        {:error, error}
+    end
+  end
 
-        {:error, error} ->
-          {:error, error}
+  defp reconcile_action_navigation(session, state, previous_url, navigation_cursor, deadline) do
+    {:ok, snapshot} = Frame.snapshot(state.frame_id, connection: session.context.connection)
+
+    if snapshot.url == previous_url and snapshot.document_ref == state.document_identity do
+      session
+    else
+      {:navigate, session, browser_navigation(state, snapshot, navigation_cursor, session.context.connection, deadline)}
+    end
+  end
+
+  defp browser_navigation(state, snapshot, navigation_cursor, connection, deadline) do
+    if snapshot.document_ref == state.document_identity do
+      case live_navigation_kind(state, navigation_cursor, Deadline.remaining(deadline, 1)) do
+        :redirect -> Navigation.browser_committed(snapshot.url, state, live_navigation_cursor: navigation_cursor)
+        _patch -> Navigation.browser_patch(snapshot.url, state)
       end
-    rescue
-      error ->
-        reraise(error, __STACKTRACE__)
+    else
+      response = await_navigation_response!(snapshot.document_request, connection, deadline)
+      state = %{state | document_identity: snapshot.document_ref}
+      Navigation.browser_committed(snapshot.url, state, response: response)
     end
   end
 
-  defp reconcile_action_navigation(session, state, previous_url, navigation_cursor, observer, deadline) do
-    case read_current_url(state, deadline) do
-      {:error, error} ->
-        raise "Could not read the current browser URL: #{inspect(error)}"
-
-      {:ok, ^previous_url} ->
-        Session.put_page_state(session, %{state | navigation_observer: observer})
-
-      {:ok, url} ->
-        {:navigate, session,
-         browser_navigation(
-           state,
-           previous_url,
-           url,
-           navigation_cursor,
-           observer,
-           deadline
-         )}
-    end
-  end
-
-  defp read_current_url(state, deadline) do
-    do_read_current_url(state, deadline)
-  end
-
-  defp do_read_current_url(state, deadline) do
-    timeout = max(deadline - System.monotonic_time(:millisecond), 1)
-
-    case Frame.evaluate(state.frame_id,
-           expression: "() => location.href",
-           is_function: true,
-           timeout: timeout
-         ) do
-      {:ok, path} ->
-        {:ok, path}
-
-      {:error, error} ->
-        if navigation_context_error?(error) and System.monotonic_time(:millisecond) < deadline do
-          receive do
-          after
-            1 -> do_read_current_url(state, deadline)
-          end
-        else
-          {:error, error}
-        end
-    end
-  end
-
-  defp browser_navigation(state, previous_url, url, navigation_cursor, observer, deadline) do
-    case live_navigation_kind(state, navigation_cursor, remaining(deadline)) do
-      :patch ->
-        Navigation.browser_patch(url, %{state | navigation_observer: observer})
-
-      :redirect ->
-        if same_document_navigation?(state, previous_url, url, remaining(deadline)) do
-          Navigation.browser_committed(url, %{state | navigation_observer: observer},
-            live_navigation_cursor: navigation_cursor
-          )
-        else
-          response = await_navigation_response!(observer, deadline)
-
-          Navigation.browser_committed(url, state,
-            live_navigation_cursor: navigation_cursor,
-            response: response
-          )
-        end
-
-      :document ->
-        if same_document_navigation?(state, previous_url, url, remaining(deadline)) do
-          Navigation.browser_patch(url, %{state | navigation_observer: observer})
-        else
-          response = await_navigation_response!(observer, deadline)
-          Navigation.browser_committed(url, state, response: response)
-        end
-    end
-  end
-
-  defp await_navigation_response!(observer, deadline) do
-    case NavigationObserver.await(observer, remaining(deadline)) do
-      {:ok, response} ->
-        response
-
-      {:error, reason} ->
-        raise "Could not capture the final main-document response: #{inspect(reason)}"
-    end
-  end
-
-  defp same_document_navigation?(state, previous_url, url, operation_timeout) do
-    previous_url != url and
-      state.document_identity == document_identity(state, operation_timeout)
-  end
-
-  defp document_identity(state, operation_timeout) do
-    case Frame.evaluate(state.frame_id,
-           expression: "() => performance.timeOrigin",
-           is_function: true,
-           timeout: operation_timeout
-         ) do
-      {:ok, identity} -> identity
-      {:error, _error} -> nil
+  defp await_navigation_response!(request, connection, deadline) do
+    case Response.for_request(request, connection: connection, timeout: Deadline.remaining(deadline, 1)) do
+      {:ok, response} -> response
+      {:error, reason} -> raise "Could not capture the final main-document response: #{inspect(reason)}"
     end
   end
 
@@ -676,55 +585,12 @@ defmodule Fluffy.Driver.Playwright do
   end
 
   defp timeout_for(%Expect{} = expectation) do
-    expectation.options |> Keyword.get(:timeout, timeout()) |> max(1)
+    Keyword.get(expectation.options, :timeout, timeout())
   end
-
-  defp remaining(deadline), do: max(deadline - System.monotonic_time(:millisecond), 1)
 
   defp checked_expected_value(:checked), do: %{checked: true}
   defp checked_expected_value(:unchecked), do: %{checked: false}
   defp checked_expected_value(:indeterminate), do: %{indeterminate: true}
-
-  defp current_url(state, operation_timeout) do
-    deadline = System.monotonic_time(:millisecond) + max(operation_timeout, 1)
-    do_current_url(state, deadline)
-  end
-
-  defp do_current_url(state, deadline) do
-    remaining = max(deadline - System.monotonic_time(:millisecond), 1)
-
-    case Frame.evaluate(state.frame_id,
-           expression: "() => location.href",
-           is_function: true,
-           timeout: remaining
-         ) do
-      {:ok, path} ->
-        path
-
-      {:error, error} ->
-        if navigation_context_error?(error) and
-             System.monotonic_time(:millisecond) < deadline do
-          receive do
-          after
-            1 -> do_current_url(state, deadline)
-          end
-        else
-          raise "Could not read the current browser URL: #{inspect(error)}"
-        end
-    end
-  end
-
-  defp navigation_context_error?(error) do
-    String.contains?(playwright_error_message(error), [
-      "Execution context was destroyed",
-      "Cannot find context with specified id"
-    ])
-  end
-
-  defp playwright_error_message(%{error: %{message: message}}) when is_binary(message), do: message
-
-  defp playwright_error_message(%{message: message}) when is_binary(message), do: message
-  defp playwright_error_message(_error), do: ""
 
   defp validate_unwrapped_handle!(%Handle{} = handle) do
     case BrowserContext.cookies(handle.context_id,

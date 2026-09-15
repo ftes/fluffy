@@ -11,6 +11,7 @@ defmodule Fluffy.Backend.Phoenix do
   alias Fluffy.Backend.Phoenix.HTTP.Client, as: HTTPClient
   alias Fluffy.Backend.Phoenix.HTTP.Response, as: HTTPResponse
   alias Fluffy.ClientDOM
+  alias Fluffy.Deadline
   alias Fluffy.Download
   alias Fluffy.Driver.Live, as: LiveDriver
   alias Fluffy.Driver.Live.State, as: LiveState
@@ -463,7 +464,7 @@ defmodule Fluffy.Backend.Phoenix do
     end
   end
 
-  defp before_deadline?(options), do: System.monotonic_time(:millisecond) < Keyword.fetch!(options, :deadline)
+  defp before_deadline?(options), do: not Deadline.expired?(Keyword.fetch!(options, :deadline))
 
   defp attachment?(nil), do: false
 

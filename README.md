@@ -166,6 +166,8 @@ backend supports.
 
 ## Developing Fluffy
 
+Fluffy requires `playwright_ex` 0.11 or newer.
+
 The project pins the current local-development toolchain in `.tool-versions`.
 Fluffy's compatibility floor remains Elixir 1.18 and Node.js 20; development
 also requires pnpm 11.19.0 and PostgreSQL. From a clean checkout:

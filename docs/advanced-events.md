@@ -57,6 +57,9 @@ end)
 |> assert(visible(by_text("Creature index")))
 ```
 
+Captured popups get the session timeout to load and connect before they become
+available.
+
 Multiple pages and tabs require Playwright. Phoenix follows links and submits
 forms in its current page, ignoring `target` and `formtarget`, including
 `_blank`. Popup capture, page switching, and closing pages raise a capability
@@ -72,7 +75,8 @@ sessions do not.
 
 Captures the first document navigation or URL change on both backends. Later
 navigations in the callback still update the active page. HTTP redirects
-contribute their final URL and status.
+contribute their final URL and status. Reloads count even when the URL stays
+the same. Requestless documents, such as `about:blank`, have no HTTP status.
 
 ```elixir
 session

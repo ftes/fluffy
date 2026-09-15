@@ -19,6 +19,7 @@ defmodule Fluffy.Event do
   import ExUnit.Assertions
 
   alias Fluffy.Backend
+  alias Fluffy.Deadline
   alias Fluffy.Options
   alias Fluffy.Session
 
@@ -50,7 +51,11 @@ defmodule Fluffy.Event do
     new(:file_chooser, key, Options.validate_event_constructor!(:file_chooser, options))
   end
 
-  @doc "Captures a new page opened by the action. Requires Playwright."
+  @doc """
+  Captures a new page opened by the action. Requires Playwright.
+
+  The session timeout applies separately to initializing the captured page.
+  """
   @spec popup(term(), [timeout_option()]) :: t()
   def popup(key, options \\ []) do
     new(:page, key, Options.validate_event_constructor!(:page, options))
@@ -103,12 +108,12 @@ defmodule Fluffy.Event do
     options = Options.validate_event!(type, options)
     timeout = Keyword.get(options, :timeout, default_timeout(session))
 
-    deadline = System.monotonic_time(:millisecond) + timeout
+    deadline = Deadline.new(timeout)
 
     arm_options =
       options
       |> Keyword.put(:deadline, deadline)
-      |> Keyword.put(:timeout, remaining(deadline))
+      |> Keyword.put(:timeout, Deadline.remaining(deadline))
 
     {session, token} = Session.arm_event(session, type, key, arm_options)
     {:ok, armed_session, resource} = Backend.arm_event(session, type, arm_options)
@@ -116,7 +121,7 @@ defmodule Fluffy.Event do
     try do
       action_session = action.(armed_session)
       ensure_action_session!(action_session, armed_session.backend, token)
-      remaining = remaining(deadline)
+      remaining = Deadline.remaining(deadline)
 
       case Backend.await_event(action_session, resource, remaining) do
         {:ok, updated_session, value} ->
@@ -148,8 +153,6 @@ defmodule Fluffy.Event do
   defp default_timeout(session) do
     Map.get(session.context, :timeout, Application.get_env(:fluffy, :timeout, 1_000))
   end
-
-  defp remaining(deadline), do: max(deadline - System.monotonic_time(:millisecond), 0)
 
   defp default_options(:download), do: [max_bytes: 10_000_000]
   defp default_options(_type), do: []

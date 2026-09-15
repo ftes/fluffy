@@ -113,6 +113,25 @@ defmodule Fluffy.Conformance.PageURLTest do
   end
 
   @tag driver: :playwright
+  test "zero-timeout URL assertions allow the current URL predicate to finish" do
+    session =
+      :playwright
+      |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+      |> visit("/chamber")
+
+    predicate = fn uri ->
+      Process.sleep(10)
+      uri.path == "/chamber"
+    end
+
+    expect(session, page_to_have_url(predicate), timeout: 0)
+
+    assert_raise ExUnit.AssertionError, fn ->
+      expect(session, not_(page_to_have_url(predicate)), timeout: 0)
+    end
+  end
+
+  @tag driver: :playwright
   test "waits for a future same-document URL change with a URI predicate" do
     session = session_for_html(:playwright, "<h1>URL changes</h1>")
     Fluffy.Playwright.evaluate(session, "setTimeout(() => location.hash = 'ready', 100)")

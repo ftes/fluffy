@@ -59,6 +59,33 @@ defmodule Fluffy.Conformance.PageEventTest do
   end
 
   @tag driver: :playwright
+  test "initializes a captured popup after the action outlives the capture deadline" do
+    fixture =
+      TestHTTPFixtures.register(fn request ->
+        case request.path do
+          "/start" -> %{body: html(~s(<a href="redirect" target="_blank">Open details</a>))}
+          "/redirect" -> %{status: 302, headers: [{"location", "details"}], body: ""}
+          "/details" -> %{status: 202, body: html("<h1>Details page</h1>")}
+        end
+      end)
+
+    session =
+      :playwright
+      |> start_test_session()
+      |> visit(TestHTTPFixtures.path(fixture, "/start"))
+      |> wait_for(Event.popup(:details, timeout: 1_000), fn session ->
+        session = click(session, by_role(:link, name: "Open details"))
+        Process.sleep(1_000)
+        session
+      end)
+
+    assert Page.url(page(session, :details)) == TestHTTPFixtures.url(fixture, "/details")
+    assert Page.status(page(session, :details)) == 202
+    assert Page.opener(page(session, :details)) == :main
+    session |> switch_page(:details) |> expect("Details page" |> by_text() |> to_be_visible())
+  end
+
+  @tag driver: :playwright
   test "captures a formtarget new page and preserves its submitter with Playwright" do
     fixture =
       TestHTTPFixtures.register(fn request ->
