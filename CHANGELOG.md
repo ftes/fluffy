@@ -9,13 +9,14 @@
 
 ### Changed
 
-- Use `playwright_ex` from its GitHub `main` branch, locked in `mix.lock`.
+- Require `playwright_ex ~> 0.10`.
 - Delegate browser URL waiting to `Frame.wait_for_url/2` and event capture to `EventWaiter`. Captures retain the first matching event, even when several arrive before the action returns; the capture timeout starts when arming.
 - Save browser downloads through `PlaywrightEx.Download`. Temporary copies are removed after reading; source artifacts remain available until the browser context closes.
 - Unexpected predicate and handler failures propagate instead of being converted into event errors.
 
 ### Fixed
 
+- Use the session timeout to save a captured browser download, including when the callback returns after the event deadline.
 - Ignore Phoenix navigation and download events arriving after the armed capture deadline, before applying download filters or byte limits.
 - Load browser download metadata before decoding the first download event.
 - Retain the first navigation on Phoenix's Static and LiveView drivers, including patches and fragment changes, when the callback continues navigating.

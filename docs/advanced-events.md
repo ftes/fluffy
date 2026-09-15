@@ -34,7 +34,8 @@ end)
 
 `download(session, :report)` returns `%Fluffy.Download{}` with `filename`,
 `content_type`, `bytes`, and `url`. Override the default retained-byte limit
-with `max_bytes:` on `Event.download/2` or `wait_for/4`.
+with `max_bytes:` on `Event.download/2` or `wait_for/4`. Playwright uses the
+session timeout separately to save the captured download.
 
 Use `filename:` (exact string or regex) and `url:` (absolute string, regex, or
 `fn %URI{} -> boolean end`) to select a download. Both filters must match;

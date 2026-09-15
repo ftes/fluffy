@@ -98,6 +98,24 @@ defmodule Fluffy.Conformance.EventTimeoutTest do
     end
 
     @tag driver: driver
+    test "retains a download captured before the deadline when the callback finishes later with #{driver}", %{
+      driver: driver,
+      fixture: fixture
+    } do
+      driver
+      |> start_test_session(fixture)
+      |> wait_for(Event.download(:early, filename: "report.csv", timeout: 1_000), fn session ->
+        session = click(session, by_role(:link, name: "Download"))
+        Process.sleep(1_000)
+        session
+      end)
+      |> expect(download_to_have_suggested_filename(:early, "report.csv"))
+      |> expect(download_to_have_content(:early, "download bytes"))
+      |> expect(download_to_have_url(:early, TestHTTPFixtures.url(fixture, "/report")))
+      |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/start")))
+    end
+
+    @tag driver: driver
     test "a rejected download does not restart the deadline with #{driver}", %{driver: driver, fixture: fixture} do
       session = start_test_session(driver, fixture)
 

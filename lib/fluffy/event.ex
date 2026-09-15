@@ -34,7 +34,11 @@ defmodule Fluffy.Event do
   @type network_option :: unquote(NimbleOptions.option_typespec(Options.network_event_schema()))
   @type option :: timeout_option() | download_option() | dialog_option() | network_option()
 
-  @doc "Captures the first download matching the optional filename and URL filters."
+  @doc """
+  Captures the first download matching the optional filename and URL filters.
+
+  Playwright uses the session timeout separately to save the captured download.
+  """
   @spec download(term(), [download_option()]) :: t()
   def download(key, options \\ []) do
     new(:download, key, Options.validate_event_constructor!(:download, options))

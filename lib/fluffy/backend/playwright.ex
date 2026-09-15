@@ -373,7 +373,7 @@ defmodule Fluffy.Backend.Playwright do
   @impl true
   def await_event(%Session{} = session, %{type: :download} = resource, _timeout) do
     with {:ok, download} <- BrowserPage.await_download(resource.waiter) do
-      {:ok, session, normalize_download(download, resource.options)}
+      {:ok, session, normalize_download(download, resource.options, session.context.timeout)}
     end
   end
 
@@ -468,14 +468,12 @@ defmodule Fluffy.Backend.Playwright do
 
   def disarm_event(_resource), do: :ok
 
-  defp normalize_download(download, options) do
+  defp normalize_download(download, options, timeout) do
     filename = download.suggested_filename
     path = Path.join(System.tmp_dir!(), "fluffy-download-#{System.unique_integer([:positive])}")
 
     try do
-      case BrowserDownload.save_as(download, path,
-             timeout: max(Keyword.fetch!(options, :deadline) - System.monotonic_time(:millisecond), 0)
-           ) do
+      case BrowserDownload.save_as(download, path, timeout: timeout) do
         :ok -> :ok
         {:error, error} -> raise "Could not save Playwright download: #{inspect(error)}"
       end
