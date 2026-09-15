@@ -64,7 +64,7 @@ defmodule Fluffy.MixProject do
       {:lazy_html, "~> 0.1"},
       {:phoenix, "~> 1.7"},
       {:phoenix_live_view, "~> 1.0"},
-      {:playwright_ex, github: "ftes/playwright_ex", branch: "main"},
+      {:playwright_ex, "~> 0.10"},
       {:phoenix_ecto, "~> 4.7", optional: true},
       {:ecto_sql, "~> 3.10", optional: true},
       {:ex_doc, "~> 0.40.3", only: :dev, runtime: false},
