@@ -44,6 +44,16 @@ bytes or enforcing `max_bytes:`.
 
 ## New pages and tabs (Playwright only)
 
+Choose the event by **which page can open the new tab or window**:
+
+| Event | Captures the first new page… | Playwright equivalent |
+| --- | --- | --- |
+| `Event.popup(:name)` | opened by the current page | `page.waitForEvent('popup')` |
+| `Event.page(:name)` | opened anywhere in the session | `context.waitForEvent('page')` |
+
+Here, “popup” includes an ordinary new tab, such as a `target="_blank"` link.
+Use `popup` when a click on the current page opens a tab:
+
 ```elixir
 session
 |> wait_for(Event.popup(:secret_chamber), fn session ->
@@ -57,28 +67,26 @@ end)
 |> assert(visible(by_text("Creature index")))
 ```
 
-`Event.popup/2` captures the first new page opened by the page active when the
-wait is armed, including new tabs. `Event.page/2` captures the first new page
-anywhere in the session's browser context, including pages created directly
-through the native browser context. Use `page` when the opener is unknown or
-irrelevant. Both waits are armed before the callback runs.
+Use `Event.page(:secret_chamber)` in the same pattern when any new page in
+the session should match, including one created with the native browser context.
+For example, if another tab opens a page, `page` captures it; `popup` ignores it.
 
-Captured pages record their actual opener's session-local name, or `nil` when
-there is no opener or the opener is not registered in the session.
+Both waits start listening before the callback runs. `popup` remains tied to the
+page that was active at that point, even if the callback switches pages.
+Captured pages get the session timeout to load and connect before becoming
+available. Use `switch_page/2` to interact with them.
 
-Captured pages get the session timeout to load and connect before they become
-available.
+`page(session, :secret_chamber)` returns the captured `Fluffy.Page` without
+switching. Inspect it with `Page.name/1`, `Page.url/1`, `Page.status/1`,
+`Page.opener/1`, and `Page.revision/1`. The opener is its name in the session,
+or `nil` if there is no opener or it has not been captured.
 
-Multiple pages and tabs require Playwright. Phoenix follows links and submits
-forms in its current page, ignoring `target` and `formtarget`, including
-`_blank`. Page and popup capture, page switching, and closing pages raise a capability
-error in Phoenix. Multiple isolated sessions remain supported by both backends.
-All pages inside one Playwright session share cookies and storage; independent
-sessions do not.
+All pages in one session share cookies and storage. Start separate sessions
+for independent users.
 
-`page(session, :secret_chamber)` returns the captured opaque `Fluffy.Page`; use
-`Page.name/1`, `Page.url/1`, `Page.status/1`, `Page.opener/1`, and
-`Page.revision/1` to inspect its metadata without switching.
+Phoenix follows links and submits forms in the current page, ignoring `target`
+and `formtarget`, including `_blank`. Both capture events, page switching, and
+closing pages require Playwright and raise a capability error in Phoenix.
 
 ## Navigation
 

@@ -52,7 +52,10 @@ defmodule Fluffy.Event do
   end
 
   @doc """
-  Captures the first new page anywhere in the session's browser context. Requires Playwright.
+  Captures the first new tab or window anywhere in the session. Requires Playwright.
+
+  Equivalent to Playwright's `context.waitForEvent('page')`. Use `popup/2`
+  to capture only pages opened by the current page.
 
   The session timeout applies separately to initializing the captured page.
   """
@@ -62,8 +65,11 @@ defmodule Fluffy.Event do
   end
 
   @doc """
-  Captures the first new page opened by the active page when the wait is armed.
-  Includes new tabs opened by links or forms. Requires Playwright.
+  Captures the first new tab or window opened by the current page. Requires Playwright.
+
+  Equivalent to Playwright's `page.waitForEvent('popup')`; includes tabs opened
+  by `target="_blank"` links. The opener is fixed when the wait starts, even if
+  the callback switches pages. Use `page/2` to capture any new page in the session.
 
   The session timeout applies separately to initializing the captured page.
   """
