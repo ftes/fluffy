@@ -168,6 +168,7 @@ defmodule Fluffy do
   def download(%Session{} = session, key), do: Session.fetch_result!(session, key, :download)
 
   @doc group: "Event capture and results"
+  @doc playwright_only: true
   @doc "Returns a previously captured file chooser without consuming it."
   def file_chooser(%Session{} = session, key), do: Session.fetch_result!(session, key, :file_chooser)
 
@@ -176,15 +177,22 @@ defmodule Fluffy do
   def navigation(%Session{} = session, key), do: Session.fetch_result!(session, key, :navigation)
 
   @doc group: "Event capture and results"
+  @doc playwright_only: true
   @doc "Returns a previously captured `Fluffy.Page` without consuming it."
   @spec page(Session.t(), term()) :: Fluffy.Page.t()
   def page(%Session{} = session, name), do: Session.fetch_result!(session, name, :page)
 
   @doc group: "Lifecycle and navigation"
-  @doc "Makes a named Playwright page the target of subsequent actions and assertions."
+  @doc playwright_only: true
+  @doc """
+  Makes a named Playwright page the target of subsequent actions and assertions.
+
+  Raises `Fluffy.CapabilityError` with the Phoenix backend.
+  """
   def switch_page(%Session{} = session, name), do: Backend.activate_page(session, name)
 
   @doc group: "Lifecycle and navigation"
+  @doc playwright_only: true
   @doc """
   Closes a named Playwright page, or the active page when no name is supplied.
 
@@ -196,7 +204,7 @@ defmodule Fluffy do
   Closing a page does not close pages it opened. Raises `ArgumentError` when
   attempting to close the last page in the session.
 
-  Requires Playwright; raises `Fluffy.CapabilityError` with the Phoenix backend.
+  Raises `Fluffy.CapabilityError` with the Phoenix backend.
   """
   def close_page(%Session{} = session, name \\ nil) do
     Backend.close_page(session, name || session.active_page)
@@ -207,14 +215,17 @@ defmodule Fluffy do
   def page_names(%Session{} = session), do: Map.keys(session.pages)
 
   @doc group: "Event capture and results"
+  @doc playwright_only: true
   @doc "Returns a previously captured dialog without consuming it."
   def dialog(%Session{} = session, key), do: Session.fetch_result!(session, key, :dialog)
 
   @doc group: "Event capture and results"
+  @doc playwright_only: true
   @doc "Returns a previously captured request without consuming it."
   def request(%Session{} = session, key), do: Session.fetch_result!(session, key, :request)
 
   @doc group: "Event capture and results"
+  @doc playwright_only: true
   @doc "Returns a previously captured response without consuming it."
   def response(%Session{} = session, key), do: Session.fetch_result!(session, key, :response)
 

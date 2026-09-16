@@ -68,6 +68,7 @@ defmodule Fluffy.Playwright do
 
   @type screenshot_option :: unquote(NimbleOptions.option_typespec(@screenshot_schema))
 
+  @doc playwright_only: true
   @doc """
   Starts a Playwright trace for this session's BrowserContext.
 
@@ -102,6 +103,7 @@ defmodule Fluffy.Playwright do
     Session.put_context(session, Map.put(context, :trace, Trace.public_state(trace)))
   end
 
+  @doc playwright_only: true
   @doc """
   Saves a PNG screenshot of the active page and returns the session.
 
@@ -124,6 +126,7 @@ defmodule Fluffy.Playwright do
     end
   end
 
+  @doc playwright_only: true
   @doc """
   Evaluates JavaScript in the active Playwright page and returns the value.
 

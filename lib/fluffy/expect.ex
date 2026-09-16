@@ -329,45 +329,40 @@ defmodule Fluffy.Expect do
   end
 
   @doc group: "Assertions"
-  @doc """
-  Expects the captured dialog's type to equal the supplied value.
-  """
+  @doc playwright_only: true
+  @doc "Expects the captured dialog's type to equal the supplied value."
   @spec dialog_to_have_type(term(), term(), [Expect.option()]) :: Expect.t()
   def dialog_to_have_type(key, expected, options \\ []) do
     Expect.new({:dialog, key}, :dialog_type, expected, options)
   end
 
   @doc group: "Assertions"
-  @doc """
-  Expects the captured dialog's message to equal the supplied value.
-  """
+  @doc playwright_only: true
+  @doc "Expects the captured dialog's message to equal the supplied value."
   @spec dialog_to_have_message(term(), String.t(), [Expect.option()]) :: Expect.t()
   def dialog_to_have_message(key, expected, options \\ []) when is_binary(expected) do
     Expect.new({:dialog, key}, :dialog_message, expected, options)
   end
 
   @doc group: "Assertions"
-  @doc """
-  Expects the captured dialog's default value to equal the supplied value.
-  """
+  @doc playwright_only: true
+  @doc "Expects the captured dialog's default value to equal the supplied value."
   @spec dialog_to_have_default_value(term(), String.t(), [Expect.option()]) :: Expect.t()
   def dialog_to_have_default_value(key, expected, options \\ []) when is_binary(expected) do
     Expect.new({:dialog, key}, :dialog_default_value, expected, options)
   end
 
   @doc group: "Assertions"
-  @doc """
-  Expects the captured dialog's action to equal the supplied value.
-  """
+  @doc playwright_only: true
+  @doc "Expects the captured dialog's action to equal the supplied value."
   @spec dialog_to_have_action(term(), term(), [Expect.option()]) :: Expect.t()
   def dialog_to_have_action(key, expected, options \\ []) do
     Expect.new({:dialog, key}, :dialog_action, expected, options)
   end
 
   @doc group: "Assertions"
-  @doc """
-  Expects the captured dialog's prompt text to equal the supplied value.
-  """
+  @doc playwright_only: true
+  @doc "Expects the captured dialog's prompt text to equal the supplied value."
   @spec dialog_to_have_prompt_text(term(), term(), [Expect.option()]) :: Expect.t()
   def dialog_to_have_prompt_text(key, expected, options \\ []) do
     Expect.new({:dialog, key}, :dialog_prompt_text, expected, options)
@@ -425,15 +420,15 @@ defmodule Fluffy.Expect do
   end
 
   @doc group: "Assertions"
-  @doc """
-  Expects the captured request's method to equal the supplied value.
-  """
+  @doc playwright_only: true
+  @doc "Expects the captured request's method to equal the supplied value."
   @spec request_to_have_method(term(), String.t(), [Expect.option()]) :: Expect.t()
   def request_to_have_method(key, expected, options \\ []) when is_binary(expected) do
     Expect.new({:request, key}, :request_method, expected, options)
   end
 
   @doc group: "Assertions"
+  @doc playwright_only: true
   @doc """
   Expects the captured request URL to match a string, regex, URI predicate, or structured components.
 
@@ -455,6 +450,7 @@ defmodule Fluffy.Expect do
   end
 
   @doc group: "Assertions"
+  @doc playwright_only: true
   @doc """
   Expects the captured request headers to include every supplied key/value pair. Additional
   headers are allowed.
@@ -465,42 +461,39 @@ defmodule Fluffy.Expect do
   end
 
   @doc group: "Assertions"
-  @doc """
-  Expects the captured request's resource type to equal the supplied value.
-  """
+  @doc playwright_only: true
+  @doc "Expects the captured request's resource type to equal the supplied value."
   @spec request_to_have_resource_type(term(), String.t(), [Expect.option()]) :: Expect.t()
   def request_to_have_resource_type(key, expected, options \\ []) when is_binary(expected) do
     Expect.new({:request, key}, :request_resource_type, expected, options)
   end
 
   @doc group: "Assertions"
-  @doc """
-  Expects the captured request's post data to equal the supplied value.
-  """
+  @doc playwright_only: true
+  @doc "Expects the captured request's post data to equal the supplied value."
   @spec request_to_have_post_data(term(), String.t(), [Expect.option()]) :: Expect.t()
   def request_to_have_post_data(key, expected, options \\ []) when is_binary(expected) do
     Expect.new({:request, key}, :request_post_data, expected, options)
   end
 
   @doc group: "Assertions"
-  @doc """
-  Expects the captured request's page to equal the supplied value.
-  """
+  @doc playwright_only: true
+  @doc "Expects the captured request's page to equal the supplied value."
   @spec request_to_have_page(term(), term(), [Expect.option()]) :: Expect.t()
   def request_to_have_page(key, expected, options \\ []) do
     Expect.new({:request, key}, :request_page, expected, options)
   end
 
   @doc group: "Assertions"
-  @doc """
-  Expects the HTTP method of the request that produced this response.
-  """
+  @doc playwright_only: true
+  @doc "Expects the HTTP method of the request that produced this response."
   @spec response_to_have_request_method(term(), String.t(), [Expect.option()]) :: Expect.t()
   def response_to_have_request_method(key, expected, options \\ []) when is_binary(expected) do
     Expect.new({:response, key}, :response_method, expected, options)
   end
 
   @doc group: "Assertions"
+  @doc playwright_only: true
   @doc """
   Expects the captured response URL to match a string, regex, URI predicate, or structured components.
 
@@ -522,6 +515,7 @@ defmodule Fluffy.Expect do
   end
 
   @doc group: "Assertions"
+  @doc playwright_only: true
   @doc """
   Expects the captured response headers to include every supplied key/value pair. Additional
   headers are allowed.
@@ -532,15 +526,15 @@ defmodule Fluffy.Expect do
   end
 
   @doc group: "Assertions"
-  @doc """
-  Expects the captured response's resource type to equal the supplied value.
-  """
+  @doc playwright_only: true
+  @doc "Expects the captured response's resource type to equal the supplied value."
   @spec response_to_have_resource_type(term(), String.t(), [Expect.option()]) :: Expect.t()
   def response_to_have_resource_type(key, expected, options \\ []) when is_binary(expected) do
     Expect.new({:response, key}, :response_resource_type, expected, options)
   end
 
   @doc group: "Assertions"
+  @doc playwright_only: true
   @doc """
   Expects the associated request payload to equal the supplied string. This does not inspect the
   response body.
@@ -551,27 +545,24 @@ defmodule Fluffy.Expect do
   end
 
   @doc group: "Assertions"
-  @doc """
-  Expects the captured response's status to equal the supplied value.
-  """
+  @doc playwright_only: true
+  @doc "Expects the captured response's status to equal the supplied value."
   @spec response_to_have_status(term(), integer(), [Expect.option()]) :: Expect.t()
   def response_to_have_status(key, expected, options \\ []) when is_integer(expected) do
     Expect.new({:response, key}, :response_status, expected, options)
   end
 
   @doc group: "Assertions"
-  @doc """
-  Expects the captured response's status text to equal the supplied value.
-  """
+  @doc playwright_only: true
+  @doc "Expects the captured response's status text to equal the supplied value."
   @spec response_to_have_status_text(term(), String.t(), [Expect.option()]) :: Expect.t()
   def response_to_have_status_text(key, expected, options \\ []) when is_binary(expected) do
     Expect.new({:response, key}, :response_status_text, expected, options)
   end
 
   @doc group: "Assertions"
-  @doc """
-  Expects the captured response's page to equal the supplied value.
-  """
+  @doc playwright_only: true
+  @doc "Expects the captured response's page to equal the supplied value."
   @spec response_to_have_page(term(), term(), [Expect.option()]) :: Expect.t()
   def response_to_have_page(key, expected, options \\ []) do
     Expect.new({:response, key}, :response_page, expected, options)

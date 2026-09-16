@@ -112,18 +112,23 @@ defmodule Fluffy.Assert do
   @doc "Equivalent to `Fluffy.Expect.download_to_have_url/3`."
   defdelegate download_url(key, expected, options \\ []), to: Fluffy.Expect, as: :download_to_have_url
 
+  @doc playwright_only: true
   @doc "Equivalent to `Fluffy.Expect.dialog_to_have_type/3`."
   defdelegate dialog_type(key, expected, options \\ []), to: Fluffy.Expect, as: :dialog_to_have_type
 
+  @doc playwright_only: true
   @doc "Equivalent to `Fluffy.Expect.dialog_to_have_message/3`."
   defdelegate dialog_message(key, expected, options \\ []), to: Fluffy.Expect, as: :dialog_to_have_message
 
+  @doc playwright_only: true
   @doc "Equivalent to `Fluffy.Expect.dialog_to_have_default_value/3`."
   defdelegate dialog_default_value(key, expected, options \\ []), to: Fluffy.Expect, as: :dialog_to_have_default_value
 
+  @doc playwright_only: true
   @doc "Equivalent to `Fluffy.Expect.dialog_to_have_action/3`."
   defdelegate dialog_action(key, expected, options \\ []), to: Fluffy.Expect, as: :dialog_to_have_action
 
+  @doc playwright_only: true
   @doc "Equivalent to `Fluffy.Expect.dialog_to_have_prompt_text/3`."
   defdelegate dialog_prompt_text(key, expected, options \\ []), to: Fluffy.Expect, as: :dialog_to_have_prompt_text
 
@@ -136,49 +141,63 @@ defmodule Fluffy.Assert do
   @doc "Equivalent to `Fluffy.Expect.navigation_to_have_status/3`."
   defdelegate navigation_status(key, expected, options \\ []), to: Fluffy.Expect, as: :navigation_to_have_status
 
+  @doc playwright_only: true
   @doc "Equivalent to `Fluffy.Expect.request_to_have_method/3`."
   defdelegate request_method(key, expected, options \\ []), to: Fluffy.Expect, as: :request_to_have_method
 
+  @doc playwright_only: true
   @doc "Equivalent to `Fluffy.Expect.request_to_have_url/3`."
   defdelegate request_url(key, expected, options \\ []), to: Fluffy.Expect, as: :request_to_have_url
 
+  @doc playwright_only: true
   @doc "Equivalent to `Fluffy.Expect.request_to_have_headers/3`."
   defdelegate request_headers(key, expected, options \\ []), to: Fluffy.Expect, as: :request_to_have_headers
 
+  @doc playwright_only: true
   @doc "Equivalent to `Fluffy.Expect.request_to_have_resource_type/3`."
   defdelegate request_resource_type(key, expected, options \\ []), to: Fluffy.Expect, as: :request_to_have_resource_type
 
+  @doc playwright_only: true
   @doc "Equivalent to `Fluffy.Expect.request_to_have_post_data/3`."
   defdelegate request_post_data(key, expected, options \\ []), to: Fluffy.Expect, as: :request_to_have_post_data
 
+  @doc playwright_only: true
   @doc "Equivalent to `Fluffy.Expect.request_to_have_page/3`."
   defdelegate request_page(key, expected, options \\ []), to: Fluffy.Expect, as: :request_to_have_page
 
+  @doc playwright_only: true
   @doc "Equivalent to `Fluffy.Expect.response_to_have_request_method/3`."
   defdelegate response_request_method(key, expected, options \\ []),
     to: Fluffy.Expect,
     as: :response_to_have_request_method
 
+  @doc playwright_only: true
   @doc "Equivalent to `Fluffy.Expect.response_to_have_url/3`."
   defdelegate response_url(key, expected, options \\ []), to: Fluffy.Expect, as: :response_to_have_url
 
+  @doc playwright_only: true
   @doc "Equivalent to `Fluffy.Expect.response_to_have_headers/3`."
   defdelegate response_headers(key, expected, options \\ []), to: Fluffy.Expect, as: :response_to_have_headers
 
+  @doc playwright_only: true
   @doc "Equivalent to `Fluffy.Expect.response_to_have_resource_type/3`."
   defdelegate response_resource_type(key, expected, options \\ []), to: Fluffy.Expect, as: :response_to_have_resource_type
 
+  @doc playwright_only: true
   @doc "Equivalent to `Fluffy.Expect.response_to_have_request_post_data/3`."
   defdelegate response_request_post_data(key, expected, options \\ []),
     to: Fluffy.Expect,
     as: :response_to_have_request_post_data
 
+  @doc playwright_only: true
   @doc "Equivalent to `Fluffy.Expect.response_to_have_status/3`."
   defdelegate response_status(key, expected, options \\ []), to: Fluffy.Expect, as: :response_to_have_status
 
+  @doc playwright_only: true
   @doc "Equivalent to `Fluffy.Expect.response_to_have_status_text/3`."
   defdelegate response_status_text(key, expected, options \\ []), to: Fluffy.Expect, as: :response_to_have_status_text
 
+  @doc playwright_only: true
   @doc "Equivalent to `Fluffy.Expect.response_to_have_page/3`."
   defdelegate response_page(key, expected, options \\ []), to: Fluffy.Expect, as: :response_to_have_page
 end

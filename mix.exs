@@ -79,6 +79,9 @@ defmodule Fluffy.MixProject do
   defp docs do
     [
       main: "readme",
+      annotations_for_docs: fn metadata ->
+        if metadata[:playwright_only], do: ["Playwright only"], else: []
+      end,
       source_ref: "v#{@version}",
       assets: %{"docs/images" => "docs/images"},
       extras: ["README.md"] ++ @doc_files,
