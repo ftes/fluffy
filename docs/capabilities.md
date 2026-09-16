@@ -11,6 +11,7 @@ boundaries described below.
 <!-- capability-matrix:start -->
 | Feature | Phoenix | Playwright |
 | --- | --- | --- |
+| Frame locators and traversal | - | equivalent |
 | Documented CSS locator subset | equivalent | equivalent |
 | Text, label, and attribute locators | equivalent | equivalent |
 | Structural role and accessible-name subset | structural subset | equivalent |
@@ -74,8 +75,16 @@ LiveView `unwrap/2` receives only the View.
 ### Tabs, windows, and iframes
 
 The Playwright backend supports named pages for browser tabs and popup windows.
-Fluffy currently has no dedicated iframe locator or frame-switching API;
-page switching does not select an iframe. See
+Use [frame locators](usage.md#frames-playwright) to query iframe contents with
+Playwright. Page switching does not select an iframe, and frame locators do not
+change the active page.
+
+Static and LiveView can query the iframe element in their current markup, but
+do not load its `src` or parse its `srcdoc` as a child document. They do not
+flatten iframe contents into the parent document or ignore frame boundaries:
+executing a frame-traversing query raises `Fluffy.CapabilityError`. Visit the
+embedded route directly to test it independently with Phoenix; use Playwright
+to test the embedding behavior. See
 [Browser terminology](advanced-events.md#browser-terminology-tabs-windows-pages-and-frames)
 for how pages, browser contexts, and frames relate.
 

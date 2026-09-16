@@ -10,6 +10,8 @@ defmodule Fluffy.Locator.Playwright do
     |> Selector.build()
   end
 
+  defp apply_operation(:enter_frame, selector), do: Selector.concat(selector, "internal:control=enter-frame")
+
   defp apply_operation({:css, css}, selector) do
     Selector.concat(selector, Selector.css(css))
   end

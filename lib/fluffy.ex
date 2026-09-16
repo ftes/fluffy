@@ -396,8 +396,11 @@ defmodule Fluffy do
   defp validate_event!(%Event{}), do: :ok
 
   defp dispatch_driver(%Session{} = session, operation, arguments) do
+    driver = DriverRegistry.module(Session.current_driver(session))
+    driver.validate_operation!(session, operation, arguments)
+
     result =
-      apply(DriverRegistry.module(Session.current_driver(session)), operation, [
+      apply(driver, operation, [
         session | arguments
       ])
 
@@ -405,6 +408,7 @@ defmodule Fluffy do
   rescue
     error ->
       stacktrace = __STACKTRACE__
+      error = Fluffy.Internal.OperationFailure.normalize(session, operation, arguments, error)
 
       Backend.capture_failure(session, operation, error, stacktrace)
 

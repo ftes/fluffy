@@ -25,6 +25,10 @@ defmodule Fluffy.Driver.Live do
   @retry_interval 10
 
   @impl true
+  def validate_operation!(session, operation, arguments),
+    do: Fluffy.Driver.PhoenixValidation.validate_operation!(session, operation, arguments)
+
+  @impl true
   def expect(%Session{} = session, %Expect{} = expectation) do
     options = Keyword.validate!(expectation.options, [:timeout])
 
@@ -446,13 +450,6 @@ defmodule Fluffy.Driver.Live do
   defp evaluate_expectation(%Session{} = session, %Expect{target: {:locator, locator}, kind: :focused}) do
     actual = session |> client_dom() |> ClientDOM.focused?(locator)
     {:ok, actual, actual}
-  end
-
-  defp evaluate_expectation(%Session{}, %Expect{target: {:locator, _locator}, kind: :checked, expected: :indeterminate}) do
-    raise Fluffy.CapabilityError,
-      capability: :indeterminate_checked_state,
-      driver: :live,
-      detail: "indeterminate is a browser-owned DOM property"
   end
 
   defp evaluate_expectation(%Session{} = session, %Expect{target: {:locator, locator}, kind: :checked, expected: expected}) do

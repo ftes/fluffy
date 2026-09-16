@@ -45,7 +45,7 @@ defmodule Fluffy.Conformance.LiveRetryTest do
     session = :phoenix |> live_session() |> visit("/live/fluffy")
     started_at = System.monotonic_time(:millisecond)
 
-    assert_raise Fluffy.StrictnessError, fn ->
+    assert_raise Fluffy.OperationError, fn ->
       click(
         session,
         by_role(:button, name: "Rouse guardian head", exact: true),

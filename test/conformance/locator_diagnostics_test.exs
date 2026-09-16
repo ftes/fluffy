@@ -9,7 +9,7 @@ defmodule Fluffy.Conformance.LocatorDiagnosticsTest do
 
   for driver <- [:static, :playwright] do
     @tag driver: driver
-    test "count failures describe the public locator and candidates with #{driver}" do
+    test "count failures describe the public locator with backend-native diagnostics with #{driver}" do
       session =
         session_for_html(
           unquote(driver),
@@ -19,13 +19,19 @@ defmodule Fluffy.Conformance.LocatorDiagnosticsTest do
 
       error =
         assert_raise ExUnit.AssertionError, fn ->
-          expect(session, :button |> by_role(name: "Save") |> to_have_count(1), timeout: 0)
+          expect(session, :button |> by_role(name: "Save") |> to_have_count(1), timeout: 1_000)
         end
 
       assert error.message =~ "by_role(:button, name: \"Save\")"
-      assert error.message =~ "it matched 2"
-      assert error.message =~ "<button>Save</button>"
-      assert error.message =~ "<button>Save draft</button>"
+
+      if unquote(driver) == :playwright do
+        assert error.message =~ "value: 2"
+        assert error.message =~ "Call log:"
+      else
+        assert error.message =~ "it matched 2"
+        assert error.message =~ "<button>Save</button>"
+        assert error.message =~ "<button>Save draft</button>"
+      end
     end
 
     @tag driver: driver
@@ -62,13 +68,13 @@ defmodule Fluffy.Conformance.LocatorDiagnosticsTest do
   end
 
   @tag driver: :playwright
-  test "Playwright actions translate ambiguity to the canonical strictness error" do
+  test "Playwright actions retain native ambiguity diagnostics" do
     session =
       session_for_html(:playwright, "<button>Save</button><button>Save draft</button>",
         base_url: Fluffy.TestServer.base_url()
       )
 
-    assert_raise Fluffy.StrictnessError, ~r/it matched 2/, fn ->
+    assert_raise Fluffy.OperationError, ~r/strict mode violation/, fn ->
       click(session, by_role(:button, name: "Save"))
     end
   end

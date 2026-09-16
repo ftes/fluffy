@@ -1,6 +1,7 @@
 defmodule Fluffy.StrictnessError do
   @moduledoc """
-  Raised when a single-target operation resolves to zero or multiple elements.
+  Raised internally when a single-target query resolves to zero or multiple elements.
+  Public Phoenix actions preserve this exception in `Fluffy.OperationError.cause`.
   """
 
   defexception [:locator, :candidates, :message]

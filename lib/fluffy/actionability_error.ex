@@ -1,6 +1,7 @@
 defmodule Fluffy.ActionabilityError do
   @moduledoc """
-  Raised when an element exists but cannot receive the requested action.
+  Raised internally when an element cannot receive an action.
+  Public Phoenix actions preserve this exception in `Fluffy.OperationError.cause`.
   """
 
   defexception [:action, :reason, :locator, :target, :message]

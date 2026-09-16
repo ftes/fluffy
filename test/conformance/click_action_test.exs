@@ -35,9 +35,9 @@ defmodule Fluffy.Conformance.ClickActionTest do
     @tag driver: driver
     test "click requires exactly one target with #{driver}" do
       with_html(unquote(driver), "<button>Save</button><button>Save draft</button>", fn session ->
-        assert_raise Fluffy.StrictnessError, ~r/it matched 2/, fn ->
+        assert_action_error(session, Fluffy.StrictnessError, ~r/it matched 2/, fn ->
           click(session, by_role(:button, name: "Save"), timeout: 5)
-        end
+        end)
       end)
     end
 
@@ -45,21 +45,21 @@ defmodule Fluffy.Conformance.ClickActionTest do
     test "click rejects a disabled button with #{driver}" do
       with_html(unquote(driver), "<button disabled>Save</button>", fn session ->
         error =
-          assert_raise Fluffy.ActionabilityError, ~r/disabled/, fn ->
+          assert_action_error(session, Fluffy.ActionabilityError, ~r/disabled/, fn ->
             click(session, by_role(:button, name: "Save"), timeout: 5)
-          end
+          end)
 
-        assert error.action == :click
-        assert error.reason == :disabled
+        assert error.operation == :click
+        if Fluffy.Session.current_driver(session) != :playwright, do: assert(error.cause.reason == :disabled)
       end)
     end
 
     @tag driver: driver
     test "click rejects a structurally hidden target with #{driver}" do
       with_html(unquote(driver), "<button hidden>Save</button>", fn session ->
-        assert_raise Fluffy.ActionabilityError, ~r/hidden/, fn ->
+        assert_action_error(session, Fluffy.ActionabilityError, ~r/hidden/, fn ->
           click(session, by_css("button"), timeout: 5)
-        end
+        end)
       end)
     end
   end

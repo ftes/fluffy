@@ -94,9 +94,9 @@ defmodule Fluffy.Conformance.CheckActionTest do
       html = ~s(<label><input type="radio" name="contact" checked>Email</label>)
 
       with_html(unquote(driver), html, fn session ->
-        assert_raise Fluffy.ActionabilityError, ~r/cannot uncheck a selected radio/, fn ->
+        assert_action_error(session, Fluffy.ActionabilityError, ~r/cannot uncheck a selected radio/, fn ->
           uncheck(session, by_role(:radio, name: "Email"), timeout: 5)
-        end
+        end)
       end)
     end
 
@@ -105,9 +105,9 @@ defmodule Fluffy.Conformance.CheckActionTest do
       html = ~s(<label><input type="checkbox" disabled>Updates</label>)
 
       with_html(unquote(driver), html, fn session ->
-        assert_raise Fluffy.ActionabilityError, ~r/disabled/, fn ->
+        assert_action_error(session, Fluffy.ActionabilityError, ~r/disabled/, fn ->
           check(session, by_role(:checkbox, name: "Updates"), timeout: 5)
-        end
+        end)
       end)
     end
   end

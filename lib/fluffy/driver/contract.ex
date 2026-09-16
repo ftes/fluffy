@@ -11,6 +11,8 @@ defmodule Fluffy.Driver.Contract do
           | {:navigate, Session.t(), Navigation.t()}
           | {:navigate, Session.t(), Navigation.t(), {:retry, non_neg_integer()}}
 
+  @callback validate_operation!(Session.t(), atom(), list()) :: :ok
+
   @callback set_html(Session.t(), String.t()) :: result()
   @callback expect(Session.t(), Expect.t()) :: result()
   @callback click(Session.t(), Locator.t(), keyword()) :: result()
