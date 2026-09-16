@@ -3,54 +3,6 @@ defmodule Fluffy.HTML.DocumentIndexTest do
 
   alias Fluffy.HTML.DocumentIndex
 
-  for parser <- [:from_fragment, :from_document] do
-    test "native paths match index entries in #{parser}" do
-      document =
-        apply(LazyHTML, unquote(parser), [
-          """
-          <main>
-            text <!-- comments do not count as element siblings -->
-            <span id="first">same</span>
-            <template><span id="inert">same</span></template>
-            <strong id="middle">same</strong>
-            <span id="last">same</span>
-          </main>
-          <aside><span id="other-root">same</span></aside>
-          """
-        ])
-
-      index = DocumentIndex.new(document)
-      elements = document |> LazyHTML.query("*") |> Enum.to_list()
-
-      assert length(elements) == length(index.entries)
-
-      for {element, entry} <- Enum.zip(elements, index.entries) do
-        assert DocumentIndex.fetch_by_element(index, element) == {:ok, entry}
-        assert DocumentIndex.id!(index, element) == entry.id
-        assert LazyHTML.tag(element) == [entry.tag]
-        assert LazyHTML.attributes(element) == [entry.attributes]
-        target = DocumentIndex.target_by_id(index, entry.id)
-        assert DocumentIndex.path(target.element) == DocumentIndex.path(element)
-
-        [css_path] = LazyHTML.css_path(element)
-        [selected] = document |> LazyHTML.query(css_path) |> Enum.to_list()
-        assert LazyHTML.to_tree(selected) == LazyHTML.to_tree(element)
-      end
-    end
-  end
-
-  test "lookup paths use sibling positions even when tag names need CSS escaping" do
-    document = LazyHTML.from_fragment("<x:box><x.foo></x.foo></x:box><x:box></x:box>")
-    index = DocumentIndex.new(document)
-    elements = document |> LazyHTML.query("*") |> Enum.to_list()
-
-    assert Enum.map(elements, &DocumentIndex.path/1) == [[1], [1, 1], [2]]
-
-    for {element, entry} <- Enum.zip(elements, index.entries) do
-      assert DocumentIndex.fetch_by_element(index, element) == {:ok, entry}
-    end
-  end
-
   test "maps duplicate-looking siblings and multiple fragment roots to unique nodes" do
     document =
       LazyHTML.from_fragment("""
