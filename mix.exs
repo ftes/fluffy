@@ -61,7 +61,7 @@ defmodule Fluffy.MixProject do
   defp deps do
     [
       {:nimble_options, "~> 1.1"},
-      {:lazy_html, "~> 0.1"},
+      {:lazy_html, github: "dashbitco/lazy_html", branch: "main", override: true},
       {:phoenix, "~> 1.7"},
       {:phoenix_live_view, "~> 1.0"},
       {:playwright_ex, "~> 0.11"},
