@@ -71,6 +71,14 @@ not the surrounding dead layout. Use `Phoenix.ConnTest` for initial
 outer-layout HTML assertions or Playwright for full-document interactions.
 LiveView `unwrap/2` receives only the View.
 
+### Tabs, windows, and iframes
+
+The Playwright backend supports named pages for browser tabs and popup windows.
+Fluffy currently has no dedicated iframe locator or frame-switching API;
+page switching does not select an iframe. See
+[Browser terminology](advanced-events.md#browser-terminology-tabs-windows-pages-and-frames)
+for how pages, browser contexts, and frames relate.
+
 ### Browser baseline
 
 Fluffy verifies compatibility against pinned Chromium. Firefox and WebKit are

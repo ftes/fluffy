@@ -21,6 +21,27 @@ action. The capture timeout starts when arming; events arriving after it
 expires are ignored. Return the updated session from the callback. Captured
 results can be read repeatedly through their keys.
 
+## Browser terminology: tabs, windows, pages, and frames
+
+Playwright uses these terms for browser UI elements:
+
+- **Page**: a browser tab or popup window. Fluffy gives captured pages names
+  within a session; `switch_page/2` selects the page for subsequent actions and
+  assertions.
+- **Popup**: a new page opened by another page. This includes ordinary new tabs,
+  not just separate popup windows.
+- **Browser context**: an isolated browser session. A Fluffy Playwright session
+  owns one context, and its pages share cookies and storage.
+- **Frame**: a document within a page. Each page has a main frame; an HTML
+  `<iframe>` embeds an additional frame, not another tab or window.
+
+Fluffy supports switching between named pages, but currently has no dedicated
+iframe locator or frame-switching API. `switch_page/2` does not select an iframe,
+and ordinary Fluffy locators do not enter iframe documents.
+
+See Playwright's [pages](https://playwright.dev/docs/pages) and
+[frames](https://playwright.dev/docs/frames) guides for the underlying concepts.
+
 ## Downloads
 
 ```elixir
