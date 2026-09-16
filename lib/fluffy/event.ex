@@ -50,7 +50,7 @@ defmodule Fluffy.Event do
     new(:download, key, Options.validate_event_constructor!(:download, options))
   end
 
-  @doc "Captures the browser file chooser opened by the action. Requires Playwright."
+  @doc "Captures the browser file chooser opened by the action."
   @doc playwright_only: true
   @spec file_chooser(term(), [timeout_option()]) :: t()
   def file_chooser(key, options \\ []) do
@@ -58,7 +58,7 @@ defmodule Fluffy.Event do
   end
 
   @doc """
-  Captures the first new tab or window anywhere in the session. Requires Playwright.
+  Captures the first new tab or window anywhere in the session.
 
   Equivalent to Playwright's `context.waitForEvent('page')`. Use `popup/2`
   to capture only pages opened by the current page.
@@ -72,7 +72,7 @@ defmodule Fluffy.Event do
   end
 
   @doc """
-  Captures the first new tab or window opened by the current page. Requires Playwright.
+  Captures the first new tab or window opened by the current page.
 
   Equivalent to Playwright's `page.waitForEvent('popup')`; includes tabs opened
   by `target="_blank"` links. The opener is fixed when the wait starts, even if
@@ -92,7 +92,7 @@ defmodule Fluffy.Event do
     new(:navigation, key, Options.validate_event_constructor!(:navigation, options))
   end
 
-  @doc "Captures and handles the browser dialog opened by the action. Requires Playwright."
+  @doc "Captures and handles the browser dialog opened by the action."
   @doc playwright_only: true
   @spec dialog(term(), [dialog_option()]) :: t()
   def dialog(key, options \\ []) do
@@ -101,7 +101,7 @@ defmodule Fluffy.Event do
     new(:dialog, key, Keyword.put(options, :decision, decision))
   end
 
-  @doc "Captures the first browser request matching the supplied matcher. Requires Playwright."
+  @doc "Captures the first browser request matching the supplied matcher."
   @doc playwright_only: true
   @spec request(term(), String.t() | Regex.t() | (term() -> boolean()), [timeout_option()]) :: t()
   def request(key, matcher, options \\ []) do
@@ -109,7 +109,7 @@ defmodule Fluffy.Event do
     new(:request, key, Keyword.put(options, :matcher, matcher))
   end
 
-  @doc "Captures the first browser response matching the supplied matcher. Requires Playwright."
+  @doc "Captures the first browser response matching the supplied matcher."
   @doc playwright_only: true
   @spec response(term(), String.t() | Regex.t() | (term() -> boolean()), [timeout_option()]) :: t()
   def response(key, matcher, options \\ []) do
