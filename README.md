@@ -158,8 +158,8 @@ backend supports.
   diagnostics
 - [Assertion styles](docs/assertion-styles.md) — imported `assert`/`refute` and
   `expect` vocabularies compared
-- [Advanced events and pages](docs/advanced-events.md) — downloads, tabs,
-  navigation, dialogs, and network events
+- [Advanced events and pages](docs/advanced-events.md) — tabs, windows, iframe
+  limitations, downloads, navigation, dialogs, and network events
 - [Migrating from PhoenixTest](docs/migration-from-phoenix-test.md) — an alternate
   starting point for existing PhoenixTest suites
 - [Capability matrix](docs/capabilities.md) — backend differences and limitations
