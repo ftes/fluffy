@@ -71,6 +71,27 @@ sessions do not.
 `Page.name/1`, `Page.url/1`, `Page.status/1`, `Page.opener/1`, and
 `Page.revision/1` to inspect its metadata without switching.
 
+### Closing pages
+
+`close_page(session)` closes the active page; `close_page(session, :name)` closes
+the named page. When closing the active page, the returned session targets its
+opener if that page is still open. Otherwise, it targets another remaining
+page, with no guaranteed selection order. Fluffy does not track page switching
+history. Closing an inactive page leaves the active page unchanged.
+
+Closing an opener leaves the pages it opened alive. Closing the last page in a
+session raises `ArgumentError`.
+
+In the example above, closing `:secret_chamber` returns to its opener, `:main`.
+When a particular target matters after closing, select it explicitly with
+`switch_page/2`:
+
+```elixir
+session
+|> close_page(:secret_chamber)
+|> switch_page(:main)
+```
+
 ## Navigation
 
 Captures the first document navigation or URL change on both backends. Later
