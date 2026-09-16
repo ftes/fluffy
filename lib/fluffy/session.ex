@@ -135,7 +135,7 @@ defmodule Fluffy.Session do
   @doc false
   def put_result(%__MODULE__{pending_event: %{token: token}} = session, token, value) do
     key = session.pending_event.key
-    type = session.pending_event.type
+    type = if session.pending_event.type == :popup, do: :page, else: session.pending_event.type
 
     %{
       session

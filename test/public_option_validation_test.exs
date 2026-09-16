@@ -73,7 +73,8 @@ defmodule Fluffy.PublicOptionValidationTest do
     refute function_exported?(Expect, :url, 3)
     refute function_exported?(Expect, :status, 1)
     refute function_exported?(Expect, :page_opener, 2)
-    refute function_exported?(Event, :page, 1)
+    assert %Event{type: :page} = Event.page(:child)
+    assert %Event{type: :popup} = Event.popup(:child)
 
     assert %Expect{target: :page, kind: :url} = Expect.page_to_have_url("/accounts")
     assert %Expect{target: :page, kind: :status} = Expect.page_to_have_status(200)

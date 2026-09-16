@@ -369,7 +369,8 @@ defmodule Fluffy.Options do
   def validate_event_constructor!(:dialog, options), do: NimbleOptions.validate!(options, @dialog_event_schema)
   def validate_event_constructor!(:download, options), do: NimbleOptions.validate!(options, @download_event_schema)
 
-  def validate_event_constructor!(type, options) when type in [:file_chooser, :navigation, :page, :request, :response] do
+  def validate_event_constructor!(type, options)
+      when type in [:file_chooser, :navigation, :page, :popup, :request, :response] do
     NimbleOptions.validate!(options, @action_schema)
   end
 
@@ -377,7 +378,7 @@ defmodule Fluffy.Options do
   def validate_event!(:dialog, options), do: NimbleOptions.validate!(options, @normalized_dialog_event_schema)
   def validate_event!(:download, options), do: NimbleOptions.validate!(options, @download_event_schema)
 
-  def validate_event!(type, options) when type in [:file_chooser, :navigation, :page] do
+  def validate_event!(type, options) when type in [:file_chooser, :navigation, :page, :popup] do
     NimbleOptions.validate!(options, @action_schema)
   end
 

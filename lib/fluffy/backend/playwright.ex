@@ -252,15 +252,23 @@ defmodule Fluffy.Backend.Playwright do
     arm_waiter(session, :navigation, state.frame_id, :navigated, options, predicate: predicate, transform: transform)
   end
 
-  def arm_event(%Session{} = session, :page, options) do
+  def arm_event(%Session{} = session, type, options) when type in [:page, :popup] do
     %{key: name} = Session.pending_event(session)
 
     if Map.has_key?(session.pages, name) do
       raise ArgumentError, "page name #{inspect(name)} is already in use"
     end
 
+    opener_id = Session.page_state(session).page_id
+
+    predicate = fn %{params: %{page: %{guid: page_id}}} ->
+      type == :page or
+        Connection.initializer!(session.context.connection, page_id)[:opener] == %{guid: opener_id}
+    end
+
     {:ok, waiter} =
       EventWaiter.arm(session.context.context_id, :page,
+        predicate: predicate,
         connection: session.context.connection,
         timeout: Keyword.fetch!(options, :timeout)
       )
@@ -270,7 +278,6 @@ defmodule Fluffy.Backend.Playwright do
        type: :page,
        waiter: waiter,
        name: name,
-       opener: session.active_page,
        options: options
      }}
   end
@@ -351,7 +358,7 @@ defmodule Fluffy.Backend.Playwright do
           id: resource.name,
           driver: :playwright,
           state: state,
-          opener: resource.opener
+          opener: page_name(session, initializer[:opener])
         }
 
         page = Page.commit(page, :playwright, state, url, status: response_status(response))

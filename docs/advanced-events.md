@@ -57,12 +57,21 @@ end)
 |> assert(visible(by_text("Creature index")))
 ```
 
-Captured popups get the session timeout to load and connect before they become
+`Event.popup/2` captures the first new page opened by the page active when the
+wait is armed, including new tabs. `Event.page/2` captures the first new page
+anywhere in the session's browser context, including pages created directly
+through the native browser context. Use `page` when the opener is unknown or
+irrelevant. Both waits are armed before the callback runs.
+
+Captured pages record their actual opener's session-local name, or `nil` when
+there is no opener or the opener is not registered in the session.
+
+Captured pages get the session timeout to load and connect before they become
 available.
 
 Multiple pages and tabs require Playwright. Phoenix follows links and submits
 forms in its current page, ignoring `target` and `formtarget`, including
-`_blank`. Popup capture, page switching, and closing pages raise a capability
+`_blank`. Page and popup capture, page switching, and closing pages raise a capability
 error in Phoenix. Multiple isolated sessions remain supported by both backends.
 All pages inside one Playwright session share cookies and storage; independent
 sessions do not.

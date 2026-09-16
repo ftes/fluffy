@@ -411,7 +411,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
       session = playwright_html("<p>Main page</p>")
 
       session =
-        wait_for(session, Event.popup(:native_child), fn session ->
+        wait_for(session, Event.page(:native_child), fn session ->
           unwrap(session, fn handle ->
             {:ok, page} =
               BrowserContext.new_page(handle.context_id,
@@ -432,7 +432,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
       session
       |> switch_page(:native_child)
       |> expect(Fluffy.Expect.page_to_have_url(Fluffy.TestServer.base_url() <> "/chamber"))
-      |> expect(Fluffy.Expect.page_to_have_opener(:main))
+      |> expect(Fluffy.Expect.page_to_have_opener(nil))
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
     end
 
@@ -441,7 +441,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
       session = playwright_html("<p>Main page</p>")
 
       session =
-        wait_for(session, Event.popup(:blank_child), fn session ->
+        wait_for(session, Event.page(:blank_child), fn session ->
           unwrap(session, fn handle ->
             assert {:ok, _page} =
                      BrowserContext.new_page(handle.context_id,

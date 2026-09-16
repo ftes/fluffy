@@ -52,7 +52,7 @@ defmodule Fluffy.Page do
   def status(%__MODULE__{status: status}), do: status
 
   @doc group: "Metadata"
-  @doc "Returns the session-local name of the page that opened this page."
+  @doc "Returns the opener's session-local name, or `nil` if absent or unregistered."
   @spec opener(t()) :: term() | nil
   def opener(%__MODULE__{opener: opener}), do: opener
 
