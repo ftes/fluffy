@@ -23,7 +23,7 @@ defmodule Fluffy.HTML.DocumentIndex do
     :disabled_ids
   ]
 
-  @type path :: [pos_integer()]
+  @type path :: String.t()
   @type selector_path :: [{String.t(), pos_integer()}]
 
   @type entry :: %{
@@ -51,7 +51,7 @@ defmodule Fluffy.HTML.DocumentIndex do
 
   @spec new(LazyHTML.t()) :: t()
   def new(%LazyHTML{} = document) do
-    {all_entries, _next_id} = document |> LazyHTML.to_tree() |> index_nodes(nil, nil, false, [], [], 0)
+    {all_entries, _next_id} = document |> LazyHTML.to_tree() |> index_nodes(nil, nil, false, "", [], 0)
     all_entries = Enum.reverse(all_entries)
     entries = Enum.reject(all_entries, & &1.inert?)
     nodes_by_id = Map.new(all_entries, &{&1.id, &1})
@@ -73,10 +73,7 @@ defmodule Fluffy.HTML.DocumentIndex do
   def path(%LazyHTML{} = element) do
     [path] = LazyHTML.css_path(element)
 
-    # Sibling positions uniquely identify a node without decoding escaped tag names.
-    ~r/:nth-child\((\d+)\)/
-    |> Regex.scan(path, capture: :all_but_first)
-    |> Enum.map(fn [position] -> String.to_integer(position) end)
+    path
   end
 
   @spec fetch_by_element(t(), LazyHTML.t()) :: {:ok, entry()} | :error
@@ -176,7 +173,8 @@ defmodule Fluffy.HTML.DocumentIndex do
         when is_binary(tag) ->
           tag_position = Map.get(tag_counts, tag, 0) + 1
           element_position = element_position + 1
-          path = parent_path ++ [element_position]
+          segment = "#{escape_tag(tag)}:nth-child(#{element_position})"
+          path = if parent_path == "", do: segment, else: parent_path <> " > " <> segment
           selector_path = parent_selector_path ++ [{tag, tag_position}]
 
           entry = %{
@@ -223,6 +221,41 @@ defmodule Fluffy.HTML.DocumentIndex do
   defp selector(path) do
     Enum.map_join(path, " > ", fn {tag, position} -> "#{tag}:nth-of-type(#{position})" end)
   end
+
+  # Match LazyHTML's css_path/1 encoding, including its Lexbor-specific escaping
+  # of all non-ASCII code points. Equivalent CSS spellings are not equal map keys.
+  defp escape_tag(tag) do
+    if simple_tag?(tag, true) do
+      tag
+    else
+      tag
+      |> String.to_charlist()
+      |> Enum.with_index()
+      |> Enum.map_join(fn {char, index} ->
+        cond do
+          char <= 0x1F or char >= 0x7F or
+              (char in ?0..?9 and (index == 0 or (index == 1 and String.starts_with?(tag, "-")))) ->
+            "\\" <> String.downcase(Integer.to_string(char, 16)) <> " "
+
+          tag == "-" ->
+            "\\-"
+
+          char in ?a..?z or char in ?A..?Z or char in ?0..?9 or char in [?-, ?_] ->
+            <<char>>
+
+          true ->
+            "\\" <> <<char>>
+        end
+      end)
+    end
+  end
+
+  defp simple_tag?(<<char, rest::binary>>, first?)
+       when char in ?a..?z or char in ?A..?Z or char == ?_ or (not first? and (char in ?0..?9 or char == ?-)),
+       do: simple_tag?(rest, false)
+
+  defp simple_tag?("", false), do: true
+  defp simple_tag?(_tag, _first?), do: false
 
   defp target_from_entry(index, entry, element) do
     %Target{
@@ -318,7 +351,7 @@ defmodule Fluffy.HTML.DocumentIndex do
   end
 
   defp descendant?(path, ancestor_path) do
-    path != ancestor_path and Enum.take(path, length(ancestor_path)) == ancestor_path
+    String.starts_with?(path, ancestor_path <> " > ")
   end
 
   defp within?(path, ancestor_path), do: path == ancestor_path or descendant?(path, ancestor_path)

@@ -39,12 +39,41 @@ defmodule Fluffy.HTML.DocumentIndexTest do
     end
   end
 
-  test "lookup paths use sibling positions even when tag names need CSS escaping" do
+  test "tree-walk paths match native CSS paths for escaped tag names" do
     document = LazyHTML.from_fragment("<x:box><x.foo></x.foo></x:box><x:box></x:box>")
     index = DocumentIndex.new(document)
     elements = document |> LazyHTML.query("*") |> Enum.to_list()
 
-    assert Enum.map(elements, &DocumentIndex.path/1) == [[1], [1, 1], [2]]
+    assert Enum.map(index.entries, & &1.path) == LazyHTML.css_path(LazyHTML.query(document, "*"))
+
+    for {element, entry} <- Enum.zip(elements, index.entries) do
+      assert DocumentIndex.fetch_by_element(index, element) == {:ok, entry}
+    end
+  end
+
+  test "tree-walk paths match native CSS identifier edge cases" do
+    tags = [
+      "1st-item",
+      "-1st-item",
+      "-",
+      "--item",
+      "item\u001F",
+      "item\u007F",
+      "éclair",
+      "item😀",
+      "item\\name",
+      "item name",
+      "item\u{10FFFF}",
+      "_item-12",
+      "x:nth-child(2)",
+      "x>y"
+    ]
+
+    document = LazyHTML.from_tree(Enum.map(tags, &{&1, [], [{"span", [], []}]}))
+    index = DocumentIndex.new(document)
+    elements = LazyHTML.query(document, "*")
+
+    assert Enum.map(index.entries, & &1.path) == LazyHTML.css_path(elements)
 
     for {element, entry} <- Enum.zip(elements, index.entries) do
       assert DocumentIndex.fetch_by_element(index, element) == {:ok, entry}
