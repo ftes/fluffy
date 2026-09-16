@@ -23,7 +23,8 @@ defmodule Fluffy.HTML.DocumentIndex do
     :disabled_ids
   ]
 
-  @type path :: [{String.t(), pos_integer()}]
+  @type path :: [pos_integer()]
+  @type selector_path :: [{String.t(), pos_integer()}]
 
   @type entry :: %{
           attributes: [{String.t(), String.t()}],
@@ -34,7 +35,7 @@ defmodule Fluffy.HTML.DocumentIndex do
           inert?: boolean(),
           parent_id: non_neg_integer() | nil,
           path: path(),
-          selector_path: path(),
+          selector_path: selector_path(),
           tag: String.t()
         }
 
@@ -69,7 +70,14 @@ defmodule Fluffy.HTML.DocumentIndex do
   end
 
   @spec path(LazyHTML.t()) :: path()
-  def path(%LazyHTML{} = element), do: path(element, [])
+  def path(%LazyHTML{} = element) do
+    [path] = LazyHTML.css_path(element)
+
+    # Sibling positions uniquely identify a node without decoding escaped tag names.
+    ~r/:nth-child\((\d+)\)/
+    |> Regex.scan(path, capture: :all_but_first)
+    |> Enum.map(fn [position] -> String.to_integer(position) end)
+  end
 
   @spec fetch_by_element(t(), LazyHTML.t()) :: {:ok, entry()} | :error
   def fetch_by_element(%__MODULE__{} = index, %LazyHTML{} = element) do
@@ -161,18 +169,6 @@ defmodule Fluffy.HTML.DocumentIndex do
     target_from_entry(index, entry, element)
   end
 
-  defp path(element, path) do
-    [tag] = LazyHTML.tag(element)
-    [position] = LazyHTML.nth_child(element)
-    parent = LazyHTML.parent_node(element)
-    path = [{tag, position} | path]
-
-    case LazyHTML.tag(parent) do
-      [] -> path
-      [_parent_tag] -> path(parent, path)
-    end
-  end
-
   defp index_nodes(nodes, parent_id, implicit_form_id, inert?, parent_path, parent_selector_path, next_id) do
     {entries, next_id, _tag_counts, _element_position} =
       Enum.reduce(nodes, {[], next_id, %{}, 0}, fn
@@ -180,7 +176,7 @@ defmodule Fluffy.HTML.DocumentIndex do
         when is_binary(tag) ->
           tag_position = Map.get(tag_counts, tag, 0) + 1
           element_position = element_position + 1
-          path = parent_path ++ [{tag, element_position}]
+          path = parent_path ++ [element_position]
           selector_path = parent_selector_path ++ [{tag, tag_position}]
 
           entry = %{
