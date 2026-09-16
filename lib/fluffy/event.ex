@@ -2,6 +2,11 @@ defmodule Fluffy.Event do
   @moduledoc """
   Typed event-wait values and event capture orchestration.
 
+  Events annotated "Playwright only" require the Playwright backend when passed
+  to `Fluffy.wait_for/4`. With the Phoenix backend, capture raises
+  `Fluffy.CapabilityError` before the action runs. Constructing an event value
+  does not require a session.
+
   Download events accept:
 
   #{NimbleOptions.docs(Fluffy.Options.download_event_schema())}
@@ -45,7 +50,8 @@ defmodule Fluffy.Event do
     new(:download, key, Options.validate_event_constructor!(:download, options))
   end
 
-  @doc "Captures the browser file chooser opened by the action."
+  @doc "Captures the browser file chooser opened by the action. Requires Playwright."
+  @doc playwright_only: true
   @spec file_chooser(term(), [timeout_option()]) :: t()
   def file_chooser(key, options \\ []) do
     new(:file_chooser, key, Options.validate_event_constructor!(:file_chooser, options))
@@ -59,6 +65,7 @@ defmodule Fluffy.Event do
 
   The session timeout applies separately to initializing the captured page.
   """
+  @doc playwright_only: true
   @spec page(term(), [timeout_option()]) :: t()
   def page(key, options \\ []) do
     new(:page, key, Options.validate_event_constructor!(:page, options))
@@ -73,6 +80,7 @@ defmodule Fluffy.Event do
 
   The session timeout applies separately to initializing the captured page.
   """
+  @doc playwright_only: true
   @spec popup(term(), [timeout_option()]) :: t()
   def popup(key, options \\ []) do
     new(:popup, key, Options.validate_event_constructor!(:popup, options))
@@ -84,6 +92,8 @@ defmodule Fluffy.Event do
     new(:navigation, key, Options.validate_event_constructor!(:navigation, options))
   end
 
+  @doc "Captures and handles the browser dialog opened by the action. Requires Playwright."
+  @doc playwright_only: true
   @spec dialog(term(), [dialog_option()]) :: t()
   def dialog(key, options \\ []) do
     options = Options.validate_event_constructor!(:dialog, options)
@@ -91,12 +101,16 @@ defmodule Fluffy.Event do
     new(:dialog, key, Keyword.put(options, :decision, decision))
   end
 
+  @doc "Captures the first browser request matching the supplied matcher. Requires Playwright."
+  @doc playwright_only: true
   @spec request(term(), String.t() | Regex.t() | (term() -> boolean()), [timeout_option()]) :: t()
   def request(key, matcher, options \\ []) do
     options = Options.validate_event_constructor!(:request, options)
     new(:request, key, Keyword.put(options, :matcher, matcher))
   end
 
+  @doc "Captures the first browser response matching the supplied matcher. Requires Playwright."
+  @doc playwright_only: true
   @spec response(term(), String.t() | Regex.t() | (term() -> boolean()), [timeout_option()]) :: t()
   def response(key, matcher, options \\ []) do
     options = Options.validate_event_constructor!(:response, options)

@@ -331,6 +331,8 @@ defmodule Fluffy.Expect do
   @doc group: "Assertions"
   @doc """
   Expects the captured dialog's type to equal the supplied value.
+
+  Requires a result captured with the Playwright backend.
   """
   @spec dialog_to_have_type(term(), term(), [Expect.option()]) :: Expect.t()
   def dialog_to_have_type(key, expected, options \\ []) do
@@ -340,6 +342,8 @@ defmodule Fluffy.Expect do
   @doc group: "Assertions"
   @doc """
   Expects the captured dialog's message to equal the supplied value.
+
+  Requires a result captured with the Playwright backend.
   """
   @spec dialog_to_have_message(term(), String.t(), [Expect.option()]) :: Expect.t()
   def dialog_to_have_message(key, expected, options \\ []) when is_binary(expected) do
@@ -349,6 +353,8 @@ defmodule Fluffy.Expect do
   @doc group: "Assertions"
   @doc """
   Expects the captured dialog's default value to equal the supplied value.
+
+  Requires a result captured with the Playwright backend.
   """
   @spec dialog_to_have_default_value(term(), String.t(), [Expect.option()]) :: Expect.t()
   def dialog_to_have_default_value(key, expected, options \\ []) when is_binary(expected) do
@@ -358,6 +364,8 @@ defmodule Fluffy.Expect do
   @doc group: "Assertions"
   @doc """
   Expects the captured dialog's action to equal the supplied value.
+
+  Requires a result captured with the Playwright backend.
   """
   @spec dialog_to_have_action(term(), term(), [Expect.option()]) :: Expect.t()
   def dialog_to_have_action(key, expected, options \\ []) do
@@ -367,6 +375,8 @@ defmodule Fluffy.Expect do
   @doc group: "Assertions"
   @doc """
   Expects the captured dialog's prompt text to equal the supplied value.
+
+  Requires a result captured with the Playwright backend.
   """
   @spec dialog_to_have_prompt_text(term(), term(), [Expect.option()]) :: Expect.t()
   def dialog_to_have_prompt_text(key, expected, options \\ []) do
@@ -427,6 +437,8 @@ defmodule Fluffy.Expect do
   @doc group: "Assertions"
   @doc """
   Expects the captured request's method to equal the supplied value.
+
+  Requires a result captured with the Playwright backend.
   """
   @spec request_to_have_method(term(), String.t(), [Expect.option()]) :: Expect.t()
   def request_to_have_method(key, expected, options \\ []) when is_binary(expected) do
@@ -441,6 +453,8 @@ defmodule Fluffy.Expect do
   Relative strings are not resolved. Structured keywords use the same path,
   query, and fragment rules as `Fluffy.Expect.page_to_have_url/2`.
   Function predicates receive a `%URI{}`.
+
+  Requires a result captured with the Playwright backend.
   """
   @spec request_to_have_url(term(), Fluffy.Page.url_expectation(), [Expect.option()]) :: Expect.t()
   def request_to_have_url(key, expected, options \\ [])
@@ -458,6 +472,8 @@ defmodule Fluffy.Expect do
   @doc """
   Expects the captured request headers to include every supplied key/value pair. Additional
   headers are allowed.
+
+  Requires a result captured with the Playwright backend.
   """
   @spec request_to_have_headers(term(), map(), [Expect.option()]) :: Expect.t()
   def request_to_have_headers(key, expected, options \\ []) when is_map(expected) do
@@ -467,6 +483,8 @@ defmodule Fluffy.Expect do
   @doc group: "Assertions"
   @doc """
   Expects the captured request's resource type to equal the supplied value.
+
+  Requires a result captured with the Playwright backend.
   """
   @spec request_to_have_resource_type(term(), String.t(), [Expect.option()]) :: Expect.t()
   def request_to_have_resource_type(key, expected, options \\ []) when is_binary(expected) do
@@ -476,6 +494,8 @@ defmodule Fluffy.Expect do
   @doc group: "Assertions"
   @doc """
   Expects the captured request's post data to equal the supplied value.
+
+  Requires a result captured with the Playwright backend.
   """
   @spec request_to_have_post_data(term(), String.t(), [Expect.option()]) :: Expect.t()
   def request_to_have_post_data(key, expected, options \\ []) when is_binary(expected) do
@@ -485,6 +505,8 @@ defmodule Fluffy.Expect do
   @doc group: "Assertions"
   @doc """
   Expects the captured request's page to equal the supplied value.
+
+  Requires a result captured with the Playwright backend.
   """
   @spec request_to_have_page(term(), term(), [Expect.option()]) :: Expect.t()
   def request_to_have_page(key, expected, options \\ []) do
@@ -494,6 +516,8 @@ defmodule Fluffy.Expect do
   @doc group: "Assertions"
   @doc """
   Expects the HTTP method of the request that produced this response.
+
+  Requires a result captured with the Playwright backend.
   """
   @spec response_to_have_request_method(term(), String.t(), [Expect.option()]) :: Expect.t()
   def response_to_have_request_method(key, expected, options \\ []) when is_binary(expected) do
@@ -508,6 +532,8 @@ defmodule Fluffy.Expect do
   Relative strings are not resolved. Structured keywords use the same path,
   query, and fragment rules as `Fluffy.Expect.page_to_have_url/2`.
   Function predicates receive a `%URI{}`.
+
+  Requires a result captured with the Playwright backend.
   """
   @spec response_to_have_url(term(), Fluffy.Page.url_expectation(), [Expect.option()]) :: Expect.t()
   def response_to_have_url(key, expected, options \\ [])
@@ -525,6 +551,8 @@ defmodule Fluffy.Expect do
   @doc """
   Expects the captured response headers to include every supplied key/value pair. Additional
   headers are allowed.
+
+  Requires a result captured with the Playwright backend.
   """
   @spec response_to_have_headers(term(), map(), [Expect.option()]) :: Expect.t()
   def response_to_have_headers(key, expected, options \\ []) when is_map(expected) do
@@ -534,6 +562,8 @@ defmodule Fluffy.Expect do
   @doc group: "Assertions"
   @doc """
   Expects the captured response's resource type to equal the supplied value.
+
+  Requires a result captured with the Playwright backend.
   """
   @spec response_to_have_resource_type(term(), String.t(), [Expect.option()]) :: Expect.t()
   def response_to_have_resource_type(key, expected, options \\ []) when is_binary(expected) do
@@ -544,6 +574,8 @@ defmodule Fluffy.Expect do
   @doc """
   Expects the associated request payload to equal the supplied string. This does not inspect the
   response body.
+
+  Requires a result captured with the Playwright backend.
   """
   @spec response_to_have_request_post_data(term(), String.t(), [Expect.option()]) :: Expect.t()
   def response_to_have_request_post_data(key, expected, options \\ []) when is_binary(expected) do
@@ -553,6 +585,8 @@ defmodule Fluffy.Expect do
   @doc group: "Assertions"
   @doc """
   Expects the captured response's status to equal the supplied value.
+
+  Requires a result captured with the Playwright backend.
   """
   @spec response_to_have_status(term(), integer(), [Expect.option()]) :: Expect.t()
   def response_to_have_status(key, expected, options \\ []) when is_integer(expected) do
@@ -562,6 +596,8 @@ defmodule Fluffy.Expect do
   @doc group: "Assertions"
   @doc """
   Expects the captured response's status text to equal the supplied value.
+
+  Requires a result captured with the Playwright backend.
   """
   @spec response_to_have_status_text(term(), String.t(), [Expect.option()]) :: Expect.t()
   def response_to_have_status_text(key, expected, options \\ []) when is_binary(expected) do
@@ -571,6 +607,8 @@ defmodule Fluffy.Expect do
   @doc group: "Assertions"
   @doc """
   Expects the captured response's page to equal the supplied value.
+
+  Requires a result captured with the Playwright backend.
   """
   @spec response_to_have_page(term(), term(), [Expect.option()]) :: Expect.t()
   def response_to_have_page(key, expected, options \\ []) do
