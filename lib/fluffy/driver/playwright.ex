@@ -323,6 +323,7 @@ defmodule Fluffy.Driver.Playwright do
            Frame.press(state.frame_id,
              selector: PlaywrightLocator.selector(locator),
              key: key,
+             strict: true,
              delay: options[:delay],
              timeout: remaining
            )
@@ -559,7 +560,7 @@ defmodule Fluffy.Driver.Playwright do
       navigation_aware_action(session, action_timeout, fn remaining ->
         apply(Frame, action, [
           state.frame_id,
-          [selector: PlaywrightLocator.selector(locator), timeout: remaining]
+          [selector: PlaywrightLocator.selector(locator), strict: true, timeout: remaining]
         ])
       end)
 

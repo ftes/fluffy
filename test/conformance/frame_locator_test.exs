@@ -232,6 +232,32 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
     |> expect(to_be_visible(by_role(frame_locator("#second"), :button, name: "Other")))
   end
 
+  for action <- [:focus, :blur, :press] do
+    @tag driver: :playwright
+    test "#{action} rejects ambiguous frame owners and ambiguous elements" do
+      body = "<input aria-label='Email'><input aria-label='Email'>"
+      session = browser_html(iframe("first", body) <> iframe("second", body))
+
+      for locator <- [
+            "iframe" |> frame_locator() |> by_role(:textbox) |> first(),
+            "#first" |> frame_locator() |> by_role(:textbox)
+          ] do
+        error =
+          assert_raise Fluffy.OperationError, fn ->
+            case unquote(action) do
+              :press -> press(session, locator, "Tab", timeout: 200)
+              action -> apply(Fluffy, action, [session, locator, [timeout: 200]])
+            end
+          end
+
+        assert error.operation == unquote(action)
+        assert error.locator == locator
+        assert %{error: %{name: "Error", message: message}} = error.cause
+        assert message =~ "strict mode violation"
+      end
+    end
+  end
+
   for driver <- [:static, :live] do
     @tag driver: driver
     test "#{driver} rejects traversal, including negated assertions and filter operands" do
