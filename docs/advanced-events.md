@@ -35,9 +35,11 @@ Playwright uses these terms for browser UI elements:
 - **Frame**: a document within a page. Each page has a main frame; an HTML
   `<iframe>` embeds an additional frame, not another tab or window.
 
-Fluffy supports switching between named pages, but currently has no dedicated
-iframe locator or frame-switching API. `switch_page/2` does not select an iframe,
-and ordinary Fluffy locators do not enter iframe documents.
+Fluffy supports switching between named pages and querying iframe contents with
+[frame locators](usage.md#frames-playwright) on the Playwright backend.
+`switch_page/2` does not select an iframe, and ordinary Fluffy locators do not
+enter iframe documents. Frame locators scope element queries without changing
+the active page. Frame traversal is not supported by the Phoenix backend.
 
 See Playwright's [pages](https://playwright.dev/docs/pages) and
 [frames](https://playwright.dev/docs/frames) guides for the underlying concepts.

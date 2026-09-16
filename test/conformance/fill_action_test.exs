@@ -59,27 +59,27 @@ defmodule Fluffy.Conformance.FillActionTest do
     @tag driver: driver
     test "fill requires exactly one target with #{driver}" do
       with_html(unquote(driver), ~s(<input title="Name"><input title="Name">), fn session ->
-        assert_raise Fluffy.StrictnessError, ~r/it matched 2/, fn ->
+        assert_action_error(session, Fluffy.StrictnessError, ~r/it matched 2/, fn ->
           fill(session, by_title("Name"), "Ada", timeout: 5)
-        end
+        end)
       end)
     end
 
     @tag driver: driver
     test "fill rejects a disabled field with #{driver}" do
       with_html(unquote(driver), ~s(<input aria-label="Name" disabled>), fn session ->
-        assert_raise Fluffy.ActionabilityError, ~r/disabled/, fn ->
+        assert_action_error(session, Fluffy.ActionabilityError, ~r/disabled/, fn ->
           fill(session, by_label("Name"), "Ada", timeout: 5)
-        end
+        end)
       end)
     end
 
     @tag driver: driver
     test "fill rejects a readonly field with #{driver}" do
       with_html(unquote(driver), ~s(<input aria-label="Name" readonly>), fn session ->
-        assert_raise Fluffy.ActionabilityError, ~r/readonly/, fn ->
+        assert_action_error(session, Fluffy.ActionabilityError, ~r/readonly/, fn ->
           fill(session, by_label("Name"), "Ada", timeout: 5)
-        end
+        end)
       end)
     end
 
@@ -87,11 +87,11 @@ defmodule Fluffy.Conformance.FillActionTest do
     test "readonly does not hide a non-fillable target error with #{driver}" do
       with_html(unquote(driver), ~s(<button readonly>Save</button>), fn session ->
         error =
-          assert_raise Fluffy.ActionabilityError, ~r/not editable/, fn ->
+          assert_action_error(session, Fluffy.ActionabilityError, ~r/not editable/, fn ->
             fill(session, by_role(:button, name: "Save"), "Ada", timeout: 5)
-          end
+          end)
 
-        assert error.reason == :not_editable
+        if Fluffy.Session.current_driver(session) != :playwright, do: assert(error.cause.reason == :not_editable)
       end)
     end
 
@@ -177,9 +177,9 @@ defmodule Fluffy.Conformance.FillActionTest do
         |> fill(by_label("Allowed"), "new")
         |> expect("Allowed" |> by_label() |> to_have_value("new"))
 
-        assert_raise Fluffy.ActionabilityError, ~r/disabled/, fn ->
+        assert_action_error(session, Fluffy.ActionabilityError, ~r/disabled/, fn ->
           fill(session, by_label("Blocked"), "new", timeout: 5)
-        end
+        end)
       end)
     end
 

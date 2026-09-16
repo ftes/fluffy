@@ -40,7 +40,7 @@ defmodule Fluffy.Conformance.FileChooserEventTest do
   end
 
   @tag driver: :playwright
-  test "normalizes multiple-file rejection without mutating a single-file chooser" do
+  test "preserves native multiple-file rejection without mutating a single-file chooser" do
     session =
       wait_for(
         playwright_session(),
@@ -49,15 +49,16 @@ defmodule Fluffy.Conformance.FileChooserEventTest do
       )
 
     error =
-      assert_raise Fluffy.ActionabilityError, fn ->
+      assert_raise Fluffy.OperationError, fn ->
         set_input_files(session, :attachment, [
           %FilePayload{name: "first.txt", bytes: "first"},
           %FilePayload{name: "second.txt", bytes: "second"}
         ])
       end
 
-    assert error.action == :set_input_files
-    assert error.reason == :multiple_files_not_allowed
+    assert error.operation == :set_input_files
+    assert error.locator == :attachment
+    assert error.cause
 
     assert Playwright.evaluate(
              session,

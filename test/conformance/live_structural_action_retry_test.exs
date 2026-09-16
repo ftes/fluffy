@@ -91,44 +91,48 @@ defmodule Fluffy.Conformance.LiveStructuralActionRetryTest do
     missing = by_css("#never-appears")
 
     error =
-      assert_raise Fluffy.StrictnessError, fn ->
+      assert_raise Fluffy.OperationError, fn ->
         click(session, missing, timeout: 20)
       end
 
+    assert error.backend == :phoenix
+    assert error.driver == :live
+    assert error.operation == :click
+    assert %Fluffy.StrictnessError{} = error.cause
     assert error.locator == missing
-    assert error.candidates == []
+    assert error.cause.candidates == []
 
     disabled = by_css("#permanently-disabled")
 
     error =
-      assert_raise Fluffy.ActionabilityError, fn ->
+      assert_raise Fluffy.OperationError, fn ->
         click(session, disabled, timeout: 20)
       end
 
-    assert error.action == :click
-    assert error.reason == :disabled
+    assert error.operation == :click
+    assert error.cause.reason == :disabled
     assert error.locator == disabled
 
     readonly = by_css("#permanently-readonly")
 
     error =
-      assert_raise Fluffy.ActionabilityError, fn ->
+      assert_raise Fluffy.OperationError, fn ->
         fill(session, readonly, "Ada", timeout: 20)
       end
 
-    assert error.action == :fill
-    assert error.reason == :readonly
+    assert error.operation == :fill
+    assert error.cause.reason == :readonly
     assert error.locator == readonly
 
     select = by_css("#permanent-plan")
 
     error =
-      assert_raise Fluffy.ActionabilityError, fn ->
+      assert_raise Fluffy.OperationError, fn ->
         select_option(session, select, "pro", timeout: 20)
       end
 
-    assert error.action == :select_option
-    assert error.reason == :option_not_found
+    assert error.operation == :select_option
+    assert error.cause.reason == :option_not_found
     assert error.locator == select
   end
 
@@ -158,7 +162,7 @@ defmodule Fluffy.Conformance.LiveStructuralActionRetryTest do
 
     started_at = System.monotonic_time(:millisecond)
 
-    assert_raise Fluffy.StrictnessError, Enum.at(failures, 0)
+    assert_raise Fluffy.OperationError, Enum.at(failures, 0)
 
     assert_actionability_error(:not_editable, Enum.at(failures, 1))
     assert_actionability_error(:not_editable, Enum.at(failures, 2))
@@ -179,7 +183,7 @@ defmodule Fluffy.Conformance.LiveStructuralActionRetryTest do
   end
 
   defp assert_actionability_error(reason, fun) do
-    error = assert_raise Fluffy.ActionabilityError, fun
-    assert error.reason == reason
+    error = assert_raise Fluffy.OperationError, fun
+    assert error.cause.reason == reason
   end
 end

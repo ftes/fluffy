@@ -177,6 +177,57 @@ Fluffy reports the ambiguity instead of choosing for you. Narrow the
 locator, or use `assert(count(locator, n))` when multiple matches are
 the intended assertion.
 
+## Frames (Playwright)
+
+Use a frame locator to query elements inside an iframe. Frame locators are lazy;
+Playwright resolves the frame and target when an action or assertion runs.
+
+```elixir
+checkout = frame_locator("#checkout")
+email = by_label(checkout, "Email")
+
+session
+|> fill(email, "buyer@example.com")
+|> assert(value(email, "buyer@example.com"))
+|> click(by_role(checkout, :button, name: "Pay"))
+```
+
+Each frame boundary is strict: if multiple iframes match, an action or assertion
+inside that frame fails with a strictness error. Narrow the iframe locator, or
+select a particular match with `first/1` or `nth/2` before converting it with
+`content_frame/1`:
+
+```elixir
+checkout = by_title("Checkout") |> first() |> content_frame()
+payment = frame_locator(checkout, "#payment")
+pay_button = by_role(payment, :button, name: "Pay")
+iframe_element = Fluffy.FrameLocator.owner(checkout)
+```
+
+The `by_*` builders return ordinary element locators that support existing actions,
+filters, and assertions. `owner/1` returns the iframe element in its containing
+document. As in Playwright JS, `has` and `has_not` filter operands must remain in
+the same frame and cannot themselves traverse frames.
+
+A frame locator never changes the active page. Page URL/title assertions and
+navigation helpers continue to target the page's main frame. Child navigation
+leaves that page state unchanged; navigation targeting `_top` updates it normally.
+
+The Phoenix backend does not flatten frames into one document. Static operates
+on the response HTML; LiveView operates on the current rendered LiveView. An
+`<iframe>` in that markup is an element whose attributes can be queried, but
+neither driver loads its `src` nor turns its `srcdoc` into a child document.
+Ordinary locators therefore cannot find elements inside it. Frame traversal is
+not supported by Static and LiveView and raises `Fluffy.CapabilityError` when
+an action or assertion executes the query; frame boundaries are never silently
+ignored.
+
+To test the embedded route on its own with Phoenix, visit it directly. Use
+Playwright to test it as an embedded document, including interactions between
+the parent page and iframe. See
+[Playwright's FrameLocator API](https://playwright.dev/docs/api/class-framelocator)
+for the underlying browser behavior.
+
 ## Actions and expectations
 
 Actions and expectations use the same API on both backends:
@@ -414,7 +465,25 @@ Playwright can also capture a script-opened chooser before the triggering
 click. Pass its result key to `set_input_files/3`; see
 [Advanced events and pages](advanced-events.md#file-choosers).
 
-## Browser diagnostics
+## Operation failures and browser diagnostics
+
+Element-action failures raise `Fluffy.OperationError` across drivers. Rescue it
+uniformly and inspect `backend`, `driver`, `operation`, `locator` (or captured
+file-chooser key), and `cause` for details. This includes `submit` and file selection.
+
+For Playwright, `cause` preserves the original adapter error, including native
+error names and call logs. For Phoenix, it retains `Fluffy.StrictnessError` or
+`Fluffy.ActionabilityError`, including structural reasons and candidates. LiveView
+finishes its action retries before wrapping the final failure. Browser failures
+are not classified by parsing messages or inspecting a later DOM snapshot.
+
+Existing code rescuing structural errors from public actions should rescue
+`Fluffy.OperationError` and inspect its cause instead. Invalid arguments,
+unsupported capabilities, and unexpected programming errors remain distinct.
+
+Failed assertions remain `ExUnit.AssertionError`. Browser assertion messages
+include the expected condition and Playwright's received values, timeout details,
+and call log. No candidate markup is reconstructed after browser failure.
 
 Start a context-wide trace explicitly when debugging a Playwright scenario:
 

@@ -13,6 +13,10 @@ defmodule Fluffy.Driver.Static do
   alias Fluffy.URLMatcher
 
   @impl true
+  def validate_operation!(session, operation, arguments),
+    do: Fluffy.Driver.PhoenixValidation.validate_operation!(session, operation, arguments)
+
+  @impl true
   def set_html(%Session{} = session, html) when is_binary(html) do
     state = Map.put(Session.page_state(session), :client_dom, ClientDOM.from_fragment(html))
     Session.put_page_state(session, state)
@@ -51,12 +55,6 @@ defmodule Fluffy.Driver.Static do
       %Expect{target: {:locator, locator}, kind: :focused} ->
         actual = session |> client_dom() |> ClientDOM.focused?(locator)
         assert_truth!(expectation, actual, actual)
-
-      %Expect{target: {:locator, _locator}, kind: :checked, expected: :indeterminate} ->
-        raise Fluffy.CapabilityError,
-          capability: :indeterminate_checked_state,
-          driver: :static,
-          detail: "indeterminate is a browser-owned DOM property"
 
       %Expect{target: {:locator, locator}, kind: :checked, expected: expected} ->
         actual = session |> client_dom() |> ClientDOM.checked?(locator)

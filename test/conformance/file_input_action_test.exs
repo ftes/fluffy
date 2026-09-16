@@ -266,12 +266,14 @@ defmodule Fluffy.Conformance.FileInputActionTest do
         |> set_input_files(by_label("Attachment"), file)
 
       error =
-        assert_raise Fluffy.ActionabilityError, fn ->
+        assert_action_error(session, Fluffy.ActionabilityError, ~r/./, fn ->
           set_input_files(session, by_label("Attachment"), [file, invalid_fixture_path()])
-        end
+        end)
 
-      assert error.action == :set_input_files
-      assert error.reason == :multiple_files_not_allowed
+      assert error.operation == :set_input_files
+
+      if Fluffy.Session.current_driver(session) != :playwright,
+        do: assert(error.cause.reason == :multiple_files_not_allowed)
 
       session
       |> click(by_role(:button, name: "Save"))
@@ -502,12 +504,12 @@ defmodule Fluffy.Conformance.FileInputActionTest do
         )
 
       error =
-        assert_raise Fluffy.ActionabilityError, fn ->
+        assert_action_error(session, Fluffy.ActionabilityError, ~r/./, fn ->
           set_input_files(session, by_label("Attachment"), fixture_path())
-        end
+        end)
 
-      assert error.action == :set_input_files
-      assert error.reason == :not_file_input
+      assert error.operation == :set_input_files
+      if Fluffy.Session.current_driver(session) != :playwright, do: assert(error.cause.reason == :not_file_input)
     end
   end
 

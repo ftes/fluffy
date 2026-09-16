@@ -16,6 +16,13 @@ defmodule Fluffy.Capability do
 
   @matrix [
     %{
+      id: :frames,
+      feature: "Frame locators and traversal",
+      drivers: %{static: :browser_only, live: :browser_only, playwright: :equivalent},
+      detail:
+        "Frame traversal follows Playwright and is not supported by Static and LiveView. Querying the iframe element itself remains ordinary DOM behavior."
+    },
+    %{
       id: :css_locators,
       feature: "Documented CSS locator subset",
       drivers: %{static: :equivalent, live: :equivalent, playwright: :equivalent},
@@ -43,7 +50,8 @@ defmodule Fluffy.Capability do
       id: :dom_assertions,
       feature: "DOM assertions and strictness",
       drivers: %{static: :equivalent, live: :equivalent, playwright: :equivalent},
-      detail: "Counts, text, attributes, values, checked state, focus, and canonical failure classes are paired."
+      detail:
+        "Counts, text, attributes, values, checked state, and focus are paired. Assertions raise ExUnit.AssertionError with Phoenix structural diagnostics or native Playwright details."
     },
     %{
       id: :page_title_assertions,

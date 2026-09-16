@@ -3,18 +3,14 @@ defmodule Fluffy.Driver.Playwright do
 
   @behaviour Fluffy.Driver.Contract
 
-  import ExUnit.Assertions
-
-  alias Fluffy.Actionability
-  alias Fluffy.ClientDOM
   alias Fluffy.Deadline
   alias Fluffy.Expect
-  alias Fluffy.Expectation
   alias Fluffy.FileChooser
   alias Fluffy.Internal.Navigation
+  alias Fluffy.Internal.OperationFailure
   alias Fluffy.Locator
   alias Fluffy.Locator.Playwright, as: PlaywrightLocator
-  alias Fluffy.Locator.Static, as: StaticLocator
+  alias Fluffy.Playwright.Diagnostics
   alias Fluffy.Playwright.Handle
   alias Fluffy.Playwright.Response
   alias Fluffy.Session
@@ -23,8 +19,12 @@ defmodule Fluffy.Driver.Playwright do
   alias PlaywrightEx.ElementHandle
   alias PlaywrightEx.FilePayload, as: BrowserFilePayload
   alias PlaywrightEx.Frame
+  alias PlaywrightEx.Locator, as: BrowserLocator
   alias PlaywrightEx.Page, as: BrowserPage
   alias PlaywrightEx.Serialization
+
+  @impl true
+  def validate_operation!(_session, _operation, _arguments), do: :ok
 
   @impl true
   def expect(%Session{} = session, %Expect{} = expectation) do
@@ -43,21 +43,11 @@ defmodule Fluffy.Driver.Playwright do
   defp execute_expectation(session, expectation) do
     case expectation do
       %Expect{target: {:locator, locator}, kind: :count, expected: expected} ->
-        result =
-          frame_expect(session, expectation,
-            expression: "to.have.count",
-            expected_number: expected,
-            selector: PlaywrightLocator.selector(locator)
-          )
-
-        if result != {:ok, not expectation.negated?} do
-          if expectation.negated? do
-            raise ExUnit.AssertionError,
-              message: "Expected #{Expect.describe(expectation)}, got #{inspect(result)}"
-          else
-            Expectation.raise_count!(locator, expected, snapshot_candidates(session, locator))
-          end
-        end
+        frame_expect!(session, expectation,
+          expression: "to.have.count",
+          expected_number: expected,
+          selector: PlaywrightLocator.selector(locator)
+        )
 
       %Expect{target: {:locator, locator}, kind: :visible} ->
         frame_expect!(session, expectation,
@@ -155,36 +145,28 @@ defmodule Fluffy.Driver.Playwright do
         outcome
 
       {:error, error} ->
-        case snapshot_candidates(session, locator) do
-          [element] ->
-            ensure_snapshot_enabled!(session, locator, :click)
-            Actionability.ensure_clickable!(element, :click, locator)
-            raise "Playwright click failed: #{inspect(error)}"
-
-          candidates ->
-            raise Fluffy.StrictnessError, locator: locator, candidates: candidates
-        end
+        OperationFailure.raise_playwright!(:click, locator, error)
     end
   end
 
   @impl true
   def submit(%Session{} = session, %Locator{} = locator, options \\ []) do
     options = Keyword.validate!(options, [:timeout])
-    state = Session.page_state(session)
     action_timeout = options |> Keyword.get(:timeout, timeout()) |> max(1)
-    target = form_target!(session, locator, action_timeout)
 
     case navigation_aware_action(session, action_timeout, fn remaining ->
-           Frame.evaluate(state.frame_id,
+           BrowserLocator.evaluate(
+             Session.page_state(session).frame_id,
+             connection: session.context.connection,
+             selector: PlaywrightLocator.selector(locator),
              expression: """
-             selector => {
-               const form = document.querySelector(selector)
-               if (!form) throw new Error(`Fluffy form target disappeared: ${selector}`)
+             form => {
+               if (form.localName !== 'form')
+                 throw new Error(`submit/2 requires a form locator, got ${form.localName}`)
                form.requestSubmit()
              }
              """,
              is_function: true,
-             arg: target.selector,
              timeout: remaining
            )
          end) do
@@ -192,7 +174,7 @@ defmodule Fluffy.Driver.Playwright do
         outcome
 
       {:error, error} ->
-        raise "Playwright submit failed: #{inspect(error)}"
+        OperationFailure.raise_playwright!(:submit, locator, error)
     end
   end
 
@@ -214,36 +196,15 @@ defmodule Fluffy.Driver.Playwright do
         outcome
 
       {:error, error} ->
-        case snapshot_candidates(session, locator) do
-          [element] ->
-            ensure_snapshot_enabled!(session, locator, :fill)
-            Actionability.ensure_editable!(element, :fill, locator)
-            raise "Playwright fill failed: #{inspect(error)}"
-
-          candidates ->
-            raise Fluffy.StrictnessError, locator: locator, candidates: candidates
-        end
+        OperationFailure.raise_playwright!(:fill, locator, error)
     end
   end
 
   @impl true
-  def set_input_files(%Session{} = session, %Locator{} = locator, source, selected_files, options) do
+  def set_input_files(%Session{} = session, %Locator{} = locator, source, _selected_files, options) do
     options = Keyword.validate!(options, [:timeout])
     state = Session.page_state(session)
     action_timeout = options |> Keyword.get(:timeout, timeout()) |> max(1)
-
-    case snapshot_candidates(session, locator) do
-      [element] ->
-        Actionability.ensure_file_input_files!(
-          element,
-          selected_files,
-          :set_input_files,
-          locator
-        )
-
-      _not_one_target ->
-        :ok
-    end
 
     selector = PlaywrightLocator.selector(locator)
 
@@ -260,18 +221,14 @@ defmodule Fluffy.Driver.Playwright do
         outcome
 
       {:error, error} ->
-        case snapshot_candidates(session, locator) do
-          [_element] -> raise "Playwright set_input_files failed: #{inspect(error)}"
-          candidates -> raise Fluffy.StrictnessError, locator: locator, candidates: candidates
-        end
+        OperationFailure.raise_playwright!(:set_input_files, locator, error)
     end
   end
 
-  def set_input_files(%Session{} = session, key, source, selected_files, options) when is_atom(key) do
+  def set_input_files(%Session{} = session, key, source, _selected_files, options) when is_atom(key) do
     options = Keyword.validate!(options, [:timeout])
     chooser = Session.fetch_result!(session, key, :file_chooser)
     ensure_chooser_page!(session, chooser, key)
-    ensure_chooser_accepts_files!(chooser, selected_files, key)
     action_timeout = options |> Keyword.get(:timeout, timeout()) |> max(1)
 
     result =
@@ -284,8 +241,11 @@ defmodule Fluffy.Driver.Playwright do
       end)
 
     case result do
-      {:ok, _result, outcome} -> outcome
-      {:error, error} -> raise "Playwright file chooser set_input_files failed: #{inspect(error)}"
+      {:ok, _result, outcome} ->
+        outcome
+
+      {:error, error} ->
+        OperationFailure.raise_playwright!(:set_input_files, key, error)
     end
   end
 
@@ -313,15 +273,7 @@ defmodule Fluffy.Driver.Playwright do
         outcome
 
       {:error, error} ->
-        case snapshot_candidates(session, locator) do
-          [element] ->
-            ensure_snapshot_enabled!(session, locator, action)
-            classify_checked_failure!(element, action, locator)
-            raise "Playwright #{action} failed: #{inspect(error)}"
-
-          candidates ->
-            raise Fluffy.StrictnessError, locator: locator, candidates: candidates
-        end
+        OperationFailure.raise_playwright!(action, locator, error)
     end
   end
 
@@ -346,15 +298,7 @@ defmodule Fluffy.Driver.Playwright do
         outcome
 
       {:error, error} ->
-        case snapshot_candidates(session, locator) do
-          [element] ->
-            ensure_snapshot_enabled!(session, locator, :select_option)
-            classify_select_failure!(element, requested, locator)
-            raise "Playwright select_option failed: #{inspect(error)}"
-
-          candidates ->
-            raise Fluffy.StrictnessError, locator: locator, candidates: candidates
-        end
+        OperationFailure.raise_playwright!(:select_option, locator, error)
     end
   end
 
@@ -387,10 +331,7 @@ defmodule Fluffy.Driver.Playwright do
         outcome
 
       {:error, error} ->
-        case snapshot_candidates(session, locator) do
-          [_element] -> raise "Playwright press failed: #{inspect(error)}"
-          candidates -> raise Fluffy.StrictnessError, locator: locator, candidates: candidates
-        end
+        OperationFailure.raise_playwright!(:press, locator, error)
     end
   end
 
@@ -416,66 +357,21 @@ defmodule Fluffy.Driver.Playwright do
     outcome
   end
 
-  defp snapshot_candidates(session, locator) do
-    state = Session.page_state(session)
-
-    case Frame.content(state.frame_id, timeout: timeout()) do
-      {:ok, html} ->
-        html
-        |> LazyHTML.from_document()
-        |> StaticLocator.resolve(locator)
-
-      {:error, _error} ->
-        []
-    end
-  end
-
-  defp form_target!(session, locator, action_timeout) do
-    state = Session.page_state(session)
-
-    case Frame.content(state.frame_id, timeout: action_timeout) do
-      {:ok, html} ->
-        target = html |> ClientDOM.from_document() |> ClientDOM.target!(locator)
-
-        if target.tag == "form" do
-          target
-        else
-          raise ArgumentError, "submit/2 requires a form locator, got #{inspect(target.tag)}"
-        end
-
-      {:error, error} ->
-        raise "Could not resolve Playwright form target: #{inspect(error)}"
-    end
-  end
-
-  defp ensure_snapshot_enabled!(session, locator, action) do
-    state = Session.page_state(session)
-
-    with {:ok, html} <- Frame.content(state.frame_id, timeout: timeout()),
-         %{disabled?: true} <- html |> ClientDOM.from_document() |> ClientDOM.target!(locator) do
-      raise Fluffy.ActionabilityError,
-        action: action,
-        reason: :disabled,
-        locator: locator
-    else
-      _enabled_or_unavailable -> :ok
-    end
-  end
-
   defp frame_expect!(%Session{} = session, %Expect{} = expectation, options) do
-    result = frame_expect(session, expectation, options)
-    expected_result = {:ok, not expectation.negated?}
-
-    assert result == expected_result,
-           "Expected #{Expect.describe(expectation)}, got #{inspect(result)}"
-  end
-
-  defp frame_expect(%Session{} = session, %Expect{} = expectation, options) do
     state = Session.page_state(session)
     timeout = expectation.options |> Keyword.get(:timeout, timeout()) |> max(1)
-    options = Keyword.merge([is_not: expectation.negated?, timeout: timeout], options)
 
-    Frame.expect(state.frame_id, options)
+    options =
+      Keyword.merge([connection: session.context.connection, is_not: expectation.negated?, timeout: timeout], options)
+
+    case Frame.expect_result(state.frame_id, options) do
+      {:ok, _result} ->
+        :ok
+
+      {:error, error} ->
+        raise ExUnit.AssertionError,
+          message: "Expected #{Expect.describe(expectation)}\n" <> Diagnostics.format(error)
+    end
   end
 
   defp page_url_expect!(%Session{} = session, %Expect{} = expectation, expected) do
@@ -492,11 +388,11 @@ defmodule Fluffy.Driver.Playwright do
       {:ok, _result} ->
         :ok
 
-      {:error, _error} ->
+      {:error, error} ->
         {:ok, %{url: actual}} = Frame.snapshot(state.frame_id, connection: session.context.connection)
 
         raise ExUnit.AssertionError,
-          message: "Expected #{Expect.describe(expectation)}, got #{inspect(actual)}"
+          message: "Expected #{Expect.describe(expectation)}, got #{inspect(actual)}\n" <> Diagnostics.format(error)
     end
   end
 
@@ -612,7 +508,7 @@ defmodule Fluffy.Driver.Playwright do
 
   defp invalidated_handle!(kind, error) do
     raise ArgumentError,
-          "Playwright unwrap invalidated the tracked #{kind}; use Fluffy page and session lifecycle APIs: #{inspect(error)}"
+          "Playwright unwrap invalidated the tracked #{kind}; use Fluffy page and session lifecycle APIs: #{inspect(error, limit: :infinity)}"
   end
 
   defp expected_text(value) do
@@ -641,30 +537,6 @@ defmodule Fluffy.Driver.Playwright do
       match_substring: false,
       normalize_white_space: true
     }
-  end
-
-  defp classify_checked_failure!(element, action, locator) do
-    Actionability.ensure_checkable!(element, action, locator)
-
-    if action == :uncheck and LazyHTML.tag(element) == ["input"] and
-         LazyHTML.attribute(element, "type") == ["radio"] and
-         LazyHTML.attribute(element, "checked") != [] do
-      raise Fluffy.ActionabilityError,
-        action: action,
-        reason: :cannot_uncheck_radio,
-        locator: locator
-    end
-
-    Actionability.ensure_enabled!(element, action, locator)
-  end
-
-  defp classify_select_failure!(element, requested, locator) do
-    Actionability.ensure_selectable!(element, :select_option, locator)
-
-    html = LazyHTML.to_html(element)
-    client_dom = ClientDOM.from_fragment(html)
-    select = Locator.new({:css, "select"})
-    ClientDOM.select_option(client_dom, select, requested)
   end
 
   defp protocol_options(requested) do
@@ -696,10 +568,7 @@ defmodule Fluffy.Driver.Playwright do
         outcome
 
       {:error, error} ->
-        case snapshot_candidates(session, locator) do
-          [_element] -> raise "Playwright #{action} failed: #{inspect(error)}"
-          candidates -> raise Fluffy.StrictnessError, locator: locator, candidates: candidates
-        end
+        OperationFailure.raise_playwright!(action, locator, error)
     end
   end
 
@@ -724,15 +593,6 @@ defmodule Fluffy.Driver.Playwright do
             "captured file chooser #{inspect(key)} belongs to a page other than the active page"
     end
   end
-
-  defp ensure_chooser_accepts_files!(%FileChooser{multiple?: false}, [_, _ | _], key) do
-    raise Fluffy.ActionabilityError,
-      action: :set_input_files,
-      reason: :multiple_files_not_allowed,
-      target: "captured file chooser #{inspect(key)}"
-  end
-
-  defp ensure_chooser_accepts_files!(%FileChooser{}, _selected_files, _key), do: :ok
 
   defp timeout do
     :fluffy

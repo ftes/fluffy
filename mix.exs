@@ -64,7 +64,7 @@ defmodule Fluffy.MixProject do
       {:lazy_html, "~> 0.1"},
       {:phoenix, "~> 1.7"},
       {:phoenix_live_view, "~> 1.0"},
-      {:playwright_ex, "~> 0.11"},
+      {:playwright_ex, "~> 0.12.0"},
       {:phoenix_ecto, "~> 4.7", optional: true},
       {:ecto_sql, "~> 3.10", optional: true},
       {:ex_doc, "~> 0.40.3", only: :dev, runtime: false},
@@ -95,6 +95,7 @@ defmodule Fluffy.MixProject do
           Fluffy,
           Fluffy.Test,
           Fluffy.Locator,
+          Fluffy.FrameLocator,
           Fluffy.Expect,
           Fluffy.Assert,
           Fluffy.Page,
@@ -117,6 +118,7 @@ defmodule Fluffy.MixProject do
           Fluffy.CapabilityError,
           Fluffy.ActionabilityError,
           Fluffy.StrictnessError,
+          Fluffy.OperationError,
           Fluffy.LiveViewError
         ]
       ]

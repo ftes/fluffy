@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Added
+
+- Lazy Playwright frame locators, nested frame scopes, `content_frame/1`, and `Fluffy.FrameLocator.owner/1`.
+- `Fluffy.OperationError` for element-action failures across drivers, carrying backend, driver, operation, locator or file-chooser key, and the original cause.
+
+### Changed
+
+- Browser action failures, including `submit` and file selection, now preserve native Playwright errors and call logs instead of inferring `Fluffy.StrictnessError` or `Fluffy.ActionabilityError` from a later DOM snapshot. Callers rescuing structural errors from public actions should rescue `Fluffy.OperationError` instead. Static and LiveView preserve structural errors in `cause`, wrapping only after action retries finish. Assertions remain `ExUnit.AssertionError`; invalid arguments and unsupported capabilities stay distinct.
+- Browser assertions continue to raise `ExUnit.AssertionError`, retaining Playwright's received values, timeout details, and call logs. Candidate markup is no longer reconstructed.
+- Require `playwright_ex ~> 0.12.0` for locator evaluation and native assertion diagnostics.
+
 ## 0.4.0 — 2026-09-15
 
 ### Added

@@ -88,9 +88,9 @@ defmodule Fluffy.Conformance.SelectOptionActionTest do
       html = ~s(<select aria-label="Plan"><option disabled>Unavailable</option></select>)
 
       with_html(unquote(driver), html, fn session ->
-        assert_raise Fluffy.ActionabilityError, ~r/disabled option/, fn ->
+        assert_action_error(session, Fluffy.ActionabilityError, ~r/disabled option/, fn ->
           select_option(session, by_label("Plan"), "Unavailable", timeout: 5)
-        end
+        end)
       end)
     end
 
@@ -122,9 +122,9 @@ defmodule Fluffy.Conformance.SelectOptionActionTest do
         ~s(<select aria-label="Plan"><optgroup disabled><option>Legacy</option></optgroup></select>)
 
       with_html(unquote(driver), html, fn session ->
-        assert_raise Fluffy.ActionabilityError, ~r/disabled option/, fn ->
+        assert_action_error(session, Fluffy.ActionabilityError, ~r/disabled option/, fn ->
           select_option(session, by_label("Plan"), "Legacy", timeout: 5)
-        end
+        end)
       end)
     end
   end
