@@ -10,7 +10,7 @@ defmodule Fluffy.Event do
 
   #{NimbleOptions.docs(Fluffy.Options.dialog_event_schema())}
 
-  File-chooser, popup, navigation, request, and response events accept
+  File-chooser, page, popup, navigation, request, and response events accept
   the shared timeout option:
 
   #{NimbleOptions.docs(Fluffy.Options.action_schema())}
@@ -27,7 +27,7 @@ defmodule Fluffy.Event do
   defstruct [:type, :key, options: []]
 
   @type type ::
-          :dialog | :download | :file_chooser | :navigation | :page | :request | :response
+          :dialog | :download | :file_chooser | :navigation | :page | :popup | :request | :response
   @type t :: %__MODULE__{type: type(), key: term(), options: keyword()}
   @type timeout_option :: unquote(NimbleOptions.option_typespec(Options.action_schema()))
   @type download_option :: unquote(NimbleOptions.option_typespec(Options.download_event_schema()))
@@ -52,13 +52,30 @@ defmodule Fluffy.Event do
   end
 
   @doc """
-  Captures a new page opened by the action. Requires Playwright.
+  Captures the first new tab or window anywhere in the session. Requires Playwright.
+
+  Equivalent to Playwright's `context.waitForEvent('page')`. Use `popup/2`
+  to capture only pages opened by the current page.
+
+  The session timeout applies separately to initializing the captured page.
+  """
+  @spec page(term(), [timeout_option()]) :: t()
+  def page(key, options \\ []) do
+    new(:page, key, Options.validate_event_constructor!(:page, options))
+  end
+
+  @doc """
+  Captures the first new tab or window opened by the current page. Requires Playwright.
+
+  Equivalent to Playwright's `page.waitForEvent('popup')`; includes tabs opened
+  by `target="_blank"` links. The opener is fixed when the wait starts, even if
+  the callback switches pages. Use `page/2` to capture any new page in the session.
 
   The session timeout applies separately to initializing the captured page.
   """
   @spec popup(term(), [timeout_option()]) :: t()
   def popup(key, options \\ []) do
-    new(:page, key, Options.validate_event_constructor!(:page, options))
+    new(:popup, key, Options.validate_event_constructor!(:popup, options))
   end
 
   @doc "Captures the first document navigation or URL change. HTTP redirects resolve to their final URL and status."
@@ -87,7 +104,8 @@ defmodule Fluffy.Event do
   end
 
   @doc false
-  def new(type, key, options) when type in [:dialog, :download, :file_chooser, :navigation, :page, :request, :response] do
+  def new(type, key, options)
+      when type in [:dialog, :download, :file_chooser, :navigation, :page, :popup, :request, :response] do
     %__MODULE__{type: type, key: key, options: Options.validate_event!(type, options)}
   end
 

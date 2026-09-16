@@ -162,7 +162,7 @@ defmodule Fluffy.Backend.Phoenix do
     {:ok, session, %{type: type, token: token, options: options}}
   end
 
-  def arm_event(%Session{} = session, :page, _options) do
+  def arm_event(%Session{} = session, type, _options) when type in [:page, :popup] do
     require_browser_pages!(session)
   end
 

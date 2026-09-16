@@ -9,6 +9,60 @@ defmodule Fluffy.Conformance.PageEventTest do
   alias Fluffy.Page
   alias Fluffy.TestHTTPFixtures
 
+  for event_type <- [:page, :popup] do
+    @tag driver: :playwright
+    test "#{event_type} capture respects its scope and records the actual opener" do
+      fixture =
+        TestHTTPFixtures.register(fn request ->
+          case request.path do
+            "/start" ->
+              %{
+                body:
+                  html(
+                    ~s(<a href="other" target="_blank">Open other</a><a href="selected" target="_blank">Open selected</a>)
+                  )
+              }
+
+            "/other" ->
+              %{body: html(~s(<a href="unrelated" target="_blank">Open unrelated</a>))}
+
+            "/unrelated" ->
+              %{body: html("<h1>Unrelated</h1>")}
+
+            "/selected" ->
+              %{body: html("<h1>Selected</h1>")}
+          end
+        end)
+
+      session =
+        :playwright
+        |> start_test_session()
+        |> visit(TestHTTPFixtures.path(fixture, "/start"))
+        |> wait_for(Event.popup(:other), &click(&1, by_role(:link, name: "Open other")))
+
+      event = apply(Event, unquote(event_type), [:captured])
+
+      session =
+        wait_for(session, event, fn session ->
+          session
+          |> switch_page(:other)
+          |> click(by_role(:link, name: "Open unrelated"))
+          |> switch_page(:main)
+          |> click(by_role(:link, name: "Open selected"))
+          |> switch_page(:other)
+        end)
+
+      {path, opener} =
+        case unquote(event_type) do
+          :page -> {"/unrelated", :other}
+          :popup -> {"/selected", :main}
+        end
+
+      assert Page.url(page(session, :captured)) == TestHTTPFixtures.url(fixture, path)
+      assert Page.opener(page(session, :captured)) == opener
+    end
+  end
+
   @tag driver: :playwright
   test "captures, names, switches, and closes a declarative new page with Playwright" do
     fixture =
@@ -138,15 +192,17 @@ defmodule Fluffy.Conformance.PageEventTest do
           :live -> :phoenix |> start_test_session() |> visit("/live/chamber-map")
         end
 
-      error =
-        assert_raise Fluffy.CapabilityError, fn ->
-          wait_for(session, Event.popup(:child), fn _session ->
-            flunk("unsupported popup capture must not run the action")
-          end)
-        end
+      for event <- [Event.page(:child), Event.popup(:child)] do
+        error =
+          assert_raise Fluffy.CapabilityError, fn ->
+            wait_for(session, event, fn _session ->
+              flunk("unsupported page capture must not run the action")
+            end)
+          end
 
-      assert error.capability == :pages
-      assert error.driver == unquote(driver)
+        assert error.capability == :pages
+        assert error.driver == unquote(driver)
+      end
 
       for action <- [&switch_page(&1, :main), &close_page/1] do
         error = assert_raise Fluffy.CapabilityError, fn -> action.(session) end
