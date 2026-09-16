@@ -88,6 +88,27 @@ Phoenix follows links and submits forms in the current page, ignoring `target`
 and `formtarget`, including `_blank`. Both capture events, page switching, and
 closing pages require Playwright and raise a capability error in Phoenix.
 
+### Closing pages
+
+`close_page(session)` closes the active page; `close_page(session, :name)` closes
+the named page. When closing the active page, the returned session targets its
+opener if that page is still open. Otherwise, it targets another remaining
+page, with no guaranteed selection order. Fluffy does not track page switching
+history. Closing an inactive page leaves the active page unchanged.
+
+Closing an opener leaves the pages it opened alive. Closing the last page in a
+session raises `ArgumentError`.
+
+In the example above, closing `:secret_chamber` returns to its opener, `:main`.
+When a particular target matters after closing, select it explicitly with
+`switch_page/2`:
+
+```elixir
+session
+|> close_page(:secret_chamber)
+|> switch_page(:main)
+```
+
 ## Navigation
 
 Captures the first document navigation or URL change on both backends. Later

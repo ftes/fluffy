@@ -185,7 +185,19 @@ defmodule Fluffy do
   def switch_page(%Session{} = session, name), do: Backend.activate_page(session, name)
 
   @doc group: "Lifecycle and navigation"
-  @doc "Closes a named Playwright page, or the active page when no name is supplied."
+  @doc """
+  Closes a named Playwright page, or the active page when no name is supplied.
+
+  When closing the active page, the returned session targets its opener if that
+  page is still open. Otherwise, it targets another remaining page; the selection
+  order is unspecified. Page switching history is not tracked. Closing an
+  inactive page leaves the active page unchanged.
+
+  Closing a page does not close pages it opened. Raises `ArgumentError` when
+  attempting to close the last page in the session.
+
+  Requires Playwright; raises `Fluffy.CapabilityError` with the Phoenix backend.
+  """
   def close_page(%Session{} = session, name \\ nil) do
     Backend.close_page(session, name || session.active_page)
   end
