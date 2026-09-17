@@ -145,6 +145,14 @@ defmodule Fluffy.Backend.Phoenix do
   end
 
   @impl true
+  @spec new_page(Session.t(), term()) :: no_return()
+  def new_page(session, _name), do: require_browser_pages!(session)
+
+  @impl true
+  @spec history(Session.t(), :go_back | :go_forward, keyword()) :: no_return()
+  def history(session, _direction, _options), do: require_browser_pages!(session)
+
+  @impl true
   @spec activate_page(Session.t(), term()) :: no_return()
   def activate_page(%Session{} = session, _page_id) do
     require_browser_pages!(session)

@@ -245,7 +245,7 @@ defmodule Fluffy.Options do
     reduced_motion: [type: {:in, [:reduce, :no_preference, nil]}],
     screen: [type: :map, keys: @viewport_schema],
     service_workers: [type: {:in, [:allow, :block]}],
-    storage_state: [type: {:or, [:string, :map]}],
+    storage_state: [type: {:or, [:string, {:map, {:or, [:atom, :string]}, :any}]}],
     strict_selectors: [type: :boolean],
     timezone_id: [type: :string],
     user_agent: [type: :string],

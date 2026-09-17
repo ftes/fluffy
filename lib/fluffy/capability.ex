@@ -177,6 +177,25 @@ defmodule Fluffy.Capability do
       detail: "Multiple pages, new tabs, and page lifecycle operations require Playwright."
     },
     %{
+      id: :browser_history,
+      feature: "Browser history navigation",
+      drivers: %{static: :browser_only, live: :browser_only, playwright: :equivalent},
+      detail: "Back and forward navigation require a real browser history."
+    },
+    %{
+      id: :browser_context_state,
+      feature: "Browser cookie helpers and storage-state export",
+      drivers: %{static: :browser_only, live: :browser_only, playwright: :equivalent},
+      detail:
+        "Cookie queries and mutation, and storage export and restoration, operate on the Playwright browser context."
+    },
+    %{
+      id: :browser_pointer_typing,
+      feature: "Hover, drag-and-drop, and sequential typing",
+      drivers: %{static: :browser_only, live: :browser_only, playwright: :equivalent},
+      detail: "Native pointer and per-character keyboard events require Playwright."
+    },
+    %{
       id: :browser_events,
       feature: "Dialogs and browser request/response events",
       drivers: %{static: :browser_only, live: :browser_only, playwright: :equivalent},

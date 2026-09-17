@@ -336,6 +336,41 @@ defmodule Fluffy.Driver.Playwright do
     end
   end
 
+  def hover(session, locator, options), do: browser_action(session, :hover, locator, [], options)
+
+  def drag_to(session, source, target, options) do
+    browser_action(session, :drag_and_drop, source, [target: PlaywrightLocator.selector(target)], options)
+  end
+
+  def press_sequentially(session, locator, text, options) when is_binary(text) do
+    browser_action(session, :type, locator, [text: text], options)
+  end
+
+  defp browser_action(session, operation, locator, extra, options) do
+    selector_key = if operation == :drag_and_drop, do: :source, else: :selector
+    timeout = max(Keyword.get(options, :timeout, session.context.timeout), 1)
+
+    case navigation_aware_action(session, timeout, fn remaining ->
+           args = options ++ extra
+
+           args =
+             args
+             |> Keyword.put(selector_key, PlaywrightLocator.selector(locator))
+             |> Keyword.put(:strict, true)
+             |> Keyword.put(:connection, session.context.connection)
+             |> Keyword.put(:timeout, remaining)
+
+           apply(Frame, operation, [Session.page_state(session).frame_id, args])
+         end) do
+      {:ok, _result, outcome} -> outcome
+      {:error, error} -> OperationFailure.raise_playwright!(public_browser_action(operation), locator, error)
+    end
+  end
+
+  defp public_browser_action(:type), do: :press_sequentially
+  defp public_browser_action(:drag_and_drop), do: :drag_to
+  defp public_browser_action(operation), do: operation
+
   @impl true
   def unwrap(%Session{} = session, fun) when is_function(fun, 1) do
     state = Session.page_state(session)

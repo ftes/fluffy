@@ -31,6 +31,9 @@ boundaries described below.
 | Computed style, layout, and browser accessibility tree | - | equivalent |
 | Downloads | equivalent | equivalent |
 | Named pages and new tabs | - | equivalent |
+| Browser history navigation | - | equivalent |
+| Browser cookie helpers and storage-state export | - | equivalent |
+| Hover, drag-and-drop, and sequential typing | - | equivalent |
 | Dialogs and browser request/response events | - | equivalent |
 | Active-page JavaScript evaluation | - | equivalent |
 | JavaScript-owned DOM and default actions | - | equivalent |

@@ -202,10 +202,56 @@ defmodule Fluffy.Backend.Playwright do
   end
 
   @impl true
+  def new_page(session, name) do
+    if Map.has_key?(session.pages, name), do: raise(ArgumentError, "page name #{inspect(name)} is already in use")
+    context = session.context
+
+    {:ok, browser_page} =
+      BrowserContext.new_page(context.context_id, connection: context.connection, timeout: context.timeout)
+
+    subscribe_to_console!(browser_page.guid, context.connection)
+    state = new_page_state(context.context_id, browser_page.guid, browser_page.main_frame.guid)
+    {:ok, snapshot} = Frame.snapshot(state.frame_id, connection: context.connection)
+    state = %{state | document_identity: snapshot.document_ref}
+    page = %Page{id: name, driver: :playwright, state: state, url: snapshot.url}
+    session |> Session.put_page(page) |> activate_page(name)
+  end
+
+  @impl true
+  def history(session, direction, options) do
+    state = Session.page_state(session)
+    timeout = max(Keyword.get(options, :timeout, session.context.timeout), 1)
+
+    result =
+      Connection.send(
+        session.context.connection,
+        %{guid: state.page_id, method: direction, params: %{wait_until: "load", timeout: timeout}},
+        timeout
+      )
+
+    case PlaywrightEx.ChannelResponse.unwrap(result, & &1) do
+      {:ok, response} ->
+        {:ok, snapshot} = Frame.snapshot(state.frame_id, connection: session.context.connection)
+
+        if snapshot.url == Session.current_page(session).url and snapshot.document_ref == state.document_identity do
+          session
+        else
+          adopt_navigated_document(session, state, response_metadata(response), nil, timeout)
+        end
+
+      {:error, error} ->
+        raise "Playwright #{direction} failed: #{inspect(error)}"
+    end
+  end
+
+  @impl true
   def activate_page(%Session{} = session, page_id) do
     page = fetch_page!(session, page_id)
 
-    case BrowserPage.bring_to_front(page.state.page_id, timeout: session.context.timeout) do
+    case BrowserPage.bring_to_front(page.state.page_id,
+           connection: session.context.connection,
+           timeout: session.context.timeout
+         ) do
       {:ok, _result} ->
         Session.activate_page(session, page_id)
 
@@ -765,6 +811,9 @@ defmodule Fluffy.Backend.Playwright do
 
   defp normalize_browser_context_options(options) do
     Enum.map(options, fn
+      {:storage_state, path} when is_binary(path) ->
+        {:storage_state, path |> File.read!() |> Jason.decode!()}
+
       {:bypass_csp, value} ->
         {:bypassCSP, value}
 

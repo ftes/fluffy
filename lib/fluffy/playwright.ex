@@ -190,6 +190,77 @@ defmodule Fluffy.Playwright do
     end
   end
 
+  @doc playwright_only: true
+  @doc "Adds cookie maps to the browser context and returns the session."
+  def add_cookies(session, cookies) when is_list(cookies) do
+    context_call(session, :add_cookies, cookies: cookies)
+    session
+  end
+
+  @doc playwright_only: true
+  @doc "Returns browser cookies, optionally filtered by a list of `:urls`. Accepts `:timeout`."
+  def cookies(session, options \\ []) do
+    context_call(session, :cookies, Keyword.validate!(options, [:urls, :timeout]))
+  end
+
+  @doc playwright_only: true
+  @doc "Clears cookies and returns the session. Filters `:name`, `:domain`, and `:path` accept strings or regexes. Accepts `:timeout`."
+  def clear_cookies(session, options \\ []) do
+    context_call(session, :clear_cookies, Keyword.validate!(options, [:name, :domain, :path, :timeout]))
+    session
+  end
+
+  @doc playwright_only: true
+  @doc "Returns storage state for reuse as `browser_context: [storage_state: state]`. Accepts `:indexed_db`, `:timeout`, and optional JSON output `:path`."
+  def storage_state(session, options \\ []) do
+    options = Keyword.validate!(options, [:indexed_db, :timeout, :path])
+    {path, options} = Keyword.pop(options, :path)
+    state = session |> context_call(:storage_state, options) |> storage_wire_keys()
+    if path, do: File.write!(path, Jason.encode!(state))
+    state
+  end
+
+  # Decoded protocol keys can be strings when their atoms do not already exist.
+  # Export the wire spelling so both JSON files and maps can be imported again.
+  defp storage_wire_keys(values) when is_list(values), do: Enum.map(values, &storage_wire_keys/1)
+
+  defp storage_wire_keys(value) when is_map(value) do
+    record? = Map.has_key?(value, :value) or Map.has_key?(value, "value")
+
+    Map.new(value, fn {key, item} ->
+      wire_key =
+        case to_string(key) do
+          "local_storage" -> "localStorage"
+          "indexed_db" -> "indexedDB"
+          "http_only" -> "httpOnly"
+          "same_site" -> "sameSite"
+          "partition_key" -> "partitionKey"
+          "key_path" -> "keyPath"
+          "auto_increment" -> "autoIncrement"
+          "multi_entry" -> "multiEntry"
+          other -> other
+        end
+
+      {wire_key, if(record? and wire_key in ["value", "key"], do: item, else: storage_wire_keys(item))}
+    end)
+  end
+
+  defp storage_wire_keys(value), do: value
+
+  defp context_call(session, operation, options) do
+    ensure_playwright_backend!(session, operation)
+
+    options =
+      options
+      |> Keyword.put(:connection, session.context.connection)
+      |> Keyword.put_new(:timeout, session.context.timeout)
+
+    case apply(PlaywrightEx.BrowserContext, operation, [session.context.context_id, options]) do
+      {:ok, value} -> value
+      {:error, error} -> raise "Playwright #{operation} failed: #{inspect(error)}"
+    end
+  end
+
   defp ensure_playwright!(session) do
     case Session.current_driver(session) do
       :playwright ->

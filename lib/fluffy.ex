@@ -54,6 +54,71 @@ defmodule Fluffy do
   @spec start_session(backend(), [session_option()]) :: Session.t()
   def start_session(backend, options \\ []), do: Backend.start_session(backend, options)
 
+  @doc group: "Lifecycle and navigation"
+  @doc "Closes a session and its resources. Returns `:ok` or `{:error, reason}`."
+  def close_session(%Session{} = session), do: Backend.close_session(session)
+
+  @doc group: "Lifecycle and navigation"
+  @doc playwright_only: true
+  @doc "Creates and activates a named blank page in the session's browser context."
+  def new_page(%Session{} = session, name), do: Backend.new_page(session, name)
+
+  @doc group: "Lifecycle and navigation"
+  @doc playwright_only: true
+  @doc "Navigates backward in browser history. Does nothing if there is no entry."
+  def go_back(%Session{} = session, options \\ []) do
+    Backend.history(session, :go_back, Fluffy.Options.validate_action!(options))
+  end
+
+  @doc group: "Lifecycle and navigation"
+  @doc playwright_only: true
+  @doc "Navigates forward in browser history. Does nothing if there is no entry."
+  def go_forward(%Session{} = session, options \\ []) do
+    Backend.history(session, :go_forward, Fluffy.Options.validate_action!(options))
+  end
+
+  @doc group: "Actions"
+  @doc playwright_only: true
+  @doc "Hovers over a locator. Requires Playwright."
+  def hover(%Session{} = session, locator, options \\ []) do
+    require_playwright!(session, :hover)
+    options = Fluffy.Options.validate_action!(options)
+    dispatch_driver(session, :hover, [locator, options])
+  end
+
+  @doc group: "Actions"
+  @doc playwright_only: true
+  @doc "Drags the source locator onto the target locator in the same frame. Requires Playwright."
+  def drag_to(%Session{} = session, source, target, options \\ []) do
+    require_playwright!(session, :drag_to)
+    options = Fluffy.Options.validate_action!(options)
+    dispatch_driver(session, :drag_to, [source, target, options])
+  end
+
+  @doc group: "Actions"
+  @doc playwright_only: true
+  @doc "Types text character by character, emitting keyboard events. Accepts `:delay` in milliseconds. Requires Playwright."
+  def press_sequentially(%Session{} = session, locator, text, options \\ []) do
+    require_playwright!(session, :press_sequentially)
+    options = validate_typing!(options)
+    dispatch_driver(session, :press_sequentially, [locator, text, options])
+  end
+
+  defp validate_typing!(options) do
+    {delay, options} = Keyword.pop(options, :delay, 0)
+    if !(is_integer(delay) and delay >= 0), do: raise(ArgumentError, "delay must be a non-negative integer")
+    Keyword.put(Fluffy.Options.validate_action!(options), :delay, delay)
+  end
+
+  defp require_playwright!(session, capability) do
+    if session.backend != Fluffy.Backend.Playwright do
+      raise Fluffy.CapabilityError,
+        capability: capability,
+        driver: Session.current_driver(session),
+        detail: "This operation requires Playwright"
+    end
+  end
+
   @doc group: "Diagnostics and native access"
   @doc """
   Groups the operations in `fun` under a named diagnostic step.

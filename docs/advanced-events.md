@@ -232,3 +232,44 @@ picker UI.
 
 See [Browser diagnostics](usage.md#browser-diagnostics) for traces, screenshots,
 and failure artifacts.
+
+## Creating pages and navigating history
+
+Use `new_page/2` to create and activate a named blank browser page. The name
+must not already identify an open page. The new page shares the session's
+cookies and storage and has no opener. `switch_page/2` also brings the selected
+tab to the front.
+
+```elixir
+session
+|> new_page(:dashboard)
+|> visit("/dashboard")
+|> visit("/settings")
+|> go_back()
+|> go_forward()
+|> switch_page(:main)
+```
+
+`go_back/2` and `go_forward/2` accept `timeout:` and return the updated session.
+They leave the browser at its current URL when there is no history entry.
+These operations require Playwright. `close_session/1` is available for both
+backends and releases the session's resources early, returning `:ok` or
+`{:error, reason}`. Do not reuse a closed session.
+
+## Cookies, storage, and browser interactions
+
+`Fluffy.Playwright.add_cookies/2` and `clear_cookies/2` return the session.
+`cookies/2` returns cookie maps; its optional `urls:` list filters by URL.
+`clear_cookies/2` accepts string or regex filters for `name:`, `domain:`, and
+`path:`. These helpers operate on the entire browser context.
+
+`Fluffy.Playwright.storage_state/2` returns a state map and optionally writes
+JSON with `path:`. Include IndexedDB with `indexed_db: true`. Reuse the result
+with `start_session(:playwright, browser_context: [storage_state: state])`.
+
+For browser interaction, use `hover(session, locator)`,
+`drag_to(session, source, target)`, or
+`press_sequentially(session, locator, text, delay: 20)`. All accept `timeout:`.
+Sequential typing emits keyboard events for each character and appends at the
+current caret position. Drag source and target must belong to the same frame.
+These actions require Playwright and reconcile navigation caused by the action.

@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## 0.5.1 — 2026-09-17
+
+### Added
+
+- `new_page/2` creates and activates a named browser page in the existing session.
+- `go_back/2` and `go_forward/2` navigate browser history, and `close_session/1` releases session resources early.
+- `hover/3`, `drag_to/4`, and `press_sequentially/4` provide native browser interactions with strict locators and navigation reconciliation.
+- `Fluffy.Playwright` helpers add, query, and clear cookies, and export reusable storage state to a map or JSON file.
+
+### Fixed
+
+- Restore exported browser storage state from string-keyed maps and JSON files.
+- Route page activation through the session's Playwright connection when bringing its tab to the front.
+
 ## 0.5.0 — 2026-09-16
 
 ### Added

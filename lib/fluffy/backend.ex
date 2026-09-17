@@ -26,6 +26,9 @@ defmodule Fluffy.Backend do
     backend.close_session(session)
   end
 
+  def new_page(%Session{backend: backend} = session, name), do: backend.new_page(session, name)
+  def history(%Session{backend: backend} = session, direction, options), do: backend.history(session, direction, options)
+
   def visit(%Session{backend: backend} = session, destination) do
     backend.visit(session, destination)
   end

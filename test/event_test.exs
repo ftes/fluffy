@@ -11,6 +11,8 @@ defmodule Fluffy.EventTest do
 
     def start_session(_options, _attachment), do: raise("not used")
     def close_session(_session), do: :ok
+    def new_page(_session, _name), do: raise("not used")
+    def history(_session, _direction, _options), do: raise("not used")
     def visit(_session, _path), do: raise("not used")
     def reload(_session, _options), do: raise("not used")
     def navigate(_session, _navigation), do: raise("not used")
