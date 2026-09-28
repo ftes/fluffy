@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.5.2 — 2026-09-28
+
+### Fixed
+
+- Allow managed LiveView uploads across the dependency versions accepted by `mix.exs`, removing the runtime restriction to LiveView 1.2.11.
+
 ## 0.5.1 — 2026-09-17
 
 ### Added
