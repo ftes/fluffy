@@ -20,3 +20,6 @@ version. Renovate ignores the oldest toolchain file.
 Keep GitHub's Dependabot security alerts enabled independently of Renovate.
 The former Dependabot version-update configuration and custom toolchain workflow
 have been removed. Renovate App PRs trigger normal pull-request CI.
+
+Dependency ranges use Renovate's `replace` strategy: out-of-range updates replace
+the existing range instead of widening support to include both release lines.

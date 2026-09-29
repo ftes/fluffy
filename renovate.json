@@ -16,6 +16,7 @@
   ],
   "minimumReleaseAge": "2 days",
   "automerge": false,
+  "rangeStrategy": "replace",
   "ignorePaths": [
     ".tool-versions.oldest"
   ],
