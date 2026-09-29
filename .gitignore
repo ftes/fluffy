@@ -12,4 +12,3 @@
 /integration/.consumer-build-*/
 /.pg/
 .DS_Store
-__pycache__/

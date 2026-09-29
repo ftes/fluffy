@@ -76,7 +76,6 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-chromium
-      - run: python3 -m unittest discover -s scripts -p 'test_*.py'
       - run: mix deps.get
       - run: pnpm install --frozen-lockfile
       - if: steps.playwright-cache.outputs.cache-hit != 'true'
