@@ -61,7 +61,7 @@ defmodule Fluffy.MixProject do
   defp deps do
     [
       {:nimble_options, "~> 1.1"},
-      {:lazy_html, "~> 0.1"},
+      {:lazy_html, ">= 0.1.0 and < 1.0.0"},
       {:phoenix, "~> 1.7"},
       {:phoenix_live_view, "~> 1.0"},
       {:playwright_ex, "~> 0.12.0"},
@@ -72,7 +72,7 @@ defmodule Fluffy.MixProject do
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:bandit, "~> 1.0", only: :test},
-      {:postgrex, "~> 0.22", only: :test}
+      {:postgrex, ">= 0.22.0 and < 1.0.0", only: :test}
     ]
   end
 
