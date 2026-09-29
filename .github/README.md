@@ -3,7 +3,7 @@
 Install the [Renovate GitHub App](https://github.com/apps/renovate) for this
 repository to activate `renovate.json`. The hosted app creates update PRs during
 the Monday 00:00–06:59 Europe/Berlin window, with a two-day release age where
-release timestamps are available. Updates require review; automerge is disabled.
+release timestamps are available (three days for npm via the best-practices preset). Updates require review; automerge is disabled.
 
 Renovate discovers both the root and `integration/consumer` Mix projects, npm
 packages, GitHub Actions and `.tool-versions`. Action references remain pinned to
@@ -21,8 +21,13 @@ Keep GitHub's Dependabot security alerts enabled independently of Renovate.
 The former Dependabot version-update configuration and custom toolchain workflow
 have been removed. Renovate App PRs trigger normal pull-request CI.
 
-Dependency ranges use Renovate's `replace` strategy: out-of-range updates replace
-the existing range instead of widening support to include both release lines.
+Renovate extends `config:best-practices`, including action/container digest pins,
+development-dependency pins and weekly lockfile maintenance. Mix overrides the
+preset's development-dependency pinning with `in-range-only`: `mix.exs` support
+ranges stay unchanged, while weekly maintenance lets Mix resolve the newest
+allowed versions in `mix.lock`. Out-of-range Mix upgrades require a manual
+constraint change. Other dependency ranges retain `replace`, except where the
+preset pins development dependencies.
 
 Renovate generates Mix lockfiles with OTP 29 and Elixir 1.20.4, configured via
 `constraints`. Its Mix worker otherwise defaults to OTP 26, which cannot run
