@@ -6,7 +6,9 @@
 version: 2
 updates:
   - package-ecosystem: "mix"
-    directory: "/"
+    directories:
+      - "/"
+      - "/integration/consumer"
     schedule:
       interval: "weekly"
     cooldown:
