@@ -1,0 +1,59 @@
+name: Update toolchain
+
+on:
+  schedule:
+    - cron: "23 6 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: update-toolchain
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+jobs:
+  update:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: main
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          # Same download-race workaround as CI.
+          version: "2026.8.14"
+          install: false
+          cache: false
+          env: false
+          export_path: false
+      - run: python3 -m unittest discover -s scripts -p 'test_*.py'
+      - run: python3 scripts/update_toolchain.py
+      - name: Open or update toolchain PR
+        id: pr
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
+        with:
+          branch: codex/update-toolchain
+          base: main
+          delete-branch: true
+          add-paths: |
+            .tool-versions
+            package.json
+          commit-message: "chore: update toolchain patches"
+          title: "chore: update toolchain patches"
+          body: |
+            Updates Elixir, Erlang, Node.js and pnpm to stable patches within their current major/minor release lines.
+
+            Elixir's OTP build stays aligned with Erlang. The newest CI lane reads `.tool-versions`; the oldest compatibility lane and minimum supported Elixir version stay fixed.
+
+            CI is dispatched explicitly on this branch. Review its results before merging.
+      # GITHUB_TOKEN-created PRs do not trigger pull_request workflows.
+      - name: Run CI on the update branch
+        if: steps.pr.outputs.pull-request-number
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_BRANCH: ${{ steps.pr.outputs.pull-request-branch }}
+        run: gh workflow run ci.yml --ref "$PR_BRANCH"

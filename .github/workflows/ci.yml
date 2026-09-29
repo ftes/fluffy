@@ -25,13 +25,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - lane: oldest
-            elixir: "1.18.5-otp-27"
-            erlang: "27.3.4.17"
-          - lane: newest
-            elixir: "1.20.4-otp-29"
-            erlang: "29.0.6"
+        lane: [oldest, newest]
     services:
       postgres:
         image: postgres:16
@@ -49,31 +43,40 @@ jobs:
       FLUFFY_BROWSER: chromium
       MIX_ENV: test
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Select toolchain
+        id: toolchain
+        env:
+          TOOLCHAIN_LANE: ${{ matrix.lane }}
+        run: |
+          if [ "$TOOLCHAIN_LANE" = oldest ]; then
+            cp .tool-versions.oldest .tool-versions
+            # Keep Corepack and mise on the same pnpm version for this lane.
+            pnpm_version=$(awk '$1 == "pnpm" { print $2 }' .tool-versions)
+            jq --arg version "pnpm@$pnpm_version" '.packageManager = $version' package.json > package.json.tmp
+            mv package.json.tmp package.json
+          fi
+          awk '$1 == "elixir" || $1 == "erlang" { print $1 "=" $2 }' .tool-versions >> "$GITHUB_OUTPUT"
       - name: Setup toolchain
-        uses: jdx/mise-action@v4.3.0
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
           version: ${{ env.MISE_VERSION }}
-          tool_versions: |
-            erlang ${{ matrix.erlang }}
-            elixir ${{ matrix.elixir }}
-            nodejs 20.20.2
-            pnpm 11.19.0
       - name: Restore Dialyzer PLTs
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: |
             ~/.mix/dialyxir*.plt*
             _build/test/dialyxir*.plt*
-          key: dialyzer-${{ runner.os }}-erlang-${{ matrix.erlang }}-elixir-${{ matrix.elixir }}-${{ hashFiles('mix.lock') }}
+          key: dialyzer-${{ runner.os }}-erlang-${{ steps.toolchain.outputs.erlang }}-elixir-${{ steps.toolchain.outputs.elixir }}-${{ hashFiles('mix.lock') }}
           restore-keys: |
-            dialyzer-${{ runner.os }}-erlang-${{ matrix.erlang }}-elixir-${{ matrix.elixir }}-
+            dialyzer-${{ runner.os }}-erlang-${{ steps.toolchain.outputs.erlang }}-elixir-${{ steps.toolchain.outputs.elixir }}-
       - name: Restore Playwright browsers
         id: playwright-cache
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-chromium
+      - run: python3 -m unittest discover -s scripts -p 'test_*.py'
       - run: mix deps.get
       - run: pnpm install --frozen-lockfile
       - if: steps.playwright-cache.outputs.cache-hit != 'true'
@@ -106,8 +109,8 @@ jobs:
           mix test
       - name: Upload browser failure artifacts
         if: failure() || steps.tests.outputs.retried == 'true'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: browser-failures-${{ matrix.lane }}-elixir-${{ matrix.elixir }}-erlang-${{ matrix.erlang }}
+          name: browser-failures-${{ matrix.lane }}-elixir-${{ steps.toolchain.outputs.elixir }}-erlang-${{ steps.toolchain.outputs.erlang }}
           path: tmp/fluffy-artifacts
           if-no-files-found: ignore
