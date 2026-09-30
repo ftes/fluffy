@@ -24,6 +24,20 @@ defmodule Fluffy.Driver.Playwright do
   alias PlaywrightEx.Serialization
 
   @impl true
+  def open_browser(%Session{} = session, open_fun) do
+    {:ok, html} =
+      Frame.content(Session.page_state(session).frame_id,
+        connection: session.context.connection,
+        timeout: session.context.timeout
+      )
+
+    url = Session.current_page(session).url
+    resolver = fn path -> URI.to_string(URI.merge(url, path)) end
+    Fluffy.OpenBrowser.write(LazyHTML.from_document(html), resolver, open_fun)
+    session
+  end
+
+  @impl true
   def validate_operation!(_session, _operation, _arguments), do: :ok
 
   @impl true

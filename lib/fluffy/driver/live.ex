@@ -3,7 +3,7 @@ defmodule Fluffy.Driver.Live do
 
   @behaviour Fluffy.Driver.Contract
 
-  import Phoenix.LiveViewTest
+  import Phoenix.LiveViewTest, except: [open_browser: 1, open_browser: 2]
 
   alias Fluffy.ClientDOM
   alias Fluffy.Driver.Live.ActionResolver
@@ -23,6 +23,12 @@ defmodule Fluffy.Driver.Live do
   alias Fluffy.URLMatcher
 
   @retry_interval 10
+
+  @impl true
+  def open_browser(%Session{} = session, open_fun) do
+    Phoenix.LiveViewTest.open_browser(Session.page_state(session).view, open_fun)
+    session
+  end
 
   @impl true
   def validate_operation!(session, operation, arguments),

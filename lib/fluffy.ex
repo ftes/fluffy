@@ -150,6 +150,36 @@ defmodule Fluffy do
     end
   end
 
+  @doc group: "Diagnostics and native access"
+  @doc """
+  Opens a temporary HTML snapshot of the active page in your default browser.
+
+  Returns the unchanged session so it can be used in a pipeline. LiveView pages
+  use `Phoenix.LiveViewTest.open_browser/1`. Static pages resolve local assets
+  through the session endpoint; Playwright pages resolve assets against the page
+  URL. Scripts are removed. This is an HTML snapshot, not an offline archive:
+  browser resources must remain accessible, and DOM properties such as unsaved
+  input values, canvas contents, and shadow roots are not serialized.
+
+  The temporary file remains available after the session closes.
+
+      session
+      |> visit("/chamber")
+      |> open_browser()
+  """
+  @spec open_browser(Session.t()) :: Session.t()
+  def open_browser(%Session{} = session), do: open_browser(session, &Fluffy.OpenBrowser.open/1)
+
+  @doc false
+  @spec open_browser(Session.t(), (String.t() -> term())) :: Session.t()
+  def open_browser(%Session{} = session, open_fun) when is_function(open_fun, 1) do
+    if Session.current_driver(session) == :unvisited do
+      raise ArgumentError, "visit a page before calling open_browser/1"
+    end
+
+    dispatch_driver(session, :open_browser, [open_fun])
+  end
+
   @doc false
   def session_for_html(driver, html, options \\ [])
 

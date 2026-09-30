@@ -30,6 +30,7 @@ defmodule Fluffy.Driver.Contract do
   @callback focus(Session.t(), Locator.t(), keyword()) :: result()
   @callback blur(Session.t(), Locator.t(), keyword()) :: result()
   @callback press(Session.t(), Locator.t(), String.t(), keyword()) :: result()
+  @callback open_browser(Session.t(), (String.t() -> term())) :: Session.t()
   @callback unwrap(Session.t(), (term() -> term())) :: result()
 
   @optional_callbacks set_html: 2

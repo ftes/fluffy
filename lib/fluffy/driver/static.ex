@@ -13,6 +13,14 @@ defmodule Fluffy.Driver.Static do
   alias Fluffy.URLMatcher
 
   @impl true
+  def open_browser(%Session{} = session, open_fun) do
+    endpoint = if session.context.http, do: session.context.http.endpoint
+    document = Session.page_state(session).client_dom.document
+    Fluffy.OpenBrowser.write(document, Fluffy.OpenBrowser.static_asset_resolver(endpoint), open_fun)
+    session
+  end
+
+  @impl true
   def validate_operation!(session, operation, arguments),
     do: Fluffy.Driver.PhoenixValidation.validate_operation!(session, operation, arguments)
 
