@@ -20,6 +20,6 @@ defmodule Fluffy.Conformance.LiveReadinessErrorTest do
     assert error.message =~ "/actions/disconnected-live-root"
     assert error.message =~ "page \""
     assert error.message =~ "frame \""
-    assert error.message =~ "[data-phx-main].phx-connected"
+    assert error.message =~ "every LiveView root to be .phx-connected"
   end
 end

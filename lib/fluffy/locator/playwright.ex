@@ -58,15 +58,23 @@ defmodule Fluffy.Locator.Playwright do
     )
   end
 
+  defp apply_operation({:and, right}, selector) do
+    Selector.and(selector, selector(right))
+  end
+
+  defp apply_operation({:or, right}, selector) do
+    Selector.concat(selector, "internal:or=#{JSON.encode!(selector(right))}")
+  end
+
   defp apply_operation({:filter, options}, selector) do
     Enum.reduce(options, selector, fn
       {:has_text, text}, current ->
-        has_text = text_selector("internal:has-text", text, false)
+        has_text = text_selector("internal:has-text", text, Keyword.get(options, :exact, false))
 
         Selector.concat(current, has_text)
 
       {:has_not_text, text}, current ->
-        has_not_text = text_selector("internal:has-not-text", text, false)
+        has_not_text = text_selector("internal:has-not-text", text, Keyword.get(options, :exact, false))
 
         Selector.concat(current, has_not_text)
 
@@ -75,6 +83,9 @@ defmodule Fluffy.Locator.Playwright do
 
       {:has_not, %Locator{} = child}, current ->
         Selector.concat(current, "internal:has-not=#{JSON.encode!(selector(child))}")
+
+      {:exact, _exact?}, current ->
+        current
     end)
   end
 

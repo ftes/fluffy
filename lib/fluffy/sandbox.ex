@@ -7,7 +7,7 @@ defmodule Fluffy.Sandbox do
 
   @default_header "x-fluffy-sandbox"
   @default_sandbox Sandbox
-  @config_keys [:header, :sandbox]
+  @config_keys [:header, :sandbox, :trap_exit]
 
   @type allowance :: module() | {module(), atom(), list()}
 
@@ -26,7 +26,7 @@ defmodule Fluffy.Sandbox do
   end
 
   @doc false
-  @spec config() :: [header: String.t(), sandbox: allowance()]
+  @spec config() :: [header: String.t(), sandbox: allowance(), trap_exit: boolean()]
   def config do
     :fluffy
     |> Application.get_env(__MODULE__, [])
@@ -39,10 +39,13 @@ defmodule Fluffy.Sandbox do
     header = Keyword.get(options, :header, @default_header)
     sandbox = Keyword.get(options, :sandbox, @default_sandbox)
 
+    trap_exit? = Keyword.get(options, :trap_exit, true)
+    if not is_boolean(trap_exit?), do: raise(ArgumentError, "expected sandbox :trap_exit to be a boolean")
+
     validate_header!(header)
     validate_sandbox!(sandbox)
 
-    [header: header, sandbox: sandbox]
+    [header: header, sandbox: sandbox, trap_exit: trap_exit?]
   end
 
   def validate_config!(other) do
@@ -68,7 +71,7 @@ defmodule Fluffy.Sandbox do
 
       metadata =
         repos
-        |> PhoenixSandbox.metadata_for(self())
+        |> PhoenixSandbox.metadata_for(self(), trap_exit: config()[:trap_exit])
         |> PhoenixSandbox.encode_metadata()
 
       {owners, {header(), metadata}}

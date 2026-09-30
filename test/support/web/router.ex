@@ -91,6 +91,7 @@ defmodule Fluffy.TestWeb.Router do
   scope "/", Fluffy.TestWeb do
     pipe_through(:browser)
 
+    get("/embedded-ready", PageController, :embedded_ready)
     get("/database", PageController, :database)
     get("/databases", PageController, :databases)
   end

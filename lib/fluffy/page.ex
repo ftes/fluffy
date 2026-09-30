@@ -11,7 +11,7 @@ defmodule Fluffy.Page do
   @moduledoc groups: ["Metadata", "Assertions"]
 
   @enforce_keys [:id, :driver, :state]
-  defstruct [:id, :driver, :state, :url, :status, :opener, revision: 0]
+  defstruct [:id, :driver, :state, :url, :status, :opener, :document_id, revision: 0]
 
   @opaque t :: %__MODULE__{
             id: term(),
@@ -24,6 +24,7 @@ defmodule Fluffy.Page do
             url: String.t() | nil,
             status: non_neg_integer() | nil,
             opener: term() | nil,
+            document_id: reference() | nil,
             revision: non_neg_integer()
           }
 
@@ -63,7 +64,7 @@ defmodule Fluffy.Page do
 
   @doc false
   def commit(%__MODULE__{} = page, driver, state, url, options \\ []) do
-    options = Keyword.validate!(options, status: page.status)
+    options = Keyword.validate!(options, status: page.status, same_document: false)
 
     %{
       page
@@ -71,6 +72,8 @@ defmodule Fluffy.Page do
         state: state,
         url: url,
         status: options[:status],
+        # URL patches advance the revision without replacing the form-owning document.
+        document_id: if(options[:same_document], do: page.document_id, else: make_ref()),
         revision: page.revision + 1
     }
   end

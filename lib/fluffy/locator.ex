@@ -189,6 +189,9 @@ defmodule Fluffy.Locator do
       :enter_frame ->
         true
 
+      {operator, inner} when operator in [:and, :or] ->
+        crosses_frame?(inner)
+
       {:filter, options} ->
         Enum.any?(options, fn
           {key, %__MODULE__{} = inner} when key in [:has, :has_not] -> crosses_frame?(inner)
@@ -205,6 +208,32 @@ defmodule Fluffy.Locator do
   defp child_query(%FrameLocator{owner: owner}, operation) do
     owner |> append(:enter_frame) |> append(operation)
   end
+
+  @doc """
+  Matches only elements matched by both locators, preserving the left locator's order.
+
+  The right locator resolves from the same query root, not within each left match.
+  Inside `filter/2`'s `:has` or `:has_not`, that root is the filter candidate.
+
+      by_css("#email") |> and_(by_label("Email", exact: true))
+
+  With Playwright, the right locator may be relative to the left locator's frame
+  or use the same frame prefix. Playwright validates frame compatibility when
+  the locator resolves; intersections across different frames are unsupported.
+
+      frame = frame_locator("#checkout")
+      by_css(frame, "input") |> and_(by_label(frame, "Email"))
+
+  Like other locators, intersections are lazy and retain normal action strictness.
+  """
+  @spec and_(t(), t()) :: t()
+  def and_(%__MODULE__{} = left, %__MODULE__{} = right) do
+    append(left, {:and, right})
+  end
+
+  @doc "Matches elements in either locator, once each in document order, retaining action strictness."
+  @spec or_(t(), t()) :: t()
+  def or_(%__MODULE__{} = left, %__MODULE__{} = right), do: append(left, {:or, right})
 
   @spec filter(t(), [filter_option()]) :: t()
   def filter(%__MODULE__{} = locator, options) when is_list(options) do
@@ -259,6 +288,10 @@ defmodule Fluffy.Locator do
   defp describe_operation({:test_id, attribute, test_id}) do
     "by_test_id(#{inspect(test_id)}, attribute: #{inspect(attribute)})"
   end
+
+  defp describe_operation({:or, right}), do: "or_(#{describe(right)})"
+
+  defp describe_operation({:and, right}), do: "and_(#{describe(right)})"
 
   defp describe_operation({:filter, options}), do: "filter(#{describe_keywords(options)})"
   defp describe_operation({:nth, 0}), do: "nth(0)"

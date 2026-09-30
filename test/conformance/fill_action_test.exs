@@ -17,6 +17,36 @@ defmodule Fluffy.Conformance.FillActionTest do
 
   for driver <- [:static, :playwright] do
     @tag driver: driver
+    test "fill converts String.Chars values without escaping with #{driver}" do
+      session = session_for_html(unquote(driver), ~s(<input aria-label="Value"><textarea aria-label="Notes"></textarea>))
+
+      values = [
+        {42, "42"},
+        {12.5, "12.5"},
+        {true, "true"},
+        {:ready, "ready"},
+        {nil, ""},
+        {~D[2026-09-30], "2026-09-30"},
+        {~T[12:34:56], "12:34:56"},
+        {~N[2026-09-30 12:34:56], "2026-09-30 12:34:56"},
+        {~U[2026-09-30 12:34:56Z], "2026-09-30 12:34:56Z"},
+        {~c"<tag>&\"'", "<tag>&\"'"},
+        {"<tag>&\"'", "<tag>&\"'"},
+        {%Fluffy.TestFormValue{value: "<tag>&"}, "custom:<tag>&"}
+      ]
+
+      Enum.reduce(values, session, fn {value, expected}, session ->
+        session
+        |> fill(by_label("Value"), value)
+        |> expect(to_have_value(by_label("Value"), expected))
+        |> fill(by_label("Notes"), value)
+        |> expect(to_have_value(by_label("Notes"), expected))
+      end)
+
+      assert_raise Protocol.UndefinedError, fn -> fill(session, by_label("Value"), %{}) end
+    end
+
+    @tag driver: driver
     test "fill replaces an input's current value with #{driver}" do
       field = by_label("Email")
       html = ~s(<label for="email">Email</label><input id="email" value="old@example.com">)

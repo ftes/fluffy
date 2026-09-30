@@ -50,6 +50,10 @@ defmodule Fluffy.ClientDOM.Query do
      end)}
   end
 
+  defp rewrite_operation({operation, %Locator{} = child}, marker) when operation in [:and, :or] do
+    {operation, rewrite(child, marker)}
+  end
+
   defp rewrite_operation(operation, _marker), do: operation
 
   # DocumentIndex assigns IDs in element preorder, including inert descendants.

@@ -260,7 +260,7 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
 
   for driver <- [:static, :live] do
     @tag driver: driver
-    test "#{driver} rejects traversal, including negated assertions and filter operands" do
+    test "#{driver} rejects traversal, including negated assertions and composite operands" do
       session =
         case unquote(driver) do
           :static -> session_for_html(:static, "<iframe id='child'></iframe>")
@@ -274,7 +274,9 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
             fn -> expect(session, not_(to_be_visible(locator))) end,
             fn -> expect(session, "missing" |> by_css() |> filter(has: locator) |> to_have_count(0)) end,
             fn -> expect(session, "missing" |> by_css() |> filter(has_not: locator) |> to_have_count(0)) end,
-            fn -> click(session, "missing" |> by_css() |> filter(has_not: locator)) end
+            fn -> click(session, "missing" |> by_css() |> filter(has_not: locator)) end,
+            fn -> expect(session, "missing" |> by_css() |> and_(locator) |> to_have_count(0)) end,
+            fn -> click(session, "missing" |> by_css() |> and_("button" |> by_css() |> and_(locator))) end
           ] do
         error = assert_raise Fluffy.CapabilityError, operation
         assert error.capability == :frames
@@ -290,6 +292,39 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
       assert error.driver == unquote(driver)
 
       expect(session, to_have_count(by_css("#child"), if(unquote(driver) == :static, do: 1, else: 0)))
+    end
+  end
+
+  @tag driver: :playwright
+  test "intersections accept frame-relative operands and matching nested frame prefixes" do
+    html = ~s(<label for="email">Email</label><input id="email">)
+    session = browser_html(~s(<input aria-label="Email">) <> iframe("outer", iframe("inner", html)))
+    frame = "#outer" |> frame_locator() |> frame_locator("#inner")
+
+    for right <- [by_label("Email", exact: true), by_label(frame, "Email", exact: true)] do
+      locator = frame |> by_css("input") |> and_(right)
+
+      session
+      |> fill(locator, "inside")
+      |> expect(to_have_value(locator, "inside"))
+      |> expect(to_have_value(by_label("Email"), ""))
+    end
+  end
+
+  @tag driver: :playwright
+  test "intersections retain Playwright errors for incompatible frame operands" do
+    html = ~s(<input aria-label="Email">)
+    session = browser_html(html <> iframe("first", html) <> iframe("second", html))
+    first_frame = frame_locator("#first")
+    second_frame = frame_locator("#second")
+
+    for locator <- [
+          first_frame |> by_css("input") |> and_(by_label(second_frame, "Email")),
+          "input" |> by_css() |> and_(by_label(first_frame, "Email"))
+        ] do
+      error = assert_raise Fluffy.OperationError, fn -> fill(session, locator, "invalid", timeout: 1_000) end
+      assert error.message =~ "Frame locators are not allowed inside composite locators"
+      assert error.locator == locator
     end
   end
 

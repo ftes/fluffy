@@ -25,10 +25,10 @@ defmodule Fluffy.TestWeb.ActionabilityLive do
     {:noreply, assign(socket, accounts_checked?: true)}
   end
 
-  def handle_event("toggle-payload-checkbox", %{"id" => id}, socket) do
+  def handle_event("toggle-payload-checkbox", %{"id" => id} = params, socket) do
     {:noreply,
      update(socket, :checked_keys, fn checked_keys ->
-       Map.update!(checked_keys, id, &(!&1))
+       Map.put(checked_keys, id, params["value"] == "on")
      end)}
   end
 
@@ -70,6 +70,7 @@ defmodule Fluffy.TestWeb.ActionabilityLive do
         Attribute payload
         <input
           type="checkbox"
+          value="on"
           phx-click="toggle-payload-checkbox"
           phx-value-id="attrs"
           checked={@checked_keys["attrs"]}
@@ -86,6 +87,17 @@ defmodule Fluffy.TestWeb.ActionabilityLive do
         />
       </label>
       <p>JS payload state: {if @checked_keys["js"], do: "checked", else: "unchecked"}</p>
+
+      <.live_component
+        module={Fluffy.TestWeb.CheckboxPayloadComponent}
+        id="Component payload"
+        override={false}
+      />
+      <.live_component
+        module={Fluffy.TestWeb.CheckboxPayloadComponent}
+        id="Override payload"
+        override={true}
+      />
 
       <fieldset>
         <legend>Mystic creature</legend>

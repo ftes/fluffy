@@ -142,6 +142,10 @@ config :fluffy, Fluffy.Sandbox,
   sandbox: MyApp.TestSandbox
 ```
 
+Sandbox metadata defaults to `trap_exit: true`, following Phoenix Ecto. Set
+`trap_exit: false` in this configuration if the application must retain ordinary
+exit handling, for example when linked tasks finish normally in a LiveView.
+
 The sandbox value may be a module implementing `allow(repo, owner, child)` or
 Phoenix Ecto's `{module, function, extra_arguments}` form. For example:
 

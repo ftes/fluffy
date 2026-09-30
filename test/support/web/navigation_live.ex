@@ -9,7 +9,7 @@ defmodule Fluffy.TestWeb.NavigationLive do
       Process.send_after(self(), :navigate, 30)
     end
 
-    {:ok, assign(socket, step: params["step"] || "initial", topic: params["topic"])}
+    {:ok, assign(socket, step: params["step"] || "initial", topic: params["topic"], saved_step: nil, saves: 0)}
   end
 
   @impl true
@@ -18,6 +18,14 @@ defmodule Fluffy.TestWeb.NavigationLive do
   end
 
   @impl true
+  def handle_event("change_step", %{"step" => step}, socket) do
+    {:noreply, push_patch(socket, to: "/live/chamber-map?#{URI.encode_query(%{step: step})}")}
+  end
+
+  def handle_event("save_step", %{"step" => step}, socket) do
+    {:noreply, assign(socket, saved_step: step, saves: socket.assigns.saves + 1)}
+  end
+
   def handle_event("redirect_static", _params, socket) do
     {:noreply, redirect(socket, to: "/chamber")}
   end
@@ -55,6 +63,12 @@ defmodule Fluffy.TestWeb.NavigationLive do
     ~H"""
     <main>
       <p>Map position: {@step}</p>
+      <form id="map-form" phx-change="change_step" phx-submit="save_step">
+        <label for="map-step">Map step</label>
+        <input id="map-step" name="step" value={@step} />
+      </form>
+      <p :if={@saved_step}>Saved step: {@saved_step}</p>
+      <p>Saves: {@saves}</p>
       <.link patch="/live/chamber-map?step=patched">Reveal passage</.link>
       <.link navigate="/live/secret-chamber">Secret chamber</.link>
       <a :if={@topic} href={"/live/redirect-ready?topic=#{@topic}"} target="_blank">Open ready popup</a>

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- `Fluffy.PhoenixTest` provides a slim PhoenixTest-style vocabulary (`visit`, `click_link`, `fill_in`, `select`, `check`, `within`, `assert_has`, `assert_path`, and friends) over Fluffy sessions from a single import. Unsupported options and combinations raise `ArgumentError`.
+
 ## 0.5.2 — 2026-09-28
 
 ### Fixed

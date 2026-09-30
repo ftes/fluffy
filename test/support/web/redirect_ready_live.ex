@@ -4,8 +4,11 @@ defmodule Fluffy.TestWeb.RedirectReadyLive do
   use Phoenix.LiveView
 
   @impl true
-  def mount(%{"topic" => topic}, _session, socket) do
+  def mount(:not_mounted_at_router, session, socket), do: mount(session, %{}, socket)
+
+  def mount(%{"topic" => topic} = params, _session, socket) do
     if connected?(socket) do
+      if params["delay"], do: Process.sleep(params["delay"])
       Phoenix.PubSub.subscribe(Fluffy.TestPubSub, topic)
     end
 

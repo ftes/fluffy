@@ -7,6 +7,20 @@ defmodule Fluffy.Conformance.LiveFormTest do
 
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
+    test "String.Chars values reach LiveView change events as literal strings with #{driver}", %{driver: driver} do
+      driver
+      |> start_test_session()
+      |> visit("/live/potions")
+      |> fill(by_label("First ingredient"), ~D[2026-09-30])
+      |> expect("Last first: 2026-09-30" |> by_text() |> to_be_visible())
+      |> Fluffy.PhoenixTest.fill_in("Final ingredient", with: %Fluffy.TestFormValue{value: "<tag>&"})
+      |> then(fn %{session: session} -> session end)
+      |> expect("Last last: custom:<tag>&" |> by_text() |> to_be_visible())
+      |> select_option(by_label("Potion colours"), [:blue, %{value: :green}])
+      |> expect("Potion colours" |> by_label() |> to_have_values(["green", "blue"]))
+    end
+
+    @tag driver: driver
     test "unchanged sticky LiveView renders preserve entered form values with #{driver}", %{driver: driver} do
       driver
       |> start_test_session()

@@ -198,7 +198,7 @@ defmodule Fluffy.Backend.Playwright do
   end
 
   def navigate(%Session{backend: __MODULE__} = session, %BrowserPatch{state: state, url: url}) do
-    Session.commit_page(session, :playwright, state, url)
+    Session.commit_page(session, :playwright, state, url, same_document: true)
   end
 
   @impl true
@@ -693,33 +693,23 @@ defmodule Fluffy.Backend.Playwright do
       Deadline.remaining(deadline, 1)
     )
 
-    case Frame.evaluate(state.frame_id,
-           expression: "() => document.querySelector('[data-phx-main]') !== null",
-           is_function: true,
-           timeout: Deadline.remaining(deadline, 1)
-         ) do
-      {:ok, true} ->
-        result =
-          Frame.wait_for_selector(state.frame_id,
-            selector: "css=[data-phx-main].phx-connected",
-            state: "attached",
-            strict: true,
-            timeout: Deadline.remaining(deadline, 1)
-          )
+    result =
+      Frame.wait_for_function(state.frame_id,
+        expression: """
+        () => document.readyState !== 'loading' &&
+            Array.from(document.querySelectorAll('[data-phx-main], [data-phx-session]'))
+          .every(element => element.classList.contains('phx-connected'))
+        """,
+        is_function: true,
+        timeout: Deadline.remaining(deadline, 1)
+      )
 
-        case result do
-          {:ok, _element} ->
-            :ok
-
-          {:error, error} ->
-            raise "LiveView browser connection failed for #{navigation_target(state, destination)}: expected [data-phx-main].phx-connected, got #{inspect(error)}"
-        end
-
-      {:ok, false} ->
+    case result do
+      {:ok, _result} ->
         :ok
 
       {:error, error} ->
-        raise "Could not inspect #{navigation_target(state, destination)} for [data-phx-main].phx-connected: #{inspect(error)}"
+        raise "LiveView browser connection failed for #{navigation_target(state, destination)}: expected every LiveView root to be .phx-connected, got #{inspect(error)}"
     end
   end
 
