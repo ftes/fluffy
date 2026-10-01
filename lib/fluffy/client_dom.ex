@@ -8,12 +8,11 @@ defmodule Fluffy.ClientDOM do
   alias Fluffy.HTML.Target
   alias Fluffy.Locator
 
-  @enforce_keys [:document, :index]
-  defstruct [:document, :index, focused: nil, properties: %{}]
+  @enforce_keys [:document]
+  defstruct [:document, focused: nil, properties: %{}]
 
   @opaque t :: %__MODULE__{
             document: term(),
-            index: DocumentIndex.t(),
             focused: integer() | nil,
             properties: map()
           }
@@ -27,19 +26,35 @@ defmodule Fluffy.ClientDOM do
   end
 
   defp new(document) do
-    index = DocumentIndex.new(document)
+    index = index(%__MODULE__{document: document})
 
     %__MODULE__{
       document: document,
-      index: index,
       properties: initial_radio_properties(index)
     }
   end
 
+  # The immutable LazyHTML document is a shared NIF resource. Keep its derived
+  # index in the caller instead of copying its large tree through SessionRuntime.
+  # One entry bounds retention; changing documents simply rebuilds the index.
+  @doc false
+  @spec index(%__MODULE__{}) :: DocumentIndex.t()
+  def index(%__MODULE__{document: document}) do
+    case Process.get({__MODULE__, :index}) do
+      {^document, index} ->
+        index
+
+      _missing ->
+        index = DocumentIndex.new(document)
+        Process.put({__MODULE__, :index}, {document, index})
+        index
+    end
+  end
+
   def reconcile(%__MODULE__{} = client_dom, html) when is_binary(html) do
+    old_nodes = index(client_dom).entries
     new_document = LazyHTML.from_fragment(html)
-    new_index = DocumentIndex.new(new_document)
-    old_nodes = client_dom.index.entries
+    new_index = index(%__MODULE__{document: new_document})
     new_nodes = new_index.entries
     new_by_identity = Map.new(new_nodes, &{&1.identity, &1})
 
@@ -80,7 +95,6 @@ defmodule Fluffy.ClientDOM do
 
     %__MODULE__{
       document: new_document,
-      index: new_index,
       focused: Map.get(old_to_new, client_dom.focused),
       properties: properties
     }
@@ -131,13 +145,13 @@ defmodule Fluffy.ClientDOM do
   end
 
   def form_submission(%__MODULE__{} = client_dom, target, driver \\ :static) do
-    Fluffy.Form.build(client_dom.index, client_dom.properties, target, driver)
+    Fluffy.Form.build(index(client_dom), client_dom.properties, target, driver)
   end
 
   @doc false
   def submit_form(%__MODULE__{} = client_dom, target, driver \\ :static) do
     Fluffy.Form.submit(
-      client_dom.index,
+      index(client_dom),
       client_dom.properties,
       target,
       driver
@@ -149,7 +163,7 @@ defmodule Fluffy.ClientDOM do
     target = target!(client_dom, locator)
 
     Fluffy.Form.implicit_submission(
-      client_dom.index,
+      index(client_dom),
       client_dom.properties,
       target,
       driver
@@ -157,7 +171,7 @@ defmodule Fluffy.ClientDOM do
   end
 
   def triggered_submission(%__MODULE__{} = client_dom) do
-    Fluffy.Form.triggered(client_dom.index, client_dom.properties)
+    Fluffy.Form.triggered(index(client_dom), client_dom.properties)
   end
 
   def change_event(%__MODULE__{} = client_dom, %Locator{} = locator) do
@@ -166,12 +180,12 @@ defmodule Fluffy.ClientDOM do
   end
 
   def change_event(%__MODULE__{} = client_dom, %Target{} = target) do
-    build_change_event(client_dom, client_dom.index, target)
+    build_change_event(client_dom, index(client_dom), target)
   end
 
   @doc false
   def dispatch_change_event(%__MODULE__{} = client_dom, target) do
-    index = client_dom.index
+    index = index(client_dom)
 
     case Fluffy.Form.dispatch_change(index, client_dom.properties, target) do
       nil ->
@@ -227,12 +241,12 @@ defmodule Fluffy.ClientDOM do
 
   def live_managed_form?(%__MODULE__{} = client_dom, %Locator{} = locator) do
     target = target!(client_dom, locator)
-    Fluffy.Form.live_managed_form?(client_dom.index, target)
+    Fluffy.Form.live_managed_form?(index(client_dom), target)
   end
 
   def live_change_form?(%__MODULE__{} = client_dom, %Locator{} = locator) do
     target = target!(client_dom, locator)
-    Fluffy.Form.live_change_form?(client_dom.index, target)
+    Fluffy.Form.live_change_form?(index(client_dom), target)
   end
 
   def set_checked(%__MODULE__{} = client_dom, %Locator{} = locator, desired) when is_boolean(desired) do
@@ -384,7 +398,8 @@ defmodule Fluffy.ClientDOM do
   end
 
   defp checked_ids(client_dom) do
-    client_dom.index
+    client_dom
+    |> index()
     |> DocumentIndex.targets_by_tag(["input", "select"])
     |> Enum.flat_map(fn
       %{tag: "select"} = target ->
@@ -414,14 +429,14 @@ defmodule Fluffy.ClientDOM do
   end
 
   defp targets(client_dom, _locator, elements) do
-    Enum.map(elements, &DocumentIndex.target!(client_dom.index, &1))
+    Enum.map(elements, &DocumentIndex.target!(index(client_dom), &1))
   end
 
   @doc false
   def focused_target(%__MODULE__{focused: nil}), do: nil
 
   def focused_target(%__MODULE__{} = client_dom) do
-    DocumentIndex.target_by_id(client_dom.index, client_dom.focused)
+    DocumentIndex.target_by_id(index(client_dom), client_dom.focused)
   end
 
   @doc false
@@ -442,12 +457,12 @@ defmodule Fluffy.ClientDOM do
   def target_identity_present?(%__MODULE__{} = _client_dom, {:selector, _selector}), do: false
 
   def target_identity_present?(%__MODULE__{} = client_dom, identity) do
-    DocumentIndex.identity_present?(client_dom.index, identity)
+    DocumentIndex.identity_present?(index(client_dom), identity)
   end
 
   @doc false
   def selector_for_node_id(%__MODULE__{} = client_dom, node_id) do
-    DocumentIndex.selector_for_id!(client_dom.index, node_id)
+    DocumentIndex.selector_for_id!(index(client_dom), node_id)
   end
 
   defp maybe_put_keyboard_value(payload, client_dom, target)
@@ -496,7 +511,8 @@ defmodule Fluffy.ClientDOM do
   end
 
   defp tabbable_targets(client_dom) do
-    client_dom.index
+    client_dom
+    |> index()
     |> DocumentIndex.all_targets()
     |> Enum.with_index()
     |> Enum.flat_map(fn {target, document_index} ->
@@ -533,7 +549,7 @@ defmodule Fluffy.ClientDOM do
   end
 
   defp maybe_reset_form(client_dom, target) do
-    properties = Fluffy.Form.reset(client_dom.index, client_dom.properties, target)
+    properties = Fluffy.Form.reset(index(client_dom), client_dom.properties, target)
     %{client_dom | properties: properties}
   end
 
@@ -572,7 +588,7 @@ defmodule Fluffy.ClientDOM do
         client_dom
 
       name ->
-        index = client_dom.index
+        index = index(client_dom)
         target_owner_id = Map.get(index.form_owner_ids, target_id)
 
         index
@@ -624,9 +640,10 @@ defmodule Fluffy.ClientDOM do
   defp default_value(%{attributes: attributes}), do: attribute(attributes, "value") || ""
 
   defp select_options(client_dom, target) do
-    client_dom.index
+    client_dom
+    |> index()
     |> DocumentIndex.descendants_by_tag(target.id, "option")
-    |> Enum.map(&select_option(&1, client_dom.index))
+    |> Enum.map(&select_option(&1, index(client_dom)))
     |> Enum.with_index()
     |> Enum.map(fn {option, index} -> Map.put(option, :index, index) end)
   end

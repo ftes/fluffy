@@ -1,6 +1,7 @@
 defmodule Fluffy.EventTest do
   use Fluffy.TestCase, async: true
 
+  alias Fluffy.Backend.Phoenix
   alias Fluffy.Event
   alias Fluffy.Page
   alias Fluffy.Session
@@ -9,18 +10,23 @@ defmodule Fluffy.EventTest do
     @moduledoc false
     @behaviour Fluffy.Backend.Contract
 
+    defdelegate page_snapshot(context, page), to: Phoenix
+    defdelegate page_status(context, page), to: Phoenix
+    defdelegate commit_page(page, driver, state, url, options), to: Phoenix
+    defdelegate prepare_page(context, page, runtime), to: Phoenix
+    defdelegate runtime_event(context, message), to: Phoenix
+
     def start_session(_options, _attachment), do: raise("not used")
-    def close_session(_session), do: :ok
     def new_page(_session, _name), do: raise("not used")
     def history(_session, _direction, _options), do: raise("not used")
     def visit(_session, _path), do: raise("not used")
     def reload(_session, _options), do: raise("not used")
     def navigate(_session, _navigation), do: raise("not used")
-    def activate_page(_session, _page_id), do: raise("not used")
     def close_page(_session, _page_id), do: raise("not used")
     def absolute_url(_session, path), do: path
     def run_step(_session, _name, _location, fun), do: fun.()
     def capture_failure(_session, _operation, _error, _stacktrace), do: :ok
+    def normalize_error(_session, _operation, _arguments, error), do: error
 
     def arm_event(session, type, options) do
       probe = Keyword.fetch!(options, :probe)
@@ -60,7 +66,7 @@ defmodule Fluffy.EventTest do
     assert Process.get(:event_action_count) == 1
     assert_receive {:awaited, remaining} when remaining <= 100
     assert_receive :disarmed
-    assert Session.fetch_result!(session, :observation, :fake) == %{captured: true}
+    assert Event.fetch_result!(session, :observation, :fake) == %{captured: true}
   end
 
   test "always disarms when the action fails" do
@@ -104,6 +110,23 @@ defmodule Fluffy.EventTest do
     refute_receive {:armed, _type}
   end
 
+  test "disarms and preserves a callback error even when the callback closes the session" do
+    assert_raise RuntimeError, "action failed", fn ->
+      Event.capture(
+        session(),
+        :fake,
+        :failure,
+        fn session ->
+          Fluffy.close_session(session)
+          raise "action failed"
+        end,
+        probe: self()
+      )
+    end
+
+    assert_receive :disarmed
+  end
+
   test "requires the action to return its updated session" do
     assert_raise ArgumentError, ~r/must return the updated session/, fn ->
       Event.capture(
@@ -111,7 +134,9 @@ defmodule Fluffy.EventTest do
         :fake,
         :invalid,
         fn session ->
-          %{session | pending_event: nil}
+          {:ok, pending} = Fluffy.SessionRuntime.pending_capture(session.runtime)
+          Fluffy.SessionRuntime.cancel_capture(session.runtime, pending.token)
+          session
         end,
         probe: self()
       )
@@ -121,7 +146,7 @@ defmodule Fluffy.EventTest do
   end
 
   defp session do
-    page = %Page{id: :main, driver: :static, state: %{}}
+    page = %Page.State{name: :main, driver: :static, state: %{}}
     Session.new(FakeBackend, %{timeout: 100}, page)
   end
 end

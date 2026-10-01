@@ -30,7 +30,7 @@ defmodule Fluffy.Conformance.PageCleanupTest do
       |> visit(TestHTTPFixtures.path(fixture, "/start"))
       |> wait_for(Event.popup(:child), &click(&1, by_role(:link, name: "Open child")))
 
-    page_ids = Enum.map(session.pages, fn {_name, page} -> page.state.page_id end)
+    page_ids = Enum.map(Session.pages(session), fn {_name, page} -> page.state.page_id end)
     assert length(page_ids) == 2
     :ok = GenServer.stop(TestScope.current())
 
@@ -58,7 +58,7 @@ defmodule Fluffy.Conformance.PageCleanupTest do
     end
 
     refute Process.get(:duplicate_page_action_ran)
-    assert Session.current_page(session).id == :main
+    assert Session.current_page(session).name == :main
   end
 
   @tag driver: :phoenix
@@ -109,11 +109,7 @@ defmodule Fluffy.Conformance.PageCleanupTest do
     refute Process.alive?(live_view_proxy_pid(page))
     refute Process.alive?(page.state.watcher)
 
-    resources =
-      TestScope.current()
-      |> TestScope.status()
-      |> get_in([:sessions, session.context.resource_id])
-      |> Kernel.||([])
+    {:ok, resources} = Fluffy.SessionRuntime.resources(session.runtime)
 
     refute {:live_view, page.state.view.pid} in resources
     refute {:live_view, live_view_proxy_pid(page)} in resources

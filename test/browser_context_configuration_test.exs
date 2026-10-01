@@ -33,9 +33,9 @@ defmodule Fluffy.BrowserContextConfigurationTest do
 
     defaults = start_session(:playwright, base_url: origin)
 
-    refute Map.has_key?(configured.context, :browser_id)
-    refute Map.has_key?(defaults.context, :browser_id)
-    refute configured.context.context_id == defaults.context.context_id
+    refute Map.has_key?(Fluffy.Session.context(configured), :browser_id)
+    refute Map.has_key?(Fluffy.Session.context(defaults), :browser_id)
+    refute Fluffy.Session.context(configured).context_id == Fluffy.Session.context(defaults).context_id
 
     assert %{
              "color_scheme" => true,

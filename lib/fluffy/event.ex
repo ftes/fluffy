@@ -27,6 +27,7 @@ defmodule Fluffy.Event do
   alias Fluffy.Deadline
   alias Fluffy.Options
   alias Fluffy.Session
+  alias Fluffy.SessionRuntime
 
   @enforce_keys [:type, :key]
   defstruct [:type, :key, options: []]
@@ -147,17 +148,28 @@ defmodule Fluffy.Event do
       |> Keyword.put(:deadline, deadline)
       |> Keyword.put(:timeout, Deadline.remaining(deadline))
 
-    {session, token} = Session.arm_event(session, type, key, arm_options)
+    token = value!(SessionRuntime.begin_capture(session.runtime, type, key, arm_options))
+
+    try do
+      capture_armed(session, type, key, action, arm_options, token, deadline, timeout)
+    after
+      SessionRuntime.cancel_capture(session.runtime, token)
+    end
+  end
+
+  defp capture_armed(session, type, key, action, arm_options, token, deadline, timeout) do
+    backend = Session.backend(session)
     {:ok, armed_session, resource} = Backend.arm_event(session, type, arm_options)
 
     try do
       action_session = action.(armed_session)
-      ensure_action_session!(action_session, armed_session.backend, token)
+      ensure_action_session!(action_session, armed_session.runtime, token)
       remaining = Deadline.remaining(deadline)
 
       case Backend.await_event(action_session, resource, remaining) do
         {:ok, updated_session, value} ->
-          Session.put_result(updated_session, token, value)
+          value!(SessionRuntime.finish_capture(updated_session.runtime, token, value))
+          updated_session
 
         {:error, reason} when reason == :timeout or (is_map(reason) and reason.reason == :timeout) ->
           flunk("Expected #{inspect(type)} event #{inspect(key)} within #{timeout} ms, but no matching event occurred")
@@ -166,12 +178,12 @@ defmodule Fluffy.Event do
           flunk("Could not capture #{inspect(type)} event #{inspect(key)}: #{inspect(reason)}")
       end
     after
-      :ok = Backend.disarm_event(session.backend, resource)
+      :ok = Backend.disarm_event(backend, resource)
     end
   end
 
-  defp ensure_action_session!(%Session{backend: backend} = session, backend, token) do
-    case Session.pending_event(session) do
+  defp ensure_action_session!(%Session{runtime: runtime} = session, runtime, token) do
+    case value!(SessionRuntime.pending_capture(session.runtime)) do
       %{token: ^token} -> :ok
       _missing -> raise ArgumentError, "event action must return the updated session it receives"
     end
@@ -182,8 +194,15 @@ defmodule Fluffy.Event do
           "event action must return a Fluffy.Session, got: #{inspect(other)}"
   end
 
+  @doc false
+  def fetch_result!(session, key, type), do: value!(SessionRuntime.fetch_result(session.runtime, key, type))
+
+  defp value!({:ok, value}), do: value
+  defp value!(:ok), do: :ok
+  defp value!({:error, message}), do: raise(ArgumentError, message)
+
   defp default_timeout(session) do
-    Map.get(session.context, :timeout, Application.get_env(:fluffy, :timeout, 1_000))
+    Map.get(Session.context(session), :timeout, Application.get_env(:fluffy, :timeout, 1_000))
   end
 
   defp default_options(:download), do: [max_bytes: 10_000_000]

@@ -14,7 +14,8 @@ defmodule Fluffy.Backend do
 
   @doc false
   def start_unmanaged_session(name, options) when is_list(options) do
-    start_session(name, options, :unmanaged)
+    {:ok, runtime} = Fluffy.SessionRuntime.start(self())
+    start_session(name, options, {nil, runtime, nil})
   end
 
   @doc false
@@ -22,57 +23,82 @@ defmodule Fluffy.Backend do
     Fluffy.Backend.Phoenix.session_for_html(html)
   end
 
-  def close_session(%Session{backend: backend} = session) do
-    backend.close_session(session)
+  def close_session(%Session{} = session), do: Fluffy.SessionRuntime.close(session.runtime)
+
+  def new_page(session, name), do: dispatch(session, :new_page, [name])
+  def history(session, direction, options), do: dispatch(session, :history, [direction, options])
+
+  def visit(session, destination) do
+    dispatch(session, :visit, [destination])
   end
 
-  def new_page(%Session{backend: backend} = session, name), do: backend.new_page(session, name)
-  def history(%Session{backend: backend} = session, direction, options), do: backend.history(session, direction, options)
-
-  def visit(%Session{backend: backend} = session, destination) do
-    backend.visit(session, destination)
+  def reload(session, options) do
+    dispatch(session, :reload, [options])
   end
 
-  def reload(%Session{backend: backend} = session, options) do
-    backend.reload(session, options)
+  def navigate(session, navigation) do
+    dispatch(session, :navigate, [navigation])
   end
 
-  def navigate(%Session{backend: backend} = session, navigation) do
-    backend.navigate(session, navigation)
+  def close_page(session, page_id) do
+    dispatch(session, :close_page, [page_id])
   end
 
-  def activate_page(%Session{backend: backend} = session, page_id) do
-    backend.activate_page(session, page_id)
+  def arm_event(session, type, options) do
+    Session.backend(session).arm_event(session, type, options)
   end
 
-  def close_page(%Session{backend: backend} = session, page_id) do
-    backend.close_page(session, page_id)
-  end
-
-  def arm_event(%Session{backend: backend} = session, type, options) do
-    backend.arm_event(session, type, options)
-  end
-
-  def await_event(%Session{backend: backend} = session, resource, timeout) do
-    backend.await_event(session, resource, timeout)
+  def await_event(session, resource, timeout) do
+    Session.backend(session).await_event(session, resource, timeout)
   end
 
   def disarm_event(backend, resource), do: backend.disarm_event(resource)
 
-  def run_step(%Session{backend: backend} = session, name, location, fun) do
-    backend.run_step(session, name, location, fun)
+  def run_step(session, name, location, fun) do
+    Session.backend(session).run_step(session, name, location, fun)
   end
 
-  def capture_failure(%Session{backend: backend} = session, operation, error, stacktrace) do
-    backend.capture_failure(session, operation, error, stacktrace)
+  def capture_failure(session, operation, error, stacktrace) do
+    Session.backend(session).capture_failure(session, operation, error, stacktrace)
+  rescue
+    # A failed native callback may have closed the session. Diagnostics must
+    # never replace the original action error with a runtime lookup error.
+    _artifact_error -> :error
+  catch
+    :exit, _reason -> :error
   end
 
-  def absolute_url(%Session{backend: backend} = session, path), do: backend.absolute_url(session, path)
+  def absolute_url(session, path), do: Session.backend(session).absolute_url(session, path)
+
+  def normalize_error(session, operation, arguments, error)
+      when is_struct(error, Fluffy.StrictnessError) or is_struct(error, Fluffy.ActionabilityError),
+      do: Session.backend(session).normalize_error(session, operation, arguments, error)
+
+  def normalize_error(_session, _operation, _arguments, error), do: error
+
+  def page_snapshot(runtime, record), do: dispatch_page(runtime, record, :page_snapshot)
+  def page_status(runtime, record), do: dispatch_page(runtime, record, :page_status)
+
+  defp dispatch_page(runtime, record, operation) do
+    case Fluffy.SessionRuntime.configuration(runtime) do
+      {:ok, {backend, context}} -> apply(backend, operation, [context, record])
+      {:error, message} -> raise ArgumentError, message
+    end
+  end
+
+  defp dispatch(session, operation, args) do
+    apply(Session.backend(session), operation, [session | args])
+  end
 
   defp start_session(name, options, attachment) do
     options = name |> Fluffy.Options.validate_session!(options) |> session_options(name)
     backend = Fluffy.Backend.Registry.module(name)
     backend.start_session(options, attachment)
+  rescue
+    error ->
+      {_scope, runtime, _header} = attachment
+      Fluffy.SessionRuntime.close(runtime)
+      reraise error, __STACKTRACE__
   end
 
   defp session_options(options, :phoenix) do

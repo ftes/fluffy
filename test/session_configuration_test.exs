@@ -25,8 +25,8 @@ defmodule Fluffy.SessionConfigurationTest do
 
     session = start_session(:phoenix)
 
-    assert session.context.http.endpoint == Endpoint
-    assert session.context.http.base_url == Endpoint.url()
+    assert Fluffy.Session.context(session).http.endpoint == Endpoint
+    assert Fluffy.Session.context(session).http.base_url == Endpoint.url()
 
     session
     |> visit("/chamber")
@@ -39,7 +39,7 @@ defmodule Fluffy.SessionConfigurationTest do
 
     session = start_session(:phoenix)
 
-    assert session.context.http.base_url == "http://127.0.0.1:43123"
+    assert Fluffy.Session.context(session).http.base_url == "http://127.0.0.1:43123"
   end
 
   test "an unavailable endpoint listener falls back to the configured endpoint URL" do
@@ -48,7 +48,7 @@ defmodule Fluffy.SessionConfigurationTest do
 
     session = start_session(:phoenix)
 
-    assert session.context.http.base_url == "http://configured.example:4002"
+    assert Fluffy.Session.context(session).http.base_url == "http://configured.example:4002"
   end
 
   test "session options override global endpoint and base URL" do
@@ -72,7 +72,7 @@ defmodule Fluffy.SessionConfigurationTest do
 
     session = start_session(:phoenix)
 
-    assert session.context.http.base_url == "http://configured.example"
+    assert Fluffy.Session.context(session).http.base_url == "http://configured.example"
   end
 
   test "a configured base URL starts Playwright without an endpoint" do
@@ -81,7 +81,7 @@ defmodule Fluffy.SessionConfigurationTest do
 
     session = start_session(:playwright)
 
-    assert session.context.base_url == Fluffy.TestServer.base_url()
+    assert Fluffy.Session.context(session).base_url == Fluffy.TestServer.base_url()
   end
 
   test "missing global and session configuration reports the required setting" do

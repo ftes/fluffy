@@ -29,8 +29,7 @@ defmodule Fluffy.Test do
     end
 
     Fluffy.TestScope.setup(context,
-      sandbox: if(sandbox?, do: {Fluffy.Sandbox, :acquire, [context, repos]}, else: false),
-      timeout: Keyword.get(options, :timeout, 5_000)
+      sandbox: if(sandbox?, do: {Fluffy.Sandbox, :acquire, [context, repos]}, else: false)
     )
   end
 end

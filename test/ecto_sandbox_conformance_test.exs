@@ -63,9 +63,9 @@ defmodule Fluffy.EctoSandboxConformanceTest do
     first = browser_session()
     second = browser_session()
 
-    refute Map.has_key?(first.context, :browser_id)
-    refute Map.has_key?(second.context, :browser_id)
-    refute first.context.context_id == second.context.context_id
+    refute Map.has_key?(Fluffy.Session.context(first), :browser_id)
+    refute Map.has_key?(Fluffy.Session.context(second), :browser_id)
+    refute Fluffy.Session.context(first).context_id == Fluffy.Session.context(second).context_id
 
     first |> visit("/database") |> expect(value |> by_text() |> to_be_visible())
     second |> visit("/database") |> expect(value |> by_text() |> to_be_visible())

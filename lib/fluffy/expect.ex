@@ -709,13 +709,13 @@ defmodule Fluffy.Expect do
   end
 
   defp expect_active_page(%Session{} = session, %Expect{kind: :status} = expectation) do
-    actual = Session.current_page(session).status
+    actual = Fluffy.Page.status(Session.handle(session))
     assert_expected!(expectation, actual)
     session
   end
 
   defp expect_active_page(%Session{} = session, %Expect{kind: :opener} = expectation) do
-    actual = Session.current_page(session).opener
+    actual = session |> Session.handle() |> Fluffy.Page.opener() |> opener_value(expectation.expected)
     assert_expected!(expectation, actual)
     session
   end
@@ -725,14 +725,25 @@ defmodule Fluffy.Expect do
   end
 
   defp expect_captured_result(%Session{} = session, type, key, %Expect{} = expectation) do
-    result = Session.fetch_result!(session, key, type)
+    result = Fluffy.Event.fetch_result!(session, key, type)
     field = Expect.result_field(expectation)
-    actual = Map.fetch!(result, field)
+
+    actual =
+      case result do
+        %Fluffy.Page{} -> apply(Fluffy.Page, field, [result])
+        _ -> Map.fetch!(result, field)
+      end
+
+    actual = if field == :opener, do: opener_value(actual, expectation.expected), else: actual
     actual = if expectation.kind == :download_size, do: byte_size(actual), else: actual
 
     assert_expected!(expectation, actual)
     session
   end
+
+  defp opener_value(nil, _expected), do: nil
+  defp opener_value(page, %Fluffy.Page{}), do: page
+  defp opener_value(page, _expected), do: Fluffy.Page.name(page)
 
   defp assert_expected!(%Expect{kind: :request_headers} = expectation, actual) do
     expected = expectation.expected

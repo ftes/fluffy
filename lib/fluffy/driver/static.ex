@@ -13,7 +13,7 @@ defmodule Fluffy.Driver.Static do
 
   @impl true
   def open_browser(%Session{} = session, open_fun) do
-    endpoint = if session.context.http, do: session.context.http.endpoint
+    endpoint = if Session.context(session).http, do: Session.context(session).http.endpoint
     document = Session.page_state(session).client_dom.document
     Fluffy.OpenBrowser.write(document, Fluffy.OpenBrowser.static_asset_resolver(endpoint), open_fun)
     session

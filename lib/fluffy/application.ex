@@ -7,7 +7,12 @@ defmodule Fluffy.Application do
   def start(_type, _args) do
     Fluffy.Sandbox.config()
     validate_playwright_config()
-    Supervisor.start_link(children(), strategy: :rest_for_one, name: Fluffy.Supervisor)
+
+    Supervisor.start_link(
+      children() ++ [{DynamicSupervisor, strategy: :one_for_one, name: Fluffy.SessionRuntime.Supervisor}],
+      strategy: :rest_for_one,
+      name: Fluffy.Supervisor
+    )
   end
 
   defp children do

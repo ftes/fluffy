@@ -3,7 +3,7 @@ defmodule Fluffy.Internal.OperationFailure do
 
   # Element actions take their locator as the first driver argument. Assertions
   # take an Expect and unwrap takes a callback, so neither enters this envelope.
-  def normalize(%Fluffy.Session{backend: Fluffy.Backend.Phoenix} = session, operation, arguments, cause)
+  def normalize(%Fluffy.Session{} = session, operation, arguments, cause)
       when is_struct(cause, Fluffy.StrictnessError) or is_struct(cause, Fluffy.ActionabilityError) do
     wrap_operation(session, operation, arguments, cause)
   end

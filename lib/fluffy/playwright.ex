@@ -93,12 +93,7 @@ defmodule Fluffy.Playwright do
 
     trace = Trace.start(context, options)
 
-    :ok =
-      Fluffy.TestScope.register_trace(
-        context.resource_scope,
-        context.resource_id,
-        trace
-      )
+    :ok = Fluffy.SessionRuntime.register(session.runtime, {:trace, trace}, fn -> Trace.stop(trace) end)
 
     Session.put_context(session, Map.put(context, :trace, Trace.public_state(trace)))
   end
@@ -252,10 +247,10 @@ defmodule Fluffy.Playwright do
 
     options =
       options
-      |> Keyword.put(:connection, session.context.connection)
-      |> Keyword.put_new(:timeout, session.context.timeout)
+      |> Keyword.put(:connection, Session.context(session).connection)
+      |> Keyword.put_new(:timeout, Session.context(session).timeout)
 
-    case apply(PlaywrightEx.BrowserContext, operation, [session.context.context_id, options]) do
+    case apply(PlaywrightEx.BrowserContext, operation, [Session.context(session).context_id, options]) do
       {:ok, value} -> value
       {:error, error} -> raise "Playwright #{operation} failed: #{inspect(error)}"
     end

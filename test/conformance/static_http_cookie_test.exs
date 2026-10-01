@@ -13,13 +13,13 @@ defmodule Fluffy.Conformance.StaticHTTPCookieTest do
       fixture = TestHTTPFixtures.register(&cookie_response/1)
       session = start_test_session(driver)
 
-      session = visit(session, TestHTTPFixtures.path(fixture, "/account/set"))
-      session = visit(session, TestHTTPFixtures.path(fixture, "/outside"))
-      session = visit(session, TestHTTPFixtures.path(fixture, "/account/read"))
-      session = visit(session, TestHTTPFixtures.path(fixture, "/replace"))
-      session = visit(session, TestHTTPFixtures.path(fixture, "/read-replacement"))
-      session = visit(session, TestHTTPFixtures.path(fixture, "/delete"))
-      session = visit(session, TestHTTPFixtures.path(fixture, "/after-delete"))
+      visit(session, TestHTTPFixtures.path(fixture, "/account/set"))
+      visit(session, TestHTTPFixtures.path(fixture, "/outside"))
+      visit(session, TestHTTPFixtures.path(fixture, "/account/read"))
+      visit(session, TestHTTPFixtures.path(fixture, "/replace"))
+      visit(session, TestHTTPFixtures.path(fixture, "/read-replacement"))
+      visit(session, TestHTTPFixtures.path(fixture, "/delete"))
+      visit(session, TestHTTPFixtures.path(fixture, "/after-delete"))
 
       expect(session, "Cookie observation" |> by_text() |> to_be_visible())
 
@@ -57,9 +57,9 @@ defmodule Fluffy.Conformance.StaticHTTPCookieTest do
       first = start_test_session(driver)
       second = start_test_session(driver)
 
-      first = visit(first, TestHTTPFixtures.path(fixture, "/set"))
+      visit(first, TestHTTPFixtures.path(fixture, "/set"))
       _second = visit(second, TestHTTPFixtures.path(fixture, "/read"))
-      _first = visit(first, TestHTTPFixtures.path(fixture, "/read"))
+      visit(first, TestHTTPFixtures.path(fixture, "/read"))
 
       [_set, second_read, first_read] = TestHTTPFixtures.requests(fixture)
       assert cookie_map(second_read) == %{}

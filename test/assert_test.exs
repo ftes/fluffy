@@ -26,13 +26,9 @@ defmodule Fluffy.AssertTest do
   end
 
   test "typed expectations and session expressions are evaluated once" do
-    session = %Fluffy.Session{
-      backend: Fluffy.Backend.Phoenix,
-      pages: %{},
-      active_page: nil,
-      context: nil,
-      results: %{response: %{type: :response, value: %{status: 200}}}
-    }
+    session = Fluffy.session_for_html(:static, "<p>Response</p>")
+    {:ok, token} = Fluffy.SessionRuntime.begin_capture(session.runtime, :response, :response, [])
+    Fluffy.SessionRuntime.finish_capture(session.runtime, token, %{status: 200})
 
     session_fun = fn ->
       send(self(), :session_evaluated)

@@ -12,7 +12,7 @@ defmodule Fluffy.PlaywrightSessionTest do
 
     session = Fluffy.visit(session, "/stage")
 
-    assert session.backend == PlaywrightBackend
+    assert Session.backend(session) == PlaywrightBackend
     assert Session.current_driver(session) == :playwright
     assert DriverRegistry.module(Session.current_driver(session)) == PlaywrightDriver
     state = Session.page_state(session)

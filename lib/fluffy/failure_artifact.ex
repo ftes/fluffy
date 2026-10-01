@@ -14,7 +14,7 @@ defmodule Fluffy.FailureArtifact do
     File.mkdir_p!(directory)
     stem = artifact_stem(session, operation)
     state = Session.page_state(session)
-    timeout = min(Map.get(session.context, :timeout, 2_000), 2_000)
+    timeout = min(Map.get(Session.context(session), :timeout, 2_000), 2_000)
 
     write_content(state.frame_id, Path.join(directory, stem <> ".html"), timeout)
 
@@ -22,7 +22,7 @@ defmodule Fluffy.FailureArtifact do
       state.page_id,
       Path.join(directory, stem <> ".png"),
       full_page: true,
-      connection: session.context.connection,
+      connection: Session.context(session).connection,
       timeout: timeout
     )
 
@@ -51,16 +51,15 @@ defmodule Fluffy.FailureArtifact do
     Enum.join(Enum.reject([prefix, operation, unique], &is_nil/1), "-")
   end
 
-  defp test_prefix(%Session{context: %{resource_scope: scope}}) when is_pid(scope) do
-    context = TestScope.metadata(scope)
-    module = context |> Map.get(:module) |> inspect()
-    test = Map.get(context, :test)
-    slug("#{module} #{test}")
+  defp test_prefix(session) do
+    if scope = Session.context(session).resource_scope do
+      context = TestScope.metadata(scope)
+      module = context |> Map.get(:module) |> inspect()
+      slug("#{module} #{Map.get(context, :test)}")
+    end
   catch
     :exit, _reason -> nil
   end
-
-  defp test_prefix(_session), do: nil
 
   defp slug(value) do
     value

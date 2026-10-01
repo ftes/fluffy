@@ -59,7 +59,7 @@ defmodule Fluffy.Conformance.PageEventTest do
         end
 
       assert Page.url(page(session, :captured)) == TestHTTPFixtures.url(fixture, path)
-      assert Page.opener(page(session, :captured)) == opener
+      assert Page.opener(page(session, :captured)) == current_page(switch_page(session, opener))
     end
   end
 
@@ -91,8 +91,7 @@ defmodule Fluffy.Conformance.PageEventTest do
     assert Page.name(captured_page) == :details
     assert Page.url(captured_page) == details_url
     assert Page.status(captured_page) == 202
-    assert Page.opener(captured_page) == :main
-    assert Page.revision(captured_page) == 1
+    assert Page.opener(captured_page) == current_page(session)
 
     assert Enum.sort(page_names(session)) == [:details, :main]
 
@@ -104,6 +103,7 @@ defmodule Fluffy.Conformance.PageEventTest do
       |> expect(Fluffy.Expect.page_to_have_status(202))
       |> expect(Fluffy.Expect.page_to_have_opener(:main))
       |> close_page()
+      |> switch_page(:main)
 
     assert page_names(session) == [:main]
 
@@ -135,7 +135,7 @@ defmodule Fluffy.Conformance.PageEventTest do
 
     assert Page.url(page(session, :details)) == TestHTTPFixtures.url(fixture, "/details")
     assert Page.status(page(session, :details)) == 202
-    assert Page.opener(page(session, :details)) == :main
+    assert Page.opener(page(session, :details)) == current_page(session)
     session |> switch_page(:details) |> expect("Details page" |> by_text() |> to_be_visible())
   end
 
@@ -181,6 +181,7 @@ defmodule Fluffy.Conformance.PageEventTest do
 
     session
     |> close_page()
+    |> switch_page(:main)
     |> expect(Fluffy.Expect.page_to_have_url(opener_url))
   end
 
@@ -204,7 +205,9 @@ defmodule Fluffy.Conformance.PageEventTest do
         assert error.driver == unquote(driver)
       end
 
-      for action <- [&switch_page(&1, :main), &close_page/1] do
+      assert switch_page(session, current_page(session)) == session
+
+      for action <- [&close_page/1] do
         error = assert_raise Fluffy.CapabilityError, fn -> action.(session) end
         assert error.capability == :pages
       end

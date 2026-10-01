@@ -200,8 +200,8 @@ defmodule Fluffy.PlaywrightEventCaptureTest do
 
         {:ok, _} =
           PlaywrightEx.Page.close(Fluffy.Session.page_state(session).page_id,
-            connection: session.context.connection,
-            timeout: session.context.timeout
+            connection: Fluffy.Session.context(session).connection,
+            timeout: Fluffy.Session.context(session).timeout
           )
 
         assert {:ok, _session, %{status: 201}} = Backend.await_event(session, resource, 1_000)

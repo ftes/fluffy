@@ -578,10 +578,9 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
   defp input_mutation_label(:replace), do: "Replace attachment"
 
   defp upload_clients(session) do
-    TestScope.current()
-    |> TestScope.status()
-    |> get_in([:sessions, session.context.resource_id])
-    |> Enum.flat_map(fn
+    {:ok, resources} = Fluffy.SessionRuntime.resources(session.runtime)
+
+    Enum.flat_map(resources, fn
       {:upload_client, pid} -> [pid]
       _resource -> []
     end)

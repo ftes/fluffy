@@ -44,9 +44,14 @@ defmodule Fluffy.PhoenixTest do
     the contained session and explicit locators.
     """
     @enforce_keys [:session]
-    defstruct [:session, :scope, :active_form]
+    defstruct [:session, :scope, :active_form, :active_form_document]
 
-    @type t :: %__MODULE__{session: NativeSession.t(), scope: Locator.t() | nil, active_form: Locator.t() | nil}
+    @type t :: %__MODULE__{
+            session: NativeSession.t(),
+            scope: Locator.t() | nil,
+            active_form: Locator.t() | nil,
+            active_form_document: term()
+          }
   end
 
   @typedoc "A facade session, or a native session accepted when entering the facade."
@@ -206,7 +211,9 @@ defmodule Fluffy.PhoenixTest do
   """
   @spec submit(session()) :: Session.t()
   def submit(session) do
-    case wrap(session) do
+    session = wrap(session)
+
+    case current_form(session, page_identity(session.session)) do
       %Session{active_form: nil} ->
         raise ArgumentError, "no active form; fill, select, check, choose, or upload a field first"
 
@@ -311,12 +318,17 @@ defmodule Fluffy.PhoenixTest do
 
   defp map_session(session, fun) do
     session = wrap(session)
+    before_document = page_identity(session.session)
+    session = current_form(session, before_document)
     native = fun.(session.session)
-    active_form = if page_identity(native) == page_identity(session.session), do: session.active_form
-    %{session | session: native, active_form: active_form}
+    current_form(%{session | session: native}, page_identity(native))
   end
 
-  defp clear_form(session), do: %{session | active_form: nil}
+  defp clear_form(session), do: %{session | active_form: nil, active_form_document: nil}
+
+  # Another handle can navigate this shared page without updating the wrapper.
+  defp current_form(%Session{active_form_document: document} = session, document), do: session
+  defp current_form(session, _document), do: clear_form(session)
 
   defp page_identity(native) do
     page = NativeSession.current_page(native)
@@ -325,11 +337,12 @@ defmodule Fluffy.PhoenixTest do
 
   defp field_action(session, locator, fun) do
     session = wrap(session)
+    before_document = page_identity(session.session)
     form = Form.owner(session.session, locator)
     updated = map_session(session, fun)
 
-    if page_identity(updated.session) == page_identity(session.session) do
-      %{updated | active_form: form || Form.owner(updated.session, locator)}
+    if page_identity(updated.session) == before_document do
+      %{updated | active_form: form || Form.owner(updated.session, locator), active_form_document: before_document}
     else
       clear_form(updated)
     end

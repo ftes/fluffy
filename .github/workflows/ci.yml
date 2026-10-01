@@ -83,7 +83,13 @@ jobs:
       - if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: pnpm exec playwright install-deps chromium
       - run: pnpm run build:test
-      - run: mix lint
+      - name: Check formatting
+        if: matrix.lane == 'newest'
+        run: mix format --check-formatted
+      - name: Compile and lint
+        run: |
+          mix compile --warnings-as-errors
+          mix credo --format oneline
       - name: Run tests with one retry
         id: tests
         run: |

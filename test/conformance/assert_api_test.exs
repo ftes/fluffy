@@ -77,16 +77,16 @@ defmodule Fluffy.Conformance.AssertAPITest do
   test "captured results use flat constructors and negation" do
     session = session_for_html(:static, "<p>Saved</p>")
 
-    session = %{
-      session
-      | results: %{
-          receipt: %{type: :download, value: %{filename: "receipt.pdf", bytes: "pdf"}},
-          confirmation: %{type: :dialog, value: %{message: "Saved"}},
-          destination: %{type: :navigation, value: %{url: "https://example.test/receipt"}},
-          payment: %{type: :request, value: %{method: "POST"}},
-          result: %{type: :response, value: %{status: 201}}
-        }
-    }
+    for {key, type, value} <- [
+          {:receipt, :download, %{filename: "receipt.pdf", bytes: "pdf"}},
+          {:confirmation, :dialog, %{message: "Saved"}},
+          {:destination, :navigation, %{url: "https://example.test/receipt"}},
+          {:payment, :request, %{method: "POST"}},
+          {:result, :response, %{status: 201}}
+        ] do
+      {:ok, token} = Fluffy.SessionRuntime.begin_capture(session.runtime, type, key, [])
+      :ok = Fluffy.SessionRuntime.finish_capture(session.runtime, token, value)
+    end
 
     session
     |> assert(download_suggested_filename(:receipt, "receipt.pdf"))
