@@ -4,12 +4,11 @@ defmodule Fluffy.TestScope do
   use GenServer
 
   alias Ecto.Adapters.SQL.Sandbox
-  alias Fluffy.Playwright.Trace
-  alias PlaywrightEx.BrowserContext
+  alias Fluffy.SessionRuntime
 
   @process_key {__MODULE__, :current}
 
-  @type attachment :: :unmanaged | {pid(), reference(), {String.t(), String.t()} | nil}
+  @type attachment :: {pid() | nil, pid(), {String.t(), String.t()} | nil}
 
   def setup(context, options) when is_map(context) and is_list(options) do
     case current() do
@@ -28,11 +27,7 @@ defmodule Fluffy.TestScope do
 
     {:ok, scope} =
       ExUnit.Callbacks.start_supervised(
-        {__MODULE__,
-         owners: owners,
-         sandbox_header: sandbox_header,
-         test_context: test_context(context),
-         timeout: Keyword.fetch!(options, :timeout)},
+        {__MODULE__, owners: owners, sandbox_header: sandbox_header, test_context: test_context(context)},
         id: make_ref()
       )
 
@@ -45,7 +40,7 @@ defmodule Fluffy.TestScope do
   end
 
   def child_spec(options) do
-    %{id: __MODULE__, start: {__MODULE__, :start_link, [options]}, restart: :temporary}
+    %{id: __MODULE__, start: {__MODULE__, :start_link, [options]}, restart: :temporary, shutdown: :infinity}
   end
 
   def current, do: Process.get(@process_key)
@@ -60,70 +55,7 @@ defmodule Fluffy.TestScope do
 
   @doc false
   def attach_session(scope) when is_pid(scope) do
-    session_id = make_ref()
-    :ok = GenServer.call(scope, {:attach_session, session_id})
-    {scope, session_id, GenServer.call(scope, :sandbox_header)}
-  end
-
-  def attachment_values(:unmanaged), do: {nil, nil, nil}
-  def attachment_values({_scope, _session_id, _header} = attachment), do: attachment
-
-  def register_browser_context(nil, _session_id, _context_id), do: :ok
-
-  def register_browser_context(scope, session_id, context_id) do
-    GenServer.call(scope, {:register, session_id, {:browser_context, context_id}})
-  end
-
-  def register_trace(scope, session_id, trace) do
-    GenServer.call(scope, {:register, session_id, {:trace, trace}})
-  end
-
-  def register_live_view(nil, _session_id, _view_pid), do: :ok
-
-  def register_live_view(scope, session_id, view_pid) do
-    GenServer.call(scope, {:register, session_id, {:live_view, view_pid}})
-  end
-
-  @doc false
-  def release_live_view(nil, _session_id, _view_pid), do: :ok
-
-  def release_live_view(scope, session_id, view_pid) do
-    release_resource(scope, session_id, {:live_view, view_pid})
-  end
-
-  def register_upload_client(nil, _session_id, _upload_client_pid), do: :ok
-
-  def register_upload_client(scope, session_id, upload_client_pid) do
-    GenServer.call(scope, {:register, session_id, {:upload_client, upload_client_pid}})
-  end
-
-  @doc false
-  def release_upload_client(nil, _session_id, _upload_client_pid), do: :ok
-
-  def release_upload_client(scope, session_id, upload_client_pid) do
-    release_resource(scope, session_id, {:upload_client, upload_client_pid})
-  end
-
-  defp release_resource(scope, session_id, resource) do
-    if Process.alive?(scope) do
-      try do
-        GenServer.call(scope, {:release, session_id, resource}, :infinity)
-      catch
-        :exit, _reason -> :ok
-      end
-    else
-      :ok
-    end
-  end
-
-  def close_session(nil, _session_id), do: :not_managed
-
-  def close_session(scope, session_id) do
-    if Process.alive?(scope) do
-      GenServer.call(scope, {:close_session, session_id}, :infinity)
-    else
-      :ok
-    end
+    GenServer.call(scope, {:attach_session, self()})
   end
 
   @impl true
@@ -138,49 +70,21 @@ defmodule Fluffy.TestScope do
        owners: owners,
        sandbox_header: Keyword.get(options, :sandbox_header),
        sessions: %{},
-       test_context: Keyword.fetch!(options, :test_context),
-       timeout: Keyword.get(options, :timeout, 5_000)
+       test_context: Keyword.fetch!(options, :test_context)
      }}
   end
 
   @impl true
-  def handle_call({:attach_session, session_id}, _from, state) do
-    {:reply, :ok, put_in(state, [:sessions, session_id], [])}
+  def handle_call({:attach_session, owner}, _from, state) do
+    {:ok, runtime} = SessionRuntime.start(owner, self())
+    state = %{state | sessions: Map.put(state.sessions, runtime, Process.monitor(runtime))}
+    {:reply, {self(), runtime, state.sandbox_header}, state}
   end
 
-  def handle_call(:sandbox_header, _from, state) do
-    {:reply, state.sandbox_header, state}
-  end
-
-  def handle_call(:test_context, _from, state) do
-    {:reply, state.test_context, state}
-  end
+  def handle_call(:test_context, _from, state), do: {:reply, state.test_context, state}
 
   def handle_call(:status, _from, state) do
     {:reply, Map.take(state, [:owners, :sandbox_header, :sessions, :test_context]), state}
-  end
-
-  def handle_call({:register, session_id, resource}, _from, state) do
-    sessions = Map.update(state.sessions, session_id, [resource], &[resource | &1])
-    {:reply, :ok, %{state | sessions: sessions}}
-  end
-
-  def handle_call({:close_session, session_id}, _from, state) do
-    {resources, sessions} = Map.pop(state.sessions, session_id, [])
-    cleanup_resources(resources, state.timeout)
-    {:reply, :ok, %{state | sessions: sessions}}
-  end
-
-  def handle_call({:release, session_id, resource}, _from, state) do
-    resources = Map.get(state.sessions, session_id, [])
-
-    case List.delete(resources, resource) do
-      ^resources ->
-        {:reply, :ok, state}
-
-      remaining ->
-        {:reply, :ok, put_in(state, [:sessions, session_id], remaining)}
-    end
   end
 
   @impl true
@@ -196,61 +100,15 @@ defmodule Fluffy.TestScope do
         {:stop, {:shutdown, {:sandbox_owner_down, reason}}, state}
 
       _other ->
-        {:noreply, state}
+        {:noreply, %{state | sessions: Map.delete(state.sessions, owner)}}
     end
   end
 
   @impl true
   def terminate(_reason, state) do
-    state.sessions
-    |> Map.values()
-    |> List.flatten()
-    |> cleanup_resources(state.timeout)
-
+    Enum.each(Map.keys(state.sessions), &SessionRuntime.close/1)
     Enum.each(state.owners, &stop_sandbox_owner/1)
     :ok
-  end
-
-  defp cleanup_resources(resources, timeout) do
-    resources
-    |> Enum.filter(&match?({:trace, _trace}, &1))
-    |> Enum.each(fn {:trace, trace} -> safely(fn -> Trace.stop(trace) end) end)
-
-    resources
-    |> Enum.filter(&match?({:browser_context, _context_id}, &1))
-    |> Enum.each(fn {:browser_context, context_id} ->
-      safely(fn -> BrowserContext.close(context_id, timeout: timeout) end)
-    end)
-
-    resources
-    |> Enum.filter(&match?({:upload_client, _upload_client_pid}, &1))
-    |> Enum.each(fn {:upload_client, upload_client_pid} ->
-      stop_process(upload_client_pid, timeout)
-    end)
-
-    resources
-    |> Enum.filter(&match?({:live_view, _view_pid}, &1))
-    |> Enum.each(fn {:live_view, view_pid} -> stop_process(view_pid, timeout) end)
-  end
-
-  defp stop_process(pid, timeout) do
-    if Process.alive?(pid) do
-      reference = Process.monitor(pid)
-      Process.exit(pid, :shutdown)
-
-      receive do
-        {:DOWN, ^reference, :process, ^pid, _reason} -> :ok
-      after
-        timeout ->
-          if Process.alive?(pid), do: Process.exit(pid, :kill)
-
-          receive do
-            {:DOWN, ^reference, :process, ^pid, _reason} -> :ok
-          after
-            timeout -> :ok
-          end
-      end
-    end
   end
 
   if Code.ensure_loaded?(Sandbox) do

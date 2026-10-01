@@ -22,12 +22,9 @@ defmodule Fluffy.Conformance.PhoenixSessionTest do
 
     session = click(session, by_role(:button, name: "Play the flute"))
     assert Session.current_driver(session) == :live
-    assert Session.current_page(session).revision == 2
     expect(session, "Sleeping heads: 1" |> by_text() |> to_be_visible())
 
     session = visit(session, "/chamber")
     assert Session.current_driver(session) == :static
-
-    assert Session.current_page(session).revision == 3
   end
 end

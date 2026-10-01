@@ -33,11 +33,10 @@ end
 defmodule Fluffy.Internal.Navigation.BrowserCommitted do
   @moduledoc false
   @enforce_keys [:state, :url]
-  defstruct [:live_navigation_cursor, :response, :state, :url]
+  defstruct [:live_navigation_cursor, :state, :url]
 
   @type t :: %__MODULE__{
           live_navigation_cursor: non_neg_integer() | nil,
-          response: map() | nil,
           state: term(),
           url: String.t()
         }
@@ -92,11 +91,10 @@ defmodule Fluffy.Internal.Navigation do
   def patch(destination, state), do: %Patch{destination: destination, state: state}
 
   def browser_committed(url, state, options \\ []) do
-    options = Keyword.validate!(options, [:live_navigation_cursor, :response])
+    options = Keyword.validate!(options, [:live_navigation_cursor])
 
     %BrowserCommitted{
       live_navigation_cursor: options[:live_navigation_cursor],
-      response: options[:response],
       state: state,
       url: url
     }

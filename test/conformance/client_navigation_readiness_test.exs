@@ -73,13 +73,16 @@ defmodule Fluffy.Conformance.ClientNavigationReadinessTest do
       |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
       |> visit(Fluffy.TestHTTPFixtures.path(fixture))
 
-    first = Fluffy.Session.current_page(session)
+    first = current_page(session)
     assert Fluffy.Page.status(first) == 201
+    initial_url = Fluffy.Page.url(first)
+    initial_document = Fluffy.Page.snapshot(first).document_id
     session = click(session, by_role(:button, name: "Reload"))
-    reloaded = Fluffy.Session.current_page(session)
-    assert Fluffy.Page.url(reloaded) == Fluffy.Page.url(first)
+    reloaded = current_page(session)
+    assert reloaded == first
+    assert Fluffy.Page.url(first) == initial_url
     assert Fluffy.Page.status(reloaded) == 202
-    assert Fluffy.Page.revision(reloaded) > Fluffy.Page.revision(first)
+    refute Fluffy.Page.snapshot(first).document_id == initial_document
   end
 
   @tag driver: :playwright
@@ -92,7 +95,7 @@ defmodule Fluffy.Conformance.ClientNavigationReadinessTest do
       |> visit(Fluffy.TestHTTPFixtures.path(fixture))
       |> click(by_role(:link, name: "Blank"))
 
-    assert Fluffy.Page.url(Fluffy.Session.current_page(session)) == "about:blank"
-    assert Fluffy.Page.status(Fluffy.Session.current_page(session)) == nil
+    assert Fluffy.Page.url(current_page(session)) == "about:blank"
+    assert Fluffy.Page.status(current_page(session)) == nil
   end
 end

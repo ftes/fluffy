@@ -1,7 +1,7 @@
 defmodule Fluffy.LiveViewWatcher do
   @moduledoc false
 
-  use GenServer, restart: :transient
+  use GenServer, restart: :temporary
 
   def start_link(options) do
     GenServer.start_link(__MODULE__, options)

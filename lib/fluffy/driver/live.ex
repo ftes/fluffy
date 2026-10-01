@@ -20,7 +20,6 @@ defmodule Fluffy.Driver.Live do
   alias Fluffy.Locator
   alias Fluffy.Page
   alias Fluffy.Session
-  alias Fluffy.TestScope
   alias Fluffy.URLMatcher
 
   @retry_interval 10
@@ -225,7 +224,7 @@ defmodule Fluffy.Driver.Live do
   end
 
   @doc false
-  def release_page_uploads(%Session{} = session, %Page{driver: :live, state: state}) do
+  def release_page_uploads(%Session{} = session, %Page.State{driver: :live, state: state}) do
     state
     |> Map.fetch!(:live_uploads)
     |> UploadState.forms()
@@ -234,7 +233,7 @@ defmodule Fluffy.Driver.Live do
     :ok
   end
 
-  def release_page_uploads(%Session{}, %Page{}), do: :ok
+  def release_page_uploads(%Session{}, %Page.State{}), do: :ok
 
   @impl true
   def set_checked(%Session{} = session, %Locator{} = locator, desired, options \\ []) do
@@ -259,7 +258,7 @@ defmodule Fluffy.Driver.Live do
   end
 
   defp commit_checked(session, client_dom, target) do
-    identity = Map.fetch!(client_dom.index.nodes_by_id, target.id).identity
+    identity = Map.fetch!(ClientDOM.index(client_dom).nodes_by_id, target.id).identity
 
     case commit_click(session, client_dom, target) do
       %Session{} = session ->
@@ -267,9 +266,12 @@ defmodule Fluffy.Driver.Live do
 
         # A selector such as :checked stops matching after uncheck. Follow the
         # original control across any click patch instead of resolving it again.
-        case Enum.find(client_dom.index.entries, &(&1.identity == identity)) do
-          nil -> session
-          entry -> dispatch_live_change(session, client_dom, DocumentIndex.target_by_id(client_dom.index, entry.id))
+        case Enum.find(ClientDOM.index(client_dom).entries, &(&1.identity == identity)) do
+          nil ->
+            session
+
+          entry ->
+            dispatch_live_change(session, client_dom, DocumentIndex.target_by_id(ClientDOM.index(client_dom), entry.id))
         end
 
       navigation ->
@@ -540,7 +542,7 @@ defmodule Fluffy.Driver.Live do
       end
     catch
       :exit, original_reason ->
-        case live_view_exit_event(state.view, state.watcher, session.context.timeout) do
+        case live_view_exit_event(state.view, state.watcher, Session.context(session).timeout) do
           {:redirect, redirect} -> follow_redirect_result(session, {:error, redirect})
           {:died, reason} -> raise Fluffy.LiveViewError, reason: reason
           :none -> raise Fluffy.LiveViewError, reason: original_reason
@@ -577,7 +579,7 @@ defmodule Fluffy.Driver.Live do
   end
 
   defp reconcile_unwrapped_exit(session, view, watcher, original_reason) do
-    case live_view_exit_event(view, watcher, session.context.timeout) do
+    case live_view_exit_event(view, watcher, Session.context(session).timeout) do
       {:redirect, redirect} -> follow_redirect_result(session, {:error, redirect})
       {:died, reason} -> raise Fluffy.LiveViewError, reason: reason
       :none -> exit(original_reason)
@@ -691,7 +693,7 @@ defmodule Fluffy.Driver.Live do
         follow_redirect_result(session, {:error, redirect})
 
       {:exit, original_reason} ->
-        case live_view_exit_event(state.view, state.watcher, session.context.timeout) do
+        case live_view_exit_event(state.view, state.watcher, Session.context(session).timeout) do
           {:redirect, redirect} -> follow_redirect_result(session, {:error, redirect})
           {:died, reason} -> raise Fluffy.LiveViewError, reason: reason
           :none -> raise Fluffy.LiveViewError, reason: original_reason
@@ -828,7 +830,7 @@ defmodule Fluffy.Driver.Live do
 
     target = ClientDOM.target!(state.client_dom, locator)
     event_context = owning_view_context(state.view, target)
-    form_id = Form.owner_id(state.client_dom.index, target)
+    form_id = Form.owner_id(ClientDOM.index(state.client_dom), target)
 
     form_selector =
       selector_for_view(
@@ -856,16 +858,17 @@ defmodule Fluffy.Driver.Live do
             type: selected_file.content_type
           }
         end),
-        session.context.http.endpoint
+        Session.context(session).http.endpoint
       )
 
     session = if append?, do: session, else: release_live_upload_for_form(session, form_id)
 
     :ok =
-      TestScope.register_upload_client(
-        session.context.resource_scope,
-        session.context.resource_id,
-        upload.pid
+      Fluffy.Backend.Phoenix.register_process(
+        session.runtime,
+        :upload_client,
+        upload.pid,
+        Session.context(session).timeout
       )
 
     # The selection-triggered `phx-change` may replace or remove this input.
@@ -992,7 +995,7 @@ defmodule Fluffy.Driver.Live do
   defp live_upload_for_submit(session, target) do
     state = Session.page_state(session)
 
-    case Form.owner_id(state.client_dom.index, target) do
+    case Form.owner_id(ClientDOM.index(state.client_dom), target) do
       nil ->
         :none
 
@@ -1213,11 +1216,7 @@ defmodule Fluffy.Driver.Live do
   end
 
   defp release_upload_client(session, upload) do
-    TestScope.release_upload_client(
-      session.context.resource_scope,
-      session.context.resource_id,
-      upload.pid
-    )
+    Fluffy.SessionRuntime.release(session.runtime, {:upload_client, upload.pid})
 
     UploadCompat.stop(upload)
   end

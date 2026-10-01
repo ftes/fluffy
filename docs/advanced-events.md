@@ -101,30 +101,24 @@ available. Use `switch_page/2` to interact with them.
 
 `page(session, :secret_chamber)` returns the captured `Fluffy.Page` without
 switching. Inspect it with `Page.name/1`, `Page.url/1`, `Page.status/1`,
-`Page.opener/1`, and `Page.revision/1`. The opener is its name in the session,
-or `nil` if there is no opener or it has not been captured.
+and `Page.opener/1`. Metadata resolves current state through the live page handle.
+The opener is a stable page handle, or `nil` if there is no opener or it has closed,
+matching Playwright's `page.opener()` behavior.
 
 All pages in one session share cookies and storage. Start separate sessions
 for independent users.
 
 Phoenix follows links and submits forms in the current page, ignoring `target`
-and `formtarget`, including `_blank`. Both capture events, page switching, and
-closing pages require Playwright and raise a capability error in Phoenix.
+and `formtarget`, including `_blank`. Capturing and closing pages require Playwright and raise a capability error in
+Phoenix. Selecting the existing current page is supported on all backends.
 
 ### Closing pages
 
-`close_page(session)` closes the active page; `close_page(session, :name)` closes
-the named page. When closing the active page, the returned session targets its
-opener if that page is still open. Otherwise, it targets another remaining
-page, with no guaranteed selection order. Fluffy does not track page switching
-history. Closing an inactive page leaves the active page unchanged.
-
-Closing an opener leaves the pages it opened alive. Closing the last page in a
-session raises `ArgumentError`.
-
-In the example above, closing `:secret_chamber` returns to its opener, `:main`.
-When a particular target matters after closing, select it explicitly with
-`switch_page/2`:
+`close_page(session)` closes the selected page. Pass a page handle or name to
+close another page. Closing leaves each handle's selection unchanged: explicitly
+select an open page before continuing with a handle whose selected page closed.
+Closing an opener leaves the pages it opened alive. Closed page handles cannot
+be reused, even when a new page receives the same name.
 
 ```elixir
 session

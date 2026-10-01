@@ -16,39 +16,39 @@ defmodule Fluffy.BackendDriverArchitectureTest do
   test "a durable session selects a backend separately from its active page driver" do
     session = session_for_html(:static, "<main>Static</main>")
 
-    assert session.backend == Phoenix
+    assert Session.backend(session) == Phoenix
     assert DriverRegistry.module(Session.current_driver(session)) == Static
   end
 
   test "a Static driver reports link navigation and the Phoenix backend commits it" do
     session = visit(phoenix_session(), "/actions/click")
-    revision = Session.current_page(session).revision
+    document = Session.current_page(session).document_id
 
     assert {:navigate, pending_session, %Navigation.Link{destination: "/chamber"} = intent} =
              Static.click(session, by_role(:link, name: "Enter the chamber"), [])
 
-    assert Session.current_page(pending_session).revision == revision
+    assert Session.current_page(pending_session).document_id == document
 
     navigated_session = Backend.navigate(pending_session, intent)
 
     assert Session.current_driver(navigated_session) == :static
-    assert Session.current_page(navigated_session).revision == revision + 1
+    refute Session.current_page(navigated_session).document_id == document
     expect(navigated_session, "The guardian sleeps" |> by_text() |> to_be_visible())
   end
 
   test "a Live driver reports patches and the Phoenix backend commits them" do
     session = visit(phoenix_session(), "/live/chamber-map")
-    revision = Session.current_page(session).revision
+    document = Session.current_page(session).document_id
 
     assert {:navigate, pending_session, %Navigation.Patch{destination: "/live/chamber-map?step=patched"} = intent} =
              Live.click(session, by_role(:link, name: "Reveal passage", exact: true), [])
 
-    assert Session.current_page(pending_session).revision == revision
+    assert Session.current_page(pending_session).document_id == document
 
     navigated_session = Backend.navigate(pending_session, intent)
 
     assert Session.current_driver(navigated_session) == :live
-    assert Session.current_page(navigated_session).revision == revision + 1
+    assert Session.current_page(navigated_session).document_id == document
     expect(navigated_session, Fluffy.Expect.page_to_have_url("/live/chamber-map?step=patched"))
     expect(navigated_session, "Map position: patched" |> by_text() |> to_be_visible())
   end

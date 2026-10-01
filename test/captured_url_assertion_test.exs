@@ -3,9 +3,6 @@ defmodule Fluffy.CapturedURLAssertionTest do
 
   import Fluffy.Expect, only: [expect: 2, not_: 1]
 
-  alias Fluffy.Backend.Phoenix
-  alias Fluffy.Session
-
   for {module, constructor, type, field} <- [
         {Fluffy.Expect, :download_to_have_url, :download, :url},
         {Fluffy.Expect, :navigation_to_have_url, :navigation, :url},
@@ -16,13 +13,9 @@ defmodule Fluffy.CapturedURLAssertionTest do
     test "#{inspect(module)}.#{constructor} matches structured URL components" do
       url = "https://example.test/reports?tag=one&tag=two&q=hello+world#summary"
 
-      session = %Session{
-        backend: Phoenix,
-        context: nil,
-        pages: %{},
-        active_page: nil,
-        results: %{captured: %{type: unquote(type), value: %{unquote(field) => url}}}
-      }
+      session = Fluffy.session_for_html(:static, "<p>Captured URL</p>")
+      {:ok, token} = Fluffy.SessionRuntime.begin_capture(session.runtime, unquote(type), :captured, [])
+      Fluffy.SessionRuntime.finish_capture(session.runtime, token, %{unquote(field) => url})
 
       assertion = fn expected ->
         apply(unquote(module), unquote(constructor), [:captured, expected])
@@ -66,15 +59,9 @@ defmodule Fluffy.CapturedURLAssertionTest do
     test "#{inspect(module)}.#{constructor} matches captured URLs" do
       url = "https://example.test/reports/42?format=csv"
 
-      session = %Session{
-        backend: Phoenix,
-        context: nil,
-        pages: %{},
-        active_page: nil,
-        results: %{
-          captured: %{type: unquote(type), value: %{unquote(field) => url}}
-        }
-      }
+      session = Fluffy.session_for_html(:static, "<p>Captured URL</p>")
+      {:ok, token} = Fluffy.SessionRuntime.begin_capture(session.runtime, unquote(type), :captured, [])
+      Fluffy.SessionRuntime.finish_capture(session.runtime, token, %{unquote(field) => url})
 
       assertion = fn expected ->
         apply(unquote(module), unquote(constructor), [:captured, expected])

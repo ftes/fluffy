@@ -11,12 +11,12 @@ defmodule Fluffy.Conformance.InitialConnTest do
   test "uses an initial connection's authorization assign for a first Static visit only" do
     session = initial_session()
 
-    session = visit(session, "/initial-connection/chamber")
+    visit(session, "/initial-connection/chamber")
 
     assert Session.current_driver(session) == :static
     expect(session, "Static initial principal: chamber-keeper" |> by_text() |> to_be_visible())
 
-    session = visit(session, "/initial-connection/chamber")
+    visit(session, "/initial-connection/chamber")
 
     expect(session, Fluffy.Expect.page_to_have_status(403))
     expect(session, "Initial authorization required" |> by_text() |> to_be_visible())
@@ -48,7 +48,7 @@ defmodule Fluffy.Conformance.InitialConnTest do
   test "an ordinary Phoenix session receives the application's authorization denial" do
     session = phoenix_session()
 
-    session = visit(session, "/initial-connection/chamber")
+    visit(session, "/initial-connection/chamber")
 
     assert Session.current_driver(session) == :static
     expect(session, Fluffy.Expect.page_to_have_status(403))

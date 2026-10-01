@@ -12,7 +12,6 @@ defmodule Fluffy.Driver.Playwright do
   alias Fluffy.Locator.Playwright, as: PlaywrightLocator
   alias Fluffy.Playwright.Diagnostics
   alias Fluffy.Playwright.Handle
-  alias Fluffy.Playwright.Response
   alias Fluffy.Session
   alias Fluffy.URLMatcher
   alias PlaywrightEx.BrowserContext
@@ -27,8 +26,8 @@ defmodule Fluffy.Driver.Playwright do
   def open_browser(%Session{} = session, open_fun) do
     {:ok, html} =
       Frame.content(Session.page_state(session).frame_id,
-        connection: session.context.connection,
-        timeout: session.context.timeout
+        connection: Session.context(session).connection,
+        timeout: Session.context(session).timeout
       )
 
     url = Session.current_page(session).url
@@ -171,7 +170,7 @@ defmodule Fluffy.Driver.Playwright do
     case navigation_aware_action(session, action_timeout, fn remaining ->
            BrowserLocator.evaluate(
              Session.page_state(session).frame_id,
-             connection: session.context.connection,
+             connection: Session.context(session).connection,
              selector: PlaywrightLocator.selector(locator),
              expression: """
              form => {
@@ -241,7 +240,7 @@ defmodule Fluffy.Driver.Playwright do
 
   def set_input_files(%Session{} = session, key, source, _selected_files, options) when is_atom(key) do
     options = Keyword.validate!(options, [:timeout])
-    chooser = Session.fetch_result!(session, key, :file_chooser)
+    chooser = Fluffy.Event.fetch_result!(session, key, :file_chooser)
     ensure_chooser_page!(session, chooser, key)
     action_timeout = options |> Keyword.get(:timeout, timeout()) |> max(1)
 
@@ -249,7 +248,7 @@ defmodule Fluffy.Driver.Playwright do
       navigation_aware_action(session, action_timeout, fn remaining ->
         ElementHandle.set_input_files(
           chooser.element_id,
-          [connection: session.context.connection, timeout: remaining] ++
+          [connection: Session.context(session).connection, timeout: remaining] ++
             selection_options(source)
         )
       end)
@@ -362,7 +361,7 @@ defmodule Fluffy.Driver.Playwright do
 
   defp browser_action(session, operation, locator, extra, options) do
     selector_key = if operation == :drag_and_drop, do: :source, else: :selector
-    timeout = max(Keyword.get(options, :timeout, session.context.timeout), 1)
+    timeout = max(Keyword.get(options, :timeout, Session.context(session).timeout), 1)
 
     case navigation_aware_action(session, timeout, fn remaining ->
            args = options ++ extra
@@ -371,7 +370,7 @@ defmodule Fluffy.Driver.Playwright do
              args
              |> Keyword.put(selector_key, PlaywrightLocator.selector(locator))
              |> Keyword.put(:strict, true)
-             |> Keyword.put(:connection, session.context.connection)
+             |> Keyword.put(:connection, Session.context(session).connection)
              |> Keyword.put(:timeout, remaining)
 
            apply(Frame, operation, [Session.page_state(session).frame_id, args])
@@ -390,15 +389,15 @@ defmodule Fluffy.Driver.Playwright do
     state = Session.page_state(session)
 
     handle = %Handle{
-      context_id: session.context.context_id,
+      context_id: Session.context(session).context_id,
       page_id: state.page_id,
       frame_id: state.frame_id,
-      connection: session.context.connection,
-      timeout: session.context.timeout
+      connection: Session.context(session).connection,
+      timeout: Session.context(session).timeout
     }
 
     {:ok, :unwrap, outcome} =
-      navigation_aware_action(session, session.context.timeout, fn _remaining ->
+      navigation_aware_action(session, Session.context(session).timeout, fn _remaining ->
         _ignored = fun.(handle)
         validate_unwrapped_handle!(handle)
         {:ok, :unwrap}
@@ -412,7 +411,10 @@ defmodule Fluffy.Driver.Playwright do
     timeout = expectation.options |> Keyword.get(:timeout, timeout()) |> max(1)
 
     options =
-      Keyword.merge([connection: session.context.connection, is_not: expectation.negated?, timeout: timeout], options)
+      Keyword.merge(
+        [connection: Session.context(session).connection, is_not: expectation.negated?, timeout: timeout],
+        options
+      )
 
     case Frame.expect_result(state.frame_id, options) do
       {:ok, _result} ->
@@ -430,7 +432,7 @@ defmodule Fluffy.Driver.Playwright do
     matcher = fn uri -> URLMatcher.matches?(expected, URI.to_string(uri)) != expectation.negated? end
 
     case Frame.wait_for_url(state.frame_id,
-           connection: session.context.connection,
+           connection: Session.context(session).connection,
            url: matcher,
            wait_until: "commit",
            timeout: timeout
@@ -439,7 +441,7 @@ defmodule Fluffy.Driver.Playwright do
         :ok
 
       {:error, error} ->
-        {:ok, %{url: actual}} = Frame.snapshot(state.frame_id, connection: session.context.connection)
+        {:ok, %{url: actual}} = Frame.snapshot(state.frame_id, connection: Session.context(session).connection)
 
         raise ExUnit.AssertionError,
           message: "Expected #{Expect.describe(expectation)}, got #{inspect(actual)}\n" <> Diagnostics.format(error)
@@ -449,7 +451,7 @@ defmodule Fluffy.Driver.Playwright do
   defp navigation_aware_action(session, operation_timeout, action) do
     # Browser bookkeeping has its own budget; it must not consume a short
     # action/assertion timeout or silently leave navigation state stale.
-    deadline = Deadline.new(max(session.context.timeout, 1))
+    deadline = Deadline.new(max(Session.context(session).timeout, 1))
     state = Session.page_state(session)
 
     previous_url = Session.current_page(session).url
@@ -463,7 +465,7 @@ defmodule Fluffy.Driver.Playwright do
             state,
             previous_url,
             navigation_cursor,
-            Deadline.new(max(session.context.timeout, 1))
+            Deadline.new(max(Session.context(session).timeout, 1))
           )
 
         {:ok, value, outcome}
@@ -474,32 +476,46 @@ defmodule Fluffy.Driver.Playwright do
   end
 
   defp reconcile_action_navigation(session, state, previous_url, navigation_cursor, deadline) do
-    {:ok, snapshot} = Frame.snapshot(state.frame_id, connection: session.context.connection)
+    kind = live_navigation_kind(state, navigation_cursor, Deadline.remaining(deadline, 1))
 
-    if snapshot.url == previous_url and snapshot.document_ref == state.document_identity do
+    if kind in [:redirect, :patch] do
+      complete_live_navigation(state, navigation_cursor, Deadline.remaining(deadline, 1))
+    end
+
+    {:ok, snapshot} = Frame.snapshot(state.frame_id, connection: Session.context(session).connection)
+
+    if kind != :redirect and snapshot.url == previous_url and snapshot.document_ref == state.document_identity do
       session
     else
-      {:navigate, session, browser_navigation(state, snapshot, navigation_cursor, session.context.connection, deadline)}
+      {:navigate, session, browser_navigation(state, snapshot, kind, navigation_cursor)}
     end
   end
 
-  defp browser_navigation(state, snapshot, navigation_cursor, connection, deadline) do
+  defp browser_navigation(state, snapshot, kind, navigation_cursor) do
     if snapshot.document_ref == state.document_identity do
-      case live_navigation_kind(state, navigation_cursor, Deadline.remaining(deadline, 1)) do
+      case kind do
         :redirect -> Navigation.browser_committed(snapshot.url, state, live_navigation_cursor: navigation_cursor)
         _patch -> Navigation.browser_patch(snapshot.url, state)
       end
     else
-      response = await_navigation_response!(snapshot.document_request, connection, deadline)
       state = %{state | document_identity: snapshot.document_ref}
-      Navigation.browser_committed(snapshot.url, state, response: response)
+      Navigation.browser_committed(snapshot.url, state)
     end
   end
 
-  defp await_navigation_response!(request, connection, deadline) do
-    case Response.for_request(request, connection: connection, timeout: Deadline.remaining(deadline, 1)) do
-      {:ok, response} -> response
-      {:error, reason} -> raise "Could not capture the final main-document response: #{inspect(reason)}"
+  # LiveView starts a navigation synchronously but can change the URL after the
+  # click has returned. Capture the final frame state only after that navigation
+  # finishes, including redirects that keep the same URL or replace the document.
+  defp complete_live_navigation(state, cursor, timeout) do
+    case Frame.wait_for_function(state.frame_id,
+           expression:
+             "cursor => window.__fluffyLiveNavigationEvents?.slice(cursor).every(event => event.complete) ?? true",
+           is_function: true,
+           arg: cursor,
+           timeout: timeout
+         ) do
+      {:ok, _result} -> :ok
+      {:error, error} -> raise "LiveView browser navigation did not complete: #{inspect(error)}"
     end
   end
 

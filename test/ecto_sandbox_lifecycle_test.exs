@@ -49,7 +49,7 @@ defmodule Fluffy.EctoSandboxLifecycleTest do
       )
       |> visit("/live/database?delay=250")
 
-    context_id = session.context.context_id
+    context_id = Fluffy.Session.context(session).context_id
     GenServer.stop(scope)
 
     refute Process.alive?(owner)
@@ -68,7 +68,7 @@ defmodule Fluffy.EctoSandboxLifecycleTest do
         endpoint: Endpoint
       )
 
-    context_id = session.context.context_id
+    context_id = Fluffy.Session.context(session).context_id
     scope_reference = Process.monitor(scope)
     Process.exit(owner, :kill)
 
@@ -85,12 +85,12 @@ defmodule Fluffy.EctoSandboxLifecycleTest do
     {:ok, scope} =
       DynamicSupervisor.start_child(
         supervisor,
-        {TestScope, owners: [owner], sandbox_header: nil, test_context: %{}, timeout: 100}
+        {TestScope, owners: [owner], sandbox_header: nil, test_context: %{}}
       )
 
-    {_scope, session_id, _header} = TestScope.attach_session(scope)
+    {_scope, runtime, _header} = TestScope.attach_session(scope)
     live_view = spawn(fn -> Process.sleep(:infinity) end)
-    :ok = TestScope.register_live_view(scope, session_id, live_view)
+    :ok = Fluffy.Backend.Phoenix.register_process(runtime, :live_view, live_view, 100)
 
     owner_reference = Process.monitor(owner)
     view_reference = Process.monitor(live_view)

@@ -5,7 +5,6 @@ defmodule Fluffy.Backend.Playwright.Context do
     :base_url,
     :connection,
     :context_id,
-    :resource_id,
     :resource_scope,
     :timeout,
     :tracing_id
@@ -14,7 +13,6 @@ defmodule Fluffy.Backend.Playwright.Context do
     :base_url,
     :connection,
     :context_id,
-    :resource_id,
     :resource_scope,
     :timeout,
     :trace,
@@ -25,7 +23,6 @@ defmodule Fluffy.Backend.Playwright.Context do
           base_url: String.t(),
           connection: GenServer.name(),
           context_id: String.t(),
-          resource_id: reference() | nil,
           resource_scope: pid() | nil,
           timeout: pos_integer(),
           trace: map() | nil,

@@ -258,8 +258,7 @@ defmodule Fluffy.Options do
 
   @setup_schema NimbleOptions.new!(
                   repos: [type: {:list, :atom}],
-                  sandbox: [type: :boolean],
-                  timeout: [type: :pos_integer]
+                  sandbox: [type: :boolean]
                 )
 
   @session_schema NimbleOptions.new!(

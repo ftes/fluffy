@@ -111,7 +111,7 @@ defmodule Fluffy do
   end
 
   defp require_playwright!(session, capability) do
-    if session.backend != Fluffy.Backend.Playwright do
+    if Session.backend(session) != Fluffy.Backend.Playwright do
       raise Fluffy.CapabilityError,
         capability: capability,
         driver: Session.current_driver(session),
@@ -260,69 +260,66 @@ defmodule Fluffy do
 
   @doc group: "Event capture and results"
   @doc "Returns a previously captured download without consuming it."
-  def download(%Session{} = session, key), do: Session.fetch_result!(session, key, :download)
+  def download(%Session{} = session, key), do: Event.fetch_result!(session, key, :download)
 
   @doc group: "Event capture and results"
   @doc playwright_only: true
   @doc "Returns a previously captured file chooser without consuming it."
-  def file_chooser(%Session{} = session, key), do: Session.fetch_result!(session, key, :file_chooser)
+  def file_chooser(%Session{} = session, key), do: Event.fetch_result!(session, key, :file_chooser)
 
   @doc group: "Event capture and results"
   @doc "Returns a previously captured navigation without consuming it."
-  def navigation(%Session{} = session, key), do: Session.fetch_result!(session, key, :navigation)
+  def navigation(%Session{} = session, key), do: Event.fetch_result!(session, key, :navigation)
 
   @doc group: "Event capture and results"
   @doc playwright_only: true
   @doc "Returns a previously captured `Fluffy.Page` without consuming it."
   @spec page(Session.t(), term()) :: Fluffy.Page.t()
-  def page(%Session{} = session, name), do: Session.fetch_result!(session, name, :page)
+  def page(%Session{} = session, name), do: Event.fetch_result!(session, name, :page)
 
   @doc group: "Lifecycle and navigation"
-  @doc playwright_only: true
-  @doc """
-  Makes a named Playwright page the target of subsequent actions and assertions.
-
-  Raises `Fluffy.CapabilityError` with the Phoenix backend.
-  """
-  def switch_page(%Session{} = session, name), do: Backend.activate_page(session, name)
-
-  @doc group: "Lifecycle and navigation"
-  @doc playwright_only: true
-  @doc """
-  Closes a named Playwright page, or the active page when no name is supplied.
-
-  When closing the active page, the returned session targets its opener if that
-  page is still open. Otherwise, it targets another remaining page; the selection
-  order is unspecified. Page switching history is not tracked. Closing an
-  inactive page leaves the active page unchanged.
-
-  Closing a page does not close pages it opened. Raises `ArgumentError` when
-  attempting to close the last page in the session.
-
-  Raises `Fluffy.CapabilityError` with the Phoenix backend.
-  """
-  def close_page(%Session{} = session, name \\ nil) do
-    Backend.close_page(session, name || session.active_page)
+  @doc "Returns a live handle to the selected page."
+  @spec current_page(Session.t()) :: Fluffy.Page.t()
+  def current_page(%Session{} = session) do
+    Session.current_driver(session)
+    Session.handle(session)
   end
 
   @doc group: "Lifecycle and navigation"
+  @doc "Selects a page handle (or registered name) for this pipeline, without changing other handles."
+  def switch_page(%Session{} = session, page), do: Session.activate_page(session, page)
+
+  @doc group: "Lifecycle and navigation"
+  @doc "Closes a page. Handles selecting it must explicitly switch to another page before continuing."
+  def close_page(%Session{} = session, page \\ nil), do: Backend.close_page(session, page || Session.handle(session))
+
+  @doc group: "Lifecycle and navigation"
   @doc "Returns all current session-local page names."
-  def page_names(%Session{} = session), do: Map.keys(session.pages)
+  def page_names(%Session{} = session) do
+    Session.page_names(session)
+  end
+
+  @doc group: "Lifecycle and navigation"
+  @doc "Returns live handles for all open pages, including browser pages discovered without an event wait."
+  @spec pages(Session.t()) :: [Fluffy.Page.t()]
+  def pages(%Session{} = session) do
+    Enum.map(Session.pages(session), fn {_name, page} -> Fluffy.Page.new(session.runtime, page.id) end)
+  end
 
   @doc group: "Event capture and results"
   @doc playwright_only: true
   @doc "Returns a previously captured dialog without consuming it."
-  def dialog(%Session{} = session, key), do: Session.fetch_result!(session, key, :dialog)
+  def dialog(%Session{} = session, key), do: Event.fetch_result!(session, key, :dialog)
 
   @doc group: "Event capture and results"
   @doc playwright_only: true
   @doc "Returns a previously captured request without consuming it."
-  def request(%Session{} = session, key), do: Session.fetch_result!(session, key, :request)
+  def request(%Session{} = session, key), do: Event.fetch_result!(session, key, :request)
 
   @doc group: "Event capture and results"
   @doc playwright_only: true
   @doc "Returns a previously captured response without consuming it."
-  def response(%Session{} = session, key), do: Session.fetch_result!(session, key, :response)
+  def response(%Session{} = session, key), do: Event.fetch_result!(session, key, :response)
 
   @doc false
   def __expect__(session, expectation), do: dispatch_driver(session, :expect, [expectation])
@@ -526,7 +523,7 @@ defmodule Fluffy do
   rescue
     error ->
       stacktrace = __STACKTRACE__
-      error = Fluffy.Internal.OperationFailure.normalize(session, operation, arguments, error)
+      error = Backend.normalize_error(session, operation, arguments, error)
 
       Backend.capture_failure(session, operation, error, stacktrace)
 

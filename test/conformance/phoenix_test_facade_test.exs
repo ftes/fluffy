@@ -388,6 +388,29 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
     end
 
     @tag driver: driver
+    test "old facade handles cannot submit a form from a replaced document with #{driver}" do
+      fixture =
+        Fluffy.TestHTTPFixtures.register(%{
+          body: "<html><body><form method='post'><input name='name' aria-label='Name'></form></body></html>"
+        })
+
+      session =
+        unquote(driver)
+        |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+        |> visit(Fluffy.TestHTTPFixtures.path(fixture))
+        |> fill_in("Name", with: "Ada")
+
+      reload_page(session)
+
+      assert_raise ArgumentError, ~r/no active form/, fn -> submit(session) end
+      assert_raise ArgumentError, ~r/no active form/, fn -> session |> assert_has("input") |> submit() end
+
+      session |> fill_in("Name", with: "Grace") |> submit()
+      [_visit, _reload, submission] = Fluffy.TestHTTPFixtures.requests(fixture)
+      assert URI.decode_query(submission.body) == %{"name" => "Grace"}
+    end
+
+    @tag driver: driver
     test "submit retains the active form across LiveView patches with #{driver}" do
       unquote(driver)
       |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
@@ -618,7 +641,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
   test "prepared connections and scoped page operations preserve the updated connection" do
     for conn <- [Phoenix.ConnTest.build_conn(), put_endpoint(Phoenix.ConnTest.build_conn(), Endpoint)] do
       session = conn |> visit("/chamber?count=2&ready=true") |> assert_path("/chamber")
-      assert session.session.backend == Fluffy.Backend.Phoenix
+      assert Fluffy.Session.backend(session.session) == Fluffy.Backend.Phoenix
       assert_path(session, "/chamber", query_params: %{count: 2, ready: true})
       refute_path(session, "/other", query_params: %{count: 2, ready: true})
       refute_path(session, "/chamber", query_params: %{count: 3, ready: true})

@@ -1,169 +1,88 @@
 defmodule Fluffy.Session do
   @moduledoc """
-  The session state threaded through Fluffy test pipelines.
+  A live session handle with a local current-page selection.
 
-  Sessions are created and operated through the functions in `Fluffy` and
-  backend-specific public helpers such as `Fluffy.Playwright`. Their fields
-  and state-transition functions are internal implementation details.
+  Actions commit their state to the session runtime, so existing handles see
+  updates even when an action's return is discarded. Retain the returned handle
+  when switching pages. Use each session sequentially from its owning test
+  process; concurrent use of the same session is unsupported.
   """
-
-  alias Fluffy.Backend.Phoenix
-  alias Fluffy.Backend.Playwright
   alias Fluffy.Page
+  alias Fluffy.SessionRuntime
 
-  @enforce_keys [:backend, :context, :pages, :active_page]
-  defstruct [:backend, :context, :pages, :active_page, :pending_event, results: %{}]
-
-  @typedoc "A Fluffy session handle. Its fields are internal implementation details."
-  @type t :: %__MODULE__{
-          backend: Phoenix | Playwright,
-          context: map(),
-          pages: %{required(term()) => Page.t()},
-          active_page: term(),
-          pending_event: map() | nil,
-          results: map()
-        }
+  @enforce_keys [:runtime, :active_page]
+  defstruct [:runtime, :active_page]
+  @type t :: %__MODULE__{runtime: pid(), active_page: reference()}
 
   @doc false
-  def new(backend, context, %Page{id: page_id} = page) do
-    %__MODULE__{
-      backend: backend,
-      context: context,
-      pages: %{page_id => page},
-      active_page: page_id
-    }
+  def new(backend, context, %Page.State{} = page, runtime \\ nil) do
+    runtime = runtime || start_runtime()
+    id = value!(SessionRuntime.initialize(runtime, backend, context, page))
+    %__MODULE__{runtime: runtime, active_page: id}
   end
 
   @doc false
-  def current_page(%__MODULE__{} = session), do: Map.fetch!(session.pages, session.active_page)
-
+  def handle(%__MODULE__{runtime: runtime, active_page: id}), do: Page.new(runtime, id)
   @doc false
-  def current_driver(%__MODULE__{} = session), do: current_page(session).driver
-
+  def page_handle(session, page), do: Page.new(session.runtime, value!(SessionRuntime.resolve(session.runtime, page)))
   @doc false
-  def backend(%__MODULE__{} = session), do: session.backend
-
+  def current_page(session), do: Page.snapshot(handle(session))
   @doc false
-  def context(%__MODULE__{} = session), do: session.context
-
+  def current_driver(session), do: Page.record(handle(session)).driver
   @doc false
-  def put_context(%__MODULE__{} = session, context), do: %{session | context: context}
-
+  def backend(session), do: value!(SessionRuntime.backend(session.runtime))
   @doc false
-  def page_state(%__MODULE__{} = session), do: current_page(session).state
-
+  def context(session), do: value!(SessionRuntime.context(session.runtime))
   @doc false
-  def put_page_state(%__MODULE__{} = session, state) do
-    update_current_page(session, &%{&1 | state: state})
+  def pages(session), do: value!(SessionRuntime.pages(session.runtime))
+  @doc false
+  def put_context(session, context) do
+    value!(SessionRuntime.put_context(session.runtime, context))
+    session
   end
 
   @doc false
-  def put_page_opener(%__MODULE__{} = session, opener) do
-    update_current_page(session, &%{&1 | opener: opener})
+  def page_names(session), do: value!(SessionRuntime.page_names(session.runtime))
+  @doc false
+  def page_state(session), do: Page.record(handle(session)).state
+  @doc false
+  def put_page_state(session, state) do
+    value!(SessionRuntime.put_page_state(session.runtime, session.active_page, state))
+    session
   end
 
   @doc false
-  def put_page_status(%__MODULE__{} = session, status) do
-    update_current_page(session, &%{&1 | status: status})
+  def commit_page(session, driver, state, url, options \\ []) do
+    backend = backend(session)
+    page = backend.commit_page(Page.record(handle(session)), driver, state, url, options)
+    value!(SessionRuntime.replace_page(session.runtime, page))
+    session
   end
 
   @doc false
-  def commit_page(%__MODULE__{} = session, driver, state, url, options \\ []) do
-    update_current_page(session, &Page.commit(&1, driver, state, url, options))
+  def put_page(session, page) do
+    value!(SessionRuntime.register_page(session.runtime, page))
+    session
   end
 
   @doc false
-  def put_page(%__MODULE__{} = session, %Page{id: page_id} = page) do
-    if Map.has_key?(session.pages, page_id) do
-      raise ArgumentError, "page name #{inspect(page_id)} is already in use"
+  def activate_page(session, page) do
+    %{session | active_page: value!(SessionRuntime.resolve(session.runtime, page))}
+  end
+
+  defp value!({:ok, value}), do: value
+  defp value!(:ok), do: :ok
+  defp value!({:error, message}), do: raise(ArgumentError, message)
+
+  defp start_runtime do
+    case Fluffy.TestScope.current() do
+      scope when is_pid(scope) ->
+        {_scope, runtime, _header} = Fluffy.TestScope.attach_session(scope)
+        runtime
+
+      nil ->
+        {:ok, runtime} = SessionRuntime.start(self())
+        runtime
     end
-
-    %{session | pages: Map.put(session.pages, page_id, page)}
-  end
-
-  @doc false
-  def activate_page(%__MODULE__{} = session, page_id) do
-    if Map.has_key?(session.pages, page_id) do
-      %{session | active_page: page_id}
-    else
-      raise ArgumentError, "no page named #{inspect(page_id)} exists in this session"
-    end
-  end
-
-  @doc false
-  def delete_page(%__MODULE__{} = session, page_id, fallback_page) do
-    pages = Map.delete(session.pages, page_id)
-
-    if !Map.has_key?(pages, fallback_page) do
-      raise ArgumentError,
-            "cannot close page #{inspect(page_id)} without a remaining fallback page"
-    end
-
-    active_page = if session.active_page == page_id, do: fallback_page, else: session.active_page
-    %{session | pages: pages, active_page: active_page}
-  end
-
-  @doc false
-  def arm_event(%__MODULE__{pending_event: nil} = session, type, key, options) do
-    if Map.has_key?(session.results, key) do
-      raise ArgumentError,
-            "captured result key #{inspect(key)} is already in use; event result keys are immutable within a session"
-    end
-
-    token = make_ref()
-
-    {%{session | pending_event: %{token: token, type: type, key: key, options: options}}, token}
-  end
-
-  def arm_event(%__MODULE__{pending_event: pending}, _type, _key, _options) do
-    raise ArgumentError,
-          "cannot start an event expectation while #{inspect(pending.type)} #{inspect(pending.key)} is pending"
-  end
-
-  @doc false
-  def pending_event(%__MODULE__{pending_event: pending}), do: pending
-
-  @doc false
-  def capture_pending_event(%__MODULE__{pending_event: %{token: token} = pending} = session, token, value) do
-    %{session | pending_event: Map.put(pending, :captured, value)}
-  end
-
-  def capture_pending_event(%__MODULE__{}, token, _value) do
-    raise ArgumentError, "event token #{inspect(token)} is no longer pending"
-  end
-
-  @doc false
-  def put_result(%__MODULE__{pending_event: %{token: token}} = session, token, value) do
-    key = session.pending_event.key
-    type = if session.pending_event.type == :popup, do: :page, else: session.pending_event.type
-
-    %{
-      session
-      | pending_event: nil,
-        results: Map.put(session.results, key, %{type: type, value: value})
-    }
-  end
-
-  def put_result(%__MODULE__{}, token, _value) do
-    raise ArgumentError, "event token #{inspect(token)} is no longer pending"
-  end
-
-  @doc false
-  def fetch_result!(%__MODULE__{} = session, key, expected_type) do
-    case Map.fetch(session.results, key) do
-      {:ok, %{type: ^expected_type, value: value}} ->
-        value
-
-      {:ok, %{type: actual_type}} ->
-        raise ArgumentError,
-              "captured result #{inspect(key)} contains #{inspect(actual_type)}, expected #{inspect(expected_type)}"
-
-      :error ->
-        raise ArgumentError, "no captured result exists under #{inspect(key)}"
-    end
-  end
-
-  defp update_current_page(%__MODULE__{} = session, fun) do
-    %{session | pages: Map.update!(session.pages, session.active_page, fun)}
   end
 end

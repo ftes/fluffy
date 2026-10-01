@@ -28,7 +28,6 @@ defmodule Fluffy.Backend.Phoenix do
   alias Fluffy.Page
   alias Fluffy.PageLifecycle
   alias Fluffy.Session
-  alias Fluffy.TestScope
 
   # Phoenix.LiveViewTest.live/1 expands a path-taking branch that reads the
   # caller's @endpoint. Fluffy calls the conn-only branch after dispatching
@@ -38,7 +37,7 @@ defmodule Fluffy.Backend.Phoenix do
 
   @impl true
   def start_session(options, attachment) do
-    {resource_scope, resource_id, sandbox_header} = TestScope.attachment_values(attachment)
+    {resource_scope, runtime, sandbox_header} = attachment
 
     context = %Context{
       http: %HTTPClient{
@@ -48,41 +47,58 @@ defmodule Fluffy.Backend.Phoenix do
         initial_conn: Keyword.get(options, :conn),
         request_headers: put_header(Keyword.get(options, :headers, []), sandbox_header)
       },
-      resource_id: resource_id,
       resource_scope: resource_scope,
       timeout: Keyword.get(options, :timeout, Application.get_env(:fluffy, :timeout, 1_000))
     }
 
-    page = %Page{id: :main, driver: :unvisited, state: %UnvisitedState{}}
-    Session.new(__MODULE__, context, page)
+    page = %Page.State{name: :main, driver: :unvisited, state: %UnvisitedState{}}
+    Session.new(__MODULE__, context, page, runtime)
   end
 
   @doc false
   def session_for_html(html) when is_binary(html) do
-    page = %Page{
-      id: :main,
+    page = %Page.State{
+      name: :main,
       driver: :static,
       state: %StaticState{client_dom: ClientDOM.from_fragment(html)}
     }
 
     Session.new(
       __MODULE__,
-      %Context{http: nil, resource_id: nil, resource_scope: nil, timeout: 1_000},
+      %Context{http: nil, resource_scope: nil, timeout: 1_000},
       page
     )
   end
 
   @impl true
-  def close_session(%Session{} = session) do
-    :ok = PageLifecycle.release_all(session, &release_page/3)
+  def page_snapshot(_context, page), do: page
 
-    case TestScope.close_session(
-           Map.get(session.context, :resource_scope),
-           Map.get(session.context, :resource_id)
-         ) do
-      :not_managed -> :ok
-      :ok -> :ok
-    end
+  @impl true
+  def page_status(_context, page), do: page.status
+
+  @impl true
+  def commit_page(page, driver, state, url, options) do
+    options = Keyword.validate!(options, status: page.status, same_document: false)
+
+    %{
+      page
+      | driver: driver,
+        state: state,
+        url: url,
+        status: options[:status],
+        document_id: if(options[:same_document], do: page.document_id, else: make_ref())
+    }
+  end
+
+  @impl true
+  def prepare_page(_context, page, _runtime), do: {:ok, {page, nil, nil}}
+
+  @impl true
+  def runtime_event(_context, _message), do: :ignore
+
+  @doc false
+  def register_process(runtime, kind, pid, timeout) do
+    Fluffy.SessionRuntime.register(runtime, {kind, pid}, fn -> stop_process(pid, timeout, :shutdown) end)
   end
 
   @impl true
@@ -92,19 +108,23 @@ defmodule Fluffy.Backend.Phoenix do
   def capture_failure(%Session{}, _operation, _error, _stacktrace), do: :ok
 
   @impl true
+  def normalize_error(session, operation, arguments, error),
+    do: Fluffy.Internal.OperationFailure.normalize(session, operation, arguments, error)
+
+  @impl true
   def absolute_url(%Session{} = session, path) do
-    session.context.http.base_url |> URI.merge(path) |> URI.to_string()
+    Session.context(session).http.base_url |> URI.merge(path) |> URI.to_string()
   end
 
   @impl true
-  def visit(%Session{backend: __MODULE__} = session, path) do
-    url = resolve_url(session.context.http.base_url, path, session)
+  def visit(%Session{} = session, path) do
+    url = resolve_url(Session.context(session).http.base_url, path, session)
 
     request(session, url)
   end
 
   @impl true
-  def reload(%Session{backend: __MODULE__} = session, options \\ []) do
+  def reload(%Session{} = session, options \\ []) do
     _options = Keyword.validate!(options, [:timeout])
 
     case Session.current_page(session).url do
@@ -117,29 +137,30 @@ defmodule Fluffy.Backend.Phoenix do
   end
 
   @impl true
-  def navigate(%Session{backend: __MODULE__} = session, %Link{} = navigation) do
+  def navigate(%Session{} = session, %Link{} = navigation) do
     follow_link(session, navigation.destination, navigation.download)
   end
 
-  def navigate(%Session{backend: __MODULE__} = session, %Submission{} = navigation) do
+  def navigate(%Session{} = session, %Submission{} = navigation) do
     submit(session, navigation.submission)
   end
 
-  def navigate(%Session{backend: __MODULE__} = session, %Redirect{} = navigation) do
+  def navigate(%Session{} = session, %Redirect{} = navigation) do
     session
     |> put_live_redirect_flash(navigation.destination, navigation.flash)
     |> visit(navigation.destination)
   end
 
-  def navigate(%Session{backend: __MODULE__} = session, %Patch{} = navigation) do
-    url = resolve_url(Session.current_page(session).url, navigation.destination, session)
+  def navigate(%Session{} = session, %Patch{} = navigation) do
+    previous_url = Session.current_page(session).url
+    url = resolve_url(previous_url, navigation.destination, session)
 
     session
     |> Session.commit_page(:live, navigation.state, URI.to_string(url), same_document: true)
-    |> capture_url_change(Session.current_page(session).url)
+    |> capture_url_change(previous_url)
   end
 
-  def navigate(%Session{backend: __MODULE__} = session, %StaticConn{conn: conn}) do
+  def navigate(%Session{} = session, %StaticConn{conn: conn}) do
     destination = conn_request_target(conn, Session.current_page(session).url)
     commit_conn(session, conn, destination)
   end
@@ -153,12 +174,6 @@ defmodule Fluffy.Backend.Phoenix do
   def history(session, _direction, _options), do: require_browser_pages!(session)
 
   @impl true
-  @spec activate_page(Session.t(), term()) :: no_return()
-  def activate_page(%Session{} = session, _page_id) do
-    require_browser_pages!(session)
-  end
-
-  @impl true
   @spec close_page(Session.t(), term()) :: no_return()
   def close_page(%Session{} = session, _page_id) do
     require_browser_pages!(session)
@@ -166,7 +181,7 @@ defmodule Fluffy.Backend.Phoenix do
 
   @impl true
   def arm_event(%Session{} = session, type, options) when type in [:download, :navigation] do
-    %{token: token} = Session.pending_event(session)
+    %{token: token} = pending_capture(session)
     {:ok, session, %{type: type, token: token, options: options}}
   end
 
@@ -200,51 +215,66 @@ defmodule Fluffy.Backend.Phoenix do
   end
 
   @impl true
-  def await_event(
-        %Session{pending_event: %{token: token, captured: value}} = session,
-        %{type: type, token: token},
-        _timeout
-      )
-      when type in [:download, :navigation] do
-    {:ok, session, value}
+  def await_event(session, %{type: type, token: token}, _timeout) when type in [:download, :navigation] do
+    case pending_capture(session) do
+      %{token: ^token, captured: value} -> {:ok, session, value}
+      _ -> {:error, :timeout}
+    end
   end
 
-  def await_event(%Session{} = _session, _resource, _timeout), do: {:error, :timeout}
+  def await_event(_session, _resource, _timeout), do: {:error, :timeout}
 
   @impl true
   def disarm_event(_resource), do: :ok
+
+  defp pending_capture(session) do
+    case Fluffy.SessionRuntime.pending_capture(session.runtime) do
+      {:ok, pending} -> pending
+      {:error, message} -> raise ArgumentError, message
+    end
+  end
+
+  defp record_capture(session, token, value) do
+    case Fluffy.SessionRuntime.record_capture(session.runtime, token, value) do
+      :ok -> session
+      {:error, message} -> raise ArgumentError, message
+    end
+  end
 
   defp capture_url_change(session, from_url) do
     if Session.current_page(session).url == from_url, do: session, else: capture_navigation(session, from_url)
   end
 
-  defp capture_navigation(%Session{pending_event: %{captured: _value}} = session, _from_url), do: session
+  defp capture_navigation(session, from_url) do
+    case pending_capture(session) do
+      %{captured: _} ->
+        session
 
-  defp capture_navigation(
-         %Session{pending_event: %{type: :navigation, token: token, options: options}} = session,
-         from_url
-       ) do
-    if before_deadline?(options) do
-      page = Session.current_page(session)
-      navigation = %NavigationEvent{from_url: from_url, url: page.url, status: page.status}
-      Session.capture_pending_event(session, token, navigation)
-    else
-      session
+      %{type: :navigation, token: token, options: options} ->
+        if before_deadline?(options) do
+          page = Session.current_page(session)
+          navigation = %NavigationEvent{from_url: from_url, url: page.url, status: page.status}
+          record_capture(session, token, navigation)
+        else
+          session
+        end
+
+      _ ->
+        session
     end
   end
 
-  defp capture_navigation(session, _from_url), do: session
-
   defp follow_link(%Session{} = session, href, download_name) do
     current_url = Session.current_page(session).url
-    url = resolve_url(current_url || session.context.http.base_url, href, session)
+    url = resolve_url(current_url || Session.context(session).http.base_url, href, session)
 
     if same_document_navigation?(current_url, url) do
       session
       |> Session.commit_page(
         Session.current_driver(session),
         Session.page_state(session),
-        URI.to_string(url)
+        URI.to_string(url),
+        same_document: true
       )
       |> capture_url_change(current_url)
     else
@@ -286,35 +316,30 @@ defmodule Fluffy.Backend.Phoenix do
 
   @doc false
   def commit_live(%Session{} = session, conn, view, destination) do
+    previous_url = Session.current_page(session).url
     proxy_pid = live_view_proxy_pid(view)
     Process.unlink(proxy_pid)
 
     url =
       resolve_url(
-        Session.current_page(session).url || session.context.http.base_url,
+        Session.current_page(session).url || Session.context(session).http.base_url,
         destination,
         session
       )
 
     {:ok, watcher} =
-      ExUnit.Callbacks.start_supervised(
-        {LiveViewWatcher, caller: self(), view: view},
-        id: make_ref()
+      DynamicSupervisor.start_child(
+        Fluffy.SessionRuntime.Supervisor,
+        {LiveViewWatcher, caller: self(), view: view}
       )
 
-    :ok =
-      TestScope.register_live_view(
-        session.context.resource_scope,
-        session.context.resource_id,
-        view.pid
-      )
+    :ok = register_process(session.runtime, :watcher, watcher, Session.context(session).timeout)
 
     :ok =
-      TestScope.register_live_view(
-        session.context.resource_scope,
-        session.context.resource_id,
-        proxy_pid
-      )
+      register_process(session.runtime, :live_view, view.pid, Session.context(session).timeout)
+
+    :ok =
+      register_process(session.runtime, :live_view, proxy_pid, Session.context(session).timeout)
 
     state = %LiveState{
       client_dom: ClientDOM.from_fragment(render(view)),
@@ -331,24 +356,24 @@ defmodule Fluffy.Backend.Phoenix do
       [status: conn.status],
       &release_page/3
     )
-    |> capture_navigation(Session.current_page(session).url)
+    |> capture_navigation(previous_url)
   end
 
   @doc false
   def commit_conn(%Session{} = session, conn, destination) do
     url =
       resolve_url(
-        Session.current_page(session).url || session.context.http.base_url,
+        Session.current_page(session).url || Session.context(session).http.base_url,
         destination,
         session
       )
 
-    {http, response} = HTTP.follow(session.context.http, conn, url)
+    {http, response} = HTTP.follow(Session.context(session).http, conn, url)
     session |> put_http(http) |> finish_response(response, nil)
   end
 
   defp request(session, url, method \\ :get, body \\ nil, download_name \\ nil) do
-    {http, response} = HTTP.request(session.context.http, url, method, body)
+    {http, response} = HTTP.request(Session.context(session).http, url, method, body)
     session |> put_http(http) |> finish_response(response, download_name)
   end
 
@@ -357,14 +382,14 @@ defmodule Fluffy.Backend.Phoenix do
   defp put_live_redirect_flash(session, destination, flash) do
     token =
       if is_map(flash),
-        do: Phoenix.LiveView.Utils.sign_flash(session.context.http.endpoint, flash),
+        do: Phoenix.LiveView.Utils.sign_flash(Session.context(session).http.endpoint, flash),
         else: flash
 
-    url = resolve_url(session.context.http.base_url, destination, session)
+    url = resolve_url(Session.context(session).http.base_url, destination, session)
 
     http =
       HTTP.store_cookie_header(
-        session.context.http,
+        Session.context(session).http,
         url,
         "#{@live_flash_cookie}=#{token}; Path=/; Max-Age=60"
       )
@@ -398,11 +423,11 @@ defmodule Fluffy.Backend.Phoenix do
   end
 
   defp resolve_url(base_url, path, session) do
-    HTTP.resolve(session.context.http, base_url, path)
+    HTTP.resolve(Session.context(session).http, base_url, path)
   end
 
   defp put_http(%Session{} = session, %HTTPClient{} = http) do
-    %{session | context: %{session.context | http: http}}
+    Session.put_context(session, %{Session.context(session) | http: http})
   end
 
   defp same_document_navigation?(nil, _url), do: false
@@ -431,7 +456,7 @@ defmodule Fluffy.Backend.Phoenix do
     disposition = response_header(conn, "content-disposition")
 
     if not is_nil(download_name) or attachment?(disposition) do
-      case Session.pending_event(session) do
+      case pending_capture(session) do
         %{type: :download, token: token, options: options} ->
           filename = suggested_filename(disposition, download_name, url)
 
@@ -455,7 +480,7 @@ defmodule Fluffy.Backend.Phoenix do
   end
 
   defp capture_matching_download(session, token, download, options) do
-    already_captured? = Map.has_key?(Session.pending_event(session), :captured)
+    already_captured? = Map.has_key?(pending_capture(session), :captured)
 
     if not already_captured? and before_deadline?(options) and Download.matches?(download.filename, download.url, options) do
       max_bytes = Keyword.fetch!(options, :max_bytes)
@@ -466,7 +491,7 @@ defmodule Fluffy.Backend.Phoenix do
           message: "Downloaded #{size} bytes, exceeding the configured :max_bytes limit of #{max_bytes}"
       end
 
-      Session.capture_pending_event(session, token, download)
+      record_capture(session, token, download)
     else
       session
     end
@@ -544,6 +569,8 @@ defmodule Fluffy.Backend.Phoenix do
   end
 
   defp commit_static(conn, session, url) do
+    previous_url = Session.current_page(session).url
+
     state = %StaticState{
       conn: conn,
       client_dom: ClientDOM.from_document(conn.resp_body)
@@ -557,61 +584,26 @@ defmodule Fluffy.Backend.Phoenix do
       [status: conn.status],
       &release_page/3
     )
-    |> capture_navigation(Session.current_page(session).url)
+    |> capture_navigation(previous_url)
   end
 
-  defp release_page(session, %Page{driver: :live} = page, _reason) do
+  defp release_page(session, %Page.State{driver: :live} = page, _reason) do
     proxy_pid = live_view_proxy_pid(page.state.view)
     :ok = LiveDriver.release_page_uploads(session, page)
-    stop_page_process(page.state.watcher, session.context.timeout)
-    stop_page_process(page.state.view.pid, session.context.timeout)
-    stop_page_process(proxy_pid, session.context.timeout)
+    stop_process(page.state.watcher, Session.context(session).timeout, :normal)
+    Fluffy.SessionRuntime.release(session.runtime, {:watcher, page.state.watcher})
+    stop_process(page.state.view.pid, Session.context(session).timeout, :normal)
+    stop_process(proxy_pid, Session.context(session).timeout, :normal)
 
-    TestScope.release_live_view(
-      session.context.resource_scope,
-      session.context.resource_id,
-      page.state.view.pid
-    )
+    Fluffy.SessionRuntime.release(session.runtime, {:live_view, page.state.view.pid})
 
-    TestScope.release_live_view(
-      session.context.resource_scope,
-      session.context.resource_id,
-      proxy_pid
-    )
+    Fluffy.SessionRuntime.release(session.runtime, {:live_view, proxy_pid})
 
     flush_watcher_event(page.state.watcher)
     :ok
   end
 
-  defp release_page(_session, %Page{}, _reason), do: :ok
-
-  defp stop_page_process(pid, timeout) do
-    if Process.alive?(pid) do
-      Process.unlink(pid)
-      reference = Process.monitor(pid)
-
-      try do
-        GenServer.stop(pid, :normal, timeout)
-      catch
-        :exit, _reason -> if Process.alive?(pid), do: Process.exit(pid, :kill)
-      end
-
-      receive do
-        {:DOWN, ^reference, :process, ^pid, _reason} -> :ok
-      after
-        timeout ->
-          if Process.alive?(pid), do: Process.exit(pid, :kill)
-
-          receive do
-            {:DOWN, ^reference, :process, ^pid, _reason} -> :ok
-          after
-            timeout -> :ok
-          end
-      end
-    end
-
-    :ok
-  end
+  defp release_page(_session, %Page.State{}, _reason), do: :ok
 
   defp flush_watcher_event(watcher) do
     receive do
@@ -622,4 +614,38 @@ defmodule Fluffy.Backend.Phoenix do
   end
 
   defp live_view_proxy_pid(%{proxy: {_reference, _topic, proxy_pid}}) when is_pid(proxy_pid), do: proxy_pid
+
+  defp stop_process(pid, timeout, reason) do
+    if Process.alive?(pid) do
+      reference = Process.monitor(pid)
+
+      try do
+        request_stop(pid, timeout, reason)
+      catch
+        :exit, _reason -> Process.exit(pid, :kill)
+      end
+
+      receive do
+        {:DOWN, ^reference, :process, ^pid, _reason} -> :ok
+      after
+        timeout ->
+          Process.exit(pid, :kill)
+
+          receive do
+            {:DOWN, ^reference, :process, ^pid, _reason} -> :ok
+          end
+      end
+    end
+
+    :ok
+  end
+
+  # Replacing a document stops its linked processes normally in the caller;
+  # runtime teardown sends shutdown from the resource owner.
+  defp request_stop(pid, timeout, :normal) do
+    Process.unlink(pid)
+    GenServer.stop(pid, :normal, timeout)
+  end
+
+  defp request_stop(pid, _timeout, :shutdown), do: Process.exit(pid, :shutdown)
 end

@@ -33,9 +33,20 @@ defmodule MyAppWeb.CreatureTest do
 end
 ```
 
-Actions and assertions return the updated `Fluffy.Session`, so an ordinary Elixir
-pipeline represents the user's journey. The lifecycle established by
-`Fluffy.Test.setup/1` closes every session when the test finishes.
+Actions and assertions return a `Fluffy.Session` handle for pipelines. Evolving
+state belongs to the session runtime: existing handles see action results even
+when the returned handle is discarded. Use each session sequentially from its
+owning test process; concurrent use of the same session is unsupported.
+
+Page selection belongs to each handle. Retain the result of `switch_page/2` to
+select a different page in a pipeline; other handles keep their own selection.
+`current_page/1` returns a stable page handle that survives navigation, while
+`pages/1` lists all open pages, including automatically discovered browser tabs.
+After closing the selected page, explicitly switch to an open page to continue.
+
+The lifecycle established by `Fluffy.Test.setup/1` closes every session before
+releasing shared sandbox resources. Sessions also close when their owner exits,
+including sessions created outside managed test setup.
 
 The examples describe an illustrative Hogwarts application; routes, controls,
 and event handlers must exist in the application under test. Later snippets

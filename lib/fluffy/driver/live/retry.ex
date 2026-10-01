@@ -6,14 +6,14 @@ defmodule Fluffy.Driver.Live.Retry do
 
   def run(%Session{} = session, options, attempt, refresh, wait_for_retry)
       when is_list(options) and is_function(attempt, 1) and is_function(refresh, 1) and is_function(wait_for_retry, 2) do
-    timeout = Keyword.get(options, :timeout, session.context.timeout)
+    timeout = Keyword.get(options, :timeout, Session.context(session).timeout)
     deadline = Deadline.new(timeout)
     do_run(session, deadline, attempt, refresh, wait_for_retry, nil)
   end
 
   def run_current(%Session{} = session, options, attempt, refresh, wait_for_retry)
       when is_list(options) and is_function(attempt, 1) and is_function(refresh, 1) and is_function(wait_for_retry, 2) do
-    timeout = Keyword.get(options, :timeout, session.context.timeout)
+    timeout = Keyword.get(options, :timeout, Session.context(session).timeout)
     deadline = Deadline.new(timeout)
     run_attempt(session, deadline, attempt, refresh, wait_for_retry)
   end

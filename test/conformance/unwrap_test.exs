@@ -340,9 +340,9 @@ defmodule Fluffy.Conformance.UnwrapTest do
     end
 
     @tag driver: :playwright
-    test "synchronizes a native same-frame URL change into the page revision" do
+    test "preserves document identity across a native same-frame URL change" do
       session = playwright_html("<p>Hash destination</p>")
-      before_revision = Session.current_page(session).revision
+      before_document = Session.current_page(session).document_id
 
       session =
         session
@@ -356,7 +356,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
         end)
         |> expect(Fluffy.Expect.page_to_have_url("/harness#native"))
 
-      assert Session.current_page(session).revision == before_revision + 1
+      assert Session.current_page(session).document_id == before_document
     end
 
     @tag driver: :playwright
@@ -489,7 +489,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
     end
 
     @tag driver: :playwright
-    test "does not adopt a page created without a pre-armed page expectation" do
+    test "discovers and cleans up a page created without a pre-armed page expectation" do
       test_pid = self()
       session = playwright_html("<p>Main page</p>")
 
@@ -506,6 +506,10 @@ defmodule Fluffy.Conformance.UnwrapTest do
 
       assert page_names(session) == [:main]
       assert_receive {:untracked_page, page_id, connection, timeout}
+      assert length(pages(session)) == 2
+      child = Enum.find(pages(session), &(Page.name(&1) == nil))
+      assert Page.url(child) == "about:blank"
+      assert current_page(switch_page(session, child)) == child
 
       :ok = GenServer.stop(Fluffy.TestScope.current())
 
