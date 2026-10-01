@@ -20,6 +20,7 @@ defmodule Fluffy.SessionRuntime do
   def pages(runtime), do: call(runtime, :pages)
   def page_names(runtime), do: call(runtime, :page_names)
   def page(runtime, id), do: call(runtime, {:page, id})
+  def external_page(runtime, id), do: call(runtime, {:external_page, id})
   def put_page_state(runtime, id, state), do: call(runtime, {:page_state, id, state})
   def replace_page(runtime, %Page.State{} = page), do: call(runtime, {:replace_page, page})
   def close_page(runtime, id), do: call(runtime, {:close_page, id})
@@ -31,12 +32,10 @@ defmodule Fluffy.SessionRuntime do
   def release(runtime, resource), do: call(runtime, {:release_resource, resource})
   def monitor(runtime, pid), do: call(runtime, {:monitor, pid})
 
-  def begin_capture(runtime, type, key, options), do: call(runtime, {:begin_capture, type, key, options})
-  def pending_capture(runtime), do: call(runtime, :pending_capture)
-  def record_capture(runtime, token, value), do: call(runtime, {:record_capture, token, value})
-  def finish_capture(runtime, token, value), do: call(runtime, {:finish_capture, token, value})
-  def cancel_capture(runtime, token), do: call(runtime, {:cancel_capture, token})
-  def fetch_result(runtime, key, type), do: call(runtime, {:fetch_result, key, type})
+  def subscribe(runtime, pid, source, type, handler), do: call(runtime, {:subscribe, pid, source, type, handler})
+  def unsubscribe(runtime, pid), do: call(runtime, {:unsubscribe, pid})
+  def remove_listener(runtime, source, type, handler), do: call(runtime, {:remove_listener, source, type, handler})
+  def emit_event(runtime, source, type, value), do: call(runtime, {:event, source, type, value})
 
   def close(runtime) do
     GenServer.stop(runtime, :normal, :infinity)
@@ -82,8 +81,7 @@ defmodule Fluffy.SessionRuntime do
        names: %{},
        external_pages: %{},
        resources: [],
-       pending_capture: nil,
-       results: %{},
+       subscriptions: [],
        monitors: monitors
      }}
   end
@@ -101,6 +99,7 @@ defmodule Fluffy.SessionRuntime do
   end
 
   def handle_call({:page, id}, _from, state), do: {:reply, fetch_page(state, id), state}
+  def handle_call({:external_page, id}, _from, state), do: {:reply, {:ok, state.external_pages[id]}, state}
 
   def handle_call({:resolve, name}, _from, state) do
     result =
@@ -130,7 +129,7 @@ defmodule Fluffy.SessionRuntime do
   def handle_call({:close_page, id}, _from, state), do: {:reply, :ok, remove_page(state, id)}
 
   def handle_call({:initialize, backend, context, page}, _from, %{backend: nil} = state) do
-    case backend.prepare_page(context, page, self()) do
+    case backend.prepare_page(context, page) do
       {:ok, registration} -> register_page_reply(%{state | backend: backend, context: context}, registration)
       {:error, _} = error -> {:reply, error, state}
     end
@@ -140,7 +139,7 @@ defmodule Fluffy.SessionRuntime do
     do: {:reply, {:error, "session is already initialized"}, state}
 
   def handle_call({:register_page, page}, _from, state) do
-    case state.backend.prepare_page(state.context, page, self()) do
+    case state.backend.prepare_page(state.context, page) do
       {:ok, registration} -> register_page_reply(state, registration)
       {:error, _} = error -> {:reply, error, state}
     end
@@ -158,72 +157,42 @@ defmodule Fluffy.SessionRuntime do
   def handle_call({:monitor, pid}, _from, state),
     do: {:reply, :ok, %{state | monitors: [Process.monitor(pid) | state.monitors]}}
 
-  def handle_call({:begin_capture, type, key, options}, _from, state) do
-    cond do
-      state.pending_capture ->
-        pending = state.pending_capture
-
-        {:reply,
-         {:error, "cannot start an event expectation while #{inspect(pending.type)} #{inspect(pending.key)} is pending"},
-         state}
-
-      Map.has_key?(state.results, key) ->
-        {:reply,
-         {:error,
-          "captured result key #{inspect(key)} is already in use; event result keys are immutable within a session"},
-         state}
-
-      true ->
-        token = make_ref()
-        pending = %{token: token, type: type, key: key, options: options}
-        {:reply, {:ok, token}, %{state | pending_capture: pending}}
-    end
-  end
-
-  def handle_call(:pending_capture, _from, state), do: {:reply, {:ok, state.pending_capture}, state}
-
-  def handle_call({:record_capture, token, value}, _from, %{pending_capture: %{token: token} = pending} = state) do
-    if Map.has_key?(pending, :captured) do
-      {:reply, {:error, "event token #{inspect(token)} already has a captured value"}, state}
+  def handle_call({:subscribe, pid, source, type, handler}, _from, state) do
+    if source == :context or Map.has_key?(state.pages, source) do
+      subscription = %{pid: pid, source: source, type: type, handler: handler, monitor: Process.monitor(pid)}
+      {:reply, :ok, %{state | subscriptions: [subscription | state.subscriptions]}}
     else
-      {:reply, :ok, %{state | pending_capture: Map.put(pending, :captured, value)}}
+      {:reply, {:error, "event source page is closed"}, state}
     end
   end
 
-  def handle_call({:record_capture, token, _value}, _from, state), do: {:reply, stale_capture(token), state}
-
-  def handle_call({:finish_capture, token, value}, _from, %{pending_capture: %{token: token} = pending} = state) do
-    type = if pending.type == :popup, do: :page, else: pending.type
-    results = Map.put(state.results, pending.key, %{type: type, value: value})
-    {:reply, :ok, %{state | pending_capture: nil, results: results}}
+  def handle_call({:unsubscribe, pid}, _from, state) do
+    {:reply, :ok, remove_subscriptions(state, &(&1.pid == pid))}
   end
 
-  def handle_call({:finish_capture, token, _value}, _from, state), do: {:reply, stale_capture(token), state}
+  def handle_call({:remove_listener, source, type, handler}, _from, state) do
+    subscription = Enum.find(state.subscriptions, &(&1.source == source and &1.type == type and &1.handler == handler))
 
-  def handle_call({:cancel_capture, token}, _from, %{pending_capture: %{token: token}} = state),
-    do: {:reply, :ok, %{state | pending_capture: nil}}
+    if subscription do
+      {:reply, {:ok, subscription.pid}, remove_subscriptions(state, &(&1.pid == subscription.pid))}
+    else
+      {:reply, {:ok, nil}, state}
+    end
+  end
 
-  def handle_call({:cancel_capture, _token}, _from, state), do: {:reply, :ok, state}
+  def handle_call({:event, source, type, value}, _from, state) do
+    for subscription <- state.subscriptions,
+        subscription.source == source and subscription.type == type,
+        do: send(subscription.pid, {:fluffy_event, value})
 
-  def handle_call({:fetch_result, key, type}, _from, state) do
-    result =
-      case Map.fetch(state.results, key) do
-        {:ok, %{type: ^type, value: value}} ->
-          {:ok, value}
-
-        {:ok, %{type: actual_type}} ->
-          {:error, "captured result #{inspect(key)} contains #{inspect(actual_type)}, expected #{inspect(type)}"}
-
-        :error ->
-          {:error, "no captured result exists under #{inspect(key)}"}
-      end
-
-    {:reply, result, state}
+    {:reply, :ok, state}
   end
 
   @impl true
   def handle_info({:DOWN, ref, :process, _pid, _reason}, state) do
-    if ref in state.monitors, do: {:stop, :normal, state}, else: {:noreply, state}
+    if ref in state.monitors,
+      do: {:stop, :normal, state},
+      else: {:noreply, remove_subscriptions(state, &(&1.monitor == ref))}
   end
 
   def handle_info(_message, %{backend: nil} = state), do: {:noreply, state}
@@ -261,8 +230,6 @@ defmodule Fluffy.SessionRuntime do
     end
   end
 
-  defp stale_capture(token), do: {:error, "event token #{inspect(token)} is no longer pending"}
-
   defp register_page_reply(state, registration) do
     case put_page(state, registration) do
       {:ok, id, updated} -> {:reply, {:ok, id}, updated}
@@ -284,9 +251,8 @@ defmodule Fluffy.SessionRuntime do
     id = existing || make_ref()
     name = page.name
 
-    if name && Map.has_key?(state.names, name) && state.names[name] != id do
-      {:error, "page name #{inspect(name)} is already in use"}
-    else
+    with :ok <- validate_page_name(state, name, id),
+         :ok <- subscribe_new_page(state, page, existing) do
       opener = if opener_id, do: state.external_pages[opener_id], else: page.opener
       page = %{page | id: id, opener: if(Map.has_key?(state.pages, opener), do: opener)}
       state = %{state | pages: Map.put(state.pages, id, page)}
@@ -296,10 +262,23 @@ defmodule Fluffy.SessionRuntime do
     end
   end
 
+  defp validate_page_name(state, name, id) do
+    if name && Map.has_key?(state.names, name) && state.names[name] != id,
+      do: {:error, "page name #{inspect(name)} is already in use"},
+      else: :ok
+  end
+
+  defp subscribe_new_page(state, page, nil), do: state.backend.subscribe_page(state.context, page, self())
+  defp subscribe_new_page(_state, _page, _existing), do: :ok
+
   defp remove_page(state, id) do
     {page, pages} = Map.pop(state.pages, id)
 
     if page do
+      for subscription <- state.subscriptions,
+          subscription.source == id,
+          do: send(subscription.pid, {:source_closed, "event source page is closed"})
+
       # Like Playwright, a live page has no opener once that opener closes.
       pages = Map.new(pages, fn {key, page} -> {key, if(page.opener == id, do: %{page | opener: nil}, else: page)} end)
       names = Map.reject(state.names, fn {_name, value} -> value == id end)
@@ -307,6 +286,12 @@ defmodule Fluffy.SessionRuntime do
     else
       state
     end
+  end
+
+  defp remove_subscriptions(state, predicate) do
+    {removed, kept} = Enum.split_with(state.subscriptions, predicate)
+    for subscription <- removed, do: Process.demonitor(subscription.monitor, [:flush])
+    %{state | subscriptions: kept}
   end
 
   defp safely(fun) do

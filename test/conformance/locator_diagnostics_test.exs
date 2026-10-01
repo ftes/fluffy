@@ -5,8 +5,6 @@ defmodule Fluffy.Conformance.LocatorDiagnosticsTest do
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.Locator.Static, as: StaticLocator
-
   for driver <- [:static, :playwright] do
     @tag driver: driver
     test "count failures describe the public locator with backend-native diagnostics with #{driver}" do
@@ -45,13 +43,13 @@ defmodule Fluffy.Conformance.LocatorDiagnosticsTest do
     end
   end
 
-  test "fast single-target resolution rejects an ambiguous locator" do
-    document = LazyHTML.from_fragment("<button>Save</button><button>Save draft</button>")
+  test "Static click rejects an ambiguous locator" do
+    session = session_for_html(:static, "<button>Save</button><button>Save draft</button>")
     locator = by_role(:button, name: "Save")
 
     error =
-      assert_raise Fluffy.StrictnessError, fn ->
-        StaticLocator.resolve_one!(document, locator)
+      assert_raise Fluffy.OperationError, fn ->
+        click(session, locator)
       end
 
     assert error.message =~ "resolve to exactly one element"
@@ -59,11 +57,11 @@ defmodule Fluffy.Conformance.LocatorDiagnosticsTest do
     assert error.message =~ "<button>Save draft</button>"
   end
 
-  test "fast single-target resolution rejects a missing locator" do
-    document = LazyHTML.from_fragment("<button>Cancel</button>")
+  test "Static click rejects a missing locator" do
+    session = session_for_html(:static, "<button>Cancel</button>")
 
-    assert_raise Fluffy.StrictnessError, ~r/it matched 0.*Candidates: none/s, fn ->
-      StaticLocator.resolve_one!(document, by_role(:button, name: "Save", exact: true))
+    assert_raise Fluffy.OperationError, ~r/it matched 0.*Candidates: none/s, fn ->
+      click(session, by_role(:button, name: "Save", exact: true))
     end
   end
 

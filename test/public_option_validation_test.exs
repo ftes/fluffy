@@ -25,18 +25,20 @@ defmodule Fluffy.PublicOptionValidationTest do
     end
   end
 
-  test "event option values are validated when the event is constructed" do
-    assert_raise NimbleOptions.ValidationError, ~r/:max_bytes.*non[- ]negative integer/, fn ->
-      Event.download(:report, max_bytes: -1)
-    end
-
-    assert_raise NimbleOptions.ValidationError, ~r/:accept/, fn ->
-      Event.dialog(:confirmation, accept: :yes)
-    end
-
+  test "event options are validated before registration", %{session: session} do
     assert_raise NimbleOptions.ValidationError, ~r/:timeout.*non[- ]negative integer/, fn ->
-      Event.request(:request, "/reports", timeout: -1)
+      Fluffy.wait_for(session, Event.download(), timeout: -1)
     end
+
+    assert_raise NimbleOptions.ValidationError, ~r/unknown options.*scope/, fn ->
+      Fluffy.wait_for(session, Event.download(), scope: :context)
+    end
+
+    assert_raise NimbleOptions.ValidationError, fn ->
+      Fluffy.wait_for(session, Event.request(), scope: :unknown)
+    end
+
+    assert_raise FunctionClauseError, fn -> apply(Event, :download, [:legacy_key]) end
   end
 
   test "expectation option values are validated when the expectation is constructed", %{button: button} do
@@ -73,8 +75,8 @@ defmodule Fluffy.PublicOptionValidationTest do
     refute function_exported?(Expect, :url, 3)
     refute function_exported?(Expect, :status, 1)
     refute function_exported?(Expect, :page_opener, 2)
-    assert %Event{type: :page} = Event.page(:child)
-    assert %Event{type: :popup} = Event.popup(:child)
+    assert %Event{type: :page} = Event.page()
+    assert %Event{type: :popup} = Event.popup()
 
     assert %Expect{target: :page, kind: :url} = Expect.page_to_have_url("/accounts")
     assert %Expect{target: :page, kind: :status} = Expect.page_to_have_status(200)

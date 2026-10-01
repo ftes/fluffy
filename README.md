@@ -13,12 +13,10 @@ Fluffy runs tests through ConnTest, LiveViewTest, or a real browser. Its
 in-process drivers are checked against Playwright. Driver differences are
 documented in the [capability matrix](docs/capabilities.md).
 
-**Coming from PhoenixTest? Keep Phoenix and browser tests in the same module.**
-Fluffy adds strict, composable locators and
-assertion retries and action waiting for LiveView and browser tests.
-Mix non-browser and browser tests in a single test module -
-simply add `@tag backend: :playwright` to select tests.
-[See the mixed-module example and differences →](docs/migration-from-phoenix-test.md)
+**Coming from PhoenixTest?** Use `import Fluffy.PhoenixTest` to keep familiar
+helpers such as `fill_in`, `click_button`, and `assert_has`. The facade makes
+Fluffy mostly a drop-in replacement for supported tests, including browser tests.
+[Start with the migration guide →](docs/migration-from-phoenix-test.md)
 
 ```elixir
 creature_row =
@@ -76,25 +74,10 @@ action and the assertion to it.
 
 ## Getting started
 
-Add the dependency:
+Follow [Installation and runtime](docs/installation.md) for the dependency,
+endpoint, browser, and sandbox configuration.
 
-```elixir
-# mix.exs
-defp deps do
-  [
-    {:fluffy, "~> 0.3.0", only: :test}
-  ]
-end
-```
-
-Configure the endpoint:
-
-```elixir
-# config/test.exs
-config :fluffy, endpoint: MyAppWeb.Endpoint
-```
-
-Every Fluffy test establishes a lifecycle scope and imports the shared API:
+For the native locator API, establish a lifecycle scope and import its helpers:
 
 ```elixir
 use ExUnit.Case, async: true
@@ -113,45 +96,36 @@ Use `start_session(:playwright)` when a test needs a real browser. See
 [Installation and runtime](docs/installation.md) for Playwright and Ecto sandbox
 setup, then [Usage](docs/usage.md) for writing tests and a shared `FluffyCase`.
 
-## Assertion styles
+## Coming from PhoenixTest
 
-The guides use ExUnit-style assertions. Both styles use the same execution
-engine, retries, and diagnostics; this is just a choice of vocabulary.
+Replace `import PhoenixTest` with `import Fluffy.PhoenixTest` and add
+`Fluffy.Test.setup/1` to your test setup. Existing pipelines can keep their
+helper names and prepared connections:
 
-| ExUnit style — `use Fluffy.Assert` | Expect style — `import Fluffy.Expect` |
-| --- | --- |
-| `assert(visible(locator))` | `expect(to_be_visible(locator))` |
-| `refute(visible(locator))` | `expect(not_(to_be_visible(locator)))` |
-| `assert(page_url("/creatures"))` | `expect(page_to_have_url("/creatures"))` |
+```elixir
+import Fluffy.PhoenixTest
 
-Each call above is a step in a `session |> …` pipeline. See
-[Assertion styles](docs/assertion-styles.md) for setup and a fuller comparison.
+# Inside a test with Fluffy lifecycle setup:
+conn
+|> visit("/creatures/new")
+|> fill_in("Name", with: "Basilisk")
+|> click_button("Register")
+|> assert_has("#notice", text: "Creature registered")
+|> assert_path("/creatures")
+```
 
-## Migrating from PhoenixTest
+Use the facade import on its own. The [migration guide](docs/migration-from-phoenix-test.md)
+shows complete setup, the same helpers with Playwright, and compatibility
+boundaries. Adopting the native locator API is optional.
 
-For supported PhoenixTest-style helpers, use `import Fluffy.PhoenixTest` as a
-single import, with `Fluffy.Test` lifecycle setup. See the
-[facade guide](docs/migration-from-phoenix-test.md#optional-phoenixtest-style-facade)
-for supported options and behavior differences.
-
-The regular API uses composable locators:
-
-| PhoenixTest | Fluffy |
-| --- | --- |
-| `fill_in("Name", with: "Basilisk")` | `fill(by_label("Name", exact: true), "Basilisk")` |
-| `click_button("Register")` | `click(by_role(:button, name: "Register"))` |
-| `assert_path("/creatures")` | `assert(page_url(path: "/creatures"))` |
-
-See [Migrating from PhoenixTest](docs/migration-from-phoenix-test.md) for the
-full translation table and behavior differences.
-See [Visibility and DOM presence](docs/usage.md#visibility-and-dom-presence) before
-translating `assert_has` or `refute_has` into visibility assertions.
+For native tests, choose an [assertion vocabulary](docs/assertion-styles.md):
+`use Fluffy.Assert` or `import Fluffy.Expect`.
 
 ## Beyond page interactions
 
 Capture downloads, open new tabs, handle dialogs, and observe network events
-with Fluffy's event API. Download captures can filter by filename and URL; URL
-assertions also accept URI predicates. See [Advanced events and pages](docs/advanced-events.md)
+with Fluffy's event API. Register a wait before an action, then await a value.
+Predicates select events; ordinary ExUnit assertions inspect their metadata. See [Advanced events and pages](docs/advanced-events.md)
 for examples and the [Capability matrix](docs/capabilities.md) for what each
 backend supports.
 
@@ -165,13 +139,11 @@ backend supports.
   `expect` vocabularies compared
 - [Advanced events and pages](docs/advanced-events.md) — tabs, windows, iframe
   limitations, downloads, navigation, dialogs, and network events
-- [Migrating from PhoenixTest](docs/migration-from-phoenix-test.md) — an alternate
+- [Coming from PhoenixTest](docs/migration-from-phoenix-test.md) — an alternate
   starting point for existing PhoenixTest suites
 - [Capability matrix](docs/capabilities.md) — backend differences and limitations
 
 ## Developing Fluffy
-
-Fluffy requires `playwright_ex` 0.11 or newer.
 
 The project pins the current local-development toolchain in `.tool-versions`.
 Fluffy's compatibility floor remains Elixir 1.18 and Node.js 20; development

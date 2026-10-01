@@ -221,7 +221,11 @@ defmodule Fluffy.TestHTTPFixturePlug do
     headers = Enum.map(headers, fn {name, value} -> {String.downcase(name), value} end)
     conn = prepend_resp_headers(conn, headers)
 
-    conn |> send_resp(status, body) |> halt()
+    if stream = response[:stream] do
+      conn |> send_chunked(status) |> stream.() |> halt()
+    else
+      conn |> send_resp(status, body) |> halt()
+    end
   end
 
   defp read_request_body(conn, body \\ "") do

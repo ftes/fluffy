@@ -8,7 +8,7 @@ defmodule Fluffy.Driver.Live.Retry do
       when is_list(options) and is_function(attempt, 1) and is_function(refresh, 1) and is_function(wait_for_retry, 2) do
     timeout = Keyword.get(options, :timeout, Session.context(session).timeout)
     deadline = Deadline.new(timeout)
-    do_run(session, deadline, attempt, refresh, wait_for_retry, nil)
+    do_run(session, deadline, attempt, refresh, wait_for_retry)
   end
 
   def run_current(%Session{} = session, options, attempt, refresh, wait_for_retry)
@@ -18,7 +18,7 @@ defmodule Fluffy.Driver.Live.Retry do
     run_attempt(session, deadline, attempt, refresh, wait_for_retry)
   end
 
-  defp do_run(session, deadline, attempt, refresh, wait_for_retry, _last_failure) do
+  defp do_run(session, deadline, attempt, refresh, wait_for_retry) do
     case refresh.(session) do
       {:navigate, session, navigation} ->
         retry_after_navigation(session, navigation, deadline)
@@ -41,17 +41,17 @@ defmodule Fluffy.Driver.Live.Retry do
     if remaining == 0 do
       raise_failure(failure)
     else
-      wait_and_retry(session, deadline, attempt, refresh, wait_for_retry, failure, remaining)
+      wait_and_retry(session, deadline, attempt, refresh, wait_for_retry, remaining)
     end
   end
 
-  defp wait_and_retry(session, deadline, attempt, refresh, wait_for_retry, failure, remaining) do
+  defp wait_and_retry(session, deadline, attempt, refresh, wait_for_retry, remaining) do
     case wait_for_retry.(session, min(remaining, 10)) do
       {:navigate, session, navigation} ->
         retry_after_navigation(session, navigation, deadline)
 
       %Session{} = session ->
-        do_run(session, deadline, attempt, refresh, wait_for_retry, failure)
+        do_run(session, deadline, attempt, refresh, wait_for_retry)
     end
   end
 

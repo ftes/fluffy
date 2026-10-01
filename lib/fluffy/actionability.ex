@@ -95,11 +95,6 @@ defmodule Fluffy.Actionability do
     ensure_enabled!(element, action, locator)
   end
 
-  def ensure_file_input!(element, action, locator) do
-    ensure_file_input_type!(element, action, locator)
-    ensure_enabled!(element, action, locator)
-  end
-
   def ensure_file_input_type!(element, action, locator) do
     {tag, attributes} = element_info(element)
 

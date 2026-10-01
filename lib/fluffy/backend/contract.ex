@@ -13,10 +13,9 @@ defmodule Fluffy.Backend.Contract do
   @callback reload(Session.t(), keyword()) :: Session.t()
   @callback navigate(Session.t(), Navigation.t()) :: Session.t()
   @callback close_page(Session.t(), term()) :: Session.t()
-  @callback arm_event(Session.t(), atom(), keyword()) :: {:ok, Session.t(), term()}
-  @callback await_event(Session.t(), term(), non_neg_integer()) ::
-              {:ok, Session.t(), term()} | {:error, term()}
-  @callback disarm_event(term()) :: :ok
+  @callback event_source(Session.t(), atom(), :page | :context) :: :context | reference()
+  @callback subscribe_event(Session.t(), atom(), :context | reference(), pid()) ::
+              {(term() -> {:ok, term()} | {:error, String.t()} | :ignore), (-> :ok)}
   @callback run_step(Session.t(), String.t(), keyword(), (-> term())) :: term()
   @callback capture_failure(Session.t(), atom(), Exception.t(), Exception.stacktrace()) :: term()
   @callback normalize_error(Session.t(), atom(), list(), Exception.t()) :: Exception.t()
@@ -29,7 +28,9 @@ defmodule Fluffy.Backend.Contract do
 
   # Normalize backend page identities and events before they enter the runtime.
   @type page_registration :: {Page.State.t(), term() | nil, term() | nil}
-  @callback prepare_page(term(), Page.State.t(), pid()) :: {:ok, page_registration()} | {:error, String.t()}
+  @callback prepare_page(term(), Page.State.t()) :: {:ok, page_registration()} | {:error, String.t()}
+  # Called only for the first registration of an open page.
+  @callback subscribe_page(term(), Page.State.t(), pid()) :: :ok | {:error, String.t()}
   @callback runtime_event(term(), term()) ::
               {:page_opened, page_registration()} | {:page_closed, term()} | :closed | :ignore
 end

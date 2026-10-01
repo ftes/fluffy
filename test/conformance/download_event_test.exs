@@ -10,300 +10,253 @@ defmodule Fluffy.Conformance.DownloadEventTest do
   alias Fluffy.TestHTTPFixtures
 
   for driver <- [:phoenix, :playwright] do
-    @tag driver: driver
-    test "captures a download before clicking and keeps the source page with #{driver}", %{
-      driver: driver
+    @tag driver: driver, tmp_dir: true
+    test "download handles keep the source page and can be read and saved repeatedly with #{driver}", %{
+      driver: driver,
+      tmp_dir: tmp_dir
     } do
-      fixture =
-        TestHTTPFixtures.register(fn request ->
-          case request.path do
-            "/start" ->
-              %{
-                body:
-                  html("""
-                  <h1>Download source</h1>
-                  <a href="report">Download report</a>
-                  """)
-              }
+      session = session(driver)
+      pending = wait_for(session, Event.download())
+      click(session, by_role(:link, name: "Report", exact: true))
+      download = await(pending)
+      assert download.suggested_filename == "report.csv"
+      assert String.ends_with?(download.url, "/report")
+      assert Download.read!(download) == "id,total\n1,42\n"
+      assert Download.read!(download) == "id,total\n1,42\n"
+      destination = Path.join(tmp_dir, "copy.csv")
+      assert Download.save_as!(download, destination) == :ok
 
-            "/report" ->
-              %{
-                headers: [
-                  {"content-disposition", "attachment; filename=orders.csv"},
-                  {"content-type", "text/csv; charset=utf-8"}
-                ],
-                body: "id,total\n1,42\n"
-              }
-          end
-        end)
+      session
+      |> expect(page_to_have_url(&String.ends_with?(&1.path, "/start")))
+      |> expect("Source" |> by_text() |> to_be_visible())
 
-      session = start_test_session(driver)
-
-      session =
-        session
-        |> visit(TestHTTPFixtures.path(fixture, "/start"))
-        |> wait_for(
-          Event.download(:report, filename: "orders.csv", url: TestHTTPFixtures.url(fixture, "/report")),
-          fn session ->
-            click(session, by_role(:link, name: "Download report"))
-          end
-        )
-        |> expect(Fluffy.Expect.download_to_have_suggested_filename(:report, "orders.csv"))
-        |> expect(Fluffy.Expect.download_to_have_content_type(:report, "text/csv"))
-        |> expect(Fluffy.Expect.download_to_have_content(:report, "id,total\n1,42\n"))
-        |> expect("Download source" |> by_text() |> to_be_visible())
-        |> expect(Fluffy.Expect.page_to_have_url(TestHTTPFixtures.url(fixture, "/start")))
-
-      assert %Download{
-               filename: "orders.csv",
-               content_type: "text/csv",
-               bytes: "id,total\n1,42\n"
-             } = download(session, :report)
+      close_session(session)
+      assert File.read!(destination) == "id,total\n1,42\n"
+      assert_raise ArgumentError, ~r/session is closed/, fn -> Download.read!(download) end
     end
 
     @tag driver: driver
-    test "follows redirects before capturing the final download response with #{driver}", %{
-      driver: driver
-    } do
-      fixture =
-        TestHTTPFixtures.register(fn request ->
-          case request.path do
-            "/start" ->
-              %{body: html(~s(<a href="redirect">Download redirected report</a>))}
+    test "predicates skip unrelated downloads and retain the first match with #{driver}", %{driver: driver} do
+      session = session(driver)
+      pending = wait_for(session, Event.download(&(&1.suggested_filename == "report.csv")))
 
-            "/redirect" ->
-              %{status: 302, headers: [{"location", "report"}], body: "redirect body"}
+      session
+      |> click(by_role(:link, name: "Noise", exact: true))
+      |> click(by_role(:link, name: "Report", exact: true))
+      |> click(by_role(:link, name: "Renamed", exact: true))
 
-            "/report" ->
-              %{
-                headers: [
-                  {"content-disposition", "attachment; filename=final.csv"},
-                  {"content-type", "text/csv"}
-                ],
-                body: "final bytes"
-              }
-          end
-        end)
+      assert Download.read!(await(pending)) == "id,total\n1,42\n"
+    end
 
+    @tag driver: driver
+    test "two waits observe the same physical download with #{driver}", %{driver: driver} do
+      session = session(driver)
+      first = wait_for(session, Event.download())
+      second = wait_for(session, Event.download())
+      click(session, by_role(:link, name: "Report", exact: true))
+      assert await(first) == await(second)
+    end
+
+    @tag driver: driver
+    test "redirects resolve to the final download with #{driver}", %{driver: driver} do
       driver
-      |> start_test_session()
-      |> visit(TestHTTPFixtures.path(fixture, "/start"))
-      |> wait_for(Event.download(:redirected), fn session ->
-        click(session, by_role(:link, name: "Download redirected report"))
+      |> session()
+      |> expect_event(Event.download(), &click(&1, by_role(:link, name: "Redirect", exact: true)), fn download ->
+        assert download.suggested_filename == "report.csv"
+        assert Download.read!(download) == "id,total\n1,42\n"
       end)
-      |> expect(Fluffy.Expect.download_to_have_suggested_filename(:redirected, "final.csv"))
-      |> expect(Fluffy.Expect.download_to_have_content(:redirected, "final bytes"))
-      |> expect("Download redirected report" |> by_text() |> to_be_visible())
+      |> expect("Source" |> by_text() |> to_be_visible())
     end
 
     @tag driver: driver
-    test "the download attribute supplies a filename with #{driver}", %{driver: driver} do
-      fixture =
-        TestHTTPFixtures.register(fn request ->
-          case request.path do
-            "/start" ->
-              %{body: html(~s(<a href="raw" download="renamed.txt">Save locally</a>))}
-
-            "/raw" ->
-              %{headers: [{"content-type", "text/plain"}], body: "plain bytes"}
-          end
-        end)
-
-      session = start_test_session(driver)
-
-      session
-      |> visit(TestHTTPFixtures.path(fixture, "/start"))
-      |> wait_for(Event.download(:raw), &click(&1, by_role(:link, name: "Save locally")))
-      |> expect(Fluffy.Expect.download_to_have_suggested_filename(:raw, "renamed.txt"))
-      |> expect(Fluffy.Expect.download_to_have_content_type(:raw, "text/plain"))
-      |> expect(Fluffy.Expect.download_to_have_content(:raw, "plain bytes"))
+    test "the download attribute supplies the filename with #{driver}", %{driver: driver} do
+      driver
+      |> session()
+      |> expect_event(Event.download(), &click(&1, by_role(:link, name: "Renamed", exact: true)), fn download ->
+        assert download.suggested_filename == "renamed.txt"
+        assert Download.read!(download) == "plain bytes"
+      end)
     end
-  end
 
-  for driver <- [:phoenix, :playwright] do
     @tag driver: driver
-    test "a timed-out listener is cleaned up with #{driver}", %{driver: driver} do
-      fixture =
-        TestHTTPFixtures.register(fn request ->
-          case request.path do
-            "/start" ->
-              %{body: html(~s(<a href="file" download="after-timeout.txt">Download</a>))}
+    test "size limits apply when reading, not when observing a download with #{driver}", %{driver: driver} do
+      driver
+      |> session()
+      |> expect_event(Event.download(), &click(&1, by_role(:link, name: "Report", exact: true)), fn download ->
+        assert download.suggested_filename == "report.csv"
+        assert_raise ExUnit.AssertionError, ~r/max_bytes/, fn -> Download.read!(download, max_bytes: 1) end
+        assert Download.read!(download) == "id,total\n1,42\n"
+      end)
+    end
 
-            "/file" ->
-              %{headers: [{"content-type", "text/plain"}], body: "still works"}
-          end
-        end)
+    @tag driver: driver
+    test "a timeout releases its registration before the next download with #{driver}", %{driver: driver} do
+      session = session(driver)
+      pending = wait_for(session, Event.download(), timeout: 0)
+      assert_raise ExUnit.AssertionError, ~r/timeout/, fn -> await(pending) end
+      expect_event(session, Event.download(), &click(&1, by_role(:link, name: "Report", exact: true)))
+    end
 
-      session = start_test_session(driver)
-      session = visit(session, TestHTTPFixtures.path(fixture, "/start"))
-      Process.put(:download_action_count, 0)
+    @tag driver: driver
+    test "a rejected download times out with #{driver}", %{driver: driver} do
+      session = session(driver)
+      pending = wait_for(session, Event.download(fn _ -> false end), timeout: 500)
+      click(session, by_role(:link, name: "Report", exact: true))
+      assert_raise ExUnit.AssertionError, ~r/no matching download event/, fn -> await(pending) end
+    end
 
-      error =
-        assert_raise ExUnit.AssertionError, fn ->
-          wait_for(
-            session,
-            Event.download(:missing),
-            fn session ->
-              Process.put(:download_action_count, Process.get(:download_action_count) + 1)
-              session
-            end,
-            timeout: 20
-          )
-        end
-
-      assert error.message =~ "Expected :download event :missing within 20 ms"
-      assert Process.get(:download_action_count) == 1
-
-      session
-      |> wait_for(Event.download(:after_timeout), &click(&1, by_role(:link, name: "Download")))
-      |> expect(Fluffy.Expect.download_to_have_suggested_filename(:after_timeout, "after-timeout.txt"))
-      |> expect(Fluffy.Expect.download_to_have_content(:after_timeout, "still works"))
+    @tag driver: driver
+    test "downloads leave the source document intact without registrations with #{driver}", %{driver: driver} do
+      driver
+      |> session()
+      |> click(by_role(:link, name: "Report", exact: true))
+      |> expect("Source" |> by_text() |> to_be_visible())
     end
   end
 
   @tag driver: :playwright
-  test "a target-blank attachment is a download rather than a new page with Playwright" do
+  test "a target-blank attachment is a download" do
+    :playwright
+    |> session()
+    |> expect_event(Event.download(), &click(&1, by_role(:link, name: "New tab", exact: true)), fn download ->
+      assert Download.read!(download) == "id,total\n1,42\n"
+    end)
+    |> expect("Source" |> by_text() |> to_be_visible())
+  end
+
+  @tag driver: :playwright
+  test "download metadata is available before completion, while read waits for the bytes" do
+    owner = self()
+
+    fixture =
+      TestHTTPFixtures.register(fn request ->
+        case request.path do
+          "/start" ->
+            %{body: ~s(<a href="slow">Download</a>)}
+
+          "/slow" ->
+            %{
+              headers: [{"content-disposition", "attachment; filename=slow.txt"}],
+              stream: fn conn ->
+                {:ok, conn} = Plug.Conn.chunk(conn, "first")
+                send(owner, {:stream, self()})
+
+                receive do
+                  :finish -> :ok
+                after
+                  5_000 -> :ok
+                end
+
+                {:ok, conn} = Plug.Conn.chunk(conn, "last")
+                conn
+              end
+            }
+        end
+      end)
+
+    session =
+      :playwright
+      |> start_session(base_url: Fluffy.TestServer.base_url())
+      |> visit(TestHTTPFixtures.path(fixture, "/start"))
+
+    pending = wait_for(session, Event.download())
+    click(session, by_role(:link, name: "Download"))
+    assert_receive {:stream, server}
+
+    try do
+      download = await(pending)
+      assert download.suggested_filename == "slow.txt"
+      reader = Task.async(fn -> Download.read!(download) end)
+      assert Task.yield(reader, 20) == nil
+      send(server, :finish)
+      assert Task.await(reader) == "firstlast"
+    after
+      send(server, :finish)
+    end
+  end
+
+  @tag driver: :playwright, tmp_dir: true, capture_log: true
+  test "failed downloads expose metadata but raise when reading or saving", %{tmp_dir: tmp_dir} do
+    owner = self()
+
+    fixture =
+      TestHTTPFixtures.register(fn request ->
+        case request.path do
+          "/start" ->
+            %{body: ~s(<a href="broken">Download</a>)}
+
+          "/broken" ->
+            %{
+              headers: [{"content-disposition", "attachment; filename=broken.txt"}],
+              stream: fn conn ->
+                {:ok, _conn} = Plug.Conn.chunk(conn, "partial")
+                send(owner, {:stream, self()})
+
+                receive do
+                  :abort -> exit(:shutdown)
+                after
+                  5_000 -> exit(:shutdown)
+                end
+              end
+            }
+        end
+      end)
+
+    session =
+      :playwright
+      |> start_session(base_url: Fluffy.TestServer.base_url())
+      |> visit(TestHTTPFixtures.path(fixture, "/start"))
+
+    pending = wait_for(session, Event.download())
+    click(session, by_role(:link, name: "Download"))
+    assert_receive {:stream, server}
+    download = await(pending)
+    assert download.suggested_filename == "broken.txt"
+    send(server, :abort)
+
+    assert_raise RuntimeError, ~r/Could not save download/, fn -> Download.read!(download) end
+
+    assert_raise RuntimeError, ~r/Could not save download/, fn ->
+      Download.save_as!(download, Path.join(tmp_dir, "copy.txt"))
+    end
+  end
+
+  defp session(driver) do
     fixture =
       TestHTTPFixtures.register(fn request ->
         case request.path do
           "/start" ->
             %{
-              body: html(~s(<h1>Download source</h1><a href="report" target="_blank">Download report</a>))
+              body: """
+              <!doctype html><html><body><h1>Source</h1>
+              <a href="report">Report</a>
+              <a href="report" target="_blank">New tab</a>
+              <a href="redirect">Redirect</a>
+              <a href="raw" download="renamed.txt">Renamed</a>
+              <a href="noise" download="noise.txt">Noise</a>
+              </body></html>
+              """
             }
+
+          "/redirect" ->
+            %{status: 302, headers: [{"location", "report"}], body: "redirect"}
 
           "/report" ->
             %{
-              headers: [
-                {"content-disposition", "attachment; filename=orders.csv"},
-                {"content-type", "text/csv"}
-              ],
+              headers: [{"content-disposition", "attachment; filename=report.csv"}, {"content-type", "text/csv"}],
               body: "id,total\n1,42\n"
             }
+
+          "/raw" ->
+            %{headers: [{"content-type", "text/plain"}], body: "plain bytes"}
+
+          "/noise" ->
+            %{headers: [{"content-type", "text/plain"}], body: "ignored"}
         end
       end)
 
-    :playwright
-    |> start_test_session()
+    driver
+    |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Fluffy.TestWeb.Endpoint)
     |> visit(TestHTTPFixtures.path(fixture, "/start"))
-    |> wait_for(
-      Event.download(:report, filename: "orders.csv", url: TestHTTPFixtures.url(fixture, "/report")),
-      fn session ->
-        click(session, by_role(:link, name: "Download report"))
-      end
-    )
-    |> expect(Fluffy.Expect.download_to_have_suggested_filename(:report, "orders.csv"))
-    |> expect(Fluffy.Expect.download_to_have_content(:report, "id,total\n1,42\n"))
-    |> expect("Download source" |> by_text() |> to_be_visible())
-    |> expect(Fluffy.Expect.page_to_have_url(TestHTTPFixtures.url(fixture, "/start")))
-  end
-
-  defp start_test_session(driver) do
-    start_session(driver,
-      base_url: Fluffy.TestServer.base_url(),
-      endpoint: Fluffy.TestWeb.Endpoint
-    )
-  end
-
-  defp html(body), do: "<!doctype html><html><body>#{body}</body></html>"
-
-  for driver <- [:phoenix, :playwright] do
-    @tag driver: driver
-    test "filters before retaining bytes and keeps the first matching download with #{driver}", %{driver: driver} do
-      fixture =
-        TestHTTPFixtures.register(fn request ->
-          case request.path do
-            "/start" ->
-              %{
-                body:
-                  html("""
-                  <a href="noise">Noise</a>
-                  <a href="wrong">Wrong URL</a>
-                  <a href="first">First report</a>
-                  <a href="second">Second report</a>
-                  """)
-              }
-
-            path ->
-              filename = if path == "/noise", do: "noise.txt", else: "report.csv"
-              bytes = if path in ["/noise", "/wrong"], do: String.duplicate("x", 100), else: path
-
-              %{
-                headers: [{"content-disposition", "attachment; filename=#{filename}"}, {"content-type", "text/csv"}],
-                body: bytes
-              }
-          end
-        end)
-
-      driver
-      |> start_test_session()
-      |> visit(TestHTTPFixtures.path(fixture, "/start"))
-      |> wait_for(
-        Event.download(:report,
-          filename: ~r/^report\.csv$/,
-          url: fn %URI{path: path} ->
-            String.ends_with?(path, ["/first", "/second"])
-          end,
-          max_bytes: 10
-        ),
-        fn session ->
-          session
-          |> click(by_role(:link, name: "Noise", exact: true))
-          |> click(by_role(:link, name: "Wrong URL"))
-          |> click(by_role(:link, name: "First report"))
-          |> click(by_role(:link, name: "Second report"))
-        end
-      )
-      |> expect(download_to_have_content(:report, "/first"))
-      |> expect(download_to_have_url(:report, fn %URI{path: path} -> String.ends_with?(path, "/first") end))
-    end
-
-    @tag driver: driver
-    test "unmatched downloads report a missing event with #{driver}", %{driver: driver} do
-      fixture =
-        TestHTTPFixtures.register(fn request ->
-          case request.path do
-            "/start" -> %{body: html(~s(<a href="file" download="actual.txt">Download</a>))}
-            "/file" -> %{headers: [{"content-type", "text/plain"}], body: "ignored"}
-          end
-        end)
-
-      session = driver |> start_test_session() |> visit(TestHTTPFixtures.path(fixture, "/start"))
-
-      assert_raise ExUnit.AssertionError, ~r/no matching event occurred/, fn ->
-        wait_for(
-          session,
-          Event.download(:missing, filename: "missing.txt", max_bytes: 0, timeout: 500),
-          &click(&1, by_role(:link, name: "Download"))
-        )
-      end
-    end
-  end
-
-  @tag driver: :playwright, tmp_dir: true
-  test "capturing bytes preserves the source download for another consumer", %{tmp_dir: tmp_dir} do
-    fixture =
-      TestHTTPFixtures.register(fn request ->
-        case request.path do
-          "/start" -> %{body: html(~s(<a href="file" download="shared.txt">Download</a>))}
-          "/file" -> %{headers: [{"content-type", "text/plain"}], body: "shared bytes"}
-        end
-      end)
-
-    session = :playwright |> start_test_session() |> visit(TestHTTPFixtures.path(fixture, "/start"))
-
-    unwrap(session, fn handle ->
-      {:ok, waiter} =
-        PlaywrightEx.Page.expect_download(handle.page_id, connection: handle.connection, timeout: handle.timeout)
-
-      try do
-        wait_for(session, Event.download(:file), &click(&1, by_role(:link, name: "Download")))
-        {:ok, download} = PlaywrightEx.Page.await_download(waiter)
-        path = Path.join(tmp_dir, "second-copy.txt")
-        assert :ok = PlaywrightEx.Download.save_as(download, path, timeout: handle.timeout)
-        assert File.read!(path) == "shared bytes"
-      after
-        PlaywrightEx.EventWaiter.cancel(waiter)
-      end
-    end)
   end
 end

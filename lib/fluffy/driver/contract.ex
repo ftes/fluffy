@@ -20,7 +20,7 @@ defmodule Fluffy.Driver.Contract do
   @callback fill(Session.t(), Locator.t(), String.t(), keyword()) :: result()
   @callback set_input_files(
               Session.t(),
-              Locator.t() | atom(),
+              Locator.t() | Fluffy.FileChooser.t(),
               Fluffy.SelectedFile.source(),
               [Fluffy.SelectedFile.t()],
               keyword()

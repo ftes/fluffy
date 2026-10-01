@@ -20,13 +20,6 @@ defmodule Fluffy.Locator.Static do
     end)
   end
 
-  def resolve_one!(document, %Locator{} = locator) do
-    case resolve(document, locator) do
-      [element] -> element
-      candidates -> raise Fluffy.StrictnessError, locator: locator, candidates: candidates
-    end
-  end
-
   defp apply_operation({:css, selector}, scopes) do
     query_scopes(scopes, selector)
   end

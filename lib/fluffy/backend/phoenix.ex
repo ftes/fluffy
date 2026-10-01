@@ -11,7 +11,6 @@ defmodule Fluffy.Backend.Phoenix do
   alias Fluffy.Backend.Phoenix.HTTP.Client, as: HTTPClient
   alias Fluffy.Backend.Phoenix.HTTP.Response, as: HTTPResponse
   alias Fluffy.ClientDOM
-  alias Fluffy.Deadline
   alias Fluffy.Download
   alias Fluffy.Driver.Live, as: LiveDriver
   alias Fluffy.Driver.Live.State, as: LiveState
@@ -24,7 +23,6 @@ defmodule Fluffy.Backend.Phoenix do
   alias Fluffy.Internal.Navigation.StaticConn
   alias Fluffy.Internal.Navigation.Submission
   alias Fluffy.LiveViewWatcher
-  alias Fluffy.NavigationEvent
   alias Fluffy.Page
   alias Fluffy.PageLifecycle
   alias Fluffy.Session
@@ -91,7 +89,10 @@ defmodule Fluffy.Backend.Phoenix do
   end
 
   @impl true
-  def prepare_page(_context, page, _runtime), do: {:ok, {page, nil, nil}}
+  def prepare_page(_context, page), do: {:ok, {page, nil, nil}}
+
+  @impl true
+  def subscribe_page(_context, _page, _runtime), do: :ok
 
   @impl true
   def runtime_event(_context, _message), do: :ignore
@@ -155,9 +156,7 @@ defmodule Fluffy.Backend.Phoenix do
     previous_url = Session.current_page(session).url
     url = resolve_url(previous_url, navigation.destination, session)
 
-    session
-    |> Session.commit_page(:live, navigation.state, URI.to_string(url), same_document: true)
-    |> capture_url_change(previous_url)
+    Session.commit_page(session, :live, navigation.state, URI.to_string(url), same_document: true)
   end
 
   def navigate(%Session{} = session, %StaticConn{conn: conn}) do
@@ -180,103 +179,36 @@ defmodule Fluffy.Backend.Phoenix do
   end
 
   @impl true
-  def arm_event(%Session{} = session, type, options) when type in [:download, :navigation] do
-    %{token: token} = pending_capture(session)
-    {:ok, session, %{type: type, token: token, options: options}}
-  end
+  def event_source(session, :download, _scope), do: session.active_page
 
-  def arm_event(%Session{} = session, type, _options) when type in [:page, :popup] do
-    require_browser_pages!(session)
-  end
+  def event_source(session, type, _scope) when type in [:page, :popup], do: require_browser_pages!(session)
 
-  def arm_event(%Session{} = session, :dialog, _options) do
+  def event_source(session, type, _scope) do
+    capability =
+      case type do
+        :dialog -> :browser_dialogs
+        :file_chooser -> :file_chooser_events
+        :frame_navigated -> :browser_frame_events
+        type when type in [:request, :response] -> :browser_network_events
+      end
+
     raise Fluffy.CapabilityError,
-      capability: :browser_dialogs,
+      capability: capability,
       driver: Session.current_driver(session),
-      detail: "the in-process drivers do not execute alert, confirm, prompt, or beforeunload"
-  end
-
-  def arm_event(%Session{} = session, :file_chooser, _options) do
-    raise Fluffy.CapabilityError,
-      capability: :file_chooser_events,
-      driver: Session.current_driver(session),
-      detail: "script-opened file chooser events are browser-owned and require a Playwright session"
-  end
-
-  def arm_event(%Session{} = session, type, _options) when type in [:request, :response] do
-    raise Fluffy.CapabilityError,
-      capability: :browser_network_events,
-      driver: Session.current_driver(session),
-      detail: "request and response event streams include browser subresources and currently require Playwright"
-  end
-
-  def arm_event(%Session{} = session, type, options) do
-    {:ok, session, %{type: type, options: options}}
+      detail: "#{type} events require a Playwright session"
   end
 
   @impl true
-  def await_event(session, %{type: type, token: token}, _timeout) when type in [:download, :navigation] do
-    case pending_capture(session) do
-      %{token: ^token, captured: value} -> {:ok, session, value}
-      _ -> {:error, :timeout}
-    end
-  end
-
-  def await_event(_session, _resource, _timeout), do: {:error, :timeout}
-
-  @impl true
-  def disarm_event(_resource), do: :ok
-
-  defp pending_capture(session) do
-    case Fluffy.SessionRuntime.pending_capture(session.runtime) do
-      {:ok, pending} -> pending
-      {:error, message} -> raise ArgumentError, message
-    end
-  end
-
-  defp record_capture(session, token, value) do
-    case Fluffy.SessionRuntime.record_capture(session.runtime, token, value) do
-      :ok -> session
-      {:error, message} -> raise ArgumentError, message
-    end
-  end
-
-  defp capture_url_change(session, from_url) do
-    if Session.current_page(session).url == from_url, do: session, else: capture_navigation(session, from_url)
-  end
-
-  defp capture_navigation(session, from_url) do
-    case pending_capture(session) do
-      %{captured: _} ->
-        session
-
-      %{type: :navigation, token: token, options: options} ->
-        if before_deadline?(options) do
-          page = Session.current_page(session)
-          navigation = %NavigationEvent{from_url: from_url, url: page.url, status: page.status}
-          record_capture(session, token, navigation)
-        else
-          session
-        end
-
-      _ ->
-        session
-    end
-  end
+  def subscribe_event(_session, :download, _source, _pid), do: {fn _ -> :ignore end, fn -> :ok end}
 
   defp follow_link(%Session{} = session, href, download_name) do
     current_url = Session.current_page(session).url
     url = resolve_url(current_url || Session.context(session).http.base_url, href, session)
 
     if same_document_navigation?(current_url, url) do
-      session
-      |> Session.commit_page(
-        Session.current_driver(session),
-        Session.page_state(session),
-        URI.to_string(url),
+      Session.commit_page(session, Session.current_driver(session), Session.page_state(session), URI.to_string(url),
         same_document: true
       )
-      |> capture_url_change(current_url)
     else
       request(session, url, :get, nil, download_name)
     end
@@ -316,7 +248,6 @@ defmodule Fluffy.Backend.Phoenix do
 
   @doc false
   def commit_live(%Session{} = session, conn, view, destination) do
-    previous_url = Session.current_page(session).url
     proxy_pid = live_view_proxy_pid(view)
     Process.unlink(proxy_pid)
 
@@ -348,15 +279,7 @@ defmodule Fluffy.Backend.Phoenix do
       watcher: watcher
     }
 
-    session
-    |> PageLifecycle.replace_document(
-      :live,
-      state,
-      URI.to_string(url),
-      [status: conn.status],
-      &release_page/3
-    )
-    |> capture_navigation(previous_url)
+    PageLifecycle.replace_document(session, :live, state, URI.to_string(url), [status: conn.status], &release_page/3)
   end
 
   @doc false
@@ -456,48 +379,20 @@ defmodule Fluffy.Backend.Phoenix do
     disposition = response_header(conn, "content-disposition")
 
     if not is_nil(download_name) or attachment?(disposition) do
-      case pending_capture(session) do
-        %{type: :download, token: token, options: options} ->
-          filename = suggested_filename(disposition, download_name, url)
+      download = %Download{
+        suggested_filename: suggested_filename(disposition, download_name, url),
+        url: URI.to_string(url),
+        runtime: session.runtime,
+        source: conn.resp_body
+      }
 
-          download = %Download{
-            filename: filename,
-            content_type: content_type(conn, filename),
-            bytes: conn.resp_body,
-            url: URI.to_string(url)
-          }
-
-          {:ok, capture_matching_download(session, token, download, options)}
-
-        _no_download_expectation ->
-          # A browser keeps the source document when a response is downloaded.
-          # Without an expectation there is no result to retain.
-          {:ok, session}
-      end
+      :ok = Fluffy.SessionRuntime.emit_event(session.runtime, session.active_page, :download, download)
+      # Downloads keep the source document, whether or not anyone observes them.
+      {:ok, session}
     else
       :not_a_download
     end
   end
-
-  defp capture_matching_download(session, token, download, options) do
-    already_captured? = Map.has_key?(pending_capture(session), :captured)
-
-    if not already_captured? and before_deadline?(options) and Download.matches?(download.filename, download.url, options) do
-      max_bytes = Keyword.fetch!(options, :max_bytes)
-      size = byte_size(download.bytes)
-
-      if size > max_bytes do
-        raise ExUnit.AssertionError,
-          message: "Downloaded #{size} bytes, exceeding the configured :max_bytes limit of #{max_bytes}"
-      end
-
-      record_capture(session, token, download)
-    else
-      session
-    end
-  end
-
-  defp before_deadline?(options), do: not Deadline.expired?(Keyword.fetch!(options, :deadline))
 
   defp attachment?(nil), do: false
 
@@ -545,13 +440,6 @@ defmodule Fluffy.Backend.Phoenix do
     end
   end
 
-  defp content_type(conn, filename) do
-    case response_header(conn, "content-type") do
-      nil -> MIME.from_path(filename)
-      value -> value |> String.split(";", parts: 2) |> hd() |> String.trim()
-    end
-  end
-
   defp response_header(conn, name) do
     conn
     |> Plug.Conn.get_resp_header(name)
@@ -569,22 +457,12 @@ defmodule Fluffy.Backend.Phoenix do
   end
 
   defp commit_static(conn, session, url) do
-    previous_url = Session.current_page(session).url
-
     state = %StaticState{
       conn: conn,
       client_dom: ClientDOM.from_document(conn.resp_body)
     }
 
-    session
-    |> PageLifecycle.replace_document(
-      :static,
-      state,
-      URI.to_string(url),
-      [status: conn.status],
-      &release_page/3
-    )
-    |> capture_navigation(previous_url)
+    PageLifecycle.replace_document(session, :static, state, URI.to_string(url), [status: conn.status], &release_page/3)
   end
 
   defp release_page(session, %Page.State{driver: :live} = page, _reason) do

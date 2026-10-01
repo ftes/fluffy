@@ -3,7 +3,7 @@ defmodule Fluffy do
   Pipeable feature testing for Phoenix applications.
 
   Start a session with the Phoenix (`:phoenix`) or Playwright (`:playwright`)
-  backend, then compose locators, actions, expectations, and event capture.
+  backend, then compose locators, actions, expectations, and event waits.
   Import `Fluffy.Expect` for expectations, or use `Fluffy.Assert` for
   ExUnit-style assertions. The
   Phoenix backend selects its Static (`Phoenix.ConnTest`) or LiveView
@@ -18,13 +18,14 @@ defmodule Fluffy do
   @moduledoc groups: [
                "Lifecycle and navigation",
                "Actions",
-               "Event capture and results",
+               "Events",
                "Diagnostics and native access"
              ]
 
   alias Fluffy.Backend
   alias Fluffy.Driver.Registry, as: DriverRegistry
   alias Fluffy.Event
+  alias Fluffy.Event.Pending
   alias Fluffy.Expect
   alias Fluffy.SelectedFile
   alias Fluffy.Session
@@ -242,40 +243,29 @@ defmodule Fluffy do
     end
   end
 
-  @doc group: "Event capture and results"
-  @doc """
-  Captures an event caused by `action` and stores the normalized result under
-  the event's key.
+  @doc group: "Events"
+  @doc "Registers an event wait immediately. Await the pending handle once with `await/1`."
+  @spec wait_for(Session.t(), Event.t(), [Event.option()]) :: Pending.t()
+  def wait_for(%Session{} = session, %Event{} = event, options \\ []), do: Event.wait(session, event, options)
 
-  The listener is installed before the action runs. The capture timeout starts
-  when arming; events arriving after it expires are ignored. The returned
-  session keeps the captured result so the call remains pipeable.
-  """
-  @spec wait_for(Session.t(), Event.t(), (Session.t() -> Session.t()), [Event.option()]) :: Session.t()
-  def wait_for(%Session{} = session, %Event{} = event, action, options \\ []) when is_function(action, 1) do
-    event = Event.merge_options(event, options)
-    validate_event!(event)
-    Event.capture(session, event.type, event.key, action, event.options)
-  end
+  @doc group: "Events"
+  @doc "Consumes a pending event and returns its value. Its deadline starts at registration."
+  @spec await(Pending.t()) :: term()
+  defdelegate await(pending), to: Pending
 
-  @doc group: "Event capture and results"
-  @doc "Returns a previously captured download without consuming it."
-  def download(%Session{} = session, key), do: Event.fetch_result!(session, key, :download)
+  @doc group: "Events"
+  @doc "Registers a persistent handler. Handlers run independently, linked to the registering caller."
+  def on(%Session{} = session, %Event{} = event, handler, options \\ []),
+    do: Event.listen(session, event, handler, options, :on)
 
-  @doc group: "Event capture and results"
-  @doc playwright_only: true
-  @doc "Returns a previously captured file chooser without consuming it."
-  def file_chooser(%Session{} = session, key), do: Event.fetch_result!(session, key, :file_chooser)
+  @doc group: "Events"
+  @doc "Registers a handler for the first matching event, removing it before invocation."
+  def once(%Session{} = session, %Event{} = event, handler, options \\ []),
+    do: Event.listen(session, event, handler, options, :once)
 
-  @doc group: "Event capture and results"
-  @doc "Returns a previously captured navigation without consuming it."
-  def navigation(%Session{} = session, key), do: Event.fetch_result!(session, key, :navigation)
-
-  @doc group: "Event capture and results"
-  @doc playwright_only: true
-  @doc "Returns a previously captured `Fluffy.Page` without consuming it."
-  @spec page(Session.t(), term()) :: Fluffy.Page.t()
-  def page(%Session{} = session, name), do: Event.fetch_result!(session, name, :page)
+  @doc group: "Events"
+  @doc "Removes the most recently registered listener matching this source, event type, and handler."
+  def off(%Session{} = session, %Event{} = event, handler, options \\ []), do: Event.off(session, event, handler, options)
 
   @doc group: "Lifecycle and navigation"
   @doc "Returns a live handle to the selected page."
@@ -305,21 +295,6 @@ defmodule Fluffy do
   def pages(%Session{} = session) do
     Enum.map(Session.pages(session), fn {_name, page} -> Fluffy.Page.new(session.runtime, page.id) end)
   end
-
-  @doc group: "Event capture and results"
-  @doc playwright_only: true
-  @doc "Returns a previously captured dialog without consuming it."
-  def dialog(%Session{} = session, key), do: Event.fetch_result!(session, key, :dialog)
-
-  @doc group: "Event capture and results"
-  @doc playwright_only: true
-  @doc "Returns a previously captured request without consuming it."
-  def request(%Session{} = session, key), do: Event.fetch_result!(session, key, :request)
-
-  @doc group: "Event capture and results"
-  @doc playwright_only: true
-  @doc "Returns a previously captured response without consuming it."
-  def response(%Session{} = session, key), do: Event.fetch_result!(session, key, :response)
 
   @doc false
   def __expect__(session, expectation), do: dispatch_driver(session, :expect, [expectation])
@@ -385,9 +360,9 @@ defmodule Fluffy do
   action with `:max_bytes`. File contents are never included in size or
   validation errors.
 
-  When `locator_or_chooser` is an atom, it names a chooser previously captured
-  with `Fluffy.Event.file_chooser/2`. Chooser-key selection is available only
-  in Playwright sessions.
+  Pass a chooser returned by `Fluffy.Event.file_chooser/1` directly. It targets
+  its original page and preserves the session's current-page selection. Choosers
+  require Playwright.
 
   ## Options
 
@@ -395,7 +370,7 @@ defmodule Fluffy do
   """
   @spec set_input_files(
           Session.t(),
-          Fluffy.Locator.t() | atom(),
+          Fluffy.Locator.t() | Fluffy.FileChooser.t(),
           String.t() | Fluffy.FilePayload.t() | [String.t()] | [Fluffy.FilePayload.t()],
           [file_input_option()]
         ) :: Session.t()
@@ -412,11 +387,20 @@ defmodule Fluffy do
     {source, selected_files} = SelectedFile.prepare!(selection, max_bytes: max_bytes)
     driver_options = Keyword.delete(options, :max_bytes)
 
-    dispatch_driver(
-      session,
-      :set_input_files,
-      [locator_or_chooser, source, selected_files, driver_options]
-    )
+    target_session =
+      case locator_or_chooser do
+        %Fluffy.FileChooser{page: page} -> Session.activate_page(session, page)
+        _locator -> session
+      end
+
+    result =
+      dispatch_driver(
+        target_session,
+        :set_input_files,
+        [locator_or_chooser, source, selected_files, driver_options]
+      )
+
+    %{result | active_page: session.active_page}
   end
 
   @doc group: "Actions"
@@ -500,16 +484,6 @@ defmodule Fluffy do
     dispatch_driver(session, :set_checked, [locator, desired, options])
   end
 
-  defp validate_event!(%Event{type: :dialog, options: options}) do
-    options |> Keyword.fetch!(:decision) |> validate_dialog_decision!()
-  end
-
-  defp validate_event!(%Event{type: type, options: options}) when type in [:request, :response] do
-    options |> Keyword.fetch!(:matcher) |> validate_network_matcher!()
-  end
-
-  defp validate_event!(%Event{}), do: :ok
-
   defp dispatch_driver(%Session{} = session, operation, arguments) do
     driver = DriverRegistry.module(Session.current_driver(session))
     driver.validate_operation!(session, operation, arguments)
@@ -547,22 +521,5 @@ defmodule Fluffy do
       %Expect{} = expectation -> Expect.merge_options(expectation, timeout: remaining)
       options -> Keyword.put(options, :timeout, remaining)
     end)
-  end
-
-  defp validate_dialog_decision!(decision) when decision in [:accept, :dismiss] or is_function(decision, 1), do: :ok
-
-  defp validate_dialog_decision!({:accept, prompt_text}) when is_binary(prompt_text), do: :ok
-
-  defp validate_dialog_decision!(decision) do
-    raise ArgumentError,
-          "dialog decision must be :accept, :dismiss, {:accept, prompt_text}, or a one-argument function; got: #{inspect(decision)}"
-  end
-
-  defp validate_network_matcher!(matcher) when is_binary(matcher) or is_struct(matcher, Regex) or is_function(matcher, 1),
-    do: :ok
-
-  defp validate_network_matcher!(matcher) do
-    raise ArgumentError,
-          "network event matcher must be a URL string, Regex, or a one-argument function; got: #{inspect(matcher)}"
   end
 end

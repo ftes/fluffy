@@ -1,9 +1,12 @@
 # Assertion styles
 
-Fluffy offers two imported vocabularies for the same assertions. The guides use
+Fluffy’s native locator API offers two vocabularies for the same assertions. The guides use
 `assert` and `refute`; choose `expect` if you prefer Playwright-style names.
 Both construct the same expectation values and preserve driver behavior,
 retries, timeout options, diagnostics, and the returned session.
+
+For PhoenixTest-style helpers, use the [facade](migration-from-phoenix-test.md)
+instead of either native import setup below.
 
 ## ExUnit style
 
@@ -70,8 +73,7 @@ end
 ## Naming comparison
 
 The following calls are pipeline steps, with the session supplied by `|>`.
-Locator constructors take a locator, page constructors target the active page,
-and captured-result constructors take the capture key first.
+Locator constructors take a locator; page constructors target the active page.
 
 | ExUnit style | Expect style |
 | --- | --- |
@@ -83,11 +85,10 @@ and captured-result constructors take the capture key first.
 | `assert(value(locator, "Basilisk"))` | `expect(to_have_value(locator, "Basilisk"))` |
 | `assert(page_url("/creatures"))` | `expect(page_to_have_url("/creatures"))` |
 | `assert(page_title("Creatures"))` | `expect(page_to_have_title("Creatures"))` |
-| `assert(download_suggested_filename(:report, "report.csv"))` | `expect(download_to_have_suggested_filename(:report, "report.csv"))` |
-| `assert(dialog_message(:confirmation, "Saved"))` | `expect(dialog_to_have_message(:confirmation, "Saved"))` |
-| `assert(navigation_url(:destination, path: "/creatures"))` | `expect(navigation_to_have_url(:destination, path: "/creatures"))` |
-| `assert(request_method(:save, "POST"))` | `expect(request_to_have_method(:save, "POST"))` |
-| `assert(response_status(:save, 201))` | `expect(response_to_have_status(:save, 201))` |
+
+Use `assert_event(session, event, action, assertion)` or the equivalent
+`expect_event` for events. The optional assertion receives an ordinary event value;
+use ExUnit assertions on its fields. See [Events and pages](advanced-events.md).
 
 The same naming pattern applies to the remaining constructors. See the
 `Fluffy.Assert` and `Fluffy.Expect` references for their complete APIs.
@@ -107,8 +108,8 @@ session
 `expect(session, not_(expectation))`. It preserves driver errors rather than
 turning them into successful refutations. Retrying drivers wait until the
 negative condition holds; they do not require it to hold for the entire timeout.
-Captured-result assertions inspect an already retained result immediately;
-their timeout does not wait for a new event. Capture that event with `wait_for`.
+Event values use ordinary ExUnit assertions; event waiting is documented in
+[Events and pages](advanced-events.md).
 
 Refuting visibility accepts an absent or invisible element. See
 [Visibility and DOM presence](usage.md#visibility-and-dom-presence) for absence

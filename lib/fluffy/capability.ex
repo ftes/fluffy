@@ -168,7 +168,7 @@ defmodule Fluffy.Capability do
       id: :downloads,
       feature: "Downloads",
       drivers: %{static: :equivalent, live: :equivalent, playwright: :equivalent},
-      detail: "Declarative same-context downloads are normalized to the same pipeable result contract."
+      detail: "HTTP downloads return handles with metadata and explicit read/save operations on both backends."
     },
     %{
       id: :pages,
@@ -197,7 +197,7 @@ defmodule Fluffy.Capability do
     },
     %{
       id: :browser_events,
-      feature: "Dialogs and browser request/response events",
+      feature: "Dialogs, frame navigation, and browser request/response events",
       drivers: %{static: :browser_only, live: :browser_only, playwright: :equivalent},
       detail: "JavaScript dialogs and subresource network streams do not occur in an in-process page driver."
     },
@@ -259,7 +259,7 @@ defmodule Fluffy.Capability do
       feature: "Script-opened file chooser events",
       drivers: %{static: :browser_only, live: :browser_only, playwright: :equivalent},
       detail:
-        "Event.file_chooser/2 captures a Playwright chooser before its triggering action; the result key can be passed to set_input_files/4. In-process drivers do not execute the application JavaScript that opens a chooser."
+        "Event.file_chooser/1 captures a Playwright chooser before its triggering action; the chooser can be passed to set_input_files/4. In-process drivers do not execute the application JavaScript that opens a chooser."
     }
   ]
 

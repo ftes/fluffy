@@ -38,31 +38,17 @@ state belongs to the session runtime: existing handles see action results even
 when the returned handle is discarded. Use each session sequentially from its
 owning test process; concurrent use of the same session is unsupported.
 
-Page selection belongs to each handle. Retain the result of `switch_page/2` to
-select a different page in a pipeline; other handles keep their own selection.
-`current_page/1` returns a stable page handle that survives navigation, while
-`pages/1` lists all open pages, including automatically discovered browser tabs.
-After closing the selected page, explicitly switch to an open page to continue.
-
-The lifecycle established by `Fluffy.Test.setup/1` closes every session before
-releasing shared sandbox resources. Sessions also close when their owner exits,
-including sessions created outside managed test setup.
+For page selection and handle lifetime, see
+[Pages, popups, and frames](advanced-events.md#pages-popups-and-frames).
 
 The examples describe an illustrative Hogwarts application; routes, controls,
 and event handlers must exist in the application under test. Later snippets
 assume the same imports and an initialized `session`. Upload examples also
 require the named fixture files.
 
-The first example assumes `config :fluffy, endpoint: MyAppWeb.Endpoint` in
-`config/test.exs`. Fluffy derives the base URL from the endpoint. Explicit
-session options remain available for tests that target another endpoint or
-origin.
-
-Every Fluffy test calls `Fluffy.Test.setup/1`, whether or not the
-application uses Ecto. When `ecto_repos` are configured, the same callback
-also establishes sandbox ownership. See
-[Installation and runtime](installation.md#ecto-sandbox) for endpoint and
-sandbox configuration.
+Complete [Installation and runtime](installation.md) before running these
+examples. That guide owns endpoint, browser, and lifecycle/sandbox configuration.
+For PhoenixTest-style helpers, follow [Coming from PhoenixTest](migration-from-phoenix-test.md).
 
 ## Choosing a backend
 
@@ -71,12 +57,8 @@ LiveViews, links, redirects, cookies, and LiveView events. Its first visit
 selects the Static or LiveView driver. Later document navigations select the
 driver for the new page again without changing the public session.
 
-The LiveView driver synchronizes form mutations eagerly: `fill`, `check`,
-`uncheck`, and `select_option` immediately dispatch an applicable `phx-change`
-and reconcile the server render before returning. It deliberately ignores
-`phx-debounce` and `phx-throttle`, as PhoenixTest does. Choose Playwright when
-the test is about delayed or blur-only delivery, coalescing, cancellation, or
-throttle suppression rather than the resulting application state.
+For LiveView event scheduling and keyboard limitations, see
+[LiveView timing and keyboard events](capabilities.md#liveview-timing-and-keyboard-events).
 
 Use `:playwright` when the behavior depends on JavaScript, browser layout,
 native-validation events or blocking, dialogs, request/response events, or
@@ -92,9 +74,8 @@ test "updates the preview rendered by a JavaScript hook" do
 end
 ```
 
-A Playwright session owns an isolated BrowserContext. Create another session
-for another isolated user; pages opened inside one session share that user's
-cookies and storage.
+See [Pages, popups, and frames](advanced-events.md#pages-popups-and-frames)
+for page selection and user isolation.
 
 See the [capability matrix](capabilities.md) for backend differences.
 
@@ -181,6 +162,12 @@ session
 
 Available constructors are `by_role`, `by_text`, `by_label`,
 `by_placeholder`, `by_alt_text`, `by_title`, `by_test_id`, and `by_css`.
+Text, role-name, and label matching default to normalized substring matching;
+use `exact: true` for a complete match. Role names follow accessible-name
+precedence: `aria-labelledby`, then `aria-label`, then native labels. Explicit
+ARIA roles override implicit roles. CSS must be valid browser CSS; escape
+special characters in IDs or use a semantic/test-id locator.
+
 Refine a locator with `filter`, `first`, `last`, or zero-based `nth`.
 Use `and_` to require both locators to match the same element:
 
@@ -211,12 +198,8 @@ LiveView's protection of focused fields during server updates, including
 keyboard navigation, and focus assertions.
 
 `fill` leaves its field focused, matching Playwright; use `blur` when the test
-needs to leave it. Keeping focus does **not** suppress normal `phx-change`:
-LiveView handles the input event while the field is still focused. In the
-Playwright backend, `phx-debounce="blur"` defers that change until focus leaves.
-The Phoenix backend deliberately dispatches form changes eagerly, including
-blur-debounced fields; use Playwright to test blur-only delivery or debounce
-timing, as described in the backend guidance above.
+needs to leave it. See [LiveView timing and keyboard events](capabilities.md#liveview-timing-and-keyboard-events)
+for how focus and debounce affect change delivery.
 
 Single-target actions are strict: if a locator matches more than one element,
 Fluffy reports the ambiguity instead of choosing for you. Narrow the
@@ -368,9 +351,13 @@ Use `submit(form_locator)` when the intent is native form submission without a
 specific submitter. Click the intended submit button when its `name=value` or
 override attributes matter. `press(locator, "Enter")` is reserved for the
 documented implicit-Enter default action, not as shorthand for `submit`.
-The Playwright driver applies native constraint validation; the Static and
-LiveView drivers deliberately bypass it and submit the current structural form
-state.
+Submissions use the latest DOM ownership and control state in document order.
+Removed or disabled controls are omitted; renamed and newly inserted controls
+use their current names and owners. Duplicate names preserve their order,
+hidden inputs remain independent entries, and readonly controls submit even
+though they cannot be filled. Multiple selections replace the selected set.
+See [Forms and files](capabilities.md#forms-and-files) for validation and
+serialization boundaries.
 
 LiveView supports declarative Enter, Space, and Tab handlers. Use Playwright
 for more complex keyboard behavior; see
@@ -378,10 +365,7 @@ for more complex keyboard behavior; see
 
 ## Assertions
 
-The examples use `use Fluffy.Assert`, which imports `assert`, `refute`, and
-all assertion constructors. Place it after your ExUnit case module to preserve
-ordinary ExUnit assertions without import clashes. See
-[Assertion styles](assertion-styles.md) for the equivalent `expect` vocabulary,
+See [Assertion styles](assertion-styles.md) for native assertion imports,
 constructor names, options, and negation semantics.
 
 ## Visibility and DOM presence
@@ -389,8 +373,8 @@ constructor names, options, and negation semantics.
 Even the `:phoenix` backend checks **structural visibility**, rather than just
 DOM presence. Its Static and LiveView drivers treat a matched element with a
 `hidden` attribute or `aria-hidden="true"` as invisible. This differs from
-PhoenixTest's `assert_has` and `refute_has`, which check for matching DOM
-elements rather than their visibility.
+the PhoenixTest-style facade's `assert_has` and `refute_has`, which check for
+matching DOM elements rather than their visibility.
 
 Phoenix does not compute CSS or browser layout: a CSS class or inline
 `display: none` alone does not make an element structurally invisible. Use
@@ -462,7 +446,9 @@ and nonblocking.
 Structured queries decode like `URLSearchParams`: distinct parameter-name
 order is ignored, and repeated values retain their order and duplicates.
 Exact query mode rejects unrelated names; `query_mode: :subset` allows them
-while requiring all values for each requested name.
+while requiring all values for each requested name. Keys and values are strings;
+bracketed names remain literal, rather than becoming nested Plug data. Bare
+parameters and empty values both decode to `""`; `+` and `%20` decode to a space.
 
 ## Reloading
 
@@ -510,19 +496,19 @@ session
 
 One path or payload, a homogeneous list of either, and `[]` are accepted.
 Fluffy validates and snapshots the complete selection before changing the
-page. The aggregate default is 10 MB; configure `:file_input_max_bytes` or pass
-`max_bytes:` for one action. Error messages and diagnostic artifacts do not
+page. See [Upload limits](installation.md#upload-limits) for the aggregate
+limit and per-action override. Error messages and diagnostic artifacts do not
 copy payload contents.
 
 Playwright can also capture a script-opened chooser before the triggering
-click. Pass its result key to `set_input_files/3`; see
+click. Pass the chooser directly to `set_input_files/3`; see
 [Advanced events and pages](advanced-events.md#file-choosers).
 
 ## Operation failures and browser diagnostics
 
 Element-action failures raise `Fluffy.OperationError` across drivers. Rescue it
-uniformly and inspect `backend`, `driver`, `operation`, `locator` (or captured
-file-chooser key), and `cause` for details. This includes `submit` and file selection.
+uniformly and inspect `backend`, `driver`, `operation`, `locator` (or file-chooser
+handle), and `cause` for details. This includes `submit` and file selection.
 
 For Playwright, `cause` preserves the original adapter error, including native
 error names and call logs. For Phoenix, it retains `Fluffy.StrictnessError` or
@@ -554,7 +540,7 @@ end)
 ```
 
 Fluffy saves the trace before closing its BrowserContext. A trace covers
-the session's main page and captured popups; different sessions produce
+all pages in the session; different sessions produce
 different archives. Explicit tracing opens Trace Viewer by default for local
 debugging, while `open: false` is appropriate in CI. `step/3` remains portable:
 it adds nested, source-linked trace groups when tracing is active and simply
@@ -568,17 +554,9 @@ session
 |> assert(visible(by_text("Potion ready")))
 ```
 
-The configured Playwright console logger reports browser console messages and
-uncaught page errors without turning them into assertions. Separately,
-`artifact_dir` enables best-effort HTML, screenshot, and formatted-error files
-when a public browser operation fails. Diagnostic capture never replaces the
-original operation error. See [Playwright setup](installation.md#playwright-setup)
-for artifact, trace, and logger configuration.
-
-Downloads, popups, navigation metadata, dialogs, and network events require a
-listener to be installed before the triggering action. Use the pipeable
-`wait_for(Event.*(...))` APIs described in
-[Advanced events and pages](advanced-events.md).
+See [Playwright setup](installation.md#playwright-setup) for console logging,
+failure artifacts, and their configuration. See [Events and pages](advanced-events.md)
+for downloads, popups, dialogs, and network events.
 
 ## Browser-only evaluation
 
@@ -627,10 +605,10 @@ and reconciles the original View or Handle. Exceptions, throws, and exits pass
 through unchanged. Match PlaywrightEx `{:error, reason}` results inside the
 callback when failure should stop the test.
 
+Do not consume `assert_patch` or `assert_redirect` notifications inside a LiveView
+callback: Fluffy uses them to reconcile navigation. Assert the resulting page or
+URL after `unwrap/2`.
+
 The Playwright handle exposes only `context_id`, `page_id`, `frame_id`,
-`connection`, and `timeout`. Operations that change owned lifecycle or require
-a listener before an action must use Fluffy's first-class APIs. Pre-arm
-navigation, pages, downloads, dialogs, requests, and responses with
-`wait_for(Event.*(...))`; manage named pages with `switch_page` and
-`close_page`. Closing a tracked page/context or creating an untracked page
-through `unwrap/2` is unsupported.
+`connection`, and `timeout`. Use the [event and page APIs](advanced-events.md)
+for lifecycle operations and registrations that must precede an action.

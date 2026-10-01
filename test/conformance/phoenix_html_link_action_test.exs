@@ -165,9 +165,12 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
     :playwright
     |> start_test_session()
     |> visit(TestHTTPFixtures.path(fixture, "/links/start"))
-    |> wait_for(Event.popup(:deletion), &click(&1, by_text("Delete", exact: true)))
-    |> expect(Fluffy.Expect.page_to_have_url(opener_url))
-    |> switch_page(:deletion)
+    |> then(fn session ->
+      pending = wait_for(session, Event.popup())
+      click(session, by_text("Delete", exact: true))
+      expect(session, Fluffy.Expect.page_to_have_url(opener_url))
+      switch_page(session, await(pending))
+    end)
     |> expect(:heading |> by_role(name: "Deleted in popup", exact: true) |> to_be_visible())
 
     [_source, submission] = TestHTTPFixtures.requests(fixture)
@@ -231,11 +234,11 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
     :playwright
     |> start_test_session()
     |> visit(TestHTTPFixtures.path(fixture, "/links/start"))
-    |> wait_for(
-      Event.dialog(:confirmation, accept: true),
-      &click(&1, by_text("Delete with confirmation", exact: true))
-    )
-    |> expect(Fluffy.Expect.dialog_to_have_message(:confirmation, "Delete?\nThis cannot be undone."))
+    |> once(Event.dialog(), fn dialog ->
+      assert dialog.message == "Delete?\nThis cannot be undone."
+      Fluffy.Dialog.accept(dialog)
+    end)
+    |> expect_event(Event.dialog(), &click(&1, by_text("Delete with confirmation", exact: true)))
     |> expect(:heading |> by_role(name: "Deleted after confirmation", exact: true) |> to_be_visible())
 
     assert [_source, submission] = TestHTTPFixtures.requests(fixture)
@@ -262,11 +265,8 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
     :playwright
     |> start_test_session()
     |> visit(TestHTTPFixtures.path(fixture, "/links/start"))
-    |> wait_for(
-      Event.dialog(:confirmation, dismiss: true),
-      &click(&1, by_text("Delete with confirmation", exact: true))
-    )
-    |> expect(Fluffy.Expect.dialog_to_have_action(:confirmation, :dismiss))
+    |> once(Event.dialog(), &Fluffy.Dialog.dismiss/1)
+    |> expect_event(Event.dialog(), &click(&1, by_text("Delete with confirmation", exact: true)))
     |> expect(Fluffy.Expect.page_to_have_url(source_url))
     |> expect(:heading |> by_role(name: "Before confirmation", exact: true) |> to_be_visible())
 

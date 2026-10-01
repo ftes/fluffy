@@ -2,6 +2,7 @@ defmodule Fluffy.Conformance.PageCleanupTest do
   use Fluffy.TestCase, async: false
 
   import Fluffy
+  import Fluffy.Expect
   import Fluffy.Locator
 
   alias Fluffy.Backend
@@ -28,7 +29,7 @@ defmodule Fluffy.Conformance.PageCleanupTest do
       :playwright
       |> start_session(base_url: Fluffy.TestServer.base_url())
       |> visit(TestHTTPFixtures.path(fixture, "/start"))
-      |> wait_for(Event.popup(:child), &click(&1, by_role(:link, name: "Open child")))
+      |> expect_event(Event.popup(), &click(&1, by_role(:link, name: "Open child")))
 
     page_ids = Enum.map(Session.pages(session), fn {_name, page} -> page.state.page_id end)
     assert length(page_ids) == 2
@@ -48,16 +49,10 @@ defmodule Fluffy.Conformance.PageCleanupTest do
       switch_page(session, :missing)
     end
 
-    Process.put(:duplicate_page_action_ran, false)
-
     assert_raise ArgumentError, ~r/page name :main is already in use/, fn ->
-      wait_for(session, Event.popup(:main), fn session ->
-        Process.put(:duplicate_page_action_ran, true)
-        session
-      end)
+      new_page(session, :main)
     end
 
-    refute Process.get(:duplicate_page_action_ran)
     assert Session.current_page(session).name == :main
   end
 

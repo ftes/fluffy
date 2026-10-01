@@ -238,10 +238,8 @@ defmodule Fluffy.Driver.Playwright do
     end
   end
 
-  def set_input_files(%Session{} = session, key, source, _selected_files, options) when is_atom(key) do
+  def set_input_files(%Session{} = session, %FileChooser{} = chooser, source, _selected_files, options) do
     options = Keyword.validate!(options, [:timeout])
-    chooser = Fluffy.Event.fetch_result!(session, key, :file_chooser)
-    ensure_chooser_page!(session, chooser, key)
     action_timeout = options |> Keyword.get(:timeout, timeout()) |> max(1)
 
     result =
@@ -258,7 +256,7 @@ defmodule Fluffy.Driver.Playwright do
         outcome
 
       {:error, error} ->
-        OperationFailure.raise_playwright!(:set_input_files, key, error)
+        OperationFailure.raise_playwright!(:set_input_files, chooser, error)
     end
   end
 
@@ -452,6 +450,7 @@ defmodule Fluffy.Driver.Playwright do
     # Browser bookkeeping has its own budget; it must not consume a short
     # action/assertion timeout or silently leave navigation state stale.
     deadline = Deadline.new(max(Session.context(session).timeout, 1))
+    prepare_document(session)
     state = Session.page_state(session)
 
     previous_url = Session.current_page(session).url
@@ -472,6 +471,20 @@ defmodule Fluffy.Driver.Playwright do
 
       {:error, error} ->
         {:error, error}
+    end
+  end
+
+  defp prepare_document(session) do
+    case Session.page_state(session) do
+      %{document_identity: nil} = state ->
+        # Page events resolve at creation. The first operation, not the event
+        # waiter, owns document readiness and LiveView connection waiting.
+        {:ok, snapshot} = Frame.snapshot(state.frame_id, connection: Session.context(session).connection)
+        state = %{state | document_identity: snapshot.document_ref}
+        Fluffy.Backend.navigate(session, Navigation.browser_committed(snapshot.url, state))
+
+      _ready ->
+        session
     end
   end
 
@@ -651,13 +664,6 @@ defmodule Fluffy.Driver.Playwright do
           }
         end)
     ]
-  end
-
-  defp ensure_chooser_page!(session, %FileChooser{page_id: page_id}, key) do
-    if Session.page_state(session).page_id != page_id do
-      raise ArgumentError,
-            "captured file chooser #{inspect(key)} belongs to a page other than the active page"
-    end
   end
 
   defp timeout do

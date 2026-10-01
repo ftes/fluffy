@@ -3,8 +3,8 @@ defmodule Fluffy.OperationError do
   An element operation failure with its backend's original cause.
 
   `backend` is `:phoenix` or `:playwright`; `driver` identifies the active driver.
-  `operation` names the public action and `locator` is the query or captured
-  file-chooser key. `cause` retains a native Playwright error or a structured
+  `operation` names the public action and `locator` is the query or
+  `Fluffy.FileChooser` handle. `cause` retains a native Playwright error or a structured
   Phoenix `Fluffy.StrictnessError` or `Fluffy.ActionabilityError`.
 
   No shared fine-grained failure category is inferred for browser errors.
@@ -25,7 +25,7 @@ defmodule Fluffy.OperationError do
     description =
       case locator do
         %Fluffy.Locator{} -> Fluffy.Locator.describe(locator)
-        key -> "captured file chooser #{inspect(key)}"
+        %Fluffy.FileChooser{} -> "file chooser"
       end
 
     %__MODULE__{

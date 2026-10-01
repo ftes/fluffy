@@ -109,101 +109,6 @@ defmodule Fluffy.Options do
                            ]
                          )
 
-  @download_event_schema NimbleOptions.new!(
-                           @timeout_options ++
-                             [
-                               filename: [
-                                 type: {:or, [:string, {:struct, Regex}]},
-                                 doc:
-                                   "Only capture downloads whose suggested filename matches this exact string or regex."
-                               ],
-                               url: [
-                                 type: {:or, [:string, {:struct, Regex}, {:fun, 1}]},
-                                 doc:
-                                   "Only capture downloads whose URL matches this absolute string, regex, or URI predicate."
-                               ],
-                               max_bytes: [
-                                 type: :non_neg_integer,
-                                 doc: "Maximum number of response bytes to retain; defaults to 10,000,000."
-                               ]
-                             ]
-                         )
-
-  @dialog_event_schema NimbleOptions.new!(
-                         @timeout_options ++
-                           [
-                             decision: [
-                               type:
-                                 {:or,
-                                  [
-                                    {:in, [:accept, :dismiss]},
-                                    {:tuple, [{:in, [:accept]}, :string]},
-                                    {:fun, 1}
-                                  ]},
-                               type_spec:
-                                 quote(
-                                   do:
-                                     :accept
-                                     | :dismiss
-                                     | {:accept, String.t()}
-                                     | (Fluffy.Dialog.t() ->
-                                          :accept | :dismiss | {:accept, String.t()})
-                                 ),
-                               type_doc: "`:accept`, `:dismiss`, `{:accept, prompt_text}`, or a one-argument function",
-                               doc: "Accept, dismiss, accept with prompt text, or decide from the captured dialog."
-                             ],
-                             accept: [
-                               type: {:or, [{:in, [true]}, :string]},
-                               type_spec: quote(do: true | String.t()),
-                               type_doc: "`true` or `t:String.t/0`",
-                               doc: "Compatibility shorthand for accepting, optionally with prompt text."
-                             ],
-                             dismiss: [
-                               type: {:in, [true]},
-                               type_spec: quote(do: true),
-                               type_doc: "`true`",
-                               doc: "Compatibility shorthand for dismissing the dialog."
-                             ]
-                           ]
-                       )
-
-  @normalized_dialog_event_schema NimbleOptions.new!(
-                                    @timeout_options ++
-                                      [
-                                        decision: [
-                                          type:
-                                            {:or,
-                                             [
-                                               {:in, [:accept, :dismiss]},
-                                               {:tuple, [{:in, [:accept]}, :string]},
-                                               {:fun, 1}
-                                             ]},
-                                          type_spec:
-                                            quote(
-                                              do:
-                                                :accept
-                                                | :dismiss
-                                                | {:accept, String.t()}
-                                                | (Fluffy.Dialog.t() ->
-                                                     :accept | :dismiss | {:accept, String.t()})
-                                            )
-                                        ]
-                                      ]
-                                  )
-
-  @network_matcher_type {:or, [:string, {:struct, Regex}, {:fun, 1}]}
-
-  @network_event_schema NimbleOptions.new!(
-                          @timeout_options ++
-                            [
-                              matcher: [
-                                type: @network_matcher_type,
-                                type_spec: quote(do: String.t() | Regex.t() | (term() -> boolean())),
-                                doc: "URL string, regular expression, or one-argument event predicate."
-                              ]
-                            ]
-                        )
-
   @evaluate_schema NimbleOptions.new!(
                      arg: [
                        type: :any,
@@ -330,15 +235,6 @@ defmodule Fluffy.Options do
   def filter_locator_schema, do: @filter_locator_schema
 
   @doc false
-  def download_event_schema, do: @download_event_schema
-
-  @doc false
-  def dialog_event_schema, do: @dialog_event_schema
-
-  @doc false
-  def network_event_schema, do: @network_event_schema
-
-  @doc false
   def evaluate_schema, do: @evaluate_schema
 
   @spec validate_action!(keyword()) :: keyword()
@@ -367,29 +263,6 @@ defmodule Fluffy.Options do
 
   @spec validate_filter_locator!(keyword()) :: keyword()
   def validate_filter_locator!(options), do: NimbleOptions.validate!(options, @filter_locator_schema)
-
-  @spec validate_event_constructor!(atom(), keyword()) :: keyword()
-  def validate_event_constructor!(:dialog, options), do: NimbleOptions.validate!(options, @dialog_event_schema)
-  def validate_event_constructor!(:download, options), do: NimbleOptions.validate!(options, @download_event_schema)
-
-  def validate_event_constructor!(type, options)
-      when type in [:file_chooser, :navigation, :page, :popup, :request, :response] do
-    NimbleOptions.validate!(options, @action_schema)
-  end
-
-  @spec validate_event!(atom(), keyword()) :: keyword()
-  def validate_event!(:dialog, options), do: NimbleOptions.validate!(options, @normalized_dialog_event_schema)
-  def validate_event!(:download, options), do: NimbleOptions.validate!(options, @download_event_schema)
-
-  def validate_event!(type, options) when type in [:file_chooser, :navigation, :page, :popup] do
-    NimbleOptions.validate!(options, @action_schema)
-  end
-
-  def validate_event!(type, options) when type in [:request, :response] do
-    NimbleOptions.validate!(options, @network_event_schema)
-  end
-
-  def validate_event!(_backend_event, options), do: options
 
   @spec validate_evaluate!(keyword()) :: keyword()
   def validate_evaluate!(options), do: NimbleOptions.validate!(options, @evaluate_schema)

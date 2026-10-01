@@ -1,254 +1,210 @@
-# Advanced events and pages
+# Events and pages
 
-The examples assume the [test setup](usage.md#your-first-test), an initialized
-`session`, and application routes and controls matching each scenario. Use
-these imports and aliases after your ExUnit case module:
+Register before the triggering action, then await an ordinary value:
 
 ```elixir
 use Fluffy.Assert
-
 import Fluffy
 import Fluffy.Locator
+alias Fluffy.{Dialog, Download, Event, FileChooser, Frame, Page}
 
-alias Fluffy.{Event, FileChooser, Page}
+pending = wait_for(session, Event.download())
+click(session, by_role(:button, name: "Download report"))
+download = await(pending)
+assert download.suggested_filename == "report.csv"
+assert Download.read!(download) =~ "customer_id,total"
 ```
 
-`use Fluffy.Assert` imports the assertion vocabulary. Page and captured-result
-constructors use target prefixes, such as `page_url` and `response_status`.
+Each wait has an independent source, predicate, and deadline. The deadline starts
+at registration, using the session timeout unless `timeout:` is supplied. Await
+once; reuse the returned value freely. Separate waits can observe the same event.
+A settled event outcome survives subsequent timeout or source closure. A still-pending
+wait reports timeout, page closure, or session closure through `await`.
 
-`wait_for(Event.*(...), action)` installs the listener before running the
-action. The capture timeout starts when arming; events arriving after it
-expires are ignored. Return the updated session from the callback. Captured
-results can be read repeatedly through their keys.
+Constructors accept an optional unary predicate. False and nil skip an event;
+predicate failures propagate through `await`. Keep predicates short and inspect
+available metadata. Use ordinary assertions when failure details matter.
 
-## Browser terminology: tabs, windows, pages, and frames
+## Pipeline expectations
 
-Playwright uses these terms for browser UI elements:
+`assert_event` and `Fluffy.Expect.expect_event` register before invoking the action,
+await a matching event, optionally inspect it, and return the input session:
 
-- **Page**: a browser tab or popup window. Fluffy gives captured pages names
-  within a session; `switch_page/2` selects the page for subsequent actions and
-  assertions.
-- **Popup**: a new page opened by another page. This includes ordinary new tabs,
-  not just separate popup windows.
-- **Browser context**: an isolated browser session. A Fluffy Playwright session
-  owns one context, and its pages share cookies and storage.
-- **Frame**: a document within a page. Each page has a main frame; an HTML
-  `<iframe>` embeds an additional frame, not another tab or window.
+```elixir
+session
+|> assert_event(
+  Event.download(&(&1.suggested_filename == "report.csv")),
+  &click(&1, by_role(:button, name: "Download report")),
+  fn download -> assert Download.read!(download) =~ "customer_id,total" end,
+  timeout: 5_000
+)
+|> click(by_role(:button, name: "Continue"))
+```
 
-Fluffy supports switching between named pages and querying iframe contents with
-[frame locators](usage.md#frames-playwright) on the Playwright backend.
-`switch_page/2` does not select an iframe, and ordinary Fluffy locators do not
-enter iframe documents. Frame locators scope element queries without changing
-the active page. Frame traversal is not supported by the Phoenix backend.
-
-See Playwright's [pages](https://playwright.dev/docs/pages) and
-[frames](https://playwright.dev/docs/frames) guides for the underlying concepts.
+The assertion callback and options are optional. With four arguments, pass either
+an assertion callback or options. Both callbacks run once in the caller process;
+their return values are ignored. Actions update shared state, while the enclosing
+pipeline retains its original page selection. The helper releases its registration
+on every exit and preserves callback errors.
 
 ## Downloads
 
-```elixir
-session
-|> wait_for(Event.download(:report, filename: "potions.csv"), fn session ->
-  click(session, by_role(:button, name: "Download potion ledger"))
-end)
-|> assert(download_suggested_filename(:report, "potions.csv"))
-|> assert(download_content_type(:report, "text/csv"))
-```
+A download handle exposes `suggested_filename` and `url` when downloading starts.
+`Download.read!(download, max_bytes: 10_000_000)` waits for completion and returns
+bytes, enforcing the indicated in-memory limit (10 MB by default).
+`Download.save_as!(download, destination)` waits and saves using bounded memory.
+Failures raise when reading or saving. Handles belong to their session; saved
+files outlive it. In-process HTTP downloads use the same API. JavaScript-generated
+downloads require Playwright.
 
-`download(session, :report)` returns `%Fluffy.Download{}` with `filename`,
-`content_type`, `bytes`, and `url`. Override the default retained-byte limit
-with `max_bytes:` on `Event.download/2` or `wait_for/4`. Playwright uses the
-session timeout separately to save the captured download.
+## Pages, popups, and frames
 
-Use `filename:` (exact string or regex) and `url:` (absolute string, regex, or
-`fn %URI{} -> boolean end`) to select a download. Both filters must match;
-the first matching download is retained. Filtering happens before reading
-bytes or enforcing `max_bytes:`.
+A page is a browser tab or window. A popup is a page opened by another page;
+ordinary `target="_blank"` tabs count. Each browser context owns a session's
+cookies and storage. Frames are documents inside a page, including its main frame
+and any child iframes.
 
-## New pages and tabs (Playwright only)
-
-Choose the event by **which page can open the new tab or window**:
-
-| Event | Captures the first new page… | Playwright equivalent |
-| --- | --- | --- |
-| `Event.popup(:name)` | opened by the current page | `page.waitForEvent('popup')` |
-| `Event.page(:name)` | opened anywhere in the session | `context.waitForEvent('page')` |
-
-Here, “popup” includes an ordinary new tab, such as a `target="_blank"` link.
-Use `popup` when a click on the current page opens a tab:
+`Event.popup()` observes pages opened by the selected page at registration.
+`Event.page()` observes any new page in the context. Both may return handles for
+the same physical page. The event resolves immediately; the page may still be
+loading. Subsequent actions and assertions handle readiness.
 
 ```elixir
+main = current_page(session)
+pending = wait_for(session, Event.popup())
+click(session, by_role(:link, name: "Open report"))
+report = await(pending)
+
 session
-|> wait_for(Event.popup(:secret_chamber), fn session ->
-  click(session, by_role(:button, name: "Open chamber in new tab"))
-end)
-|> switch_page(:secret_chamber)
-|> assert(page_opener(:main))
-|> assert(page_url(path: "/chambers/secrets"))
-|> assert(visible(by_role(:heading, name: "Chamber of Secrets")))
+|> switch_page(report)
+|> assert(page_opener(main))
+|> assert(page_url(path: "/reports/preview"))
 |> close_page()
-|> assert(visible(by_text("Creature index")))
+|> switch_page(main)
 ```
 
-Use `Event.page(:secret_chamber)` in the same pattern when any new page in
-the session should match, including one created with the native browser context.
-For example, if another tab opens a page, `page` captures it; `popup` ignores it.
+Inspect live page handles with `Page.url/1`, `Page.status/1`, and `Page.opener/1`.
+The opener is nil if absent or closed. `current_page/1` returns a stable handle
+that survives navigation; `pages/1` lists all open pages, including tabs discovered
+without an event registration.
+Page selection is local to each session handle: retain the result of
+`switch_page/2`; other session handles keep their own selection.
+Closed page handles are invalid; closing a page does not change any session
+handle's selection. Explicitly switch to an open
+page before continuing. Closing an opener leaves its child pages alive.
 
-Both waits start listening before the callback runs. `popup` remains tied to the
-page that was active at that point, even if the callback switches pages.
-Captured pages get the session timeout to load and connect before becoming
-available. Use `switch_page/2` to interact with them.
+`new_page(session, :dashboard)` creates and selects a named blank page.
+`switch_page/2` accepts handles or names. Pages share cookies and storage; start
+another session for an independent user. Phoenix follows links and submits forms
+in the current page, ignoring `target` and `formtarget`; page creation and closing
+require Playwright.
 
-`page(session, :secret_chamber)` returns the captured `Fluffy.Page` without
-switching. Inspect it with `Page.name/1`, `Page.url/1`, `Page.status/1`,
-and `Page.opener/1`. Metadata resolves current state through the live page handle.
-The opener is a stable page handle, or `nil` if there is no opener or it has closed,
-matching Playwright's `page.opener()` behavior.
+Frame locators query iframe contents without switching pages. Browser-only
+`Event.frame_navigated()` observes navigation of any frame belonging to the page
+bound at registration, including frames created later. It returns a live frame
+handle: `Frame.url/1`, `Frame.page/1`, and `Frame.parent_frame/1` expose current
+metadata. The main frame has no parent. Navigation events signal frame navigation,
+not loading completion.
 
-All pages in one session share cookies and storage. Start separate sessions
-for independent users.
-
-Phoenix follows links and submits forms in the current page, ignoring `target`
-and `formtarget`, including `_blank`. Capturing and closing pages require Playwright and raise a capability error in
-Phoenix. Selecting the existing current page is supported on all backends.
-
-### Closing pages
-
-`close_page(session)` closes the selected page. Pass a page handle or name to
-close another page. Closing leaves each handle's selection unchanged: explicitly
-select an open page before continuing with a handle whose selected page closed.
-Closing an opener leaves the pages it opened alive. Closed page handles cannot
-be reused, even when a new page receives the same name.
+For navigation outcomes on either backend, use ordinary page assertions:
 
 ```elixir
 session
-|> close_page(:secret_chamber)
-|> switch_page(:main)
+|> click(by_role(:link, name: "Continue"))
+|> assert(page_url(path: "/next"))
+|> assert(page_status(200))
 ```
 
-## Navigation
+`go_back/2` and `go_forward/2` require Playwright and accept `timeout:`. For
+reloading either backend, see [Reloading](usage.md#reloading).
+`close_session/1` releases session resources on either backend.
 
-Captures the first document navigation or URL change on both backends. Later
-navigations in the callback still update the active page. HTTP redirects
-contribute their final URL and status. Reloads count even when the URL stays
-the same. Requestless documents, such as `about:blank`, have no HTTP status.
+## Listeners and dialogs
+
+`on(session, event, handler)` registers a persistent listener. `once` removes its
+registration before invoking the first matching handler; it does not require an
+event to occur. All three listener operations return the input session.
+`off(session, event, handler)` removes only the most recent registration matching
+the source, event type, and handler; the predicate does not affect removal.
+Repeated registrations require repeated removal calls.
+
+Each listener handles matching events in delivery order. Different listeners run
+independently; relative ordering is unspecified. Handlers and predicates execute
+outside the session runtime and browser connection, linked to the registering
+caller so unhandled failures fail that caller. Registration completes before
+returning. Listeners have no deadline and are cleaned up when removed or when
+their owner or session closes.
+
+Dialogs require Playwright. Handle them on arrival because an unresolved dialog
+blocks the triggering action:
 
 ```elixir
 session
-|> wait_for(Event.navigation(:forbidden_forest), fn session ->
-  click(session, by_role(:link, name: "Follow the spiders"))
+|> once(Event.dialog(), fn dialog ->
+  assert dialog.type == :confirm
+  assert dialog.message == "Delete this item?"
+  Dialog.accept(dialog)
 end)
-|> assert(navigation_url(:forbidden_forest, path: "/forest"))
-|> assert(navigation_status(:forbidden_forest, 200))
+|> assert_event(Event.dialog(), &click(&1, by_role(:button, name: "Delete")))
 ```
 
-Captured download, navigation, request, and response URL assertions
-accept exact strings, regexes, or structured path, query, and fragment matchers.
-Function predicates receive a `%URI{}`. This also applies to `navigation_from_url/3`. Strings are compared as
-captured, without resolving relative URLs. Structured matching follows the
-[same rules as page URL assertions](usage.md#page-assertions): query matching is
-exact by default; use `query_mode: :subset` to allow additional parameter names.
+Use `Dialog.accept(dialog, "prompt text")` for prompts or `Dialog.dismiss(dialog)`.
+Types are `:alert`, `:confirm`, `:prompt`, and `:beforeunload`; metadata also includes
+`message` and `default_value`. Register a persistent catch-all handler when needed:
 
 ```elixir
+accept_dialog = &Dialog.accept/1
 session
-|> assert(
-  navigation_url(:forbidden_forest,
-    path: "/forest",
-    query: %{"guide" => "spiders"},
-    query_mode: :subset
-  )
-)
+|> on(Event.dialog(), accept_dialog)
+|> click(by_role(:button, name: "Delete first item"))
+|> click(by_role(:button, name: "Delete second item"))
+|> off(Event.dialog(), accept_dialog)
 ```
 
-These assertions inspect the retained event result; they do not wait for the
-active page to change. `wait_for/3` handles waiting for the event.
-
-## Dialogs
-
-Dialogs are atomic browser-only events. The decision is installed before the
-action so an unhandled modal cannot deadlock the click:
-
-```elixir
-session
-|> wait_for(Event.dialog(:delete_recipe, decision: :accept), fn session ->
-  click(session, by_role(:button, name: "Delete recipe"))
-end)
-|> assert(dialog_type(:delete_recipe, :confirm))
-|> assert(dialog_message(:delete_recipe, "Delete this recipe?"))
-|> assert(dialog_action(:delete_recipe, :accept))
-```
-
-Set `decision:` to `:accept`, `:dismiss`, `{:accept, "prompt text"}`, or a
-function receiving the unhandled `%Fluffy.Dialog{}`.
+Without dialog listeners or waits, Playwright dismisses dialogs automatically.
+Once registered, handlers must resolve dialogs; a rejected predicate leaves the
+dialog unresolved. A wait observes without accepting or dismissing. Independent
+handlers and waits can observe the same dialog; ensure only one handler resolves it.
 
 ## Requests and responses
 
+Request and response events require Playwright. Page scope, the default, includes
+child frames; `scope: :context` observes all pages, including a popup's first request.
+Sources remain bound when switching pages. Use the same source and scope for `off`.
+Other events reject `scope:`: page events always observe the context, while popup,
+download, dialog, chooser, and frame-navigation events bind to the selected page.
+
 ```elixir
 session
-|> wait_for(Event.response(:potions, ~r{/api/potions}), fn session ->
-  click(session, by_role(:button, name: "Refresh potions"))
-end)
-|> assert(response_status(:potions, 200))
-|> assert(response_resource_type(:potions, "fetch"))
+|> assert_event(
+  Event.response(&String.ends_with?(&1.url, "/api/reports")),
+  &click(&1, by_role(:button, name: "Refresh")),
+  fn response -> assert response.status == 200 end,
+  scope: :context
+)
 ```
 
-Matchers can be an exact URL, regex, or normalized-event predicate. These are
-browser-wide subresource streams and therefore Playwright-only. The event
-contains method, URL, headers, resource type, post data, status fields, and the
-known page name.
+Requests signal issuance; responses signal status and headers, without waiting for
+the response body. Values expose URL, method, headers, resource type, post data,
+page, and response status fields where applicable. The page can be nil when it
+is not yet known, such as for a popup's initial request.
 
 ## File choosers
 
-Directly locating the file input is preferred, even when it is hidden.
-Applications sometimes expose only a button whose JavaScript opens the input's
-native chooser. Capture that browser event before clicking, then pass its key
-to the same file-selection action:
+Locate a file input directly when possible, including hidden inputs. For a button
+whose JavaScript opens a chooser, register first and pass the returned value directly:
 
 ```elixir
-session
-|> wait_for(Event.file_chooser(:portrait), fn session ->
-  click(session, by_role(:button, name: "Choose creature portrait"))
-end)
-|> set_input_files(:portrait, %Fluffy.FilePayload{
-  name: "fluffy.png",
-  bytes: File.read!("test/support/fixtures/fluffy.png"),
-  content_type: "image/png"
-})
+pending = wait_for(session, Event.file_chooser())
+click(session, by_role(:button, name: "Choose portrait"))
+chooser = await(pending)
+assert FileChooser.multiple?(chooser) == false
+set_input_files(session, chooser, "test/support/fixtures/portrait.png")
 ```
 
-`file_chooser(session, :portrait)` returns the opaque
-`%Fluffy.FileChooser{}`; `FileChooser.multiple?/1` exposes whether
-it accepts multiple files. The chooser result is non-consuming and lives with
-the session, but it belongs to the page that opened it. Scripted chooser events
-are Playwright-only because Static and LiveView do not execute application
-JavaScript. This API sets files programmatically; it does not operate the OS
-picker UI.
-
-See [Browser diagnostics](usage.md#browser-diagnostics) for traces, screenshots,
-and failure artifacts.
-
-## Creating pages and navigating history
-
-Use `new_page/2` to create and activate a named blank browser page. The name
-must not already identify an open page. The new page shares the session's
-cookies and storage and has no opener. `switch_page/2` also brings the selected
-tab to the front.
-
-```elixir
-session
-|> new_page(:dashboard)
-|> visit("/dashboard")
-|> visit("/settings")
-|> go_back()
-|> go_forward()
-|> switch_page(:main)
-```
-
-`go_back/2` and `go_forward/2` accept `timeout:` and return the updated session.
-They leave the browser at its current URL when there is no history entry.
-These operations require Playwright. `close_session/1` is available for both
-backends and releases the session's resources early, returning `:ok` or
-`{:error, reason}`. Do not reuse a closed session.
+The chooser identifies its source page. Setting files preserves the current-page
+selection, even after switching elsewhere. This sets files programmatically; it
+does not operate the OS picker. Choosers require Playwright.
 
 ## Cookies, storage, and browser interactions
 

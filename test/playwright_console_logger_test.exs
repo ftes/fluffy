@@ -45,8 +45,11 @@ defmodule Fluffy.PlaywrightConsoleLoggerTest do
 
         second
         |> visit(TestHTTPFixtures.path(fixture, "/start"))
-        |> wait_for(Event.popup(:popup), &click(&1, by_role(:button, name: "Open popup")))
-        |> switch_page(:popup)
+        |> then(fn session ->
+          pending = wait_for(session, Event.popup())
+          click(session, by_role(:button, name: "Open popup"))
+          switch_page(session, await(pending))
+        end)
         |> Playwright.evaluate("console.error('popup context error')")
 
         Playwright.evaluate(
