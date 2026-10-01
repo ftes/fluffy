@@ -8,7 +8,6 @@ defmodule Fluffy.Driver.Static do
   alias Fluffy.Expectation
   alias Fluffy.Internal.Navigation
   alias Fluffy.Locator
-  alias Fluffy.Locator.Static, as: StaticLocator
   alias Fluffy.Session
   alias Fluffy.URLMatcher
 
@@ -37,13 +36,13 @@ defmodule Fluffy.Driver.Static do
     case expectation do
       %Expect{target: {:locator, locator}, kind: :count, expected: expected} ->
         candidates =
-          session |> Session.page_state() |> document() |> StaticLocator.resolve(locator)
+          session |> client_dom() |> ClientDOM.resolve(locator)
 
         assert_count_expectation!(expectation, locator, expected, candidates)
 
       %Expect{target: {:locator, locator}, kind: :visible} ->
         candidates =
-          session |> Session.page_state() |> document() |> StaticLocator.resolve(locator)
+          session |> client_dom() |> ClientDOM.resolve(locator)
 
         visible_count = Enum.count(candidates, &structurally_visible?/1)
         assert_truth!(expectation, visible_count > 0, visible_count)

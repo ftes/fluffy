@@ -12,11 +12,11 @@ defmodule Fluffy.Driver.Live do
   alias Fluffy.Driver.Live.UploadState
   alias Fluffy.Expect
   alias Fluffy.Form
+  alias Fluffy.HTML.DocumentIndex
   alias Fluffy.HTML.Semantics
   alias Fluffy.Internal.Navigation
   alias Fluffy.LiveViewTest.UploadCompat
   alias Fluffy.Locator
-  alias Fluffy.Locator.Static, as: StaticLocator
   alias Fluffy.Page
   alias Fluffy.Session
   alias Fluffy.TestScope
@@ -251,7 +251,7 @@ defmodule Fluffy.Driver.Live do
         if candidate_client_dom == state.client_dom do
           session
         else
-          commit_checked(session, candidate_client_dom, target, locator)
+          commit_checked(session, candidate_client_dom, target)
         end
 
       navigation ->
@@ -259,10 +259,19 @@ defmodule Fluffy.Driver.Live do
     end
   end
 
-  defp commit_checked(session, client_dom, target, locator) do
+  defp commit_checked(session, client_dom, target) do
+    identity = Map.fetch!(client_dom.index.nodes_by_id, target.id).identity
+
     case commit_click(session, client_dom, target) do
       %Session{} = session ->
-        dispatch_live_change(session, Session.page_state(session).client_dom, locator)
+        client_dom = Session.page_state(session).client_dom
+
+        # A selector such as :checked stops matching after uncheck. Follow the
+        # original control across any click patch instead of resolving it again.
+        case Enum.find(client_dom.index.entries, &(&1.identity == identity)) do
+          nil -> session
+          entry -> dispatch_live_change(session, client_dom, DocumentIndex.target_by_id(client_dom.index, entry.id))
+        end
 
       navigation ->
         navigation
@@ -387,7 +396,7 @@ defmodule Fluffy.Driver.Live do
     {client_dom, target} = ClientDOM.click(state.client_dom, locator)
 
     if Semantics.input_type(target) in ["checkbox", "radio"],
-      do: commit_checked(session, client_dom, target, locator),
+      do: commit_checked(session, client_dom, target),
       else: commit_click(session, client_dom, target)
   end
 
@@ -426,13 +435,13 @@ defmodule Fluffy.Driver.Live do
   end
 
   defp evaluate_expectation(%Session{} = session, %Expect{target: {:locator, locator}, kind: :count, expected: expected}) do
-    candidates = session |> document() |> StaticLocator.resolve(locator)
+    candidates = session |> client_dom() |> ClientDOM.resolve(locator)
     {:ok, length(candidates) == expected, length(candidates)}
   end
 
   defp evaluate_expectation(%Session{} = session, %Expect{target: {:locator, locator}, kind: :visible}) do
     document = document(session)
-    candidates = StaticLocator.resolve(document, locator)
+    candidates = session |> client_dom() |> ClientDOM.resolve(locator)
     visible_count = Enum.count(candidates, &structurally_visible?/1)
     actual = if visible_count > 0, do: visible_count, else: normalize(LazyHTML.text(document))
     {:ok, visible_count > 0, actual}
@@ -714,11 +723,6 @@ defmodule Fluffy.Driver.Live do
     after
       0 -> nil
     end
-  end
-
-  defp dispatch_live_change(session, client_dom, %Locator{} = locator) do
-    target = ClientDOM.target!(client_dom, locator)
-    dispatch_live_change(session, client_dom, target)
   end
 
   defp dispatch_live_change(session, client_dom, %Fluffy.HTML.Target{} = target) do
@@ -1069,7 +1073,7 @@ defmodule Fluffy.Driver.Live do
 
   defp live_upload_entry_rendered?(client_dom, entry_ref) do
     selector = ~s([phx-value-ref="#{entry_ref}"])
-    StaticLocator.resolve(client_dom.document, Locator.new({:css, selector})) != []
+    ClientDOM.resolve(client_dom, Locator.new({:css, selector})) != []
   end
 
   defp put_live_upload_files(session, %{input_selector: selector}, selected_files) do

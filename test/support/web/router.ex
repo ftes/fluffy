@@ -56,6 +56,7 @@ defmodule Fluffy.TestWeb.Router do
       live("/nested", NestedParentLive)
       live("/enchanted-title", PageTitleLive)
       live("/keyboard", KeyboardLive)
+      live("/checked-controls", CheckedControlsLive)
     end
   end
 
