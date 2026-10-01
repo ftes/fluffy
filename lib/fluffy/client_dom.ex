@@ -2,11 +2,11 @@ defmodule Fluffy.ClientDOM do
   @moduledoc false
 
   alias Fluffy.Actionability
+  alias Fluffy.ClientDOM.Query
   alias Fluffy.HTML.DocumentIndex
   alias Fluffy.HTML.Semantics
   alias Fluffy.HTML.Target
   alias Fluffy.Locator
-  alias Fluffy.Locator.Static, as: StaticLocator
 
   @enforce_keys [:document, :index]
   defstruct [:document, :index, focused: nil, properties: %{}]
@@ -379,8 +379,27 @@ defmodule Fluffy.ClientDOM do
   end
 
   @doc false
+  def resolve(%__MODULE__{} = client_dom, %Locator{} = locator) do
+    Query.resolve(client_dom.document, locator, fn -> checked_ids(client_dom) end)
+  end
+
+  defp checked_ids(client_dom) do
+    client_dom.index
+    |> DocumentIndex.targets_by_tag(["input", "select"])
+    |> Enum.flat_map(fn
+      %{tag: "select"} = target ->
+        client_dom |> selected_options_for_target(target) |> Enum.map(& &1.id)
+
+      target ->
+        type = String.downcase(attribute(target.attributes, "type") || "")
+        if type in ["checkbox", "radio"] and checked_target?(client_dom, target), do: [target.id], else: []
+    end)
+    |> MapSet.new()
+  end
+
+  @doc false
   def target!(%__MODULE__{} = client_dom, locator) do
-    elements = StaticLocator.resolve(client_dom.document, locator)
+    elements = resolve(client_dom, locator)
 
     case elements do
       [_element] -> client_dom |> targets(locator, elements) |> List.first()
@@ -390,7 +409,7 @@ defmodule Fluffy.ClientDOM do
 
   @doc false
   def targets(%__MODULE__{} = client_dom, %Locator{} = locator) do
-    elements = StaticLocator.resolve(client_dom.document, locator)
+    elements = resolve(client_dom, locator)
     targets(client_dom, locator, elements)
   end
 
@@ -643,6 +662,10 @@ defmodule Fluffy.ClientDOM do
   end
 
   defp selected_values_for_target(client_dom, target) do
+    client_dom |> selected_options_for_target(target) |> Enum.map(& &1.value)
+  end
+
+  defp selected_options_for_target(client_dom, target) do
     options = select_options(client_dom, target)
 
     selected_ids =
@@ -651,9 +674,7 @@ defmodule Fluffy.ClientDOM do
         ids -> ids
       end
 
-    options
-    |> Enum.filter(&(&1.id in selected_ids))
-    |> Enum.map(& &1.value)
+    Enum.filter(options, &(&1.id in selected_ids))
   end
 
   defp default_selected_ids(options, attributes) do

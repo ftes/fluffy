@@ -172,6 +172,29 @@ Available constructors are `by_role`, `by_text`, `by_label`,
 `by_placeholder`, `by_alt_text`, `by_title`, `by_test_id`, and `by_css`.
 Refine a locator with `filter`, `first`, `last`, or zero-based `nth`.
 
+CSS `:checked` matches current checkbox, radio, and option state, including
+changes made by `check`, `uncheck`, and `select_option`. For example,
+`by_label("Country") |> by_css("option:checked")` locates the current selection.
+Attribute selectors such as `[checked]` and `[selected]` still match the
+rendered HTML attributes, which can differ from the user's input.
+
+The Phoenix backend tracks current input properties but approximates LiveView
+patch reconciliation. It can preserve checkbox input when the rendered
+`checked` attribute stays unchanged, or adopt a changed server selection while
+Playwright retains the user's focused selection. The selectors read each
+backend's current state consistently. Use Playwright when the test depends on
+LiveView's protection of focused fields during server updates, including
+`phx-patch-focused`. The in-process backend still supports `focus`, `blur`,
+keyboard navigation, and focus assertions.
+
+`fill` leaves its field focused, matching Playwright; use `blur` when the test
+needs to leave it. Keeping focus does **not** suppress normal `phx-change`:
+LiveView handles the input event while the field is still focused. In the
+Playwright backend, `phx-debounce="blur"` defers that change until focus leaves.
+The Phoenix backend deliberately dispatches form changes eagerly, including
+blur-debounced fields; use Playwright to test blur-only delivery or debounce
+timing, as described in the backend guidance above.
+
 Single-target actions are strict: if a locator matches more than one element,
 Fluffy reports the ambiguity instead of choosing for you. Narrow the
 locator, or use `assert(count(locator, n))` when multiple matches are
