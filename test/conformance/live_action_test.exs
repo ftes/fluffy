@@ -135,10 +135,38 @@ defmodule Fluffy.Conformance.LiveActionTest do
       |> expect("Attribute payload state: checked" |> by_text(exact: true) |> to_be_visible())
       |> uncheck(attrs)
       |> expect("Attribute payload state: unchecked" |> by_text(exact: true) |> to_be_visible())
+      |> click(attrs)
+      |> expect("Attribute payload state: checked" |> by_text(exact: true) |> to_be_visible())
+      |> click(attrs)
+      |> expect("Attribute payload state: unchecked" |> by_text(exact: true) |> to_be_visible())
       |> check(js)
       |> expect("JS payload state: checked" |> by_text(exact: true) |> to_be_visible())
       |> uncheck(js)
       |> expect("JS payload state: unchecked" |> by_text(exact: true) |> to_be_visible())
+    end
+
+    @tag driver: driver
+    test "checkable click payloads omit unchecked values and preserve explicit overrides with #{driver}", %{
+      driver: driver
+    } do
+      component = by_label("Component payload", exact: true)
+      overridden = by_label("Override payload", exact: true)
+      metadata = %{"id" => "component", "key" => "kept"}
+      checked_payload = metadata |> Map.put("value", "on") |> inspect()
+      unchecked_payload = inspect(metadata)
+      override_payload = metadata |> Map.put("value", "from-js") |> inspect()
+
+      driver
+      |> live_session()
+      |> visit("/live/mystic-creatures")
+      |> check(component)
+      |> expect(checked_payload |> by_text(exact: true) |> to_be_visible())
+      |> uncheck(component)
+      |> expect(unchecked_payload |> by_text(exact: true) |> to_be_visible())
+      |> check(overridden)
+      |> expect(override_payload |> by_text(exact: true) |> to_be_visible())
+      |> uncheck(overridden)
+      |> expect(override_payload |> by_text(exact: true) |> to_be_visible())
     end
 
     @tag driver: driver

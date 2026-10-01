@@ -7,6 +7,44 @@ defmodule Fluffy.Conformance.SelectOptionActionTest do
 
   for driver <- [:static, :playwright] do
     @tag driver: driver
+    test "select_option converts scalar and explicit option values with #{driver}" do
+      session =
+        session_for_html(unquote(driver), """
+        <select aria-label="Value" multiple>
+          <option value="">Empty</option>
+          <option value="42">Number</option>
+          <option value="12.5">Fraction</option>
+          <option value="ready">Atom</option>
+          <option value="2026-09-30">Date</option>
+          <option value="literal">&lt;tag&gt;&amp;</option>
+          <option value="custom:&lt;tag&gt;&amp;">Custom</option>
+        </select>
+        """)
+
+      field = by_label("Value")
+
+      session
+      |> select_option(field, 42)
+      |> expect(to_have_values(field, ["42"]))
+      |> select_option(field, nil)
+      |> expect(to_have_values(field, [""]))
+      |> select_option(field, ~D[2026-09-30])
+      |> expect(to_have_values(field, ["2026-09-30"]))
+      |> select_option(field, %Fluffy.TestFormValue{value: "<tag>&"})
+      |> expect(to_have_values(field, ["custom:<tag>&"]))
+      |> select_option(field, %{label: ~c"<tag>&"})
+      |> expect(to_have_values(field, ["literal"]))
+      |> select_option(field, %{index: 1})
+      |> expect(to_have_values(field, ["42"]))
+      |> select_option(field, [%{value: 12.5}, :ready, %{value: ~D[2026-09-30]}, %{label: :Number}])
+      |> expect(to_have_values(field, ["42", "12.5", "ready", "2026-09-30"]))
+      |> select_option(field, %{value: ~c"ready"})
+      |> expect(to_have_values(field, ["ready"]))
+
+      assert_raise Protocol.UndefinedError, fn -> select_option(session, field, %{value: %{}}) end
+    end
+
+    @tag driver: driver
     test "select_option matches a single option by value or label with #{driver}" do
       field = by_label("Country")
 

@@ -33,6 +33,29 @@ defmodule Fluffy.TestWeb.PageController do
     """)
   end
 
+  def embedded_ready(conn, %{"topic" => topic}) do
+    views =
+      for id <- ["first", "second"] do
+        conn
+        |> Phoenix.Component.live_render(Fluffy.TestWeb.RedirectReadyLive,
+          id: id,
+          session: %{"topic" => topic, "delay" => 100}
+        )
+        |> Phoenix.HTML.Safe.to_iodata()
+      end
+
+    send_html(
+      conn,
+      IO.iodata_to_binary([
+        "<html><head><meta name='csrf-token' content='",
+        Plug.CSRFProtection.get_csrf_token(),
+        "'><script type='module' src='/assets/test_browser.js'></script></head><body>",
+        views,
+        "</body></html>"
+      ])
+    )
+  end
+
   def redirect_live_ready(conn, %{"topic" => topic}) do
     redirect(conn, to: "/live/redirect-ready?topic=#{URI.encode_www_form(topic)}")
   end

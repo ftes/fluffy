@@ -98,6 +98,7 @@ defmodule Fluffy.MixProject do
           Fluffy.FrameLocator,
           Fluffy.Expect,
           Fluffy.Assert,
+          Fluffy.PhoenixTest,
           Fluffy.Page,
           Fluffy.Event,
           Fluffy.Playwright,

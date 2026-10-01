@@ -5,7 +5,7 @@ import {LiveSocket} from "phoenix_live_view"
 document.documentElement.dataset.fluffyTestBrowser = "ready"
 
 const csrfToken = document.querySelector("meta[name='csrf-token']")?.content
-const liveRoot = document.querySelector("[data-phx-main]")
+const liveRoot = document.querySelector("[data-phx-main], [data-phx-session]")
 
 if (csrfToken && liveRoot) {
   const liveSocket = new LiveSocket("/live", Socket, {

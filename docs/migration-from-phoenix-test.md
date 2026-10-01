@@ -4,6 +4,90 @@ Fluffy replaces PhoenixTest helpers with composable locators, explicit form
 submission, and a shared Phoenix/Playwright API. This guide covers the setup
 and behavior differences that matter when converting tests.
 
+## Optional PhoenixTest-style facade
+
+Use `import Fluffy.PhoenixTest` as a single import for the supported
+PhoenixTest-style actions, assertions, and utilities. Choose this instead of
+`import Fluffy` plus `import Fluffy.Expect` or `use Fluffy.Assert`. The regular
+styles also typically import `Fluffy.Locator`. Other APIs remain available
+through qualified calls.
+
+```elixir
+defmodule MyAppWeb.PotionTest do
+  use ExUnit.Case, async: true
+  import Fluffy.PhoenixTest
+
+  setup context do
+    Fluffy.Test.setup(context)
+  end
+
+  test "saves a potion" do
+    start_session(:phoenix)
+    |> visit("/potions/new")
+    |> within("#potion-form", fn session ->
+      session
+      |> fill_in("Name", with: "Polyjuice")
+      |> click_button("Save")
+    end)
+    |> assert_path("/potions")
+    |> assert_has("#notice", text: "Saved")
+  end
+end
+```
+
+Keep your endpoint and sandbox configuration. A prepared connection can also
+be piped into `visit/2`; it always starts a Phoenix session. `put_endpoint/2`
+stores an endpoint override on that connection. Otherwise Fluffy's configured
+endpoint is used. `start_session/1,2` permits an explicit backend choice.
+
+The facade retains Fluffy behavior and driver boundaries. In particular:
+
+- CSS click overloads match text or labels and accept `exact: true` to distinguish overlapping text.
+  If text and label identify different elements, normal Fluffy strictness applies.
+- Field actions use exact labels by default and accept `exact: false`.
+  Selector-plus-label overloads intersect both locators on the same control.
+  `fill_in` values and `select` option labels accept any `String.Chars` value;
+  native form actions convert them with `to_string/1` without HTML escaping.
+  `select` accepts `option:` or the legacy `from:` form, always matches exact
+  option labels, and replaces the selected set when given a list. Use
+  `option: [charlist]` for a single charlist option label.
+- `assert_has` checks DOM presence, including hidden elements and multiple
+  matches; `refute_has` checks absence. Both support substring text or `exact: true`, `count:`,
+  one-based `at:`, `value:`, `checked:`, `selected:`, and `timeout:`. Optional `label:` filters
+  any of these assertions, defaults to substring matching, and accepts `exact:`.
+  For example, `assert_has(session, "select", label: "Crew reminder day")`
+  checks for a labelled select. Position is applied after label filtering and
+  before text filtering. Value and checked predicates require one control.
+- `selected:` matches a selected option’s complete normalized text.
+  Only one of `text:`, `value:`, `checked:`, or `selected:` is accepted.
+  Counts with field predicates and `at:` with `count:`
+  raise `ArgumentError`. The special `"title"` selector supports substring
+  text, exact text, and bare nonempty-title presence.
+- `assert_path` checks a path and optionally an exact flat
+  `query_params:` map, converting scalar keys and values to strings.
+  A whole `*` path segment matches one segment (including an empty one), so
+  `/projects/*/edit` matches `/projects/42/edit` but not `/projects/42/extra/edit`.
+  Other segments are literal, including embedded stars. Query strings and
+  fragments do not affect path matching. `refute_path` negates the combined
+  path/query condition. Nested query structures are rejected.
+- Facade actions and assertions return a `Fluffy.PhoenixTest.Session`. `within` adds
+  a CSS scope; return the updated wrapper from the callback. Nested scopes
+  restore the outer scope while preserving the active form.
+- Field actions remember their owning form for `submit()`. External controls
+  with a `form` attribute are supported. `submit(session, selector)` can also
+  select a form explicitly. Navigation, submission, reload, and `unwrap`
+  clear form tracking.
+- Native Fluffy takes the contained `session` field. Keep any interop helpers in
+  the consuming application, or use native Fluffy throughout tests centered on
+  browser scripting, tabs, and event capture. There are no public conversion or
+  native-callback helpers in the facade.
+- `reload_page`, `open_browser`, and `unwrap` retain Fluffy's driver-specific
+  semantics. Downloads use native event capture before their triggering action;
+  there is no implicit `assert_download/2`.
+
+The rest of this guide describes migration to the regular locator API and
+behavior differences that also apply when using the facade.
+
 ## Phoenix and browser tests in the same module
 
 Keep related tests together, sharing fixtures, helpers, and the same actions
@@ -289,6 +373,9 @@ session
 ```
 
 The path list preserves selection order. Pass `[]` to clear the input.
+The facade also accepts multiple paths: `upload("Evidence", paths)`, with optional
+CSS and label options. For an empty selection with both CSS and label, use
+`upload(session, "#evidence", "Evidence", [], [])` to distinguish it from empty options.
 For generated bytes, use `%Fluffy.FilePayload{}`. For a JavaScript-opened file
 chooser, use Playwright's `Event.file_chooser`. See
 [Files and uploads](usage.md#files-and-uploads) and

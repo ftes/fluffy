@@ -135,7 +135,7 @@ defmodule Fluffy.Backend.Phoenix do
     url = resolve_url(Session.current_page(session).url, navigation.destination, session)
 
     session
-    |> Session.commit_page(:live, navigation.state, URI.to_string(url))
+    |> Session.commit_page(:live, navigation.state, URI.to_string(url), same_document: true)
     |> capture_url_change(Session.current_page(session).url)
   end
 

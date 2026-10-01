@@ -129,7 +129,12 @@ Each call above is a step in a `session |> …` pipeline. See
 
 ## Migrating from PhoenixTest
 
-The pipeline stays familiar; actions and expectations use composable locators:
+For supported PhoenixTest-style helpers, use `import Fluffy.PhoenixTest` as a
+single import, with `Fluffy.Test` lifecycle setup. See the
+[facade guide](docs/migration-from-phoenix-test.md#optional-phoenixtest-style-facade)
+for supported options and behavior differences.
+
+The regular API uses composable locators:
 
 | PhoenixTest | Fluffy |
 | --- | --- |

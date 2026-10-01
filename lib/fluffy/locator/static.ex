@@ -6,7 +6,18 @@ defmodule Fluffy.Locator.Static do
   @labelled_control_selector "button, input, meter, output, progress, select, textarea"
 
   def resolve(document, %Locator{} = locator) do
-    Enum.reduce(locator.operations, [document], &apply_operation/2)
+    Enum.reduce(locator.operations, [document], fn
+      {:and, right}, candidates ->
+        matches = document |> resolve(right) |> MapSet.new(&LazyHTML.css_path/1)
+        Enum.filter(candidates, &MapSet.member?(matches, LazyHTML.css_path(&1)))
+
+      {:or, right}, candidates ->
+        matches = MapSet.new(candidates ++ resolve(document, right), &LazyHTML.css_path/1)
+        document |> LazyHTML.query("*") |> Enum.filter(&MapSet.member?(matches, LazyHTML.css_path(&1)))
+
+      operation, candidates ->
+        apply_operation(operation, candidates)
+    end)
   end
 
   def resolve_one!(document, %Locator{} = locator) do
@@ -74,8 +85,9 @@ defmodule Fluffy.Locator.Static do
   defp apply_operation({:filter, options}, scopes) do
     Enum.filter(scopes, fn candidate ->
       Enum.all?(options, fn
-        {:has_text, text} -> text_matches?(LazyHTML.text(candidate), text, false)
-        {:has_not_text, text} -> not text_matches?(LazyHTML.text(candidate), text, false)
+        {:has_text, text} -> text_matches?(LazyHTML.text(candidate), text, Keyword.get(options, :exact, false))
+        {:has_not_text, text} -> not text_matches?(LazyHTML.text(candidate), text, Keyword.get(options, :exact, false))
+        {:exact, _exact?} -> true
         {:has, %Locator{} = child} -> resolve(candidate, child) != []
         {:has_not, %Locator{} = child} -> resolve(candidate, child) == []
       end)
@@ -117,7 +129,9 @@ defmodule Fluffy.Locator.Static do
       |> Enum.reject(&has_author_label?/1)
 
     aria_labelled =
-      Enum.filter(controls, fn control ->
+      [scope]
+      |> query_scopes("[aria-label], [aria-labelledby]")
+      |> Enum.filter(fn control ->
         case element_attribute(control, "aria-labelledby") do
           nil -> direct_label_matches?(control, expected, exact?)
           _references -> referenced_label_matches?(scope, control, expected, exact?)

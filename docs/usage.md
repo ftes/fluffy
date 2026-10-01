@@ -171,6 +171,18 @@ session
 Available constructors are `by_role`, `by_text`, `by_label`,
 `by_placeholder`, `by_alt_text`, `by_title`, `by_test_id`, and `by_css`.
 Refine a locator with `filter`, `first`, `last`, or zero-based `nth`.
+Use `and_` to require both locators to match the same element:
+
+```elixir
+email = by_css("#email") |> and_(by_label("Email", exact: true))
+```
+
+The right locator resolves from the original query root, not inside the left
+matches. Inside a `has` or `has_not` filter, it resolves from that filter's
+candidate. Intersections preserve the left locator's order and can be chained.
+For frames, the right locator can be relative to the left locator's frame or
+use the same frame prefix. Playwright validates frame compatibility when the
+locator resolves; intersections across different frames are unsupported.
 
 CSS `:checked` matches current checkbox, radio, and option state, including
 changes made by `check`, `uncheck`, and `select_option`. For example,
@@ -269,6 +281,13 @@ session
 |> assert(checked(by_label("Flute ready")))
 |> assert(visible(by_text("Creature saved")))
 ```
+
+`fill` accepts any value implementing `String.Chars`, such as numbers, dates,
+and custom structs. `select_option` also converts option values and labels,
+including those in `%{value: value}` and `%{label: label}` requests. Conversion
+uses `to_string/1` without HTML escaping; `%{index: index}` remains numeric.
+Lists in `select_option` represent multiple options. To select a single
+charlist value, use `%{value: charlist}` (or `%{label: charlist}` for its label).
 
 Use `checked(locator, checked: false)` for an unchecked control. The
 browser-owned indeterminate state is Playwright-only:

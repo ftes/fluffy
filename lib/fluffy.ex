@@ -359,10 +359,16 @@ defmodule Fluffy do
   end
 
   @doc group: "Actions"
-  @spec fill(Session.t(), Fluffy.Locator.t(), String.t(), [action_option()]) :: Session.t()
+  @doc """
+  Fills a control with the literal string representation of `value`.
+
+  Accepts any value implementing `String.Chars`, including numbers, dates,
+  and custom structs. Conversion uses `to_string/1`, without HTML escaping.
+  """
+  @spec fill(Session.t(), Fluffy.Locator.t(), String.Chars.t(), [action_option()]) :: Session.t()
   def fill(%Session{} = session, locator, value, options \\ []) do
     options = Fluffy.Options.validate_action!(options)
-    dispatch_driver(session, :fill, [locator, value, options])
+    dispatch_driver(session, :fill, [locator, to_string(value), options])
   end
 
   @doc group: "Actions"
@@ -429,11 +435,28 @@ defmodule Fluffy do
   end
 
   @doc group: "Actions"
+  @doc """
+  Selects options by value or label, or explicitly with `%{value: value}`,
+  `%{label: label}`, or `%{index: index}`.
+
+  Values and labels accept `String.Chars` and are converted without HTML
+  escaping. Indexes remain zero-based integers. A list requests multiple
+  options; wrap a charlist in `%{value: charlist}` or `%{label: charlist}`
+  to use it as one option.
+  """
   @spec select_option(Session.t(), Fluffy.Locator.t(), term(), [action_option()]) :: Session.t()
   def select_option(%Session{} = session, locator, requested, options \\ []) do
     options = Fluffy.Options.validate_action!(options)
+    requested = if is_list(requested), do: requested, else: [requested]
+    requested = Enum.map(requested, &stringify_option/1)
     dispatch_driver(session, :select_option, [locator, requested, options])
   end
+
+  defp stringify_option(value) when is_struct(value), do: to_string(value)
+  defp stringify_option(%{value: value} = option), do: %{option | value: to_string(value)}
+  defp stringify_option(%{label: label} = option), do: %{option | label: to_string(label)}
+  defp stringify_option(%{index: _index} = option), do: option
+  defp stringify_option(value), do: to_string(value)
 
   @doc group: "Actions"
   @spec focus(Session.t(), Fluffy.Locator.t(), [action_option()]) :: Session.t()

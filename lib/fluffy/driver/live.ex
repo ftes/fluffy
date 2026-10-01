@@ -7,6 +7,7 @@ defmodule Fluffy.Driver.Live do
 
   alias Fluffy.ClientDOM
   alias Fluffy.Driver.Live.ActionResolver
+  alias Fluffy.Driver.Live.Click
   alias Fluffy.Driver.Live.Keyboard
   alias Fluffy.Driver.Live.Retry
   alias Fluffy.Driver.Live.UploadState
@@ -99,9 +100,7 @@ defmodule Fluffy.Driver.Live do
       :render_click ->
         result =
           try do
-            event_view
-            |> element(selector_for_view(client_dom, target.selector, event_context))
-            |> render_click()
+            Click.render(event_view, client_dom, target, selector_for_view(client_dom, target.selector, event_context))
           catch
             :exit, reason -> raise Fluffy.LiveViewError, reason: reason
           end
