@@ -435,52 +435,13 @@ defmodule Fluffy.Driver.Live do
     reconcile_unwrapped(session, state.client_dom)
   end
 
-  defp evaluate_expectation(%Session{} = session, %Expect{target: {:locator, locator}, kind: :count, expected: expected}) do
-    candidates = session |> client_dom() |> ClientDOM.resolve(locator)
-    {:ok, length(candidates) == expected, length(candidates)}
-  end
+  defp evaluate_expectation(%Session{} = session, %Expect{target: {:locator, _locator}} = expectation) do
+    {passed?, actual} = ClientDOM.Expectation.evaluate(client_dom(session), expectation)
 
-  defp evaluate_expectation(%Session{} = session, %Expect{target: {:locator, locator}, kind: :visible}) do
-    document = document(session)
-    candidates = session |> client_dom() |> ClientDOM.resolve(locator)
-    visible_count = Enum.count(candidates, &structurally_visible?/1)
-    actual = if visible_count > 0, do: visible_count, else: normalize(LazyHTML.text(document))
-    {:ok, visible_count > 0, actual}
-  end
+    actual =
+      if expectation.kind == :visible and actual == 0, do: normalize(LazyHTML.text(document(session))), else: actual
 
-  defp evaluate_expectation(%Session{} = session, %Expect{target: {:locator, locator}, kind: :disabled}) do
-    actual = session |> client_dom() |> ClientDOM.disabled?(locator)
-    {:ok, actual, actual}
-  end
-
-  defp evaluate_expectation(%Session{} = session, %Expect{target: {:locator, locator}, kind: :editable}) do
-    actual = session |> client_dom() |> ClientDOM.editable?(locator)
-    {:ok, actual, actual}
-  end
-
-  defp evaluate_expectation(%Session{} = session, %Expect{target: {:locator, locator}, kind: :enabled}) do
-    actual = not (session |> client_dom() |> ClientDOM.disabled?(locator))
-    {:ok, actual, actual}
-  end
-
-  defp evaluate_expectation(%Session{} = session, %Expect{target: {:locator, locator}, kind: :focused}) do
-    actual = session |> client_dom() |> ClientDOM.focused?(locator)
-    {:ok, actual, actual}
-  end
-
-  defp evaluate_expectation(%Session{} = session, %Expect{target: {:locator, locator}, kind: :checked, expected: expected}) do
-    actual = session |> client_dom() |> ClientDOM.checked?(locator)
-    {:ok, actual == (expected == :checked), actual}
-  end
-
-  defp evaluate_expectation(%Session{} = session, %Expect{target: {:locator, locator}, kind: :value, expected: expected}) do
-    actual = session |> client_dom() |> ClientDOM.value(locator)
-    {:ok, actual == expected, actual}
-  end
-
-  defp evaluate_expectation(%Session{} = session, %Expect{target: {:locator, locator}, kind: :values, expected: expected}) do
-    actual = session |> client_dom() |> ClientDOM.selected_values(locator)
-    {:ok, actual == expected, actual}
+    {:ok, passed?, actual}
   end
 
   defp evaluate_expectation(%Session{} = session, %Expect{target: :page, kind: :url, expected: expected}) do
@@ -495,17 +456,6 @@ defmodule Fluffy.Driver.Live do
 
   defp client_dom(session), do: session |> Session.page_state() |> Map.fetch!(:client_dom)
   defp document(session), do: session |> client_dom() |> Map.fetch!(:document)
-
-  defp structurally_visible?(element) do
-    attributes =
-      case LazyHTML.attributes(element) do
-        [attributes] -> attributes
-        _other -> []
-      end
-
-    not List.keymember?(attributes, "hidden", 0) and
-      String.downcase(attribute(attributes, "aria-hidden") || "false") != "true"
-  end
 
   defp resolve_live_action(session, locator, options, action) do
     options = Keyword.validate!(options, [:timeout])

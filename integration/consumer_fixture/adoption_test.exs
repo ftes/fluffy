@@ -23,6 +23,22 @@ defmodule FluffyConsumer.AdoptionTest do
     end
 
     @tag backend: backend
+    test "download events compose with ordinary assertions using #{backend}", %{backend: backend} do
+      backend
+      |> start_session()
+      |> visit("/")
+      |> assert_event(
+        Fluffy.Event.download(),
+        &click(&1, by_role(:link, name: "Download report")),
+        fn download ->
+          assert download.suggested_filename == "report.csv"
+          assert Fluffy.Download.read!(download) == "id,total\n1,42\n"
+        end
+      )
+      |> assert(page_url("/"))
+    end
+
+    @tag backend: backend
     test "the public native escape hatch remains pipeable with #{backend}", %{backend: backend} do
       session = start_session(backend)
 

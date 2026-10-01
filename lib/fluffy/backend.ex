@@ -44,16 +44,6 @@ defmodule Fluffy.Backend do
     dispatch(session, :close_page, [page_id])
   end
 
-  def arm_event(session, type, options) do
-    Session.backend(session).arm_event(session, type, options)
-  end
-
-  def await_event(session, resource, timeout) do
-    Session.backend(session).await_event(session, resource, timeout)
-  end
-
-  def disarm_event(backend, resource), do: backend.disarm_event(resource)
-
   def run_step(session, name, location, fun) do
     Session.backend(session).run_step(session, name, location, fun)
   end

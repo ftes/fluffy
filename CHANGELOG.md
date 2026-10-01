@@ -2,9 +2,29 @@
 
 ## Unreleased
 
+## 0.6.0 — 2026-10-01
+
 ### Added
 
 - `Fluffy.PhoenixTest` provides a slim PhoenixTest-style vocabulary (`visit`, `click_link`, `fill_in`, `select`, `check`, `within`, `assert_has`, `assert_path`, and friends) over Fluffy sessions from a single import. Unsupported options and combinations raise `ArgumentError`.
+- `open_browser/2` opens an HTML snapshot from any driver for inspecting a test's current page.
+- Independent `wait_for/3` and `await/1` event waits, pipeable `expect_event` and `assert_event` helpers, and persistent `on`, `once`, and `off` listeners. Predicates select events; ordinary ExUnit assertions check the returned values.
+- Live browser frame handles from `Event.frame_navigated/1`, page/context request and response scopes, and dialog handles with explicit acceptance or dismissal.
+- Download handles expose metadata when downloading starts. `Download.read!/2` and `Download.save_as!/2` wait for completion; reads retain the default 10 MB limit and saves use bounded memory.
+
+### Changed
+
+- **Breaking:** replace keyed event captures, callback-style `wait_for`, captured-result assertion constructors, and `Event.navigation` with independent waits and ordinary values. Use page URL/status assertions for cross-backend navigation outcomes. See [Events and pages](docs/advanced-events.md) for migration examples.
+- Sessions and pages are live handles backed by shared session state. Actions remain visible through existing handles, while page selection stays local to each session handle. Closed pages reject subsequent operations, and session resources close with their owning test process.
+- Form actions accept values implementing `String.Chars`. The PhoenixTest facade retains its wrapper, scoped operations, and active-form tracking for `submit()`.
+- Require `playwright_ex ~> 0.13.0` for synchronous event cleanup and page frame-navigation events.
+
+### Fixed
+
+- Resolve Phoenix `:checked` selectors and selected-option assertions against current user input as well as server-rendered form state.
+- Keep in-process DOM indexes local to the calling test process to avoid copying them through the session runtime on every operation.
+- File chooser handles retain their source page, reconcile navigation there, and preserve the caller's page selection.
+- Popup events resolve without waiting for loading; subsequent actions and assertions wait for document readiness and LiveView connection.
 
 ## 0.5.2 — 2026-09-28
 

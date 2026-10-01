@@ -40,40 +40,9 @@ defmodule Fluffy.Driver.Static do
 
         assert_count_expectation!(expectation, locator, expected, candidates)
 
-      %Expect{target: {:locator, locator}, kind: :visible} ->
-        candidates =
-          session |> client_dom() |> ClientDOM.resolve(locator)
-
-        visible_count = Enum.count(candidates, &structurally_visible?/1)
-        assert_truth!(expectation, visible_count > 0, visible_count)
-
-      %Expect{target: {:locator, locator}, kind: :disabled} ->
-        actual = session |> client_dom() |> ClientDOM.disabled?(locator)
-        assert_truth!(expectation, actual, actual)
-
-      %Expect{target: {:locator, locator}, kind: :editable} ->
-        actual = session |> client_dom() |> ClientDOM.editable?(locator)
-        assert_truth!(expectation, actual, actual)
-
-      %Expect{target: {:locator, locator}, kind: :enabled} ->
-        actual = not (session |> client_dom() |> ClientDOM.disabled?(locator))
-        assert_truth!(expectation, actual, actual)
-
-      %Expect{target: {:locator, locator}, kind: :focused} ->
-        actual = session |> client_dom() |> ClientDOM.focused?(locator)
-        assert_truth!(expectation, actual, actual)
-
-      %Expect{target: {:locator, locator}, kind: :checked, expected: expected} ->
-        actual = session |> client_dom() |> ClientDOM.checked?(locator)
-        assert_truth!(expectation, actual == (expected == :checked), actual)
-
-      %Expect{target: {:locator, locator}, kind: :value, expected: expected} ->
-        actual = session |> client_dom() |> ClientDOM.value(locator)
-        assert_truth!(expectation, actual == expected, actual)
-
-      %Expect{target: {:locator, locator}, kind: :values, expected: expected} ->
-        actual = session |> client_dom() |> ClientDOM.selected_values(locator)
-        assert_truth!(expectation, actual == expected, actual)
+      %Expect{target: {:locator, _locator}} ->
+        {passed?, actual} = ClientDOM.Expectation.evaluate(client_dom(session), expectation)
+        assert_truth!(expectation, passed?, actual)
 
       %Expect{target: :page, kind: :url, expected: expected} ->
         actual = Session.current_page(session).url
@@ -267,16 +236,5 @@ defmodule Fluffy.Driver.Static do
   defp assert_count_expectation!(%Expect{} = expectation, _locator, expected, candidates) do
     actual = length(candidates)
     assert_truth!(expectation, actual == expected, actual)
-  end
-
-  defp structurally_visible?(element) do
-    attributes =
-      case LazyHTML.attributes(element) do
-        [attributes] -> attributes
-        _other -> []
-      end
-
-    not List.keymember?(attributes, "hidden", 0) and
-      String.downcase(attribute(attributes, "aria-hidden") || "false") != "true"
   end
 end

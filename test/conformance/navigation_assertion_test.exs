@@ -1,17 +1,15 @@
-defmodule Fluffy.Conformance.NavigationEventTest do
+defmodule Fluffy.Conformance.NavigationAssertionTest do
   use Fluffy.TestCase, async: true
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.Event
-  alias Fluffy.NavigationEvent
   alias Fluffy.TestHTTPFixtures
 
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
-    test "captures link navigation metadata with #{driver}", %{driver: driver} do
+    test "asserts link navigation URL and status with #{driver}", %{driver: driver} do
       fixture =
         TestHTTPFixtures.register(fn request ->
           case request.path do
@@ -20,25 +18,19 @@ defmodule Fluffy.Conformance.NavigationEventTest do
           end
         end)
 
-      from_url = TestHTTPFixtures.url(fixture, "/start")
       destination = TestHTTPFixtures.url(fixture, "/destination?source=link")
       session = start_test_session(driver)
 
-      session =
-        session
-        |> visit(TestHTTPFixtures.path(fixture, "/start"))
-        |> wait_for(Event.navigation(:continue), &click(&1, by_role(:link, name: "Continue")))
-        |> expect(Fluffy.Expect.navigation_to_have_from_url(:continue, from_url))
-        |> expect(Fluffy.Expect.navigation_to_have_url(:continue, destination))
-        |> expect(Fluffy.Expect.navigation_to_have_status(:continue, 202))
-        |> expect("Arrived" |> by_text() |> to_be_visible())
-
-      assert %NavigationEvent{url: ^destination, status: 202} =
-               navigation(session, :continue)
+      session
+      |> visit(TestHTTPFixtures.path(fixture, "/start"))
+      |> click(by_role(:link, name: "Continue"))
+      |> expect(page_to_have_url(destination))
+      |> expect(page_to_have_status(202))
+      |> expect("Arrived" |> by_text() |> to_be_visible())
     end
 
     @tag driver: driver
-    test "captures form submission navigation with #{driver}", %{driver: driver} do
+    test "asserts form submission navigation with #{driver}", %{driver: driver} do
       fixture =
         TestHTTPFixtures.register(fn request ->
           case request.path do
@@ -64,9 +56,9 @@ defmodule Fluffy.Conformance.NavigationEventTest do
       session
       |> visit(TestHTTPFixtures.path(fixture, "/start"))
       |> fill(by_label("Query"), "fluffy")
-      |> wait_for(Event.navigation(:submit), &click(&1, by_role(:button, name: "Search")))
-      |> expect(Fluffy.Expect.navigation_to_have_url(:submit, destination))
-      |> expect(Fluffy.Expect.navigation_to_have_status(:submit, 201))
+      |> click(by_role(:button, name: "Search"))
+      |> expect(page_to_have_url(destination))
+      |> expect(page_to_have_status(201))
       |> expect("Submitted" |> by_text() |> to_be_visible())
 
       [request] =
@@ -79,7 +71,7 @@ defmodule Fluffy.Conformance.NavigationEventTest do
     end
 
     @tag driver: driver
-    test "captures the final response after a redirect with #{driver}", %{driver: driver} do
+    test "asserts the final response after a redirect with #{driver}", %{driver: driver} do
       fixture =
         TestHTTPFixtures.register(fn request ->
           case request.path do
@@ -94,9 +86,9 @@ defmodule Fluffy.Conformance.NavigationEventTest do
 
       session
       |> visit(TestHTTPFixtures.path(fixture, "/start"))
-      |> wait_for(Event.navigation(:redirect), &click(&1, by_role(:link, name: "Continue")))
-      |> expect(Fluffy.Expect.navigation_to_have_url(:redirect, destination))
-      |> expect(Fluffy.Expect.navigation_to_have_status(:redirect, 203))
+      |> click(by_role(:link, name: "Continue"))
+      |> expect(page_to_have_url(destination))
+      |> expect(page_to_have_status(203))
       |> expect("Final" |> by_text() |> to_be_visible())
     end
   end
@@ -112,7 +104,7 @@ defmodule Fluffy.Conformance.NavigationEventTest do
 
   for driver <- [:phoenix, :playwright], redirect? <- [false, true] do
     @tag driver: driver
-    test "captures the first navigation and retains the current page with #{driver}, redirect: #{redirect?}", %{
+    test "asserts sequential navigations with #{driver}, redirect: #{redirect?}", %{
       driver: driver
     } do
       first_path = if unquote(redirect?), do: "redirect", else: "first"
@@ -130,12 +122,10 @@ defmodule Fluffy.Conformance.NavigationEventTest do
       driver
       |> start_test_session()
       |> visit(TestHTTPFixtures.path(fixture, "/start"))
-      |> wait_for(Event.navigation(:first), fn session ->
-        session |> click(by_role(:link, name: "First")) |> click(by_role(:link, name: "Second"))
-      end)
-      |> expect(navigation_to_have_from_url(:first, TestHTTPFixtures.url(fixture, "/start")))
-      |> expect(navigation_to_have_url(:first, TestHTTPFixtures.url(fixture, "/first")))
-      |> expect(navigation_to_have_status(:first, 201))
+      |> click(by_role(:link, name: "First"))
+      |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/first")))
+      |> expect(page_to_have_status(201))
+      |> click(by_role(:link, name: "Second"))
       |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/second")))
       |> expect(page_to_have_status(202))
     end
@@ -143,7 +133,7 @@ defmodule Fluffy.Conformance.NavigationEventTest do
 
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
-    test "retains a fragment navigation before a new document with #{driver}", %{driver: driver} do
+    test "asserts a fragment navigation before a new document with #{driver}", %{driver: driver} do
       fixture =
         TestHTTPFixtures.register(fn request ->
           case request.path do
@@ -161,29 +151,18 @@ defmodule Fluffy.Conformance.NavigationEventTest do
       driver
       |> start_test_session()
       |> visit(TestHTTPFixtures.path(fixture, "/start"))
-      |> wait_for(Event.navigation(:first), fn session ->
-        session |> click(by_role(:link, name: "Section", exact: true)) |> click(by_role(:link, name: "Second"))
-      end)
-      |> expect(navigation_to_have_from_url(:first, TestHTTPFixtures.url(fixture, "/start")))
-      |> expect(navigation_to_have_url(:first, TestHTTPFixtures.url(fixture, "/start#section")))
-      |> expect(navigation_to_have_status(:first, 200))
+      |> click(by_role(:link, name: "Section", exact: true))
+      |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/start#section")))
+      |> expect(page_to_have_status(200))
+      |> click(by_role(:link, name: "Second"))
       |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/second")))
       |> expect(page_to_have_status(202))
-    end
-
-    @tag driver: driver
-    test "does not capture navigation when the action leaves the page unchanged with #{driver}", %{driver: driver} do
-      session = driver |> start_test_session() |> visit("/chamber")
-
-      assert_raise ExUnit.AssertionError, ~r/no matching event occurred/, fn ->
-        wait_for(session, Event.navigation(:missing, timeout: 100), & &1)
-      end
     end
   end
 
   for driver <- [:phoenix, :playwright], kind <- [:patch, :navigate] do
     @tag driver: driver
-    test "retains a LiveView #{kind} before another navigation with #{driver}", %{driver: driver} do
+    test "asserts a LiveView #{kind} before another navigation with #{driver}", %{driver: driver} do
       {link, destination} =
         case unquote(kind) do
           :patch -> {"Reveal passage", "/live/chamber-map?step=patched"}
@@ -193,15 +172,10 @@ defmodule Fluffy.Conformance.NavigationEventTest do
       driver
       |> start_test_session()
       |> visit("/live/chamber-map")
-      |> wait_for(Event.navigation(:first), fn session ->
-        session
-        |> click(by_role(:link, name: link, exact: true))
-        |> expect(page_to_have_url(destination))
-        |> visit("/chamber")
-      end)
-      |> expect(navigation_to_have_from_url(:first, Fluffy.TestServer.base_url() <> "/live/chamber-map"))
-      |> expect(navigation_to_have_url(:first, Fluffy.TestServer.base_url() <> destination))
-      |> expect(navigation_to_have_status(:first, 200))
+      |> click(by_role(:link, name: link, exact: true))
+      |> expect(page_to_have_url(destination))
+      |> expect(page_to_have_status(200))
+      |> visit("/chamber")
       |> expect(page_to_have_url("/chamber"))
       |> expect(page_to_have_status(200))
     end
@@ -209,30 +183,24 @@ defmodule Fluffy.Conformance.NavigationEventTest do
 
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
-    test "captures a same-URL reload before another navigation with #{driver}", %{driver: driver} do
+    test "asserts a same-URL reload before another navigation with #{driver}", %{driver: driver} do
       driver
       |> start_test_session()
       |> visit("/chamber")
-      |> wait_for(Event.navigation(:first), fn session ->
-        session |> reload() |> visit("/live/chamber-map")
-      end)
-      |> expect(navigation_to_have_from_url(:first, Fluffy.TestServer.base_url() <> "/chamber"))
-      |> expect(navigation_to_have_url(:first, Fluffy.TestServer.base_url() <> "/chamber"))
-      |> expect(navigation_to_have_status(:first, 200))
+      |> reload()
+      |> expect(page_to_have_url("/chamber"))
+      |> expect(page_to_have_status(200))
+      |> visit("/live/chamber-map")
       |> expect(page_to_have_url("/live/chamber-map"))
     end
 
     @tag driver: driver
-    test "ignores a LiveView patch to the current URL with #{driver}", %{driver: driver} do
+    test "keeps the URL after a LiveView patch to the current URL with #{driver}", %{driver: driver} do
       session = driver |> start_test_session() |> visit("/live/chamber-map?step=patched")
 
-      assert_raise ExUnit.AssertionError, ~r/no matching event occurred/, fn ->
-        wait_for(
-          session,
-          Event.navigation(:unchanged, timeout: 500),
-          &click(&1, by_role(:link, name: "Reveal passage", exact: true))
-        )
-      end
+      session
+      |> click(by_role(:link, name: "Reveal passage", exact: true))
+      |> expect(page_to_have_url("/live/chamber-map?step=patched"))
     end
   end
 end

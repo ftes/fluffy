@@ -3,39 +3,20 @@ defmodule Fluffy.SessionRuntimeTest do
 
   alias Fluffy.SessionRuntime
 
-  test "the runtime enforces capture tokens, immutable keys, and result types without crashing" do
-    {:ok, runtime} = SessionRuntime.start(self())
-    {:ok, token} = SessionRuntime.begin_capture(runtime, :popup, :result, [])
-
-    assert {:error, pending_error} = SessionRuntime.begin_capture(runtime, :download, :other, [])
-    assert pending_error =~ "is pending"
-    assert {:error, _} = SessionRuntime.record_capture(runtime, make_ref(), :wrong)
-    assert {:error, _} = SessionRuntime.finish_capture(runtime, make_ref(), :wrong)
-    assert :ok = SessionRuntime.record_capture(runtime, token, :first)
-    assert {:error, _} = SessionRuntime.record_capture(runtime, token, :second)
-    assert {:ok, %{captured: :first}} = SessionRuntime.pending_capture(runtime)
-    assert :ok = SessionRuntime.finish_capture(runtime, token, :first)
-    assert {:ok, nil} = SessionRuntime.pending_capture(runtime)
-    assert {:ok, :first} = SessionRuntime.fetch_result(runtime, :result, :page)
-    assert {:error, _} = SessionRuntime.fetch_result(runtime, :result, :download)
-    assert {:error, _} = SessionRuntime.fetch_result(runtime, :missing, :page)
-    assert {:error, duplicate_error} = SessionRuntime.begin_capture(runtime, :page, :result, [])
-    assert duplicate_error =~ "already in use"
-    assert {:ok, :first} = SessionRuntime.fetch_result(runtime, :result, :page)
-  end
-
-  test "cancelling an old capture cannot cancel its replacement" do
-    {:ok, runtime} = SessionRuntime.start(self())
-    {:ok, old_token} = SessionRuntime.begin_capture(runtime, :download, :result, [])
-    assert :ok = SessionRuntime.cancel_capture(runtime, old_token)
-    {:ok, new_token} = SessionRuntime.begin_capture(runtime, :download, :result, [])
-
-    assert :ok = SessionRuntime.cancel_capture(runtime, old_token)
-    assert {:error, _} = SessionRuntime.finish_capture(runtime, old_token, :stale)
-    assert {:ok, %{token: ^new_token}} = SessionRuntime.pending_capture(runtime)
-    assert :ok = SessionRuntime.finish_capture(runtime, new_token, :download)
-    assert :ok = SessionRuntime.close(runtime)
-    assert {:error, "session is closed"} = SessionRuntime.cancel_capture(runtime, new_token)
+  test "event routing respects source and type, and removal is idempotent" do
+    session = Fluffy.session_for_html(:static, "<p>Events</p>")
+    runtime = session.runtime
+    assert :ok = SessionRuntime.subscribe(runtime, self(), session.active_page, :download, nil)
+    SessionRuntime.emit_event(runtime, :context, :download, :wrong_source)
+    SessionRuntime.emit_event(runtime, session.active_page, :response, :wrong_type)
+    refute_receive {:fluffy_event, _}
+    SessionRuntime.emit_event(runtime, session.active_page, :download, :matching)
+    assert_receive {:fluffy_event, :matching}
+    assert :ok = SessionRuntime.unsubscribe(runtime, self())
+    assert :ok = SessionRuntime.unsubscribe(runtime, self())
+    SessionRuntime.emit_event(runtime, session.active_page, :download, :removed)
+    refute_receive {:fluffy_event, _}
+    assert {:error, _} = SessionRuntime.subscribe(runtime, self(), make_ref(), :download, nil)
   end
 
   test "page errors leave the runtime usable" do

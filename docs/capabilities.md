@@ -34,7 +34,7 @@ boundaries described below.
 | Browser history navigation | - | equivalent |
 | Browser cookie helpers and storage-state export | - | equivalent |
 | Hover, drag-and-drop, and sequential typing | - | equivalent |
-| Dialogs and browser request/response events | - | equivalent |
+| Dialogs, frame navigation, and browser request/response events | - | equivalent |
 | Active-page JavaScript evaluation | - | equivalent |
 | JavaScript-owned DOM and default actions | - | equivalent |
 | Native invalid, submit, and formdata event ordering | - | equivalent |
@@ -59,7 +59,8 @@ for the distinction from browser rendering and DOM absence.
 ### LiveView timing and keyboard events
 
 LiveView eagerly dispatches each applicable form-control `phx-change` and
-ignores `phx-debounce`/`phx-throttle` scheduling. Use Playwright for delay,
+ignores `phx-debounce`/`phx-throttle` scheduling, including `phx-debounce="blur"`.
+Keeping focus does not suppress these eager changes. Use Playwright for delay,
 blur-only delivery, coalescing, cancellation, and throttle suppression.
 
 For Enter, Space, and Tab, LiveView dispatches the supported direct and window
@@ -88,7 +89,7 @@ flatten iframe contents into the parent document or ignore frame boundaries:
 executing a frame-traversing query raises `Fluffy.CapabilityError`. Visit the
 embedded route directly to test it independently with Phoenix; use Playwright
 to test the embedding behavior. See
-[Browser terminology](advanced-events.md#browser-terminology-tabs-windows-pages-and-frames)
+[Pages, popups, and frames](advanced-events.md#pages-popups-and-frames)
 for how pages, browser contexts, and frames relate.
 
 ### Browser baseline
@@ -119,7 +120,7 @@ empty-file entries. Managed LiveView uploads support validation, progress,
 cancellation, replacement, auto-upload, and submission.
 
 Native picker UI, external uploaders, directories, drag-and-drop, and arbitrary
-`FileList` mutation are unsupported. `Event.file_chooser/2` requires Playwright
+`FileList` mutation are unsupported. `Event.file_chooser/1` requires Playwright
 because application JavaScript opens the chooser.
 
 ### Native escape hatch

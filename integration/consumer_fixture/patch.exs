@@ -56,7 +56,10 @@ Igniter.new()
 |> Config.configure("test.exs", :fluffy, [:playwright], playwright_config)
 |> Igniter.Libs.Phoenix.append_to_scope(
   "/",
-  ~s(get "/complete", PageController, :complete),
+  """
+  get "/complete", PageController, :complete
+  get "/download", PageController, :download
+  """,
   router: FluffyConsumerWeb.Router,
   arg2: FluffyConsumerWeb,
   with_pipelines: [:browser]

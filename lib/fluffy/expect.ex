@@ -1,19 +1,16 @@
 defmodule Fluffy.Expect do
   @moduledoc """
-  Typed locator, active-page, and captured-result assertion values executed by
+  Typed locator and active-page assertion values executed by
   `Fluffy.Expect.expect/2`.
 
-  Page and captured-result constructors use target prefixes such as
-  `page_to_have_url/2` and `response_to_have_status/3`.
+  Page constructors use target prefixes such as `page_to_have_url/2`.
   Import this module to use `expect/2`, `not_/1`, and all constructors.
   For ExUnit-style names, use `Fluffy.Assert`.
 
   Assertion constructors use fluent `to_be_*` names for states and `to_have_*`
   names for properties.
 
-  Every expectation constructor accepts the shared timeout option. Captured-result
-  assertions inspect an already retained result immediately; their timeout option
-  does not wait for another event. Set the capture timeout on `Fluffy.wait_for/4`.
+  Every expectation constructor accepts the shared timeout option.
 
   #{NimbleOptions.docs(Fluffy.Options.expectation_schema())}
 
@@ -34,14 +31,7 @@ defmodule Fluffy.Expect do
 
   @dialyzer {:nowarn_function, expect: 3}
 
-  @type target ::
-          {:locator, Locator.t()}
-          | :page
-          | {:download, term()}
-          | {:dialog, term()}
-          | {:navigation, term()}
-          | {:request, term()}
-          | {:response, term()}
+  @type target :: {:locator, Locator.t()} | :page
 
   @type kind ::
           :checked
@@ -57,33 +47,6 @@ defmodule Fluffy.Expect do
           | :value
           | :values
           | :visible
-          | :download_content
-          | :download_content_type
-          | :download_size
-          | :download_suggested_filename
-          | :download_url
-          | :dialog_action
-          | :dialog_default_value
-          | :dialog_message
-          | :dialog_prompt_text
-          | :dialog_type
-          | :navigation_from_url
-          | :navigation_status
-          | :navigation_url
-          | :request_headers
-          | :request_method
-          | :request_page
-          | :request_post_data
-          | :request_resource_type
-          | :request_url
-          | :response_headers
-          | :response_method
-          | :response_page
-          | :response_post_data
-          | :response_resource_type
-          | :response_status
-          | :response_status_text
-          | :response_url
 
   @type t :: %__MODULE__{
           target: target(),
@@ -110,11 +73,26 @@ defmodule Fluffy.Expect do
 
       :page ->
         expect_active_page(session, expectation)
-
-      {type, key} when type in [:download, :dialog, :navigation, :request, :response] ->
-        expect_captured_result(session, type, key, expectation)
     end
   end
+
+  @doc """
+  Registers before the action, awaits a matching event, and optionally asserts on
+  its value. Action and assertion callbacks run once in the caller; their return
+  values are ignored. Returns the input session, retaining its page selection.
+  """
+  def expect_event(session, event, action), do: Fluffy.Event.expect(session, event, action, nil, [])
+
+  @doc "Expects an event with an assertion callback or wait options."
+  def expect_event(session, event, action, assertion) when is_function(assertion, 1),
+    do: Fluffy.Event.expect(session, event, action, assertion, [])
+
+  def expect_event(session, event, action, options) when is_list(options),
+    do: Fluffy.Event.expect(session, event, action, nil, options)
+
+  @doc "Expects an event with an assertion callback and wait options."
+  def expect_event(session, event, action, assertion, options) when is_function(assertion, 1) and is_list(options),
+    do: Fluffy.Event.expect(session, event, action, assertion, options)
 
   @doc "Negates an expectation while preserving its target and options."
   @spec not_(t()) :: t()
@@ -270,304 +248,6 @@ defmodule Fluffy.Expect do
     Expect.new(:page, :opener, expected, options)
   end
 
-  @doc group: "Assertions"
-  @doc """
-  Expects the captured download's suggested filename to equal the supplied value.
-  """
-  @spec download_to_have_suggested_filename(term(), String.t(), [Expect.option()]) :: Expect.t()
-  def download_to_have_suggested_filename(key, expected, options \\ []) when is_binary(expected) do
-    Expect.new({:download, key}, :download_suggested_filename, expected, options)
-  end
-
-  @doc group: "Assertions"
-  @doc """
-  Expects the captured download's content type to equal the supplied value.
-  """
-  @spec download_to_have_content_type(term(), String.t(), [Expect.option()]) :: Expect.t()
-  def download_to_have_content_type(key, expected, options \\ []) when is_binary(expected) do
-    Expect.new({:download, key}, :download_content_type, expected, options)
-  end
-
-  @doc group: "Assertions"
-  @doc """
-  Expects the complete downloaded bytes to equal the supplied binary; no text decoding is
-  performed.
-  """
-  @spec download_to_have_content(term(), binary(), [Expect.option()]) :: Expect.t()
-  def download_to_have_content(key, expected, options \\ []) when is_binary(expected) do
-    Expect.new({:download, key}, :download_content, expected, options)
-  end
-
-  @doc group: "Assertions"
-  @doc """
-  Expects the download size in bytes.
-  """
-  @spec download_to_have_size(term(), non_neg_integer(), [Expect.option()]) :: Expect.t()
-  def download_to_have_size(key, expected, options \\ []) when is_integer(expected) and expected >= 0 do
-    Expect.new({:download, key}, :download_size, expected, options)
-  end
-
-  @doc group: "Assertions"
-  @doc """
-  Expects the captured download URL to match a string, regex, URI predicate, or structured components.
-
-  Strings match exactly and regexes match against the complete captured URL.
-  Relative strings are not resolved. Structured keywords use the same path,
-  query, and fragment rules as `Fluffy.Expect.page_to_have_url/2`.
-  Function predicates receive a `%URI{}`.
-  """
-  @spec download_to_have_url(term(), Fluffy.Page.url_expectation(), [Expect.option()]) :: Expect.t()
-  def download_to_have_url(key, expected, options \\ [])
-
-  def download_to_have_url(key, expected, options)
-      when is_binary(expected) or is_struct(expected, Regex) or is_function(expected, 1) do
-    Expect.new({:download, key}, :download_url, expected, options)
-  end
-
-  def download_to_have_url(key, components, options) when is_list(components) do
-    Expect.new({:download, key}, :download_url, URLMatcher.new!(components), options)
-  end
-
-  @doc group: "Assertions"
-  @doc playwright_only: true
-  @doc "Expects the captured dialog's type to equal the supplied value."
-  @spec dialog_to_have_type(term(), term(), [Expect.option()]) :: Expect.t()
-  def dialog_to_have_type(key, expected, options \\ []) do
-    Expect.new({:dialog, key}, :dialog_type, expected, options)
-  end
-
-  @doc group: "Assertions"
-  @doc playwright_only: true
-  @doc "Expects the captured dialog's message to equal the supplied value."
-  @spec dialog_to_have_message(term(), String.t(), [Expect.option()]) :: Expect.t()
-  def dialog_to_have_message(key, expected, options \\ []) when is_binary(expected) do
-    Expect.new({:dialog, key}, :dialog_message, expected, options)
-  end
-
-  @doc group: "Assertions"
-  @doc playwright_only: true
-  @doc "Expects the captured dialog's default value to equal the supplied value."
-  @spec dialog_to_have_default_value(term(), String.t(), [Expect.option()]) :: Expect.t()
-  def dialog_to_have_default_value(key, expected, options \\ []) when is_binary(expected) do
-    Expect.new({:dialog, key}, :dialog_default_value, expected, options)
-  end
-
-  @doc group: "Assertions"
-  @doc playwright_only: true
-  @doc "Expects the captured dialog's action to equal the supplied value."
-  @spec dialog_to_have_action(term(), term(), [Expect.option()]) :: Expect.t()
-  def dialog_to_have_action(key, expected, options \\ []) do
-    Expect.new({:dialog, key}, :dialog_action, expected, options)
-  end
-
-  @doc group: "Assertions"
-  @doc playwright_only: true
-  @doc "Expects the captured dialog's prompt text to equal the supplied value."
-  @spec dialog_to_have_prompt_text(term(), term(), [Expect.option()]) :: Expect.t()
-  def dialog_to_have_prompt_text(key, expected, options \\ []) do
-    Expect.new({:dialog, key}, :dialog_prompt_text, expected, options)
-  end
-
-  @doc group: "Assertions"
-  @doc """
-  Expects the captured navigation URL to match a string, regex, URI predicate, or structured components.
-
-  Strings match exactly and regexes match against the complete captured URL.
-  Relative strings are not resolved. Structured keywords use the same path,
-  query, and fragment rules as `Fluffy.Expect.page_to_have_url/2`.
-  Function predicates receive a `%URI{}`.
-  """
-  @spec navigation_to_have_url(term(), Fluffy.Page.url_expectation(), [Expect.option()]) :: Expect.t()
-  def navigation_to_have_url(key, expected, options \\ [])
-
-  def navigation_to_have_url(key, expected, options)
-      when is_binary(expected) or is_struct(expected, Regex) or is_function(expected, 1) do
-    Expect.new({:navigation, key}, :navigation_url, expected, options)
-  end
-
-  def navigation_to_have_url(key, components, options) when is_list(components) do
-    Expect.new({:navigation, key}, :navigation_url, URLMatcher.new!(components), options)
-  end
-
-  @doc group: "Assertions"
-  @doc """
-  Expects the captured navigation source URL to match a string, regex, URI predicate, or structured components.
-
-  Strings match exactly and regexes match against the complete captured URL.
-  Relative strings are not resolved. Structured keywords use the same path,
-  query, and fragment rules as `Fluffy.Expect.page_to_have_url/2`.
-  Function predicates receive a `%URI{}`.
-  """
-  @spec navigation_to_have_from_url(term(), Fluffy.Page.url_expectation(), [Expect.option()]) :: Expect.t()
-  def navigation_to_have_from_url(key, expected, options \\ [])
-
-  def navigation_to_have_from_url(key, expected, options)
-      when is_binary(expected) or is_struct(expected, Regex) or is_function(expected, 1) do
-    Expect.new({:navigation, key}, :navigation_from_url, expected, options)
-  end
-
-  def navigation_to_have_from_url(key, components, options) when is_list(components) do
-    Expect.new({:navigation, key}, :navigation_from_url, URLMatcher.new!(components), options)
-  end
-
-  @doc group: "Assertions"
-  @doc """
-  Expects the captured navigation's status to equal the supplied value.
-  """
-  @spec navigation_to_have_status(term(), integer(), [Expect.option()]) :: Expect.t()
-  def navigation_to_have_status(key, expected, options \\ []) when is_integer(expected) do
-    Expect.new({:navigation, key}, :navigation_status, expected, options)
-  end
-
-  @doc group: "Assertions"
-  @doc playwright_only: true
-  @doc "Expects the captured request's method to equal the supplied value."
-  @spec request_to_have_method(term(), String.t(), [Expect.option()]) :: Expect.t()
-  def request_to_have_method(key, expected, options \\ []) when is_binary(expected) do
-    Expect.new({:request, key}, :request_method, expected, options)
-  end
-
-  @doc group: "Assertions"
-  @doc playwright_only: true
-  @doc """
-  Expects the captured request URL to match a string, regex, URI predicate, or structured components.
-
-  Strings match exactly and regexes match against the complete captured URL.
-  Relative strings are not resolved. Structured keywords use the same path,
-  query, and fragment rules as `Fluffy.Expect.page_to_have_url/2`.
-  Function predicates receive a `%URI{}`.
-  """
-  @spec request_to_have_url(term(), Fluffy.Page.url_expectation(), [Expect.option()]) :: Expect.t()
-  def request_to_have_url(key, expected, options \\ [])
-
-  def request_to_have_url(key, expected, options)
-      when is_binary(expected) or is_struct(expected, Regex) or is_function(expected, 1) do
-    Expect.new({:request, key}, :request_url, expected, options)
-  end
-
-  def request_to_have_url(key, components, options) when is_list(components) do
-    Expect.new({:request, key}, :request_url, URLMatcher.new!(components), options)
-  end
-
-  @doc group: "Assertions"
-  @doc playwright_only: true
-  @doc """
-  Expects the captured request headers to include every supplied key/value pair. Additional
-  headers are allowed.
-  """
-  @spec request_to_have_headers(term(), map(), [Expect.option()]) :: Expect.t()
-  def request_to_have_headers(key, expected, options \\ []) when is_map(expected) do
-    Expect.new({:request, key}, :request_headers, expected, options)
-  end
-
-  @doc group: "Assertions"
-  @doc playwright_only: true
-  @doc "Expects the captured request's resource type to equal the supplied value."
-  @spec request_to_have_resource_type(term(), String.t(), [Expect.option()]) :: Expect.t()
-  def request_to_have_resource_type(key, expected, options \\ []) when is_binary(expected) do
-    Expect.new({:request, key}, :request_resource_type, expected, options)
-  end
-
-  @doc group: "Assertions"
-  @doc playwright_only: true
-  @doc "Expects the captured request's post data to equal the supplied value."
-  @spec request_to_have_post_data(term(), String.t(), [Expect.option()]) :: Expect.t()
-  def request_to_have_post_data(key, expected, options \\ []) when is_binary(expected) do
-    Expect.new({:request, key}, :request_post_data, expected, options)
-  end
-
-  @doc group: "Assertions"
-  @doc playwright_only: true
-  @doc "Expects the captured request's page to equal the supplied value."
-  @spec request_to_have_page(term(), term(), [Expect.option()]) :: Expect.t()
-  def request_to_have_page(key, expected, options \\ []) do
-    Expect.new({:request, key}, :request_page, expected, options)
-  end
-
-  @doc group: "Assertions"
-  @doc playwright_only: true
-  @doc "Expects the HTTP method of the request that produced this response."
-  @spec response_to_have_request_method(term(), String.t(), [Expect.option()]) :: Expect.t()
-  def response_to_have_request_method(key, expected, options \\ []) when is_binary(expected) do
-    Expect.new({:response, key}, :response_method, expected, options)
-  end
-
-  @doc group: "Assertions"
-  @doc playwright_only: true
-  @doc """
-  Expects the captured response URL to match a string, regex, URI predicate, or structured components.
-
-  Strings match exactly and regexes match against the complete captured URL.
-  Relative strings are not resolved. Structured keywords use the same path,
-  query, and fragment rules as `Fluffy.Expect.page_to_have_url/2`.
-  Function predicates receive a `%URI{}`.
-  """
-  @spec response_to_have_url(term(), Fluffy.Page.url_expectation(), [Expect.option()]) :: Expect.t()
-  def response_to_have_url(key, expected, options \\ [])
-
-  def response_to_have_url(key, expected, options)
-      when is_binary(expected) or is_struct(expected, Regex) or is_function(expected, 1) do
-    Expect.new({:response, key}, :response_url, expected, options)
-  end
-
-  def response_to_have_url(key, components, options) when is_list(components) do
-    Expect.new({:response, key}, :response_url, URLMatcher.new!(components), options)
-  end
-
-  @doc group: "Assertions"
-  @doc playwright_only: true
-  @doc """
-  Expects the captured response headers to include every supplied key/value pair. Additional
-  headers are allowed.
-  """
-  @spec response_to_have_headers(term(), map(), [Expect.option()]) :: Expect.t()
-  def response_to_have_headers(key, expected, options \\ []) when is_map(expected) do
-    Expect.new({:response, key}, :response_headers, expected, options)
-  end
-
-  @doc group: "Assertions"
-  @doc playwright_only: true
-  @doc "Expects the captured response's resource type to equal the supplied value."
-  @spec response_to_have_resource_type(term(), String.t(), [Expect.option()]) :: Expect.t()
-  def response_to_have_resource_type(key, expected, options \\ []) when is_binary(expected) do
-    Expect.new({:response, key}, :response_resource_type, expected, options)
-  end
-
-  @doc group: "Assertions"
-  @doc playwright_only: true
-  @doc """
-  Expects the associated request payload to equal the supplied string. This does not inspect the
-  response body.
-  """
-  @spec response_to_have_request_post_data(term(), String.t(), [Expect.option()]) :: Expect.t()
-  def response_to_have_request_post_data(key, expected, options \\ []) when is_binary(expected) do
-    Expect.new({:response, key}, :response_post_data, expected, options)
-  end
-
-  @doc group: "Assertions"
-  @doc playwright_only: true
-  @doc "Expects the captured response's status to equal the supplied value."
-  @spec response_to_have_status(term(), integer(), [Expect.option()]) :: Expect.t()
-  def response_to_have_status(key, expected, options \\ []) when is_integer(expected) do
-    Expect.new({:response, key}, :response_status, expected, options)
-  end
-
-  @doc group: "Assertions"
-  @doc playwright_only: true
-  @doc "Expects the captured response's status text to equal the supplied value."
-  @spec response_to_have_status_text(term(), String.t(), [Expect.option()]) :: Expect.t()
-  def response_to_have_status_text(key, expected, options \\ []) when is_binary(expected) do
-    Expect.new({:response, key}, :response_status_text, expected, options)
-  end
-
-  @doc group: "Assertions"
-  @doc playwright_only: true
-  @doc "Expects the captured response's page to equal the supplied value."
-  @spec response_to_have_page(term(), term(), [Expect.option()]) :: Expect.t()
-  def response_to_have_page(key, expected, options \\ []) do
-    Expect.new({:response, key}, :response_page, expected, options)
-  end
-
   @doc false
   def matches?(%Regex{} = expected, actual) when is_binary(actual), do: Regex.match?(expected, actual)
 
@@ -606,35 +286,6 @@ defmodule Fluffy.Expect do
   end
 
   @doc false
-  def result_field(%__MODULE__{kind: :download_suggested_filename}), do: :filename
-  def result_field(%__MODULE__{kind: :download_content_type}), do: :content_type
-  def result_field(%__MODULE__{kind: :download_content}), do: :bytes
-  def result_field(%__MODULE__{kind: :download_size}), do: :bytes
-  def result_field(%__MODULE__{kind: :download_url}), do: :url
-  def result_field(%__MODULE__{kind: :dialog_type}), do: :type
-  def result_field(%__MODULE__{kind: :dialog_message}), do: :message
-  def result_field(%__MODULE__{kind: :dialog_default_value}), do: :default_value
-  def result_field(%__MODULE__{kind: :dialog_action}), do: :action
-  def result_field(%__MODULE__{kind: :dialog_prompt_text}), do: :prompt_text
-  def result_field(%__MODULE__{kind: :navigation_url}), do: :url
-  def result_field(%__MODULE__{kind: :navigation_from_url}), do: :from_url
-  def result_field(%__MODULE__{kind: :navigation_status}), do: :status
-  def result_field(%__MODULE__{kind: :request_method}), do: :method
-  def result_field(%__MODULE__{kind: :request_url}), do: :url
-  def result_field(%__MODULE__{kind: :request_headers}), do: :headers
-  def result_field(%__MODULE__{kind: :request_resource_type}), do: :resource_type
-  def result_field(%__MODULE__{kind: :request_post_data}), do: :post_data
-  def result_field(%__MODULE__{kind: :request_page}), do: :page
-  def result_field(%__MODULE__{kind: :response_method}), do: :method
-  def result_field(%__MODULE__{kind: :response_url}), do: :url
-  def result_field(%__MODULE__{kind: :response_headers}), do: :headers
-  def result_field(%__MODULE__{kind: :response_resource_type}), do: :resource_type
-  def result_field(%__MODULE__{kind: :response_post_data}), do: :post_data
-  def result_field(%__MODULE__{kind: :response_status}), do: :status
-  def result_field(%__MODULE__{kind: :response_status_text}), do: :status_text
-  def result_field(%__MODULE__{kind: :response_page}), do: :page
-
-  @doc false
   def describe(%__MODULE__{} = expectation) do
     expectation
     |> positive_description()
@@ -663,10 +314,6 @@ defmodule Fluffy.Expect do
     "active page to have opener #{inspect(expected)}"
   end
 
-  defp positive_description(%__MODULE__{target: {type, key}, kind: kind, expected: expected}) do
-    "#{type} #{inspect(key)} #{result_matcher_description(kind, expected)}"
-  end
-
   defp locator_matcher_description(:checked, :checked), do: "to be checked"
   defp locator_matcher_description(:checked, :unchecked), do: "to be unchecked"
   defp locator_matcher_description(:checked, :indeterminate), do: "to be indeterminate"
@@ -678,17 +325,6 @@ defmodule Fluffy.Expect do
   defp locator_matcher_description(:value, expected), do: "to have value #{inspect(expected)}"
   defp locator_matcher_description(:values, expected), do: "to have values #{inspect(expected)}"
   defp locator_matcher_description(:visible, _expected), do: "to be visible"
-
-  defp result_matcher_description(kind, expected) do
-    property =
-      case kind do
-        :response_method -> "request method"
-        :response_post_data -> "request post data"
-        _ -> kind |> Atom.to_string() |> String.split("_", parts: 2) |> List.last() |> String.replace("_", " ")
-      end
-
-    "to have #{property} #{URLMatcher.describe(expected)}"
-  end
 
   defp maybe_negated(description, false), do: description
   defp maybe_negated(description, true), do: "not " <> description
@@ -724,43 +360,9 @@ defmodule Fluffy.Expect do
     raise ArgumentError, "unsupported active page expectation: #{Expect.describe(expectation)}"
   end
 
-  defp expect_captured_result(%Session{} = session, type, key, %Expect{} = expectation) do
-    result = Fluffy.Event.fetch_result!(session, key, type)
-    field = Expect.result_field(expectation)
-
-    actual =
-      case result do
-        %Fluffy.Page{} -> apply(Fluffy.Page, field, [result])
-        _ -> Map.fetch!(result, field)
-      end
-
-    actual = if field == :opener, do: opener_value(actual, expectation.expected), else: actual
-    actual = if expectation.kind == :download_size, do: byte_size(actual), else: actual
-
-    assert_expected!(expectation, actual)
-    session
-  end
-
   defp opener_value(nil, _expected), do: nil
   defp opener_value(page, %Fluffy.Page{}), do: page
   defp opener_value(page, _expected), do: Fluffy.Page.name(page)
-
-  defp assert_expected!(%Expect{kind: :request_headers} = expectation, actual) do
-    expected = expectation.expected
-    passed? = Map.take(actual, Map.keys(expected)) == expected
-    assert_expectation_truth!(expectation, passed?, actual)
-  end
-
-  defp assert_expected!(%Expect{kind: :response_headers} = expectation, actual) do
-    expected = expectation.expected
-    passed? = Map.take(actual, Map.keys(expected)) == expected
-    assert_expectation_truth!(expectation, passed?, actual)
-  end
-
-  defp assert_expected!(%Expect{kind: kind} = expectation, actual)
-       when kind in [:download_url, :navigation_url, :navigation_from_url, :request_url, :response_url] do
-    assert_expectation_truth!(expectation, URLMatcher.matches?(expectation.expected, actual), actual)
-  end
 
   defp assert_expected!(%Expect{} = expectation, actual) do
     assert_expectation_truth!(expectation, Expect.matches?(expectation.expected, actual), actual)

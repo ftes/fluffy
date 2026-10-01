@@ -119,10 +119,11 @@ defmodule Fluffy.Conformance.SessionRuntimeTest do
         :playwright
         |> start_session()
         |> visit(Fluffy.TestHTTPFixtures.path(fixture))
-        |> wait_for(Fluffy.Event.popup(:child), &click(&1, by_role(:link, name: "Open")))
 
+      pending = wait_for(session, Fluffy.Event.popup())
+      click(session, by_role(:link, name: "Open"))
       opener = current_page(session)
-      child = switch_page(session, :child)
+      child = switch_page(session, await(pending))
       expect(child, page_to_have_opener(opener))
       expect(child, page_to_have_opener(:main))
 

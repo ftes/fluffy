@@ -378,31 +378,20 @@ defmodule Fluffy.Conformance.UnwrapTest do
     end
 
     @tag driver: :playwright
-    test "composes with a pre-armed navigation expectation" do
-      session = playwright_html("<p>Before captured navigation</p>")
-
-      session =
-        wait_for(session, Event.navigation(:native_navigation), fn session ->
-          unwrap(session, fn handle ->
-            {:ok, _response} =
-              Frame.goto(handle.frame_id,
-                url: "/chamber",
-                wait_until: "load",
-                connection: handle.connection,
-                timeout: handle.timeout
-              )
-          end)
-        end)
-
-      session
-      |> expect(
-        Fluffy.Expect.navigation_to_have_from_url(
-          :native_navigation,
-          Fluffy.TestServer.base_url() <> "/harness"
-        )
-      )
-      |> expect(Fluffy.Expect.navigation_to_have_url(:native_navigation, Fluffy.TestServer.base_url() <> "/chamber"))
-      |> expect(Fluffy.Expect.navigation_to_have_status(:native_navigation, 200))
+    test "composes native navigation with page assertions" do
+      "<p>Before navigation</p>"
+      |> playwright_html()
+      |> unwrap(fn handle ->
+        {:ok, _response} =
+          Frame.goto(handle.frame_id,
+            url: "/chamber",
+            wait_until: "load",
+            connection: handle.connection,
+            timeout: handle.timeout
+          )
+      end)
+      |> expect(Fluffy.Expect.page_to_have_url("/chamber"))
+      |> expect(Fluffy.Expect.page_to_have_status(200))
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
     end
 
@@ -410,27 +399,28 @@ defmodule Fluffy.Conformance.UnwrapTest do
     test "composes with a pre-armed page expectation" do
       session = playwright_html("<p>Main page</p>")
 
-      session =
-        wait_for(session, Event.page(:native_child), fn session ->
-          unwrap(session, fn handle ->
-            {:ok, page} =
-              BrowserContext.new_page(handle.context_id,
-                connection: handle.connection,
-                timeout: handle.timeout
-              )
+      pending = wait_for(session, Event.page())
 
-            {:ok, _response} =
-              Frame.goto(page.main_frame.guid,
-                url: "/chamber",
-                wait_until: "load",
-                connection: handle.connection,
-                timeout: handle.timeout
-              )
-          end)
-        end)
+      unwrap(session, fn handle ->
+        {:ok, page} =
+          BrowserContext.new_page(handle.context_id,
+            connection: handle.connection,
+            timeout: handle.timeout
+          )
+
+        {:ok, _response} =
+          Frame.goto(page.main_frame.guid,
+            url: "/chamber",
+            wait_until: "load",
+            connection: handle.connection,
+            timeout: handle.timeout
+          )
+      end)
+
+      child = await(pending)
 
       session
-      |> switch_page(:native_child)
+      |> switch_page(child)
       |> expect(Fluffy.Expect.page_to_have_url(Fluffy.TestServer.base_url() <> "/chamber"))
       |> expect(Fluffy.Expect.page_to_have_opener(nil))
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
@@ -440,21 +430,22 @@ defmodule Fluffy.Conformance.UnwrapTest do
     test "captures a blank page without requiring an HTTP response" do
       session = playwright_html("<p>Main page</p>")
 
-      session =
-        wait_for(session, Event.page(:blank_child), fn session ->
-          unwrap(session, fn handle ->
-            assert {:ok, _page} =
-                     BrowserContext.new_page(handle.context_id,
-                       connection: handle.connection,
-                       timeout: handle.timeout
-                     )
-          end)
-        end)
+      pending = wait_for(session, Event.page())
 
-      assert Page.url(page(session, :blank_child)) == "about:blank"
+      unwrap(session, fn handle ->
+        assert {:ok, _page} =
+                 BrowserContext.new_page(handle.context_id,
+                   connection: handle.connection,
+                   timeout: handle.timeout
+                 )
+      end)
+
+      child = await(pending)
+
+      assert Page.url(child) == "about:blank"
 
       session
-      |> switch_page(:blank_child)
+      |> switch_page(child)
       |> expect(Fluffy.Expect.page_to_have_url("about:blank"))
     end
 

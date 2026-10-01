@@ -27,8 +27,6 @@ defmodule Fluffy.AssertTest do
 
   test "typed expectations and session expressions are evaluated once" do
     session = Fluffy.session_for_html(:static, "<p>Response</p>")
-    {:ok, token} = Fluffy.SessionRuntime.begin_capture(session.runtime, :response, :response, [])
-    Fluffy.SessionRuntime.finish_capture(session.runtime, token, %{status: 200})
 
     session_fun = fn ->
       send(self(), :session_evaluated)
@@ -37,7 +35,7 @@ defmodule Fluffy.AssertTest do
 
     expectation_fun = fn ->
       send(self(), :expectation_evaluated)
-      response_status(:response, 200)
+      visible(Fluffy.Locator.by_text("Response"))
     end
 
     assert assert(session_fun.(), expectation_fun.()) == session

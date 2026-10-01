@@ -41,40 +41,21 @@ defmodule Fluffy.Conformance.EventTimeoutTest do
 
   for driver <- [:phoenix, :playwright], timeout <- [0, 100] do
     @tag driver: driver
-    test "ignores navigation after a #{timeout} ms deadline with #{driver}", %{driver: driver, fixture: fixture} do
-      session = start_test_session(driver, fixture)
-
-      assert_raise ExUnit.AssertionError, ~r/no matching event occurred/, fn ->
-        wait_for(session, Event.navigation(:late, timeout: unquote(timeout)), fn session ->
-          Process.sleep(unquote(timeout))
-
-          session
-          |> click(by_role(:link, name: "Continue"))
-          |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/destination")))
-        end)
-      end
-    end
-
-    @tag driver: driver
     test "ignores matching downloads after a #{timeout} ms deadline with #{driver}", %{
       driver: driver,
       fixture: fixture
     } do
       session = start_test_session(driver, fixture)
 
-      assert_raise ExUnit.AssertionError, ~r/no matching event occurred/, fn ->
-        wait_for(
+      assert_raise ExUnit.AssertionError, ~r/no matching download event/, fn ->
+        expect_event(
           session,
-          Event.download(:late,
-            filename: "report.csv",
-            url: TestHTTPFixtures.url(fixture, "/report"),
-            max_bytes: 1,
-            timeout: unquote(timeout)
-          ),
+          Event.download(&(&1.suggested_filename == "report.csv")),
           fn session ->
             Process.sleep(unquote(timeout))
             click(session, by_role(:link, name: "Download"))
-          end
+          end,
+          timeout: unquote(timeout)
         )
       end
     end
@@ -82,36 +63,25 @@ defmodule Fluffy.Conformance.EventTimeoutTest do
 
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
-    test "retains navigation captured before the deadline when the callback finishes later with #{driver}", %{
-      driver: driver,
-      fixture: fixture
-    } do
-      driver
-      |> start_test_session(fixture)
-      |> wait_for(Event.navigation(:early, timeout: 1_000), fn session ->
-        session = click(session, by_role(:link, name: "Continue"))
-        Process.sleep(1_000)
-        session
-      end)
-      |> expect(navigation_to_have_url(:early, TestHTTPFixtures.url(fixture, "/destination")))
-      |> expect(navigation_to_have_status(:early, 201))
-    end
-
-    @tag driver: driver
     test "retains a download captured before the deadline when the callback finishes later with #{driver}", %{
       driver: driver,
       fixture: fixture
     } do
       driver
       |> start_test_session(fixture)
-      |> wait_for(Event.download(:early, filename: "report.csv", timeout: 1_000), fn session ->
-        session = click(session, by_role(:link, name: "Download"))
-        Process.sleep(1_000)
-        session
-      end)
-      |> expect(download_to_have_suggested_filename(:early, "report.csv"))
-      |> expect(download_to_have_content(:early, "download bytes"))
-      |> expect(download_to_have_url(:early, TestHTTPFixtures.url(fixture, "/report")))
+      |> expect_event(
+        Event.download(&(&1.suggested_filename == "report.csv")),
+        fn session ->
+          click(session, by_role(:link, name: "Download"))
+          Process.sleep(1_000)
+        end,
+        fn download ->
+          assert download.suggested_filename == "report.csv"
+          assert Fluffy.Download.read!(download) == "download bytes"
+          assert download.url == TestHTTPFixtures.url(fixture, "/report")
+        end,
+        timeout: 1_000
+      )
       |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/start")))
     end
 
@@ -119,13 +89,18 @@ defmodule Fluffy.Conformance.EventTimeoutTest do
     test "a rejected download does not restart the deadline with #{driver}", %{driver: driver, fixture: fixture} do
       session = start_test_session(driver, fixture)
 
-      assert_raise ExUnit.AssertionError, ~r/no matching event occurred/, fn ->
-        wait_for(session, Event.download(:late, filename: "report.csv", timeout: 1_000), fn session ->
-          Process.sleep(600)
-          session = click(session, by_role(:link, name: "Noise"))
-          Process.sleep(600)
-          click(session, by_role(:link, name: "Download"))
-        end)
+      assert_raise ExUnit.AssertionError, ~r/no matching download event/, fn ->
+        expect_event(
+          session,
+          Event.download(&(&1.suggested_filename == "report.csv")),
+          fn session ->
+            Process.sleep(600)
+            session = click(session, by_role(:link, name: "Noise"))
+            Process.sleep(600)
+            click(session, by_role(:link, name: "Download"))
+          end,
+          timeout: 1_000
+        )
       end
     end
   end

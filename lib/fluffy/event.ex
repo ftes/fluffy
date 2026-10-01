@@ -1,229 +1,87 @@
 defmodule Fluffy.Event do
   @moduledoc """
-  Typed event-wait values and event capture orchestration.
+  Event descriptions shared by waits and listeners.
 
-  Events annotated "Playwright only" require the Playwright backend when passed
-  to `Fluffy.wait_for/4`. With the Phoenix backend, capture raises
-  `Fluffy.CapabilityError` before the action runs. Constructing an event value
-  does not require a session.
+  Constructors accept an optional unary predicate. A false or nil result skips
+  the event. Predicates inspect event metadata; use ordinary assertions on the
+  awaited value to check its contents.
 
-  Download events accept:
-
-  #{NimbleOptions.docs(Fluffy.Options.download_event_schema())}
-
-  Dialog events accept:
-
-  #{NimbleOptions.docs(Fluffy.Options.dialog_event_schema())}
-
-  File-chooser, page, popup, navigation, request, and response events accept
-  the shared timeout option:
-
-  #{NimbleOptions.docs(Fluffy.Options.action_schema())}
+  Download events support both backends. Other events require Playwright.
+  Request and response registrations accept `scope: :page` (the default) or
+  `scope: :context`. Page events observe the context; all other events observe
+  the page selected when registering.
   """
 
-  import ExUnit.Assertions
-
-  alias Fluffy.Backend
-  alias Fluffy.Deadline
-  alias Fluffy.Options
+  alias Fluffy.Event.Pending
+  alias Fluffy.Event.Subscription
   alias Fluffy.Session
   alias Fluffy.SessionRuntime
 
-  @enforce_keys [:type, :key]
-  defstruct [:type, :key, options: []]
+  @types [:download, :popup, :page, :frame_navigated, :dialog, :file_chooser, :request, :response]
+  @enforce_keys [:type]
+  defstruct [:type, :predicate]
 
-  @type type ::
-          :dialog | :download | :file_chooser | :navigation | :page | :popup | :request | :response
-  @type t :: %__MODULE__{type: type(), key: term(), options: keyword()}
-  @type timeout_option :: unquote(NimbleOptions.option_typespec(Options.action_schema()))
-  @type download_option :: unquote(NimbleOptions.option_typespec(Options.download_event_schema()))
-  @type dialog_option :: unquote(NimbleOptions.option_typespec(Options.dialog_event_schema()))
-  @type network_option :: unquote(NimbleOptions.option_typespec(Options.network_event_schema()))
-  @type option :: timeout_option() | download_option() | dialog_option() | network_option()
+  @type type :: :download | :popup | :page | :frame_navigated | :dialog | :file_chooser | :request | :response
+  @type t :: %__MODULE__{type: type(), predicate: (term() -> term()) | nil}
+  @type option :: {:timeout, non_neg_integer()} | {:scope, :page | :context}
 
-  @doc """
-  Captures the first download matching the optional filename and URL filters.
-
-  Playwright uses the session timeout separately to save the captured download.
-  """
-  @spec download(term(), [download_option()]) :: t()
-  def download(key, options \\ []) do
-    new(:download, key, Options.validate_event_constructor!(:download, options))
-  end
-
-  @doc "Captures the browser file chooser opened by the action."
-  @doc playwright_only: true
-  @spec file_chooser(term(), [timeout_option()]) :: t()
-  def file_chooser(key, options \\ []) do
-    new(:file_chooser, key, Options.validate_event_constructor!(:file_chooser, options))
-  end
-
-  @doc """
-  Captures the first new tab or window anywhere in the session.
-
-  Equivalent to Playwright's `context.waitForEvent('page')`. Use `popup/2`
-  to capture only pages opened by the current page.
-
-  The session timeout applies separately to initializing the captured page.
-  """
-  @doc playwright_only: true
-  @spec page(term(), [timeout_option()]) :: t()
-  def page(key, options \\ []) do
-    new(:page, key, Options.validate_event_constructor!(:page, options))
-  end
-
-  @doc """
-  Captures the first new tab or window opened by the current page.
-
-  Equivalent to Playwright's `page.waitForEvent('popup')`; includes tabs opened
-  by `target="_blank"` links. The opener is fixed when the wait starts, even if
-  the callback switches pages. Use `page/2` to capture any new page in the session.
-
-  The session timeout applies separately to initializing the captured page.
-  """
-  @doc playwright_only: true
-  @spec popup(term(), [timeout_option()]) :: t()
-  def popup(key, options \\ []) do
-    new(:popup, key, Options.validate_event_constructor!(:popup, options))
-  end
-
-  @doc "Captures the first document navigation or URL change. HTTP redirects resolve to their final URL and status."
-  @spec navigation(term(), [timeout_option()]) :: t()
-  def navigation(key, options \\ []) do
-    new(:navigation, key, Options.validate_event_constructor!(:navigation, options))
-  end
-
-  @doc "Captures and handles the browser dialog opened by the action."
-  @doc playwright_only: true
-  @spec dialog(term(), [dialog_option()]) :: t()
-  def dialog(key, options \\ []) do
-    options = Options.validate_event_constructor!(:dialog, options)
-    {decision, options} = pop_dialog_decision!(options)
-    new(:dialog, key, Keyword.put(options, :decision, decision))
-  end
-
-  @doc "Captures the first browser request matching the supplied matcher."
-  @doc playwright_only: true
-  @spec request(term(), String.t() | Regex.t() | (term() -> boolean()), [timeout_option()]) :: t()
-  def request(key, matcher, options \\ []) do
-    options = Options.validate_event_constructor!(:request, options)
-    new(:request, key, Keyword.put(options, :matcher, matcher))
-  end
-
-  @doc "Captures the first browser response matching the supplied matcher."
-  @doc playwright_only: true
-  @spec response(term(), String.t() | Regex.t() | (term() -> boolean()), [timeout_option()]) :: t()
-  def response(key, matcher, options \\ []) do
-    options = Options.validate_event_constructor!(:response, options)
-    new(:response, key, Keyword.put(options, :matcher, matcher))
+  for type <- @types do
+    @doc "Describes a #{type} event, optionally filtered by a unary predicate."
+    @spec unquote(type)((term() -> term()) | nil) :: t()
+    def unquote(type)(predicate \\ nil) when is_nil(predicate) or is_function(predicate, 1) do
+      %__MODULE__{type: unquote(type), predicate: predicate}
+    end
   end
 
   @doc false
-  def new(type, key, options)
-      when type in [:dialog, :download, :file_chooser, :navigation, :page, :popup, :request, :response] do
-    %__MODULE__{type: type, key: key, options: Options.validate_event!(type, options)}
+  def wait(session, event, options) do
+    {source, options} = registration(session, event, options, :wait)
+    timeout = Keyword.get(options, :timeout, Session.context(session).timeout)
+    deadline = Fluffy.Deadline.new(timeout)
+    pid = Subscription.start(session, event, source, :wait, nil, deadline)
+    Pending.new(pid)
   end
 
   @doc false
-  def merge_options(%__MODULE__{type: type, options: event_options} = event, options) when is_list(options) do
-    merged =
-      type
-      |> default_options()
-      |> Keyword.merge(event_options)
-      |> Keyword.merge(options)
-      |> then(&Options.validate_event!(type, &1))
-
-    %{event | options: merged}
+  def listen(session, event, handler, options, mode) when is_function(handler, 1) do
+    {source, _options} = registration(session, event, options, :listener)
+    Subscription.start(session, event, source, mode, handler, nil)
+    session
   end
 
   @doc false
-  def capture(%Session{} = session, type, key, action, options \\ []) when is_atom(type) and is_function(action, 1) do
-    options = Options.validate_event!(type, options)
-    timeout = Keyword.get(options, :timeout, default_timeout(session))
+  def off(session, event, handler, options) when is_function(handler, 1) do
+    {source, _options} = registration(session, event, options, :listener)
 
-    deadline = Deadline.new(timeout)
+    case SessionRuntime.remove_listener(session.runtime, source, event.type, handler) do
+      {:ok, nil} -> :ok
+      {:ok, pid} -> Subscription.remove(pid)
+      {:error, message} -> raise ArgumentError, message
+    end
 
-    arm_options =
-      options
-      |> Keyword.put(:deadline, deadline)
-      |> Keyword.put(:timeout, Deadline.remaining(deadline))
+    session
+  end
 
-    token = value!(SessionRuntime.begin_capture(session.runtime, type, key, arm_options))
+  @doc false
+  def expect(session, event, action, assertion, options) when is_function(action, 1) do
+    pending = wait(session, event, options)
 
     try do
-      capture_armed(session, type, key, action, arm_options, token, deadline, timeout)
+      action.(session)
+      value = Pending.await(pending)
+      if assertion, do: assertion.(value)
+      session
     after
-      SessionRuntime.cancel_capture(session.runtime, token)
+      Pending.cancel(pending)
     end
   end
 
-  defp capture_armed(session, type, key, action, arm_options, token, deadline, timeout) do
-    backend = Session.backend(session)
-    {:ok, armed_session, resource} = Backend.arm_event(session, type, arm_options)
-
-    try do
-      action_session = action.(armed_session)
-      ensure_action_session!(action_session, armed_session.runtime, token)
-      remaining = Deadline.remaining(deadline)
-
-      case Backend.await_event(action_session, resource, remaining) do
-        {:ok, updated_session, value} ->
-          value!(SessionRuntime.finish_capture(updated_session.runtime, token, value))
-          updated_session
-
-        {:error, reason} when reason == :timeout or (is_map(reason) and reason.reason == :timeout) ->
-          flunk("Expected #{inspect(type)} event #{inspect(key)} within #{timeout} ms, but no matching event occurred")
-
-        {:error, reason} ->
-          flunk("Could not capture #{inspect(type)} event #{inspect(key)}: #{inspect(reason)}")
-      end
-    after
-      :ok = Backend.disarm_event(backend, resource)
-    end
-  end
-
-  defp ensure_action_session!(%Session{runtime: runtime} = session, runtime, token) do
-    case value!(SessionRuntime.pending_capture(session.runtime)) do
-      %{token: ^token} -> :ok
-      _missing -> raise ArgumentError, "event action must return the updated session it receives"
-    end
-  end
-
-  defp ensure_action_session!(other, _backend, _token) do
-    raise ArgumentError,
-          "event action must return a Fluffy.Session, got: #{inspect(other)}"
-  end
-
-  @doc false
-  def fetch_result!(session, key, type), do: value!(SessionRuntime.fetch_result(session.runtime, key, type))
-
-  defp value!({:ok, value}), do: value
-  defp value!(:ok), do: :ok
-  defp value!({:error, message}), do: raise(ArgumentError, message)
-
-  defp default_timeout(session) do
-    Map.get(Session.context(session), :timeout, Application.get_env(:fluffy, :timeout, 1_000))
-  end
-
-  defp default_options(:download), do: [max_bytes: 10_000_000]
-  defp default_options(_type), do: []
-
-  defp pop_dialog_decision!(options) when is_list(options) do
-    cond do
-      Keyword.has_key?(options, :decision) ->
-        {Keyword.fetch!(options, :decision), Keyword.delete(options, :decision)}
-
-      Keyword.get(options, :accept) == true ->
-        {:accept, Keyword.delete(options, :accept)}
-
-      is_binary(Keyword.get(options, :accept)) ->
-        {{:accept, Keyword.fetch!(options, :accept)}, Keyword.delete(options, :accept)}
-
-      Keyword.get(options, :dismiss) == true ->
-        {:dismiss, Keyword.delete(options, :dismiss)}
-
-      true ->
-        {:accept, options}
-    end
+  defp registration(session, %__MODULE__{type: type, predicate: predicate}, options, mode)
+       when type in @types and (is_nil(predicate) or is_function(predicate, 1)) do
+    schema = if mode == :wait, do: [timeout: [type: :non_neg_integer]], else: []
+    schema = if type in [:request, :response], do: schema ++ [scope: [type: {:in, [:page, :context]}]], else: schema
+    options = NimbleOptions.validate!(options, schema)
+    source = Session.backend(session).event_source(session, type, Keyword.get(options, :scope, :page))
+    {source, options}
   end
 end

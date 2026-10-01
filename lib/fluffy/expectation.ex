@@ -14,11 +14,6 @@ defmodule Fluffy.Expectation do
     :ok
   end
 
-  def raise_count!(%Locator{} = locator, expected, candidates) do
-    raise ExUnit.AssertionError,
-      message: count_message(locator, expected, length(candidates), candidates)
-  end
-
   def count_message(locator, expected, actual, candidates) do
     String.trim("""
     Expected #{Locator.describe(locator)} to match #{expected} element(s), but it matched #{actual}.

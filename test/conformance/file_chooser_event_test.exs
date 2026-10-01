@@ -2,6 +2,7 @@ defmodule Fluffy.Conformance.FileChooserEventTest do
   use Fluffy.TestCase, async: true
 
   import Fluffy
+  import Fluffy.Expect
   import Fluffy.Locator
 
   alias Fluffy.Event
@@ -13,18 +14,11 @@ defmodule Fluffy.Conformance.FileChooserEventTest do
   test "captures a scripted chooser before the click and selects an in-memory file through it" do
     session = playwright_session()
 
-    session =
-      session
-      |> wait_for(
-        Event.file_chooser(:attachment),
-        &click(&1, by_role(:button, name: "Choose attachment"))
-      )
-      |> set_input_files(
-        :attachment,
-        %FilePayload{name: "chosen.txt", bytes: "chosen", content_type: "text/plain"}
-      )
-
-    refute session |> file_chooser(:attachment) |> FileChooser.multiple?()
+    pending = wait_for(session, Event.file_chooser())
+    click(session, by_role(:button, name: "Choose attachment"))
+    chooser = await(pending)
+    set_input_files(session, chooser, %FilePayload{name: "chosen.txt", bytes: "chosen", content_type: "text/plain"})
+    refute FileChooser.multiple?(chooser)
 
     assert %{"contents" => "chosen", "name" => "chosen.txt", "type" => "text/plain"} =
              Playwright.evaluate(
@@ -41,23 +35,21 @@ defmodule Fluffy.Conformance.FileChooserEventTest do
 
   @tag driver: :playwright
   test "preserves native multiple-file rejection without mutating a single-file chooser" do
-    session =
-      wait_for(
-        playwright_session(),
-        Event.file_chooser(:attachment),
-        &click(&1, by_role(:button, name: "Choose attachment"))
-      )
+    session = playwright_session()
+    pending = wait_for(session, Event.file_chooser())
+    click(session, by_role(:button, name: "Choose attachment"))
+    chooser = await(pending)
 
     error =
       assert_raise Fluffy.OperationError, fn ->
-        set_input_files(session, :attachment, [
+        set_input_files(session, chooser, [
           %FilePayload{name: "first.txt", bytes: "first"},
           %FilePayload{name: "second.txt", bytes: "second"}
         ])
       end
 
     assert error.operation == :set_input_files
-    assert error.locator == :attachment
+    assert error.locator == chooser
     assert error.cause
 
     assert Playwright.evaluate(
@@ -68,18 +60,14 @@ defmodule Fluffy.Conformance.FileChooserEventTest do
 
   @tag driver: :playwright
   test "reports and fills a multiple-file chooser in selection order" do
-    session =
-      [multiple?: true]
-      |> playwright_session()
-      |> wait_for(
-        Event.file_chooser(:attachments),
-        &click(&1, by_role(:button, name: "Choose attachment"))
-      )
-
-    assert session |> file_chooser(:attachments) |> FileChooser.multiple?()
+    session = playwright_session(multiple?: true)
+    pending = wait_for(session, Event.file_chooser())
+    click(session, by_role(:button, name: "Choose attachment"))
+    chooser = await(pending)
+    assert FileChooser.multiple?(chooser)
 
     session =
-      set_input_files(session, :attachments, [
+      set_input_files(session, chooser, [
         %FilePayload{name: "first.txt", bytes: "first"},
         %FilePayload{name: "second.txt", bytes: "second"}
       ])
@@ -94,18 +82,11 @@ defmodule Fluffy.Conformance.FileChooserEventTest do
   test "releases each chooser subscription and can capture another chooser" do
     session = playwright_session()
 
-    session =
-      session
-      |> wait_for(
-        Event.file_chooser(:first),
-        &click(&1, by_role(:button, name: "Choose attachment"))
-      )
-      |> set_input_files(:first, %FilePayload{name: "first.txt", bytes: "first"})
-      |> wait_for(
-        Event.file_chooser(:second),
-        &click(&1, by_role(:button, name: "Choose attachment"))
-      )
-      |> set_input_files(:second, [])
+    for selection <- [%FilePayload{name: "first.txt", bytes: "first"}, []] do
+      pending = wait_for(session, Event.file_chooser())
+      click(session, by_role(:button, name: "Choose attachment"))
+      set_input_files(session, await(pending), selection)
+    end
 
     assert Playwright.evaluate(
              session,
@@ -125,7 +106,7 @@ defmodule Fluffy.Conformance.FileChooserEventTest do
 
     error =
       assert_raise Fluffy.CapabilityError, fn ->
-        wait_for(session, Event.file_chooser(:attachment), fn session ->
+        expect_event(session, Event.file_chooser(), fn session ->
           Process.put(:chooser_action_ran, true)
           session
         end)
@@ -133,6 +114,45 @@ defmodule Fluffy.Conformance.FileChooserEventTest do
 
     assert error.capability == :file_chooser_events
     refute Process.get(:chooser_action_ran)
+  end
+
+  @tag driver: :playwright
+  test "a chooser targets its original page while preserving the selected page" do
+    original = playwright_session()
+    pending = wait_for(original, Event.file_chooser())
+    click(original, by_role(:button, name: "Choose attachment"))
+    chooser = await(pending)
+    other = new_page(original, :other)
+    assert set_input_files(other, chooser, %FilePayload{name: "original.txt", bytes: "original"}) == other
+    assert Playwright.evaluate(original, "document.querySelector('#attachment').files[0].name") == "original.txt"
+  end
+
+  for navigation <- [:patch, :document] do
+    @tag driver: :playwright
+    test "chooser reconciles #{navigation} navigation before restoring page selection" do
+      original = playwright_session()
+      destination = if unquote(navigation) == :patch, do: "#selected", else: "/chamber"
+
+      Playwright.evaluate(
+        original,
+        "destination => { document.querySelector('#attachment').onchange = () => { location.href = destination } }",
+        arg: destination,
+        is_function: true
+      )
+
+      pending = wait_for(original, Event.file_chooser())
+      click(original, by_role(:button, name: "Choose attachment"))
+      chooser = await(pending)
+      other = new_page(original, :other)
+
+      assert set_input_files(other, chooser, %FilePayload{name: "selected.txt", bytes: "selected"}) == other
+      assert Fluffy.Page.url(current_page(other)) == "about:blank"
+
+      expect(
+        original,
+        page_to_have_url(if(unquote(navigation) == :patch, do: [fragment: "selected"], else: [path: "/chamber"]))
+      )
+    end
   end
 
   defp playwright_session(options \\ []) do

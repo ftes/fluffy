@@ -1,33 +1,15 @@
 defmodule Fluffy.PhoenixTest do
   @moduledoc """
-  A best-effort PhoenixTest vocabulary over Fluffy's existing behavior.
+  A PhoenixTest-style facade over Fluffy's actions and assertions.
 
-  Import this module on its own for the supported actions, assertions, and
-  utilities. `Fluffy.Test.setup/2` lifecycle setup is still required. Alternatively,
-  use `import Fluffy` with `import Fluffy.Expect` or `use Fluffy.Assert`, and
-  `import Fluffy.Locator` for the regular locator API.
+  Import this module on its own to keep familiar PhoenixTest helper names with
+  either backend. See [Coming from PhoenixTest](migration-from-phoenix-test.md)
+  for migration setup, examples, and compatibility differences.
 
-      import Fluffy.PhoenixTest
-
-      start_session(:phoenix)
-      |> visit("/potions")
-      |> fill_in("Name", with: "Polyjuice")
-      |> click_button("Save")
-      |> assert_has("#notice", text: "Saved")
-
-  This facade retains Fluffy's strictness, retries, actionability, control state,
-  form serialization, and driver boundaries. Actions and assertions return a
-  facade session. Field actions track their owning form for `submit/1`; navigation
-  and `unwrap/2` clear that tracking. Native interoperability belongs in the
-  consuming application, using the contained `session` field explicitly.
-
-  Field actions default to exact labels; assertions default to substring labels.
-  `label:` filters presence, count, text, and field-state assertions by label.
-  CSS/text assertions include hidden elements and support `exact: true` for
-  case-sensitive matching of the complete normalized text. `selected:` matches a
-  selected option’s complete normalized text. Assertions reject multiple predicates
-  and counts combined with field state. Path assertions support single-segment wildcards and flat query maps. Unsupported options raise
-  `ArgumentError`. See the migration guide for the retained behavior differences.
+  Actions and assertions return a `Fluffy.PhoenixTest.Session`. Native Fluffy
+  APIs accept its contained `session` field. The function documentation below
+  defines the supported overloads and options; unsupported options raise
+  `ArgumentError`.
   """
 
   alias Fluffy.Expect
@@ -242,11 +224,21 @@ defmodule Fluffy.PhoenixTest do
   for {name, negated?} <- [assert_has: false, refute_has: true] do
     @doc """
     Checks CSS presence or negates it, including hidden elements and multiple matches.
-    Supports `text:`, text `exact:`, `count:`, one-based `at:`, `value:`, `checked:`, and `timeout:`.
-    Field predicates support `label:` and label `exact:`. Only one of `text:`,
-    `value:`, or `checked:` is accepted; counts cannot be combined with field state
-    or `at:`. With `label:`, `at:` positions among the label-matching controls.
-    The special selector `\"title\"` checks the page title and supports exact text.
+
+    Supports `text:`, `count:`, one-based `at:`, `value:`, `checked:`, `selected:`,
+    `label:`, `exact:`, and `timeout:`. Text and label matching default to substring
+    matching. `exact: true` matches the complete normalized text or label and is
+    case-sensitive. Value comparisons are exact; `selected:` matches a selected
+    option's complete normalized text. With field predicates, `exact:` applies
+    only to the optional label.
+
+    Only one of `text:`, `value:`, `checked:`, or `selected:` is accepted. Counts
+    cannot be combined with field predicates or `at:`. Label filtering precedes
+    `at:`, which precedes text filtering. Value and checked predicates require
+    one control. `exact:` requires `text:` or `label:`.
+
+    The special selector `"title"` accepts `text:`, `exact:`, and `timeout:`.
+    Text defaults to substring matching; without text it requires a nonempty title.
     """
     @spec unquote(name)(session(), String.t()) :: session()
     @spec unquote(name)(session(), String.t(), String.t() | keyword()) :: session()

@@ -19,6 +19,7 @@ defmodule FluffyConsumerWeb.Router do
 
     get "/", PageController, :home
     get "/complete", PageController, :complete
+    get "/download", PageController, :download
   end
 
   # Other scopes may use custom stacks.

@@ -9,7 +9,7 @@ database. Then follow [Usage](usage.md) for your first test and shared test case
 ```elixir
 defp deps do
   [
-    {:fluffy, "~> 0.3.0", only: :test}
+{:fluffy, "~> 0.6.0", only: :test}
   ]
 end
 ```
@@ -77,8 +77,7 @@ created only when a test calls `Fluffy.Playwright.trace/1,2`.
 
 Set `engine: :firefox` or `engine: :webkit` after installing the corresponding
 browser.
-Playwright provides cross-engine compatibility; Fluffy uses pinned Chromium
-as its browser-backed conformance baseline.
+See [Browser baseline](capabilities.md#browser-baseline) for conformance coverage.
 Fluffy launches one browser lazily per configured runtime lane and creates a
 fresh isolated `BrowserContext` for each session. ExUnit `max_cases` is the
 default concurrency bound; Fluffy does not add a second pool limiter.
@@ -125,7 +124,8 @@ end
 
 The scope adopts an existing DataCase/ConnCase checkout when present. It
 closes browser contexts and in-process LiveViews before stopping sandbox
-owners, including when the owner test process fails.
+owners, including when the owner test process fails. Sessions also close when
+their owning process exits. Call setup once per test, whether or not Ecto is used.
 
 Use `Fluffy.Test.setup(context, sandbox: false)` for a test that deliberately
 needs lifecycle management without the configured repositories, or pass
