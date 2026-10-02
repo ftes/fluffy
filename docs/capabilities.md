@@ -71,14 +71,15 @@ listeners, and client-side `JS` commands remain Playwright-only.
 
 ### LiveView document and patch boundaries
 
-LiveView locators and actions see the current `Phoenix.LiveViewTest.View`,
-not the surrounding dead layout. Use `Phoenix.ConnTest` for initial
-outer-layout HTML assertions or Playwright for full-document interactions.
-LiveView `unwrap/2` receives only the View.
+LiveView locators and actions see the current `Phoenix.LiveViewTest.View`, not the
+surrounding dead layout. Use `Phoenix.ConnTest` for initial outer-layout HTML assertions
+or Playwright for full-document interactions. LiveView `Fluffy.unwrap/2` receives only
+the View.
 
 ### Tabs, windows, and iframes
 
-The Playwright backend supports named pages for browser tabs and popup windows.
+The Playwright backend exposes page handles for browser tabs and popup windows.
+`new_page/1` returns a handle; `switch_page/2` selects it for subsequent actions.
 Use [frame locators](usage.md#frames-playwright) to query iframe contents with
 Playwright. Page switching does not select an iframe, and frame locators do not
 change the active page.
@@ -99,14 +100,13 @@ available through Playwright but are not covered by Fluffy's conformance suite.
 
 ### Phoenix.HTML actions and dialogs
 
-For a Static or LiveView target with `data-confirm`, `click/2` ignores the
-attribute and continues with the normal structural action. It does not create,
-inspect, accept, or dismiss a browser dialog; use Playwright whenever the
-prompt or its cancellation path is part of the assertion. Both in-process
-drivers model the pinned Phoenix.HTML `data-method`/`data-to` hidden-form
-action for plain elements, including links and buttons. Custom
-`phoenix.link.click` listeners, cancellation, and competing LiveView actions
-remain browser-only.
+For a Static or LiveView target with `data-confirm`, `Fluffy.click/2` ignores the
+attribute and continues with the normal structural action. It does not create, inspect,
+accept, or dismiss a browser dialog; use Playwright whenever the prompt or its
+cancellation path is part of the assertion. Both in-process drivers model the pinned
+Phoenix.HTML `data-method`/`data-to` hidden-form action for plain elements, including
+links and buttons. Custom `phoenix.link.click` listeners, cancellation, and competing
+LiveView actions remain browser-only.
 
 ### Forms and files
 
@@ -120,7 +120,7 @@ empty-file entries. Managed LiveView uploads support validation, progress,
 cancellation, replacement, auto-upload, and submission.
 
 Native picker UI, external uploaders, directories, drag-and-drop, and arbitrary
-`FileList` mutation are unsupported. `Event.file_chooser/1` requires Playwright
+`FileList` mutation are unsupported. `Fluffy.Event.file_chooser/1` requires Playwright
 because application JavaScript opens the chooser.
 
 ### Native escape hatch

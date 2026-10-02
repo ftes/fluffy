@@ -10,10 +10,10 @@ instead of either native import setup below.
 
 ## ExUnit style
 
-Place `use Fluffy.Assert` after `use ExUnit.Case` or your application's case
-module. It imports the constructors and replaces only ExUnit's conflicting
-`assert/2` and `refute/2` imports. Ordinary ExUnit assertions, pattern bindings,
-custom messages, and other helpers remain available.
+Place `use Fluffy.Assert` after `use ExUnit.Case` or your application's case module. It
+imports the constructors and replaces only ExUnit's conflicting
+`ExUnit.Assertions.assert/2` and `ExUnit.Assertions.refute/2` imports. Ordinary ExUnit
+assertions, pattern bindings, custom messages, and other helpers remain available.
 
 ```elixir
 use ExUnit.Case, async: true
@@ -86,9 +86,9 @@ Locator constructors take a locator; page constructors target the active page.
 | `assert(page_url("/creatures"))` | `expect(page_to_have_url("/creatures"))` |
 | `assert(page_title("Creatures"))` | `expect(page_to_have_title("Creatures"))` |
 
-Use `assert_event(session, event, action, assertion)` or the equivalent
-`expect_event` for events. The optional assertion receives an ordinary event value;
-use ExUnit assertions on its fields. See [Events and pages](advanced-events.md).
+Use `Fluffy.Assert.assert_event/4` or the equivalent `Fluffy.Expect.expect_event/4` for
+events. The optional assertion receives an ordinary event value; use ExUnit assertions
+on its fields. See [Events and pages](advanced-events.md).
 
 The same naming pattern applies to the remaining constructors. See the
 `Fluffy.Assert` and `Fluffy.Expect` references for their complete APIs.

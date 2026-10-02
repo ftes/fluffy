@@ -31,7 +31,7 @@ defmodule Fluffy.Conformance.PageCleanupTest do
       |> visit(TestHTTPFixtures.path(fixture, "/start"))
       |> expect_event(Event.popup(), &click(&1, by_role(:link, name: "Open child")))
 
-    page_ids = Enum.map(Session.pages(session), fn {_name, page} -> page.state.page_id end)
+    page_ids = Enum.map(Session.pages(session), fn {_id, page} -> page.state.page_id end)
     assert length(page_ids) == 2
     :ok = GenServer.stop(TestScope.current())
 
@@ -41,19 +41,16 @@ defmodule Fluffy.Conformance.PageCleanupTest do
   end
 
   @tag driver: :playwright
-  test "missing and duplicate page names fail before page actions" do
-    session =
-      Fluffy.session_for_html(:playwright, "<button>Unused</button>", base_url: Fluffy.TestServer.base_url())
+  test "page actions and opener assertions reject names" do
+    session = start_session(:playwright)
+    main = current_page(session)
 
-    assert_raise ArgumentError, ~r/no page named :missing/, fn ->
-      switch_page(session, :missing)
-    end
+    assert_raise FunctionClauseError, fn -> apply(Fluffy, :switch_page, [session, :main]) end
+    assert_raise FunctionClauseError, fn -> apply(Fluffy, :close_page, [session, :main]) end
+    assert_raise FunctionClauseError, fn -> apply(Fluffy.Expect, :page_to_have_opener, [:main]) end
 
-    assert_raise ArgumentError, ~r/page name :main is already in use/, fn ->
-      new_page(session, :main)
-    end
-
-    assert Session.current_page(session).name == :main
+    assert current_page(session) == main
+    assert pages(session) == [main]
   end
 
   @tag driver: :phoenix

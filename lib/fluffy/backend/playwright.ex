@@ -78,7 +78,7 @@ defmodule Fluffy.Backend.Playwright do
       timeout: Keyword.get(options, :timeout, timeout())
     }
 
-    page = page_record(context_state, browser_page.guid, :main)
+    page = page_record(context_state, browser_page.guid)
 
     session = Session.new(__MODULE__, context_state, page, runtime)
     :ok = Fluffy.SessionRuntime.monitor(runtime, GenServer.whereis(connection))
@@ -90,7 +90,7 @@ defmodule Fluffy.Backend.Playwright do
   def page_snapshot(context, page) do
     case Frame.snapshot(page.state.frame_id, connection: context.connection) do
       {:ok, snapshot} -> %{page | url: snapshot.url, document_id: {snapshot.document_ref, page.document_id}}
-      {:error, _error} -> raise ArgumentError, "page #{inspect(page.name || page.id)} is closed"
+      {:error, _error} -> raise ArgumentError, "page #{inspect(page.id)} is closed"
     end
   end
 
@@ -126,7 +126,7 @@ defmodule Fluffy.Backend.Playwright do
     opener_id = if opener, do: opener.guid
     {:ok, {%{page | url: nil, document_id: nil}, id, opener_id}}
   rescue
-    ArgumentError -> {:error, "page #{inspect(page.name || page.id)} is closed"}
+    ArgumentError -> {:error, "page #{inspect(page.id)} is closed"}
   end
 
   @impl true
@@ -137,14 +137,14 @@ defmodule Fluffy.Backend.Playwright do
 
     case Connection.subscribe_event(context.connection, runtime, id, event) do
       :ok -> :ok
-      {:error, _reason} -> {:error, "page #{inspect(page.name || page.id)} is closed"}
+      {:error, _reason} -> {:error, "page #{inspect(page.id)} is closed"}
     end
   end
 
   @doc false
-  def page_record(context, guid, name \\ nil) do
+  def page_record(context, guid) do
     initializer = Connection.initializer!(context.connection, guid)
-    %Page.State{name: name, driver: :playwright, state: %State{page_id: guid, frame_id: initializer.main_frame.guid}}
+    %Page.State{driver: :playwright, state: %State{page_id: guid, frame_id: initializer.main_frame.guid}}
   end
 
   @impl true
@@ -255,21 +255,18 @@ defmodule Fluffy.Backend.Playwright do
   end
 
   @impl true
-  def new_page(session, name) do
-    if Map.has_key?(Session.pages(session), name),
-      do: raise(ArgumentError, "page name #{inspect(name)} is already in use")
-
+  def new_page(session) do
     context = Session.context(session)
 
     {:ok, browser_page} =
       BrowserContext.new_page(context.context_id, connection: context.connection, timeout: context.timeout)
 
-    page = page_record(context, browser_page.guid, name)
+    page = page_record(context, browser_page.guid)
     state = page.state
     {:ok, snapshot} = Frame.snapshot(state.frame_id, connection: context.connection)
     state = %{state | document_identity: snapshot.document_ref}
     page = %{page | state: state}
-    session |> Session.put_page(page) |> Session.activate_page(name)
+    Session.register_page(session, page)
   end
 
   @impl true

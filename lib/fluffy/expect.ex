@@ -242,9 +242,10 @@ defmodule Fluffy.Expect do
   end
 
   @doc group: "Assertions"
-  @doc "Expects the active page to name the requested opener page."
-  @spec page_to_have_opener(term(), [Expect.option()]) :: Expect.t()
-  def page_to_have_opener(expected, options \\ []) when is_list(options) do
+  @doc "Expects the active page to have the given opener handle, or no opener with `nil`."
+  @spec page_to_have_opener(Fluffy.Page.t() | nil, [Expect.option()]) :: Expect.t()
+  def page_to_have_opener(expected, options \\ [])
+      when (is_struct(expected, Fluffy.Page) or is_nil(expected)) and is_list(options) do
     Expect.new(:page, :opener, expected, options)
   end
 
@@ -351,7 +352,7 @@ defmodule Fluffy.Expect do
   end
 
   defp expect_active_page(%Session{} = session, %Expect{kind: :opener} = expectation) do
-    actual = session |> Session.handle() |> Fluffy.Page.opener() |> opener_value(expectation.expected)
+    actual = session |> Session.handle() |> Fluffy.Page.opener()
     assert_expected!(expectation, actual)
     session
   end
@@ -359,10 +360,6 @@ defmodule Fluffy.Expect do
   defp expect_active_page(_session, %Expect{} = expectation) do
     raise ArgumentError, "unsupported active page expectation: #{Expect.describe(expectation)}"
   end
-
-  defp opener_value(nil, _expected), do: nil
-  defp opener_value(page, %Fluffy.Page{}), do: page
-  defp opener_value(page, _expected), do: Fluffy.Page.name(page)
 
   defp assert_expected!(%Expect{} = expectation, actual) do
     assert_expectation_truth!(expectation, Expect.matches?(expectation.expected, actual), actual)

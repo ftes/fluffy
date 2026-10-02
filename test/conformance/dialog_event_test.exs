@@ -93,7 +93,7 @@ defmodule Fluffy.Conformance.DialogEventTest do
     original = session()
     handler = &Dialog.accept/1
     on(original, Event.dialog(), handler)
-    other = new_page(original, :other)
+    other = switch_page(original, new_page(original))
     off(other, Event.dialog(), handler)
     assert Playwright.evaluate(other, "confirm('Other')") == false
     original |> click(by_role(:button, name: "Confirm")) |> expect("accepted" |> by_text(exact: true) |> to_be_visible())

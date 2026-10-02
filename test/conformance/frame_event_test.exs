@@ -40,7 +40,7 @@ defmodule Fluffy.Conformance.FrameEventTest do
     assert Frame.parent_frame(parent) == nil
 
     pending = wait_for(session, Event.frame_navigated())
-    other = new_page(session, :other)
+    other = switch_page(session, new_page(session))
     Playwright.evaluate(other, "location.hash = 'other'; true")
     Playwright.evaluate(session, "document.querySelector('iframe').contentWindow.location.hash = 'updated'; true")
     assert await(pending) == child

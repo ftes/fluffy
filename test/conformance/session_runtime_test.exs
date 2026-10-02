@@ -71,7 +71,7 @@ defmodule Fluffy.Conformance.SessionRuntimeTest do
   test "page selections are independent and closed identities cannot be reused" do
     session = :playwright |> start_session() |> visit("/chamber")
     main = current_page(session)
-    other_session = session |> new_page(:other) |> visit("/live/three-heads")
+    other_session = session |> switch_page(new_page(session)) |> visit("/live/three-heads")
     other = current_page(other_session)
 
     click(other_session, by_role(:button, name: "Play the flute"))
@@ -88,7 +88,7 @@ defmodule Fluffy.Conformance.SessionRuntimeTest do
     assert_raise ArgumentError, ~r/closed/, fn -> click(other_session, by_css("button")) end
     assert current_page(switch_page(other_session, main)) == main
 
-    replacement = session |> new_page(:other) |> current_page()
+    replacement = new_page(session)
     refute replacement == other
     assert_raise ArgumentError, ~r/closed/, fn -> switch_page(session, other) end
     assert Enum.sort(pages(session)) == Enum.sort([main, replacement])
@@ -97,7 +97,7 @@ defmodule Fluffy.Conformance.SessionRuntimeTest do
   @tag driver: :playwright
   test "native page closure invalidates handles without closing other pages" do
     session = start_session(:playwright)
-    other = new_page(session, :other)
+    other = switch_page(session, new_page(session))
     closed = current_page(other)
     state = Session.page_state(other)
     context = Session.context(other)
@@ -125,7 +125,6 @@ defmodule Fluffy.Conformance.SessionRuntimeTest do
       opener = current_page(session)
       child = switch_page(session, await(pending))
       expect(child, page_to_have_opener(opener))
-      expect(child, page_to_have_opener(:main))
 
       case unquote(close) do
         :fluffy ->
@@ -141,11 +140,11 @@ defmodule Fluffy.Conformance.SessionRuntimeTest do
 
       assert_eventually(fn -> Page.opener(current_page(child)) == nil end)
       expect(child, page_to_have_opener(nil))
-      expect(child, not_(page_to_have_opener(:main)))
-      assert_raise ArgumentError, ~r/closed/, fn -> Page.name(opener) end
+      expect(child, not_(page_to_have_opener(opener)))
+      assert_raise ArgumentError, ~r/closed/, fn -> Page.url(opener) end
 
-      # Reusing a name must not make a different page this child's opener.
-      new_page(child, :main)
+      # Creating a new page must not restore a closed opener.
+      new_page(child)
       expect(child, page_to_have_opener(nil))
     end
   end
@@ -175,7 +174,6 @@ defmodule Fluffy.Conformance.SessionRuntimeTest do
 
     assert_eventually(fn -> length(pages(session)) == 2 end)
     [discovered] = pages(session) -- [main]
-    assert Page.name(discovered) == nil
 
     session |> switch_page(discovered) |> visit("/chamber")
     assert Page.url(discovered) =~ "/chamber"

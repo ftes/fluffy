@@ -85,6 +85,10 @@ defmodule Fluffy.Options do
                           )
 
   @filter_locator_schema NimbleOptions.new!(
+                           visible: [
+                             type: :boolean,
+                             doc: "Filter by structural visibility in Static/Live and rendered visibility in Playwright."
+                           ],
                            exact: [
                              type: :boolean,
                              doc: "Match the whole normalized text, case-sensitively, for has_text and has_not_text."

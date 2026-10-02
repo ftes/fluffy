@@ -9,13 +9,16 @@
 [![CI](https://github.com/ftes/fluffy/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ftes/fluffy/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.md)
 
-Fluffy runs tests through ConnTest, LiveViewTest, or a real browser. Its
-in-process drivers are checked against Playwright. Driver differences are
-documented in the [capability matrix](docs/capabilities.md).
+Fluffy tests Phoenix pages and LiveViews directly, or uses a real browser when
+needed. Fluffy's behavior is checked against a real browser to verify that tests
+run without a browser behave consistently. See the
+[capability matrix](docs/capabilities.md) for supported behavior and differences.
 
 **Coming from PhoenixTest?** Use `import Fluffy.PhoenixTest` to keep familiar
 helpers such as `fill_in`, `click_button`, and `assert_has`. The facade makes
 Fluffy mostly a drop-in replacement for supported tests, including browser tests.
+Get automatic waiting for LiveView actions and assertions, plus automatic
+LiveView connection waiting in browser tests.
 [Start with the migration guide →](docs/migration-from-phoenix-test.md)
 
 ```elixir

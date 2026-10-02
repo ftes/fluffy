@@ -65,7 +65,7 @@ defmodule Fluffy.PublicOptionValidationTest do
     end
 
     assert_raise NimbleOptions.ValidationError, ~r/:timeout.*non[- ]negative integer/, fn ->
-      Expect.page_to_have_opener(:main, timeout: -1)
+      Expect.page_to_have_opener(nil, timeout: -1)
     end
   end
 
@@ -80,7 +80,7 @@ defmodule Fluffy.PublicOptionValidationTest do
 
     assert %Expect{target: :page, kind: :url} = Expect.page_to_have_url("/accounts")
     assert %Expect{target: :page, kind: :status} = Expect.page_to_have_status(200)
-    assert %Expect{target: :page, kind: :opener} = Expect.page_to_have_opener(:main)
+    assert %Expect{target: :page, kind: :opener} = Expect.page_to_have_opener(nil)
   end
 
   test "action options fail before reaching a driver", %{session: session, button: button} do

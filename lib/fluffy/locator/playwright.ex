@@ -84,6 +84,9 @@ defmodule Fluffy.Locator.Playwright do
       {:has_not, %Locator{} = child}, current ->
         Selector.concat(current, "internal:has-not=#{JSON.encode!(selector(child))}")
 
+      {:visible, visible?}, current ->
+        Selector.concat(current, "visible=#{visible?}")
+
       {:exact, _exact?}, current ->
         current
     end)

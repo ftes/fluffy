@@ -22,9 +22,41 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
       |> refute_has("div", text: "Day", exact: true)
       |> within("table", fn session ->
         session
-        |> assert_has("th[hidden]", text: "Day", exact: true)
+        |> refute_has("th[hidden]", text: "Day", exact: true)
         |> refute_has("th", text: "DAY", exact: true)
       end)
+    end
+
+    @tag driver: driver
+    test "counts and field predicates preserve native visibility defaults with #{driver}" do
+      session =
+        Fluffy.session_for_html(unquote(driver), """
+        <p hidden>Hidden</p><p>Visible</p><p>Also visible</p>
+        <input hidden value="secret"><input id="public" value="public">
+        <input id="checked" hidden type="checkbox" checked>
+        <select hidden><option selected>Hidden choice</option></select>
+        """)
+
+      session
+      |> assert_has("p", at: 2)
+      |> assert_has("p", count: 3)
+      |> refute_has("p[hidden]")
+      |> assert_has("p[hidden]", count: 1)
+      |> refute_has("p[hidden]", count: 0)
+      |> refute_has("#missing")
+      |> assert_has("#public", value: "public")
+      |> assert_has("input[hidden][value]", value: "secret")
+      |> assert_has("#checked", checked: true)
+      |> assert_has("select", selected: "Hidden choice")
+
+      Expect.expect(session, Expect.to_have_count(Locator.by_css("p"), 3))
+
+      hidden = "p" |> Locator.by_css() |> Locator.filter(visible: false)
+      Expect.expect(session, Expect.to_have_count(hidden, 1))
+
+      assert_raise ExUnit.AssertionError, fn ->
+        refute_has(session, "input[hidden][value]", value: "secret", timeout: 0)
+      end
     end
 
     @tag driver: driver
@@ -74,6 +106,59 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
       |> assert_path(path, query_params: %{"delete" => ""})
       |> within("main", fn session -> click_button(session, "button", "Save") end)
       |> assert_path(path, query_params: %{"action" => "save"})
+    end
+
+    @tag driver: driver
+    test "CSS links prefer text and do not fall back on ambiguous text with #{driver}" do
+      fixture =
+        Fluffy.TestHTTPFixtures.register(%{
+          body: """
+          <a href="?text">Open</a><a href="?label" aria-label="Open">Other</a>
+          <a href="?one">Duplicate</a><a href="?two">Duplicate</a>
+          <a href="?fallback" aria-label="Duplicate">Fallback</a>
+          """
+        })
+
+      path = Fluffy.TestHTTPFixtures.path(fixture)
+
+      session =
+        unquote(if driver == :static, do: :phoenix, else: driver)
+        |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+        |> visit(path)
+        |> click_link("a", "Open", exact: true)
+        |> assert_path(path, query_params: %{"text" => ""})
+
+      assert_raise Fluffy.OperationError, fn ->
+        click_link(session, "a", "Duplicate", exact: true)
+      end
+    end
+
+    @tag driver: driver
+    test "facade visibility accepts any visible match while native assertions remain strict with #{driver}" do
+      session = Fluffy.session_for_html(unquote(driver), "<p hidden>Hidden</p><p>Visible</p><p>Also visible</p>")
+
+      session
+      |> assert_has("p")
+      |> assert_has("p", at: 2)
+      |> refute_has("p", at: 1)
+      |> refute_has("p[hidden]")
+      |> refute_has("#missing")
+      |> assert_has("p", count: 3)
+
+      assert_raise ExUnit.AssertionError, fn -> refute_has(session, "p", timeout: 0) end
+
+      for expectation <- [
+            Expect.to_be_visible(Locator.by_css("p")),
+            Expect.to_be_visible(Locator.by_css("p:not([hidden])"))
+          ],
+          negated? <- [false, true] do
+        expectation = if negated?, do: Expect.not_(expectation), else: expectation
+        assert_raise ExUnit.AssertionError, fn -> Expect.expect(session, expectation, timeout: 0) end
+      end
+
+      unquote(driver)
+      |> Fluffy.session_for_html("<p hidden>One</p><p hidden>Two</p>")
+      |> refute_has("p")
     end
 
     @tag driver: driver
@@ -136,10 +221,10 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
 
       returned =
         session
-        |> assert_has("p")
+        |> assert_has("p", at: 2)
         |> assert_has("p", count: 3)
         |> assert_has("p", "notice", count: 2)
-        |> assert_has("p", text: "Hidden", at: 1, exact: false)
+        |> refute_has("p", text: "Hidden", at: 1, exact: false)
         |> refute_has("p", "Hidden", at: 2)
         |> refute_has("p", count: 2)
         |> refute_has("#missing")
@@ -150,7 +235,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
 
       assert returned.session == session
 
-      assert_raise ExUnit.AssertionError, fn -> refute_has(session, "[hidden]", timeout: 0) end
+      assert_raise ExUnit.AssertionError, fn -> assert_has(session, "[hidden]", timeout: 0) end
       assert_raise ExUnit.AssertionError, fn -> assert_has(session, "p", "Hidden", at: 2, timeout: 0) end
 
       assert_raise ExUnit.AssertionError, fn ->
@@ -177,11 +262,11 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
       |> assert_has("select", label: "Crew reminder day")
       |> refute_has("input", label: "Crew reminder day")
       |> refute_has("select", label: "Missing")
-      |> assert_has("input", label: "Crew reminder time")
-      |> assert_has("input[hidden]", label: "Crew reminder time")
+      |> assert_has("input", label: "Crew reminder time", at: 1)
+      |> refute_has("input[hidden]", label: "Crew reminder time")
       |> assert_has("input", label: "Crew reminder", count: 2)
       |> refute_has("input", label: "Crew reminder", count: 1)
-      |> assert_has("input", label: "Crew reminder time", exact: true, at: 2)
+      |> refute_has("input", label: "Crew reminder time", exact: true, at: 2)
       |> refute_has("input", label: "Crew reminder time", at: 3)
       |> refute_has("select", label: "Crew reminder", exact: true)
       |> assert_has("select", label: "Crew reminder", text: "Monday")
@@ -200,7 +285,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
       end
 
       assert_raise ExUnit.AssertionError, fn ->
-        refute_has(session, "input[hidden]", label: "Crew reminder time", timeout: 0)
+        assert_has(session, "input[hidden]", label: "Crew reminder time", timeout: 0)
       end
     end
 

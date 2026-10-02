@@ -20,6 +20,13 @@ defmodule Fluffy.Locator.Static do
     end)
   end
 
+  def structurally_visible?(element) do
+    case LazyHTML.attributes(element) do
+      [attributes] -> not hidden?(attributes)
+      _ -> true
+    end
+  end
+
   defp apply_operation({:css, selector}, scopes) do
     query_scopes(scopes, selector)
   end
@@ -80,6 +87,7 @@ defmodule Fluffy.Locator.Static do
       Enum.all?(options, fn
         {:has_text, text} -> text_matches?(LazyHTML.text(candidate), text, Keyword.get(options, :exact, false))
         {:has_not_text, text} -> not text_matches?(LazyHTML.text(candidate), text, Keyword.get(options, :exact, false))
+        {:visible, visible?} -> structurally_visible?(candidate) == visible?
         {:exact, _exact?} -> true
         {:has, %Locator{} = child} -> resolve(candidate, child) != []
         {:has_not, %Locator{} = child} -> resolve(candidate, child) == []

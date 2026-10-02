@@ -495,10 +495,9 @@ defmodule Fluffy.Conformance.UnwrapTest do
           send(test_pid, {:untracked_page, page.guid, handle.connection, handle.timeout})
         end)
 
-      assert page_names(session) == [:main]
       assert_receive {:untracked_page, page_id, connection, timeout}
       assert length(pages(session)) == 2
-      child = Enum.find(pages(session), &(Page.name(&1) == nil))
+      [child] = pages(session) -- [current_page(session)]
       assert Page.url(child) == "about:blank"
       assert current_page(switch_page(session, child)) == child
 

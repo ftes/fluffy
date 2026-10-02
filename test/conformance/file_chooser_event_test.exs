@@ -122,7 +122,7 @@ defmodule Fluffy.Conformance.FileChooserEventTest do
     pending = wait_for(original, Event.file_chooser())
     click(original, by_role(:button, name: "Choose attachment"))
     chooser = await(pending)
-    other = new_page(original, :other)
+    other = switch_page(original, new_page(original))
     assert set_input_files(other, chooser, %FilePayload{name: "original.txt", bytes: "original"}) == other
     assert Playwright.evaluate(original, "document.querySelector('#attachment').files[0].name") == "original.txt"
   end
@@ -143,7 +143,7 @@ defmodule Fluffy.Conformance.FileChooserEventTest do
       pending = wait_for(original, Event.file_chooser())
       click(original, by_role(:button, name: "Choose attachment"))
       chooser = await(pending)
-      other = new_page(original, :other)
+      other = switch_page(original, new_page(original))
 
       assert set_input_files(other, chooser, %FilePayload{name: "selected.txt", bytes: "selected"}) == other
       assert Fluffy.Page.url(current_page(other)) == "about:blank"

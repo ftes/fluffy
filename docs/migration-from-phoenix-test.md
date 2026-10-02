@@ -5,15 +5,31 @@ drop-in replacement for supported PhoenixTest helpers: keep `visit`, `fill_in`,
 `click_button`, `assert_has`, `assert_path`, `within`, and `submit` in your tests.
 You do not need to rewrite them into locators to adopt Fluffy or use Playwright.
 
+## Less manual waiting
+
+With the Phoenix backend, Fluffy retries LiveView assertions and supported action
+prerequisites automatically—for example, while waiting for a button to appear or
+become enabled. PhoenixTest supports assertion waiting with an explicit positive
+`timeout:`; Fluffy also waits before actions and enables waiting by default.
+Static pages are checked immediately.
+
+With the browser backend, visiting a LiveView waits for it to connect before
+returning. Unlike PhoenixTest.Playwright, you don't need to add
+`assert_has("body .phx-connected")` after each visit. Application-specific loading
+may still need an assertion.
+
+See [Actionability checks and waiting](usage.md#actionability-checks-and-waiting)
+for supported retries, timeout options, and connection readiness.
+
 ## Replace the import and add lifecycle setup
 
 Replace `import PhoenixTest` with `import Fluffy.PhoenixTest`, including imports
 in your shared case module. Import the facade on its own; mixing it with
 `import Fluffy` introduces overlapping function names.
 
-After completing [Installation and runtime](installation.md), keep your
-application's `ConnCase` and add `Fluffy.Test.setup/1` after its setup. A prepared
-connection can still be piped directly into `visit/2`:
+After completing [Installation and runtime](installation.md), keep your application's
+`ConnCase` and add `Fluffy.Test.setup/1` after its setup. A prepared connection can
+still be piped directly into `Fluffy.PhoenixTest.visit/2`:
 
 ```elixir
 defmodule MyAppWeb.PotionTest do
@@ -45,8 +61,8 @@ already calls `Fluffy.Test.setup/1`, do not call it again in individual modules.
 
 ## Phoenix and browser tests in the same module
 
-Piping a connection into `visit/2` always starts a Phoenix session. To choose
-a backend, start a session explicitly. The same facade calls work with both:
+Piping a connection into `Fluffy.PhoenixTest.visit/2` always starts a Phoenix session.
+To choose a backend, start a session explicitly. The same facade calls work with both:
 
 ```elixir
 defmodule MyAppWeb.PotionTest do
@@ -86,7 +102,10 @@ The facade preserves PhoenixTest vocabulary and conveniences:
 
 - Field actions use exact labels by default. `within` scopes a callback, and
   field actions remember their owning form for `submit()`.
-- `assert_has` and `refute_has` check DOM presence, including hidden elements.
+- Without `count:` or a field predicate, `assert_has` and `refute_has` check
+  visibility; hidden or absent elements satisfy `refute_has`. Static/Live check
+  structural visibility, while Playwright checks rendered visibility. Counts and
+  field predicates add no visibility requirement, matching native assertions.
   They retain one-based `at:` positions and familiar text and field predicates.
 - `assert_path` remains a path assertion; use `query_params:` when the query
   is part of the assertion.
@@ -94,9 +113,11 @@ The facade preserves PhoenixTest vocabulary and conveniences:
 The facade uses Fluffy's execution engine, so it is not an exact compatibility
 implementation. Check these differences when migrating:
 
-- **Strictness and waiting:** single-target actions reject ambiguous matches.
-  Static checks immediately; LiveView retries supported transient states.
-  See [Actionability checks and waiting](usage.md#actionability-checks-and-waiting).
+- **Strict matching:** single-target actions and native visibility assertions reject
+  ambiguous matches. Facade `assert_has` accepts any visible match; `refute_has`
+  requires no visible matches.
+- **CSS links:** text matches take precedence over labels. Label matching is a
+  fallback only when no text match exists when the action starts.
 - **Form behavior:** submissions use current DOM ownership and control state.
   See [Form submission and keyboard actions](usage.md#form-submission-and-keyboard-actions)
   and [Forms and files](capabilities.md#forms-and-files) for supported behavior.
@@ -126,9 +147,9 @@ conn
 |> visit("/chambers/secrets")
 ```
 
-The prepared connection applies to the first request only. Connect params do
-not carry across later navigation, and `unwrap/2` runs too late to supply initial
-mount params. Browser tests use the application's real LiveSocket parameters.
+The prepared connection applies to the first request only. Connect params do not carry
+across later navigation, and `Fluffy.PhoenixTest.unwrap/2` runs too late to supply
+initial mount params. Browser tests use the application's real LiveSocket parameters.
 
 ### Using native Fluffy APIs
 
@@ -161,7 +182,8 @@ Each call below is a pipeline step:
 | `uncheck("Ready")` | `uncheck(by_label("Ready", exact: true))` |
 | `click_button("Brew")` | `click(by_role(:button, name: "Brew"))` |
 | `click_link("Potions")` | `click(by_role(:link, name: "Potions"))` |
-| `refute_has("#notice")` | `assert(count(by_css("#notice"), 0))` |
+| `refute_has("#notice")` | `refute(visible(by_css("#notice")))` |
+| `assert_has("#notice", count: 0)` | `assert(count(by_css("#notice"), 0))` |
 | `assert_path("/potions")` | `assert(page_url(path: "/potions"))` |
 | `assert_path("/potions", query_params: params)` | `assert(page_url(path: "/potions", query: params))` with string keys and values |
 | `assert_has("title", text: "Potions", exact: true)` | `assert(page_title("Potions"))` |
@@ -171,7 +193,8 @@ Each call below is a pipeline step:
 
 When rewriting, preserve the original assertion's intent:
 
-- Native `visible` adds a visibility requirement. For DOM presence/absence,
+- Native `visible` uses the same visibility rules but rejects multiple matches;
+  facade `assert_has` accepts any visible match. For DOM presence/absence,
   use counts as described in [Visibility and DOM presence](usage.md#visibility-and-dom-presence).
 - Native text, role-name, and label locators default to substring matching;
   use `exact: true` to retain exact field labels. Native `nth` is zero-based, whereas facade `at:` is

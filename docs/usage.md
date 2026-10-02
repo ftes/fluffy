@@ -201,8 +201,9 @@ keyboard navigation, and focus assertions.
 needs to leave it. See [LiveView timing and keyboard events](capabilities.md#liveview-timing-and-keyboard-events)
 for how focus and debounce affect change delivery.
 
-Single-target actions are strict: if a locator matches more than one element,
-Fluffy reports the ambiguity instead of choosing for you. Narrow the
+Single-target actions and native visibility assertions are strict: if a locator
+matches more than one element, Fluffy reports the ambiguity instead of choosing
+for you. Facade `assert_has` accepts any visible match. Narrow the
 locator, or use `assert(count(locator, n))` when multiple matches are
 the intended assertion.
 
@@ -221,10 +222,10 @@ session
 |> click(by_role(checkout, :button, name: "Pay"))
 ```
 
-Each frame boundary is strict: if multiple iframes match, an action or assertion
-inside that frame fails with a strictness error. Narrow the iframe locator, or
-select a particular match with `first/1` or `nth/2` before converting it with
-`content_frame/1`:
+Each frame boundary is strict: if multiple iframes match, an action or assertion inside
+that frame fails with a strictness error. Narrow the iframe locator, or select a
+particular match with `Fluffy.Locator.first/1` or `Fluffy.Locator.nth/2` before
+converting it with `Fluffy.Locator.content_frame/1`:
 
 ```elixir
 checkout = by_title("Checkout") |> first() |> content_frame()
@@ -234,9 +235,9 @@ iframe_element = Fluffy.FrameLocator.owner(checkout)
 ```
 
 The `by_*` builders return ordinary element locators that support existing actions,
-filters, and assertions. `owner/1` returns the iframe element in its containing
-document. As in Playwright JS, `has` and `has_not` filter operands must remain in
-the same frame and cannot themselves traverse frames.
+filters, and assertions. `Fluffy.FrameLocator.owner/1` returns the iframe element in its
+containing document. As in Playwright JS, `has` and `has_not` filter operands must
+remain in the same frame and cannot themselves traverse frames.
 
 A frame locator never changes the active page. Page URL/title assertions and
 navigation helpers continue to target the page's main frame. Child navigation
@@ -293,13 +294,17 @@ session
 
 Static and LiveView raise `Fluffy.CapabilityError` for indeterminate state.
 
-LiveView expectations observe fresh renders and retry transient missing or
-actionability failures until their deadline. Static expectations are
-immediate. Playwright uses the browser's native waiting behavior. Pass
-`timeout:` to an action or expectation when a particular operation needs a
-different deadline.
-
 ### Actionability checks and waiting
+
+LiveView expectations observe fresh renders and retry until they pass or reach
+their deadline. Supported LiveView actions also retry transient missing or
+actionability failures, as listed below. Waiting is enabled by default; pass
+`timeout:` to an action or expectation to change its deadline. Static checks
+are immediate. Playwright uses the browser's native waiting behavior.
+
+When a Playwright visit finds LiveView roots, it waits for every root to have
+`phx-connected` before returning. This confirms the LiveView connection, but
+application-specific loading may still need an assertion.
 
 Playwright already checks each action's prerequisites and waits automatically
 for the target to be ready. As elsewhere in Fluffy, Playwright is the model we
@@ -339,11 +344,11 @@ Playwright uses the browser's action-specific checks: for example, `fill`
 waits for rendered visibility, enablement, and editability, while `click`
 also waits for stability and the target to receive pointer events.
 
-Keep separate assertions when the state itself is the behavior under test,
-such as a button becoming enabled after a required field is filled.
-`assert(enabled(locator))` does not imply visibility, and neither does
-`refute(disabled(locator))`; the latter is the same negation as
-`assert(not_(disabled(locator)))` with `not_/1` imported from `Fluffy.Expect`.
+Keep separate assertions when the state itself is the behavior under test, such as a
+button becoming enabled after a required field is filled. `assert(enabled(locator))`
+does not imply visibility, and neither does `refute(disabled(locator))`; the latter is
+the same negation as `assert(not_(disabled(locator)))` with `Fluffy.Expect.not_/1`
+imported from `Fluffy.Expect`.
 
 ### Form submission and keyboard actions
 
@@ -372,9 +377,15 @@ constructor names, options, and negation semantics.
 
 Even the `:phoenix` backend checks **structural visibility**, rather than just
 DOM presence. Its Static and LiveView drivers treat a matched element with a
-`hidden` attribute or `aria-hidden="true"` as invisible. This differs from
-the PhoenixTest-style facade's `assert_has` and `refute_has`, which check for
-matching DOM elements rather than their visibility.
+`hidden` attribute or `aria-hidden="true"` as invisible.
+
+Without `count:` or a field predicate, the PhoenixTest-style facade's
+`assert_has` requires any visible match and `refute_has` requires no visible
+matches. Native visibility assertions require an unambiguous locator.
+Counts and field predicates (`value:`, `checked:`, `selected:`) add no visibility
+requirement. Use `assert_has(selector, count: 1)` for DOM presence, including
+hidden inputs or script elements, and `selected:` on a select to check its
+selected option.
 
 Phoenix does not compute CSS or browser layout: a CSS class or inline
 `display: none` alone does not make an element structurally invisible. Use
@@ -452,7 +463,7 @@ parameters and empty values both decode to `""`; `+` and `%20` decode to a space
 
 ## Reloading
 
-Use `reload/1` to reload the active document:
+Use `Fluffy.reload/1` to reload the active document:
 
 ```elixir
 session
@@ -463,9 +474,9 @@ session
 |> assert(page_url("/chambers/secrets"))
 ```
 
-The Phoenix backend dispatches the current URL again and selects the driver for
-the returned document. The Playwright backend uses the page's native reload.
-`reload/1` promises a fresh document, not preservation of unsaved client-side
+The Phoenix backend dispatches the current URL again and selects the driver for the
+returned document. The Playwright backend uses the page's native reload.
+`Fluffy.reload/1` promises a fresh document, not preservation of unsaved client-side
 state.
 
 ## Files and uploads
@@ -500,9 +511,9 @@ page. See [Upload limits](installation.md#upload-limits) for the aggregate
 limit and per-action override. Error messages and diagnostic artifacts do not
 copy payload contents.
 
-Playwright can also capture a script-opened chooser before the triggering
-click. Pass the chooser directly to `set_input_files/3`; see
-[Advanced events and pages](advanced-events.md#file-choosers).
+Playwright can also capture a script-opened chooser before the triggering click. Pass
+the chooser directly to `Fluffy.set_input_files/3`; see [Advanced events and
+pages](advanced-events.md#file-choosers).
 
 ## Operation failures and browser diagnostics
 
@@ -539,12 +550,12 @@ start_session(:playwright)
 end)
 ```
 
-Fluffy saves the trace before closing its BrowserContext. A trace covers
-all pages in the session; different sessions produce
-different archives. Explicit tracing opens Trace Viewer by default for local
-debugging, while `open: false` is appropriate in CI. `step/3` remains portable:
-it adds nested, source-linked trace groups when tracing is active and simply
-runs the callback on Phoenix or an untraced Playwright session.
+Fluffy saves the trace before closing its BrowserContext. A trace covers all pages in
+the session; different sessions produce different archives. Explicit tracing opens Trace
+Viewer by default for local debugging, while `open: false` is appropriate in CI.
+`Fluffy.step/3` remains portable: it adds nested, source-linked trace groups when
+tracing is active and simply runs the callback on Phoenix or an untraced Playwright
+session.
 
 Save an explicit PNG while retaining the pipeline with:
 
@@ -576,16 +587,16 @@ end)
 |> click(by_role(:button, name: "Reveal diary message"))
 ```
 
-`evaluate/2` returns the JavaScript result, not the session. Use `then/2`, as
-above, to continue a pipeline. Function-style expressions can pass
-`is_function: true` and `arg:`. Phoenix sessions raise a capability error
-because Phoenix does not execute client code.
+`Fluffy.Playwright.evaluate/2` returns the JavaScript result, not the session. Use
+`then/2`, as above, to continue a pipeline. Function-style expressions can pass
+`is_function: true` and `arg:`. Phoenix sessions raise a capability error because
+Phoenix does not execute client code.
 
 ## Native escape hatch
 
-Use `unwrap/2` for an uncommon driver-native operation that has no first-class
-Fluffy API. It returns the reconciled session, so the pipeline can continue,
-but the callback value is intentionally driver-specific:
+Use `Fluffy.unwrap/2` for an uncommon driver-native operation that has no first-class
+Fluffy API. It returns the reconciled session, so the pipeline can continue, but the
+callback value is intentionally driver-specific:
 
 ```elixir
 session
@@ -606,8 +617,8 @@ through unchanged. Match PlaywrightEx `{:error, reason}` results inside the
 callback when failure should stop the test.
 
 Do not consume `assert_patch` or `assert_redirect` notifications inside a LiveView
-callback: Fluffy uses them to reconcile navigation. Assert the resulting page or
-URL after `unwrap/2`.
+callback: Fluffy uses them to reconcile navigation. Assert the resulting page or URL
+after `Fluffy.unwrap/2`.
 
 The Playwright handle exposes only `context_id`, `page_id`, `frame_id`,
 `connection`, and `timeout`. Use the [event and page APIs](advanced-events.md)

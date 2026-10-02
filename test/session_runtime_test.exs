@@ -24,9 +24,9 @@ defmodule Fluffy.SessionRuntimeTest do
     runtime = session.runtime
     assert {:error, _} = SessionRuntime.page(runtime, make_ref())
     assert {:error, _} = SessionRuntime.put_page_state(runtime, make_ref(), %{})
-    assert {:error, _} = SessionRuntime.resolve(runtime, :missing)
+    assert {:error, _} = SessionRuntime.resolve(runtime, Fluffy.Page.new(runtime, make_ref()))
     assert {:ok, page} = SessionRuntime.page(runtime, session.active_page)
-    assert {:error, _} = SessionRuntime.register_page(runtime, %{page | id: nil})
+    assert {:error, _} = SessionRuntime.replace_page(runtime, %{page | id: make_ref()})
     Fluffy.fill(session, Fluffy.Locator.by_label("Name"), "Ada")
     Fluffy.Expect.expect(session, Fluffy.Expect.to_have_value(Fluffy.Locator.by_label("Name"), "Ada"))
   end

@@ -8,19 +8,25 @@ defmodule Fluffy.Conformance.BrowserAPITest do
   alias Fluffy.Playwright
 
   @tag driver: :playwright
-  test "creates named pages sharing cookies, switches, and closes resources" do
+  test "creates page handles sharing cookies without changing the selection" do
     session = start_session(:playwright)
+    main = current_page(session)
     session = Playwright.add_cookies(session, [%{name: "token", value: "abc", url: Fluffy.TestServer.base_url()}])
-    other = new_page(session, :other)
-    assert Enum.sort(page_names(other)) == [:main, :other]
-    assert Playwright.evaluate(other, "document.visibilityState") == "visible"
-    assert_raise ArgumentError, ~r/already in use/, fn -> new_page(other, :other) end
-    other = visit(other, "/harness")
-    assert Playwright.evaluate(other, "document.cookie") =~ "token=abc"
-    main = switch_page(other, :main)
-    assert Playwright.evaluate(main, "document.visibilityState") == "visible"
-    assert page_names(close_page(main, :other)) == [:main]
-    assert :ok = close_session(main)
+    other = new_page(session)
+    assert %Fluffy.Page{} = other
+    refute other == main
+    assert current_page(session) == main
+    assert Enum.sort(pages(session)) == Enum.sort([main, other])
+
+    other_session = switch_page(session, other)
+    assert Playwright.evaluate(other_session, "document.visibilityState") == "visible"
+    other_session = visit(other_session, "/harness")
+    assert Playwright.evaluate(other_session, "document.cookie") =~ "token=abc"
+    assert current_page(switch_page(other_session, main)) == main
+    assert close_page(session, other) == session
+    assert pages(session) == [main]
+    assert_raise ArgumentError, ~r/closed/, fn -> switch_page(session, other) end
+    assert :ok = close_session(session)
   end
 
   @tag driver: :playwright
@@ -90,7 +96,8 @@ defmodule Fluffy.Conformance.BrowserAPITest do
 
   @tag driver: :playwright
   test "history reconciles same-document navigation and leaves an empty history unchanged" do
-    session = :playwright |> start_session() |> new_page(:blank)
+    session = start_session(:playwright)
+    session = switch_page(session, new_page(session))
     assert go_back(session) == session
     assert go_forward(session) == session
     session = session |> visit("/harness") |> visit("/harness#other")
@@ -102,7 +109,7 @@ defmodule Fluffy.Conformance.BrowserAPITest do
     session = start_session(:phoenix)
 
     for operation <- [
-          fn -> new_page(session, :other) end,
+          fn -> new_page(session) end,
           fn -> go_back(session) end,
           fn -> go_forward(session) end,
           fn -> hover(session, by_css("button")) end,

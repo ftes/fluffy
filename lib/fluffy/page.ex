@@ -3,7 +3,7 @@ defmodule Fluffy.Page do
   An opaque, live handle to one page in a session.
 
   Metadata resolves the latest state. Handles survive navigation, but a closed
-  page cannot be used again, even if another page is given the same name.
+  page cannot be used again. Newly created pages have distinct identities.
   """
   @moduledoc groups: ["Metadata", "Assertions"]
 
@@ -25,11 +25,6 @@ defmodule Fluffy.Page do
   @doc false
   @spec new(pid(), reference()) :: t()
   def new(runtime, id), do: %__MODULE__{runtime: runtime, id: id}
-
-  @doc group: "Metadata"
-  @doc "Returns the page's session-local name, when assigned."
-  @spec name(t()) :: term() | nil
-  def name(page), do: record(page).name
 
   @doc group: "Metadata"
   @doc "Returns the page's current URL."

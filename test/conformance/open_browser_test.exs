@@ -51,12 +51,8 @@ defmodule Fluffy.Conformance.OpenBrowserTest do
   end
 
   test "browser snapshots resolve relative assets and use the active page" do
-    session =
-      :playwright
-      |> start_session()
-      |> visit("/chamber")
-      |> new_page(:snapshot)
-      |> visit("/chamber")
+    session = :playwright |> start_session() |> visit("/chamber")
+    session = session |> switch_page(new_page(session)) |> visit("/chamber")
 
     Fluffy.Playwright.evaluate(session, """
     document.body.innerHTML = '<img src="assets/image.png"><p>Second page</p>'

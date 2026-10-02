@@ -1,6 +1,17 @@
 # Changelog
 
-## Unreleased
+## 0.6.1 — 2026-10-02
+
+### Added
+
+- Locator `filter(visible: true | false)` uses structural visibility in Static/Live and rendered visibility in Playwright.
+
+### Changed
+
+- **PhoenixTest facade:** `assert_has` requires any visible match and `refute_has` requires no visible matches, instead of checking DOM presence, when no count or field predicate is supplied. Multiple matches remain allowed. Counts and field predicates add no visibility requirement, matching native assertions.
+- **PhoenixTest facade:** CSS `click_link` prefers text matches and falls back to labels only when no text match exists. Ambiguous or non-actionable text matches remain errors.
+- **Native API:** Static/Live visibility assertions now reject ambiguous locators, matching Playwright.
+- Remove page names. `new_page/1` returns a page handle without changing the session's current page; use `switch_page/2` to select it. Switching, closing, and opener assertions accept page handles instead of names. Remove `new_page/2`, `page_names/1`, and `Fluffy.Page.name(page)`. See [Events and pages](docs/advanced-events.md) for migration examples.
 
 ## 0.6.0 — 2026-10-01
 

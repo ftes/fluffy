@@ -64,14 +64,29 @@ defmodule Fluffy.PhoenixTest do
 
   def visit(session, path), do: session |> map_session(&Fluffy.visit(&1, path)) |> clear_form()
 
-  @doc "Clicks a link by accessible name, or by CSS and text or label (optional `exact:`)."
+  @doc """
+  Clicks a link by accessible name, or by CSS and text (optional `exact:`).
+  CSS links fall back to label matching only when no text match exists at the
+  time of the call. Ambiguous or non-actionable text matches do not trigger fallback.
+  """
   @spec click_link(session(), String.t()) :: session()
   @spec click_link(session(), String.t(), String.t()) :: session()
   def click_link(session, text), do: click_role(session, :link, text)
   def click_link(session, selector, text), do: click_link(session, selector, text, [])
 
   @spec click_link(session(), String.t(), String.t(), keyword()) :: session()
-  def click_link(session, selector, text, options), do: click_text(session, selector, text, options)
+  def click_link(session, selector, text, options) do
+    string!(text, :text)
+    options = options!(options, [:exact])
+    text_locator = session |> css_locator(selector) |> Locator.filter(Keyword.put(options, :has_text, text))
+    label_locator = field_locator(session, selector, text, exact: Keyword.get(options, :exact, false))
+
+    map_session(session, fn native ->
+      locator = if Fluffy.PhoenixTest.Query.matches?(native, text_locator), do: text_locator, else: label_locator
+
+      Fluffy.click(native, locator)
+    end)
+  end
 
   @doc "Clicks a button by accessible name, or by CSS and text or label (optional `exact:`)."
   @spec click_button(session(), String.t()) :: session()
@@ -223,7 +238,11 @@ defmodule Fluffy.PhoenixTest do
 
   for {name, negated?} <- [assert_has: false, refute_has: true] do
     @doc """
-    Checks CSS presence or negates it, including hidden elements and multiple matches.
+    Checks whether any CSS match is visible, or negates that check.
+    Multiple matches are allowed; refutation requires every match to be hidden or absent.
+    Static and Live use structural visibility; Playwright uses rendered visibility.
+    Without a count or field predicate, hidden and absent elements satisfy refutation.
+    Counts and field predicates do not add a visibility requirement, matching native assertions.
 
     Supports `text:`, `count:`, one-based `at:`, `value:`, `checked:`, `selected:`,
     `label:`, `exact:`, and `timeout:`. Text and label matching default to substring
@@ -415,7 +434,7 @@ defmodule Fluffy.PhoenixTest do
         Expect.to_have_count(locator, options[:count], timeout)
 
       true ->
-        locator |> Expect.to_have_count(0, timeout) |> Expect.not_()
+        locator |> Locator.filter(visible: true) |> Locator.first() |> Expect.to_be_visible(timeout)
     end
   end
 

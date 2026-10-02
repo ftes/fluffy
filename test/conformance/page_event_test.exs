@@ -42,7 +42,6 @@ defmodule Fluffy.Conformance.PageEventTest do
     assert await(popup_wait) == page
     assert Page.opener(page) == current_page(session)
     assert page in pages(session)
-    assert page_names(session) == [:main]
 
     session
     |> switch_page(page)
@@ -50,7 +49,7 @@ defmodule Fluffy.Conformance.PageEventTest do
     |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/details")))
     |> expect(page_to_have_status(202))
     |> close_page()
-    |> switch_page(:main)
+    |> switch_page(current_page(session))
     |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/start")))
 
     assert pages(session) == [current_page(session)]
@@ -59,13 +58,13 @@ defmodule Fluffy.Conformance.PageEventTest do
   @tag driver: :playwright
   test "a scoped page expectation ignores callback page selection and return values" do
     {session, _fixture} = browser_session()
-    other = new_page(session, :other)
+    other = switch_page(session, new_page(session))
 
     assert expect_event(
              session,
              Event.page(),
              fn original ->
-               new_page(original, :created)
+               new_page(original)
                other
              end,
              fn page ->
@@ -74,8 +73,8 @@ defmodule Fluffy.Conformance.PageEventTest do
              end
            ) == session
 
-    assert :created in page_names(session)
-    assert Page.name(current_page(session)) == :main
+    assert length(pages(session)) == 3
+    refute current_page(session) == current_page(other)
   end
 
   @tag driver: :playwright

@@ -103,8 +103,9 @@ defmodule Fluffy.PlaywrightEventCaptureTest do
     fixture = TestHTTPFixtures.register(%{body: "ok"})
     session = session_for_html(:playwright, "<h1>Main</h1>")
     page_wait = wait_for(session, Event.page())
-    session = new_page(session, :other)
-    assert await(page_wait) == current_page(session)
+    page = new_page(session)
+    assert await(page_wait) == page
+    session = switch_page(session, page)
 
     first = wait_for(session, Event.response())
     second = wait_for(session, Event.response())

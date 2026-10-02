@@ -67,7 +67,7 @@ defmodule Fluffy.Conformance.NetworkEventTest do
     {original, fixture} = session()
     page_wait = wait_for(original, Event.request())
     context_wait = wait_for(original, Event.request(), scope: :context)
-    other = new_page(original, :other)
+    other = switch_page(original, new_page(original))
     visit(other, TestHTTPFixtures.path(fixture, "/child"))
     other_request = await(context_wait)
     assert other_request.page == current_page(other)
@@ -92,7 +92,7 @@ defmodule Fluffy.Conformance.NetworkEventTest do
   @tag driver: :playwright
   test "listener removal matches page or context scope" do
     {original, fixture} = session()
-    other = new_page(original, :other)
+    other = switch_page(original, new_page(original))
     owner = self()
     handler = fn event -> send(owner, {:request, event.page}) end
     on(original, Event.request(), handler)

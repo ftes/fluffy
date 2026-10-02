@@ -18,7 +18,6 @@ defmodule Fluffy.SessionRuntime do
   def context(runtime), do: call(runtime, :context)
   def put_context(runtime, context), do: call(runtime, {:context, context})
   def pages(runtime), do: call(runtime, :pages)
-  def page_names(runtime), do: call(runtime, :page_names)
   def page(runtime, id), do: call(runtime, {:page, id})
   def external_page(runtime, id), do: call(runtime, {:external_page, id})
   def put_page_state(runtime, id, state), do: call(runtime, {:page_state, id, state})
@@ -49,7 +48,6 @@ defmodule Fluffy.SessionRuntime do
   end
 
   def resolve(_runtime, %Page{}), do: {:error, "page belongs to a different session"}
-  def resolve(runtime, name), do: call(runtime, {:resolve, name})
 
   def initialize(runtime, backend, context, page) do
     call(runtime, {:initialize, backend, context, page})
@@ -78,7 +76,6 @@ defmodule Fluffy.SessionRuntime do
        backend: nil,
        context: nil,
        pages: %{},
-       names: %{},
        external_pages: %{},
        resources: [],
        subscriptions: [],
@@ -91,26 +88,10 @@ defmodule Fluffy.SessionRuntime do
   def handle_call(:backend, _from, state), do: {:reply, {:ok, state.backend}, state}
   def handle_call(:context, _from, state), do: {:reply, {:ok, state.context}, state}
   def handle_call({:context, context}, _from, state), do: {:reply, :ok, %{state | context: context}}
-  def handle_call(:page_names, _from, state), do: {:reply, {:ok, Map.keys(state.names)}, state}
-
-  def handle_call(:pages, _from, state) do
-    pages = Map.new(state.pages, fn {_id, page} -> {page.name || page.id, page} end)
-    {:reply, {:ok, pages}, state}
-  end
+  def handle_call(:pages, _from, state), do: {:reply, {:ok, state.pages}, state}
 
   def handle_call({:page, id}, _from, state), do: {:reply, fetch_page(state, id), state}
   def handle_call({:external_page, id}, _from, state), do: {:reply, {:ok, state.external_pages[id]}, state}
-
-  def handle_call({:resolve, name}, _from, state) do
-    result =
-      cond do
-        Map.has_key?(state.pages, name) -> {:ok, name}
-        Map.has_key?(state.names, name) -> {:ok, Map.fetch!(state.names, name)}
-        true -> {:error, "no page named #{inspect(name)} exists in this session"}
-      end
-
-    {:reply, result, state}
-  end
 
   def handle_call({:page_state, id, page_state}, _from, state) do
     case fetch_page(state, id) do
@@ -240,36 +221,24 @@ defmodule Fluffy.SessionRuntime do
   defp put_page(state, {page, external_id, opener_id}) do
     existing = if external_id, do: state.external_pages[external_id]
 
-    cond do
-      existing && not Map.has_key?(state.pages, existing) -> {:ok, existing, state}
-      existing && is_nil(page.name) -> {:ok, existing, state}
-      true -> store_page(state, page, external_id, opener_id, existing)
+    if existing do
+      {:ok, existing, state}
+    else
+      store_page(state, page, external_id, opener_id)
     end
   end
 
-  defp store_page(state, page, external_id, opener_id, existing) do
-    id = existing || make_ref()
-    name = page.name
+  defp store_page(state, page, external_id, opener_id) do
+    id = make_ref()
 
-    with :ok <- validate_page_name(state, name, id),
-         :ok <- subscribe_new_page(state, page, existing) do
+    with :ok <- state.backend.subscribe_page(state.context, page, self()) do
       opener = if opener_id, do: state.external_pages[opener_id], else: page.opener
       page = %{page | id: id, opener: if(Map.has_key?(state.pages, opener), do: opener)}
       state = %{state | pages: Map.put(state.pages, id, page)}
-      state = if name, do: %{state | names: Map.put(state.names, name, id)}, else: state
       state = if external_id, do: %{state | external_pages: Map.put(state.external_pages, external_id, id)}, else: state
       {:ok, id, state}
     end
   end
-
-  defp validate_page_name(state, name, id) do
-    if name && Map.has_key?(state.names, name) && state.names[name] != id,
-      do: {:error, "page name #{inspect(name)} is already in use"},
-      else: :ok
-  end
-
-  defp subscribe_new_page(state, page, nil), do: state.backend.subscribe_page(state.context, page, self())
-  defp subscribe_new_page(_state, _page, _existing), do: :ok
 
   defp remove_page(state, id) do
     {page, pages} = Map.pop(state.pages, id)
@@ -281,8 +250,7 @@ defmodule Fluffy.SessionRuntime do
 
       # Like Playwright, a live page has no opener once that opener closes.
       pages = Map.new(pages, fn {key, page} -> {key, if(page.opener == id, do: %{page | opener: nil}, else: page)} end)
-      names = Map.reject(state.names, fn {_name, value} -> value == id end)
-      %{state | pages: pages, names: names}
+      %{state | pages: pages}
     else
       state
     end

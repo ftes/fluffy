@@ -42,8 +42,6 @@ defmodule Fluffy.Session do
   end
 
   @doc false
-  def page_names(session), do: value!(SessionRuntime.page_names(session.runtime))
-  @doc false
   def page_state(session), do: Page.record(handle(session)).state
   @doc false
   def put_page_state(session, state) do
@@ -60,9 +58,9 @@ defmodule Fluffy.Session do
   end
 
   @doc false
-  def put_page(session, page) do
-    value!(SessionRuntime.register_page(session.runtime, page))
-    session
+  def register_page(session, page) do
+    id = value!(SessionRuntime.register_page(session.runtime, page))
+    Page.new(session.runtime, id)
   end
 
   @doc false

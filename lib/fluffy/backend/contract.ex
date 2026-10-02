@@ -7,12 +7,12 @@ defmodule Fluffy.Backend.Contract do
   alias Fluffy.TestScope
 
   @callback start_session(keyword(), TestScope.attachment()) :: Session.t()
-  @callback new_page(Session.t(), term()) :: Session.t()
+  @callback new_page(Session.t()) :: Page.t()
   @callback history(Session.t(), :go_back | :go_forward, keyword()) :: Session.t()
   @callback visit(Session.t(), String.t()) :: Session.t()
   @callback reload(Session.t(), keyword()) :: Session.t()
   @callback navigate(Session.t(), Navigation.t()) :: Session.t()
-  @callback close_page(Session.t(), term()) :: Session.t()
+  @callback close_page(Session.t(), Page.t()) :: Session.t()
   @callback event_source(Session.t(), atom(), :page | :context) :: :context | reference()
   @callback subscribe_event(Session.t(), atom(), :context | reference(), pid()) ::
               {(term() -> {:ok, term()} | {:error, String.t()} | :ignore), (-> :ok)}

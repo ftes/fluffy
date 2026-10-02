@@ -61,8 +61,22 @@ defmodule Fluffy do
 
   @doc group: "Lifecycle and navigation"
   @doc playwright_only: true
-  @doc "Creates and activates a named blank page in the session's browser context."
-  def new_page(%Session{} = session, name), do: Backend.new_page(session, name)
+  @doc """
+  Creates a blank page in the session's browser context and returns its handle.
+
+  The session keeps its current page selection. Use `switch_page/2` to select
+  the new page. Pages share the context's cookies and storage.
+
+      main = current_page(session)
+      other = new_page(session)
+
+      session
+      |> switch_page(other)
+      |> visit("/dashboard")
+      |> switch_page(main)
+  """
+  @spec new_page(Session.t()) :: Fluffy.Page.t()
+  def new_page(%Session{} = session), do: Backend.new_page(session)
 
   @doc group: "Lifecycle and navigation"
   @doc playwright_only: true
@@ -276,24 +290,25 @@ defmodule Fluffy do
   end
 
   @doc group: "Lifecycle and navigation"
-  @doc "Selects a page handle (or registered name) for this pipeline, without changing other handles."
-  def switch_page(%Session{} = session, page), do: Session.activate_page(session, page)
+  @doc "Selects a page handle for this pipeline, without changing other session handles."
+  @spec switch_page(Session.t(), Fluffy.Page.t()) :: Session.t()
+  def switch_page(%Session{} = session, %Fluffy.Page{} = page), do: Session.activate_page(session, page)
 
   @doc group: "Lifecycle and navigation"
   @doc "Closes a page. Handles selecting it must explicitly switch to another page before continuing."
-  def close_page(%Session{} = session, page \\ nil), do: Backend.close_page(session, page || Session.handle(session))
+  @spec close_page(Session.t()) :: Session.t()
+  def close_page(%Session{} = session), do: close_page(session, Session.handle(session))
 
   @doc group: "Lifecycle and navigation"
-  @doc "Returns all current session-local page names."
-  def page_names(%Session{} = session) do
-    Session.page_names(session)
-  end
+  @doc "Closes the given page handle, preserving the session's current-page selection."
+  @spec close_page(Session.t(), Fluffy.Page.t()) :: Session.t()
+  def close_page(%Session{} = session, %Fluffy.Page{} = page), do: Backend.close_page(session, page)
 
   @doc group: "Lifecycle and navigation"
   @doc "Returns live handles for all open pages, including browser pages discovered without an event wait."
   @spec pages(Session.t()) :: [Fluffy.Page.t()]
   def pages(%Session{} = session) do
-    Enum.map(Session.pages(session), fn {_name, page} -> Fluffy.Page.new(session.runtime, page.id) end)
+    Enum.map(Session.pages(session), fn {id, _page} -> Fluffy.Page.new(session.runtime, id) end)
   end
 
   @doc false
@@ -362,7 +377,17 @@ defmodule Fluffy do
 
   Pass a chooser returned by `Fluffy.Event.file_chooser/1` directly. It targets
   its original page and preserves the session's current-page selection. Choosers
-  require Playwright.
+  require Playwright. The returned session keeps this action pipeable:
+
+      pending = wait_for(session, Fluffy.Event.file_chooser())
+
+      session
+      |> click(by_role(:button, name: "Upload"))
+      |> set_input_files(await(pending), "test/fixtures/report.pdf")
+      |> click(by_role(:button, name: "Save"))
+
+  Register the wait before clicking the button. `await/1` returns the chooser;
+  `set_input_files/4` fills its input and returns the session.
 
   ## Options
 

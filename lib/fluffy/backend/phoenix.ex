@@ -49,14 +49,13 @@ defmodule Fluffy.Backend.Phoenix do
       timeout: Keyword.get(options, :timeout, Application.get_env(:fluffy, :timeout, 1_000))
     }
 
-    page = %Page.State{name: :main, driver: :unvisited, state: %UnvisitedState{}}
+    page = %Page.State{driver: :unvisited, state: %UnvisitedState{}}
     Session.new(__MODULE__, context, page, runtime)
   end
 
   @doc false
   def session_for_html(html) when is_binary(html) do
     page = %Page.State{
-      name: :main,
       driver: :static,
       state: %StaticState{client_dom: ClientDOM.from_fragment(html)}
     }
@@ -165,15 +164,15 @@ defmodule Fluffy.Backend.Phoenix do
   end
 
   @impl true
-  @spec new_page(Session.t(), term()) :: no_return()
-  def new_page(session, _name), do: require_browser_pages!(session)
+  @spec new_page(Session.t()) :: no_return()
+  def new_page(session), do: require_browser_pages!(session)
 
   @impl true
   @spec history(Session.t(), :go_back | :go_forward, keyword()) :: no_return()
   def history(session, _direction, _options), do: require_browser_pages!(session)
 
   @impl true
-  @spec close_page(Session.t(), term()) :: no_return()
+  @spec close_page(Session.t(), Page.t()) :: no_return()
   def close_page(%Session{} = session, _page_id) do
     require_browser_pages!(session)
   end

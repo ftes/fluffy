@@ -34,9 +34,9 @@ application hosted elsewhere, configure `config :fluffy, base_url: "..."`
 instead. Explicit `endpoint:` and `base_url:` session options override the
 global values for multi-endpoint or dynamic-server tests.
 
-The application's normal browser bundle must connect its LiveSocket. A
-Playwright visit containing a LiveView root waits for `phx-connected` before it
-returns.
+The application's normal browser bundle must connect its LiveSocket. See
+[Actionability checks and waiting](usage.md#actionability-checks-and-waiting)
+for Fluffy's automatic LiveView connection wait.
 
 ## Playwright setup
 
@@ -70,10 +70,10 @@ there when a public browser operation fails. Use a writable per-run directory
 locally and configure CI to upload it when the test job fails; artifact capture
 does not run for successful operations.
 
-The default console logger sends browser `console` messages and uncaught page
-errors through Elixir's `Logger`; set `js_logger: false` to disable it or
-configure another module implementing `PlaywrightEx.JsLogger`. Trace files are
-created only when a test calls `Fluffy.Playwright.trace/1,2`.
+The default console logger sends browser `console` messages and uncaught page errors
+through Elixir's `Logger`; set `js_logger: false` to disable it or configure another
+module implementing `PlaywrightEx.JsLogger`. Trace files are created only when a test
+calls `Fluffy.Playwright.trace/1` or `Fluffy.Playwright.trace/2`.
 
 Set `engine: :firefox` or `engine: :webkit` after installing the corresponding
 browser.
@@ -158,12 +158,11 @@ defmodule MyApp.TestSandbox do
 end
 ```
 
-Fluffy validates this configuration when its application starts. The same
-header and allowance value must be passed to the endpoint plug, and
-`connect_info/0` selects `:user_agent` or `:x_headers` for the socket. An
-application may instead retain its own LiveView/channel hook when additional
-ownership rules require application state; use the same encoded metadata and
-call `Phoenix.Ecto.SQL.Sandbox.allow/2` there.
+Fluffy validates this configuration when its application starts. The same header and
+allowance value must be passed to the endpoint plug, and `Fluffy.Sandbox.connect_info/0`
+selects `:user_agent` or `:x_headers` for the socket. An application may instead retain
+its own LiveView/channel hook when additional ownership rules require application state;
+use the same encoded metadata and call `Phoenix.Ecto.SQL.Sandbox.allow/2` there.
 
 ## Upload limits
 
@@ -171,7 +170,7 @@ call `Phoenix.Ecto.SQL.Sandbox.allow/2` there.
 config :fluffy, file_input_max_bytes: 10_000_000
 ```
 
-`file_input_max_bytes` bounds the aggregate bytes Fluffy will snapshot for
-one `set_input_files/3,4` action. It applies to local paths and in-memory
-payloads on all three drivers and can be overridden with the action's
-`max_bytes:` option.
+`file_input_max_bytes` bounds the aggregate bytes Fluffy will snapshot for one
+`Fluffy.set_input_files/3` or `Fluffy.set_input_files/4` action. It applies to local
+paths and in-memory payloads on all three drivers and can be overridden with the
+action's `max_bytes:` option.

@@ -25,7 +25,7 @@ defmodule Fluffy.Backend do
 
   def close_session(%Session{} = session), do: Fluffy.SessionRuntime.close(session.runtime)
 
-  def new_page(session, name), do: dispatch(session, :new_page, [name])
+  def new_page(session), do: dispatch(session, :new_page, [])
   def history(session, direction, options), do: dispatch(session, :history, [direction, options])
 
   def visit(session, destination) do

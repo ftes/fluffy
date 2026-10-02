@@ -27,16 +27,19 @@ available metadata. Use ordinary assertions when failure details matter.
 
 ## Pipeline expectations
 
-`assert_event` and `Fluffy.Expect.expect_event` register before invoking the action,
-await a matching event, optionally inspect it, and return the input session:
+`Fluffy.Assert.assert_event/3` and `Fluffy.Expect.expect_event/3` register before
+invoking the action, await a matching event, optionally inspect it, and return the input
+session:
 
 ```elixir
 session
 |> assert_event(
-  Event.download(&(&1.suggested_filename == "report.csv")),
+  Event.download(),
   &click(&1, by_role(:button, name: "Download report")),
-  fn download -> assert Download.read!(download) =~ "customer_id,total" end,
-  timeout: 5_000
+  fn download ->
+    assert download.suggested_filename == "report.csv"
+    assert Download.read!(download) =~ "customer_id,total"
+  end
 )
 |> click(by_role(:button, name: "Continue"))
 ```
@@ -83,28 +86,42 @@ session
 |> switch_page(main)
 ```
 
-Inspect live page handles with `Page.url/1`, `Page.status/1`, and `Page.opener/1`.
-The opener is nil if absent or closed. `current_page/1` returns a stable handle
-that survives navigation; `pages/1` lists all open pages, including tabs discovered
-without an event registration.
-Page selection is local to each session handle: retain the result of
-`switch_page/2`; other session handles keep their own selection.
-Closed page handles are invalid; closing a page does not change any session
-handle's selection. Explicitly switch to an open
-page before continuing. Closing an opener leaves its child pages alive.
+Inspect live page handles with `Fluffy.Page.url/1`, `Fluffy.Page.status/1`, and
+`Fluffy.Page.opener/1`. The opener is nil if absent or closed. `Fluffy.current_page/1`
+returns a stable handle that survives navigation; `Fluffy.pages/1` lists all open pages,
+including tabs discovered without an event registration. Page selection is local to each
+session handle: retain the result of `Fluffy.switch_page/2`; other session handles keep
+their own selection. Closed page handles are invalid; closing a page does not change any
+session handle's selection. Explicitly switch to an open page before continuing. Closing
+an opener leaves its child pages alive.
 
-`new_page(session, :dashboard)` creates and selects a named blank page.
-`switch_page/2` accepts handles or names. Pages share cookies and storage; start
-another session for an independent user. Phoenix follows links and submits forms
-in the current page, ignoring `target` and `formtarget`; page creation and closing
-require Playwright.
+`new_page(session)` returns a new blank page handle without changing the session's
+selection. Pass that handle to `switch_page/2` or `close_page/2`:
+
+```elixir
+main = current_page(session)
+dashboard = new_page(session)
+
+session
+|> switch_page(dashboard)
+|> visit("/dashboard")
+|> close_page(dashboard)
+|> switch_page(main)
+```
+
+Pages share cookies and storage; start another session for an independent user.
+Pages are identified only by handles: `new_page/2`, `page_names/1`, `Page.name/1`,
+and atom names in switching, closing, and opener assertions have been removed.
+Retain `current_page(session)` to return to the initial page, and use `pages(session)`
+to list open handles. Phoenix follows links and submits forms in the current page,
+ignoring `target` and `formtarget`; page creation and closing require Playwright.
 
 Frame locators query iframe contents without switching pages. Browser-only
-`Event.frame_navigated()` observes navigation of any frame belonging to the page
-bound at registration, including frames created later. It returns a live frame
-handle: `Frame.url/1`, `Frame.page/1`, and `Frame.parent_frame/1` expose current
-metadata. The main frame has no parent. Navigation events signal frame navigation,
-not loading completion.
+`Event.frame_navigated()` observes navigation of any frame belonging to the page bound
+at registration, including frames created later. It returns a live frame handle:
+`Fluffy.Frame.url/1`, `Fluffy.Frame.page/1`, and `Fluffy.Frame.parent_frame/1` expose
+current metadata. The main frame has no parent. Navigation events signal frame
+navigation, not loading completion.
 
 For navigation outcomes on either backend, use ordinary page assertions:
 
@@ -115,9 +132,9 @@ session
 |> assert(page_status(200))
 ```
 
-`go_back/2` and `go_forward/2` require Playwright and accept `timeout:`. For
-reloading either backend, see [Reloading](usage.md#reloading).
-`close_session/1` releases session resources on either backend.
+`Fluffy.go_back/2` and `Fluffy.go_forward/2` require Playwright and accept `timeout:`.
+For reloading either backend, see [Reloading](usage.md#reloading).
+`Fluffy.close_session/1` releases session resources on either backend.
 
 ## Listeners and dialogs
 
@@ -208,10 +225,10 @@ does not operate the OS picker. Choosers require Playwright.
 
 ## Cookies, storage, and browser interactions
 
-`Fluffy.Playwright.add_cookies/2` and `clear_cookies/2` return the session.
-`cookies/2` returns cookie maps; its optional `urls:` list filters by URL.
-`clear_cookies/2` accepts string or regex filters for `name:`, `domain:`, and
-`path:`. These helpers operate on the entire browser context.
+`Fluffy.Playwright.add_cookies/2` and `Fluffy.Playwright.clear_cookies/2` return the
+session. `Fluffy.Playwright.cookies/2` returns cookie maps; its optional `urls:` list
+filters by URL. `Fluffy.Playwright.clear_cookies/2` accepts string or regex filters for
+`name:`, `domain:`, and `path:`. These helpers operate on the entire browser context.
 
 `Fluffy.Playwright.storage_state/2` returns a state map and optionally writes
 JSON with `path:`. Include IndexedDB with `indexed_db: true`. Reuse the result

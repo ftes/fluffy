@@ -3,7 +3,7 @@ defmodule Fluffy.ClientDOM.Expectation do
 
   alias Fluffy.ClientDOM
   alias Fluffy.Expect
-  alias Fluffy.HTML.Semantics
+  alias Fluffy.Locator.Static
 
   # Evaluate one DOM snapshot. Drivers own retries, negation, and diagnostics.
   def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :count, expected: expected}) do
@@ -12,7 +12,13 @@ defmodule Fluffy.ClientDOM.Expectation do
   end
 
   def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :visible}) do
-    actual = client_dom |> ClientDOM.resolve(locator) |> Enum.count(&structurally_visible?/1)
+    candidates = ClientDOM.resolve(client_dom, locator)
+
+    if length(candidates) > 1 do
+      raise ExUnit.AssertionError, message: Fluffy.Expectation.strictness_message(locator, candidates)
+    end
+
+    actual = Enum.count(candidates, &Static.structurally_visible?/1)
     {actual > 0, actual}
   end
 
@@ -49,16 +55,5 @@ defmodule Fluffy.ClientDOM.Expectation do
   def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :values, expected: expected}) do
     actual = ClientDOM.selected_values(client_dom, locator)
     {actual == expected, actual}
-  end
-
-  defp structurally_visible?(element) do
-    attributes =
-      case LazyHTML.attributes(element) do
-        [attributes] -> attributes
-        _other -> []
-      end
-
-    not Semantics.has_attribute?(attributes, "hidden") and
-      String.downcase(Semantics.attribute(attributes, "aria-hidden") || "false") != "true"
   end
 end
