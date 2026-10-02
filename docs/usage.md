@@ -301,6 +301,10 @@ different deadline.
 
 ### Actionability checks and waiting
 
+When a Playwright visit finds LiveView roots, it waits for every root, including
+nested views, to connect and finish joining. Application-specific loading may
+still need an assertion.
+
 Playwright already checks each action's prerequisites and waits automatically
 for the target to be ready. As elsewhere in Fluffy, Playwright is the model we
 follow, with the Phoenix-specific limits described below. Usually you can act

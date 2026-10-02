@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- Prevent false Playwright connection timeouts when a parent LiveView update removes a connected nested view's `phx-connected` class. Readiness checks use the bound LiveView's connection and join state when available.
+
 ## 0.6.0 — 2026-10-01
 
 ### Added
