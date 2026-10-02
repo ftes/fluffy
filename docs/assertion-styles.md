@@ -5,9 +5,6 @@ Fluffy’s native locator API offers two vocabularies for the same assertions. T
 Both construct the same expectation values and preserve driver behavior,
 retries, timeout options, diagnostics, and the returned session.
 
-For PhoenixTest-style helpers, use the [facade](migration-from-phoenix-test.md)
-instead of either native import setup below.
-
 ## ExUnit style
 
 Place `use Fluffy.Assert` after `use ExUnit.Case` or your application's case module. It
@@ -38,6 +35,16 @@ test "registers a creature" do
   assert {:ok, name} = {:ok, "Basilisk"}
   assert name == "Basilisk", "ordinary ExUnit assertions still work"
 end
+```
+
+For visibility checks, `assert_has(session, locator, options \\ [])` and
+`refute_has(session, locator, options \\ [])` are shorthand for
+`assert(session, visible(locator), options)` and its refutation:
+
+```elixir
+session
+|> assert_has(by_text("Creature registered"))
+|> refute_has(by_text("Saving…"), timeout: 1_000)
 ```
 
 See [Shared test case](usage.md#shared-test-case) to centralize these imports

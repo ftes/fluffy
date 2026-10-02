@@ -55,6 +55,22 @@ defmodule Fluffy.Assert do
   def refute(session, %Fluffy.Expect{} = expectation, options),
     do: Fluffy.Expect.expect(session, Fluffy.Expect.not_(expectation), options)
 
+  @doc """
+  Asserts that the locator resolves to a visible element and returns the session.
+
+  Equivalent to `assert(session, visible(locator), options)`.
+  For DOM presence regardless of visibility, use a `count` expectation.
+  """
+  def assert_has(session, %Fluffy.Locator{} = locator, options \\ []), do: assert(session, visible(locator), options)
+
+  @doc """
+  Asserts that the locator is absent or hidden and returns the session.
+
+  Equivalent to `refute(session, visible(locator), options)`.
+  Use `count(locator, 0)` to require DOM absence.
+  """
+  def refute_has(session, %Fluffy.Locator{} = locator, options \\ []), do: refute(session, visible(locator), options)
+
   @doc "Equivalent to `Fluffy.Expect.to_have_count/3`."
   defdelegate count(locator, expected, options \\ []), to: Fluffy.Expect, as: :to_have_count
 

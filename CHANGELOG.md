@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.3 — 2026-10-02
+
+### Added
+
+- `Fluffy.Assert.assert_has/2,3` and `refute_has/2,3` as shortcuts for visibility assertions.
+
 ## 0.6.2 — 2026-10-02
 
 ### Changed

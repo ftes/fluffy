@@ -24,6 +24,9 @@ defmodule Fluffy.Conformance.AssertAPITest do
       returned =
         session
         |> assert(expectation)
+        |> assert_has(by_css("#visible"))
+        |> refute_has(by_css("#hidden"))
+        |> refute_has(by_css("#absent"), timeout: 20)
         |> assert(checked(by_label("Subscribe")))
         |> refute(visible(by_css("#hidden")))
         |> refute(visible(by_css("#absent")))
@@ -32,6 +35,14 @@ defmodule Fluffy.Conformance.AssertAPITest do
         |> refute(page_title("Error"))
 
       assert returned == session
+
+      assert_raise ExUnit.AssertionError, fn ->
+        assert_has(session, by_css("#hidden"), timeout: 20)
+      end
+
+      assert_raise ExUnit.AssertionError, fn ->
+        refute_has(session, by_css("#visible"), timeout: 20)
+      end
 
       assert_raise ExUnit.AssertionError, fn ->
         refute(session, expectation, timeout: 20)
@@ -58,8 +69,8 @@ defmodule Fluffy.Conformance.AssertAPITest do
       unquote(driver)
       |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Fluffy.TestWeb.Endpoint)
       |> visit("/live/async?delay=40")
-      |> refute(visible(by_text("Status: waiting")), timeout: 1_000)
-      |> assert(visible(by_text("Status: ready")), timeout: 1_000)
+      |> refute_has(by_text("Status: waiting"), timeout: 1_000)
+      |> assert_has(by_text("Status: ready"), timeout: 1_000)
       |> assert(page_url(path: "/live/async"))
       |> click(by_role(:button, name: "Appeared"))
       |> assert(visible(by_text("Activated")))

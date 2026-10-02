@@ -59,6 +59,24 @@ sandbox checkout; the required endpoint and sandbox configuration lives in
 [Installation and runtime](installation.md#ecto-sandbox). If your shared case
 already calls `Fluffy.Test.setup/1`, do not call it again in individual modules.
 
+## Using native assertions alongside the facade
+
+The facade's `assert_has` and `refute_has` accept selectors and options such as
+`text:` and `count:`. The similarly named `Fluffy.Assert` helpers take native
+locators and are visibility shortcuts; native count assertions remain explicit
+with `assert(session, count(locator, n))`.
+
+If using `Fluffy.Assert` alongside the facade, exclude its overlapping names:
+
+```elixir
+use Fluffy.Assert
+import Fluffy.Assert, except: [assert_has: 2, assert_has: 3, refute_has: 2, refute_has: 3]
+import Fluffy.PhoenixTest
+```
+
+Native assertions take the contained native session (`session.session`), while
+facade assertions take the facade session.
+
 ## Phoenix and browser tests in the same module
 
 Piping a connection into `Fluffy.PhoenixTest.visit/2` always starts a Phoenix session.
