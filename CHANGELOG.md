@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.2 — 2026-10-02
+
+### Changed
+
+- Allow newer `playwright_ex` 0.x releases, keeping 0.13.0 as the minimum version.
+
+### Fixed
+
+- Prevent false Playwright connection timeouts when a parent LiveView update removes a connected nested view's `phx-connected` class. Readiness checks use the bound LiveView's connection and join state when available.
+
 ## 0.6.1 — 2026-10-02
 
 ### Added

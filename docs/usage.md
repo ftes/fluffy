@@ -302,9 +302,9 @@ actionability failures, as listed below. Waiting is enabled by default; pass
 `timeout:` to an action or expectation to change its deadline. Static checks
 are immediate. Playwright uses the browser's native waiting behavior.
 
-When a Playwright visit finds LiveView roots, it waits for every root to have
-`phx-connected` before returning. This confirms the LiveView connection, but
-application-specific loading may still need an assertion.
+When a Playwright visit finds LiveView roots, it waits for every root, including
+nested views, to connect and finish joining. Application-specific loading may
+still need an assertion.
 
 Playwright already checks each action's prerequisites and waits automatically
 for the target to be ready. As elsewhere in Fluffy, Playwright is the model we

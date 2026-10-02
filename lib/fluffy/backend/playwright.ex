@@ -362,7 +362,15 @@ defmodule Fluffy.Backend.Playwright do
         expression: """
         () => document.readyState !== 'loading' &&
             Array.from(document.querySelectorAll('[data-phx-main], [data-phx-session]'))
-          .every(element => element.classList.contains('phx-connected'))
+          .every(element => {
+            // Parent patches can remove a nested view's phx-connected class.
+            // Read the bound view without requiring a window.liveSocket global.
+            const view = element.phxPrivate?.view
+            if (typeof view?.isConnected === 'function' && typeof view?.isJoinPending === 'function') {
+              return view.isConnected() && !view.isJoinPending()
+            }
+            return element.classList.contains('phx-connected')
+          })
         """,
         is_function: true,
         timeout: Deadline.remaining(deadline, 1)
@@ -373,7 +381,7 @@ defmodule Fluffy.Backend.Playwright do
         :ok
 
       {:error, error} ->
-        raise "LiveView browser connection failed for #{navigation_target(state, destination)}: expected every LiveView root to be .phx-connected, got #{inspect(error)}"
+        raise "LiveView browser connection failed for #{navigation_target(state, destination)}: expected every LiveView root to be connected with its join complete, got #{inspect(error)}"
     end
   end
 
