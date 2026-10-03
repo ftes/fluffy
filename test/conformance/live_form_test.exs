@@ -162,6 +162,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
       |> start_test_session()
       |> visit("/live/potions")
       |> fill(draft, "client draft")
+      |> focus(draft)
       |> press(draft, "Enter")
       |> expect("#drafts > div:first-child input" |> by_css() |> to_have_value("B"))
       |> expect(to_have_value(draft, "client draft"))

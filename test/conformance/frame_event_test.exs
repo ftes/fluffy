@@ -2,6 +2,7 @@ defmodule Fluffy.Conformance.FrameEventTest do
   use Fluffy.TestCase, async: true
 
   import Fluffy
+  import Fluffy.Playwright
 
   alias Fluffy.Event
   alias Fluffy.Frame

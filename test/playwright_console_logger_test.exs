@@ -4,6 +4,7 @@ defmodule Fluffy.PlaywrightConsoleLoggerTest do
   import ExUnit.CaptureLog
   import Fluffy
   import Fluffy.Locator
+  import Fluffy.Playwright
 
   alias Fluffy.Event
   alias Fluffy.Playwright

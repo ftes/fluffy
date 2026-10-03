@@ -7,230 +7,228 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
 
   alias Fluffy.TestHTTPFixtures
 
-  for driver <- [:phoenix, :playwright] do
-    @tag driver: driver
-    test "Enter submits through the default submitter with #{driver}", %{driver: driver} do
-      fixture =
-        TestHTTPFixtures.register_sequence([
-          %{
-            body:
-              html("""
-              <form method="post" action="submit">
-                <label>Name <input name="name"></label>
-                <button name="commit" value="first">First</button>
-                <button name="commit" value="second">Second</button>
-              </form>
-              """)
-          },
-          %{status: 201, body: html("<h1>Submitted</h1>")}
-        ])
-
-      session = start_test_session(driver)
-
-      destination = TestHTTPFixtures.url(fixture, "/submit")
-
-      session =
-        session
-        |> visit(TestHTTPFixtures.path(fixture, "/start"))
-        |> fill(by_label("Name"), "Ada")
-        |> press(by_label("Name"), "Enter")
-        |> expect("Submitted" |> by_text() |> to_be_visible())
-        |> expect(Fluffy.Expect.page_to_have_status(201))
-
-      assert Fluffy.Session.current_page(session).url == destination
-
-      [_source, submission] = TestHTTPFixtures.requests(fixture)
-      assert submission.method == "POST"
-      assert submission.path == "/submit"
-      assert submission.body == "name=Ada&commit=first"
-    end
-
-    @tag driver: driver
-    test "Enter treats an invalid input type as the text state with #{driver}", %{driver: driver} do
-      fixture =
-        TestHTTPFixtures.register_sequence([
-          %{
-            body:
-              html("""
-              <form method="post" action="submit">
-                <label>Name <input type="invented" name="name" value="Ada"></label>
-              </form>
-              """)
-          },
-          %{body: html("<h1>Submitted invalid type</h1>")}
-        ])
-
-      driver
-      |> start_test_session()
-      |> visit(TestHTTPFixtures.path(fixture, "/start"))
-      |> press(by_label("Name"), "Enter")
-      |> expect("Submitted invalid type" |> by_text() |> to_be_visible())
-
-      [_source, submission] = TestHTTPFixtures.requests(fixture)
-      assert submission.body == "name=Ada"
-    end
-
-    @tag driver: driver
-    test "Enter takes the LiveView form's default submit path with #{driver}", %{driver: driver} do
-      session = start_test_session(driver)
-
-      session
-      |> visit("/live/potions")
-      |> fill(by_label("First"), "Ada")
-      |> press(by_label("First"), "Enter")
-      |> expect("Saved commit: save" |> by_text() |> to_be_visible())
-      |> expect("Last first: Ada" |> by_text() |> to_be_visible())
-    end
-
-    @tag driver: driver
-    test "Enter submits after a blur-debounced Live mutation with #{driver}", %{driver: driver} do
-      session = start_test_session(driver)
-
-      session
-      |> visit("/live/potions")
-      |> fill(by_label("Debounced", exact: true), "before Enter")
-      |> press(by_label("First"), "Enter")
-      |> expect("Last debounced: before Enter" |> by_text() |> to_be_visible())
-      |> expect("Event targets: profile/debounced" |> by_text() |> to_be_visible())
-      |> expect("Saved commit: save" |> by_text() |> to_be_visible())
-    end
-
-    @tag driver: driver
-    test "Enter submits one blocking control without a submitter with #{driver}", %{
-      driver: driver
-    } do
-      fixture =
-        TestHTTPFixtures.register_sequence([
-          %{
-            body:
-              html("""
-              <form method="post" action="submit">
-                <label>Name <input name="name"></label>
-              </form>
-              """)
-          },
-          %{body: html("<h1>Submitted</h1>")}
-        ])
-
-      session = start_test_session(driver)
-
-      session
-      |> visit(TestHTTPFixtures.path(fixture, "/start"))
-      |> fill(by_label("Name"), "Ada")
-      |> press(by_label("Name"), "Enter")
-      |> expect("Submitted" |> by_text() |> to_be_visible())
-
-      [_source, submission] = TestHTTPFixtures.requests(fixture)
-      assert submission.body == "name=Ada"
-    end
-
-    @tag driver: driver
-    test "a disabled default submitter suppresses Enter submission with #{driver}", %{
-      driver: driver
-    } do
-      fixture =
-        TestHTTPFixtures.register(%{
+  @tag driver: :playwright
+  test "Enter submits through the default submitter with Playwright", %{driver: driver} do
+    fixture =
+      TestHTTPFixtures.register_sequence([
+        %{
           body:
             html("""
             <form method="post" action="submit">
               <label>Name <input name="name"></label>
-              <button disabled>Disabled default</button>
-              <button>Later enabled submitter</button>
+              <button name="commit" value="first">First</button>
+              <button name="commit" value="second">Second</button>
             </form>
-            <p>Still here</p>
             """)
-        })
+        },
+        %{status: 201, body: html("<h1>Submitted</h1>")}
+      ])
 
-      session = start_test_session(driver)
+    session = start_test_session(driver)
 
-      session
-      |> visit(TestHTTPFixtures.path(fixture, "/start"))
-      |> press(by_label("Name"), "Enter")
-      |> expect("Still here" |> by_text() |> to_be_visible())
+    destination = TestHTTPFixtures.url(fixture, "/submit")
 
-      assert [_source] = TestHTTPFixtures.requests(fixture)
-    end
-
-    @tag driver: driver
-    test "an external submitter is the default when first in tree order with #{driver}", %{
-      driver: driver
-    } do
-      fixture =
-        TestHTTPFixtures.register_sequence([
-          %{
-            body:
-              html("""
-              <button form="search" name="commit" value="external">External</button>
-              <form id="search" method="post" action="submit">
-                <label>Name <input name="name"></label>
-                <button name="commit" value="inside">Inside</button>
-              </form>
-              """)
-          },
-          %{body: html("<h1>Submitted</h1>")}
-        ])
-
-      session = start_test_session(driver)
-
+    session =
       session
       |> visit(TestHTTPFixtures.path(fixture, "/start"))
       |> fill(by_label("Name"), "Ada")
       |> press(by_label("Name"), "Enter")
       |> expect("Submitted" |> by_text() |> to_be_visible())
+      |> expect(Fluffy.Expect.page_to_have_status(201))
 
-      [_source, submission] = TestHTTPFixtures.requests(fixture)
-      assert submission.body == "commit=external&name=Ada"
-    end
+    assert Fluffy.Session.current_page(session).url == destination
 
-    @tag driver: driver
-    test "Enter is inert with multiple blocking controls and no submitter with #{driver}", %{
-      driver: driver
-    } do
-      fixture =
-        TestHTTPFixtures.register(%{
+    [_source, submission] = TestHTTPFixtures.requests(fixture)
+    assert submission.method == "POST"
+    assert submission.path == "/submit"
+    assert submission.body == "name=Ada&commit=first"
+  end
+
+  @tag driver: :playwright
+  test "Enter treats an invalid input type as the text state with Playwright", %{driver: driver} do
+    fixture =
+      TestHTTPFixtures.register_sequence([
+        %{
           body:
             html("""
             <form method="post" action="submit">
-              <label>First <input name="first"></label>
-              <label>Second <input name="second"></label>
+              <label>Name <input type="invented" name="name" value="Ada"></label>
             </form>
-            <p>Still here</p>
             """)
-        })
+        },
+        %{body: html("<h1>Submitted invalid type</h1>")}
+      ])
 
-      session = start_test_session(driver)
+    driver
+    |> start_test_session()
+    |> visit(TestHTTPFixtures.path(fixture, "/start"))
+    |> press(by_label("Name"), "Enter")
+    |> expect("Submitted invalid type" |> by_text() |> to_be_visible())
 
-      session
-      |> visit(TestHTTPFixtures.path(fixture, "/start"))
-      |> press(by_label("First"), "Enter")
-      |> expect("Still here" |> by_text() |> to_be_visible())
+    [_source, submission] = TestHTTPFixtures.requests(fixture)
+    assert submission.body == "name=Ada"
+  end
 
-      assert [_source] = TestHTTPFixtures.requests(fixture)
-    end
+  @tag driver: :playwright
+  test "Enter takes the LiveView form's default submit path with Playwright", %{driver: driver} do
+    session = start_test_session(driver)
 
-    @tag driver: driver
-    test "Enter in a textarea is inert with #{driver}", %{driver: driver} do
-      fixture =
-        TestHTTPFixtures.register(%{
+    session
+    |> visit("/live/potions")
+    |> fill(by_label("First"), "Ada")
+    |> press(by_label("First"), "Enter")
+    |> expect("Saved commit: save" |> by_text() |> to_be_visible())
+    |> expect("Last first: Ada" |> by_text() |> to_be_visible())
+  end
+
+  @tag driver: :playwright
+  test "Enter submits after a blur-debounced Live mutation with Playwright", %{driver: driver} do
+    session = start_test_session(driver)
+
+    session
+    |> visit("/live/potions")
+    |> fill(by_label("Debounced", exact: true), "before Enter")
+    |> press(by_label("First"), "Enter")
+    |> expect("Last debounced: before Enter" |> by_text() |> to_be_visible())
+    |> expect("Event targets: profile/debounced" |> by_text() |> to_be_visible())
+    |> expect("Saved commit: save" |> by_text() |> to_be_visible())
+  end
+
+  @tag driver: :playwright
+  test "Enter submits one blocking control without a submitter with Playwright", %{
+    driver: driver
+  } do
+    fixture =
+      TestHTTPFixtures.register_sequence([
+        %{
           body:
             html("""
             <form method="post" action="submit">
-              <label>Notes <textarea name="notes"></textarea></label>
-              <button>Submit</button>
+              <label>Name <input name="name"></label>
             </form>
-            <p>Still here</p>
             """)
-        })
+        },
+        %{body: html("<h1>Submitted</h1>")}
+      ])
 
-      session = start_test_session(driver)
+    session = start_test_session(driver)
 
-      session
-      |> visit(TestHTTPFixtures.path(fixture, "/start"))
-      |> press(by_label("Notes"), "Enter")
-      |> expect("Still here" |> by_text() |> to_be_visible())
+    session
+    |> visit(TestHTTPFixtures.path(fixture, "/start"))
+    |> fill(by_label("Name"), "Ada")
+    |> press(by_label("Name"), "Enter")
+    |> expect("Submitted" |> by_text() |> to_be_visible())
 
-      assert [_source] = TestHTTPFixtures.requests(fixture)
-    end
+    [_source, submission] = TestHTTPFixtures.requests(fixture)
+    assert submission.body == "name=Ada"
+  end
+
+  @tag driver: :playwright
+  test "a disabled default submitter suppresses Enter submission with Playwright", %{
+    driver: driver
+  } do
+    fixture =
+      TestHTTPFixtures.register(%{
+        body:
+          html("""
+          <form method="post" action="submit">
+            <label>Name <input name="name"></label>
+            <button disabled>Disabled default</button>
+            <button>Later enabled submitter</button>
+          </form>
+          <p>Still here</p>
+          """)
+      })
+
+    session = start_test_session(driver)
+
+    session
+    |> visit(TestHTTPFixtures.path(fixture, "/start"))
+    |> press(by_label("Name"), "Enter")
+    |> expect("Still here" |> by_text() |> to_be_visible())
+
+    assert [_source] = TestHTTPFixtures.requests(fixture)
+  end
+
+  @tag driver: :playwright
+  test "an external submitter is the default when first in tree order with Playwright", %{
+    driver: driver
+  } do
+    fixture =
+      TestHTTPFixtures.register_sequence([
+        %{
+          body:
+            html("""
+            <button form="search" name="commit" value="external">External</button>
+            <form id="search" method="post" action="submit">
+              <label>Name <input name="name"></label>
+              <button name="commit" value="inside">Inside</button>
+            </form>
+            """)
+        },
+        %{body: html("<h1>Submitted</h1>")}
+      ])
+
+    session = start_test_session(driver)
+
+    session
+    |> visit(TestHTTPFixtures.path(fixture, "/start"))
+    |> fill(by_label("Name"), "Ada")
+    |> press(by_label("Name"), "Enter")
+    |> expect("Submitted" |> by_text() |> to_be_visible())
+
+    [_source, submission] = TestHTTPFixtures.requests(fixture)
+    assert submission.body == "commit=external&name=Ada"
+  end
+
+  @tag driver: :playwright
+  test "Enter is inert with multiple blocking controls and no submitter with Playwright", %{
+    driver: driver
+  } do
+    fixture =
+      TestHTTPFixtures.register(%{
+        body:
+          html("""
+          <form method="post" action="submit">
+            <label>First <input name="first"></label>
+            <label>Second <input name="second"></label>
+          </form>
+          <p>Still here</p>
+          """)
+      })
+
+    session = start_test_session(driver)
+
+    session
+    |> visit(TestHTTPFixtures.path(fixture, "/start"))
+    |> press(by_label("First"), "Enter")
+    |> expect("Still here" |> by_text() |> to_be_visible())
+
+    assert [_source] = TestHTTPFixtures.requests(fixture)
+  end
+
+  @tag driver: :playwright
+  test "Enter in a textarea is inert with Playwright", %{driver: driver} do
+    fixture =
+      TestHTTPFixtures.register(%{
+        body:
+          html("""
+          <form method="post" action="submit">
+            <label>Notes <textarea name="notes"></textarea></label>
+            <button>Submit</button>
+          </form>
+          <p>Still here</p>
+          """)
+      })
+
+    session = start_test_session(driver)
+
+    session
+    |> visit(TestHTTPFixtures.path(fixture, "/start"))
+    |> press(by_label("Notes"), "Enter")
+    |> expect("Still here" |> by_text() |> to_be_visible())
+
+    assert [_source] = TestHTTPFixtures.requests(fixture)
   end
 
   @tag driver: :playwright
@@ -377,38 +375,6 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
         |> expect("Result" |> by_label() |> to_have_value("waiting"))
       end
     )
-  end
-
-  test "Static names inline key handlers as an Enter default-action boundary" do
-    session =
-      session_for_html(
-        :static,
-        ~S|<form><label>Name <input aria-label="Name" onkeydown="event.preventDefault()"></label><button>Submit</button></form>|
-      )
-
-    error =
-      assert_raise Fluffy.CapabilityError, fn ->
-        press(session, by_label("Name"), "Enter")
-      end
-
-    assert error.driver == :static
-    assert error.capability == :keyboard_default_action
-  end
-
-  test "Static bypasses native constraint validation for implicit Enter" do
-    fixture =
-      TestHTTPFixtures.register_sequence([
-        %{
-          body: html(~s(<form action="submitted"><input aria-label="Name" required><button>Submit</button></form>))
-        },
-        %{body: html("<h1>Submitted</h1>")}
-      ])
-
-    :phoenix
-    |> start_test_session()
-    |> visit(TestHTTPFixtures.path(fixture, "/start"))
-    |> press(by_label("Name"), "Enter")
-    |> expect("Submitted" |> by_text() |> to_be_visible())
   end
 
   defp with_html(html, fun) do

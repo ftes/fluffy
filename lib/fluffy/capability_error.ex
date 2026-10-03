@@ -1,6 +1,6 @@
 defmodule Fluffy.CapabilityError do
   @moduledoc """
-  Raised when a driver cannot truthfully determine a requested browser fact.
+  Raised when a driver cannot support a requested action or assertion.
   """
 
   defexception [:capability, :driver, :detail, :message]
@@ -17,7 +17,7 @@ defmodule Fluffy.CapabilityError do
       detail: detail,
       message:
         "#{inspect(driver)} does not support #{inspect(capability)}: #{detail}. " <>
-          "Run this assertion with the Playwright driver."
+          "Use a Playwright session for this operation."
     }
   end
 end

@@ -154,26 +154,13 @@ defmodule Fluffy.Driver.Static do
   end
 
   @impl true
-  def press(%Session{} = session, %Locator{} = locator, key, options \\ []) do
-    Keyword.validate!(options, [:delay, :timeout])
-
-    case key do
-      key when key in ["Space", "Tab"] ->
-        update_client_dom(session, &ClientDOM.press(&1, locator, key))
-
-      "Enter" ->
-        state = Session.page_state(session)
-        client_dom = ClientDOM.focus(state.client_dom, locator)
-        session = Session.put_page_state(session, %{state | client_dom: client_dom})
-
-        case ClientDOM.implicit_submission(client_dom, locator) do
-          nil ->
-            session
-
-          submission ->
-            {:navigate, session, Navigation.submission(submission)}
-        end
-    end
+  @spec press(Session.t(), Locator.t(), String.t()) :: no_return()
+  @spec press(Session.t(), Locator.t(), String.t(), keyword()) :: no_return()
+  def press(%Session{} = _session, %Locator{} = _locator, _key, _options \\ []) do
+    raise Fluffy.CapabilityError,
+      capability: :press,
+      driver: :static,
+      detail: "Static pages do not support keyboard events"
   end
 
   @impl true

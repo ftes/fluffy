@@ -4,6 +4,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
+  import Fluffy.Playwright
   import Phoenix.ConnTest, only: [get: 2]
 
   alias Fluffy.Event

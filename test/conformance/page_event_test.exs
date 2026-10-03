@@ -4,6 +4,7 @@ defmodule Fluffy.Conformance.PageEventTest do
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
+  import Fluffy.Playwright
 
   alias Fluffy.Event
   alias Fluffy.Page
@@ -138,9 +139,18 @@ defmodule Fluffy.Conformance.PageEventTest do
         assert error.driver == unquote(driver)
       end
 
-      assert switch_page(session, current_page(session)) == session
-      error = assert_raise Fluffy.CapabilityError, fn -> close_page(session) end
-      assert error.capability == :pages
+      for operation <- [
+            fn -> current_page(session) end,
+            fn -> pages(session) end,
+            fn -> switch_page(session, Fluffy.Session.handle(session)) end,
+            fn -> close_page(session) end,
+            fn -> close_page(session, Fluffy.Session.handle(session)) end,
+            fn -> new_page(session) end
+          ] do
+        error = assert_raise Fluffy.CapabilityError, operation
+        assert error.capability == :pages
+        assert error.driver == unquote(driver)
+      end
     end
   end
 

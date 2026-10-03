@@ -4,6 +4,7 @@ defmodule Fluffy.Conformance.BrowserAPITest do
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
+  import Fluffy.Playwright
 
   alias Fluffy.Playwright
 

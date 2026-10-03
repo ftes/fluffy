@@ -24,30 +24,6 @@ defmodule Fluffy.Form do
   def submit(_index, _properties, _target, _driver), do: nil
 
   @doc false
-  def implicit_submission(index, properties, target, driver) do
-    with true <- implicit_submission_control?(target),
-         form when not is_nil(form) <- form_owner(index, target) do
-      ensure_implicit_keyboard_default_supported!(index, form, driver)
-
-      case default_submitter(index, form) do
-        nil ->
-          if blocking_control_count(index, form) == 1 do
-            submission(index, properties, form, empty_submitter(), driver)
-          end
-
-        submitter ->
-          if disabled_submitter?(index, submitter) do
-            nil
-          else
-            submission(index, properties, form, submitter, driver)
-          end
-      end
-    else
-      _not_an_implicit_submission -> nil
-    end
-  end
-
-  @doc false
   def change(index, properties, target) do
     build_change(index, properties, target, nil)
   end
@@ -225,46 +201,6 @@ defmodule Fluffy.Form do
     |> Enum.filter(&owned_by_form?(&1, form, owner_ids))
     |> Enum.flat_map(&control_fields(&1, index, properties, submitter, disabled_ids, driver))
   end
-
-  defp default_submitter(index, form) do
-    index
-    |> DocumentIndex.targets_by_tag(["button", "input"])
-    |> Enum.find(fn candidate ->
-      submitter?(candidate) and owned_target_by_form?(candidate, form, index)
-    end)
-  end
-
-  defp blocking_control_count(index, form) do
-    index
-    |> DocumentIndex.targets_by_tag("input")
-    |> Enum.count(fn candidate ->
-      implicit_submission_control?(candidate) and
-        owned_target_by_form?(candidate, form, index) and not disabled?(index, candidate.id)
-    end)
-  end
-
-  defp disabled_submitter?(index, submitter) do
-    has_attribute?(submitter.attributes, "disabled") or disabled?(index, submitter.id)
-  end
-
-  defp implicit_submission_control?(%{tag: "input"} = target) do
-    input_type(target) in [
-      "text",
-      "search",
-      "url",
-      "tel",
-      "email",
-      "password",
-      "date",
-      "month",
-      "week",
-      "time",
-      "datetime-local",
-      "number"
-    ]
-  end
-
-  defp implicit_submission_control?(_target), do: false
 
   defp control_fields(target, index, properties, submitter, disabled_ids, driver) do
     name = attribute(target.attributes, "name")
@@ -565,29 +501,6 @@ defmodule Fluffy.Form do
         capability: :form_associated_elements,
         driver: driver,
         detail: "object and form-associated custom element entry construction requires a browser"
-    end
-  end
-
-  defp ensure_implicit_keyboard_default_supported!(index, form, driver) do
-    keyboard_handlers = [
-      "onkeydown",
-      "onkeypress",
-      "onkeyup"
-    ]
-
-    has_keyboard_handler? =
-      index
-      |> DocumentIndex.all_targets()
-      |> Enum.any?(fn target ->
-        owned_target_by_form?(target, form, index) and
-          Enum.any?(keyboard_handlers, &has_attribute?(target.attributes, &1))
-      end)
-
-    if has_keyboard_handler? do
-      raise CapabilityError,
-        capability: :keyboard_default_action,
-        driver: driver,
-        detail: "implicit Enter submission with inline key handlers requires Playwright"
     end
   end
 

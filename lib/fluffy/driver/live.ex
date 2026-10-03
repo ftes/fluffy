@@ -8,13 +8,11 @@ defmodule Fluffy.Driver.Live do
   alias Fluffy.ClientDOM
   alias Fluffy.Driver.Live.ActionResolver
   alias Fluffy.Driver.Live.Click
-  alias Fluffy.Driver.Live.Keyboard
   alias Fluffy.Driver.Live.Retry
   alias Fluffy.Driver.Live.UploadState
   alias Fluffy.Expect
   alias Fluffy.Form
   alias Fluffy.HTML.DocumentIndex
-  alias Fluffy.HTML.Semantics
   alias Fluffy.Internal.Navigation
   alias Fluffy.LiveViewTest.UploadCompat
   alias Fluffy.Locator
@@ -306,125 +304,53 @@ defmodule Fluffy.Driver.Live do
 
   @impl true
   def press(%Session{} = session, %Locator{} = locator, key, options \\ []) do
-    options = Keyword.validate!(options, [:delay, :timeout])
-    resolve_options = Keyword.take(options, [:timeout])
+    options = Keyword.validate!(options, [:timeout])
 
-    case resolve_live_action(session, locator, resolve_options, fn client_dom ->
-           target = ClientDOM.target!(client_dom, locator)
-           {ClientDOM.focus(client_dom, locator), target}
-         end) do
-      {%Session{} = session, {client_dom, target}} ->
-        press_key(session, client_dom, target, locator, key)
+    case resolve_live_action(session, locator, options, &ClientDOM.target!(&1, locator)) do
+      {%Session{} = session, target} ->
+        phases = Enum.filter([:keydown, :keyup], &key_binding?(target, &1))
+        phases = if phases == [], do: [:keydown], else: phases
+
+        Enum.reduce_while(phases, session, fn phase, session ->
+          case dispatch_key(session, locator, key, phase, options) do
+            %Session{} = session -> {:cont, session}
+            navigation -> {:halt, navigation}
+          end
+        end)
 
       navigation ->
         navigation
     end
   end
 
-  defp press_key(session, client_dom, target, locator, key) do
-    state = Session.page_state(session)
-    session = Session.put_page_state(session, %{state | client_dom: client_dom})
-    submission = if key == "Enter", do: ClientDOM.implicit_submission(client_dom, locator, :live)
-
-    with %Session{} = session <-
-           dispatch_key_bindings(session, Keyboard.bindings(client_dom, target, :keydown, key)),
-         %Session{} = session <- commit_key_default(session, locator, key, submission),
-         %Session{} = session <- dispatch_keyup(session, target, key, submission) do
-      commit_space_default(session, locator, key)
-    end
+  defp key_binding?(target, phase) do
+    attribute(target.attributes, "phx-#{phase}") != nil or
+      attribute(target.attributes, "phx-window-#{phase}") != nil
   end
 
-  defp dispatch_keyup(session, _target, key, %{phx_submit?: true}) do
-    client_dom = client_dom(session)
-    dispatch_key_bindings(session, Keyboard.window_bindings(client_dom, :keyup, key))
-  end
+  defp dispatch_key(session, locator, key, phase, options) do
+    case resolve_live_action(session, locator, options, &ClientDOM.target!(&1, locator)) do
+      {%Session{} = session, target} ->
+        state = Session.page_state(session)
+        context = owning_view_context(state.view, target)
+        selector = selector_for_view(state.client_dom, target.selector, context)
 
-  defp dispatch_keyup(session, _target, key, _submission) do
-    client_dom = client_dom(session)
+        result =
+          try do
+            event_element = element(context.view, selector)
 
-    bindings =
-      case ClientDOM.focused_target(client_dom) do
-        nil -> Keyboard.window_bindings(client_dom, :keyup, key)
-        target -> Keyboard.bindings(client_dom, target, :keyup, key)
-      end
+            case phase do
+              :keydown -> render_keydown(event_element, %{"key" => key})
+              :keyup -> render_keyup(event_element, %{"key" => key})
+            end
+          catch
+            :exit, reason -> raise Fluffy.LiveViewError, reason: reason
+          end
 
-    dispatch_key_bindings(session, bindings)
-  end
+        commit_render_result(session, state.client_dom, result, context.view)
 
-  defp dispatch_key_bindings(session, bindings) do
-    Enum.reduce_while(bindings, session, fn binding, session ->
-      case dispatch_key_binding(session, binding) do
-        %Session{} = session -> {:cont, session}
-        navigation -> {:halt, navigation}
-      end
-    end)
-  end
-
-  defp dispatch_key_binding(session, %Keyboard{} = binding) do
-    state = Session.page_state(session)
-    event_context = owning_view_context(state.view, binding.target)
-    event_view = event_context.view
-
-    selector = selector_for_view(state.client_dom, binding.target.selector, event_context)
-
-    result =
-      try do
-        event_element = element(event_view, selector)
-
-        case binding.phase do
-          :keydown -> render_keydown(event_element, binding.payload)
-          :keyup -> render_keyup(event_element, binding.payload)
-        end
-      catch
-        :exit, reason -> raise Fluffy.LiveViewError, reason: reason
-      end
-
-    commit_render_result(session, state.client_dom, result, event_view)
-  end
-
-  defp commit_key_default(session, locator, "Tab", _submission) do
-    update_client_dom(session, &ClientDOM.press(&1, locator, "Tab"))
-  end
-
-  defp commit_key_default(session, _locator, "Enter", submission) do
-    commit_implicit_enter(session, submission)
-  end
-
-  defp commit_key_default(session, _locator, _key, _submission), do: session
-
-  defp commit_space_default(session, locator, "Space") do
-    state = Session.page_state(session)
-    {client_dom, target} = ClientDOM.click(state.client_dom, locator)
-
-    if Semantics.input_type(target) in ["checkbox", "radio"],
-      do: commit_checked(session, client_dom, target),
-      else: commit_click(session, client_dom, target)
-  end
-
-  defp commit_space_default(session, _locator, _key), do: session
-
-  defp commit_implicit_enter(session, nil), do: session
-
-  defp commit_implicit_enter(session, submission) do
-    state = Session.page_state(session)
-
-    form_target =
-      state.client_dom
-      |> ClientDOM.targets(Locator.new({:css, "form"}))
-      |> Enum.find(&(&1.id == submission.form_id))
-
-    event_context =
-      case form_target do
-        nil -> %{view: state.view, root_id: nil}
-        target -> owning_view_context(state.view, target)
-      end
-
-    case submission do
-      %{phx_submit?: true} ->
-        dispatch_live_submit(session, state.client_dom, submission, event_context)
-
-      %{phx_submit?: false} ->
-        {:navigate, session, Navigation.submission(submission)}
+      navigation ->
+        navigation
     end
   end
 

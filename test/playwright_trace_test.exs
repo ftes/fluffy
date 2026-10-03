@@ -4,6 +4,7 @@ defmodule Fluffy.PlaywrightTraceTest do
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
+  import Fluffy.Playwright
 
   alias Fluffy.Event
   alias Fluffy.FilePayload

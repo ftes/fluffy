@@ -158,18 +158,6 @@ defmodule Fluffy.ClientDOM do
     )
   end
 
-  @doc false
-  def implicit_submission(%__MODULE__{} = client_dom, %Locator{} = locator, driver \\ :static) do
-    target = target!(client_dom, locator)
-
-    Fluffy.Form.implicit_submission(
-      index(client_dom),
-      client_dom.properties,
-      target,
-      driver
-    )
-  end
-
   def triggered_submission(%__MODULE__{} = client_dom) do
     Fluffy.Form.triggered(index(client_dom), client_dom.properties)
   end
@@ -322,28 +310,6 @@ defmodule Fluffy.ClientDOM do
     if client_dom.focused == target.id, do: %{client_dom | focused: nil}, else: client_dom
   end
 
-  def press(%__MODULE__{} = client_dom, %Locator{} = locator, "Space") do
-    {client_dom, _target} = click(client_dom, locator)
-    client_dom
-  end
-
-  def press(%__MODULE__{} = client_dom, %Locator{} = locator, "Tab") do
-    target = target!(client_dom, locator)
-    client_dom = if focusable?(target), do: %{client_dom | focused: target.id}, else: client_dom
-    targets = tabbable_targets(client_dom)
-
-    case Enum.find_index(targets, &(&1.id == target.id)) do
-      nil ->
-        client_dom
-
-      index ->
-        case Enum.at(targets, index + 1) do
-          nil -> %{client_dom | focused: nil}
-          next -> %{client_dom | focused: next.id}
-        end
-    end
-  end
-
   def focused?(%__MODULE__{} = client_dom, %Locator{} = locator) do
     client_dom.focused == target!(client_dom, locator).id
   end
@@ -433,18 +399,6 @@ defmodule Fluffy.ClientDOM do
   end
 
   @doc false
-  def focused_target(%__MODULE__{focused: nil}), do: nil
-
-  def focused_target(%__MODULE__{} = client_dom) do
-    DocumentIndex.target_by_id(index(client_dom), client_dom.focused)
-  end
-
-  @doc false
-  def keyboard_payload(%__MODULE__{} = client_dom, %Target{} = target, key) do
-    maybe_put_keyboard_value(%{"key" => key}, client_dom, target)
-  end
-
-  @doc false
   def target_identity(%{tag: tag, attributes: attributes, selector: selector}) do
     cond do
       html_id = attribute(attributes, "id") -> {:html_id, tag, html_id}
@@ -465,35 +419,6 @@ defmodule Fluffy.ClientDOM do
     DocumentIndex.selector_for_id!(index(client_dom), node_id)
   end
 
-  defp maybe_put_keyboard_value(payload, client_dom, target)
-       when target.tag in ["button", "input", "option", "output", "select", "textarea"] do
-    type = input_type(target)
-
-    if type in ["checkbox", "radio"] and not checked_for_target?(client_dom, target) do
-      payload
-    else
-      Map.put(payload, "value", value_for_target(client_dom, target))
-    end
-  end
-
-  defp maybe_put_keyboard_value(payload, _client_dom, _target), do: payload
-
-  defp checked_for_target?(client_dom, target) do
-    client_dom.properties
-    |> Map.get(target.id, %{})
-    |> Map.get(:checked, has_attribute?(target.attributes, "checked"))
-  end
-
-  defp value_for_target(client_dom, %{tag: "select"} = target) do
-    client_dom |> selected_values_for_target(target) |> List.first() || ""
-  end
-
-  defp value_for_target(client_dom, target) do
-    client_dom.properties
-    |> Map.get(target.id, %{})
-    |> Map.get(:value, default_value(target))
-  end
-
   defp maybe_focus(client_dom, target) do
     if focusable?(target), do: %{client_dom | focused: target.id}, else: client_dom
   end
@@ -508,31 +433,6 @@ defmodule Fluffy.ClientDOM do
         has_attribute?(attributes, "tabindex")
 
     element_focusable? and not has_attribute?(attributes, "disabled")
-  end
-
-  defp tabbable_targets(client_dom) do
-    client_dom
-    |> index()
-    |> DocumentIndex.all_targets()
-    |> Enum.with_index()
-    |> Enum.flat_map(fn {target, document_index} ->
-      tab_index = tab_index(target.attributes)
-
-      if focusable?(target) and tab_index >= 0,
-        do: [{target, tab_index, document_index}],
-        else: []
-    end)
-    |> Enum.sort_by(fn {_target, tab_index, document_index} ->
-      if tab_index > 0, do: {0, tab_index, document_index}, else: {1, 0, document_index}
-    end)
-    |> Enum.map(&elem(&1, 0))
-  end
-
-  defp tab_index(attributes) do
-    case Integer.parse(attribute(attributes, "tabindex") || "0") do
-      {tab_index, ""} -> tab_index
-      _invalid -> 0
-    end
   end
 
   defp maybe_toggle_checked(client_dom, target) do

@@ -119,7 +119,7 @@ defmodule Fluffy.Capability do
         playwright: :equivalent
       },
       detail:
-        "For Enter, Space, and Tab, LiveView reproduces paired direct/window phx-keydown and phx-keyup dispatch, phx-key filtering, payload values, targeting, focus movement, and structural default-action order. Client-side JS commands, LiveSocket metadata callbacks, modifiers, repeat, and browser timing require Playwright."
+        "LiveView forwards arbitrary keys unchanged through LiveViewTest keydown/keyup handlers on the selected element. No browser default actions, phx-key filtering, key translation, or synthesized field values are simulated. Static does not support press."
     },
     %{
       id: :supported_form_model,
@@ -130,14 +130,10 @@ defmodule Fluffy.Capability do
     },
     %{
       id: :implicit_enter_submission,
-      feature: "Structural Enter implicit form submission",
-      drivers: %{
-        static: :structural_subset,
-        live: :structural_subset,
-        playwright: :equivalent
-      },
+      feature: "Enter implicit form submission",
+      drivers: %{static: :browser_only, live: :browser_only, playwright: :equivalent},
       detail:
-        "Static and LiveView reproduce the paired text-control/default-submitter subset, including disabled and external defaults. LiveView composes supported declarative key handlers through the separate keyboard-event contract. Both bypass native validation; validation events/blocking and inline key-handler timing remain browser-only."
+        "Only Playwright performs implicit Enter submission. Use submit or click a submitter for explicit form submission with Phoenix."
     },
     %{
       id: :native_constraint_validation,

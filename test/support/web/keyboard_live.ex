@@ -161,7 +161,8 @@ defmodule Fluffy.TestWeb.KeyboardLive do
         phx-keyup="space-keyup"
         phx-value-scope="space"
       >Space key target</button>
-      <label>Space checkbox <input id="space-checkbox" type="checkbox" /></label>
+      <label>Space checkbox
+      <input id="space-checkbox" type="checkbox" phx-keydown="space-keydown" phx-keyup="space-keyup" /></label>
 
       <label>
         Payload key

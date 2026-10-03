@@ -4,6 +4,7 @@ defmodule Fluffy.Conformance.SessionRuntimeTest do
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
+  import Fluffy.Playwright
 
   alias Fluffy.Backend
   alias Fluffy.Page
@@ -42,15 +43,15 @@ defmodule Fluffy.Conformance.SessionRuntimeTest do
     @tag driver: driver
     test "existing handles see navigation and actions with #{driver}" do
       session = start_session(unquote(driver))
-      page = current_page(session)
+      page = Session.handle(session)
       visit(session, "/live/three-heads")
       click(session, by_role(:button, name: "Play the flute"))
       expect(session, "Sleeping heads: 1" |> by_text() |> to_be_visible())
-      assert current_page(session) == page
+      assert Session.handle(session) == page
       assert Page.url(page) =~ "/live/three-heads"
 
       visit(session, "/chamber")
-      assert current_page(session) == page
+      assert Session.handle(session) == page
       assert Page.url(page) =~ "/chamber"
       assert Page.status(page) == 200
       expect(session, "The guardian sleeps" |> by_text() |> to_be_visible())
@@ -61,7 +62,7 @@ defmodule Fluffy.Conformance.SessionRuntimeTest do
       first = unquote(driver) |> start_session() |> visit("/live/three-heads")
       second = unquote(driver) |> start_session() |> visit("/live/three-heads")
       Backend.close_session(first)
-      assert_raise ArgumentError, ~r/session is closed/, fn -> current_page(first) end
+      assert_raise ArgumentError, ~r/session is closed/, fn -> Session.current_driver(first) end
       click(second, by_role(:button, name: "Play the flute"))
       expect(second, "Sleeping heads: 1" |> by_text() |> to_be_visible())
     end

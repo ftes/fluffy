@@ -87,18 +87,23 @@ session
 ```
 
 Inspect live page handles with `Fluffy.Page.url/1`, `Fluffy.Page.status/1`, and
-`Fluffy.Page.opener/1`. The opener is nil if absent or closed. `Fluffy.current_page/1`
-returns a stable handle that survives navigation; `Fluffy.pages/1` lists all open pages,
+`Fluffy.Page.opener/1`. The opener is nil if absent or closed. `Fluffy.Playwright.current_page/1`
+returns a stable handle that survives navigation; `Fluffy.Playwright.pages/1` lists all open pages,
 including tabs discovered without an event registration. Page selection is local to each
-session handle: retain the result of `Fluffy.switch_page/2`; other session handles keep
+session handle: retain the result of `Fluffy.Playwright.switch_page/2`; other session handles keep
 their own selection. Closed page handles are invalid; closing a page does not change any
 session handle's selection. Explicitly switch to an open page before continuing. Closing
 an opener leaves its child pages alive.
 
-`new_page(session)` returns a new blank page handle without changing the session's
-selection. Pass that handle to `switch_page/2` or `close_page/2`:
+`Fluffy.Playwright.new_page(session)` returns a new blank page handle without changing the session's
+selection. Pass that handle to `Fluffy.Playwright.switch_page/2` or `Fluffy.Playwright.close_page/2`:
+
+Import `Fluffy.Playwright` alongside `Fluffy` to use browser-only helpers
+without module qualifiers.
 
 ```elixir
+import Fluffy.Playwright
+
 main = current_page(session)
 dashboard = new_page(session)
 
@@ -132,7 +137,7 @@ session
 |> assert(page_status(200))
 ```
 
-`Fluffy.go_back/2` and `Fluffy.go_forward/2` require Playwright and accept `timeout:`.
+`Fluffy.Playwright.go_back/2` and `Fluffy.Playwright.go_forward/2` require Playwright and accept `timeout:`.
 For reloading either backend, see [Reloading](usage.md#reloading).
 `Fluffy.close_session/1` releases session resources on either backend.
 
@@ -234,9 +239,9 @@ filters by URL. `Fluffy.Playwright.clear_cookies/2` accepts string or regex filt
 JSON with `path:`. Include IndexedDB with `indexed_db: true`. Reuse the result
 with `start_session(:playwright, browser_context: [storage_state: state])`.
 
-For browser interaction, use `hover(session, locator)`,
-`drag_to(session, source, target)`, or
-`press_sequentially(session, locator, text, delay: 20)`. All accept `timeout:`.
+For browser interaction, use `Fluffy.Playwright.hover(session, locator)`,
+`Fluffy.Playwright.drag_to(session, source, target)`, or
+`Fluffy.Playwright.press_sequentially(session, locator, text, delay: 20)`. All accept `timeout:`.
 Sequential typing emits keyboard events for each character and appends at the
 current caret position. Drag source and target must belong to the same frame.
 These actions require Playwright and reconcile navigation caused by the action.

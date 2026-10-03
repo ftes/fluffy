@@ -25,7 +25,7 @@ boundaries described below.
 | LiveView form-change delivery and timing | structural subset | equivalent |
 | Declarative LiveView keyboard events | structural subset | equivalent |
 | Supported mutable form state and ordered submission | equivalent | equivalent |
-| Structural Enter implicit form submission | structural subset | equivalent |
+| Enter implicit form submission | - | equivalent |
 | Native constraint validation | - | equivalent |
 | Specialized scalar input values | structural subset | equivalent |
 | Computed style, layout, and browser accessibility tree | - | equivalent |
@@ -63,11 +63,18 @@ ignores `phx-debounce`/`phx-throttle` scheduling, including `phx-debounce="blur"
 Keeping focus does not suppress these eager changes. Use Playwright for delay,
 blur-only delivery, coalescing, cancellation, and throttle suppression.
 
-For Enter, Space, and Tab, LiveView dispatches the supported direct and window
-`phx-keydown`/`phx-keyup` bindings, filters `phx-key`, preserves `phx-target`,
-and orders events around the structural default action. Application-defined
-LiveSocket metadata, modifiers and chords, repeats, browser timing, inline
-listeners, and client-side `JS` commands remain Playwright-only.
+`Fluffy.press/4` has a driver-specific contract:
+
+- **Static:** unsupported; raises `Fluffy.CapabilityError` for every key.
+- **LiveView:** passes the supplied key unchanged to LiveViewTest keydown/keyup
+  handlers bound to the selected element. This includes window bindings on that
+  element, without discovering handlers elsewhere in the document. LiveViewTest
+  supplies event values and targeting. Fluffy does not apply `phx-key` filters,
+  translate keys or modifier combinations, synthesize field values, or simulate
+  focus movement, editing, activation, or implicit submission. An element with
+  no keyboard binding raises. Callers supply the intended key value.
+- **Playwright:** native browser key presses, including default actions and
+  Playwright modifier syntax.
 
 ### LiveView document and patch boundaries
 
@@ -79,7 +86,10 @@ the View.
 ### Tabs, windows, and iframes
 
 The Playwright backend exposes page handles for browser tabs and popup windows.
-`new_page/1` returns a handle; `switch_page/2` selects it for subsequent actions.
+All public page-management helpers live in `Fluffy.Playwright` and reject Phoenix
+sessions. Phoenix retains one current document internally; use shared page URL,
+title, and status assertions to inspect it.
+`Fluffy.Playwright.new_page/1` returns a handle; `Fluffy.Playwright.switch_page/2` selects it for subsequent actions.
 Use [frame locators](usage.md#frames-playwright) to query iframe contents with
 Playwright. Page switching does not select an iframe, and frame locators do not
 change the active page.

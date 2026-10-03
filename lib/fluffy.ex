@@ -30,8 +30,6 @@ defmodule Fluffy do
   alias Fluffy.SelectedFile
   alias Fluffy.Session
 
-  @shared_press_keys ["Enter", "Space", "Tab"]
-
   @doc group: "Lifecycle and navigation"
   @doc """
   Starts an isolated `:phoenix` or `:playwright` session.
@@ -58,81 +56,6 @@ defmodule Fluffy do
   @doc group: "Lifecycle and navigation"
   @doc "Closes a session and its resources. Returns `:ok` or `{:error, reason}`."
   def close_session(%Session{} = session), do: Backend.close_session(session)
-
-  @doc group: "Lifecycle and navigation"
-  @doc playwright_only: true
-  @doc """
-  Creates a blank page in the session's browser context and returns its handle.
-
-  The session keeps its current page selection. Use `switch_page/2` to select
-  the new page. Pages share the context's cookies and storage.
-
-      main = current_page(session)
-      other = new_page(session)
-
-      session
-      |> switch_page(other)
-      |> visit("/dashboard")
-      |> switch_page(main)
-  """
-  @spec new_page(Session.t()) :: Fluffy.Page.t()
-  def new_page(%Session{} = session), do: Backend.new_page(session)
-
-  @doc group: "Lifecycle and navigation"
-  @doc playwright_only: true
-  @doc "Navigates backward in browser history. Does nothing if there is no entry."
-  def go_back(%Session{} = session, options \\ []) do
-    Backend.history(session, :go_back, Fluffy.Options.validate_action!(options))
-  end
-
-  @doc group: "Lifecycle and navigation"
-  @doc playwright_only: true
-  @doc "Navigates forward in browser history. Does nothing if there is no entry."
-  def go_forward(%Session{} = session, options \\ []) do
-    Backend.history(session, :go_forward, Fluffy.Options.validate_action!(options))
-  end
-
-  @doc group: "Actions"
-  @doc playwright_only: true
-  @doc "Hovers over a locator. Requires Playwright."
-  def hover(%Session{} = session, locator, options \\ []) do
-    require_playwright!(session, :hover)
-    options = Fluffy.Options.validate_action!(options)
-    dispatch_driver(session, :hover, [locator, options])
-  end
-
-  @doc group: "Actions"
-  @doc playwright_only: true
-  @doc "Drags the source locator onto the target locator in the same frame. Requires Playwright."
-  def drag_to(%Session{} = session, source, target, options \\ []) do
-    require_playwright!(session, :drag_to)
-    options = Fluffy.Options.validate_action!(options)
-    dispatch_driver(session, :drag_to, [source, target, options])
-  end
-
-  @doc group: "Actions"
-  @doc playwright_only: true
-  @doc "Types text character by character, emitting keyboard events. Accepts `:delay` in milliseconds. Requires Playwright."
-  def press_sequentially(%Session{} = session, locator, text, options \\ []) do
-    require_playwright!(session, :press_sequentially)
-    options = validate_typing!(options)
-    dispatch_driver(session, :press_sequentially, [locator, text, options])
-  end
-
-  defp validate_typing!(options) do
-    {delay, options} = Keyword.pop(options, :delay, 0)
-    if !(is_integer(delay) and delay >= 0), do: raise(ArgumentError, "delay must be a non-negative integer")
-    Keyword.put(Fluffy.Options.validate_action!(options), :delay, delay)
-  end
-
-  defp require_playwright!(session, capability) do
-    if Session.backend(session) != Fluffy.Backend.Playwright do
-      raise Fluffy.CapabilityError,
-        capability: capability,
-        driver: Session.current_driver(session),
-        detail: "This operation requires Playwright"
-    end
-  end
 
   @doc group: "Diagnostics and native access"
   @doc """
@@ -280,36 +203,6 @@ defmodule Fluffy do
   @doc group: "Events"
   @doc "Removes the most recently registered listener matching this source, event type, and handler."
   def off(%Session{} = session, %Event{} = event, handler, options \\ []), do: Event.off(session, event, handler, options)
-
-  @doc group: "Lifecycle and navigation"
-  @doc "Returns a live handle to the selected page."
-  @spec current_page(Session.t()) :: Fluffy.Page.t()
-  def current_page(%Session{} = session) do
-    Session.current_driver(session)
-    Session.handle(session)
-  end
-
-  @doc group: "Lifecycle and navigation"
-  @doc "Selects a page handle for this pipeline, without changing other session handles."
-  @spec switch_page(Session.t(), Fluffy.Page.t()) :: Session.t()
-  def switch_page(%Session{} = session, %Fluffy.Page{} = page), do: Session.activate_page(session, page)
-
-  @doc group: "Lifecycle and navigation"
-  @doc "Closes a page. Handles selecting it must explicitly switch to another page before continuing."
-  @spec close_page(Session.t()) :: Session.t()
-  def close_page(%Session{} = session), do: close_page(session, Session.handle(session))
-
-  @doc group: "Lifecycle and navigation"
-  @doc "Closes the given page handle, preserving the session's current-page selection."
-  @spec close_page(Session.t(), Fluffy.Page.t()) :: Session.t()
-  def close_page(%Session{} = session, %Fluffy.Page{} = page), do: Backend.close_page(session, page)
-
-  @doc group: "Lifecycle and navigation"
-  @doc "Returns live handles for all open pages, including browser pages discovered without an event wait."
-  @spec pages(Session.t()) :: [Fluffy.Page.t()]
-  def pages(%Session{} = session) do
-    Enum.map(Session.pages(session), fn {id, _page} -> Fluffy.Page.new(session.runtime, id) end)
-  end
 
   @doc false
   def __expect__(session, expectation), do: dispatch_driver(session, :expect, [expectation])
@@ -480,26 +373,26 @@ defmodule Fluffy do
 
   @doc group: "Actions"
   @doc """
-  Presses `Enter`, `Space`, or `Tab` on one strict target.
+  Presses a key on one strict target. Behavior depends on the current driver.
 
-  On a LiveView page, direct or window `phx-keydown`/`phx-keyup` bindings and
-  `phx-key` filters are dispatched with their browser-shaped key and current
-  value payload before and around the supported structural default action.
-  Plain event names and push-only `Phoenix.LiveView.JS` bindings are portable;
-  client-side JS commands, custom LiveSocket metadata, modifiers, key repeat,
-  and timing assertions require Playwright.
+  Playwright performs a native key press, including browser default actions,
+  and accepts Playwright key names, characters, and modifier combinations.
 
-  `press(locator, "Enter")` means the browser's implicit Enter behavior. Use
-  `submit/2` when the intent is simply to submit a form.
+  LiveView forwards `%{"key" => key}` unchanged to LiveViewTest's
+  `render_keydown/2` and `render_keyup/2` for bindings on the selected element.
+  Either or both phases may be bound, including `phx-window-keydown` and
+  `phx-window-keyup` on that element. An element with no keyboard binding raises.
+  LiveViewTest handles event values and targeting. Fluffy does not filter
+  `phx-key`, translate key names, parse modifier combinations, synthesize input
+  values, change focus, edit text, activate controls, or submit forms.
+  The caller is responsible for supplying the intended key value.
+
+  Static pages do not support `press` and raise `Fluffy.CapabilityError`.
+  Use `submit/2` to submit a form explicitly on any driver.
   """
   @spec press(Session.t(), Fluffy.Locator.t(), String.t(), [action_option()]) :: Session.t()
   def press(%Session{} = session, locator, key, options \\ []) when is_binary(key) do
     options = Fluffy.Options.validate_action!(options)
-
-    if key not in @shared_press_keys do
-      raise ArgumentError,
-            "unsupported key #{inspect(key)}; the shared press subset is Enter, Space, and Tab"
-    end
 
     dispatch_driver(session, :press, [locator, key, options])
   end
@@ -508,6 +401,9 @@ defmodule Fluffy do
     options = Fluffy.Options.validate_action!(options)
     dispatch_driver(session, :set_checked, [locator, desired, options])
   end
+
+  @doc false
+  def __dispatch_driver__(session, operation, arguments), do: dispatch_driver(session, operation, arguments)
 
   defp dispatch_driver(%Session{} = session, operation, arguments) do
     driver = DriverRegistry.module(Session.current_driver(session))

@@ -4,6 +4,7 @@ defmodule Fluffy.Conformance.PageCleanupTest do
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
+  import Fluffy.Playwright
 
   alias Fluffy.Backend
   alias Fluffy.Event
@@ -45,8 +46,8 @@ defmodule Fluffy.Conformance.PageCleanupTest do
     session = start_session(:playwright)
     main = current_page(session)
 
-    assert_raise FunctionClauseError, fn -> apply(Fluffy, :switch_page, [session, :main]) end
-    assert_raise FunctionClauseError, fn -> apply(Fluffy, :close_page, [session, :main]) end
+    assert_raise FunctionClauseError, fn -> apply(Fluffy.Playwright, :switch_page, [session, :main]) end
+    assert_raise FunctionClauseError, fn -> apply(Fluffy.Playwright, :close_page, [session, :main]) end
     assert_raise FunctionClauseError, fn -> apply(Fluffy.Expect, :page_to_have_opener, [:main]) end
 
     assert current_page(session) == main

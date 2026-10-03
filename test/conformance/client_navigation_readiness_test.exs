@@ -4,6 +4,7 @@ defmodule Fluffy.Conformance.ClientNavigationReadinessTest do
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
+  import Fluffy.Playwright
 
   alias Fluffy.Expect
   alias Fluffy.TestWeb.Endpoint

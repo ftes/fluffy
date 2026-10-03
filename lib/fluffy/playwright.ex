@@ -7,6 +7,7 @@ defmodule Fluffy.Playwright do
   implemented by the Static or LiveView drivers.
   """
 
+  alias Fluffy.Backend
   alias Fluffy.Backend.Playwright, as: PlaywrightBackend
   alias Fluffy.CapabilityError
   alias Fluffy.Playwright.Screenshot
@@ -67,6 +68,121 @@ defmodule Fluffy.Playwright do
                      )
 
   @type screenshot_option :: unquote(NimbleOptions.option_typespec(@screenshot_schema))
+
+  @doc group: "Lifecycle and navigation"
+  @doc playwright_only: true
+  @doc "Returns a live handle to the selected page."
+  @spec current_page(Session.t()) :: Fluffy.Page.t()
+  def current_page(%Session{} = session) do
+    ensure_playwright_backend!(session, :pages)
+    Session.current_driver(session)
+    Session.handle(session)
+  end
+
+  @doc group: "Lifecycle and navigation"
+  @doc playwright_only: true
+  @doc "Selects a page handle for this pipeline, without changing other session handles."
+  @spec switch_page(Session.t(), Fluffy.Page.t()) :: Session.t()
+  def switch_page(%Session{} = session, %Fluffy.Page{} = page) do
+    ensure_playwright_backend!(session, :pages)
+    Session.activate_page(session, page)
+  end
+
+  @doc group: "Lifecycle and navigation"
+  @doc playwright_only: true
+  @doc "Closes a page. Handles selecting it must explicitly switch to another page before continuing."
+  @spec close_page(Session.t()) :: Session.t()
+  def close_page(%Session{} = session) do
+    ensure_playwright_backend!(session, :pages)
+    close_page(session, Session.handle(session))
+  end
+
+  @doc group: "Lifecycle and navigation"
+  @doc playwright_only: true
+  @doc "Closes the given page handle, preserving the session's current-page selection."
+  @spec close_page(Session.t(), Fluffy.Page.t()) :: Session.t()
+  def close_page(%Session{} = session, %Fluffy.Page{} = page) do
+    ensure_playwright_backend!(session, :pages)
+    Backend.close_page(session, page)
+  end
+
+  @doc group: "Lifecycle and navigation"
+  @doc playwright_only: true
+  @doc "Returns live handles for all open pages, including browser pages discovered without an event wait."
+  @spec pages(Session.t()) :: [Fluffy.Page.t()]
+  def pages(%Session{} = session) do
+    ensure_playwright_backend!(session, :pages)
+    Enum.map(Session.pages(session), fn {id, _page} -> Fluffy.Page.new(session.runtime, id) end)
+  end
+
+  @doc group: "Lifecycle and navigation"
+  @doc playwright_only: true
+  @doc """
+  Creates a blank page in the session's browser context and returns its handle.
+
+  The session keeps its current page selection. Use `switch_page/2` to select
+  the new page. Pages share the context's cookies and storage.
+
+      import Fluffy
+      import Fluffy.Playwright
+
+      main = current_page(session)
+      other = Fluffy.Playwright.new_page(session)
+
+      session
+      |> switch_page(other)
+      |> visit("/dashboard")
+      |> switch_page(main)
+  """
+  @spec new_page(Session.t()) :: Fluffy.Page.t()
+  def new_page(%Session{} = session), do: Backend.new_page(session)
+
+  @doc group: "Lifecycle and navigation"
+  @doc playwright_only: true
+  @doc "Navigates backward in browser history. Does nothing if there is no entry."
+  def go_back(%Session{} = session, options \\ []) do
+    Backend.history(session, :go_back, Fluffy.Options.validate_action!(options))
+  end
+
+  @doc group: "Lifecycle and navigation"
+  @doc playwright_only: true
+  @doc "Navigates forward in browser history. Does nothing if there is no entry."
+  def go_forward(%Session{} = session, options \\ []) do
+    Backend.history(session, :go_forward, Fluffy.Options.validate_action!(options))
+  end
+
+  @doc group: "Actions"
+  @doc playwright_only: true
+  @doc "Hovers over a locator. Requires Playwright."
+  def hover(%Session{} = session, locator, options \\ []) do
+    ensure_playwright_backend!(session, :hover)
+    options = Fluffy.Options.validate_action!(options)
+    Fluffy.__dispatch_driver__(session, :hover, [locator, options])
+  end
+
+  @doc group: "Actions"
+  @doc playwright_only: true
+  @doc "Drags the source locator onto the target locator in the same frame. Requires Playwright."
+  def drag_to(%Session{} = session, source, target, options \\ []) do
+    ensure_playwright_backend!(session, :drag_to)
+    options = Fluffy.Options.validate_action!(options)
+    Fluffy.__dispatch_driver__(session, :drag_to, [source, target, options])
+  end
+
+  @doc group: "Actions"
+  @doc playwright_only: true
+  @doc "Types text character by character, emitting keyboard events. Accepts `:delay` in milliseconds. Requires Playwright."
+  def press_sequentially(%Session{} = session, locator, text, options \\ []) do
+    ensure_playwright_backend!(session, :press_sequentially)
+    options = validate_typing!(options)
+    Fluffy.__dispatch_driver__(session, :press_sequentially, [locator, text, options])
+  end
+
+  defp validate_typing!(options) do
+    {delay, options} = Keyword.pop(options, :delay, 0)
+    if !(is_integer(delay) and delay >= 0), do: raise(ArgumentError, "delay must be a non-negative integer")
+    Keyword.put(Fluffy.Options.validate_action!(options), :delay, delay)
+  end
 
   @doc playwright_only: true
   @doc """
@@ -134,6 +250,7 @@ defmodule Fluffy.Playwright do
   the value and then should continue with the session:
 
       import Fluffy
+      import Fluffy.Playwright
       import Fluffy.Locator
       alias Fluffy.Playwright
 

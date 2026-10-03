@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Move `current_page`, `pages`, `switch_page`, `close_page`, `new_page`, `go_back`, `go_forward`, `hover`, `drag_to`, and `press_sequentially` from `Fluffy` to `Fluffy.Playwright`. Update qualified calls or imports to the new module. All page-management helpers now reject Phoenix sessions.
+- Simplify `press`: Static always raises `Fluffy.CapabilityError`; LiveView passes arbitrary keys unchanged through LiveViewTest keyboard handlers, without browser default actions or key filtering; Playwright retains native keyboard behavior. Remove simulated focus traversal, Space activation, and implicit Enter submission from Phoenix.
+
 ## 0.6.3 — 2026-10-02
 
 ### Added

@@ -33,6 +33,21 @@ defmodule MyAppWeb.CreatureTest do
 end
 ```
 
+For tests using browser-only helpers, also `import Fluffy.Playwright`. This
+lets you call `new_page`, `current_page`, `pages`, `switch_page`, `close_page`,
+`go_back`, `go_forward`, `hover`, `drag_to`, and
+`press_sequentially` without module qualifiers:
+
+```elixir
+import Fluffy
+import Fluffy.Locator
+import Fluffy.Playwright
+
+start_session(:playwright)
+|> visit("/creatures/fluffy")
+|> press_sequentially(by_label("Keeper"), "Hagrid", delay: 20)
+```
+
 Actions and assertions return a `Fluffy.Session` handle for pipelines. Evolving
 state belongs to the session runtime: existing handles see action results even
 when the returned handle is discarded. Use each session sequentially from its
@@ -194,8 +209,8 @@ patch reconciliation. It can preserve checkbox input when the rendered
 Playwright retains the user's focused selection. The selectors read each
 backend's current state consistently. Use Playwright when the test depends on
 LiveView's protection of focused fields during server updates, including
-`phx-patch-focused`. The in-process backend still supports `focus`, `blur`,
-keyboard navigation, and focus assertions.
+`phx-patch-focused`. The in-process backend still supports explicit `focus`, `blur`, and focus
+assertions. Keyboard-driven focus movement requires Playwright.
 
 `fill` leaves its field focused, matching Playwright; use `blur` when the test
 needs to leave it. See [LiveView timing and keyboard events](capabilities.md#liveview-timing-and-keyboard-events)
@@ -354,8 +369,7 @@ imported from `Fluffy.Expect`.
 
 Use `submit(form_locator)` when the intent is native form submission without a
 specific submitter. Click the intended submit button when its `name=value` or
-override attributes matter. `press(locator, "Enter")` is reserved for the
-documented implicit-Enter default action, not as shorthand for `submit`.
+override attributes matter. `press(locator, "Enter")` performs implicit form submission only with Playwright.
 Submissions use the latest DOM ownership and control state in document order.
 Removed or disabled controls are omitted; renamed and newly inserted controls
 use their current names and owners. Duplicate names preserve their order,
@@ -364,9 +378,24 @@ though they cannot be filled. Multiple selections replace the selected set.
 See [Forms and files](capabilities.md#forms-and-files) for validation and
 serialization boundaries.
 
-LiveView supports declarative Enter, Space, and Tab handlers. Use Playwright
-for more complex keyboard behavior; see
-[LiveView timing and keyboard events](capabilities.md#liveview-timing-and-keyboard-events).
+`Fluffy.press/4` uses native key behavior with Playwright. With LiveView, it
+forwards the supplied key unchanged to LiveViewTest keydown/keyup handlers on
+the selected element. It does not simulate focus, editing, checkbox activation,
+Enter submission, or `phx-key` filtering. Supply the desired event key yourself;
+modifier strings are not parsed. Static does not support `press`.
+
+```elixir
+# LiveView: invoke bound handlers with key = "Backspace"; do not delete text.
+session |> press(by_label("Search"), "Backspace")
+
+# Playwright: select the text, then delete it through native keyboard behavior.
+session
+|> press(by_label("Search"), "ControlOrMeta+A")
+|> press(by_label("Search"), "Backspace")
+```
+
+For character-by-character browser typing, use `Fluffy.Playwright.press_sequentially/4`.
+See [LiveView timing and keyboard events](capabilities.md#liveview-timing-and-keyboard-events).
 
 ## Assertions
 

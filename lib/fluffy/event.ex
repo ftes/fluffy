@@ -26,6 +26,7 @@ defmodule Fluffy.Event do
   @type option :: {:timeout, non_neg_integer()} | {:scope, :page | :context}
 
   for type <- @types do
+    @doc playwright_only: type != :download
     @doc "Describes a #{type} event, optionally filtered by a unary predicate."
     @spec unquote(type)((term() -> term()) | nil) :: t()
     def unquote(type)(predicate \\ nil) when is_nil(predicate) or is_function(predicate, 1) do
