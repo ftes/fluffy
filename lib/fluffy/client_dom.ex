@@ -9,11 +9,10 @@ defmodule Fluffy.ClientDOM do
   alias Fluffy.Locator
 
   @enforce_keys [:document]
-  defstruct [:document, focused: nil, properties: %{}]
+  defstruct [:document, properties: %{}]
 
   @opaque t :: %__MODULE__{
             document: term(),
-            focused: integer() | nil,
             properties: map()
           }
 
@@ -83,7 +82,6 @@ defmodule Fluffy.ClientDOM do
                    old_properties,
                    old,
                    new,
-                   old_id == client_dom.focused,
                    old_to_new,
                    patched? and not triggered_form_control?(new, new_index)
                  ) do
@@ -95,7 +93,6 @@ defmodule Fluffy.ClientDOM do
 
     %__MODULE__{
       document: new_document,
-      focused: Map.get(old_to_new, client_dom.focused),
       properties: properties
     }
   end
@@ -105,10 +102,7 @@ defmodule Fluffy.ClientDOM do
     ensure_target_enabled!(target, :click, locator)
     Actionability.ensure_clickable!(target.element, :click, locator)
 
-    client_dom =
-      client_dom
-      |> maybe_focus(target)
-      |> maybe_toggle_checked(target)
+    client_dom = maybe_toggle_checked(client_dom, target)
 
     {client_dom, target}
   end
@@ -197,17 +191,24 @@ defmodule Fluffy.ClientDOM do
     end
   end
 
-  def fill(%__MODULE__{} = client_dom, %Locator{} = locator, value) when is_binary(value) do
+  def fill(%__MODULE__{} = client_dom, %Locator{} = locator, value, driver) when is_binary(value) do
     target = target!(client_dom, locator)
     ensure_target_enabled!(target, :fill, locator)
     Actionability.ensure_editable!(target.element, :fill, locator)
+
+    if target.tag not in ["input", "textarea"] do
+      raise Fluffy.CapabilityError,
+        capability: :contenteditable_fill,
+        driver: driver,
+        detail: "filling contenteditable elements requires a browser"
+    end
 
     properties =
       client_dom.properties
       |> put_property(target.id, :value, value)
       |> put_property(target.id, :used, true)
 
-    {%{client_dom | focused: target.id, properties: properties}, target}
+    {%{client_dom | properties: properties}, target}
   end
 
   def set_input_files(%__MODULE__{} = client_dom, %Locator{} = locator, selected_files) when is_list(selected_files) do
@@ -256,9 +257,7 @@ defmodule Fluffy.ClientDOM do
           ensure_target_enabled!(target, checked_action(desired), locator)
           Actionability.ensure_enabled!(target.element, checked_action(desired), locator)
 
-          client_dom
-          |> Map.put(:focused, target.id)
-          |> put_checked_target(target, desired)
+          put_checked_target(client_dom, target, desired)
       end
 
     {client_dom, target}
@@ -297,20 +296,6 @@ defmodule Fluffy.ClientDOM do
       |> put_property(target.id, :used, true)
 
     {%{client_dom | properties: properties}, target}
-  end
-
-  def focus(%__MODULE__{} = client_dom, %Locator{} = locator) do
-    target = target!(client_dom, locator)
-    if focusable?(target), do: %{client_dom | focused: target.id}, else: client_dom
-  end
-
-  def blur(%__MODULE__{} = client_dom, %Locator{} = locator) do
-    target = target!(client_dom, locator)
-    if client_dom.focused == target.id, do: %{client_dom | focused: nil}, else: client_dom
-  end
-
-  def focused?(%__MODULE__{} = client_dom, %Locator{} = locator) do
-    client_dom.focused == target!(client_dom, locator).id
   end
 
   def checked?(%__MODULE__{} = client_dom, %Locator{} = locator) do
@@ -416,22 +401,6 @@ defmodule Fluffy.ClientDOM do
   @doc false
   def selector_for_node_id(%__MODULE__{} = client_dom, node_id) do
     DocumentIndex.selector_for_id!(index(client_dom), node_id)
-  end
-
-  defp maybe_focus(client_dom, target) do
-    if focusable?(target), do: %{client_dom | focused: target.id}, else: client_dom
-  end
-
-  defp focusable?(%{disabled?: true}), do: false
-
-  defp focusable?(%{tag: tag, attributes: attributes}) do
-    element_focusable? =
-      tag in ["button", "select", "textarea"] or
-        (tag == "input" and attribute(attributes, "type") != "hidden") or
-        (tag in ["a", "area"] and has_attribute?(attributes, "href")) or
-        has_attribute?(attributes, "tabindex")
-
-    element_focusable? and not has_attribute?(attributes, "disabled")
   end
 
   defp maybe_toggle_checked(client_dom, target) do
@@ -637,10 +606,10 @@ defmodule Fluffy.ClientDOM do
     end
   end
 
-  defp reconcile_properties(properties, old, new, focused?, old_to_new, patched?) do
+  defp reconcile_properties(properties, old, new, old_to_new, patched?) do
     %{}
     |> preserve_property(properties, :used, true)
-    |> preserve_current_value(properties, old, focused?, patched?)
+    |> preserve_current_value(properties, patched?)
     |> preserve_checkedness(properties, old, new)
     |> preserve_files(properties, old, new)
     |> preserve_selection(properties, old, new, old_to_new)
@@ -653,12 +622,12 @@ defmodule Fluffy.ClientDOM do
     end
   end
 
-  defp preserve_current_value(reconciled, properties, old, focused?, patched?) do
+  defp preserve_current_value(reconciled, properties, patched?) do
     case Map.fetch(properties, :value) do
       {:ok, value} ->
-        if not patched? or focused_text_control?(old, focused?),
-          do: Map.put(reconciled, :value, value),
-          else: reconciled
+        if patched?,
+          do: reconciled,
+          else: Map.put(reconciled, :value, value)
 
       :error ->
         reconciled
@@ -703,25 +672,6 @@ defmodule Fluffy.ClientDOM do
         reconciled
     end
   end
-
-  defp focused_text_control?(%{tag: "textarea"}, true), do: true
-
-  defp focused_text_control?(%{tag: "input", attributes: attributes}, true) do
-    input_type = attributes |> attribute("type") |> Kernel.||("text") |> String.downcase()
-
-    input_type not in [
-      "button",
-      "checkbox",
-      "file",
-      "hidden",
-      "image",
-      "radio",
-      "reset",
-      "submit"
-    ]
-  end
-
-  defp focused_text_control?(_node, _focused?), do: false
 
   defp file_input?(%{tag: "input", attributes: attributes}) do
     attributes |> attribute("type") |> Kernel.||("text") |> String.downcase() == "file"

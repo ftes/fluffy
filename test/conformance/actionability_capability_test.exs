@@ -17,7 +17,7 @@ defmodule Fluffy.Conformance.ActionabilityCapabilityTest do
       with_html(unquote(driver), html, fn session ->
         session
         |> click(by_role(:button, name: "Save"))
-        |> expect(:button |> by_role(name: "Save") |> to_be_focused())
+        |> expect(:button |> by_role(name: "Save") |> to_have_count(1))
       end)
     end
   end
@@ -27,7 +27,7 @@ defmodule Fluffy.Conformance.ActionabilityCapabilityTest do
 
     session
     |> click(by_role(:button, name: "Save"))
-    |> expect(:button |> by_role(name: "Save") |> to_be_focused())
+    |> expect(:button |> by_role(name: "Save") |> to_have_count(1))
   end
 
   test "Static ignores ancestor inline height when filling structurally" do
@@ -51,7 +51,7 @@ defmodule Fluffy.Conformance.ActionabilityCapabilityTest do
 
     session
     |> click(by_role(:button, name: "Save"))
-    |> expect(:button |> by_role(name: "Save") |> to_be_focused())
+    |> expect(:button |> by_role(name: "Save") |> to_have_count(1))
   end
 
   test "Static ignores unparsed stylesheet rules when clicking structurally" do
@@ -63,7 +63,7 @@ defmodule Fluffy.Conformance.ActionabilityCapabilityTest do
 
     session
     |> click(by_role(:button, name: "Save"))
-    |> expect(:button |> by_role(name: "Save") |> to_be_focused())
+    |> expect(:button |> by_role(name: "Save") |> to_have_count(1))
   end
 
   for driver <- [:phoenix, :playwright] do

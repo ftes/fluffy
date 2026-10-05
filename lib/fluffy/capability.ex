@@ -51,7 +51,7 @@ defmodule Fluffy.Capability do
       feature: "DOM assertions and strictness",
       drivers: %{static: :equivalent, live: :equivalent, playwright: :equivalent},
       detail:
-        "Counts, text, attributes, values, checked state, and focus are paired. Assertions raise ExUnit.AssertionError with Phoenix structural diagnostics or native Playwright details."
+        "Counts, text, attributes, values, and checked state are paired. Assertions raise ExUnit.AssertionError with Phoenix structural diagnostics or native Playwright details."
     },
     %{
       id: :page_title_assertions,
@@ -68,6 +68,13 @@ defmodule Fluffy.Capability do
         "Indeterminate has no HTML representation and is normally set by application JavaScript, so in-process drivers do not infer it."
     },
     %{
+      id: :focus,
+      feature: "Focus, blur, and focus assertions",
+      drivers: %{static: :browser_only, live: :browser_only, playwright: :equivalent},
+      detail:
+        "Phoenix does not track focus. Use Fluffy.Playwright.focus/3 and blur/3, and focus assertions with a Playwright session."
+    },
+    %{
       id: :element_actions,
       feature: "Structural element actions",
       drivers: %{
@@ -76,7 +83,7 @@ defmodule Fluffy.Capability do
         playwright: :equivalent
       },
       detail:
-        "Static and LiveView model structural visibility, enabledness, editability, focus, and control state from markup. They deliberately ignore CSS layout-dependent actionability. Click-to-focus follows the pinned Chromium baseline; WebKit does not focus a button on click."
+        "Static and LiveView model structural visibility, enabledness, editability, and control state from markup. Focus and CSS layout-dependent actionability require Playwright."
     },
     %{
       id: :static_navigation,

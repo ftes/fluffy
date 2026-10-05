@@ -37,11 +37,6 @@ defmodule Fluffy.ClientDOM.Expectation do
     {actual, actual}
   end
 
-  def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :focused}) do
-    actual = ClientDOM.focused?(client_dom, locator)
-    {actual, actual}
-  end
-
   def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :checked, expected: expected}) do
     actual = ClientDOM.checked?(client_dom, locator)
     {actual == (expected == :checked), actual}

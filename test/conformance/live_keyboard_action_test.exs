@@ -11,20 +11,20 @@ defmodule Fluffy.Conformance.LiveKeyboardActionTest do
 
       session()
       |> press(input, unquote(key))
-      |> expect(not_(to_be_focused(input)))
       |> expect("Event count: 2" |> by_text(exact: true) |> to_be_visible())
       |> expect("element-keydown:key=#{unquote(key)};value=none;scope=element" |> by_text(exact: true) |> to_be_visible())
       |> expect("element-keyup:key=#{unquote(key)};value=none;scope=element" |> by_text(exact: true) |> to_be_visible())
     end
   end
 
-  test "Backspace does not edit the field or synthesize its value in the event payload" do
+  test "Backspace sends only the key and the resulting render replaces local text" do
     input = by_label("Element key", exact: true)
 
     session()
     |> fill(input, "Ada")
-    |> press(input, "Backspace")
     |> expect(to_have_value(input, "Ada"))
+    |> press(input, "Backspace")
+    |> expect(to_have_value(input, ""))
     |> expect("element-keydown:key=Backspace;value=none;scope=element" |> by_text(exact: true) |> to_be_visible())
   end
 
@@ -36,16 +36,13 @@ defmodule Fluffy.Conformance.LiveKeyboardActionTest do
     |> expect("Submitted: none" |> by_text(exact: true) |> to_be_visible())
   end
 
-  test "Tab does not move focus and keyup-only bindings are supported" do
+  test "keydown-only and keyup-only bindings are supported" do
     first = by_label("Tab first", exact: true)
     second = by_label("Tab second", exact: true)
 
     session()
-    |> focus(first)
     |> press(first, "Tab")
-    |> expect(to_be_focused(first))
     |> press(second, "Tab")
-    |> expect(to_be_focused(first))
     |> expect("Event count: 2" |> by_text(exact: true) |> to_be_visible())
     |> expect("tab-keyup:key=Tab;value=none;scope=none" |> by_text(exact: true) |> to_be_visible())
   end

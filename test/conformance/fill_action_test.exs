@@ -4,6 +4,7 @@ defmodule Fluffy.Conformance.FillActionTest do
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
+  import Fluffy.Playwright
 
   @set_value_input_cases [
     {"color", "#123456", ""},
@@ -14,6 +15,41 @@ defmodule Fluffy.Conformance.FillActionTest do
     {"time", "03:04", ""},
     {"week", "2025-W01", ""}
   ]
+
+  for attribute <- ["contenteditable", ~s(contenteditable="true"), ~s(contenteditable="plaintext-only")] do
+    @tag driver: :playwright
+    test "Playwright fills #{attribute} as text" do
+      editor = by_role(:textbox, name: "Editor")
+      html = ~s(<div role="textbox" aria-label="Editor" #{unquote(attribute)}>Initial</div>)
+
+      with_html(:playwright, html, fn session ->
+        session
+        |> fill(editor, "Updated")
+        |> expect(to_be_visible(by_text(editor, "Updated", exact: true)))
+      end)
+    end
+
+    test "Static rejects filling #{attribute}" do
+      editor = by_role(:textbox, name: "Editor")
+      html = ~s(<div role="textbox" aria-label="Editor" #{unquote(attribute)}>Initial</div>)
+      session = session_for_html(:static, html)
+
+      error = assert_raise Fluffy.CapabilityError, fn -> fill(session, editor, "Updated") end
+      assert error.capability == :contenteditable_fill
+      assert error.driver == :static
+      expect(session, to_be_visible(by_text(editor, "Initial", exact: true)))
+    end
+  end
+
+  test "LiveView rejects filling contenteditable" do
+    session = :phoenix |> start_session() |> visit("/live/mystic-creatures")
+    editor = by_role(:textbox, name: "Editor")
+
+    error = assert_raise Fluffy.CapabilityError, fn -> fill(session, editor, "Updated") end
+    assert error.capability == :contenteditable_fill
+    assert error.driver == :live
+    expect(session, to_be_visible(by_text(editor, "Initial", exact: true)))
+  end
 
   for driver <- [:static, :playwright] do
     @tag driver: driver
@@ -56,7 +92,6 @@ defmodule Fluffy.Conformance.FillActionTest do
         |> expect(to_have_value(field, "old@example.com"))
         |> fill(field, "new@example.com")
         |> expect(to_have_value(field, "new@example.com"))
-        |> expect(to_be_focused(field))
       end)
     end
 
@@ -70,19 +105,6 @@ defmodule Fluffy.Conformance.FillActionTest do
         |> expect(to_have_value(field, "Initial notes"))
         |> fill(field, "")
         |> expect(to_have_value(field, ""))
-      end)
-    end
-
-    @tag driver: driver
-    test "fill treats a valueless contenteditable attribute as editable with #{driver}" do
-      editor = by_role(:textbox, name: "Editor")
-      html = ~s(<div role="textbox" aria-label="Editor" contenteditable></div>)
-
-      with_html(unquote(driver), html, fn session ->
-        session
-        |> expect(to_be_editable(editor))
-        |> fill(editor, "Updated")
-        |> expect(to_be_focused(editor))
       end)
     end
 

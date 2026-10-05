@@ -196,7 +196,7 @@ defmodule Fluffy.Driver.Live do
 
   @impl true
   def fill(%Session{} = session, %Locator{} = locator, value, options \\ []) do
-    case resolve_live_action(session, locator, options, &ClientDOM.fill(&1, locator, value)) do
+    case resolve_live_action(session, locator, options, &ClientDOM.fill(&1, locator, value, :live)) do
       {%Session{} = session, {client_dom, target}} -> dispatch_live_change(session, client_dom, target)
       navigation -> navigation
     end
@@ -288,18 +288,6 @@ defmodule Fluffy.Driver.Live do
       {%Session{} = session, {client_dom, target}} -> dispatch_live_change(session, client_dom, target)
       navigation -> navigation
     end
-  end
-
-  @impl true
-  def focus(%Session{} = session, %Locator{} = locator, options \\ []) do
-    Keyword.validate!(options, [:timeout])
-    update_client_dom(session, &ClientDOM.focus(&1, locator))
-  end
-
-  @impl true
-  def blur(%Session{} = session, %Locator{} = locator, options \\ []) do
-    Keyword.validate!(options, [:timeout])
-    update_client_dom(session, &ClientDOM.blur(&1, locator))
   end
 
   @impl true
@@ -1119,11 +1107,6 @@ defmodule Fluffy.Driver.Live do
   defp gather_keys([], acc), do: acc
   defp gather_keys([%{} = map], acc), do: gather_keys(map, acc)
   defp gather_keys(_value, acc), do: acc
-
-  defp update_client_dom(session, fun) do
-    state = Session.page_state(session)
-    Session.put_page_state(session, %{state | client_dom: fun.(state.client_dom)})
-  end
 
   defp normalize(text) do
     text

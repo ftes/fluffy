@@ -244,6 +244,9 @@ defmodule Fluffy do
 
   Accepts any value implementing `String.Chars`, including numbers, dates,
   and custom structs. Conversion uses `to_string/1`, without HTML escaping.
+
+  Filling contenteditable elements requires Playwright. Static and LiveView
+  support input and textarea controls.
   """
   @spec fill(Session.t(), Fluffy.Locator.t(), String.Chars.t(), [action_option()]) :: Session.t()
   def fill(%Session{} = session, locator, value, options \\ []) do
@@ -356,20 +359,6 @@ defmodule Fluffy do
   defp stringify_option(%{label: label} = option), do: %{option | label: to_string(label)}
   defp stringify_option(%{index: _index} = option), do: option
   defp stringify_option(value), do: to_string(value)
-
-  @doc group: "Actions"
-  @spec focus(Session.t(), Fluffy.Locator.t(), [action_option()]) :: Session.t()
-  def focus(%Session{} = session, locator, options \\ []) do
-    options = Fluffy.Options.validate_action!(options)
-    dispatch_driver(session, :focus, [locator, options])
-  end
-
-  @doc group: "Actions"
-  @spec blur(Session.t(), Fluffy.Locator.t(), [action_option()]) :: Session.t()
-  def blur(%Session{} = session, locator, options \\ []) do
-    options = Fluffy.Options.validate_action!(options)
-    dispatch_driver(session, :blur, [locator, options])
-  end
 
   @doc group: "Actions"
   @doc """

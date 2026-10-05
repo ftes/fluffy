@@ -4,6 +4,10 @@
 
 ### Changed
 
+- Restrict filling contenteditable elements to Playwright. Static and LiveView now raise `Fluffy.CapabilityError` instead of storing a synthetic form value.
+
+- Move `focus` and `blur` to `Fluffy.Playwright`; focus assertions now require Playwright. Remove Phoenix focus tracking and focused-text preservation during LiveView patches. Other form-state reconciliation rules are unchanged.
+
 - Remove native reset-button emulation from Static and LiveView. Reset buttons still dispatch supported LiveView events, but restoring form defaults requires Playwright.
 
 - Move `current_page`, `pages`, `switch_page`, `close_page`, `new_page`, `go_back`, `go_forward`, `hover`, `drag_to`, and `press_sequentially` from `Fluffy` to `Fluffy.Playwright`. Update qualified calls or imports to the new module. All page-management helpers now reject Phoenix sessions.

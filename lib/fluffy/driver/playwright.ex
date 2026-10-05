@@ -313,12 +313,10 @@ defmodule Fluffy.Driver.Playwright do
     end
   end
 
-  @impl true
   def focus(%Session{} = session, %Locator{} = locator, options \\ []) do
     element_action(session, locator, :focus, options)
   end
 
-  @impl true
   def blur(%Session{} = session, %Locator{} = locator, options \\ []) do
     element_action(session, locator, :blur, options)
   end

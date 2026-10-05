@@ -27,8 +27,6 @@ defmodule Fluffy.Driver.Contract do
             ) :: result()
   @callback set_checked(Session.t(), Locator.t(), boolean(), keyword()) :: result()
   @callback select_option(Session.t(), Locator.t(), term(), keyword()) :: result()
-  @callback focus(Session.t(), Locator.t(), keyword()) :: result()
-  @callback blur(Session.t(), Locator.t(), keyword()) :: result()
   @callback press(Session.t(), Locator.t(), String.t(), keyword()) :: result()
   @callback open_browser(Session.t(), (String.t() -> term())) :: Session.t()
   @callback unwrap(Session.t(), (term() -> term())) :: result()

@@ -153,6 +153,26 @@ defmodule Fluffy.Playwright do
 
   @doc group: "Actions"
   @doc playwright_only: true
+  @doc "Focuses the target in the active browser page."
+  @spec focus(Session.t(), Fluffy.Locator.t(), [Fluffy.action_option()]) :: Session.t()
+  def focus(%Session{} = session, locator, options \\ []) do
+    ensure_playwright_backend!(session, :focus)
+    options = Fluffy.Options.validate_action!(options)
+    Fluffy.__dispatch_driver__(session, :focus, [locator, options])
+  end
+
+  @doc group: "Actions"
+  @doc playwright_only: true
+  @doc "Blurs the target in the active browser page."
+  @spec blur(Session.t(), Fluffy.Locator.t(), [Fluffy.action_option()]) :: Session.t()
+  def blur(%Session{} = session, locator, options \\ []) do
+    ensure_playwright_backend!(session, :blur)
+    options = Fluffy.Options.validate_action!(options)
+    Fluffy.__dispatch_driver__(session, :blur, [locator, options])
+  end
+
+  @doc group: "Actions"
+  @doc playwright_only: true
   @doc "Hovers over a locator. Requires Playwright."
   def hover(%Session{} = session, locator, options \\ []) do
     ensure_playwright_backend!(session, :hover)

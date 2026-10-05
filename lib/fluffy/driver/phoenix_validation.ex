@@ -14,6 +14,13 @@ defmodule Fluffy.Driver.PhoenixValidation do
   defp validate_argument!(driver, %Expect{target: {:locator, locator}} = expectation) do
     validate_argument!(driver, locator)
 
+    if expectation.kind == :focused do
+      raise CapabilityError,
+        capability: :focus,
+        driver: driver,
+        detail: "focus state requires a browser"
+    end
+
     if expectation.kind == :checked and expectation.expected == :indeterminate do
       raise CapabilityError,
         capability: :indeterminate_checked_state,

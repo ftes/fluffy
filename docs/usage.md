@@ -203,18 +203,16 @@ changes made by `check`, `uncheck`, and `select_option`. For example,
 Attribute selectors such as `[checked]` and `[selected]` still match the
 rendered HTML attributes, which can differ from the user's input.
 
-The Phoenix backend tracks current input properties but approximates LiveView
-patch reconciliation. It can preserve checkbox input when the rendered
-`checked` attribute stays unchanged, or adopt a changed server selection while
-Playwright retains the user's focused selection. The selectors read each
-backend's current state consistently. Use Playwright when the test depends on
-LiveView's protection of focused fields during server updates, including
-`phx-patch-focused`. The in-process backend still supports explicit `focus`, `blur`, and focus
-assertions. Keyboard-driven focus movement requires Playwright.
+The Phoenix backend tracks current input properties but does not model focus.
+On changed LiveView renders, local text adopts the server-rendered value except
+for `phx-trigger-action` handoff. Unchanged renders retain local values; checkbox,
+select, and file state follow the rules described in
+[Focus and client state](capabilities.md#focus-and-client-state).
 
-`fill` leaves its field focused, matching Playwright; use `blur` when the test
-needs to leave it. See [LiveView timing and keyboard events](capabilities.md#liveview-timing-and-keyboard-events)
-for how focus and debounce affect change delivery.
+Use `Fluffy.Playwright.focus/3`, `Fluffy.Playwright.blur/3`, and focus assertions
+with browser sessions. With `import Fluffy.Playwright`, call `focus` and `blur`
+directly. Use Playwright when a test depends on focus-sensitive LiveView patches
+or blur/debounce timing.
 
 Single-target actions and native visibility assertions are strict: if a locator
 matches more than one element, Fluffy reports the ambiguity instead of choosing

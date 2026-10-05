@@ -112,7 +112,7 @@ defmodule Fluffy.Driver.Static do
     Keyword.validate!(options, [:timeout])
     state = Session.page_state(session)
     client_dom = Map.fetch!(state, :client_dom)
-    {client_dom, _target} = ClientDOM.fill(client_dom, locator, value)
+    {client_dom, _target} = ClientDOM.fill(client_dom, locator, value, :static)
     Session.put_page_state(session, %{state | client_dom: client_dom})
   end
 
@@ -139,18 +139,6 @@ defmodule Fluffy.Driver.Static do
     state = Session.page_state(session)
     {client_dom, _target} = state |> Map.fetch!(:client_dom) |> ClientDOM.select_option(locator, requested)
     Session.put_page_state(session, %{state | client_dom: client_dom})
-  end
-
-  @impl true
-  def focus(%Session{} = session, %Locator{} = locator, options \\ []) do
-    Keyword.validate!(options, [:timeout])
-    update_client_dom(session, &ClientDOM.focus(&1, locator))
-  end
-
-  @impl true
-  def blur(%Session{} = session, %Locator{} = locator, options \\ []) do
-    Keyword.validate!(options, [:timeout])
-    update_client_dom(session, &ClientDOM.blur(&1, locator))
   end
 
   @impl true
@@ -200,11 +188,6 @@ defmodule Fluffy.Driver.Static do
       {^name, value} -> value
       nil -> nil
     end
-  end
-
-  defp update_client_dom(session, fun) do
-    state = Session.page_state(session)
-    Session.put_page_state(session, %{state | client_dom: fun.(state.client_dom)})
   end
 
   defp assert_truth!(%Expect{} = expectation, passed?, actual) do

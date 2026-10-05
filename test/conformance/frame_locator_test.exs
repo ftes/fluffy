@@ -4,6 +4,7 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
+  import Fluffy.Playwright
 
   alias Fluffy.FrameLocator
   alias Fluffy.TestHTTPFixtures
@@ -246,7 +247,7 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
           assert_raise Fluffy.OperationError, fn ->
             case unquote(action) do
               :press -> press(session, locator, "Tab", timeout: 200)
-              action -> apply(Fluffy, action, [session, locator, [timeout: 200]])
+              action -> apply(Fluffy.Playwright, action, [session, locator, [timeout: 200]])
             end
           end
 

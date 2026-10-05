@@ -4,6 +4,7 @@ defmodule Fluffy.Conformance.CheckedLocatorTest do
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
+  import Fluffy.Playwright
 
   for driver <- [:static, :playwright] do
     @tag driver: driver
@@ -118,11 +119,11 @@ defmodule Fluffy.Conformance.CheckedLocatorTest do
       |> start_test_session()
       |> visit("/live/checked-controls?topic=#{topic}")
       |> select_option(field, "green")
-      |> focus(field)
+      |> then(fn session -> if driver == :playwright, do: focus(session, field), else: session end)
       |> expect("option:checked[value=green]" |> by_css() |> to_have_count(1))
       |> tap(fn _session -> Phoenix.PubSub.broadcast(Fluffy.TestPubSub, topic, :choose_blue) end)
       |> expect("Revision 1" |> by_text(exact: true) |> to_be_visible())
-      |> expect(to_be_focused(field))
+      |> then(fn session -> if driver == :playwright, do: expect(session, to_be_focused(field)), else: session end)
       |> expect(to_have_value(field, expected))
       |> expect("option:checked[value=#{expected}]" |> by_css() |> to_have_count(1))
     end
@@ -142,7 +143,7 @@ defmodule Fluffy.Conformance.CheckedLocatorTest do
       |> start_test_session()
       |> visit("/live/checked-controls?topic=#{topic}")
       |> check(field)
-      |> blur(field)
+      |> then(fn session -> if driver == :playwright, do: blur(session, field), else: session end)
       |> expect("#enabled:checked" |> by_css() |> to_have_count(1))
       |> tap(fn _session -> Phoenix.PubSub.broadcast(Fluffy.TestPubSub, topic, :choose_blue) end)
       |> expect("Revision 1" |> by_text(exact: true) |> to_be_visible())

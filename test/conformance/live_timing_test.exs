@@ -3,6 +3,7 @@ defmodule Fluffy.Conformance.LiveTimingTest do
 
   import Fluffy
   import Fluffy.Locator
+  import Fluffy.Playwright
 
   describe "Phoenix eager change synchronization" do
     for {label, field} <- [
@@ -35,19 +36,6 @@ defmodule Fluffy.Conformance.LiveTimingTest do
 
       assert_receive {:timing_change, ^probe, %{"bare" => "first value"}}, 0
       assert_receive {:timing_change, ^probe, %{"bare" => "final value"}}, 0
-      refute_receive {:timing_change, ^probe, _payload}, 50
-    end
-
-    test "blur does not dispatch a second change" do
-      probe = probe("phoenix-blur")
-
-      :phoenix
-      |> start_test_session()
-      |> visit("/live/timing?probe=#{probe}")
-      |> fill(by_label("Numeric debounce"), "already sent")
-      |> blur(by_label("Numeric debounce"))
-
-      assert_receive {:timing_change, ^probe, %{"numeric" => "already sent"}}, 0
       refute_receive {:timing_change, ^probe, _payload}, 50
     end
 

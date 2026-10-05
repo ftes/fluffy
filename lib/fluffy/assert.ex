@@ -86,7 +86,8 @@ defmodule Fluffy.Assert do
   @doc "Equivalent to `Fluffy.Expect.to_be_enabled/2`."
   defdelegate enabled(locator, options \\ []), to: Fluffy.Expect, as: :to_be_enabled
 
-  @doc "Equivalent to `Fluffy.Expect.to_be_focused/2`."
+  @doc playwright_only: true
+  @doc "Equivalent to `Fluffy.Expect.to_be_focused/2`. Requires Playwright."
   defdelegate focused(locator, options \\ []), to: Fluffy.Expect, as: :to_be_focused
 
   @doc "Equivalent to `Fluffy.Expect.to_be_checked/2`."

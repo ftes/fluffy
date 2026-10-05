@@ -48,6 +48,7 @@ defmodule Fluffy.TestWeb.ActionabilityLive do
   def render(assigns) do
     ~H"""
     <main>
+      <div role="textbox" aria-label="Editor" contenteditable>Initial</div>
       <style>
         .unrelated { min-width: 1px; }
       </style>

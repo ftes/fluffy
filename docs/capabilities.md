@@ -18,6 +18,7 @@ boundaries described below.
 | DOM assertions and strictness | equivalent | equivalent |
 | Page title assertions | equivalent | equivalent |
 | Indeterminate checkbox/radio DOM property | - | equivalent |
+| Focus, blur, and focus assertions | - | equivalent |
 | Structural element actions | structural subset | equivalent |
 | Visits, reloads, links, redirects, cookies, and HTTP forms | equivalent | equivalent |
 | Phoenix.HTML data-method/data-to actions | structural subset | equivalent |
@@ -60,8 +61,9 @@ for the distinction from browser rendering and DOM absence.
 
 LiveView eagerly dispatches each applicable form-control `phx-change` and
 ignores `phx-debounce`/`phx-throttle` scheduling, including `phx-debounce="blur"`.
-Keeping focus does not suppress these eager changes. Use Playwright for delay,
-blur-only delivery, coalescing, cancellation, and throttle suppression.
+Phoenix does not model focus; its change delivery is independent of focus. Use
+Playwright for delay, blur-only delivery, coalescing, cancellation, and throttle
+suppression.
 
 `Fluffy.press/4` has a driver-specific contract:
 
@@ -75,6 +77,23 @@ blur-only delivery, coalescing, cancellation, and throttle suppression.
   no keyboard binding raises. Callers supply the intended key value.
 - **Playwright:** native browser key presses, including default actions and
   Playwright modifier syntax.
+
+Filling contenteditable elements requires Playwright. Static and LiveView fill
+input and textarea controls; they do not emulate editing element text.
+
+### Focus and client state
+
+`Fluffy.Playwright.focus/3`, `Fluffy.Playwright.blur/3`, and focus assertions
+require Playwright. Static and LiveView do not track or simulate focus.
+
+On a changed LiveView render, local text values adopt the rendered value,
+except during `phx-trigger-action` handoff. Unchanged document renders preserve
+local values. Changes are detected across the document, not per control, so an
+unrelated update can discard local text. Checkbox/radio state survives while the
+rendered `checked` attribute is unchanged. Selected options survive while the
+option signature is unchanged; files survive while the matched control remains
+a file input. Use Playwright for focused input protection and exact browser patch
+behavior.
 
 ### LiveView document and patch boundaries
 

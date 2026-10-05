@@ -129,6 +129,8 @@ defmodule Fluffy.Expect do
   end
 
   @doc group: "Locator assertions"
+  @doc playwright_only: true
+  @doc "Asserts browser focus. Requires Playwright, including when negated."
   @spec to_be_focused(Locator.t(), [option()]) :: t()
   def to_be_focused(%Locator{} = locator, options \\ []) do
     new({:locator, locator}, :focused, true, options)
