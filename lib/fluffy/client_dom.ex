@@ -109,7 +109,6 @@ defmodule Fluffy.ClientDOM do
       client_dom
       |> maybe_focus(target)
       |> maybe_toggle_checked(target)
-      |> maybe_reset_form(target)
 
     {client_dom, target}
   end
@@ -446,11 +445,6 @@ defmodule Fluffy.ClientDOM do
       _other ->
         client_dom
     end
-  end
-
-  defp maybe_reset_form(client_dom, target) do
-    properties = Fluffy.Form.reset(index(client_dom), client_dom.properties, target)
-    %{client_dom | properties: properties}
   end
 
   defp checked_target?(client_dom, target) do

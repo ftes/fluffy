@@ -78,29 +78,6 @@ defmodule Fluffy.Form do
   end
 
   @doc false
-  def reset(index, properties, target) do
-    if resetter?(target) do
-      case form_owner(index, target) do
-        nil ->
-          properties
-
-        form ->
-          owner_ids = form_owner_ids(index)
-
-          controls =
-            index
-            |> DocumentIndex.targets_by_tag(["button", "input", "select", "textarea"])
-            |> Enum.filter(&owned_by_form?(&1, form, owner_ids))
-
-          properties = Enum.reduce(controls, properties, &Map.delete(&2, node_id(&1)))
-          restore_default_radio_group_state(controls, properties)
-      end
-    else
-      properties
-    end
-  end
-
-  @doc false
   def owner_id(index, target) do
     case form_owner(index, target) do
       nil -> nil
@@ -358,33 +335,6 @@ defmodule Fluffy.Form do
 
   defp owned_by_form?(control, form, owner_ids), do: Map.get(owner_ids, node_id(control)) == node_id(form)
 
-  defp restore_default_radio_group_state(controls, properties) do
-    {properties, _last_checked} =
-      Enum.reduce(controls, {properties, %{}}, fn control, {properties, last_checked} ->
-        target = control
-        name = attribute(target.attributes, "name")
-
-        if input_type(target) == "radio" and name not in [nil, ""] and
-             has_attribute?(target.attributes, "checked") do
-          properties =
-            case Map.get(last_checked, name) do
-              nil -> properties
-              prior_id -> put_control_property(properties, prior_id, :checked, false)
-            end
-
-          {put_control_property(properties, target.id, :checked, true), Map.put(last_checked, name, target.id)}
-        else
-          {properties, last_checked}
-        end
-      end)
-
-    properties
-  end
-
-  defp put_control_property(properties, id, property, value) do
-    Map.update(properties, id, %{property => value}, &Map.put(&1, property, value))
-  end
-
   defp selected_values(target, properties, index) do
     options =
       index
@@ -440,10 +390,6 @@ defmodule Fluffy.Form do
   defp submitter?(%{tag: "input"} = target), do: input_type(target) in ["submit", "image"]
 
   defp submitter?(_target), do: false
-
-  defp resetter?(%{tag: "button"} = target), do: button_type(target) == "reset"
-  defp resetter?(%{tag: "input"} = target), do: input_type(target) == "reset"
-  defp resetter?(_target), do: false
 
   defp same_target?(_target, nil), do: false
   defp same_target?(target, submitter), do: not is_nil(submitter.id) and target.id == submitter.id

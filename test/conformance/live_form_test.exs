@@ -5,6 +5,19 @@ defmodule Fluffy.Conformance.LiveFormTest do
   import Fluffy.Expect
   import Fluffy.Locator
 
+  test "Live reset buttons do not reset fields and still dispatch server events" do
+    session = :phoenix |> start_test_session() |> visit("/live/potions")
+
+    session
+    |> fill(by_label("Reset name"), "changed")
+    |> uncheck(by_label("Reset choice"))
+    |> click(by_role(:button, name: "Native reset", exact: true))
+    |> expect(to_have_value(by_label("Reset name"), "changed"))
+    |> expect(not_(to_be_checked(by_label("Reset choice"))))
+    |> click(by_role(:button, name: "Reset with server event", exact: true))
+    |> expect("#drafts > div:first-child input" |> by_css() |> to_have_value("B"))
+  end
+
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
     test "String.Chars values reach LiveView change events as literal strings with #{driver}", %{driver: driver} do

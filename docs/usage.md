@@ -378,6 +378,10 @@ though they cannot be filled. Multiple selections replace the selected set.
 See [Forms and files](capabilities.md#forms-and-files) for validation and
 serialization boundaries.
 
+Native reset-button behavior requires Playwright. Static and LiveView clicks do
+not restore form defaults or clear file selections. LiveView reset buttons with
+`phx-click` still dispatch their server event.
+
 `Fluffy.press/4` uses native key behavior with Playwright. With LiveView, it
 forwards the supplied key unchanged to LiveViewTest keydown/keyup handlers on
 the selected element. It does not simulate focus, editing, checkbox activation,

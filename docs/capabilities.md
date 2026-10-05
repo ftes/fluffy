@@ -124,6 +124,10 @@ Static and LiveView bypass native validation and retain specialized scalar
 input values as supplied strings. Use Playwright for validation events and
 blocking, browser sanitization/defaults, and custom or form-associated elements.
 
+Native reset-button behavior requires Playwright. Static and LiveView clicks do
+not restore form defaults or clear file selections. LiveView reset buttons with
+`phx-click` still dispatch their server event.
+
 File selection supports bounded local paths and typed in-memory payloads,
 ordered multiple selection, clearing, and ordinary multipart forms, including
 empty-file entries. Managed LiveView uploads support validation, progress,

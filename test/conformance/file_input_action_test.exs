@@ -223,7 +223,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       refute submission.body =~ File.read!(invalid_fixture_path())
     end
 
-    test "a form reset discards its selected FileList with #{driver}" do
+    test "only Playwright discards its selected FileList on reset with #{driver}" do
       fixture =
         TestHTTPFixtures.register_sequence([
           %{
@@ -250,9 +250,15 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       |> expect("Uploaded" |> by_text() |> to_be_visible())
 
       [_source, submission] = TestHTTPFixtures.requests(fixture)
-      assert submission.body =~ ~s(name="attachment"; filename="")
-      refute submission.body =~ "fluffy-upload.txt"
-      refute submission.body =~ File.read!(file)
+
+      if unquote(driver) == :playwright do
+        assert submission.body =~ ~s(name="attachment"; filename="")
+        refute submission.body =~ "fluffy-upload.txt"
+        refute submission.body =~ File.read!(file)
+      else
+        assert submission.body =~ "fluffy-upload.txt"
+        assert submission.body =~ File.read!(file)
+      end
     end
 
     test "rejects multiple selection on a single-file input without replacing its selection with #{driver}" do

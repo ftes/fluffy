@@ -214,7 +214,7 @@ defmodule Fluffy.Conformance.FillActionTest do
     end
 
     @tag driver: driver
-    test "a reset button restores current properties from form defaults with #{driver}" do
+    test "only Playwright resets current properties from form defaults with #{driver}" do
       html = """
       <form>
         <label>Name <input value="initial"></label>
@@ -237,15 +237,23 @@ defmodule Fluffy.Conformance.FillActionTest do
         |> fill(by_label("Notes"), "changed")
         |> select_option(by_label("Plan"), "pro")
         |> click(by_role(:button, name: "Reset"))
-        |> expect("Name" |> by_label() |> to_have_value("initial"))
-        |> expect(:checkbox |> by_role(name: "Enabled") |> to_be_checked())
-        |> expect("Notes" |> by_label() |> to_have_value("original"))
-        |> expect("Plan" |> by_label() |> to_have_value("free"))
+        |> expect(
+          "Name"
+          |> by_label()
+          |> to_have_value(if(unquote(driver) == :playwright, do: "initial", else: "changed"))
+        )
+        |> expect(:checkbox |> by_role(name: "Enabled") |> to_be_checked(checked: unquote(driver) == :playwright))
+        |> expect(
+          "Notes"
+          |> by_label()
+          |> to_have_value(if(unquote(driver) == :playwright, do: "original", else: "changed"))
+        )
+        |> expect("Plan" |> by_label() |> to_have_value(if(unquote(driver) == :playwright, do: "free", else: "pro")))
       end)
     end
 
     @tag driver: driver
-    test "reset restores the last declared radio default within its group with #{driver}" do
+    test "only Playwright restores radio defaults on reset with #{driver}" do
       first = by_role(:radio, name: "First")
       second = by_role(:radio, name: "Second")
 
@@ -262,8 +270,8 @@ defmodule Fluffy.Conformance.FillActionTest do
         |> check(first)
         |> expect(to_be_checked(first))
         |> click(by_role(:button, name: "Reset"))
-        |> expect(not_(to_be_checked(first)))
-        |> expect(to_be_checked(second))
+        |> expect(to_be_checked(first, checked: unquote(driver) != :playwright))
+        |> expect(to_be_checked(second, checked: unquote(driver) == :playwright))
       end)
     end
   end

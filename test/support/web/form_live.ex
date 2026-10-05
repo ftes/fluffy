@@ -297,6 +297,12 @@ defmodule Fluffy.TestWeb.FormLive do
       <p>Saved commit: {@saved_commit || "not saved"}</p>
       <p>Saved first present: {inspect(@saved_first_present?)}</p>
 
+      <form id="native-reset">
+        <label>Reset name <input name="name" value="initial" /></label>
+        <label><input type="checkbox" checked />Reset choice</label>
+        <button type="reset">Native reset</button>
+        <button type="reset" phx-click="reorder-drafts">Reset with server event</button>
+      </form>
       <section id="drafts">
         <div :for={draft <- @draft_order} id={"draft-row-#{draft}"}>
           <label for={if draft == "a", do: @draft_a_id, else: "draft-b"}>

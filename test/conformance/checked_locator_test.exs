@@ -28,8 +28,8 @@ defmodule Fluffy.Conformance.CheckedLocatorTest do
       |> expect("form" |> by_css() |> filter(has: by_css("#blue:checked")) |> to_have_count(1))
       |> expect("form" |> by_css() |> filter(has_not: by_css("#red:checked")) |> to_have_count(1))
       |> click(by_role(:button, name: "Reset"))
-      |> expect("#enabled:checked, #red:checked" |> by_css() |> to_have_count(2))
-      |> expect("#blue:checked" |> by_css() |> to_have_count(0))
+      |> expect("#enabled:checked, #red:checked" |> by_css() |> to_have_count(if(driver == :playwright, do: 2, else: 0)))
+      |> expect("#blue:checked" |> by_css() |> to_have_count(if(driver == :playwright, do: 0, else: 1)))
     end
 
     @tag driver: driver
