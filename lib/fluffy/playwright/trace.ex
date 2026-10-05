@@ -139,6 +139,7 @@ defmodule Fluffy.Playwright.Trace do
   defp configured_executable do
     :fluffy
     |> Application.fetch_env!(:playwright)
-    |> Keyword.fetch!(:executable)
+    |> Fluffy.Options.validate_playwright!()
+    |> Keyword.get(:executable, "playwright")
   end
 end

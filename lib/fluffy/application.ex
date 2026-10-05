@@ -29,11 +29,12 @@ defmodule Fluffy.Application do
             {Fluffy.BrowserRuntime,
              timeout: timeout,
              engine: Keyword.get(config, :engine, :chromium),
-             playwright_options: [
-               executable: Keyword.fetch!(config, :executable),
-               js_logger: normalize_js_logger(Keyword.fetch!(config, :js_logger)),
-               timeout: timeout
-             ],
+             playwright_options:
+               Keyword.take(config, [:executable]) ++
+                 [
+                   js_logger: normalize_js_logger(Keyword.fetch!(config, :js_logger)),
+                   timeout: timeout
+                 ],
              launch_options: Keyword.fetch!(config, :launch_options)}
           ]
         else

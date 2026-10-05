@@ -180,9 +180,10 @@ defmodule Fluffy.Options do
                   )
 
   @launch_schema [
+    timeout: [type: :pos_integer],
     args: [type: {:list, :string}],
     channel: [type: :string],
-    executable_path: [type: :string],
+    executable_path: [type: {:or, [nil, :string]}],
     headless: [type: :boolean],
     slow_mo: [type: {:or, [:integer, :float]}]
   ]
@@ -191,6 +192,7 @@ defmodule Fluffy.Options do
                        enabled: [type: :boolean, default: true],
                        engine: [type: {:in, [:chromium, :firefox, :webkit]}, default: :chromium],
                        executable: [type: :string],
+                       assets_dir: [type: :string],
                        timeout: [type: :pos_integer, default: 15_000],
                        launch_options: [type: :keyword_list, keys: @launch_schema, default: []],
                        artifact_dir: [type: {:or, [nil, :string]}],
@@ -300,18 +302,34 @@ defmodule Fluffy.Options do
   def validate_playwright!(options) when is_list(options) do
     options = NimbleOptions.validate!(options, @playwright_schema)
 
-    if options[:enabled] and is_nil(options[:executable]) do
-      raise ArgumentError, "enabled Fluffy Playwright configuration requires :executable"
-    end
-
     validate_js_logger!(options[:js_logger])
 
     options
+    |> Keyword.update!(:launch_options, fn launch_options ->
+      if launch_options[:executable_path] == nil,
+        do: Keyword.delete(launch_options, :executable_path),
+        else: launch_options
+    end)
+    |> resolve_playwright_executable()
   end
 
   def validate_playwright!(other) do
     raise ArgumentError,
           "expected :fluffy, :playwright configuration to be false or a keyword list, got: #{inspect(other)}"
+  end
+
+  defp resolve_playwright_executable(options) do
+    executable =
+      options
+      |> Keyword.get(:assets_dir, "./assets")
+      |> Path.join("node_modules/playwright/cli.js")
+      |> Path.expand()
+
+    if Keyword.has_key?(options, :assets_dir) or File.regular?(executable) do
+      Keyword.put_new(options, :executable, executable)
+    else
+      options
+    end
   end
 
   defp validate_conn!(nil), do: :ok

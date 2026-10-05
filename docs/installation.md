@@ -48,14 +48,14 @@ pnpm add --save-dev playwright@1.63.0
 pnpm exec playwright install chromium
 ```
 
-Configure its CLI path in `config/test.exs`:
+Configure its installation directory in `config/test.exs`:
 
 ```elixir
 config :fluffy,
   playwright: [
     enabled: true,
     engine: :chromium,
-    executable: Path.expand("../node_modules/playwright/cli.js", __DIR__),
+    assets_dir: Path.expand("..", __DIR__),
     timeout: 15_000,
     launch_options: [headless: true],
     artifact_dir: System.get_env("FLUFFY_ARTIFACT_DIR"),
@@ -63,6 +63,18 @@ config :fluffy,
     js_logger: Fluffy.Playwright.ConsoleLogger
   ]
 ```
+
+Fluffy uses an explicit `executable` first. When `assets_dir` is configured, it
+resolves `node_modules/playwright/cli.js` inside that directory. Otherwise, it uses
+`./assets/node_modules/playwright/cli.js` if present, falling back to
+`playwright_ex`'s default (`playwright` on `PATH`). Relative directories are
+resolved against the current working directory.
+
+Set `launch_options: [timeout: 10_000]` to give browser launch a separate timeout;
+otherwise it uses the global Playwright `timeout`. To use a system browser, set
+`launch_options: [executable_path: System.find_executable("google-chrome-stable")]`.
+A `nil` executable path is treated as omitted, leaving Playwright to select its
+default browser.
 
 Setting `artifact_dir` is recommended for every project that runs Playwright
 tests. Fluffy writes HTML, a full-page screenshot, and the formatted error

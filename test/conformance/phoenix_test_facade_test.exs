@@ -723,6 +723,13 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
     end
   end
 
+  test "used connections are recycled with their session cookies before visiting" do
+    Phoenix.ConnTest.build_conn()
+    |> Phoenix.ConnTest.dispatch(Endpoint, :get, "/session/start?identity=Hermione")
+    |> visit("/session/show")
+    |> assert_has("p", text: "Static identity: Hermione")
+  end
+
   test "prepared connections and scoped page operations preserve the updated connection" do
     for conn <- [Phoenix.ConnTest.build_conn(), put_endpoint(Phoenix.ConnTest.build_conn(), Endpoint)] do
       session = conn |> visit("/chamber?count=2&ready=true") |> assert_path("/chamber")

@@ -48,10 +48,13 @@ defmodule Fluffy.PhoenixTest do
   @spec put_endpoint(Plug.Conn.t(), module()) :: Plug.Conn.t()
   def put_endpoint(%Plug.Conn{} = conn, endpoint), do: Plug.Conn.put_private(conn, :phoenix_endpoint, endpoint)
 
-  @doc "Visits a path. A prepared connection always starts a Phoenix session."
+  @doc """
+  Visits a path. A connection always starts a Phoenix session.
+  Used connections are recycled automatically; fresh prepared connections are preserved.
+  """
   @spec visit(Plug.Conn.t() | session(), String.t()) :: session()
   def visit(%Plug.Conn{} = conn, path) do
-    options = [conn: conn]
+    options = [conn: Phoenix.ConnTest.ensure_recycled(conn)]
 
     options =
       case Map.fetch(conn.private, :phoenix_endpoint) do

@@ -42,6 +42,15 @@ defmodule Fluffy.BrowserRuntimeTest do
     assert BrowserRuntime.status(runtime_name).launch_count == 1
   end
 
+  @tag :tmp_dir
+  test "derives the CLI from assets_dir and preserves explicit executables", %{tmp_dir: directory} do
+    assert Options.validate_playwright!(assets_dir: directory)[:executable] ==
+             Path.join(directory, "node_modules/playwright/cli.js")
+
+    assert Options.validate_playwright!(assets_dir: directory, executable: "custom")[:executable] ==
+             "custom"
+  end
+
   test "validates global Playwright runtime and launch configuration" do
     assert [
              js_logger: Fluffy.Playwright.ConsoleLogger,
@@ -76,14 +85,58 @@ defmodule Fluffy.BrowserRuntimeTest do
                    Options.validate_playwright!(engine: :opera, executable: "playwright")
                  end
 
-    assert_raise ArgumentError, ~r/requires :executable/, fn ->
-      Options.validate_playwright!([])
-    end
+    assert Options.validate_playwright!([])[:enabled]
 
     assert_raise ArgumentError,
                  ~r/:js_logger must be false or a module implementing log\/3/,
                  fn ->
                    Options.validate_playwright!(executable: "playwright", js_logger: true)
                  end
+  end
+
+  test "allows a browser launch timeout independent of the global timeout" do
+    config = Options.validate_playwright!(timeout: 4_000, launch_options: [timeout: 10_000])
+
+    assert config[:timeout] == 4_000
+    assert config[:launch_options][:timeout] == 10_000
+
+    assert_raise NimbleOptions.ValidationError, fn ->
+      Options.validate_playwright!(launch_options: [timeout: -1])
+    end
+  end
+
+  test "treats a nil browser executable path as omitted while validating explicit paths" do
+    omitted = Options.validate_playwright!(launch_options: [headless: false])
+    nil_path = Options.validate_playwright!(launch_options: [headless: false, executable_path: nil])
+
+    assert nil_path == omitted
+
+    explicit = Options.validate_playwright!(launch_options: [executable_path: "/usr/bin/chromium"])
+    assert explicit[:launch_options][:executable_path] == "/usr/bin/chromium"
+
+    assert_raise NimbleOptions.ValidationError, fn ->
+      Options.validate_playwright!(launch_options: [executable_path: false])
+    end
+  end
+end
+
+defmodule Fluffy.PlaywrightExecutableDiscoveryTest do
+  use ExUnit.Case, async: false
+
+  alias Fluffy.Options
+
+  @tag :tmp_dir
+  test "discovers the conventional assets CLI or leaves the dependency default intact", %{tmp_dir: directory} do
+    File.cd!(directory, fn ->
+      refute Keyword.has_key?(Options.validate_playwright!([]), :executable)
+
+      File.mkdir_p!("assets/node_modules/playwright")
+      File.write!("assets/node_modules/playwright/cli.js", "")
+
+      assert Options.validate_playwright!([])[:executable] ==
+               Path.join(directory, "assets/node_modules/playwright/cli.js")
+
+      assert Options.validate_playwright!(executable: "custom")[:executable] == "custom"
+    end)
   end
 end
