@@ -85,6 +85,26 @@ defmodule Fluffy.PlaywrightTraceTest do
            end)
   end
 
+  test "coverage records instrumented page coverage in the trace archive", context do
+    directory = trace_directory(context)
+    body = "<script>window.__coverage__ = #{istanbul_coverage()}</script><h1>Covered</h1>"
+    fixture = TestHTTPFixtures.register(fn _request -> %{body: html(body)} end)
+
+    for {name, options} <- [{"with coverage", [coverage: true]}, {"without coverage", []}] do
+      :playwright
+      |> start_session(base_url: Fluffy.TestServer.base_url())
+      |> Playwright.trace([directory: directory, name: name, open: false] ++ options)
+      |> visit(TestHTTPFixtures.path(fixture, "/covered"))
+      |> expect("Covered" |> by_text() |> to_be_visible())
+    end
+
+    :ok = GenServer.stop(TestScope.current())
+
+    assert %{~c"trace.coverage" => coverage} = trace_entries(directory, "with-coverage-*.zip")
+    assert coverage =~ "fluffy/covered.js"
+    refute Map.has_key?(trace_entries(directory, "without-coverage-*.zip"), ~c"trace.coverage")
+  end
+
   test "trace is Playwright-only" do
     session =
       start_session(:phoenix,
@@ -117,6 +137,28 @@ defmodule Fluffy.PlaywrightTraceTest do
 
     on_exit(fn -> File.rm_rf!(path) end)
     path
+  end
+
+  defp trace_entries(directory, pattern) do
+    assert [path] = Path.wildcard(Path.join(directory, pattern))
+    assert {:ok, entries} = :zip.extract(String.to_charlist(path), [:memory])
+    Map.new(entries)
+  end
+
+  defp istanbul_coverage do
+    location = %{start: %{line: 1, column: 0}, end: %{line: 1, column: 10}}
+
+    JSON.encode!(%{
+      "fluffy/covered.js" => %{
+        path: "fluffy/covered.js",
+        statementMap: %{"0" => location},
+        fnMap: %{},
+        branchMap: %{},
+        s: %{"0" => 1},
+        f: %{},
+        b: %{}
+      }
+    })
   end
 
   defp html(body), do: "<!doctype html><html><body>#{body}</body></html>"

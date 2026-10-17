@@ -45,6 +45,11 @@ defmodule Fluffy.Playwright do
                     type: :boolean,
                     default: true,
                     doc: "Include source files in the trace."
+                  ],
+                  coverage: [
+                    type: :boolean,
+                    default: false,
+                    doc: "Record Istanbul coverage from instrumented page code (`window.__coverage__`)."
                   ]
                 )
 

@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `Fluffy.Playwright.trace/2` accepts `coverage: true` to record Istanbul coverage from instrumented page code (`window.__coverage__`) into the trace archive.
+
+### Changed
+
+- Playwright 1.64 or later is required.
+
 ## 0.7.0 — 2026-10-05
 
 ### Changed

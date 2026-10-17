@@ -44,7 +44,7 @@ Only the Playwright backend needs JavaScript and a browser. Install the tested
 Playwright version in your application:
 
 ```bash
-pnpm add --save-dev playwright@1.63.0
+pnpm add --save-dev playwright@1.64.1
 pnpm exec playwright install chromium
 ```
 

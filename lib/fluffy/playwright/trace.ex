@@ -35,7 +35,8 @@ defmodule Fluffy.Playwright.Trace do
       title: title,
       screenshots: Keyword.fetch!(options, :screenshots),
       snapshots: Keyword.fetch!(options, :snapshots),
-      sources: Keyword.fetch!(options, :sources)
+      sources: Keyword.fetch!(options, :sources),
+      coverage: Keyword.fetch!(options, :coverage)
     ]
 
     case Tracing.tracing_start(context.tracing_id, tracing_options) do
