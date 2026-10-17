@@ -57,6 +57,7 @@ jobs:
             mv package.json.tmp package.json
           fi
           awk '$1 == "elixir" || $1 == "erlang" { print $1 "=" $2 }' .tool-versions >> "$GITHUB_OUTPUT"
+          echo "image=$ImageOS" >> "$GITHUB_OUTPUT"
       - name: Setup toolchain
         uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
         with:
@@ -67,9 +68,9 @@ jobs:
           path: |
             ~/.mix/dialyxir*.plt*
             _build/test/dialyxir*.plt*
-          key: dialyzer-${{ runner.os }}-erlang-${{ steps.toolchain.outputs.erlang }}-elixir-${{ steps.toolchain.outputs.elixir }}-${{ hashFiles('mix.lock') }}
+          key: dialyzer-${{ steps.toolchain.outputs.image }}-erlang-${{ steps.toolchain.outputs.erlang }}-elixir-${{ steps.toolchain.outputs.elixir }}-${{ hashFiles('mix.lock') }}
           restore-keys: |
-            dialyzer-${{ runner.os }}-erlang-${{ steps.toolchain.outputs.erlang }}-elixir-${{ steps.toolchain.outputs.elixir }}-
+            dialyzer-${{ steps.toolchain.outputs.image }}-erlang-${{ steps.toolchain.outputs.erlang }}-elixir-${{ steps.toolchain.outputs.elixir }}-
       - name: Restore Playwright browsers
         id: playwright-cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
@@ -101,7 +102,9 @@ jobs:
           echo "retried=true" >> "$GITHUB_OUTPUT"
           echo "::warning::Tests failed; retrying once with seed $fluffy_test_seed. Both attempts' failure artifacts will be uploaded."
           FLUFFY_ARTIFACT_DIR="$FLUFFY_ARTIFACT_DIR/retry" mix test --warnings-as-errors --max-cases 4 --seed "$fluffy_test_seed"
-      - run: mix dialyzer --format short --list-unused-filters
+      - name: Run Dialyzer
+        if: matrix.lane == 'newest'
+        run: mix dialyzer --format short --list-unused-filters
       - name: Build documentation without warnings
         env:
           MIX_ENV: dev
