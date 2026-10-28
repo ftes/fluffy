@@ -341,10 +341,7 @@ defmodule Fluffy.Backend.Playwright do
   end
 
   defp ready_navigated_document(state, destination, timeout, live_navigation_cursor) do
-    deadline = Deadline.new(timeout)
-    wait_for_live_view(state, destination, Deadline.remaining(deadline, 1), live_navigation_cursor)
-
-    install_live_navigation_listener(state, destination, Deadline.remaining(deadline, 1))
+    wait_for_live_view(state, destination, timeout, live_navigation_cursor)
   end
 
   defp wait_for_live_view(state, destination, timeout, live_navigation_cursor) do
@@ -357,20 +354,52 @@ defmodule Fluffy.Backend.Playwright do
       Deadline.remaining(deadline, 1)
     )
 
+    # Also installs the LiveView navigation observer, which is idempotent and so
+    # safe to run on every poll, to save a round-trip per adopted document.
+    # Adopting a document moves the navigation cursor past every event so far;
+    # the driver's take_live_navigation relies on that to never adopt the same
+    # navigation twice.
     result =
       Frame.wait_for_function(state.frame_id,
         expression: """
-        () => document.readyState !== 'loading' &&
+        () => {
+          const eventKey = '__fluffyLiveNavigationEvents'
+
+          if (!Array.isArray(window[eventKey])) {
+            window[eventKey] = []
+            window.addEventListener('phx:page-loading-start', event => {
+              const {kind, to} = event.detail ?? {}
+
+              if (kind === 'patch' || kind === 'redirect') {
+                window[eventKey].push({kind, to, complete: false})
+              }
+            })
+            window.addEventListener('phx:page-loading-stop', event => {
+              const {kind, to} = event.detail ?? {}
+              const pending = [...window[eventKey]].reverse().find(candidate =>
+                !candidate.complete && candidate.kind === kind && candidate.to === to
+              )
+
+              if (pending) pending.complete = true
+            })
+          }
+
+          const connected = document.readyState !== 'loading' &&
             Array.from(document.querySelectorAll('[data-phx-main], [data-phx-session]'))
-          .every(element => {
-            // Parent patches can remove a nested view's phx-connected class.
-            // Read the bound view without requiring a window.liveSocket global.
-            const view = element.phxPrivate?.view
-            if (typeof view?.isConnected === 'function' && typeof view?.isJoinPending === 'function') {
-              return view.isConnected() && !view.isJoinPending()
-            }
-            return element.classList.contains('phx-connected')
-          })
+              .every(element => {
+                // Parent patches can remove a nested view's phx-connected class.
+                // Read the bound view without requiring a window.liveSocket global.
+                const view = element.phxPrivate?.view
+                if (typeof view?.isConnected === 'function' && typeof view?.isJoinPending === 'function') {
+                  return view.isConnected() && !view.isJoinPending()
+                }
+                return element.classList.contains('phx-connected')
+              })
+
+          if (connected) window.__fluffyLiveNavigationCursor = window[eventKey].length
+
+          return connected
+        }
         """,
         is_function: true,
         timeout: Deadline.remaining(deadline, 1)
@@ -382,45 +411,6 @@ defmodule Fluffy.Backend.Playwright do
 
       {:error, error} ->
         raise "LiveView browser connection failed for #{navigation_target(state, destination)}: expected every LiveView root to be connected with its join complete, got #{inspect(error)}"
-    end
-  end
-
-  defp install_live_navigation_listener(state, destination, timeout) do
-    case Frame.evaluate(state.frame_id,
-           expression: """
-           () => {
-             const eventKey = '__fluffyLiveNavigationEvents'
-
-             if (!Array.isArray(window[eventKey])) {
-               window[eventKey] = []
-               window.addEventListener('phx:page-loading-start', event => {
-                 const {kind, to} = event.detail ?? {}
-
-                 if (kind === 'patch' || kind === 'redirect') {
-                   window[eventKey].push({kind, to, complete: false})
-                 }
-               })
-               window.addEventListener('phx:page-loading-stop', event => {
-                 const {kind, to} = event.detail ?? {}
-                 const pending = [...window[eventKey]].reverse().find(candidate =>
-                   !candidate.complete && candidate.kind === kind && candidate.to === to
-                 )
-
-                 if (pending) pending.complete = true
-               })
-             }
-
-             return true
-           }
-           """,
-           is_function: true,
-           timeout: timeout
-         ) do
-      {:ok, _result} ->
-        :ok
-
-      {:error, error} ->
-        raise "Could not install the LiveView navigation observer for #{navigation_target(state, destination)}: #{inspect(error)}"
     end
   end
 

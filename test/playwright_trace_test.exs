@@ -11,6 +11,7 @@ defmodule Fluffy.PlaywrightTraceTest do
   alias Fluffy.Playwright
   alias Fluffy.TestHTTPFixtures
   alias Fluffy.TestScope
+  alias Fluffy.TestWeb.Endpoint
 
   test "saves a multi-page context trace before scope cleanup closes the browser", context do
     directory = trace_directory(context)
@@ -108,7 +109,7 @@ defmodule Fluffy.PlaywrightTraceTest do
   test "trace is Playwright-only" do
     session =
       start_session(:phoenix,
-        endpoint: Fluffy.TestWeb.Endpoint,
+        endpoint: Endpoint,
         base_url: Fluffy.TestServer.base_url()
       )
 
@@ -126,6 +127,28 @@ defmodule Fluffy.PlaywrightTraceTest do
     assert_raise ArgumentError, ~r/already tracing/, fn ->
       Playwright.trace(session, directory: trace_directory(context), open: false)
     end
+  end
+
+  test "LiveView navigation bookkeeping costs one browser call per action", context do
+    directory = trace_directory(context)
+
+    :playwright
+    |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+    |> Playwright.trace(directory: directory, name: "round-trips", open: false)
+    |> visit("/live/chamber-map")
+    |> click(by_text("Saves: 0"))
+    |> click(by_text("Saves: 0"))
+
+    :ok = GenServer.stop(TestScope.current())
+
+    calls =
+      for {name, body} <- trace_entries(directory, "round-trips-*.zip"),
+          List.to_string(name) =~ ~r/\.trace$/,
+          line <- String.split(body, "\n", trim: true),
+          %{"type" => "before", "class" => "Frame", "method" => method} <- [Jason.decode!(line)],
+          do: method
+
+    assert calls == ~w(goto waitForFunction click evaluateExpression click evaluateExpression)
   end
 
   defp trace_directory(context) do

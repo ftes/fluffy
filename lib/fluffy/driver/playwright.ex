@@ -447,12 +447,10 @@ defmodule Fluffy.Driver.Playwright do
   defp navigation_aware_action(session, operation_timeout, action) do
     # Browser bookkeeping has its own budget; it must not consume a short
     # action/assertion timeout or silently leave navigation state stale.
-    deadline = Deadline.new(max(Session.context(session).timeout, 1))
     prepare_document(session)
     state = Session.page_state(session)
 
     previous_url = Session.current_page(session).url
-    navigation_cursor = live_navigation_cursor(state, Deadline.remaining(deadline, 1))
 
     case action.(operation_timeout) do
       {:ok, value} ->
@@ -461,7 +459,6 @@ defmodule Fluffy.Driver.Playwright do
             session,
             state,
             previous_url,
-            navigation_cursor,
             Deadline.new(max(Session.context(session).timeout, 1))
           )
 
@@ -486,10 +483,10 @@ defmodule Fluffy.Driver.Playwright do
     end
   end
 
-  defp reconcile_action_navigation(session, state, previous_url, navigation_cursor, deadline) do
-    kind = live_navigation_kind(state, navigation_cursor, Deadline.remaining(deadline, 1))
+  defp reconcile_action_navigation(session, state, previous_url, deadline) do
+    {navigation_cursor, kind, complete?} = take_live_navigation(state, Deadline.remaining(deadline, 1))
 
-    if kind in [:redirect, :patch] do
+    if kind in [:redirect, :patch] and not complete? do
       complete_live_navigation(state, navigation_cursor, Deadline.remaining(deadline, 1))
     end
 
@@ -530,32 +527,37 @@ defmodule Fluffy.Driver.Playwright do
     end
   end
 
-  defp live_navigation_cursor(state, operation_timeout) do
+  # Takes every LiveView navigation not adopted yet in one round-trip: all
+  # events after the in-page cursor, not only those this action caused. This
+  # moves the cursor past them, and so does every document adoption (see
+  # wait_for_live_view in Fluffy.Backend.Playwright). Any new path that commits
+  # a browser navigation must move the cursor too, or the next action adopts
+  # the same navigation again.
+  defp take_live_navigation(state, operation_timeout) do
     case Frame.evaluate(state.frame_id,
-           expression: "() => window.__fluffyLiveNavigationEvents?.length ?? 0",
+           expression: """
+           () => {
+             const events = window.__fluffyLiveNavigationEvents
+             if (!Array.isArray(events)) return [0, 'document', true]
+
+             const cursor = Math.min(window.__fluffyLiveNavigationCursor ?? 0, events.length)
+             const pending = events.slice(cursor)
+             window.__fluffyLiveNavigationCursor = events.length
+
+             return [cursor, pending.at(-1)?.kind ?? 'document', pending.every(event => event.complete)]
+           }
+           """,
            is_function: true,
            timeout: operation_timeout
          ) do
-      {:ok, cursor} when is_integer(cursor) -> cursor
-      {:ok, _unexpected} -> 0
-      {:error, _error} -> 0
+      {:ok, [cursor, kind, complete?]} when is_integer(cursor) -> {cursor, live_navigation_kind(kind), complete?}
+      _otherwise -> {0, :document, true}
     end
   end
 
-  defp live_navigation_kind(state, cursor, operation_timeout) do
-    case Frame.evaluate(state.frame_id,
-           expression: """
-           cursor => window.__fluffyLiveNavigationEvents?.slice(cursor).at(-1)?.kind ?? 'document'
-           """,
-           is_function: true,
-           arg: cursor,
-           timeout: operation_timeout
-         ) do
-      {:ok, "patch"} -> :patch
-      {:ok, "redirect"} -> :redirect
-      _otherwise -> :document
-    end
-  end
+  defp live_navigation_kind("patch"), do: :patch
+  defp live_navigation_kind("redirect"), do: :redirect
+  defp live_navigation_kind(_kind), do: :document
 
   defp timeout_for(%Expect{} = expectation) do
     Keyword.get(expectation.options, :timeout, timeout())

@@ -10,6 +10,8 @@
 
 - Playwright 1.64 or later is required.
 
+- Playwright actions track LiveView navigation with one browser round-trip instead of three, and adopting a document no longer needs a separate round-trip to install the navigation observer.
+
 ## 0.7.0 — 2026-10-05
 
 ### Changed
