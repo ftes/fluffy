@@ -72,6 +72,11 @@ LiveViews, links, redirects, cookies, and LiveView events. Its first visit
 selects the Static or LiveView driver. Later document navigations select the
 driver for the new page again without changing the public session.
 
+The LiveView driver sees the whole page, as a browser does: the root layout
+around the LiveView, `live_title` updates, and portal content in its target.
+`Phoenix.LiveViewTest.render/1` covers only the LiveView's own markup. See
+[LiveView document and patch boundaries](capabilities.md#liveview-document-and-patch-boundaries).
+
 For LiveView event scheduling and keyboard limitations, see
 [LiveView timing and keyboard events](capabilities.md#liveview-timing-and-keyboard-events).
 
@@ -456,7 +461,7 @@ session
 
 Title assertions normalize whitespace. LiveView and Playwright retry until
 the title matches; Static checks immediately. LiveView also observes later
-`@page_title` updates.
+`@page_title` updates, including `live_title` prefixes and suffixes.
 
 URL assertions use the same `page_` prefix. Strings and regular expressions
 match the complete canonical URL. Use the structured form when query

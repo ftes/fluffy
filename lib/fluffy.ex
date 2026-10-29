@@ -92,10 +92,10 @@ defmodule Fluffy do
   @doc """
   Opens a temporary HTML snapshot of the active page in your default browser.
 
-  Returns the unchanged session so it can be used in a pipeline. LiveView pages
-  use `Phoenix.LiveViewTest.open_browser/1`. Static pages resolve local assets
-  through the session endpoint; Playwright pages resolve assets against the page
-  URL. Scripts are removed. This is an HTML snapshot, not an offline archive:
+  Returns the unchanged session so it can be used in a pipeline. Static and
+  LiveView pages resolve local assets through the session endpoint; LiveView
+  snapshots show the full page, including the root layout and portal content.
+  Playwright pages resolve assets against the page URL. Scripts are removed. This is an HTML snapshot, not an offline archive:
   browser resources must remain accessible, and DOM properties such as unsaved
   input values, canvas contents, and shadow roots are not serialized.
 
