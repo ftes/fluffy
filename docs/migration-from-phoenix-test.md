@@ -21,6 +21,16 @@ may still need an assertion.
 See [Actionability checks and waiting](usage.md#actionability-checks-and-waiting)
 for supported retries, timeout options, and connection readiness.
 
+## The whole page in LiveView tests
+
+PhoenixTest's LiveView driver, like `Phoenix.LiveViewTest.render/1`, sees only the
+LiveView's own markup. Fluffy keeps the root layout around it, so `assert_has` and
+clicks also work on navigation and other layout content. Title assertions include
+`live_title` prefixes and suffixes after `@page_title` changes. Portal content is
+moved into its target as in the browser, so modals and toasts rendered with
+`<.portal>` can be asserted and clicked; LiveViewTest leaves it inside a `<template>`.
+See [LiveView document and patch boundaries](capabilities.md#liveview-document-and-patch-boundaries).
+
 ## Replace the import and add lifecycle setup
 
 Replace `import PhoenixTest` with `import Fluffy.PhoenixTest`, including imports

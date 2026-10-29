@@ -18,7 +18,8 @@ run without a browser behave consistently. See the
 helpers such as `fill_in`, `click_button`, and `assert_has`. The facade makes
 Fluffy mostly a drop-in replacement for supported tests, including browser tests.
 Get automatic waiting for LiveView actions and assertions, plus automatic
-LiveView connection waiting in browser tests.
+LiveView connection waiting in browser tests. LiveView tests also see the whole
+page, including the root layout, `live_title` updates, and portal content.
 [Start with the migration guide →](docs/migration-from-phoenix-test.md)
 
 ```elixir

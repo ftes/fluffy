@@ -13,6 +13,7 @@ defmodule Fluffy.Backend.Phoenix do
   alias Fluffy.ClientDOM
   alias Fluffy.Download
   alias Fluffy.Driver.Live, as: LiveDriver
+  alias Fluffy.Driver.Live.Document, as: LiveDocument
   alias Fluffy.Driver.Live.State, as: LiveState
   alias Fluffy.Driver.Live.UploadState
   alias Fluffy.Driver.Static.State, as: StaticState
@@ -246,7 +247,7 @@ defmodule Fluffy.Backend.Phoenix do
   defp encode_post_submission(%{fields: fields}), do: Fluffy.Form.url_encode(fields)
 
   @doc false
-  def commit_live(%Session{} = session, conn, view, destination) do
+  def commit_live(%Session{} = session, conn, view, html, destination) do
     proxy_pid = live_view_proxy_pid(view)
     Process.unlink(proxy_pid)
 
@@ -271,8 +272,11 @@ defmodule Fluffy.Backend.Phoenix do
     :ok =
       register_process(session.runtime, :live_view, proxy_pid, Session.context(session).timeout)
 
+    document = LiveDocument.new(html, view.id)
+
     state = %LiveState{
-      client_dom: ClientDOM.from_fragment(render(view)),
+      client_dom: document |> LiveDocument.compose(render(view), page_title(view)) |> ClientDOM.from_document(),
+      document: document,
       live_uploads: UploadState.new(),
       view: view,
       watcher: watcher
@@ -328,8 +332,8 @@ defmodule Fluffy.Backend.Phoenix do
 
   defp commit_response(%{assigns: %{live_module: _module}} = conn, session, url) do
     case live(conn) do
-      {:ok, view, _html} ->
-        commit_live(session, conn, view, URI.to_string(url))
+      {:ok, view, html} ->
+        commit_live(session, conn, view, html, URI.to_string(url))
 
       {:error, reason} ->
         raise "LiveView navigation failed: #{inspect(reason)}"
