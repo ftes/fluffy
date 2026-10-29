@@ -6,28 +6,64 @@ defmodule Fluffy.Driver.Live.Document do
   # and teleports portal content into its target. Rebuild that document from
   # the initial `live/2` HTML after every render.
 
-  @enforce_keys [:tree, :view_id, :title]
-  defstruct [:tree, :view_id, :title]
+  # The layout is serialized once around placeholders for the view and the
+  # title text. Every render then builds one HTML string, applies portals to
+  # it, and parses it once.
 
-  @type t :: %__MODULE__{tree: LazyHTML.Tree.t(), view_id: String.t(), title: String.t() | nil}
+  @enforce_keys [:parts, :title]
+  defstruct [:parts, :title]
+
+  @type title :: %{text: String.t(), html: String.t(), prefix: String.t(), suffix: String.t(), default: String.t() | nil}
+  @type t :: %__MODULE__{parts: [String.t() | :view | :title], title: title() | nil}
 
   @node_marker "data-fluffy-node"
+  @view_marker "fluffy-live-view"
+  @title_marker "fluffy-live-title"
 
   @spec new(String.t(), String.t()) :: t()
   def new(html, view_id) when is_binary(html) and is_binary(view_id) do
     tree = html |> LazyHTML.from_document() |> LazyHTML.to_tree()
-    %__MODULE__{tree: tree, view_id: view_id, title: tree |> find_title() |> title_text()}
+    title = tree |> find_title() |> title_state()
+
+    tree =
+      tree
+      |> replace_element(view_id, [{:comment, @view_marker}])
+      |> update_first(&match?({"title", _attributes, _children}, &1), fn {"title", attributes, _children} ->
+        {"title", attributes, [@title_marker]}
+      end)
+
+    layout = serialize(tree)
+    %__MODULE__{parts: split(layout, ["<!--#{@view_marker}-->", @title_marker]), title: title}
   end
 
   @spec compose(t(), String.t(), String.t() | nil) :: LazyHTML.t()
   def compose(%__MODULE__{} = shell, view_html, page_title) when is_binary(view_html) do
-    view = view_html |> LazyHTML.from_fragment() |> LazyHTML.to_tree()
+    title_html = title_html(shell.title, page_title)
 
-    shell.tree
-    |> replace_element(shell.view_id, view)
-    |> put_title(shell.title, page_title)
+    shell.parts
+    |> Enum.map(fn
+      :view -> view_html
+      :title -> title_html
+      part -> part
+    end)
+    |> IO.iodata_to_binary()
     |> teleport_portals()
-    |> LazyHTML.from_tree()
+    |> LazyHTML.from_document()
+  end
+
+  # LazyHTML.from_tree/1 is far slower than serializing and parsing again.
+  defp serialize(tree), do: "<!DOCTYPE html>" <> LazyHTML.Tree.to_html(tree)
+
+  defp split(layout, [view_marker, title_marker]) do
+    markers = Regex.compile!("(#{Regex.escape(view_marker)}|#{Regex.escape(title_marker)})")
+
+    markers
+    |> Regex.split(layout, include_captures: true)
+    |> Enum.map(fn
+      ^view_marker -> :view
+      ^title_marker -> :title
+      part -> part
+    end)
   end
 
   defp replace_element(nodes, view_id, replacement) do
@@ -47,24 +83,18 @@ defmodule Fluffy.Driver.Live.Document do
   # Mirrors DOM.putTitle in the LiveView client. Before the first title update,
   # LiveViewTest reports the dead-rendered <title> text, which already includes
   # any prefix and suffix. Later updates arrive HTML-escaped and unwrapped.
-  defp put_title(tree, _initial_title, nil), do: tree
+  defp title_html(nil, _page_title), do: ""
+  defp title_html(title, nil), do: title.html
 
-  defp put_title(tree, initial_title, page_title) do
-    if normalize(page_title) == initial_title, do: tree, else: update_title(tree, unescape(page_title))
-  end
+  defp title_html(title, page_title) do
+    text = unescape(page_title)
 
-  defp update_title(tree, title) do
-    update_first(tree, &match?({"title", _attributes, _children}, &1), fn {"title", attributes, children} ->
-      prefix = attribute(attributes, "data-prefix") || ""
-      suffix = attribute(attributes, "data-suffix") || ""
-      default = attribute(attributes, "data-default")
-
-      cond do
-        String.trim(title) != "" -> {"title", attributes, [prefix <> title <> suffix]}
-        is_binary(default) -> {"title", attributes, [prefix <> default <> suffix]}
-        true -> {"title", attributes, children}
-      end
-    end)
+    cond do
+      normalize(page_title) == title.text -> title.html
+      String.trim(text) != "" -> escape(title.prefix <> text <> title.suffix)
+      is_binary(title.default) -> escape(title.prefix <> title.default <> title.suffix)
+      true -> title.html
+    end
   end
 
   defp find_title(nodes) do
@@ -75,17 +105,35 @@ defmodule Fluffy.Driver.Live.Document do
     end)
   end
 
-  defp title_text(nil), do: nil
-  defp title_text(title), do: [title] |> LazyHTML.from_tree() |> LazyHTML.text() |> normalize()
+  defp title_state(nil), do: nil
+
+  defp title_state({"title", attributes, _children} = title) do
+    text = [title] |> LazyHTML.from_tree() |> LazyHTML.text()
+
+    %{
+      text: normalize(text),
+      html: escape(text),
+      prefix: attribute(attributes, "data-prefix") || "",
+      suffix: attribute(attributes, "data-suffix") || "",
+      default: attribute(attributes, "data-default")
+    }
+  end
 
   # document.title strips and collapses ASCII whitespace.
   defp normalize(text), do: text |> String.split(~r/[\t\n\f\r ]+/, trim: true) |> Enum.join(" ")
 
   defp unescape(html), do: html |> LazyHTML.from_fragment() |> LazyHTML.text()
+  defp escape(text), do: text |> Phoenix.HTML.html_escape() |> Phoenix.HTML.safe_to_string()
 
   # Mirrors DOMPatch.teleport in the LiveView client: append the template's
   # root element to the target and mark it with the owning view and source.
-  defp teleport_portals(tree) do
+  defp teleport_portals(html) do
+    if String.contains?(html, "data-phx-portal"),
+      do: html |> LazyHTML.from_document() |> LazyHTML.to_tree() |> teleport_tree(),
+      else: html
+  end
+
+  defp teleport_tree(tree) do
     tree
     |> portals(nil, [])
     |> Enum.reverse()
@@ -104,6 +152,7 @@ defmodule Fluffy.Driver.Live.Document do
           update_at(tree, index, fn {tag, attributes, children} -> {tag, attributes, children ++ [teleported]} end)
       end
     end)
+    |> serialize()
   end
 
   defp portals(nodes, view_id, acc) do
@@ -132,7 +181,7 @@ defmodule Fluffy.Driver.Live.Document do
   defp target_index(tree, selector) do
     {tagged, _next} = tag_elements(tree, 0)
 
-    case tagged |> LazyHTML.from_tree() |> LazyHTML.query(selector) |> Enum.at(0) do
+    case tagged |> serialize() |> LazyHTML.from_document() |> LazyHTML.query(selector) |> Enum.at(0) do
       nil -> nil
       element -> element |> LazyHTML.attribute(@node_marker) |> List.first() |> String.to_integer()
     end
