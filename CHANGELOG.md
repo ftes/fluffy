@@ -5,10 +5,13 @@
 ### Added
 
 - `Fluffy.Playwright.trace/2` accepts `coverage: true` to record Istanbul coverage from instrumented page code (`window.__coverage__`) into the trace archive.
+- LiveView sessions see the full document: the root layout around the LiveView, `live_title` updates in `<title>`, and portal content in its target. Layout and portal elements can be located and acted on.
 
 ### Changed
 
 - Playwright 1.64 or later is required.
+- LiveView title assertions read `<title>`, including `live_title` prefix and suffix, matching Static and Playwright.
+- LiveView `open_browser` writes the composed document instead of calling `Phoenix.LiveViewTest.open_browser/2`.
 
 ## 0.7.0 — 2026-10-05
 

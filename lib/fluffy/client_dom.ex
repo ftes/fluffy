@@ -24,6 +24,8 @@ defmodule Fluffy.ClientDOM do
     html |> LazyHTML.from_document() |> new()
   end
 
+  def from_document(%LazyHTML{} = document), do: new(document)
+
   defp new(document) do
     index = index(%__MODULE__{document: document})
 
@@ -51,8 +53,11 @@ defmodule Fluffy.ClientDOM do
   end
 
   def reconcile(%__MODULE__{} = client_dom, html) when is_binary(html) do
+    reconcile(client_dom, LazyHTML.from_fragment(html))
+  end
+
+  def reconcile(%__MODULE__{} = client_dom, %LazyHTML{} = new_document) do
     old_nodes = index(client_dom).entries
-    new_document = LazyHTML.from_fragment(html)
     new_index = index(%__MODULE__{document: new_document})
     new_nodes = new_index.entries
     new_by_identity = Map.new(new_nodes, &{&1.identity, &1})

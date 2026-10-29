@@ -8,6 +8,8 @@ defmodule Fluffy.Driver.Live do
   alias Fluffy.ClientDOM
   alias Fluffy.Driver.Live.ActionResolver
   alias Fluffy.Driver.Live.Click
+  alias Fluffy.Driver.Live.Document
+  alias Fluffy.Driver.Live.Event
   alias Fluffy.Driver.Live.Retry
   alias Fluffy.Driver.Live.UploadState
   alias Fluffy.Expect
@@ -24,7 +26,8 @@ defmodule Fluffy.Driver.Live do
 
   @impl true
   def open_browser(%Session{} = session, open_fun) do
-    Phoenix.LiveViewTest.open_browser(Session.page_state(session).view, open_fun)
+    endpoint = Session.context(session).http.endpoint
+    Fluffy.OpenBrowser.write(document(session), Fluffy.OpenBrowser.static_asset_resolver(endpoint), open_fun)
     session
   end
 
@@ -97,7 +100,7 @@ defmodule Fluffy.Driver.Live do
       :render_click ->
         result =
           try do
-            Click.render(event_view, client_dom, target, selector_for_view(client_dom, target.selector, event_context))
+            Click.render(event_view, client_dom, target, view_selector(client_dom, target.selector, event_context))
           catch
             :exit, reason -> raise Fluffy.LiveViewError, reason: reason
           end
@@ -163,9 +166,7 @@ defmodule Fluffy.Driver.Live do
 
         result =
           try do
-            event_view
-            |> element(selector_for_view(client_dom, event.dispatcher_selector, event_context))
-            |> render_change(payload)
+            render_view_event(client_dom, event_context, event.dispatcher_selector, :change, payload)
           catch
             :exit, reason -> raise Fluffy.LiveViewError, reason: reason
           end
@@ -321,16 +322,10 @@ defmodule Fluffy.Driver.Live do
       {%Session{} = session, target} ->
         state = Session.page_state(session)
         context = owning_view_context(state.view, target)
-        selector = selector_for_view(state.client_dom, target.selector, context)
 
         result =
           try do
-            event_element = element(context.view, selector)
-
-            case phase do
-              :keydown -> render_keydown(event_element, %{"key" => key})
-              :keyup -> render_keyup(event_element, %{"key" => key})
-            end
+            render_view_event(state.client_dom, context, target.selector, phase, %{"key" => key})
           catch
             :exit, reason -> raise Fluffy.LiveViewError, reason: reason
           end
@@ -364,7 +359,12 @@ defmodule Fluffy.Driver.Live do
   end
 
   defp evaluate_expectation(%Session{} = session, %Expect{target: :page, kind: :title, expected: expected}) do
-    actual = session |> Session.page_state() |> Map.fetch!(:view) |> page_title()
+    actual =
+      case session |> document() |> LazyHTML.query("title") |> Enum.at(0) do
+        nil -> nil
+        title -> LazyHTML.text(title)
+      end
+
     {:ok, Expect.title_matches?(expected, actual), actual}
   end
 
@@ -398,7 +398,7 @@ defmodule Fluffy.Driver.Live do
         html when is_binary(html) ->
           Session.put_page_state(session, %{
             state
-            | client_dom: ClientDOM.reconcile(state.client_dom, html)
+            | client_dom: ClientDOM.reconcile(state.client_dom, compose(state, html))
           })
 
         {:error, redirect} ->
@@ -539,7 +539,7 @@ defmodule Fluffy.Driver.Live do
 
     case rendered do
       {:ok, html} when is_binary(html) ->
-        state = %{state | client_dom: ClientDOM.reconcile(client_dom, html)}
+        state = %{state | client_dom: ClientDOM.reconcile(client_dom, compose(state, html))}
         session = session |> Session.put_page_state(state) |> prune_stale_live_uploads()
 
         case ClientDOM.triggered_submission(state.client_dom) do
@@ -564,6 +564,8 @@ defmodule Fluffy.Driver.Live do
         end
     end
   end
+
+  defp compose(state, html), do: Document.compose(state.document, html, page_title(state.view))
 
   defp follow_redirect_result(session, {:error, {_kind, %{to: destination} = options}}) do
     {:navigate, session, Navigation.redirect(destination, flash: options[:flash])}
@@ -609,9 +611,7 @@ defmodule Fluffy.Driver.Live do
 
         result =
           try do
-            event_view
-            |> element(selector_for_view(client_dom, event.dispatcher_selector, event_context))
-            |> render_change(payload)
+            render_view_event(client_dom, event_context, event.dispatcher_selector, :change, payload)
           catch
             :exit, reason -> raise Fluffy.LiveViewError, reason: reason
           end
@@ -623,20 +623,12 @@ defmodule Fluffy.Driver.Live do
   defp dispatch_live_submit(session, client_dom, submission, event_context) do
     event_view = event_context.view
 
-    form_selector =
-      selector_for_view(
-        client_dom,
-        ClientDOM.selector_for_node_id(client_dom, submission.form_id),
-        event_context
-      )
-
+    form_selector = ClientDOM.selector_for_node_id(client_dom, submission.form_id)
     payload = Form.to_params(submission.fields)
 
     result =
       try do
-        event_view
-        |> element(form_selector)
-        |> render_submit(payload)
+        render_view_event(client_dom, event_context, form_selector, :submit, payload)
       catch
         :exit, reason -> raise Fluffy.LiveViewError, reason: reason
       end
@@ -644,22 +636,42 @@ defmodule Fluffy.Driver.Live do
     commit_render_result(session, client_dom, result, event_view)
   end
 
+  # Resolves the view a target's bindings reach, like the LiveView client's
+  # owner lookup. Teleported portal content belongs to the view that owns the
+  # portal, and elements outside every LiveView fall back to the main view.
+  # `root_id` is the container that LiveViewTest selectors are relative to; it
+  # is nil when element/2 cannot reach the target.
   defp owning_view_context(root_view, target) do
     target.ancestors
     |> Kernel.++([target])
-    |> Enum.reduce(%{view: root_view, root_id: nil}, fn candidate, context ->
-      case {attribute(candidate.attributes, "data-phx-session"), attribute(candidate.attributes, "id")} do
-        {session, id} when is_binary(session) and session != "" and is_binary(id) and id != "" ->
-          if id == context.view.id do
-            context
-          else
-            view =
-              find_live_child(context.view, id) ||
-                raise Fluffy.LiveViewError,
-                  reason: {:nested_live_view_not_found, id, context.view.id}
+    |> Enum.reduce(%{view: root_view, root_id: nil, layout?: true}, fn candidate, context ->
+      teleported = attribute(candidate.attributes, "data-phx-teleported")
 
-            %{view: view, root_id: candidate.id}
+      case {attribute(candidate.attributes, "data-phx-session"), attribute(candidate.attributes, "id")} do
+        _teleported when is_binary(teleported) ->
+          view =
+            find_view(root_view, teleported) ||
+              raise Fluffy.LiveViewError, reason: {:nested_live_view_not_found, teleported, root_view.id}
+
+          %{view: view, root_id: nil, layout?: false}
+
+        {session, id} when is_binary(session) and session != "" and id == root_view.id ->
+          %{view: root_view, root_id: candidate.id, layout?: false}
+
+        {session, id} when is_binary(session) and session != "" and is_binary(id) and id != "" ->
+          if context.layout? do
+            raise Fluffy.CapabilityError,
+              capability: :root_layout_live_views,
+              driver: :live,
+              detail: "LiveViewTest does not connect LiveView #{inspect(id)} rendered outside the main LiveView"
           end
+
+          view =
+            find_live_child(context.view, id) ||
+              raise Fluffy.LiveViewError,
+                reason: {:nested_live_view_not_found, id, context.view.id}
+
+          %{context | view: view, root_id: candidate.id}
 
         _not_a_live_root ->
           context
@@ -667,7 +679,32 @@ defmodule Fluffy.Driver.Live do
     end)
   end
 
-  defp selector_for_view(_client_dom, selector, %{root_id: nil}), do: selector
+  defp find_view(view, id) do
+    if view.id == id, do: view, else: Enum.find_value(live_children(view), &find_view(&1, id))
+  end
+
+  defp view_selector(_client_dom, _selector, %{root_id: nil}), do: nil
+  defp view_selector(client_dom, selector, context), do: selector_for_view(client_dom, selector, context)
+
+  defp render_view_event(client_dom, %{root_id: nil} = context, selector, kind, payload) do
+    target = ClientDOM.target!(client_dom, Locator.new({:css, selector}))
+
+    payload =
+      if kind in [:click, :keydown, :keyup], do: Map.merge(Event.values(target.attributes), payload), else: payload
+
+    Event.push(context.view, target, kind, payload)
+  end
+
+  defp render_view_event(client_dom, context, selector, kind, payload) do
+    element = element(context.view, selector_for_view(client_dom, selector, context))
+
+    case kind do
+      :change -> render_change(element, payload)
+      :submit -> render_submit(element, payload)
+      :keydown -> render_keydown(element, payload)
+      :keyup -> render_keyup(element, payload)
+    end
+  end
 
   defp selector_for_view(client_dom, selector, %{root_id: root_id}) do
     root_selector = ClientDOM.selector_for_node_id(client_dom, root_id)
@@ -695,6 +732,13 @@ defmodule Fluffy.Driver.Live do
     target = ClientDOM.target!(state.client_dom, locator)
     event_context = owning_view_context(state.view, target)
     form_id = Form.owner_id(ClientDOM.index(state.client_dom), target)
+
+    if is_nil(event_context.root_id) do
+      raise Fluffy.CapabilityError,
+        capability: :file_uploads,
+        driver: :live,
+        detail: "LiveView-managed file uploads outside the LiveView container, such as in a portal, require Playwright"
+    end
 
     form_selector =
       selector_for_view(
@@ -986,20 +1030,12 @@ defmodule Fluffy.Driver.Live do
   defp dispatch_live_upload_submit_event(session, form_id, submission, event_context) do
     state = Session.page_state(session)
 
-    form_selector =
-      selector_for_view(
-        state.client_dom,
-        ClientDOM.selector_for_node_id(state.client_dom, form_id),
-        event_context
-      )
-
+    form_selector = ClientDOM.selector_for_node_id(state.client_dom, form_id)
     payload = Form.to_params(submission.fields)
 
     submit_result =
       try do
-        event_context.view
-        |> element(form_selector)
-        |> render_submit(payload)
+        render_view_event(state.client_dom, event_context, form_selector, :submit, payload)
       catch
         :exit, reason -> raise Fluffy.LiveViewError, reason: reason
       end

@@ -107,6 +107,13 @@ defmodule Fluffy.Capability do
         "LiveView retries expectations and typed transient structural action failures against fresh renders under one monotonic deadline."
     },
     %{
+      id: :live_document,
+      feature: "LiveView root layout, title updates, and portals",
+      drivers: %{static: :not_applicable, live: :structural_subset, playwright: :equivalent},
+      detail:
+        "LiveView keeps the dead-rendered root layout around each render, applies live_title updates, and teleports portal content. Layout bindings reach the main LiveView. LiveViews rendered in the root layout stay unconnected and raise a named capability on actions."
+    },
+    %{
       id: :live_change_timing,
       feature: "LiveView form-change delivery and timing",
       drivers: %{

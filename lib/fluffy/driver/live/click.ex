@@ -4,26 +4,47 @@ defmodule Fluffy.Driver.Live.Click do
   import Phoenix.LiveViewTest
 
   alias Fluffy.ClientDOM
+  alias Fluffy.Driver.Live.Event
   alias Fluffy.HTML.Semantics
   alias Fluffy.Locator
 
+  # A nil selector means the target is outside the view's container, so
+  # LiveViewTest's element/2 cannot reach it.
   def render(view, client_dom, target, selector) do
     declaration = attribute(target, "phx-click")
 
-    if Semantics.input_type(target) in ["checkbox", "radio"] and declaration do
-      payload = checkable_payload(client_dom, target)
+    cond do
+      Semantics.input_type(target) in ["checkbox", "radio"] and declaration ->
+        Event.exec(view, declaration, target.attributes, :click, checkable_payload(client_dom, target))
 
-      declaration
-      |> commands()
-      |> Enum.reduce_while(render(view), fn command, result ->
-        case dispatch(command, view, target, payload) do
-          nil -> {:cont, result}
-          {:error, _redirect} = redirect -> {:halt, redirect}
-          html -> {:cont, html}
-        end
-      end)
-    else
-      view |> element(selector) |> render_click()
+      is_nil(selector) ->
+        render_detached(view, target, declaration)
+
+      true ->
+        view |> element(selector) |> render_click()
+    end
+  end
+
+  # Mirrors the LiveView client's data-phx-link handling, which applies to
+  # links anywhere in the document through the main view.
+  defp render_detached(view, target, declaration) do
+    case {attribute(target, "data-phx-link"), attribute(target, "href")} do
+      {"patch", href} when is_binary(href) ->
+        render_patch(view, href)
+
+      {"redirect", href} when is_binary(href) ->
+        kind = if attribute(target, "data-phx-link-state") == "replace", do: :replace, else: :push
+        {:error, {:live_redirect, %{to: href, kind: kind}}}
+
+      _not_a_live_link ->
+        Event.exec(view, declaration, target.attributes, :click, click_payload(target))
+    end
+  end
+
+  defp click_payload(target) do
+    case attribute(target, "value") do
+      nil -> Event.values(target.attributes)
+      value -> Map.put_new(Event.values(target.attributes), "value", value)
     end
   end
 
@@ -31,7 +52,7 @@ defmodule Fluffy.Driver.Live.Click do
   # browser instead uses current checkedness, omitting value when unchecked.
   # Dispatch the complete payload to avoid reintroducing the stale DOM value.
   defp checkable_payload(client_dom, target) do
-    payload = for {"phx-value-" <> key, value} <- target.attributes, into: %{}, do: {key, value}
+    payload = Event.values(target.attributes)
 
     if ClientDOM.checked?(client_dom, Locator.new({:css, target.selector})) do
       Map.put(payload, "value", attribute(target, "value") || "on")
@@ -39,23 +60,6 @@ defmodule Fluffy.Driver.Live.Click do
       Map.delete(payload, "value")
     end
   end
-
-  defp commands("[" <> _ = encoded), do: Phoenix.json_library().decode!(encoded)
-  defp commands(event), do: [["push", %{"event" => event}]]
-
-  defp dispatch(["push", %{"event" => event} = options], view, target, payload) do
-    view
-    |> with_target(options["target"] || attribute(target, "phx-target"))
-    |> render_click(event, Map.merge(payload, options["value"] || %{}))
-  end
-
-  defp dispatch(["patch", %{"href" => href}], view, _target, _payload), do: render_patch(view, href)
-
-  defp dispatch(["navigate", %{"href" => href} = options], _view, _target, _payload) do
-    {:error, {:live_redirect, %{to: href, kind: if(options["replace"], do: :replace, else: :push)}}}
-  end
-
-  defp dispatch(_command, _view, _target, _payload), do: nil
 
   defp attribute(target, key), do: target.attributes |> List.keyfind(key, 0, {key, nil}) |> elem(1)
 end

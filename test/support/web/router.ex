@@ -5,13 +5,19 @@ defmodule Fluffy.TestWeb.Router do
 
   import Phoenix.LiveView.Router
 
+  alias Fluffy.TestWeb.Layouts
+
   pipeline :browser do
     plug(:accepts, ["html"])
     plug(:fetch_session)
     plug(:fetch_live_flash)
-    plug(:put_root_layout, html: {Fluffy.TestWeb.Layouts, :root})
+    plug(:put_root_layout, html: {Layouts, :root})
     plug(:protect_from_forgery)
     plug(:put_secure_browser_headers)
+  end
+
+  pipeline :kennel do
+    plug(:put_root_layout, html: {Layouts, :kennel})
   end
 
   pipeline :initial_connection_authorization do
@@ -57,6 +63,15 @@ defmodule Fluffy.TestWeb.Router do
       live("/enchanted-title", PageTitleLive)
       live("/keyboard", KeyboardLive)
       live("/checked-controls", CheckedControlsLive)
+    end
+  end
+
+  scope "/live", Fluffy.TestWeb do
+    pipe_through([:browser, :kennel])
+
+    live_session :fluffy_kennel, on_mount: Fluffy.Sandbox do
+      live("/kennel", KennelLive)
+      live("/kennel/kitchen", KennelKitchenLive)
     end
   end
 

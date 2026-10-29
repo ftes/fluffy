@@ -23,6 +23,7 @@ boundaries described below.
 | Visits, reloads, links, redirects, cookies, and HTTP forms | equivalent | equivalent |
 | Phoenix.HTML data-method/data-to actions | structural subset | equivalent |
 | LiveView events, patches, navigation, and structural action retry | equivalent | equivalent |
+| LiveView root layout, title updates, and portals | structural subset | equivalent |
 | LiveView form-change delivery and timing | structural subset | equivalent |
 | Declarative LiveView keyboard events | structural subset | equivalent |
 | Supported mutable form state and ordered submission | equivalent | equivalent |
@@ -97,10 +98,14 @@ behavior.
 
 ### LiveView document and patch boundaries
 
-LiveView locators and actions see the current `Phoenix.LiveViewTest.View`, not the
-surrounding dead layout. Use `Phoenix.ConnTest` for initial outer-layout HTML assertions
-or Playwright for full-document interactions. LiveView `Fluffy.unwrap/2` receives only
-the View.
+LiveView locators and actions see the full document: the dead-rendered root layout
+with the current `Phoenix.LiveViewTest.View` render in place, `live_title` updates in
+`<title>`, and portal content teleported into its target. As in the browser, root
+layout bindings reach the main LiveView and portal bindings reach the LiveView that owns
+the portal. Other LiveViews rendered in the root layout, such as sticky ones, are not
+connected by LiveViewTest: they show their dead render, and actions on them raise
+`Fluffy.CapabilityError`. LiveView-managed uploads inside portals require Playwright.
+LiveView `Fluffy.unwrap/2` receives only the View.
 
 ### Tabs, windows, and iframes
 
