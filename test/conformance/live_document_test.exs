@@ -74,6 +74,21 @@ defmodule Fluffy.Conformance.LiveDocumentTest do
     end
   end
 
+  for driver <- [:phoenix, :playwright] do
+    @tag driver: driver
+    test "teleports a portal nested in portal content with #{driver}", %{driver: driver} do
+      status = by_role(:status, name: "Bones")
+
+      driver
+      |> kennel_session()
+      |> visit("/live/kennel")
+      |> expect(to_be_visible(status))
+      |> expect("body > [data-phx-teleported-src=bone-portal] > #bone-status" |> by_css() |> to_have_count(1))
+      |> click(by_role(status, :button, name: "Bury bone"))
+      |> expect(status |> by_text("Bones: 1") |> to_be_visible())
+    end
+  end
+
   @tag driver: :playwright
   test "interacts with a LiveView rendered in the root layout with playwright" do
     :playwright

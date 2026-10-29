@@ -133,26 +133,29 @@ defmodule Fluffy.Driver.Live.Document do
       else: html
   end
 
-  defp teleport_tree(tree) do
-    tree
-    |> portals(nil, [])
-    |> Enum.reverse()
-    |> Enum.reduce(tree, fn portal, tree ->
-      case target_index(tree, portal.target) do
-        nil ->
-          tree
+  # Teleport one portal at a time and rescan, so portals inside teleported
+  # content are found too, like the client's teleports after each morph.
+  defp teleport_tree(tree, teleported_ids \\ MapSet.new()) do
+    case tree |> portals(nil, []) |> Enum.reverse() |> Enum.find(&(not MapSet.member?(teleported_ids, &1.id))) do
+      nil -> serialize(tree)
+      portal -> tree |> teleport(portal) |> teleport_tree(MapSet.put(teleported_ids, portal.id))
+    end
+  end
 
-        index ->
-          teleported =
-            put_attributes(portal.root, [
-              {"data-phx-teleported", portal.view_id},
-              {"data-phx-teleported-src", portal.id}
-            ])
+  defp teleport(tree, portal) do
+    case target_index(tree, portal.target) do
+      nil ->
+        tree
 
-          update_at(tree, index, fn {tag, attributes, children} -> {tag, attributes, children ++ [teleported]} end)
-      end
-    end)
-    |> serialize()
+      index ->
+        teleported =
+          put_attributes(portal.root, [
+            {"data-phx-teleported", portal.view_id},
+            {"data-phx-teleported-src", portal.id}
+          ])
+
+        update_at(tree, index, fn {tag, attributes, children} -> {tag, attributes, children ++ [teleported]} end)
+    end
   end
 
   defp portals(nodes, view_id, acc) do
@@ -168,12 +171,20 @@ defmodule Fluffy.Driver.Live.Document do
         end
 
       {tag, attributes, children}, acc when is_binary(tag) ->
-        view_id = if attribute(attributes, "data-phx-session"), do: attribute(attributes, "id"), else: view_id
-        portals(children, view_id, acc)
+        portals(children, owning_view_id(attributes, view_id), acc)
 
       _text_or_comment, acc ->
         acc
     end)
+  end
+
+  # Teleported content belongs to the view that owns its portal.
+  defp owning_view_id(attributes, view_id) do
+    cond do
+      teleported = attribute(attributes, "data-phx-teleported") -> teleported
+      attribute(attributes, "data-phx-session") -> attribute(attributes, "id")
+      true -> view_id
+    end
   end
 
   # Resolve the portal's CSS target like document.querySelector by tagging

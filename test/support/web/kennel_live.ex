@@ -11,7 +11,8 @@ defmodule Fluffy.TestWeb.KennelLive do
        barks: [],
        tune: nil,
        treats: 0,
-       treat_name: nil
+       treat_name: nil,
+       bones: 0
      )}
   end
 
@@ -41,6 +42,10 @@ defmodule Fluffy.TestWeb.KennelLive do
     {:noreply, assign(socket, :treat_name, treat)}
   end
 
+  def handle_event("bury-bone", _params, socket) do
+    {:noreply, update(socket, :bones, &(&1 + 1))}
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -59,6 +64,12 @@ defmodule Fluffy.TestWeb.KennelLive do
             <button>Name treat</button>
           </form>
           <p>Treat name: {@treat_name}</p>
+          <.portal id="bone-portal" target="body">
+            <div id="bone-status" role="status" aria-label="Bones">
+              <p>Bones: {@bones}</p>
+              <button type="button" phx-click="bury-bone">Bury bone</button>
+            </div>
+          </.portal>
         </div>
       </.portal>
     </main>
