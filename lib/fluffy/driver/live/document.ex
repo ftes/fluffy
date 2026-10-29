@@ -135,10 +135,10 @@ defmodule Fluffy.Driver.Live.Document do
 
   # Teleport one portal at a time and rescan, so portals inside teleported
   # content are found too, like the client's teleports after each morph.
-  defp teleport_tree(tree, teleported_ids \\ MapSet.new()) do
-    case tree |> portals(nil, []) |> Enum.reverse() |> Enum.find(&(not MapSet.member?(teleported_ids, &1.id))) do
+  defp teleport_tree(tree, teleported_ids \\ []) do
+    case tree |> portals(nil, []) |> Enum.reverse() |> Enum.find(&(&1.id not in teleported_ids)) do
       nil -> serialize(tree)
-      portal -> tree |> teleport(portal) |> teleport_tree(MapSet.put(teleported_ids, portal.id))
+      portal -> tree |> teleport(portal) |> teleport_tree([portal.id | teleported_ids])
     end
   end
 
