@@ -6,14 +6,11 @@
     "node": ">=20"
   },
   "scripts": {
-    "build:test": "esbuild assets/js/test_browser.js --bundle --format=esm --target=es2022 --outfile=priv/static/assets/test_browser.js",
+    "build:test": "NODE_PATH=deps esbuild assets/js/test_browser.js --bundle --format=esm --target=es2022 --outfile=priv/static/assets/test_browser.js",
     "playwright:install": "playwright install chromium"
   },
   "devDependencies": {
     "esbuild": "0.28.2",
-    "phoenix": "1.8.16",
-    "phoenix_html": "4.3.0",
-    "phoenix_live_view": "1.2.12",
     "playwright": "1.64.1"
   }
 }
