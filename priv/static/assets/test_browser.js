@@ -1,6 +1,6 @@
-import "phoenix_html"
-import {Socket} from "phoenix"
-import {LiveSocket} from "phoenix_live_view"
+import "/vendor/phoenix_html/phoenix_html.js"
+import {Socket} from "/vendor/phoenix/phoenix.mjs"
+import {LiveSocket} from "/vendor/phoenix_live_view/phoenix_live_view.esm.js"
 
 document.documentElement.dataset.fluffyTestBrowser = "ready"
 

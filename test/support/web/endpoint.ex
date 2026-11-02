@@ -27,6 +27,27 @@ defmodule Fluffy.TestWeb.Endpoint do
     only: ~w(assets)
   )
 
+  plug(Plug.Static,
+    at: "/vendor/phoenix",
+    from: {:phoenix, "priv/static"},
+    gzip: false,
+    only: ~w(phoenix.mjs)
+  )
+
+  plug(Plug.Static,
+    at: "/vendor/phoenix_html",
+    from: {:phoenix_html, "priv/static"},
+    gzip: false,
+    only: ~w(phoenix_html.js)
+  )
+
+  plug(Plug.Static,
+    at: "/vendor/phoenix_live_view",
+    from: {:phoenix_live_view, "priv/static"},
+    gzip: false,
+    only: ~w(phoenix_live_view.esm.js)
+  )
+
   plug(Plug.RequestId)
   plug(Plug.Telemetry, event_prefix: [:phoenix, :endpoint])
   plug(Fluffy.TestHTTPFixturePlug)

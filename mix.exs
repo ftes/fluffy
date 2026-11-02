@@ -141,11 +141,9 @@ defmodule Fluffy.MixProject do
       setup: [
         "deps.get",
         "cmd pnpm install --frozen-lockfile",
-        "assets.build",
         "cmd pnpm exec playwright install chromium"
       ],
       "consumer.regenerate": "run --no-start integration/regenerate_consumer.exs",
-      "assets.build": ["cmd pnpm run build:test"],
       lint: [
         "format --check-formatted",
         "compile --warnings-as-errors",
