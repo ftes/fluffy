@@ -5,6 +5,7 @@
 /docs/.plan/
 /node_modules/
 /.pnpm-store/
+/priv/static/assets/test_browser.js
 /.elixir_ls/
 /.expert/
 .hex/
