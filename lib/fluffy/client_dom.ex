@@ -76,9 +76,9 @@ defmodule Fluffy.ClientDOM do
     new_by_id = Map.new(new_nodes, &{&1.id, &1})
     patched? = patch_tree(LazyHTML.to_tree(client_dom.document)) != patch_tree(LazyHTML.to_tree(new_document))
 
-    properties =
-      Enum.reduce(client_dom.properties, initial_radio_properties(new_index), fn
-        {old_id, old_properties}, properties ->
+    {properties, locally_checked} =
+      Enum.reduce(client_dom.properties, {initial_radio_properties(new_index), MapSet.new()}, fn
+        {old_id, old_properties}, {properties, locally_checked} ->
           with new_id when not is_nil(new_id) <- Map.get(old_to_new, old_id),
                old when not is_nil(old) <- Map.get(old_by_id, old_id),
                new when not is_nil(new) <- Map.get(new_by_id, new_id),
@@ -90,15 +90,20 @@ defmodule Fluffy.ClientDOM do
                    old_to_new,
                    patched? and not triggered_form_control?(new, new_index)
                  ) do
-            Map.put(properties, new_id, reconciled)
+            locally_checked =
+              if Map.get(reconciled, :checked) == true,
+                do: MapSet.put(locally_checked, new_id),
+                else: locally_checked
+
+            {Map.put(properties, new_id, reconciled), locally_checked}
           else
-            _discarded -> properties
+            _discarded -> {properties, locally_checked}
           end
       end)
 
     %__MODULE__{
       document: new_document,
-      properties: properties
+      properties: enforce_radio_group_exclusivity(properties, new_index, locally_checked)
     }
   end
 
@@ -504,6 +509,36 @@ defmodule Fluffy.ClientDOM do
     properties
   end
 
+  # A radio group has at most one checked radio. When reconciliation leaves
+  # several, the server's rendering wins over preserved local checkedness,
+  # mirroring a browser where setting one radio checked clears its group.
+  defp enforce_radio_group_exclusivity(properties, index, locally_checked) do
+    index
+    |> DocumentIndex.targets_by_tag("input")
+    |> Enum.filter(fn target ->
+      input_type(target) == "radio" and attribute(target.attributes, "name") not in [nil, ""] and
+        properties |> Map.get(target.id, %{}) |> Map.get(:checked, has_attribute?(target.attributes, "checked"))
+    end)
+    |> Enum.group_by(&{Map.get(index.form_owner_ids, &1.id), attribute(&1.attributes, "name")}, & &1.id)
+    |> Enum.reduce(properties, fn
+      {_group, [_single]}, properties ->
+        properties
+
+      {_group, checked_ids}, properties ->
+        winner = checked_ids |> Enum.reject(&MapSet.member?(locally_checked, &1)) |> List.last() || List.last(checked_ids)
+
+        checked_ids
+        |> List.delete(winner)
+        |> Enum.reduce(properties, &put_property(&2, &1, :checked, false))
+    end)
+  end
+
+  defp checkable_signature(%{tag: "input", attributes: attributes} = node) do
+    {input_type(node), attribute(attributes, "name"), attribute(attributes, "value")}
+  end
+
+  defp checkable_signature(_node), do: nil
+
   defp default_value(%{tag: "textarea", children: children}), do: tree_text(children)
   defp default_value(%{attributes: attributes}), do: attribute(attributes, "value") || ""
 
@@ -639,12 +674,16 @@ defmodule Fluffy.ClientDOM do
     end
   end
 
+  # Elements without an id are matched by position, so a patch that inserts a
+  # sibling can pair an old control with a different new one. Local checkedness
+  # only belongs to the same control: same type, name and value.
   defp preserve_checkedness(reconciled, properties, old, new) do
     case Map.fetch(properties, :checked) do
       {:ok, checked?} ->
-        if has_attribute?(old.attributes, "checked") == has_attribute?(new.attributes, "checked"),
-          do: Map.put(reconciled, :checked, checked?),
-          else: reconciled
+        if checkable_signature(old) == checkable_signature(new) and
+             has_attribute?(old.attributes, "checked") == has_attribute?(new.attributes, "checked"),
+           do: Map.put(reconciled, :checked, checked?),
+           else: reconciled
 
       :error ->
         reconciled
