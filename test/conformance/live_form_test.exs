@@ -94,6 +94,36 @@ defmodule Fluffy.Conformance.LiveFormTest do
     end
 
     @tag driver: driver
+    test "a submit marks every form control used for later changes with #{driver}", %{driver: driver} do
+      driver
+      |> start_test_session()
+      |> visit("/live/submit-used")
+      |> fill(by_label("Name"), "Ada")
+      |> expect("Email is required" |> by_text() |> to_have_count(0))
+      |> click(by_role(:button, name: "Save"))
+      |> expect("Submits: 1" |> by_text() |> to_be_visible())
+      |> expect("Email is required" |> by_text() |> to_be_visible())
+      |> fill(by_label("Name"), "Ada Lovelace")
+      |> expect(to_have_value(by_label("Name"), "Ada Lovelace"))
+      |> expect("Email is required" |> by_text() |> to_be_visible())
+    end
+
+    @tag driver: driver
+    test "a submit blocked by an upload entry error still marks the form used with #{driver}", %{driver: driver} do
+      driver
+      |> start_test_session()
+      |> visit("/live/submit-used?upload=oversized")
+      |> fill(by_label("Name"), "Ada")
+      |> set_input_files(by_label("Attachment"), Path.expand("../support/fixtures/fluffy-upload.txt", __DIR__))
+      |> expect("Upload errors: 1" |> by_text() |> to_be_visible())
+      |> click(by_role(:button, name: "Save"))
+      |> expect("Submits: 0" |> by_text() |> to_be_visible())
+      |> fill(by_label("Name"), "Ada Lovelace")
+      |> expect(to_have_value(by_label("Name"), "Ada Lovelace"))
+      |> expect("Email is required" |> by_text() |> to_be_visible())
+    end
+
+    @tag driver: driver
     test "Live submission serializes the final dynamic DOM with #{driver}", %{driver: driver} do
       session = start_test_session(driver)
 

@@ -17,6 +17,7 @@
 
 - LiveView no longer moves local checkbox, radio, select, or file state onto a different id-less control when a patch shifts it, and a radio group never ends a patch with more than one checked radio.
 - LiveView marks only the activated radio as used, not the radios it unchecks, so a patch that shifts the group no longer suppresses `_unused_` params for other fields.
+- LiveView marks every control of a `phx-submit` form as used, like the browser, so later change events no longer send `_unused_` params that hide `used_input?` errors after a failed submit.
 
 ## 0.7.0 — 2026-10-05
 
