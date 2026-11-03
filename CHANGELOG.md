@@ -12,6 +12,7 @@
 - Playwright 1.64 or later is required.
 - LiveView title assertions read `<title>`, including `live_title` prefix and suffix, matching Static and Playwright.
 - LiveView `open_browser` writes the composed document instead of calling `Phoenix.LiveViewTest.open_browser/2`.
+- LiveView keeps the focused text input's value through patches, like LiveView in the browser, unless the rendered element has `phx-patch-focused`. `fill`, `check`, `uncheck`, `click`, and `press` move this internal focus; it is not exposed. This restores the focused-text preservation removed in 0.7.0.
 
 ### Fixed
 

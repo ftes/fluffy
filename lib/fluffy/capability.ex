@@ -72,7 +72,7 @@ defmodule Fluffy.Capability do
       feature: "Focus, blur, and focus assertions",
       drivers: %{static: :browser_only, live: :browser_only, playwright: :equivalent},
       detail:
-        "Phoenix does not track focus. Use Fluffy.Playwright.focus/3 and blur/3, and focus assertions with a Playwright session."
+        "Phoenix exposes no focus state. Use Fluffy.Playwright.focus/3 and blur/3, and focus assertions with a Playwright session."
     },
     %{
       id: :element_actions,

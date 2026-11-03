@@ -62,7 +62,7 @@ for the distinction from browser rendering and DOM absence.
 
 LiveView eagerly dispatches each applicable form-control `phx-change` and
 ignores `phx-debounce`/`phx-throttle` scheduling, including `phx-debounce="blur"`.
-Phoenix does not model focus; its change delivery is independent of focus. Use
+Phoenix change delivery is independent of focus. Use
 Playwright for delay, blur-only delivery, coalescing, cancellation, and throttle
 suppression.
 
@@ -85,16 +85,22 @@ input and textarea controls; they do not emulate editing element text.
 ### Focus and client state
 
 `Fluffy.Playwright.focus/3`, `Fluffy.Playwright.blur/3`, and focus assertions
-require Playwright. Static and LiveView do not track or simulate focus.
+require Playwright. Static and LiveView expose no focus state. LiveView keeps an
+internal approximation only for focused input protection during patches: `fill`,
+`check`, `uncheck`, `click`, and `press` focus the target (a click also focuses
+its nearest focusable ancestor), a click on anything else clears focus, and
+`select_option` and `set_input_files` leave it unchanged.
 
 On a changed LiveView render, local text values adopt the rendered value,
-except during `phx-trigger-action` handoff. Unchanged document renders preserve
+except in the focused text input or textarea and during `phx-trigger-action`
+handoff. Like LiveView in the browser, focused text follows the element the
+patch matches it to, and `phx-patch-focused` on the rendered element opts out. Unchanged document renders preserve
 local values. Changes are detected across the document, not per control, so an
 unrelated update can discard local text. Checkbox/radio state survives while the
 rendered `checked` attribute is unchanged and the matched control keeps its type,
 name, and value; a radio the server renders as newly checked clears its group.
 Selected options survive while the select name and option signature are
-unchanged; files survive while the matched control remains a file input. Use Playwright for focused input protection and exact browser patch
+unchanged; files survive while the matched control remains a file input. Use Playwright for explicit focus and blur and exact browser patch
 behavior.
 
 ### LiveView document and patch boundaries

@@ -70,7 +70,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
       |> expect("Unused first: false" |> by_text() |> to_be_visible())
       |> expect("Unused last: false" |> by_text() |> to_be_visible())
       |> fill(stubborn, "silver dust")
-      |> expect(to_have_value(stubborn, if(driver == :playwright, do: "silver dust", else: "server-4")))
+      |> expect(to_have_value(stubborn, "silver dust"))
       |> fill(last, "dragon scale")
       |> expect(to_have_value(stubborn, "server-5"))
       |> expect("Last first: moonstone" |> by_text() |> to_be_visible())
@@ -169,7 +169,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
     end
 
     @tag driver: driver
-    test "keyed reorder preserves text only with browser focus using #{driver}", %{driver: driver} do
+    test "keyed reorder preserves focused text with #{driver}", %{driver: driver} do
       draft = by_label("Potion draft A")
 
       driver
@@ -178,7 +178,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
       |> fill(draft, "client draft")
       |> press(draft, "Enter")
       |> expect("#drafts > div:first-child input" |> by_css() |> to_have_value("B"))
-      |> expect(to_have_value(draft, if(driver == :playwright, do: "client draft", else: "A")))
+      |> expect(to_have_value(draft, "client draft"))
     end
 
     @tag driver: driver
@@ -271,7 +271,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
       |> expect(
         Fluffy.Expect.page_to_have_url(
-          query: %{"profile[stubborn]" => if(driver == :playwright, do: "silver dust", else: "server-2")},
+          query: %{"profile[stubborn]" => "silver dust"},
           query_mode: :subset
         )
       )

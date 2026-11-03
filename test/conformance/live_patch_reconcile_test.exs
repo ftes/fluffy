@@ -50,6 +50,31 @@ defmodule Fluffy.Conformance.LivePatchReconcileTest do
       |> expect(to_have_value(by_label("First"), "x"))
       |> expect(to_have_value(by_label("Second"), "x"))
     end
+
+    @tag driver: driver
+    test "the focused input's text follows the element LiveView patches into its place with #{driver}", %{
+      driver: driver
+    } do
+      # LiveView pairs id-less elements by position and protects the focused
+      # element's value, so the typed text lands on the inserted Note field.
+      driver
+      |> start_test_session()
+      |> visit("/live/shifted-controls")
+      |> fill(by_label("Alpha"), "typed")
+      |> expect("Changed: true" |> by_text() |> to_be_visible())
+      |> expect(to_have_value(by_label("Note"), "typed"))
+      |> expect(to_have_value(by_label("Alpha"), ""))
+    end
+
+    @tag driver: driver
+    test "phx-patch-focused lets the server value replace focused text with #{driver}", %{driver: driver} do
+      driver
+      |> start_test_session()
+      |> visit("/live/shifted-controls")
+      |> fill(by_label("Patched"), "typed")
+      |> expect("Changed: true" |> by_text() |> to_be_visible())
+      |> expect(to_have_value(by_label("Patched"), "server"))
+    end
   end
 
   defp start_test_session(driver) do

@@ -9,10 +9,13 @@ defmodule Fluffy.ClientDOM do
   alias Fluffy.Locator
 
   @enforce_keys [:document]
-  defstruct [:document, properties: %{}]
+  # `focused_id` approximates browser focus only so LiveView patches can
+  # protect the focused input like the browser does. It is not exposed.
+  defstruct [:document, :focused_id, properties: %{}]
 
   @opaque t :: %__MODULE__{
             document: term(),
+            focused_id: non_neg_integer() | nil,
             properties: map()
           }
 
@@ -75,6 +78,7 @@ defmodule Fluffy.ClientDOM do
     old_by_id = Map.new(old_nodes, &{&1.id, &1})
     new_by_id = Map.new(new_nodes, &{&1.id, &1})
     patched? = patch_tree(LazyHTML.to_tree(client_dom.document)) != patch_tree(LazyHTML.to_tree(new_document))
+    focused_id = Map.get(old_to_new, client_dom.focused_id)
 
     {properties, locally_checked} =
       Enum.reduce(client_dom.properties, {initial_radio_properties(new_index), MapSet.new()}, fn
@@ -88,7 +92,8 @@ defmodule Fluffy.ClientDOM do
                    old,
                    new,
                    old_to_new,
-                   patched? and not triggered_form_control?(new, new_index)
+                   patched? and not triggered_form_control?(new, new_index) and
+                     not (new_id == focused_id and focus_protected_value?(new))
                  ) do
             locally_checked =
               if Map.get(reconciled, :checked) == true,
@@ -103,6 +108,7 @@ defmodule Fluffy.ClientDOM do
 
     %__MODULE__{
       document: new_document,
+      focused_id: focused_id,
       properties: enforce_radio_group_exclusivity(properties, new_index, locally_checked)
     }
   end
@@ -112,7 +118,10 @@ defmodule Fluffy.ClientDOM do
     ensure_target_enabled!(target, :click, locator)
     Actionability.ensure_clickable!(target.element, :click, locator)
 
-    client_dom = maybe_toggle_checked(client_dom, target)
+    client_dom =
+      client_dom
+      |> maybe_toggle_checked(target)
+      |> Map.put(:focused_id, click_focus_id(target))
 
     {client_dom, target}
   end
@@ -218,7 +227,14 @@ defmodule Fluffy.ClientDOM do
       |> put_property(target.id, :value, value)
       |> put_property(target.id, :used, true)
 
-    {%{client_dom | properties: properties}, target}
+    {%{client_dom | properties: properties, focused_id: target.id}, target}
+  end
+
+  # Playwright focuses a key press target first; non-focusable targets keep focus.
+  def focus_target(%__MODULE__{} = client_dom, %Locator{} = locator) do
+    target = target!(client_dom, locator)
+    client_dom = if focusable?(target), do: %{client_dom | focused_id: target.id}, else: client_dom
+    {client_dom, target}
   end
 
   def set_input_files(%__MODULE__{} = client_dom, %Locator{} = locator, selected_files) when is_list(selected_files) do
@@ -267,7 +283,9 @@ defmodule Fluffy.ClientDOM do
           ensure_target_enabled!(target, checked_action(desired), locator)
           Actionability.ensure_enabled!(target.element, checked_action(desired), locator)
 
-          put_checked_target(client_dom, target, desired)
+          client_dom
+          |> put_checked_target(target, desired)
+          |> Map.put(:focused_id, target.id)
       end
 
     {client_dom, target}
@@ -718,6 +736,38 @@ defmodule Fluffy.ClientDOM do
         reconciled
     end
   end
+
+  # Browser clicks focus the nearest focusable element, or blur when none is.
+  defp click_focus_id(target) do
+    case Enum.find([target | Enum.reverse(target.ancestors)], &focusable?/1) do
+      nil -> nil
+      focusable -> focusable.id
+    end
+  end
+
+  defp focusable?(%{tag: tag, attributes: attributes} = target) do
+    cond do
+      tag == "input" -> input_type(target) != "hidden"
+      tag in ["button", "select", "textarea", "summary", "iframe"] -> true
+      tag in ["a", "area"] -> has_attribute?(attributes, "href")
+      true -> has_attribute?(attributes, "tabindex") or has_attribute?(attributes, "contenteditable")
+    end
+  end
+
+  # LiveView keeps the current value of the focused text-like control during a
+  # patch unless the new element opts out with phx-patch-focused. Selects keep
+  # their own option-signature rule.
+  defp focus_protected_value?(%{attributes: attributes} = node) do
+    text_value_control?(node) and not has_attribute?(attributes, "phx-patch-focused")
+  end
+
+  defp text_value_control?(%{tag: "textarea"}), do: true
+
+  defp text_value_control?(%{tag: "input"} = node) do
+    input_type(node) not in ["button", "checkbox", "file", "hidden", "image", "radio", "reset", "submit"]
+  end
+
+  defp text_value_control?(_node), do: false
 
   defp file_input?(%{tag: "input", attributes: attributes}) do
     attributes |> attribute("type") |> Kernel.||("text") |> String.downcase() == "file"

@@ -17,14 +17,14 @@ defmodule Fluffy.Conformance.LiveKeyboardActionTest do
     end
   end
 
-  test "Backspace sends only the key and the resulting render replaces local text" do
+  test "Backspace sends only the key and the render keeps the focused text" do
     input = by_label("Element key", exact: true)
 
     session()
     |> fill(input, "Ada")
     |> expect(to_have_value(input, "Ada"))
     |> press(input, "Backspace")
-    |> expect(to_have_value(input, ""))
+    |> expect(to_have_value(input, "Ada"))
     |> expect("element-keydown:key=Backspace;value=none;scope=element" |> by_text(exact: true) |> to_be_visible())
   end
 

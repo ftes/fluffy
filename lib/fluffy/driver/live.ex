@@ -295,8 +295,9 @@ defmodule Fluffy.Driver.Live do
   def press(%Session{} = session, %Locator{} = locator, key, options \\ []) do
     options = Keyword.validate!(options, [:timeout])
 
-    case resolve_live_action(session, locator, options, &ClientDOM.target!(&1, locator)) do
-      {%Session{} = session, target} ->
+    case resolve_live_action(session, locator, options, &ClientDOM.focus_target(&1, locator)) do
+      {%Session{} = session, {client_dom, target}} ->
+        session = Session.put_page_state(session, %{Session.page_state(session) | client_dom: client_dom})
         phases = Enum.filter([:keydown, :keyup], &key_binding?(target, &1))
         phases = if phases == [], do: [:keydown], else: phases
 

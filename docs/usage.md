@@ -208,9 +208,9 @@ changes made by `check`, `uncheck`, and `select_option`. For example,
 Attribute selectors such as `[checked]` and `[selected]` still match the
 rendered HTML attributes, which can differ from the user's input.
 
-The Phoenix backend tracks current input properties but does not model focus.
+The Phoenix backend tracks current input properties but exposes no focus state.
 On changed LiveView renders, local text adopts the server-rendered value except
-for `phx-trigger-action` handoff. Unchanged renders retain local values; checkbox,
+in the focused input and for `phx-trigger-action` handoff. Unchanged renders retain local values; checkbox,
 select, and file state follow the rules described in
 [Focus and client state](capabilities.md#focus-and-client-state).
 
