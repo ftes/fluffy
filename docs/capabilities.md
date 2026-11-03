@@ -91,9 +91,10 @@ On a changed LiveView render, local text values adopt the rendered value,
 except during `phx-trigger-action` handoff. Unchanged document renders preserve
 local values. Changes are detected across the document, not per control, so an
 unrelated update can discard local text. Checkbox/radio state survives while the
-rendered `checked` attribute is unchanged. Selected options survive while the
-option signature is unchanged; files survive while the matched control remains
-a file input. Use Playwright for focused input protection and exact browser patch
+rendered `checked` attribute is unchanged and the matched control keeps its type,
+name, and value; a radio the server renders as newly checked clears its group.
+Selected options survive while the select name and option signature are
+unchanged; files survive while the matched control remains a file input. Use Playwright for focused input protection and exact browser patch
 behavior.
 
 ### LiveView document and patch boundaries

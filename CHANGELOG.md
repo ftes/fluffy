@@ -13,6 +13,10 @@
 - LiveView title assertions read `<title>`, including `live_title` prefix and suffix, matching Static and Playwright.
 - LiveView `open_browser` writes the composed document instead of calling `Phoenix.LiveViewTest.open_browser/2`.
 
+### Fixed
+
+- LiveView no longer moves local checkbox, radio, or select state onto a different id-less control when a patch shifts it, and a radio group never ends a patch with more than one checked radio.
+
 ## 0.7.0 — 2026-10-05
 
 ### Changed

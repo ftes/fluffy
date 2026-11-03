@@ -1,4 +1,4 @@
-defmodule Fluffy.Conformance.LiveCheckedReconcileTest do
+defmodule Fluffy.Conformance.LivePatchReconcileTest do
   use Fluffy.TestCase, async: false
 
   import Fluffy
@@ -38,6 +38,17 @@ defmodule Fluffy.Conformance.LiveCheckedReconcileTest do
       |> check(by_role(:checkbox, name: "y"))
       |> expect("Changed: true" |> by_text() |> to_be_visible())
       |> expect(to_be_checked(by_role(:checkbox, name: "x"), checked: false))
+    end
+
+    @tag driver: driver
+    test "a select's choice does not move to a shifted id-less select with #{driver}", %{driver: driver} do
+      driver
+      |> start_test_session()
+      |> visit("/live/shifted-controls")
+      |> select_option(by_label("Second"), "y")
+      |> expect("Changed: true" |> by_text() |> to_be_visible())
+      |> expect(to_have_value(by_label("First"), "x"))
+      |> expect(to_have_value(by_label("Second"), "x"))
     end
   end
 

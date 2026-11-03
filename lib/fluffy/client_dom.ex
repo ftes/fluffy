@@ -705,7 +705,9 @@ defmodule Fluffy.ClientDOM do
   defp preserve_selection(reconciled, properties, old, new, old_to_new) do
     case Map.fetch(properties, :selected_ids) do
       {:ok, selected_ids} ->
-        if option_signature(old.children) == option_signature(new.children) do
+        # Like checkedness, a selection only belongs to the same named select.
+        if attribute(old.attributes, "name") == attribute(new.attributes, "name") and
+             option_signature(old.children) == option_signature(new.children) do
           mapped_ids = Enum.flat_map(selected_ids, &List.wrap(Map.get(old_to_new, &1)))
           Map.put(reconciled, :selected_ids, mapped_ids)
         else

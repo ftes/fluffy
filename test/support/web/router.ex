@@ -64,6 +64,7 @@ defmodule Fluffy.TestWeb.Router do
       live("/keyboard", KeyboardLive)
       live("/checked-controls", CheckedControlsLive)
       live("/radio-shift", RadioShiftLive)
+      live("/shifted-controls", ShiftedControlsLive)
     end
   end
 
