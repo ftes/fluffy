@@ -14,14 +14,6 @@ needed. Fluffy's behavior is checked against a real browser to verify that tests
 run without a browser behave consistently. See the
 [capability matrix](docs/capabilities.md) for supported behavior and differences.
 
-**Coming from PhoenixTest?** Use `import Fluffy.PhoenixTest` to keep familiar
-helpers such as `fill_in`, `click_button`, and `assert_has`. The facade makes
-Fluffy mostly a drop-in replacement for supported tests, including browser tests.
-Get automatic waiting for LiveView actions and assertions, plus automatic
-LiveView connection waiting in browser tests. LiveView tests also see the whole
-page, including the root layout, `live_title` updates, and portal content.
-[Start with the migration guide →](docs/migration-from-phoenix-test.md)
-
 ```elixir
 creature_row =
   by_role(:table, name: "Hagrid's creatures")
@@ -75,6 +67,16 @@ action and the assertion to it.
 </pre>
 
 </details>
+
+> #### Coming from PhoenixTest? {: .info}
+>
+> Use `import Fluffy.PhoenixTest` to keep familiar helpers such as `fill_in`,
+> `click_button`, and `assert_has`. The facade makes Fluffy mostly a drop-in
+> replacement for supported tests, including browser tests. Get automatic
+> waiting for LiveView actions and assertions, plus automatic LiveView
+> connection waiting in browser tests. LiveView tests also see the whole page,
+> including the root layout, `live_title` updates, and portal content.
+> [Start with the migration guide →](docs/migration-from-phoenix-test.md)
 
 ## Getting started
 
