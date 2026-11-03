@@ -5,6 +5,8 @@ defmodule Fluffy.Conformance.LivePatchReconcileTest do
   import Fluffy.Expect
   import Fluffy.Locator
 
+  alias Fluffy.TestHTTPFixtures
+
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
     test "checked state stays on its id-less radio when a patch inserts an element before it with #{driver}", %{
@@ -45,10 +47,28 @@ defmodule Fluffy.Conformance.LivePatchReconcileTest do
       driver
       |> start_test_session()
       |> visit("/live/shifted-controls")
-      |> select_option(by_label("Second"), "y")
+      |> select_option(by_label("Second", exact: true), "y")
       |> expect("Changed: true" |> by_text() |> to_be_visible())
-      |> expect(to_have_value(by_label("First"), "x"))
-      |> expect(to_have_value(by_label("Second"), "x"))
+      |> expect(to_have_value(by_label("First", exact: true), "x"))
+      |> expect(to_have_value(by_label("Second", exact: true), "x"))
+    end
+
+    @tag driver: driver
+    test "a file selection does not move to a shifted id-less file input with #{driver}", %{driver: driver} do
+      fixture = TestHTTPFixtures.register(%{body: "<!doctype html><html><body><h1>Saved</h1></body></html>"})
+      action = TestHTTPFixtures.path(fixture, "/submit")
+
+      driver
+      |> start_test_session()
+      |> visit("/live/shifted-controls?action=#{URI.encode_www_form(action)}")
+      |> set_input_files(by_label("Second file"), Path.expand("../support/fixtures/fluffy-upload.txt", __DIR__))
+      |> fill(by_label("Trigger"), "shift")
+      |> expect("Changed: true" |> by_text() |> to_be_visible())
+      |> click(by_role(:button, name: "Save"))
+      |> expect("Saved" |> by_text() |> to_be_visible())
+
+      [submission] = TestHTTPFixtures.requests(fixture)
+      refute submission.body =~ ~s(filename="fluffy-upload.txt")
     end
   end
 
