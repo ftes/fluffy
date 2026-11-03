@@ -622,6 +622,7 @@ defmodule Fluffy.Driver.Live do
 
   defp dispatch_live_submit(session, client_dom, submission, event_context) do
     event_view = event_context.view
+    client_dom = ClientDOM.mark_form_used(client_dom, submission.form_id)
 
     form_selector = ClientDOM.selector_for_node_id(client_dom, submission.form_id)
     payload = Form.to_params(submission.fields)
@@ -1029,18 +1030,19 @@ defmodule Fluffy.Driver.Live do
 
   defp dispatch_live_upload_submit_event(session, form_id, submission, event_context) do
     state = Session.page_state(session)
+    client_dom = ClientDOM.mark_form_used(state.client_dom, form_id)
 
-    form_selector = ClientDOM.selector_for_node_id(state.client_dom, form_id)
+    form_selector = ClientDOM.selector_for_node_id(client_dom, form_id)
     payload = Form.to_params(submission.fields)
 
     submit_result =
       try do
-        render_view_event(state.client_dom, event_context, form_selector, :submit, payload)
+        render_view_event(client_dom, event_context, form_selector, :submit, payload)
       catch
         :exit, reason -> raise Fluffy.LiveViewError, reason: reason
       end
 
-    case commit_render_result(session, state.client_dom, submit_result, event_context.view) do
+    case commit_render_result(session, client_dom, submit_result, event_context.view) do
       %Session{} = session ->
         release_live_upload_for_form(session, form_id)
 

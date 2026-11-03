@@ -221,6 +221,21 @@ defmodule Fluffy.ClientDOM do
     {%{client_dom | properties: properties}, target}
   end
 
+  # LiveView marks every element of a submitted form as used, so later change
+  # events send no `_unused_` params for them.
+  @doc false
+  def mark_form_used(%__MODULE__{} = client_dom, form_id) do
+    index = index(client_dom)
+
+    properties =
+      index
+      |> DocumentIndex.targets_by_tag(["button", "input", "select", "textarea"])
+      |> Enum.filter(&(Map.get(index.form_owner_ids, &1.id) == form_id))
+      |> Enum.reduce(client_dom.properties, &put_property(&2, &1.id, :used, true))
+
+    %{client_dom | properties: properties}
+  end
+
   def set_input_files(%__MODULE__{} = client_dom, %Locator{} = locator, selected_files) when is_list(selected_files) do
     target = target!(client_dom, locator)
 
