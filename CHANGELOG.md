@@ -13,6 +13,10 @@
 - LiveView title assertions read `<title>`, including `live_title` prefix and suffix, matching Static and Playwright.
 - LiveView `open_browser` writes the composed document instead of calling `Phoenix.LiveViewTest.open_browser/2`.
 
+### Fixed
+
+- LiveView marks only the activated radio as used, not the radios it unchecks, so a patch that shifts the group no longer suppresses `_unused_` params for other fields.
+
 ## 0.7.0 — 2026-10-05
 
 ### Changed

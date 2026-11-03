@@ -463,8 +463,10 @@ defmodule Fluffy.ClientDOM do
         |> DocumentIndex.targets_by_tag("input")
         |> Enum.reduce(client_dom, fn radio, dom ->
           case {input_type(radio), attribute(radio.attributes, "name"), radio.id, Map.get(index.form_owner_ids, radio.id)} do
+            # Only the activated radio becomes used, as in LiveView. Marking the
+            # rest would shift `used` onto other controls after a patch.
             {"radio", ^name, id, ^target_owner_id} when id != target_id ->
-              put_checked(dom, id, false)
+              %{dom | properties: put_property(dom.properties, id, :checked, false)}
 
             _other ->
               dom
