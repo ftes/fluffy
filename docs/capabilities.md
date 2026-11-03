@@ -161,6 +161,12 @@ ordered multiple selection, clearing, and ordinary multipart forms, including
 empty-file entries. Managed LiveView uploads support validation, progress,
 cancellation, replacement, auto-upload, and submission.
 
+The LiveView change event sent when files are selected for a managed upload
+carries LiveViewTest's serialization of the rendered form: server-rendered
+values and no `_unused_` params, so every field reads as used. Use Playwright
+when a test depends on `used_input?` or on local text the server has not
+rendered at the time files are selected.
+
 Native picker UI, external uploaders, directories, drag-and-drop, and arbitrary
 `FileList` mutation are unsupported. `Fluffy.Event.file_chooser/1` requires Playwright
 because application JavaScript opens the chooser.
