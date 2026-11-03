@@ -15,6 +15,7 @@
 
 ### Fixed
 
+- LiveView no longer moves local checkbox, radio, select, or file state onto a different id-less control when a patch shifts it, and a radio group never ends a patch with more than one checked radio.
 - LiveView marks only the activated radio as used, not the radios it unchecks, so a patch that shifts the group no longer suppresses `_unused_` params for other fields.
 
 ## 0.7.0 — 2026-10-05
