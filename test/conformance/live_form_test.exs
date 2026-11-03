@@ -79,6 +79,21 @@ defmodule Fluffy.Conformance.LiveFormTest do
     end
 
     @tag driver: driver
+    test "checking a radio marks only that radio used, even after a patch shifts its group with #{driver}", %{
+      driver: driver
+    } do
+      driver
+      |> start_test_session()
+      |> visit("/live/used-shift")
+      |> check(by_role(:radio, name: "c"))
+      |> expect("Changed: true" |> by_text() |> to_be_visible())
+      |> fill(by_label("Other"), "x")
+      |> expect("key:other" |> by_text(exact: true) |> to_be_visible())
+      |> expect("key:_unused_note" |> by_text(exact: true) |> to_be_visible())
+      |> expect("key:_unused_choice" |> by_text(exact: true) |> to_have_count(0))
+    end
+
+    @tag driver: driver
     test "Live submission serializes the final dynamic DOM with #{driver}", %{driver: driver} do
       session = start_test_session(driver)
 
