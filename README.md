@@ -26,7 +26,7 @@ start_session(:phoenix)
 |> assert(visible(by_role(creature_row, :cell, name: "Asleep")))
 ```
 
-This example assumes the imports and test setup below. Locators are reusable
+This example assumes the imports and test setup in [Getting started](#getting-started). Locators are reusable
 queries: find Fluffy's row in the “Hagrid's creatures” table and scope both the
 action and the assertion to it.
 
@@ -70,12 +70,33 @@ action and the assertion to it.
 
 > #### Coming from PhoenixTest? {: .info}
 >
-> Use `import Fluffy.PhoenixTest` to keep familiar helpers such as `fill_in`,
-> `click_button`, and `assert_has`. The facade makes Fluffy mostly a drop-in
-> replacement for supported tests, including browser tests. Get automatic
-> waiting for LiveView actions and assertions, plus automatic LiveView
-> connection waiting in browser tests. LiveView tests also see the whole page,
-> including the root layout, `live_title` updates, and portal content.
+> The `Fluffy.PhoenixTest` facade makes Fluffy mostly a drop-in replacement:
+> swap the import, add `Fluffy.Test.setup/1`, and keep familiar helpers such as
+> `fill_in`, `click_button`, and `assert_has`, including in browser tests. You
+> also get automatic waiting for LiveView actions, assertions, and connections,
+> and LiveView tests see the whole page, including the root layout,
+> `live_title` updates, and portal content.
+>
+> ```diff
+>  defmodule MyAppWeb.CreatureTest do
+>    use MyAppWeb.ConnCase, async: true
+> -  import PhoenixTest
+> +  import Fluffy.PhoenixTest # the facade
+> +
+> +  setup context do
+> +    Fluffy.Test.setup(context)
+> +  end
+>
+>    test "registers a creature", %{conn: conn} do
+>      conn
+>      |> visit("/creatures/new")
+>      |> fill_in("Name", with: "Basilisk")
+>      |> click_button("Register")
+>      |> assert_has("#notice", text: "Creature registered")
+>    end
+>  end
+> ```
+>
 > [Start with the migration guide →](docs/migration-from-phoenix-test.md)
 
 ## Getting started
@@ -101,31 +122,8 @@ Start with `start_session(:phoenix)` for in-process Static and LiveView tests.
 Use `start_session(:playwright)` when a test needs a real browser. See
 [Installation and runtime](docs/installation.md) for Playwright and Ecto sandbox
 setup, then [Usage](docs/usage.md) for writing tests and a shared `FluffyCase`.
-
-## Coming from PhoenixTest
-
-Replace `import PhoenixTest` with `import Fluffy.PhoenixTest` and add
-`Fluffy.Test.setup/1` to your test setup. Existing pipelines can keep their
-helper names and prepared connections:
-
-```elixir
-import Fluffy.PhoenixTest
-
-# Inside a test with Fluffy lifecycle setup:
-conn
-|> visit("/creatures/new")
-|> fill_in("Name", with: "Basilisk")
-|> click_button("Register")
-|> assert_has("#notice", text: "Creature registered")
-|> assert_path("/creatures")
-```
-
-Use the facade import on its own. The [migration guide](docs/migration-from-phoenix-test.md)
-shows complete setup, the same helpers with Playwright, and compatibility
-boundaries. Adopting the native locator API is optional.
-
-For native tests, choose an [assertion vocabulary](docs/assertion-styles.md):
-`use Fluffy.Assert` or `import Fluffy.Expect`.
+Choose an [assertion vocabulary](docs/assertion-styles.md): `use Fluffy.Assert`
+or `import Fluffy.Expect`.
 
 ## Beyond page interactions
 
