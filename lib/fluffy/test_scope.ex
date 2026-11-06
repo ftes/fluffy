@@ -117,16 +117,16 @@ defmodule Fluffy.TestScope do
         safely(fn -> Sandbox.stop_owner(owner) end)
       end
     end
+
+    defp safely(fun) do
+      fun.()
+    rescue
+      _reason -> :ok
+    catch
+      _kind, _reason -> :ok
+    end
   else
     defp stop_sandbox_owner(_owner), do: :ok
-  end
-
-  defp safely(fun) do
-    fun.()
-  rescue
-    _reason -> :ok
-  catch
-    _kind, _reason -> :ok
   end
 
   defp current! do

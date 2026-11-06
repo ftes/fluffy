@@ -10,13 +10,9 @@ defmodule Fluffy.Expect do
   Assertion constructors use fluent `to_be_*` names for states and `to_have_*`
   names for properties.
 
-  Every expectation constructor accepts the shared timeout option.
+  Every constructor documents its options. `expect/3` accepts the shared timeout:
 
   #{NimbleOptions.docs(Fluffy.Options.expectation_schema())}
-
-  `to_be_checked/2` additionally accepts:
-
-  #{NimbleOptions.docs(Fluffy.Options.checked_expectation_schema())}
   """
   @moduledoc groups: ["Locator assertions"]
 
@@ -41,7 +37,6 @@ defmodule Fluffy.Expect do
           | :enabled
           | :focused
           | :opener
-          | :status
           | :title
           | :url
           | :value
@@ -57,7 +52,18 @@ defmodule Fluffy.Expect do
         }
 
   @type option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema()))
-  @type checked_option :: unquote(NimbleOptions.option_typespec(Options.checked_expectation_schema()))
+  @type to_have_count_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_have_count)))
+  @type to_be_visible_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_be_visible)))
+  @type to_be_disabled_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_be_disabled)))
+  @type to_be_editable_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_be_editable)))
+  @type to_be_enabled_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_be_enabled)))
+  @type to_be_focused_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_be_focused)))
+  @type to_be_checked_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_be_checked)))
+  @type to_have_value_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_have_value)))
+  @type to_have_values_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_have_values)))
+  @type page_to_have_title_option ::
+          unquote(NimbleOptions.option_typespec(Options.expectation_schema(:page_to_have_title)))
+  @type page_to_have_url_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:page_to_have_url)))
 
   @doc "Executes an expectation and returns the unchanged or reconciled session."
   @spec expect(Session.t(), t(), [option()]) :: Session.t()
@@ -99,41 +105,82 @@ defmodule Fluffy.Expect do
   def not_(%__MODULE__{} = expectation), do: negate(expectation)
 
   @doc group: "Locator assertions"
-  @spec to_have_count(Locator.t(), non_neg_integer(), [option()]) :: t()
+  @doc """
+  Expects the number of elements matching the locator.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.expectation_schema(:to_have_count))}
+  """
+  @spec to_have_count(Locator.t(), non_neg_integer(), [to_have_count_option()]) :: t()
   def to_have_count(%Locator{} = locator, expected, options \\ []) when is_integer(expected) and expected >= 0 do
-    new({:locator, locator}, :count, expected, options)
+    native_expectation(:to_have_count, {:locator, locator}, :count, expected, options)
   end
 
   @doc group: "Locator assertions"
-  @spec to_be_visible(Locator.t(), [option()]) :: t()
+  @doc """
+  Expects the target to be visible.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.expectation_schema(:to_be_visible))}
+  """
+  @spec to_be_visible(Locator.t(), [to_be_visible_option()]) :: t()
   def to_be_visible(%Locator{} = locator, options \\ []) do
-    new({:locator, locator}, :visible, true, options)
+    state_expectation(:to_be_visible, locator, :visible, options)
   end
 
   @doc group: "Locator assertions"
-  @spec to_be_disabled(Locator.t(), [option()]) :: t()
+  @doc """
+  Expects the target to be disabled.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.expectation_schema(:to_be_disabled))}
+  """
+  @spec to_be_disabled(Locator.t(), [to_be_disabled_option()]) :: t()
   def to_be_disabled(%Locator{} = locator, options \\ []) do
-    new({:locator, locator}, :disabled, true, options)
+    native_expectation(:to_be_disabled, {:locator, locator}, :disabled, true, options)
   end
 
   @doc group: "Locator assertions"
-  @spec to_be_editable(Locator.t(), [option()]) :: t()
+  @doc """
+  Expects the target to be editable.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.expectation_schema(:to_be_editable))}
+  """
+  @spec to_be_editable(Locator.t(), [to_be_editable_option()]) :: t()
   def to_be_editable(%Locator{} = locator, options \\ []) do
-    new({:locator, locator}, :editable, true, options)
+    state_expectation(:to_be_editable, locator, :editable, options)
   end
 
   @doc group: "Locator assertions"
-  @spec to_be_enabled(Locator.t(), [option()]) :: t()
+  @doc """
+  Expects the target to be enabled.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.expectation_schema(:to_be_enabled))}
+  """
+  @spec to_be_enabled(Locator.t(), [to_be_enabled_option()]) :: t()
   def to_be_enabled(%Locator{} = locator, options \\ []) do
-    new({:locator, locator}, :enabled, true, options)
+    state_expectation(:to_be_enabled, locator, :enabled, options)
   end
 
   @doc group: "Locator assertions"
   @doc playwright_only: true
-  @doc "Asserts browser focus. Requires Playwright, including when negated."
-  @spec to_be_focused(Locator.t(), [option()]) :: t()
+  @doc """
+  Asserts browser focus. Requires Playwright, including when negated.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.expectation_schema(:to_be_focused))}
+  """
+  @spec to_be_focused(Locator.t(), [to_be_focused_option()]) :: t()
   def to_be_focused(%Locator{} = locator, options \\ []) do
-    new({:locator, locator}, :focused, true, options)
+    native_expectation(:to_be_focused, {:locator, locator}, :focused, true, options)
   end
 
   @doc group: "Locator assertions"
@@ -144,12 +191,16 @@ defmodule Fluffy.Expect do
   `indeterminate: true` for the browser-owned mixed state. The indeterminate
   state requires Playwright because it is a DOM property rather than HTML
   state available to the Static or LiveView drivers.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.expectation_schema(:to_be_checked))}
   """
-  @spec to_be_checked(Locator.t(), [checked_option()]) :: t()
+  @spec to_be_checked(Locator.t(), [to_be_checked_option()]) :: t()
   def to_be_checked(%Locator{} = locator, options \\ []) do
-    options = Options.validate_checked_expectation!(options)
-    checked = Keyword.get(options, :checked, :unset)
-    indeterminate = Keyword.get(options, :indeterminate, :unset)
+    options = Options.validate_expectation!(:to_be_checked, options)
+    {checked, options} = Keyword.pop(options, :checked, :unset)
+    {indeterminate, options} = Keyword.pop(options, :indeterminate, :unset)
 
     if indeterminate == true and checked != :unset do
       raise ArgumentError, "checked: and indeterminate: true cannot be used together"
@@ -162,20 +213,45 @@ defmodule Fluffy.Expect do
         true -> :checked
       end
 
-    new({:locator, locator}, :checked, expected, Keyword.take(options, [:timeout]))
+    new({:locator, locator}, :checked, expected, options)
   end
 
   @doc group: "Locator assertions"
-  @spec to_have_value(Locator.t(), String.t(), [option()]) :: t()
+  @doc """
+  Expects the target's input value.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.expectation_schema(:to_have_value))}
+  """
+  @spec to_have_value(Locator.t(), String.t(), [to_have_value_option()]) :: t()
   def to_have_value(%Locator{} = locator, expected, options \\ []) when is_binary(expected) do
-    new({:locator, locator}, :value, expected, options)
+    native_expectation(:to_have_value, {:locator, locator}, :value, expected, options)
   end
 
   @doc group: "Locator assertions"
-  @spec to_have_values(Locator.t(), [term()], [option()]) :: t()
+  @doc """
+  Expects the selected values of a multi-select.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.expectation_schema(:to_have_values))}
+  """
+  @spec to_have_values(Locator.t(), [term()], [to_have_values_option()]) :: t()
   def to_have_values(%Locator{} = locator, expected, options \\ []) when is_list(expected) do
-    new({:locator, locator}, :values, expected, options)
+    native_expectation(:to_have_values, {:locator, locator}, :values, expected, options)
   end
+
+  # `visible: false` and the like assert the opposite state, as in PlaywrightEx.
+  defp state_expectation(matcher, locator, kind, options) do
+    options = Options.validate_expectation!(matcher, options)
+    {state, options} = Keyword.pop(options, kind, true)
+    expectation = new({:locator, locator}, kind, true, options)
+    if state, do: expectation, else: negate(expectation)
+  end
+
+  defp native_expectation(matcher, target, kind, expected, options),
+    do: new(target, kind, expected, Options.validate_expectation!(matcher, options))
 
   @doc group: "Assertions"
   @doc """
@@ -186,13 +262,13 @@ defmodule Fluffy.Expect do
 
   ## Options
 
-  #{NimbleOptions.docs(Options.expectation_schema())}
+  #{NimbleOptions.docs(Options.expectation_schema(:page_to_have_title))}
   """
   @spec page_to_have_title(Fluffy.Page.title_expectation()) :: Expect.t()
-  @spec page_to_have_title(Fluffy.Page.title_expectation(), [Expect.option()]) :: Expect.t()
+  @spec page_to_have_title(Fluffy.Page.title_expectation(), [page_to_have_title_option()]) :: Expect.t()
   def page_to_have_title(expected, options \\ [])
       when (is_binary(expected) or is_struct(expected, Regex)) and is_list(options) do
-    Expect.new(:page, :title, expected, options)
+    native_expectation(:page_to_have_title, :page, :title, expected, options)
   end
 
   @doc group: "Assertions"
@@ -221,26 +297,27 @@ defmodule Fluffy.Expect do
 
   ## Assertion options
 
-  #{NimbleOptions.docs(Options.expectation_schema())}
+  #{NimbleOptions.docs(Options.expectation_schema(:page_to_have_url))}
   """
   @spec page_to_have_url(Fluffy.Page.url_expectation()) :: Expect.t()
-  @spec page_to_have_url(Fluffy.Page.url_expectation(), [Expect.option()]) :: Expect.t()
+  @spec page_to_have_url(Fluffy.Page.url_expectation(), [page_to_have_url_option()]) :: Expect.t()
   def page_to_have_url(expected, options \\ [])
 
   def page_to_have_url(expected, options)
       when (is_binary(expected) or is_struct(expected, Regex) or is_function(expected, 1)) and is_list(options) do
-    Expect.new(:page, :url, expected, options)
+    options = Options.validate_expectation!(:page_to_have_url, options)
+    {ignore_case, options} = Keyword.pop(options, :ignore_case)
+    Expect.new(:page, :url, URLMatcher.ignore_case(expected, ignore_case), options)
   end
 
   def page_to_have_url(components, options) when is_list(components) and is_list(options) do
-    Expect.new(:page, :url, URLMatcher.new!(components), options)
-  end
+    options = Options.validate_expectation!(:page_to_have_url, options)
 
-  @doc group: "Assertions"
-  @doc "Expects the active page's normalized main-resource status."
-  @spec page_to_have_status(non_neg_integer(), [Expect.option()]) :: Expect.t()
-  def page_to_have_status(expected, options \\ []) when is_integer(expected) and expected >= 0 do
-    Expect.new(:page, :status, expected, options)
+    if Keyword.has_key?(options, :ignore_case) do
+      raise ArgumentError, "ignore_case: requires a string or regular expression URL"
+    end
+
+    Expect.new(:page, :url, URLMatcher.new!(components), options)
   end
 
   @doc group: "Assertions"
@@ -305,10 +382,6 @@ defmodule Fluffy.Expect do
     "active page to have URL #{URLMatcher.describe(expected)}"
   end
 
-  defp positive_description(%__MODULE__{target: :page, kind: :status, expected: expected}) do
-    "active page to have status #{inspect(expected)}"
-  end
-
   defp positive_description(%__MODULE__{target: :page, kind: :title, expected: expected}) do
     "active page to have title #{inspect(expected)}"
   end
@@ -347,12 +420,6 @@ defmodule Fluffy.Expect do
     Fluffy.__expect__(session, expectation)
   end
 
-  defp expect_active_page(%Session{} = session, %Expect{kind: :status} = expectation) do
-    actual = Fluffy.Page.status(Session.handle(session))
-    assert_expected!(expectation, actual)
-    session
-  end
-
   defp expect_active_page(%Session{} = session, %Expect{kind: :opener} = expectation) do
     actual = session |> Session.handle() |> Fluffy.Page.opener()
     assert_expected!(expectation, actual)
@@ -379,6 +446,13 @@ defmodule Fluffy.Expect do
   defp normalize_expectation(%Expect{target: :page, kind: :url, expected: expected} = expectation, session)
        when is_binary(expected) do
     %{expectation | expected: Fluffy.Backend.absolute_url(session, expected)}
+  end
+
+  defp normalize_expectation(
+         %Expect{target: :page, kind: :url, expected: {:ignore_case, expected}} = expectation,
+         session
+       ) do
+    %{expectation | expected: {:ignore_case, Fluffy.Backend.absolute_url(session, expected)}}
   end
 
   defp normalize_expectation(%Expect{} = expectation, _session), do: expectation

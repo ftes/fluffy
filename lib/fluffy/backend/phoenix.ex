@@ -72,18 +72,14 @@ defmodule Fluffy.Backend.Phoenix do
   def page_snapshot(_context, page), do: page
 
   @impl true
-  def page_status(_context, page), do: page.status
-
-  @impl true
   def commit_page(page, driver, state, url, options) do
-    options = Keyword.validate!(options, status: page.status, same_document: false)
+    options = Keyword.validate!(options, same_document: false)
 
     %{
       page
       | driver: driver,
         state: state,
         url: url,
-        status: options[:status],
         document_id: if(options[:same_document], do: page.document_id, else: make_ref())
     }
   end
@@ -181,7 +177,7 @@ defmodule Fluffy.Backend.Phoenix do
   @impl true
   def event_source(session, :download, _scope), do: session.active_page
 
-  def event_source(session, type, _scope) when type in [:page, :popup], do: require_browser_pages!(session)
+  def event_source(session, type, _scope) when type in [:page, :popup, :close], do: require_browser_pages!(session)
 
   def event_source(session, type, _scope) do
     capability =
@@ -247,7 +243,7 @@ defmodule Fluffy.Backend.Phoenix do
   defp encode_post_submission(%{fields: fields}), do: Fluffy.Form.url_encode(fields)
 
   @doc false
-  def commit_live(%Session{} = session, conn, view, html, destination) do
+  def commit_live(%Session{} = session, view, html, destination) do
     proxy_pid = live_view_proxy_pid(view)
     Process.unlink(proxy_pid)
 
@@ -282,7 +278,7 @@ defmodule Fluffy.Backend.Phoenix do
       watcher: watcher
     }
 
-    PageLifecycle.replace_document(session, :live, state, URI.to_string(url), [status: conn.status], &release_page/3)
+    PageLifecycle.replace_document(session, :live, state, URI.to_string(url), [], &release_page/3)
   end
 
   @doc false
@@ -333,7 +329,7 @@ defmodule Fluffy.Backend.Phoenix do
   defp commit_response(%{assigns: %{live_module: _module}} = conn, session, url) do
     case live(conn) do
       {:ok, view, html} ->
-        commit_live(session, conn, view, html, URI.to_string(url))
+        commit_live(session, view, html, URI.to_string(url))
 
       {:error, reason} ->
         raise "LiveView navigation failed: #{inspect(reason)}"
@@ -465,7 +461,7 @@ defmodule Fluffy.Backend.Phoenix do
       client_dom: ClientDOM.from_document(conn.resp_body)
     }
 
-    PageLifecycle.replace_document(session, :static, state, URI.to_string(url), [status: conn.status], &release_page/3)
+    PageLifecycle.replace_document(session, :static, state, URI.to_string(url), [], &release_page/3)
   end
 
   defp release_page(session, %Page.State{driver: :live} = page, _reason) do

@@ -21,7 +21,7 @@ defmodule Fluffy.BrowserContextConfigurationTest do
             origins: [
               %{
                 origin: origin,
-                local_storage: [%{name: "fluffy-state", value: "configured"}]
+                localStorage: [%{name: "fluffy-state", value: "configured"}]
               }
             ]
           },
@@ -35,7 +35,7 @@ defmodule Fluffy.BrowserContextConfigurationTest do
 
     refute Map.has_key?(Fluffy.Session.context(configured), :browser_id)
     refute Map.has_key?(Fluffy.Session.context(defaults), :browser_id)
-    refute Fluffy.Session.context(configured).context_id == Fluffy.Session.context(defaults).context_id
+    refute Fluffy.Session.context(configured).browser_context == Fluffy.Session.context(defaults).browser_context
 
     assert %{
              "color_scheme" => true,
@@ -58,12 +58,11 @@ defmodule Fluffy.BrowserContextConfigurationTest do
                  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
                  width: innerWidth
                })
-               """,
-               is_function: true
+               """
              )
   end
 
-  test "rejects unknown and malformed BrowserContext options before creation" do
+  test "rejects unknown session and BrowserContext options before creation" do
     assert_raise NimbleOptions.ValidationError, ~r/unknown options.*:page/, fn ->
       start_session(:playwright,
         base_url: Fluffy.TestServer.base_url(),
@@ -71,14 +70,9 @@ defmodule Fluffy.BrowserContextConfigurationTest do
       )
     end
 
-    assert_raise NimbleOptions.ValidationError,
-                 ~r/:viewport.*invalid value|invalid value.*:viewport/,
-                 fn ->
-                   start_session(:playwright,
-                     base_url: Fluffy.TestServer.base_url(),
-                     browser_context: [viewport: %{width: 0, height: 700}]
-                   )
-                 end
+    assert_raise ArgumentError, ~r/mystery/, fn ->
+      start_session(:playwright, base_url: Fluffy.TestServer.base_url(), browser_context: [mystery: true])
+    end
   end
 
   test "BrowserContext options are rejected by the Phoenix backend" do

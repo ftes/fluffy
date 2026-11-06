@@ -89,7 +89,7 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
       end
 
     assert error.operation == :click
-    assert %{error: %{name: "TimeoutError"}} = error.cause
+    assert %PlaywrightEx.TimeoutError{} = error.cause
     assert error.locator == by_role(frame, :button, name: "Save")
     assert error.message =~ "content_frame()"
     assert error.message =~ "playwright click"
@@ -100,7 +100,7 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
         expect(session, to_have_count(by_role(frame, :button), 1), timeout: 1_000)
       end
 
-    assert error.message =~ "value: 2"
+    assert error.message =~ "Received: 2"
     assert error.message =~ "Call log:"
   end
 
@@ -195,8 +195,7 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
     Fluffy.Playwright.evaluate(
       session,
       "html => { window.oldFrame = document.querySelector('#child'); window.oldFrame.outerHTML = html; }",
-      is_function: true,
-      arg: iframe("child", "<label>Email<input value='replacement'></label>")
+      iframe("child", "<label>Email<input value='replacement'></label>")
     )
 
     assert Fluffy.Playwright.evaluate(session, "!window.oldFrame.isConnected")
@@ -221,7 +220,7 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
     assert error.locator == locator
     assert error.backend == :playwright
     assert error.driver == :playwright
-    assert %{error: %{name: "Error", message: message}} = error.cause
+    assert %PlaywrightEx.PlaywrightError{message: message} = error.cause
     assert message =~ "strict mode violation"
 
     selected_frame = "iframe" |> by_css() |> nth(0) |> content_frame()
@@ -253,7 +252,7 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
 
         assert error.operation == unquote(action)
         assert error.locator == locator
-        assert %{error: %{name: "Error", message: message}} = error.cause
+        assert %PlaywrightEx.PlaywrightError{message: message} = error.cause
         assert message =~ "strict mode violation"
       end
     end

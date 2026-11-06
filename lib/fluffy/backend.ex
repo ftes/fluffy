@@ -67,7 +67,6 @@ defmodule Fluffy.Backend do
   def normalize_error(_session, _operation, _arguments, error), do: error
 
   def page_snapshot(runtime, record), do: dispatch_page(runtime, record, :page_snapshot)
-  def page_status(runtime, record), do: dispatch_page(runtime, record, :page_status)
 
   defp dispatch_page(runtime, record, operation) do
     case Fluffy.SessionRuntime.configuration(runtime) do

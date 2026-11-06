@@ -176,6 +176,10 @@ defmodule Fluffy.Conformance.DownloadEventTest do
   end
 
   @tag driver: :playwright, tmp_dir: true, capture_log: true
+  @tag skip:
+         if(Application.compile_env!(:fluffy, :playwright)[:engine] == :firefox,
+           do: "Firefox never completes or fails an interrupted download"
+         )
   test "failed downloads expose metadata but raise when reading or saving", %{tmp_dir: tmp_dir} do
     owner = self()
 
@@ -214,9 +218,9 @@ defmodule Fluffy.Conformance.DownloadEventTest do
     assert download.suggested_filename == "broken.txt"
     send(server, :abort)
 
-    assert_raise RuntimeError, ~r/Could not save download/, fn -> Download.read!(download) end
+    assert_raise PlaywrightEx.PlaywrightError, ~r/download.saveAs/, fn -> Download.read!(download) end
 
-    assert_raise RuntimeError, ~r/Could not save download/, fn ->
+    assert_raise PlaywrightEx.PlaywrightError, ~r/download.saveAs/, fn ->
       Download.save_as!(download, Path.join(tmp_dir, "copy.txt"))
     end
   end

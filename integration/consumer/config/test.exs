@@ -6,7 +6,6 @@ config :fluffy,
   playwright: [
     enabled: true,
     engine: :chromium,
-    executable: Path.expand("../../../node_modules/playwright/cli.js", __DIR__),
     timeout: 15_000,
     launch_options: [headless: true],
     artifact_dir: System.get_env("FLUFFY_ARTIFACT_DIR")
@@ -16,7 +15,7 @@ config :fluffy,
 # you can enable the server option below.
 config :fluffy_consumer, FluffyConsumerWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}, port: 0],
-  secret_key_base: "y+Y0z9GU+uym4/KI0Ym23hV5FsKOvfHsoPZFVtONo1YKaS4MaiX8Wy0D/NwOg6sM",
+  secret_key_base: "nUKuuqXGdDCMZhgOdO7N4WMTxbxPOlNqxUuuXgi7SFZBq5Jsdw5u0LjHKEh+jnfg",
   server: true,
   url: [host: "configured.invalid", port: 0, scheme: "http"]
 

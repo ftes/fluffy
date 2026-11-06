@@ -9,12 +9,10 @@ defmodule Fluffy.Conformance.UnwrapTest do
 
   alias Fluffy.Event
   alias Fluffy.Page
-  alias Fluffy.Playwright.Handle
   alias Fluffy.Session
   alias Fluffy.TestWeb.Endpoint
   alias Phoenix.LiveViewTest.View
   alias PlaywrightEx.BrowserContext
-  alias PlaywrightEx.Frame
   alias PlaywrightEx.Page, as: BrowserPage
 
   @endpoint Endpoint
@@ -39,7 +37,6 @@ defmodule Fluffy.Conformance.UnwrapTest do
       session
       |> visit("/chamber")
       |> unwrap(fn %Plug.Conn{} = conn -> conn end)
-      |> expect(Fluffy.Expect.page_to_have_status(200))
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
     end
 
@@ -56,7 +53,6 @@ defmodule Fluffy.Conformance.UnwrapTest do
               resp_body: "<!doctype html><html><body><p>Native replacement</p></body></html>"
           }
         end)
-        |> expect(Fluffy.Expect.page_to_have_status(202))
         |> expect("Native replacement" |> by_text() |> to_be_visible())
 
       assert Session.page_state(session).conn.status == 202
@@ -260,56 +256,32 @@ defmodule Fluffy.Conformance.UnwrapTest do
 
   describe "Playwright" do
     @tag driver: :playwright
-    test "passes a documented handle and supports map patterns and explicit connection routing" do
+    test "passes the native page and ignores the callback's return value" do
       test_pid = self()
       session = playwright_html("<p id=target>Before</p>")
 
       session =
         session
-        |> unwrap(fn %Handle{} = handle ->
-          %{context_id: context_id, page_id: page_id, frame_id: frame_id} = handle
-
-          assert is_binary(context_id)
-          assert is_binary(page_id)
-          assert is_binary(frame_id)
-          assert is_integer(handle.timeout)
-
-          {:ok, _result} =
-            Frame.evaluate(frame_id,
-              expression: "document.querySelector('#target').textContent = 'After'",
-              connection: handle.connection,
-              timeout: handle.timeout
-            )
-
-          send(test_pid, {:native_handle, handle})
-          %{handle | frame_id: "discarded-return-value"}
+        |> unwrap(fn %BrowserPage{} = page ->
+          BrowserPage.evaluate!(page, "document.querySelector('#target').textContent = 'After'")
+          send(test_pid, {:native_page, page})
+          :discarded_return_value
         end)
         |> expect("After" |> by_text() |> to_be_visible())
 
-      assert_receive {:native_handle, %Handle{} = handle}
-      assert Session.page_state(session).frame_id == handle.frame_id
+      assert_receive {:native_page, page}
+      assert Session.page_state(session).page == page
     end
 
     @tag driver: :playwright
-    test "supports BrowserContext and Page operations through the same handle" do
+    test "reaches the BrowserContext through the page" do
       test_pid = self()
       session = playwright_html("<p>Context operation</p>")
 
       session
-      |> unwrap(fn handle ->
-        {:ok, _result} =
-          BrowserPage.bring_to_front(handle.page_id,
-            connection: handle.connection,
-            timeout: handle.timeout
-          )
-
-        {:ok, cookies} =
-          BrowserContext.cookies(handle.context_id,
-            connection: handle.connection,
-            timeout: handle.timeout
-          )
-
-        send(test_pid, {:cookies, cookies})
+      |> unwrap(fn page ->
+        :ok = BrowserPage.bring_to_front(page)
+        send(test_pid, {:cookies, page |> BrowserPage.context() |> BrowserContext.cookies!()})
         {:error, :ignored_native_result}
       end)
       |> expect("Context operation" |> by_text() |> to_be_visible())
@@ -319,23 +291,13 @@ defmodule Fluffy.Conformance.UnwrapTest do
     end
 
     @tag driver: :playwright
-    test "exposes the session timeout and leaves native error tuples to the callback" do
-      session =
-        session_for_html(:playwright, "<p>Still usable</p>",
-          base_url: Fluffy.TestServer.base_url(),
-          timeout: 1_000
-        )
+    test "leaves native error tuples to the callback" do
+      session = playwright_html("<p>Still usable</p>")
 
       session
-      |> unwrap(fn handle ->
-        assert handle.timeout == 1_000
-
-        assert {:error, _reason} =
-                 Frame.wait_for_selector(handle.frame_id,
-                   selector: "#does-not-exist",
-                   timeout: 1,
-                   connection: handle.connection
-                 )
+      |> unwrap(fn page ->
+        assert {:error, %PlaywrightEx.TimeoutError{}} =
+                 BrowserPage.wait_for_selector(page, "#does-not-exist", timeout: 1)
       end)
       |> expect("Still usable" |> by_text() |> to_be_visible())
     end
@@ -347,14 +309,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
 
       session =
         session
-        |> unwrap(fn handle ->
-          {:ok, _result} =
-            Frame.evaluate(handle.frame_id,
-              expression: "location.hash = 'native'",
-              connection: handle.connection,
-              timeout: handle.timeout
-            )
-        end)
+        |> unwrap(fn page -> BrowserPage.evaluate!(page, "location.hash = 'native'") end)
         |> expect(Fluffy.Expect.page_to_have_url("/harness#native"))
 
       assert Session.current_page(session).document_id == before_document
@@ -365,15 +320,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
       session = playwright_html("<p>Before navigation</p>")
 
       session
-      |> unwrap(fn handle ->
-        {:ok, _response} =
-          Frame.goto(handle.frame_id,
-            url: "/chamber",
-            wait_until: "load",
-            connection: handle.connection,
-            timeout: handle.timeout
-          )
-      end)
+      |> unwrap(fn page -> BrowserPage.goto!(page, "/chamber") end)
       |> expect(Fluffy.Expect.page_to_have_url("/chamber"))
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
     end
@@ -382,17 +329,19 @@ defmodule Fluffy.Conformance.UnwrapTest do
     test "composes native navigation with page assertions" do
       "<p>Before navigation</p>"
       |> playwright_html()
-      |> unwrap(fn handle ->
-        {:ok, _response} =
-          Frame.goto(handle.frame_id,
-            url: "/chamber",
-            wait_until: "load",
-            connection: handle.connection,
-            timeout: handle.timeout
-          )
-      end)
+      |> unwrap(fn page -> BrowserPage.goto!(page, "/chamber") end)
       |> expect(Fluffy.Expect.page_to_have_url("/chamber"))
-      |> expect(Fluffy.Expect.page_to_have_status(200))
+      |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
+    end
+
+    @tag driver: :playwright
+    test "adopts a document navigated natively outside unwrap before the next action" do
+      session = playwright_html("<p>Before navigation</p>")
+      page = Session.page_state(session).page
+      BrowserPage.goto!(page, "/chamber")
+
+      session
+      |> expect(Fluffy.Expect.page_to_have_url("/chamber"))
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
     end
 
@@ -402,20 +351,8 @@ defmodule Fluffy.Conformance.UnwrapTest do
 
       pending = wait_for(session, Event.page())
 
-      unwrap(session, fn handle ->
-        {:ok, page} =
-          BrowserContext.new_page(handle.context_id,
-            connection: handle.connection,
-            timeout: handle.timeout
-          )
-
-        {:ok, _response} =
-          Frame.goto(page.main_frame.guid,
-            url: "/chamber",
-            wait_until: "load",
-            connection: handle.connection,
-            timeout: handle.timeout
-          )
+      unwrap(session, fn page ->
+        page |> BrowserPage.context() |> BrowserContext.new_page!() |> BrowserPage.goto!("/chamber")
       end)
 
       child = await(pending)
@@ -432,15 +369,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
       session = playwright_html("<p>Main page</p>")
 
       pending = wait_for(session, Event.page())
-
-      unwrap(session, fn handle ->
-        assert {:ok, _page} =
-                 BrowserContext.new_page(handle.context_id,
-                   connection: handle.connection,
-                   timeout: handle.timeout
-                 )
-      end)
-
+      unwrap(session, fn page -> page |> BrowserPage.context() |> BrowserContext.new_page!() end)
       child = await(pending)
 
       assert Page.url(child) == "about:blank"
@@ -455,13 +384,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
       session = playwright_html("<p>Tracked page</p>")
 
       assert_raise ArgumentError, ~r/unwrap.*invalidated.*page/i, fn ->
-        unwrap(session, fn handle ->
-          {:ok, _result} =
-            BrowserPage.close(handle.page_id,
-              connection: handle.connection,
-              timeout: handle.timeout
-            )
-        end)
+        unwrap(session, &BrowserPage.close!/1)
       end
     end
 
@@ -470,13 +393,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
       session = playwright_html("<p>Tracked context</p>")
 
       assert_raise ArgumentError, ~r/unwrap.*invalidated.*context/i, fn ->
-        unwrap(session, fn handle ->
-          {:ok, _result} =
-            BrowserContext.close(handle.context_id,
-              connection: handle.connection,
-              timeout: handle.timeout
-            )
-        end)
+        unwrap(session, fn page -> page |> BrowserPage.context() |> BrowserContext.close!() end)
       end
     end
 
@@ -486,29 +403,20 @@ defmodule Fluffy.Conformance.UnwrapTest do
       session = playwright_html("<p>Main page</p>")
 
       session =
-        unwrap(session, fn handle ->
-          {:ok, page} =
-            BrowserContext.new_page(handle.context_id,
-              connection: handle.connection,
-              timeout: handle.timeout
-            )
-
-          send(test_pid, {:untracked_page, page.guid, handle.connection, handle.timeout})
+        unwrap(session, fn page ->
+          send(test_pid, {:untracked_page, page |> BrowserPage.context() |> BrowserContext.new_page!()})
         end)
 
-      assert_receive {:untracked_page, page_id, connection, timeout}
+      assert_receive {:untracked_page, untracked}
       assert length(pages(session)) == 2
       [child] = pages(session) -- [current_page(session)]
       assert Page.url(child) == "about:blank"
       assert current_page(switch_page(session, child)) == child
 
+      browser_context = BrowserPage.context(untracked)
       :ok = GenServer.stop(Fluffy.TestScope.current())
 
-      assert {:error, _reason} =
-               BrowserPage.bring_to_front(page_id,
-                 connection: connection,
-                 timeout: timeout
-               )
+      refute browser_context.guid in Enum.map(PlaywrightEx.Browser.contexts(Fluffy.BrowserRuntime.browser()), & &1.guid)
     end
 
     @tag driver: :playwright
@@ -516,13 +424,13 @@ defmodule Fluffy.Conformance.UnwrapTest do
       session = playwright_html("<p>Failure</p>")
 
       assert_raise RuntimeError, "native browser exception", fn ->
-        unwrap(session, fn _handle -> raise "native browser exception" end)
+        unwrap(session, fn _page -> raise "native browser exception" end)
       end
 
-      assert catch_throw(unwrap(session, fn _handle -> throw(:native_browser_throw) end)) ==
+      assert catch_throw(unwrap(session, fn _page -> throw(:native_browser_throw) end)) ==
                :native_browser_throw
 
-      assert catch_exit(unwrap(session, fn _handle -> exit(:native_browser_exit) end)) ==
+      assert catch_exit(unwrap(session, fn _page -> exit(:native_browser_exit) end)) ==
                :native_browser_exit
     end
   end

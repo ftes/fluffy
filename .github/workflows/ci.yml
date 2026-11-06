@@ -71,22 +71,53 @@ jobs:
           key: dialyzer-${{ steps.toolchain.outputs.image }}-erlang-${{ steps.toolchain.outputs.erlang }}-elixir-${{ steps.toolchain.outputs.elixir }}-${{ hashFiles('mix.lock') }}
           restore-keys: |
             dialyzer-${{ steps.toolchain.outputs.image }}-erlang-${{ steps.toolchain.outputs.erlang }}-elixir-${{ steps.toolchain.outputs.elixir }}-
+      - run: mix deps.get
       - name: Restore Playwright browsers
-        id: playwright-cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-chromium
-      - run: mix deps.get
+          path: |
+            ~/.cache/ms-playwright
+            ~/.cache/playwright_ex
+          key: playwright-${{ runner.os }}-${{ hashFiles('deps/playwright_ex/DRIVER_VERSION', 'deps/playwright_ex/NODE_VERSION') }}-chromium
+      # As in PlaywrightEx's CI: --with-deps runs apt-get against the runner's Azure mirror, which
+      # can stall. The .debs are cached per driver version, so a warm run installs offline;
+      # archive.ubuntu.com is a fallback mirror, apt times out stalled fetches, and each attempt is
+      # capped (a killed attempt's apt-get, out of timeout's reach under sudo, is killed before the next).
+      - name: Restore browser system packages
+        id: apt-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          key: apt-chromium-${{ hashFiles('deps/playwright_ex/DRIVER_VERSION', 'deps/playwright_ex/NODE_VERSION') }}-${{ steps.toolchain.outputs.image }}
+          path: ~/apt-cache
+      - name: Install driver, browser and system packages
+        run: |
+          printf 'Acquire::http::Timeout "30";\nAcquire::https::Timeout "30";\nAcquire::Retries "5";\nDPkg::Lock::Timeout "60";\nAPT::Keep-Downloaded-Packages "true";\n' | sudo tee /etc/apt/apt.conf.d/99timeouts
+          if [[ -f /etc/apt/apt-mirrors.txt ]]; then echo "http://archive.ubuntu.com/ubuntu/" | sudo tee -a /etc/apt/apt-mirrors.txt; fi
+          if compgen -G ~/apt-cache/'*.deb' > /dev/null; then sudo cp ~/apt-cache/*.deb /var/cache/apt/archives/; fi
+          for attempt in 1 2 3; do
+            if timeout 300 mix playwright_ex.install -- --with-deps chromium; then
+              mkdir -p ~/apt-cache && cp /var/cache/apt/archives/*.deb ~/apt-cache/ 2>/dev/null || true
+              exit 0
+            fi
+            echo "::warning::browser install attempt $attempt failed or timed out"
+            sudo pkill -x apt-get || true
+          done
+          exit 1
+      # One lane saves (both would race for the same key).
+      - name: Save browser system packages
+        if: matrix.lane == 'newest' && steps.apt-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          key: ${{ steps.apt-cache.outputs.cache-primary-key }}
+          path: ~/apt-cache
       - run: pnpm install --frozen-lockfile
-      - if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium
-      - if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium
       - run: pnpm run build:test
       - name: Check formatting
         if: matrix.lane == 'newest'
         run: mix format --check-formatted
+      - name: Check generated PlaywrightEx options
+        if: matrix.lane == 'newest'
+        run: mix fluffy.gen.native_options --check
       - name: Compile and lint
         run: |
           mix compile --warnings-as-errors

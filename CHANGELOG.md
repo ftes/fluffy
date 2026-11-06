@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.9.0 — Unreleased
+
+Fluffy now runs on PlaywrightEx 0.17, a port of the official Playwright client with a pinned driver.
+
+### Upgrading from 0.8
+
+- Install the driver and browsers with `mix playwright_ex.install -- chromium`; drop the npm `playwright` package and the `assets_dir` config.
+- Replace `js_logger:` with `log_browser_console: true | false`.
+- `unwrap/2` passes a `%PlaywrightEx.Page{}`; `Fluffy.Playwright.Handle` is removed.
+- `Fluffy.HTTPEvent` is replaced by `Fluffy.Request` and `Fluffy.Response` (`response.request` is the request).
+- `Fluffy.Playwright.evaluate(session, expression, arg \\ nil)` replaces the `is_function:`, `arg:` and `timeout:` options and raises after the session's `timeout:`; JavaScript `null` returns `:null`.
+- `Fluffy.Playwright.cookies(session, urls)` takes the URL list directly.
+- `browser_context:`, `launch_options:`, and the options of `screenshot`, `storage_state`, cookies and `trace` pass through to PlaywrightEx, which validates them.
+- `go_back`/`go_forward`, `hover`, `drag_to` and `press_sequentially` accept the options of their PlaywrightEx call except `no_wait_after:` and `signal:`, which would bypass navigation tracking.
+- `trace(coverage:)` is removed.
+- `Fluffy.Dialog.accept/2` and `dismiss/1` take no timeout; `Fluffy.Download` has none.
+- `page_status`, `page_to_have_status` and `Fluffy.Page.status` are removed, as in Playwright; on Playwright, assert on `Event.response` instead.
+- `OperationError.cause` and Playwright assertion messages carry native PlaywrightEx exceptions.
+- `Fluffy.Expect.checked_option` is now `to_be_checked_option`.
+
+### Added
+
+- `click`, `fill`, `check`, `uncheck`, `select_option` and `press` accept the options of their PlaywrightEx call on Playwright (e.g. `modifiers: [:shift]`, `force: true`); Phoenix raises `Fluffy.CapabilityError` for them.
+- Expectations accept the options of their PlaywrightEx assertion on every driver: `visible:`, `enabled:` and `editable:` (`false` asserts the opposite state) and `ignore_case:` for `page_to_have_url`. Options and types are generated per constructor.
+- A document navigated natively (inside or after `unwrap/2`) is adopted before the next action.
+- Fluffy relaunches the browser after it disconnects.
+- `Fluffy.FileChooser.page/1`.
+- `Fluffy.Event.close()` resolves with the selected page's handle when it closes.
+
+### Fixed
+
+- No unused-function warning when Fluffy is compiled without Ecto.
+- Playwright actions and expectations default to the session's `timeout:`, like LiveView.
+- An action that closes its own page, such as a popup's `window.close()`, succeeds instead of raising `PlaywrightEx.TargetClosedError`.
+- A browser that fails to launch raises in the session that needed it, instead of restarting every running session.
+- Playwright `check` and `uncheck` succeed once the click sets the requested state, as on Phoenix, even if page code such as a LiveView patch changes it before Playwright reads it back (common in Firefox and WebKit).
+
 ## 0.8.0 — 2026-11-04
 
 ### Added

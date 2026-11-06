@@ -101,7 +101,13 @@ defmodule Fluffy.Event.Subscription do
     do: fail(state, "session is closed")
 
   def handle_info({:DOWN, _ref, :process, _pid, _reason}, state), do: {:stop, :normal, state}
-  def handle_info({:source_closed, reason}, state), do: fail(state, reason)
+
+  def handle_info({:source_closed, reason} = message, state) do
+    if is_nil(state.outcome) and match?({:ok, _value}, state.decode.(message)),
+      do: deliver_last(message, reason, state),
+      else: fail(state, reason)
+  end
+
   def handle_info(:timeout, state), do: fail(state, "no matching #{state.event.type} event occurred before the timeout")
   def handle_info(_message, %{outcome: outcome} = state) when not is_nil(outcome), do: {:noreply, state}
 
@@ -117,6 +123,19 @@ defmodule Fluffy.Event.Subscription do
   def terminate(_reason, state) do
     if state.task, do: Task.shutdown(state.task, :brutal_kill)
     release(state)
+  end
+
+  # A source's close can itself be the event, and is its last one.
+  defp deliver_last(message, reason, %{mode: :wait} = state) do
+    case deliver(message, state) do
+      {:noreply, %{outcome: nil} = state} -> fail(state, reason)
+      settled -> settled
+    end
+  end
+
+  defp deliver_last(message, _reason, state) do
+    {:noreply, state} = deliver(message, state)
+    {:noreply, %{state | mode: :removed}}
   end
 
   defp deliver(message, %{mode: :wait} = state) do

@@ -20,7 +20,6 @@ defmodule Fluffy.Conformance.StaticHTTPErrorTest do
 
       session
       |> visit(TestHTTPFixtures.path(fixture, "/missing"))
-      |> expect(Fluffy.Expect.page_to_have_status(404))
       |> expect("Order not found" |> by_text() |> to_be_visible())
       |> expect(Fluffy.Expect.page_to_have_url(TestHTTPFixtures.url(fixture, "/missing")))
     end
@@ -37,7 +36,6 @@ defmodule Fluffy.Conformance.StaticHTTPErrorTest do
 
       session
       |> visit(TestHTTPFixtures.path(fixture, "/no-location"))
-      |> expect(Fluffy.Expect.page_to_have_status(302))
       |> expect("No redirect target" |> by_text() |> to_be_visible())
       |> expect(Fluffy.Expect.page_to_have_url(TestHTTPFixtures.url(fixture, "/no-location")))
     end

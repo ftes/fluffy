@@ -1,12 +1,12 @@
 defmodule Fluffy.Driver.Playwright.State do
   @moduledoc false
 
-  @enforce_keys [:frame_id, :page_id]
-  defstruct [:document_identity, :frame_id, :page_id]
+  @enforce_keys [:page, :frame]
+  defstruct [:page, :frame, :document_identity]
 
   @type t :: %__MODULE__{
-          document_identity: reference() | nil,
-          frame_id: String.t(),
-          page_id: String.t()
+          page: PlaywrightEx.Page.t(),
+          frame: PlaywrightEx.Frame.t(),
+          document_identity: String.t() | nil
         }
 end
