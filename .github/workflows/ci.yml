@@ -23,8 +23,8 @@ env:
   MIX_ENV: test
 
 jobs:
-  # Compile, lint and docs per lane; the newest lane also checks formatting and Dialyzer. No
-  # browser or database. Saves the deps and _build cache on main.
+  # Compile, lint and docs per lane; the newest lane also checks formatting, the generated
+  # options and Dialyzer. No browser or database. Saves the deps and _build cache on main.
   checks:
     name: checks (${{ matrix.lane }})
     runs-on: ubuntu-26.04
@@ -54,10 +54,14 @@ jobs:
       - name: Check formatting
         if: matrix.lane == 'newest'
         run: mix format --check-formatted
+      # Compiles strictly before the generator's own compile could satisfy it (as `mix lint`).
       - name: Compile and lint
         run: |
           mix compile --warnings-as-errors
           mix credo --format oneline
+      - name: Check generated PlaywrightEx options
+        if: matrix.lane == 'newest'
+        run: mix fluffy.gen.native_options --check
       - name: Run Dialyzer
         if: matrix.lane == 'newest'
         run: mix dialyzer --format short --list-unused-filters

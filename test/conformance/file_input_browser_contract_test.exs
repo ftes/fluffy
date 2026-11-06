@@ -35,8 +35,7 @@ defmodule Fluffy.Conformance.FileInputBrowserContractTest do
             value: input.value
           };
         }
-        """,
-        is_function: true
+        """
       )
 
     assert metadata["name"] == payload.name

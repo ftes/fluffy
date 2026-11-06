@@ -7,49 +7,44 @@ defmodule Fluffy.Frame do
   """
   alias Fluffy.Page
   alias Fluffy.SessionRuntime
-  alias PlaywrightEx.Connection
 
-  @enforce_keys [:page, :id]
-  defstruct [:page, :id]
-  @opaque t :: %__MODULE__{page: Page.t(), id: String.t()}
+  @enforce_keys [:page, :native]
+  defstruct [:page, :native]
+  @opaque t :: %__MODULE__{page: Page.t(), native: PlaywrightEx.Frame.t()}
 
   @doc false
-  def new(page, id), do: %__MODULE__{page: page, id: id}
+  def new(page, native), do: %__MODULE__{page: page, native: native}
 
   @doc "Returns the frame's current URL."
   @spec url(t()) :: String.t()
   def url(%__MODULE__{} = frame) do
-    context = context!(frame)
-
-    case PlaywrightEx.Frame.snapshot(frame.id, connection: context.connection) do
-      {:ok, snapshot} -> snapshot.url
-      {:error, reason} -> raise ArgumentError, "frame is closed: #{inspect(reason)}"
-    end
+    ensure_session!(frame)
+    PlaywrightEx.Frame.url(frame.native)
   end
 
   @doc "Returns the owning page's live handle."
   @spec page(t()) :: Page.t()
   def page(%__MODULE__{} = frame) do
-    context!(frame)
+    ensure_session!(frame)
     frame.page
   end
 
   @doc "Returns the parent frame, or nil for the main frame."
   @spec parent_frame(t()) :: t() | nil
   def parent_frame(%__MODULE__{} = frame) do
-    context = context!(frame)
+    ensure_session!(frame)
 
-    case Connection.initializer!(context.connection, frame.id)[:parent_frame] do
+    case PlaywrightEx.Frame.parent_frame(frame.native) do
       nil -> nil
-      %{guid: guid} -> new(frame.page, guid)
+      parent -> new(frame.page, parent)
     end
   end
 
-  defp context!(frame) do
+  defp ensure_session!(frame) do
     Page.record(frame.page)
 
     case SessionRuntime.context(frame.page.runtime) do
-      {:ok, context} -> context
+      {:ok, _context} -> :ok
       {:error, reason} -> raise ArgumentError, reason
     end
   end

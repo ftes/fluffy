@@ -9,13 +9,12 @@ defmodule Fluffy.Playwright do
 
   alias Fluffy.Backend
   alias Fluffy.Backend.Playwright, as: PlaywrightBackend
+  alias Fluffy.Backend.Playwright.Bounded
   alias Fluffy.CapabilityError
-  alias Fluffy.Playwright.Screenshot
+  alias Fluffy.Options
   alias Fluffy.Playwright.Trace
   alias Fluffy.Session
-  alias PlaywrightEx.Frame
-
-  @type evaluate_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.evaluate_schema()))
+  alias PlaywrightEx.BrowserContext
 
   @trace_schema NimbleOptions.new!(
                   directory: [
@@ -30,49 +29,25 @@ defmodule Fluffy.Playwright do
                     type: :boolean,
                     default: true,
                     doc: "Open Playwright Trace Viewer after saving the trace."
-                  ],
-                  screenshots: [
-                    type: :boolean,
-                    default: true,
-                    doc: "Capture screenshots during tracing."
-                  ],
-                  snapshots: [
-                    type: :boolean,
-                    default: true,
-                    doc: "Capture DOM snapshots and network activity."
-                  ],
-                  sources: [
-                    type: :boolean,
-                    default: true,
-                    doc: "Include source files in the trace."
-                  ],
-                  coverage: [
-                    type: :boolean,
-                    default: false,
-                    doc: "Record Istanbul coverage from instrumented page code (`window.__coverage__`)."
                   ]
                 )
 
-  @type trace_option :: unquote(NimbleOptions.option_typespec(@trace_schema))
+  @trace_capture [screenshots: true, snapshots: true, sources: true]
 
-  @screenshot_schema NimbleOptions.new!(
-                       full_page: [
-                         type: :boolean,
-                         default: false,
-                         doc: "Capture the full scrollable page instead of only the viewport."
-                       ],
-                       omit_background: [
-                         type: :boolean,
-                         default: false,
-                         doc: "Hide the default white background to allow transparency."
-                       ],
-                       timeout: [
-                         type: :pos_integer,
-                         doc: "Maximum screenshot time in milliseconds."
-                       ]
-                     )
+  @typedoc "Fluffy's trace options, and the capture options of `PlaywrightEx.Tracing.start/2`."
+  @type trace_option ::
+          unquote(NimbleOptions.option_typespec(@trace_schema))
+          | {:screenshots, boolean()}
+          | {:snapshots, boolean() | map()}
+          | {:sources, boolean()}
+          | {:live, boolean()}
 
-  @type screenshot_option :: unquote(NimbleOptions.option_typespec(@screenshot_schema))
+  @type go_back_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:go_back)))
+  @type go_forward_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:go_forward)))
+  @type hover_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:hover)))
+  @type drag_to_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:drag_to)))
+  @type press_sequentially_option ::
+          unquote(NimbleOptions.option_typespec(Options.action_schema(:press_sequentially)))
 
   @doc group: "Lifecycle and navigation"
   @doc playwright_only: true
@@ -144,69 +119,108 @@ defmodule Fluffy.Playwright do
 
   @doc group: "Lifecycle and navigation"
   @doc playwright_only: true
-  @doc "Navigates backward in browser history. Does nothing if there is no entry."
+  @doc """
+  Navigates backward in browser history. Does nothing if there is no entry.
+
+  ## Options
+
+  Playwright-only options pass through to #{Options.native_reference(:go_back)}.
+
+  #{NimbleOptions.docs(Options.action_schema(:go_back))}
+  """
+  @spec go_back(Session.t(), [go_back_option()]) :: Session.t()
   def go_back(%Session{} = session, options \\ []) do
-    Backend.history(session, :go_back, Fluffy.Options.validate_action!(options))
+    ensure_playwright_backend!(session, :history)
+    Backend.history(session, :go_back, Options.validate_action!(:go_back, options))
   end
 
   @doc group: "Lifecycle and navigation"
   @doc playwright_only: true
-  @doc "Navigates forward in browser history. Does nothing if there is no entry."
+  @doc """
+  Navigates forward in browser history. Does nothing if there is no entry.
+
+  ## Options
+
+  Playwright-only options pass through to #{Options.native_reference(:go_forward)}.
+
+  #{NimbleOptions.docs(Options.action_schema(:go_forward))}
+  """
+  @spec go_forward(Session.t(), [go_forward_option()]) :: Session.t()
   def go_forward(%Session{} = session, options \\ []) do
-    Backend.history(session, :go_forward, Fluffy.Options.validate_action!(options))
+    ensure_playwright_backend!(session, :history)
+    Backend.history(session, :go_forward, Options.validate_action!(:go_forward, options))
   end
 
   @doc group: "Actions"
   @doc playwright_only: true
-  @doc "Focuses the target in the active browser page."
+  @doc "Focuses the target in the active browser page. Accepts `timeout:`."
   @spec focus(Session.t(), Fluffy.Locator.t(), [Fluffy.action_option()]) :: Session.t()
   def focus(%Session{} = session, locator, options \\ []) do
     ensure_playwright_backend!(session, :focus)
-    options = Fluffy.Options.validate_action!(options)
+    options = Options.validate_action!(options)
     Fluffy.__dispatch_driver__(session, :focus, [locator, options])
   end
 
   @doc group: "Actions"
   @doc playwright_only: true
-  @doc "Blurs the target in the active browser page."
+  @doc "Blurs the target in the active browser page. Accepts `timeout:`."
   @spec blur(Session.t(), Fluffy.Locator.t(), [Fluffy.action_option()]) :: Session.t()
   def blur(%Session{} = session, locator, options \\ []) do
     ensure_playwright_backend!(session, :blur)
-    options = Fluffy.Options.validate_action!(options)
+    options = Options.validate_action!(options)
     Fluffy.__dispatch_driver__(session, :blur, [locator, options])
   end
 
   @doc group: "Actions"
   @doc playwright_only: true
-  @doc "Hovers over a locator. Requires Playwright."
+  @doc """
+  Hovers over a locator.
+
+  ## Options
+
+  Playwright-only options pass through to #{Options.native_reference(:hover)}.
+
+  #{NimbleOptions.docs(Options.action_schema(:hover))}
+  """
+  @spec hover(Session.t(), Fluffy.Locator.t(), [hover_option()]) :: Session.t()
   def hover(%Session{} = session, locator, options \\ []) do
     ensure_playwright_backend!(session, :hover)
-    options = Fluffy.Options.validate_action!(options)
-    Fluffy.__dispatch_driver__(session, :hover, [locator, options])
+    Fluffy.__dispatch_driver__(session, :hover, [locator, Options.validate_action!(:hover, options)])
   end
 
   @doc group: "Actions"
   @doc playwright_only: true
-  @doc "Drags the source locator onto the target locator in the same frame. Requires Playwright."
+  @doc """
+  Drags the source locator onto the target locator in the same frame.
+
+  ## Options
+
+  Playwright-only options pass through to #{Options.native_reference(:drag_to)}.
+
+  #{NimbleOptions.docs(Options.action_schema(:drag_to))}
+  """
+  @spec drag_to(Session.t(), Fluffy.Locator.t(), Fluffy.Locator.t(), [drag_to_option()]) :: Session.t()
   def drag_to(%Session{} = session, source, target, options \\ []) do
     ensure_playwright_backend!(session, :drag_to)
-    options = Fluffy.Options.validate_action!(options)
-    Fluffy.__dispatch_driver__(session, :drag_to, [source, target, options])
+    Fluffy.__dispatch_driver__(session, :drag_to, [source, target, Options.validate_action!(:drag_to, options)])
   end
 
   @doc group: "Actions"
   @doc playwright_only: true
-  @doc "Types text character by character, emitting keyboard events. Accepts `:delay` in milliseconds. Requires Playwright."
+  @doc """
+  Types text character by character, emitting keyboard events.
+
+  ## Options
+
+  Playwright-only options pass through to #{Options.native_reference(:press_sequentially)}.
+
+  #{NimbleOptions.docs(Options.action_schema(:press_sequentially))}
+  """
+  @spec press_sequentially(Session.t(), Fluffy.Locator.t(), String.t(), [press_sequentially_option()]) :: Session.t()
   def press_sequentially(%Session{} = session, locator, text, options \\ []) do
     ensure_playwright_backend!(session, :press_sequentially)
-    options = validate_typing!(options)
+    options = Options.validate_action!(:press_sequentially, options)
     Fluffy.__dispatch_driver__(session, :press_sequentially, [locator, text, options])
-  end
-
-  defp validate_typing!(options) do
-    {delay, options} = Keyword.pop(options, :delay, 0)
-    if !(is_integer(delay) and delay >= 0), do: raise(ArgumentError, "delay must be a non-negative integer")
-    Keyword.put(Fluffy.Options.validate_action!(options), :delay, delay)
   end
 
   @doc playwright_only: true
@@ -221,18 +235,22 @@ defmodule Fluffy.Playwright do
   ## Options
 
   #{NimbleOptions.docs(@trace_schema)}
+
+  Other options go to `PlaywrightEx.Tracing.start/2`. Fluffy defaults
+  `screenshots:`, `snapshots:` and `sources:` to `true`.
   """
   @spec trace(Session.t(), [trace_option()]) :: Session.t()
   def trace(session, options \\ []) when is_list(options) do
     ensure_playwright_backend!(session, :tracing)
-    options = NimbleOptions.validate!(options, @trace_schema)
+    {fluffy_options, capture_options} = Keyword.split(options, Keyword.keys(@trace_schema.schema))
+    fluffy_options = NimbleOptions.validate!(fluffy_options, @trace_schema)
     context = Session.context(session)
 
     if context.trace do
       raise ArgumentError, "this Playwright session is already tracing"
     end
 
-    trace = Trace.start(context, options)
+    trace = Trace.start(context, fluffy_options, Keyword.merge(@trace_capture, capture_options))
 
     :ok = Fluffy.SessionRuntime.register(session.runtime, {:trace, trace}, fn -> Trace.stop(trace) end)
 
@@ -241,34 +259,27 @@ defmodule Fluffy.Playwright do
 
   @doc playwright_only: true
   @doc """
-  Saves a PNG screenshot of the active page and returns the session.
+  Saves a screenshot of the active page and returns the session.
 
-  ## Options
-
-  #{NimbleOptions.docs(@screenshot_schema)}
+  Accepts the options of `PlaywrightEx.Page.screenshot/2`, such as `full_page:`.
   """
-  @spec screenshot(Session.t(), Path.t(), [screenshot_option()]) :: Session.t()
+  @spec screenshot(Session.t(), Path.t(), PlaywrightEx.Page.screenshot_options()) :: Session.t()
   def screenshot(session, path, options \\ []) when is_binary(path) and is_list(options) do
     ensure_playwright_backend!(session, :screenshot)
-    options = NimbleOptions.validate!(options, @screenshot_schema)
-    context = Session.context(session)
-    {timeout, options} = Keyword.pop(options, :timeout, context.timeout)
-
-    screenshot_options = options ++ [connection: context.connection, timeout: timeout]
-
-    case Screenshot.write(Session.page_state(session).page_id, path, screenshot_options) do
-      :ok -> session
-      {:error, error} -> raise "Could not save Playwright screenshot: #{inspect(error)}"
-    end
+    File.mkdir_p!(Path.dirname(path))
+    PlaywrightEx.Page.screenshot!(Session.page_state(session).page, Keyword.put(options, :path, path))
+    session
   end
 
   @doc playwright_only: true
   @doc """
   Evaluates JavaScript in the active Playwright page and returns the value.
 
-  This mirrors Playwright's page/frame evaluation semantics: promises are
-  awaited by Playwright, serializable JavaScript values are returned to Elixir,
-  and JavaScript or protocol failures raise.
+  This is `PlaywrightEx.Page.evaluate/3`: the expression is JavaScript source,
+  either an expression or a function that receives `arg`. Promises are awaited,
+  serializable values return as Elixir terms (objects as maps with string
+  keys, JavaScript `null` as `:null`), and JavaScript failures raise. The
+  call raises if it does not settle within the session's `timeout:`.
 
   `evaluate/3` is a browser-only value query, so it returns the evaluated value
   rather than the Fluffy session. Use Elixir's `then/2` when a pipeline needs
@@ -287,115 +298,63 @@ defmodule Fluffy.Playwright do
       end)
       |> click(by_role(:button, name: "Continue"))
 
-  For function-style expressions, pass `is_function: true` and `arg:`:
-
-      Playwright.evaluate(session, "selector => document.querySelector(selector).textContent",
-        is_function: true,
-        arg: "#status"
-      )
+      Playwright.evaluate(session, "selector => document.querySelector(selector).textContent", "#status")
 
   Do not use this for JavaScript that owns a navigation, opens a page, starts a
   download, or installs a durable listener. Use the corresponding
   listener-before-action `Fluffy.wait_for/3` event API so lifecycle and
   cleanup remain owned by Fluffy. Reserve `Fluffy.unwrap/2` for uncommon
   page-local operations that have no first-class API.
-
-  ## Options
-
-  #{NimbleOptions.docs(Fluffy.Options.evaluate_schema())}
   """
-  @spec evaluate(Session.t(), String.t(), [evaluate_option()]) :: term()
-  def evaluate(session, expression, options \\ []) when is_binary(expression) and is_list(options) do
-    options = Fluffy.Options.validate_evaluate!(options)
+  @spec evaluate(Session.t(), String.t(), term()) :: term()
+  def evaluate(session, expression, arg \\ nil) when is_binary(expression) do
     ensure_playwright!(session)
-    context = Session.context(session)
-
-    timeout = max(Keyword.get(options, :timeout) || context.timeout, 1)
-
-    case Frame.evaluate(Session.page_state(session).frame_id,
-           expression: expression,
-           is_function: options[:is_function],
-           arg: options[:arg],
-           connection: context.connection,
-           timeout: timeout
-         ) do
-      {:ok, value} ->
-        value
-
-      {:error, error} ->
-        raise "Playwright evaluate failed: #{inspect(error)}"
-    end
+    frame = Session.page_state(session).frame
+    timeout = max(Session.context(session).timeout, 1)
+    Bounded.within!(timeout, :evaluate, fn -> PlaywrightEx.Frame.evaluate(frame, expression, arg) end)
   end
 
   @doc playwright_only: true
-  @doc "Adds cookie maps to the browser context and returns the session."
+  @doc "Adds cookies to the browser context and returns the session. See `PlaywrightEx.BrowserContext.add_cookies/2`."
+  @spec add_cookies(Session.t(), [map()]) :: Session.t()
   def add_cookies(session, cookies) when is_list(cookies) do
-    context_call(session, :add_cookies, cookies: cookies)
+    session |> browser_context!(:add_cookies) |> BrowserContext.add_cookies!(cookies)
     session
   end
 
   @doc playwright_only: true
-  @doc "Returns browser cookies, optionally filtered by a list of `:urls`. Accepts `:timeout`."
-  def cookies(session, options \\ []) do
-    context_call(session, :cookies, Keyword.validate!(options, [:urls, :timeout]))
+  @doc "Returns browser cookies, optionally only those for `urls`. See `PlaywrightEx.BrowserContext.cookies/2`."
+  @spec cookies(Session.t(), String.t() | [String.t()] | nil) :: [map()]
+  def cookies(session, urls \\ nil) do
+    session |> browser_context!(:cookies) |> BrowserContext.cookies!(urls)
   end
 
   @doc playwright_only: true
-  @doc "Clears cookies and returns the session. Filters `:name`, `:domain`, and `:path` accept strings or regexes. Accepts `:timeout`."
+  @doc """
+  Clears cookies and returns the session.
+
+  Accepts the filters of `PlaywrightEx.BrowserContext.clear_cookies/2`: `name:`, `domain:` and `path:`.
+  """
+  @spec clear_cookies(Session.t(), BrowserContext.clear_cookies_options()) :: Session.t()
   def clear_cookies(session, options \\ []) do
-    context_call(session, :clear_cookies, Keyword.validate!(options, [:name, :domain, :path, :timeout]))
+    session |> browser_context!(:clear_cookies) |> BrowserContext.clear_cookies!(options)
     session
   end
 
   @doc playwright_only: true
-  @doc "Returns storage state for reuse as `browser_context: [storage_state: state]`. Accepts `:indexed_db`, `:timeout`, and optional JSON output `:path`."
+  @doc """
+  Returns the context's storage state for reuse as `browser_context: [storage_state: state]`.
+
+  Accepts the options of `PlaywrightEx.BrowserContext.storage_state/2`, such as `path:` and `indexed_db:`.
+  """
+  @spec storage_state(Session.t(), BrowserContext.storage_state_options()) :: map()
   def storage_state(session, options \\ []) do
-    options = Keyword.validate!(options, [:indexed_db, :timeout, :path])
-    {path, options} = Keyword.pop(options, :path)
-    state = session |> context_call(:storage_state, options) |> storage_wire_keys()
-    if path, do: File.write!(path, Jason.encode!(state))
-    state
+    session |> browser_context!(:storage_state) |> BrowserContext.storage_state!(options)
   end
 
-  # Decoded protocol keys can be strings when their atoms do not already exist.
-  # Export the wire spelling so both JSON files and maps can be imported again.
-  defp storage_wire_keys(values) when is_list(values), do: Enum.map(values, &storage_wire_keys/1)
-
-  defp storage_wire_keys(value) when is_map(value) do
-    record? = Map.has_key?(value, :value) or Map.has_key?(value, "value")
-
-    Map.new(value, fn {key, item} ->
-      wire_key =
-        case to_string(key) do
-          "local_storage" -> "localStorage"
-          "indexed_db" -> "indexedDB"
-          "http_only" -> "httpOnly"
-          "same_site" -> "sameSite"
-          "partition_key" -> "partitionKey"
-          "key_path" -> "keyPath"
-          "auto_increment" -> "autoIncrement"
-          "multi_entry" -> "multiEntry"
-          other -> other
-        end
-
-      {wire_key, if(record? and wire_key in ["value", "key"], do: item, else: storage_wire_keys(item))}
-    end)
-  end
-
-  defp storage_wire_keys(value), do: value
-
-  defp context_call(session, operation, options) do
+  defp browser_context!(session, operation) do
     ensure_playwright_backend!(session, operation)
-
-    options =
-      options
-      |> Keyword.put(:connection, Session.context(session).connection)
-      |> Keyword.put_new(:timeout, Session.context(session).timeout)
-
-    case apply(PlaywrightEx.BrowserContext, operation, [Session.context(session).context_id, options]) do
-      {:ok, value} -> value
-      {:error, error} -> raise "Playwright #{operation} failed: #{inspect(error)}"
-    end
+    Session.context(session).browser_context
   end
 
   defp ensure_playwright!(session) do

@@ -11,7 +11,7 @@ defmodule Fluffy.Conformance.PageCleanupTest do
   alias Fluffy.Session
   alias Fluffy.TestHTTPFixtures
   alias Fluffy.TestScope
-  alias PlaywrightEx.Page, as: BrowserPage
+  alias PlaywrightEx.Browser
 
   @tag driver: :playwright
   test "closing the test scope closes every page left in its BrowserContext" do
@@ -32,13 +32,11 @@ defmodule Fluffy.Conformance.PageCleanupTest do
       |> visit(TestHTTPFixtures.path(fixture, "/start"))
       |> expect_event(Event.popup(), &click(&1, by_role(:link, name: "Open child")))
 
-    page_ids = Enum.map(Session.pages(session), fn {_id, page} -> page.state.page_id end)
-    assert length(page_ids) == 2
+    assert map_size(Session.pages(session)) == 2
+    browser_context = Session.context(session).browser_context
     :ok = GenServer.stop(TestScope.current())
 
-    for page_id <- page_ids do
-      assert {:error, _reason} = BrowserPage.bring_to_front(page_id, timeout: 100)
-    end
+    refute browser_context.guid in Enum.map(Browser.contexts(Fluffy.BrowserRuntime.browser()), & &1.guid)
   end
 
   @tag driver: :playwright

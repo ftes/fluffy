@@ -21,7 +21,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
             </form>
             """)
         },
-        %{status: 201, body: html("<h1>Submitted</h1>")}
+        %{body: html("<h1>Submitted</h1>")}
       ])
 
     session = start_test_session(driver)
@@ -34,7 +34,6 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
       |> fill(by_label("Name"), "Ada")
       |> press(by_label("Name"), "Enter")
       |> expect("Submitted" |> by_text() |> to_be_visible())
-      |> expect(Fluffy.Expect.page_to_have_status(201))
 
     assert Fluffy.Session.current_page(session).url == destination
 

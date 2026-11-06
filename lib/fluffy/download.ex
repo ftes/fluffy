@@ -4,18 +4,19 @@ defmodule Fluffy.Download do
 
   `suggested_filename` and `url` are available to event predicates. Read or save
   the contents separately; those operations wait for completion and raise on
-  download failure. Handles belong to their session; saved files outlive it.
+  download failure. Like Playwright, they have no timeout; on Firefox, an
+  interrupted download never completes. Handles belong to their session; saved
+  files outlive it.
   """
 
   @enforce_keys [:suggested_filename, :url, :runtime, :source]
-  defstruct [:suggested_filename, :url, :runtime, :source, :timeout]
+  defstruct [:suggested_filename, :url, :runtime, :source]
 
   @type t :: %__MODULE__{
           suggested_filename: String.t(),
           url: String.t(),
           runtime: pid(),
-          source: binary() | PlaywrightEx.Download.t(),
-          timeout: non_neg_integer() | nil
+          source: binary() | PlaywrightEx.Download.t()
         }
 
   @doc "Waits for completion and reads the bytes, limited to 10 MB by default."
@@ -52,12 +53,8 @@ defmodule Fluffy.Download do
 
   defp save_source!(%{source: bytes}, destination) when is_binary(bytes), do: File.write!(destination, bytes)
 
-  defp save_source!(%{source: %PlaywrightEx.Download{} = source, timeout: timeout}, destination) do
-    case PlaywrightEx.Download.save_as(source, destination, timeout: timeout) do
-      :ok -> :ok
-      {:error, error} -> raise "Could not save download: #{inspect(error)}"
-    end
-  end
+  defp save_source!(%{source: %PlaywrightEx.Download{} = source}, destination),
+    do: PlaywrightEx.Download.save_as!(source, destination)
 
   defp check_size!(size, limit) when size > limit do
     raise ExUnit.AssertionError,

@@ -17,7 +17,10 @@ defmodule Fluffy.TestCase do
 
     if Fluffy.Session.current_driver(session) == :playwright do
       ExUnit.Assertions.assert(error.backend == :playwright)
-      ExUnit.Assertions.assert(match?(%{error: %{name: name}} when is_binary(name), error.cause))
+
+      ExUnit.Assertions.assert(
+        is_exception(error.cause) and error.cause.__struct__ |> Module.split() |> hd() == "PlaywrightEx"
+      )
     else
       ExUnit.Assertions.assert(error.backend == :phoenix)
       ExUnit.Assertions.assert(error.cause.__struct__ == structural_exception)

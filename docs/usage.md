@@ -317,7 +317,8 @@ Static and LiveView raise `Fluffy.CapabilityError` for indeterminate state.
 LiveView expectations observe fresh renders and retry until they pass or reach
 their deadline. Supported LiveView actions also retry transient missing or
 actionability failures, as listed below. Waiting is enabled by default; pass
-`timeout:` to an action or expectation to change its deadline. Static checks
+`timeout:` to an action or expectation to change its deadline. It defaults to the
+session's `timeout:` from `start_session/2`, then the configured timeout. Static checks
 are immediate. Playwright uses the browser's native waiting behavior.
 
 When a Playwright visit finds LiveView roots, it waits for every root, including
@@ -490,6 +491,18 @@ session |> assert(page_url(fn uri -> uri.path == "/potions" and uri.fragment == 
 Predicates work with both backends and with negated assertions. Keep them quick
 and nonblocking.
 
+Like Playwright, Fluffy has no page status assertion. On Playwright, assert on the
+navigation's response instead:
+
+```elixir
+session
+|> assert_event(
+  Event.response(&String.ends_with?(&1.url, "/potions")),
+  &click(&1, by_role(:link, name: "Potions")),
+  fn response -> assert response.status == 200 end
+)
+```
+
 Structured queries decode like `URLSearchParams`: distinct parameter-name
 order is ignored, and repeated values retain their order and duplicates.
 Exact query mode rejects unrelated names; `query_mode: :subset` allows them
@@ -557,8 +570,8 @@ Element-action failures raise `Fluffy.OperationError` across drivers. Rescue it
 uniformly and inspect `backend`, `driver`, `operation`, `locator` (or file-chooser
 handle), and `cause` for details. This includes `submit` and file selection.
 
-For Playwright, `cause` preserves the original adapter error, including native
-error names and call logs. For Phoenix, it retains `Fluffy.StrictnessError` or
+For Playwright, `cause` is the native PlaywrightEx exception (such as
+`PlaywrightEx.TimeoutError`), including its call log. For Phoenix, it retains `Fluffy.StrictnessError` or
 `Fluffy.ActionabilityError`, including structural reasons and candidates. LiveView
 finishes its action retries before wrapping the final failure. Browser failures
 are not classified by parsing messages or inspecting a later DOM snapshot.
@@ -607,7 +620,7 @@ for downloads, popups, dialogs, and network events.
 
 ## Browser-only evaluation
 
-Use `Fluffy.Playwright.evaluate/2` when a Playwright test needs a value from
+Use `Fluffy.Playwright.evaluate/3` when a Playwright test needs a value from
 the active page:
 
 ```elixir
@@ -623,9 +636,9 @@ end)
 |> click(by_role(:button, name: "Reveal diary message"))
 ```
 
-`Fluffy.Playwright.evaluate/2` returns the JavaScript result, not the session. Use
-`then/2`, as above, to continue a pipeline. Function-style expressions can pass
-`is_function: true` and `arg:`. Phoenix sessions raise a capability error because
+`Fluffy.Playwright.evaluate/3` returns the JavaScript result, not the session. Use
+`then/2`, as above, to continue a pipeline. A function expression receives the
+optional third argument, as in `PlaywrightEx.Frame.evaluate/3`. Phoenix sessions raise a capability error because
 Phoenix does not execute client code.
 
 ## Native escape hatch
@@ -644,18 +657,20 @@ end)
 
 The callback receives the current `%Plug.Conn{}` on a Static page, a
 `%Phoenix.LiveViewTest.View{}` on a LiveView page, or a
-`%Fluffy.Playwright.Handle{}` on a Playwright page.
+`%PlaywrightEx.Page{}` on a Playwright page.
 
 A Static callback must return its updated `Plug.Conn` because connections are
 immutable. LiveView and Playwright callback results are ignored: Fluffy retains
-and reconciles the original View or Handle. Exceptions, throws, and exits pass
-through unchanged. Match PlaywrightEx `{:error, reason}` results inside the
-callback when failure should stop the test.
+and reconciles the original View or Page. Exceptions, throws, and exits pass
+through unchanged. Prefer PlaywrightEx bang functions inside the callback when
+failure should stop the test.
 
 Do not consume `assert_patch` or `assert_redirect` notifications inside a LiveView
 callback: Fluffy uses them to reconcile navigation. Assert the resulting page or URL
 after `Fluffy.unwrap/2`.
 
-The Playwright handle exposes only `context_id`, `page_id`, `frame_id`,
-`connection`, and `timeout`. Use the [event and page APIs](advanced-events.md)
-for lifecycle operations and registrations that must precede an action.
+Reach the context and frame with `PlaywrightEx.Page.context/1` and
+`PlaywrightEx.Page.main_frame/1`. A document navigated natively, inside or after the
+callback, is adopted before the next Fluffy action. Do not close the page or
+context natively; use the [event and page APIs](advanced-events.md) for lifecycle
+operations and registrations that must precede an action.

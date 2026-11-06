@@ -53,7 +53,6 @@ defmodule Fluffy.Conformance.SessionRuntimeTest do
       visit(session, "/chamber")
       assert Session.handle(session) == page
       assert Page.url(page) =~ "/chamber"
-      assert Page.status(page) == 200
       expect(session, "The guardian sleeps" |> by_text() |> to_be_visible())
     end
 
@@ -100,9 +99,7 @@ defmodule Fluffy.Conformance.SessionRuntimeTest do
     session = start_session(:playwright)
     other = switch_page(session, new_page(session))
     closed = current_page(other)
-    state = Session.page_state(other)
-    context = Session.context(other)
-    assert {:ok, _} = PlaywrightEx.Page.close(state.page_id, connection: context.connection, timeout: context.timeout)
+    assert :ok = PlaywrightEx.Page.close(Session.page_state(other).page)
     assert_raise ArgumentError, ~r/closed/, fn -> Page.url(closed) end
     visit(session, "/chamber")
     expect(session, "The guardian sleeps" |> by_text() |> to_be_visible())
@@ -132,11 +129,7 @@ defmodule Fluffy.Conformance.SessionRuntimeTest do
           close_page(session)
 
         :native ->
-          assert {:ok, _} =
-                   PlaywrightEx.Page.close(Session.page_state(session).page_id,
-                     connection: Session.context(session).connection,
-                     timeout: Session.context(session).timeout
-                   )
+          assert :ok = PlaywrightEx.Page.close(Session.page_state(session).page)
       end
 
       assert_eventually(fn -> Page.opener(current_page(child)) == nil end)
@@ -165,24 +158,20 @@ defmodule Fluffy.Conformance.SessionRuntimeTest do
   test "native browser pages are discovered without a Fluffy event wait" do
     session = start_session(:playwright)
     main = current_page(session)
-    context = Session.context(session)
-
-    assert {:ok, browser_page} =
-             PlaywrightEx.BrowserContext.new_page(context.context_id,
-               connection: context.connection,
-               timeout: context.timeout
-             )
+    assert {:ok, browser_page} = PlaywrightEx.BrowserContext.new_page(Session.context(session).browser_context)
 
     assert_eventually(fn -> length(pages(session)) == 2 end)
     [discovered] = pages(session) -- [main]
 
-    session |> switch_page(discovered) |> visit("/chamber")
+    session
+    |> switch_page(discovered)
+    |> visit("/chamber")
+    |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
+
     assert Page.url(discovered) =~ "/chamber"
-    assert Page.status(discovered) == 200
     assert current_page(session) == main
 
-    assert {:ok, _} =
-             PlaywrightEx.Page.close(browser_page.guid, connection: context.connection, timeout: context.timeout)
+    assert :ok = PlaywrightEx.Page.close(browser_page)
 
     assert_eventually(fn -> pages(session) == [main] end)
     assert_raise ArgumentError, ~r/closed/, fn -> Page.url(discovered) end
@@ -191,42 +180,41 @@ defmodule Fluffy.Conformance.SessionRuntimeTest do
   @tag driver: :playwright
   test "native context closure closes the session runtime" do
     session = start_session(:playwright)
-    context = Session.context(session)
     runtime = session.runtime
     monitor = Process.monitor(runtime)
 
-    assert {:ok, _} =
-             PlaywrightEx.BrowserContext.close(context.context_id,
-               connection: context.connection,
-               timeout: context.timeout
-             )
+    assert :ok = PlaywrightEx.BrowserContext.close(Session.context(session).browser_context)
 
     assert_receive {:DOWN, ^monitor, :process, ^runtime, :normal}, 5_000
     assert_raise ArgumentError, ~r/session is closed/, fn -> pages(session) end
   end
 
-  @tag driver: :playwright
-  test "an unmanaged browser session closes its context when its owner exits" do
-    parent = self()
+  for exit <- [:normal, :crash] do
+    @tag driver: :playwright
+    test "an unmanaged browser session closes its context when its owner exits (#{exit})" do
+      parent = self()
 
-    owner =
-      spawn(fn ->
-        session = session_for_html(:playwright, "<p>Owned page</p>")
-        send(parent, {:started, session.runtime, Session.context(session)})
+      owner =
+        spawn(fn ->
+          session = session_for_html(:playwright, "<p>Owned page</p>")
+          send(parent, {:started, session.runtime, Session.context(session).browser_context})
 
-        receive do
-          :finish -> :ok
-        end
-      end)
+          receive do
+            :normal -> :ok
+            :crash -> exit(:crash)
+          end
+        end)
 
-    assert_receive {:started, runtime, context}, 5_000
-    monitor = Process.monitor(runtime)
-    send(owner, :finish)
-    assert_receive {:DOWN, ^monitor, :process, ^runtime, :normal}, 5_000
-
-    assert {:error, _} =
-             PlaywrightEx.BrowserContext.cookies(context.context_id, connection: context.connection, timeout: 100)
+      assert_receive {:started, runtime, browser_context}, 5_000
+      assert browser_context.guid in context_guids()
+      monitor = Process.monitor(runtime)
+      send(owner, unquote(exit))
+      assert_receive {:DOWN, ^monitor, :process, ^runtime, :normal}, 5_000
+      refute browser_context.guid in context_guids()
+    end
   end
+
+  defp context_guids, do: Enum.map(PlaywrightEx.Browser.contexts(Fluffy.BrowserRuntime.browser()), & &1.guid)
 
   defp assert_eventually(fun, attempts \\ 100)
   defp assert_eventually(fun, 0), do: assert(fun.())

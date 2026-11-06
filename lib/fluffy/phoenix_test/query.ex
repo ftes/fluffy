@@ -13,17 +13,11 @@ defmodule Fluffy.PhoenixTest.Query do
 
   defp matches?(%Driver.Live.State{client_dom: dom}, _context, locator), do: ClientDOM.resolve(dom, locator) != []
 
-  defp matches?(%Driver.Playwright.State{frame_id: frame_id}, context, locator) do
+  defp matches?(%Driver.Playwright.State{frame: frame}, _context, locator) do
     # Probe presence only. The selected click retains native waiting and strictness.
-    case PlaywrightEx.Frame.expect(frame_id,
-           connection: context.connection,
-           selector: Fluffy.Locator.Playwright.selector(locator),
-           expression: "to.have.count",
-           expected_number: 0,
-           timeout: 1
-         ) do
-      {:ok, empty?} ->
-        not empty?
+    case frame |> Fluffy.Locator.Playwright.locator(locator) |> PlaywrightEx.Locator.count() do
+      {:ok, count} ->
+        count > 0
 
       {:error, cause} ->
         raise Fluffy.OperationError,

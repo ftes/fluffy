@@ -1,10 +1,9 @@
 defmodule Fluffy.FailureArtifact do
   @moduledoc false
 
-  alias Fluffy.Playwright.Screenshot
+  alias Fluffy.Backend.Playwright.Bounded
   alias Fluffy.Session
   alias Fluffy.TestScope
-  alias PlaywrightEx.Frame
 
   def capture(session, operation, error, stacktrace, directory \\ configured_directory())
 
@@ -13,18 +12,14 @@ defmodule Fluffy.FailureArtifact do
   def capture(%Session{} = session, operation, error, stacktrace, directory) do
     File.mkdir_p!(directory)
     stem = artifact_stem(session, operation)
-    state = Session.page_state(session)
-    timeout = min(Map.get(Session.context(session), :timeout, 2_000), 2_000)
+    page = Session.page_state(session).page
 
-    write_content(state.frame_id, Path.join(directory, stem <> ".html"), timeout)
+    # Content has no timeout and waits while a script blocks the page.
+    with {:ok, {:ok, html}} <- Bounded.within(2_000, fn -> PlaywrightEx.Page.content(page) end) do
+      File.write!(Path.join(directory, stem <> ".html"), html)
+    end
 
-    Screenshot.write(
-      state.page_id,
-      Path.join(directory, stem <> ".png"),
-      full_page: true,
-      connection: Session.context(session).connection,
-      timeout: timeout
-    )
+    PlaywrightEx.Page.screenshot(page, path: Path.join(directory, stem <> ".png"), full_page: true, timeout: 2_000)
 
     File.write!(
       Path.join(directory, stem <> ".txt"),
@@ -36,13 +31,6 @@ defmodule Fluffy.FailureArtifact do
     _artifact_error -> :error
   catch
     _kind, _artifact_error -> :error
-  end
-
-  defp write_content(frame_id, path, timeout) do
-    case Frame.content(frame_id, timeout: timeout) do
-      {:ok, html} -> File.write!(path, html)
-      {:error, _reason} -> :error
-    end
   end
 
   defp artifact_stem(session, operation) do

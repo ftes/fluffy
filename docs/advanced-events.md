@@ -86,7 +86,7 @@ session
 |> switch_page(main)
 ```
 
-Inspect live page handles with `Fluffy.Page.url/1`, `Fluffy.Page.status/1`, and
+Inspect live page handles with `Fluffy.Page.url/1` and
 `Fluffy.Page.opener/1`. The opener is nil if absent or closed. `Fluffy.Playwright.current_page/1`
 returns a stable handle that survives navigation; `Fluffy.Playwright.pages/1` lists all open pages,
 including tabs discovered without an event registration. Page selection is local to each
@@ -94,6 +94,15 @@ session handle: retain the result of `Fluffy.Playwright.switch_page/2`; other se
 their own selection. Closed page handles are invalid; closing a page does not change any
 session handle's selection. Explicitly switch to an open page before continuing. Closing
 an opener leaves its child pages alive.
+
+An action that closes its own page succeeds. `Event.close()` resolves with the selected
+page's handle once it closes, by its own script or `Fluffy.Playwright.close_page/2`:
+
+```elixir
+popup
+|> expect_event(Event.close(), &click(&1, by_role(:button, name: "Authorize")))
+|> switch_page(main)
+```
 
 `Fluffy.Playwright.new_page(session)` returns a new blank page handle without changing the session's
 selection. Pass that handle to `Fluffy.Playwright.switch_page/2` or `Fluffy.Playwright.close_page/2`:
@@ -134,10 +143,10 @@ For navigation outcomes on either backend, use ordinary page assertions:
 session
 |> click(by_role(:link, name: "Continue"))
 |> assert(page_url(path: "/next"))
-|> assert(page_status(200))
 ```
 
-`Fluffy.Playwright.go_back/2` and `Fluffy.Playwright.go_forward/2` require Playwright and accept `timeout:`.
+`Fluffy.Playwright.go_back/2` and `Fluffy.Playwright.go_forward/2` require Playwright and accept the
+options of `PlaywrightEx.Page.go_back/2`.
 For reloading either backend, see [Reloading](usage.md#reloading).
 `Fluffy.close_session/1` releases session resources on either backend.
 
@@ -193,7 +202,7 @@ handlers and waits can observe the same dialog; ensure only one handler resolves
 Request and response events require Playwright. Page scope, the default, includes
 child frames; `scope: :context` observes all pages, including a popup's first request.
 Sources remain bound when switching pages. Use the same source and scope for `off`.
-Other events reject `scope:`: page events always observe the context, while popup,
+Other events reject `scope:`: page events always observe the context, while popup, close,
 download, dialog, chooser, and frame-navigation events bind to the selected page.
 
 ```elixir
@@ -207,8 +216,9 @@ session
 ```
 
 Requests signal issuance; responses signal status and headers, without waiting for
-the response body. Values expose URL, method, headers, resource type, post data,
-page, and response status fields where applicable. The page can be nil when it
+the response body. Values are `Fluffy.Request` (URL, method, headers, resource type,
+post data, page) and `Fluffy.Response` (URL, status, status text, headers, and its
+`request`). The page can be nil when it
 is not yet known, such as for a popup's initial request.
 
 ## File choosers
@@ -231,7 +241,7 @@ does not operate the OS picker. Choosers require Playwright.
 ## Cookies, storage, and browser interactions
 
 `Fluffy.Playwright.add_cookies/2` and `Fluffy.Playwright.clear_cookies/2` return the
-session. `Fluffy.Playwright.cookies/2` returns cookie maps; its optional `urls:` list
+session. `Fluffy.Playwright.cookies/2` returns cookie maps; its optional URL list
 filters by URL. `Fluffy.Playwright.clear_cookies/2` accepts string or regex filters for
 `name:`, `domain:`, and `path:`. These helpers operate on the entire browser context.
 
@@ -241,7 +251,8 @@ with `start_session(:playwright, browser_context: [storage_state: state])`.
 
 For browser interaction, use `Fluffy.Playwright.hover(session, locator)`,
 `Fluffy.Playwright.drag_to(session, source, target)`, or
-`Fluffy.Playwright.press_sequentially(session, locator, text, delay: 20)`. All accept `timeout:`.
+`Fluffy.Playwright.press_sequentially(session, locator, text, delay: 20)`. All accept
+`timeout:` and the options of the matching `PlaywrightEx.Locator` action.
 Sequential typing emits keyboard events for each character and appends at the
 current caret position. Drag source and target must belong to the same frame.
 These actions require Playwright and reconcile navigation caused by the action.

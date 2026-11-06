@@ -4,7 +4,6 @@ defmodule Fluffy.PublicOptionValidationTest do
   alias Fluffy.Event
   alias Fluffy.Expect
   alias Fluffy.Locator
-  alias Fluffy.Playwright
 
   setup do
     session = Fluffy.session_for_html(:static, "<button>Save</button>")
@@ -73,13 +72,12 @@ defmodule Fluffy.PublicOptionValidationTest do
     refute function_exported?(Expect, :url, 1)
     refute function_exported?(Expect, :url, 2)
     refute function_exported?(Expect, :url, 3)
-    refute function_exported?(Expect, :status, 1)
     refute function_exported?(Expect, :page_opener, 2)
     assert %Event{type: :page} = Event.page()
     assert %Event{type: :popup} = Event.popup()
+    assert %Event{type: :close} = Event.close()
 
     assert %Expect{target: :page, kind: :url} = Expect.page_to_have_url("/accounts")
-    assert %Expect{target: :page, kind: :status} = Expect.page_to_have_status(200)
     assert %Expect{target: :page, kind: :opener} = Expect.page_to_have_opener(nil)
   end
 
@@ -96,12 +94,6 @@ defmodule Fluffy.PublicOptionValidationTest do
   test "file input bounds fail before selection preflight", %{session: session} do
     assert_raise NimbleOptions.ValidationError, ~r/:max_bytes.*non[- ]negative integer/, fn ->
       Fluffy.set_input_files(session, Locator.by_label("Upload"), "/missing", max_bytes: -1)
-    end
-  end
-
-  test "Playwright evaluate options fail before the backend capability check", %{session: session} do
-    assert_raise NimbleOptions.ValidationError, ~r/:is_function.*boolean/, fn ->
-      Playwright.evaluate(session, "document.title", is_function: :yes)
     end
   end
 end

@@ -39,5 +39,5 @@ defmodule Fluffy.OperationError do
   end
 
   defp format(cause) when is_exception(cause), do: Exception.message(cause)
-  defp format(cause), do: Fluffy.Playwright.Diagnostics.format(cause)
+  defp format(cause), do: inspect(cause, pretty: true, limit: :infinity, printable_limit: :infinity)
 end

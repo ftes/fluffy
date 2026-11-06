@@ -116,7 +116,7 @@ LiveView `Fluffy.unwrap/2` receives only the View.
 The Playwright backend exposes page handles for browser tabs and popup windows.
 All public page-management helpers live in `Fluffy.Playwright` and reject Phoenix
 sessions. Phoenix retains one current document internally; use shared page URL,
-title, and status assertions to inspect it.
+and title assertions to inspect it.
 `Fluffy.Playwright.new_page/1` returns a handle; `Fluffy.Playwright.switch_page/2` selects it for subsequent actions.
 Use [frame locators](usage.md#frames-playwright) to query iframe contents with
 Playwright. Page switching does not select an iframe, and frame locators do not
@@ -174,6 +174,6 @@ because application JavaScript opens the chooser.
 ### Native escape hatch
 
 `Fluffy.unwrap/2` exposes driver-specific APIs: `Plug.Conn`,
-`Phoenix.LiveViewTest.View`, or `Fluffy.Playwright.Handle`. Use the shared event
+`Phoenix.LiveViewTest.View`, or `PlaywrightEx.Page`. Use the shared event
 and page APIs for lifecycle operations. See
 [Native escape hatch](usage.md#native-escape-hatch) for callback behavior.

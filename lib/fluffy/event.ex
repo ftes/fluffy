@@ -9,7 +9,8 @@ defmodule Fluffy.Event do
   Download events support both backends. Other events require Playwright.
   Request and response registrations accept `scope: :page` (the default) or
   `scope: :context`. Page events observe the context; all other events observe
-  the page selected when registering.
+  the page selected when registering. A close event resolves with that page's
+  handle, which is closed.
   """
 
   alias Fluffy.Event.Pending
@@ -17,11 +18,12 @@ defmodule Fluffy.Event do
   alias Fluffy.Session
   alias Fluffy.SessionRuntime
 
-  @types [:download, :popup, :page, :frame_navigated, :dialog, :file_chooser, :request, :response]
+  @types [:download, :popup, :page, :close, :frame_navigated, :dialog, :file_chooser, :request, :response]
   @enforce_keys [:type]
   defstruct [:type, :predicate]
 
-  @type type :: :download | :popup | :page | :frame_navigated | :dialog | :file_chooser | :request | :response
+  @type type ::
+          :download | :popup | :page | :close | :frame_navigated | :dialog | :file_chooser | :request | :response
   @type t :: %__MODULE__{type: type(), predicate: (term() -> term()) | nil}
   @type option :: {:timeout, non_neg_integer()} | {:scope, :page | :context}
 

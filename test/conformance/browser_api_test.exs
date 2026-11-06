@@ -106,6 +106,23 @@ defmodule Fluffy.Conformance.BrowserAPITest do
     session |> go_forward() |> expect(page_to_have_url(Fluffy.TestServer.base_url() <> "/harness#other"))
   end
 
+  @tag driver: :playwright
+  test "history without an entry keeps a URL a script changed" do
+    session = :playwright |> start_session() |> visit("/harness")
+    Playwright.evaluate(session, "history.replaceState(null, '', '/harness?replaced')")
+    session = go_forward(session)
+
+    assert Fluffy.Page.url(current_page(session)) == Fluffy.TestServer.base_url() <> "/harness?replaced"
+    expect(session, page_to_have_url(Fluffy.TestServer.base_url() <> "/harness?replaced"))
+  end
+
+  @tag driver: :playwright
+  test "history validates its timeout like other actions" do
+    session = start_session(:playwright)
+    assert_raise NimbleOptions.ValidationError, ~r/:timeout/, fn -> go_back(session, timeout: :infinity) end
+    assert_raise NimbleOptions.ValidationError, ~r/:timeout/, fn -> go_forward(session, timeout: -1) end
+  end
+
   test "browser operations reject Phoenix sessions" do
     session = start_session(:phoenix)
 

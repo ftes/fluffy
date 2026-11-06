@@ -29,8 +29,7 @@ defmodule Fluffy.Conformance.FileChooserEventTest do
                  const file = document.querySelector('#attachment').files[0];
                  return {name: file.name, type: file.type, contents: await file.text()};
                }
-               """,
-               is_function: true
+               """
              )
   end
 
@@ -137,8 +136,7 @@ defmodule Fluffy.Conformance.FileChooserEventTest do
       Playwright.evaluate(
         original,
         "destination => { document.querySelector('#attachment').onchange = () => { location.href = destination } }",
-        arg: destination,
-        is_function: true
+        destination
       )
 
       pending = wait_for(original, Event.file_chooser())

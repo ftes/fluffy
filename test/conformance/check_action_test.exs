@@ -128,6 +128,35 @@ defmodule Fluffy.Conformance.CheckActionTest do
     end)
   end
 
+  # Page code here reverts the click at once; a LiveView patch does the same a
+  # round trip later, often before Playwright reads the state back.
+  test "Playwright check and uncheck succeed when page code reverts the click" do
+    revert = ~s|oninput="queueMicrotask(() => this.checked = !this.checked)"|
+
+    html = """
+    <label><input type="checkbox" #{revert}>Updates</label>
+    <label><input type="checkbox" checked #{revert}>Digest</label>
+    """
+
+    with_html(:playwright, html, fn session ->
+      session
+      |> check(by_role(:checkbox, name: "Updates"))
+      |> expect(to_be_checked(by_role(:checkbox, name: "Updates"), checked: false))
+      |> uncheck(by_role(:checkbox, name: "Digest"))
+      |> expect(to_be_checked(by_role(:checkbox, name: "Digest")))
+    end)
+  end
+
+  test "Playwright check fails when the click does not change the state" do
+    html = ~s|<label><input type="checkbox" onclick="event.preventDefault()">Updates</label>|
+
+    with_html(:playwright, html, fn session ->
+      assert_raise Fluffy.OperationError, ~r/Clicking the checkbox did not change its state/, fn ->
+        check(session, by_role(:checkbox, name: "Updates"))
+      end
+    end)
+  end
+
   test "the Static driver rejects browser-owned indeterminate checkbox state" do
     checkbox = by_role(:checkbox, name: "Construction")
     html = ~s(<label><input type="checkbox">Construction</label>)

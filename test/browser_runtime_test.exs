@@ -5,7 +5,160 @@ defmodule Fluffy.BrowserRuntimeTest do
   alias Fluffy.Options
 
   test "concurrent first callers initialize one transport and one shared browser" do
-    test_process = self()
+    runtime_name = start_runtime(self())
+
+    browsers =
+      1..20
+      |> Task.async_stream(fn _index -> BrowserRuntime.browser(runtime_name) end,
+        max_concurrency: 20,
+        ordered: false
+      )
+      |> Enum.map(fn {:ok, browser} -> browser end)
+
+    assert Enum.uniq(browsers) == [%{guid: "browser-1"}]
+    assert_receive :transport_started
+    assert_receive {:browser_launched, [timeout: 100]}
+    refute_receive :transport_started
+    refute_receive {:browser_launched, _options}
+    assert BrowserRuntime.status(runtime_name).launch_count == 1
+  end
+
+  test "relaunches after the browser disconnects" do
+    runtime_name = start_runtime(self())
+    assert %{guid: "browser-1"} = BrowserRuntime.browser(runtime_name)
+
+    send(Process.whereis(runtime_name), {:browser_disconnected, "stale-browser"})
+    assert %{guid: "browser-1"} = BrowserRuntime.browser(runtime_name)
+
+    send(Process.whereis(runtime_name), {:browser_disconnected, "browser-1"})
+    assert %{guid: "browser-2"} = BrowserRuntime.browser(runtime_name)
+    assert BrowserRuntime.status(runtime_name).launch_count == 2
+  end
+
+  test "replaces a lost browser before its disconnect arrives" do
+    runtime_name = start_runtime(self())
+    lost = BrowserRuntime.browser(runtime_name)
+
+    assert %{guid: "browser-2"} = replacement = BrowserRuntime.replace(runtime_name, lost)
+    assert BrowserRuntime.replace(runtime_name, lost) == replacement
+    assert BrowserRuntime.browser(runtime_name) == replacement
+    assert BrowserRuntime.status(runtime_name).launch_count == 2
+  end
+
+  test "a failed launch raises in the caller and leaves the runtime to retry" do
+    {:ok, attempts} = Agent.start_link(fn -> 0 end)
+
+    runtime_name =
+      start_runtime(self(), fn ->
+        case Agent.get_and_update(attempts, &{&1 + 1, &1 + 1}) do
+          1 -> {:error, %PlaywrightEx.PlaywrightError{message: "Executable doesn't exist"}}
+          _ -> {:ok, %{guid: "browser-1"}}
+        end
+      end)
+
+    runtime = Process.whereis(runtime_name)
+
+    assert_raise RuntimeError, "could not launch the Playwright chromium browser: Executable doesn't exist", fn ->
+      BrowserRuntime.browser(runtime_name)
+    end
+
+    assert Process.whereis(runtime_name) == runtime
+    assert BrowserRuntime.status(runtime_name).launch_count == 0
+    assert %{guid: "browser-1"} = BrowserRuntime.browser(runtime_name)
+  end
+
+  @tag driver: :playwright, capture_log: true
+  test "relaunches against a restarted driver after the driver process dies" do
+    runtime_supervisor = start_supervised!(DynamicSupervisor)
+    playwright_name = Module.concat(__MODULE__, "Driver#{System.unique_integer([:positive])}")
+
+    runtime =
+      start_supervised!(
+        {BrowserRuntime,
+         name: Module.concat(playwright_name, Runtime),
+         engine: Application.fetch_env!(:fluffy, :playwright)[:engine],
+         timeout: 15_000,
+         launch_options: [],
+         playwright_options: [],
+         playwright_name: playwright_name,
+         runtime_supervisor: runtime_supervisor}
+      )
+
+    lost = BrowserRuntime.browser(runtime)
+    driver = PlaywrightEx.Runtime.Heap.get(PlaywrightEx.playwright(playwright_name), :driverProcess)
+    %{port: port} = :sys.get_state(driver)
+    {:os_pid, os_pid} = Port.info(port, :os_pid)
+    {_, 0} = System.cmd("kill", ["-9", to_string(os_pid)])
+
+    assert_eventually(fn -> BrowserRuntime.status(runtime).browser == nil end)
+    browser = BrowserRuntime.browser(runtime)
+    refute PlaywrightEx.Browser.is_connected(lost)
+    assert PlaywrightEx.Browser.is_connected(browser)
+    assert BrowserRuntime.status(runtime).launch_count == 2
+  end
+
+  test "validates global Playwright runtime configuration" do
+    config =
+      Options.validate_playwright!(
+        engine: :firefox,
+        executable: "playwright",
+        timeout: 2_000,
+        launch_options: [headless: false, slow_mo: 25],
+        artifact_dir: nil
+      )
+
+    assert Enum.sort(config) ==
+             Enum.sort(
+               trace_dir: "traces",
+               log_browser_console: true,
+               enabled: true,
+               engine: :firefox,
+               executable: "playwright",
+               timeout: 2_000,
+               launch_options: [headless: false, slow_mo: 25],
+               artifact_dir: nil
+             )
+
+    refute Options.validate_playwright!(log_browser_console: false)[:log_browser_console]
+    assert false == Options.validate_playwright!(false)
+
+    assert_raise NimbleOptions.ValidationError, ~r/unknown options.*:js_logger/, fn ->
+      Options.validate_playwright!(js_logger: false)
+    end
+
+    assert_raise NimbleOptions.ValidationError,
+                 ~r/:engine.*invalid value|invalid value.*:engine/,
+                 fn ->
+                   Options.validate_playwright!(engine: :opera)
+                 end
+
+    assert Options.validate_playwright!([])[:enabled]
+    refute Keyword.has_key?(Options.validate_playwright!([]), :executable)
+  end
+
+  test "passes launch options through, including a launch timeout independent of the global timeout" do
+    config = Options.validate_playwright!(timeout: 4_000, launch_options: [timeout: 10_000, channel: "chrome"])
+
+    assert config[:timeout] == 4_000
+    assert config[:launch_options] == [timeout: 10_000, channel: "chrome"]
+  end
+
+  defp assert_eventually(fun, attempts \\ 500)
+  defp assert_eventually(fun, 0), do: assert(fun.())
+
+  defp assert_eventually(fun, attempts) do
+    if !fun.() do
+      Process.sleep(10)
+      assert_eventually(fun, attempts - 1)
+    end
+  end
+
+  defp start_runtime(test_process) do
+    {:ok, launches} = Agent.start_link(fn -> 0 end)
+    start_runtime(test_process, fn -> {:ok, %{guid: "browser-#{Agent.get_and_update(launches, &{&1 + 1, &1 + 1})}"}} end)
+  end
+
+  defp start_runtime(test_process, launch) do
     runtime_name = Module.concat(__MODULE__, "Runtime#{System.unique_integer([:positive])}")
 
     start_supervised!(
@@ -15,128 +168,17 @@ defmodule Fluffy.BrowserRuntimeTest do
        launch_options: [],
        playwright_options: [],
        runtime_supervisor: :unused_in_test,
-       playwright_supervisor: :unused_in_test,
-       transport_starter: fn _runtime_supervisor, _playwright_supervisor, _options ->
+       playwright_name: :unused_in_test,
+       transport_starter: fn _runtime_supervisor, _playwright_name, _options ->
          send(test_process, :transport_started)
          :ok
        end,
-       browser_launcher: fn :chromium, _playwright_supervisor, [], 100 ->
-         send(test_process, :browser_launched)
-         {:ok, %{guid: "shared-browser"}}
+       browser_launcher: fn :chromium, _playwright_name, options ->
+         send(test_process, {:browser_launched, options})
+         launch.()
        end}
     )
 
-    browser_ids =
-      1..20
-      |> Task.async_stream(fn _index -> BrowserRuntime.browser_id(runtime_name) end,
-        max_concurrency: 20,
-        ordered: false
-      )
-      |> Enum.map(fn {:ok, browser_id} -> browser_id end)
-
-    assert Enum.uniq(browser_ids) == ["shared-browser"]
-    assert_receive :transport_started
-    assert_receive :browser_launched
-    refute_receive :transport_started
-    refute_receive :browser_launched
-    assert BrowserRuntime.status(runtime_name).launch_count == 1
-  end
-
-  @tag :tmp_dir
-  test "derives the CLI from assets_dir and preserves explicit executables", %{tmp_dir: directory} do
-    assert Options.validate_playwright!(assets_dir: directory)[:executable] ==
-             Path.join(directory, "node_modules/playwright/cli.js")
-
-    assert Options.validate_playwright!(assets_dir: directory, executable: "custom")[:executable] ==
-             "custom"
-  end
-
-  test "validates global Playwright runtime and launch configuration" do
-    assert [
-             js_logger: Fluffy.Playwright.ConsoleLogger,
-             trace_dir: "traces",
-             enabled: true,
-             engine: :firefox,
-             executable: "playwright",
-             timeout: 2_000,
-             launch_options: [headless: false, slow_mo: 25],
-             artifact_dir: nil
-           ] =
-             Options.validate_playwright!(
-               engine: :firefox,
-               executable: "playwright",
-               timeout: 2_000,
-               launch_options: [headless: false, slow_mo: 25],
-               artifact_dir: nil
-             )
-
-    assert false ==
-             Options.validate_playwright!(executable: "playwright", js_logger: false)[:js_logger]
-
-    assert false == Options.validate_playwright!(false)
-
-    assert_raise NimbleOptions.ValidationError, ~r/unknown options.*:mystery/, fn ->
-      Options.validate_playwright!(executable: "playwright", mystery: true)
-    end
-
-    assert_raise NimbleOptions.ValidationError,
-                 ~r/:engine.*invalid value|invalid value.*:engine/,
-                 fn ->
-                   Options.validate_playwright!(engine: :opera, executable: "playwright")
-                 end
-
-    assert Options.validate_playwright!([])[:enabled]
-
-    assert_raise ArgumentError,
-                 ~r/:js_logger must be false or a module implementing log\/3/,
-                 fn ->
-                   Options.validate_playwright!(executable: "playwright", js_logger: true)
-                 end
-  end
-
-  test "allows a browser launch timeout independent of the global timeout" do
-    config = Options.validate_playwright!(timeout: 4_000, launch_options: [timeout: 10_000])
-
-    assert config[:timeout] == 4_000
-    assert config[:launch_options][:timeout] == 10_000
-
-    assert_raise NimbleOptions.ValidationError, fn ->
-      Options.validate_playwright!(launch_options: [timeout: -1])
-    end
-  end
-
-  test "treats a nil browser executable path as omitted while validating explicit paths" do
-    omitted = Options.validate_playwright!(launch_options: [headless: false])
-    nil_path = Options.validate_playwright!(launch_options: [headless: false, executable_path: nil])
-
-    assert nil_path == omitted
-
-    explicit = Options.validate_playwright!(launch_options: [executable_path: "/usr/bin/chromium"])
-    assert explicit[:launch_options][:executable_path] == "/usr/bin/chromium"
-
-    assert_raise NimbleOptions.ValidationError, fn ->
-      Options.validate_playwright!(launch_options: [executable_path: false])
-    end
-  end
-end
-
-defmodule Fluffy.PlaywrightExecutableDiscoveryTest do
-  use ExUnit.Case, async: false
-
-  alias Fluffy.Options
-
-  @tag :tmp_dir
-  test "discovers the conventional assets CLI or leaves the dependency default intact", %{tmp_dir: directory} do
-    File.cd!(directory, fn ->
-      refute Keyword.has_key?(Options.validate_playwright!([]), :executable)
-
-      File.mkdir_p!("assets/node_modules/playwright")
-      File.write!("assets/node_modules/playwright/cli.js", "")
-
-      assert Options.validate_playwright!([])[:executable] ==
-               Path.join(directory, "assets/node_modules/playwright/cli.js")
-
-      assert Options.validate_playwright!(executable: "custom")[:executable] == "custom"
-    end)
+    runtime_name
   end
 end

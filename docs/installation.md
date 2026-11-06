@@ -40,41 +40,36 @@ for Fluffy's automatic LiveView connection wait.
 
 ## Playwright setup
 
-Only the Playwright backend needs JavaScript and a browser. Install the tested
-Playwright version in your application:
+Only the Playwright backend needs a browser. PlaywrightEx pins its Playwright
+driver; install it and a browser with:
 
 ```bash
-pnpm add --save-dev playwright@1.64.1
-pnpm exec playwright install chromium
+mix playwright_ex.install -- chromium
 ```
 
-Configure its installation directory in `config/test.exs`:
+Configure the backend in `config/test.exs`:
 
 ```elixir
 config :fluffy,
   playwright: [
     enabled: true,
     engine: :chromium,
-    assets_dir: Path.expand("..", __DIR__),
     timeout: 15_000,
     launch_options: [headless: true],
     artifact_dir: System.get_env("FLUFFY_ARTIFACT_DIR"),
     trace_dir: System.get_env("FLUFFY_TRACE_DIR", "traces"),
-    js_logger: Fluffy.Playwright.ConsoleLogger
+    log_browser_console: true
   ]
 ```
 
-Fluffy uses an explicit `executable` first. When `assets_dir` is configured, it
-resolves `node_modules/playwright/cli.js` inside that directory. Otherwise, it uses
-`./assets/node_modules/playwright/cli.js` if present, falling back to
-`playwright_ex`'s default (`playwright` on `PATH`). Relative directories are
-resolved against the current working directory.
+`executable` optionally points at another Playwright 1.64 driver; by default the
+pinned driver is used.
 
-Set `launch_options: [timeout: 10_000]` to give browser launch a separate timeout;
+`launch_options` are passed to `PlaywrightEx.BrowserType.launch/2` unchanged. Set
+`launch_options: [timeout: 10_000]` to give browser launch a separate timeout;
 otherwise it uses the global Playwright `timeout`. To use a system browser, set
 `launch_options: [executable_path: System.find_executable("google-chrome-stable")]`.
-A `nil` executable path is treated as omitted, leaving Playwright to select its
-default browser.
+If the browser disconnects, Fluffy launches a new one for the next session.
 
 Setting `artifact_dir` is recommended for every project that runs Playwright
 tests. Fluffy writes HTML, a full-page screenshot, and the formatted error
@@ -82,13 +77,12 @@ there when a public browser operation fails. Use a writable per-run directory
 locally and configure CI to upload it when the test job fails; artifact capture
 does not run for successful operations.
 
-The default console logger sends browser `console` messages and uncaught page errors
-through Elixir's `Logger`; set `js_logger: false` to disable it or configure another
-module implementing `PlaywrightEx.JsLogger`. Trace files are created only when a test
+Browser `console` messages and uncaught page errors go to Elixir's `Logger`; set
+`log_browser_console: false` to disable this. Trace files are created only when a test
 calls `Fluffy.Playwright.trace/1` or `Fluffy.Playwright.trace/2`.
 
 Set `engine: :firefox` or `engine: :webkit` after installing the corresponding
-browser.
+browser (`mix playwright_ex.install -- firefox`).
 See [Browser baseline](capabilities.md#browser-baseline) for conformance coverage.
 Fluffy launches one browser lazily per configured runtime lane and creates a
 fresh isolated `BrowserContext` for each session. ExUnit `max_cases` is the

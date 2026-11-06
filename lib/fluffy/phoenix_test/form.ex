@@ -14,13 +14,11 @@ defmodule Fluffy.PhoenixTest.Form do
   defp owner(%Driver.Static.State{client_dom: client_dom}, _context, locator), do: structural_owner(client_dom, locator)
   defp owner(%Driver.Live.State{client_dom: client_dom}, _context, locator), do: structural_owner(client_dom, locator)
 
-  defp owner(%Driver.Playwright.State{frame_id: frame_id}, context, locator) do
-    case PlaywrightEx.Locator.evaluate(frame_id,
-           selector: Fluffy.Locator.Playwright.selector(locator),
-           connection: context.connection,
-           timeout: context.timeout,
-           is_function: true,
-           expression: """
+  defp owner(%Driver.Playwright.State{frame: frame}, context, locator) do
+    case frame
+         |> Fluffy.Locator.Playwright.locator(locator)
+         |> PlaywrightEx.Locator.evaluate(
+           """
            element => {
              const form = element.form;
              if (!form) return null;
@@ -32,9 +30,11 @@ defmodule Fluffy.PhoenixTest.Form do
              }
              return parts.join(' > ');
            }
-           """
+           """,
+           nil,
+           timeout: context.timeout
          ) do
-      {:ok, nil} -> nil
+      {:ok, :null} -> nil
       {:ok, selector} -> Locator.by_css(selector)
       {:error, _error} -> nil
     end

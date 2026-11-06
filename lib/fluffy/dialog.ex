@@ -7,32 +7,21 @@ defmodule Fluffy.Dialog do
   observes the dialog; it does not handle it. With no dialog registrations,
   Playwright dismisses dialogs automatically.
   """
-  @enforce_keys [:type, :message, :default_value, :connection, :id, :timeout]
-  defstruct [:type, :message, :default_value, :connection, :id, :timeout]
+  @enforce_keys [:type, :message, :default_value, :native]
+  defstruct [:type, :message, :default_value, :native]
 
   @type t :: %__MODULE__{
           type: :alert | :confirm | :prompt | :beforeunload,
           message: String.t(),
           default_value: String.t(),
-          connection: GenServer.server(),
-          id: String.t(),
-          timeout: non_neg_integer()
+          native: PlaywrightEx.Dialog.t() | nil
         }
 
   @doc "Accepts the dialog, optionally supplying prompt text."
   @spec accept(t(), String.t() | nil) :: :ok
-  def accept(%__MODULE__{} = dialog, prompt_text \\ nil) do
-    options = [connection: dialog.connection, timeout: dialog.timeout]
-    options = if is_nil(prompt_text), do: options, else: Keyword.put(options, :prompt_text, prompt_text)
-    result!(PlaywrightEx.Dialog.accept(dialog.id, options))
-  end
+  def accept(%__MODULE__{native: native}, prompt_text \\ nil), do: PlaywrightEx.Dialog.accept!(native, prompt_text)
 
   @doc "Dismisses the dialog."
   @spec dismiss(t()) :: :ok
-  def dismiss(%__MODULE__{} = dialog) do
-    result!(PlaywrightEx.Dialog.dismiss(dialog.id, connection: dialog.connection, timeout: dialog.timeout))
-  end
-
-  defp result!({:ok, _}), do: :ok
-  defp result!({:error, reason}), do: raise("Could not handle dialog: #{inspect(reason)}")
+  def dismiss(%__MODULE__{native: native}), do: PlaywrightEx.Dialog.dismiss!(native)
 end

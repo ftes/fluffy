@@ -48,7 +48,6 @@ defmodule Fluffy.Conformance.PageEventTest do
     |> switch_page(page)
     |> expect(:heading |> by_role(name: "Details") |> to_be_visible())
     |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/details")))
-    |> expect(page_to_have_status(202))
     |> close_page()
     |> switch_page(current_page(session))
     |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/start")))
@@ -109,7 +108,7 @@ defmodule Fluffy.Conformance.PageEventTest do
   end
 
   @tag driver: :playwright
-  test "the first popup retains its own final response when another page also loads" do
+  test "the first popup keeps its own final document when another page also loads" do
     {session, fixture} = browser_session()
     pending = wait_for(session, Event.popup())
     click(session, by_role(:link, name: "Redirect", exact: true))
@@ -118,7 +117,7 @@ defmodule Fluffy.Conformance.PageEventTest do
     session
     |> switch_page(await(pending))
     |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/details")))
-    |> expect(page_to_have_status(202))
+    |> expect(:heading |> by_role(name: "Details") |> to_be_visible())
   end
 
   for driver <- [:static, :live] do
@@ -226,7 +225,7 @@ defmodule Fluffy.Conformance.PageEventTest do
             %{body: "<h1>Unrelated</h1>"}
 
           "/details" ->
-            %{status: 202, body: "<h1>Details</h1>"}
+            %{body: "<h1>Details</h1>"}
 
           "/redirect" ->
             %{status: 302, headers: [{"location", "details"}], body: ""}

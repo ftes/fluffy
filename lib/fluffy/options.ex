@@ -1,30 +1,84 @@
 defmodule Fluffy.Options do
   @moduledoc false
 
+  alias Fluffy.Options.Native
+
   @timeout_options [
     timeout: [
       type: :non_neg_integer,
       doc:
-        "Maximum time in milliseconds to wait for the operation. " <>
+        "Maximum time in milliseconds to wait for the operation. Defaults to the session's `timeout:`. " <>
           "Playwright browser bookkeeping and navigation synchronization use the session timeout separately."
     ]
   ]
 
   @action_schema NimbleOptions.new!(@timeout_options)
+
+  # The upstream call behind each cross-driver action and its options that pass through
+  # on Playwright. Fluffy owns `timeout` (its retry budget); `no_wait_after` and `signal`
+  # would bypass its navigation tracking.
+  @native_actions [
+    click:
+      {PlaywrightEx.Locator, :click, 2,
+       [:button, :click_count, :delay, :force, :modifiers, :position, :scroll, :steps, :trial]},
+    fill: {PlaywrightEx.Locator, :fill, 3, [:force]},
+    check: {PlaywrightEx.Locator, :check, 2, [:force, :position, :scroll, :trial]},
+    uncheck: {PlaywrightEx.Locator, :uncheck, 2, [:force, :position, :scroll, :trial]},
+    select_option: {PlaywrightEx.Locator, :select_option, 3, [:force]},
+    press: {PlaywrightEx.Locator, :press, 3, [:delay]},
+    set_input_files: {PlaywrightEx.Locator, :set_input_files, 3, []}
+  ]
+
+  # Playwright-only actions, classified like the cross-driver ones.
+  @playwright_actions [
+    hover: {PlaywrightEx.Locator, :hover, 2, [:force, :modifiers, :position, :scroll, :trial]},
+    drag_to: {PlaywrightEx.Locator, :drag_to, 3, [:force, :scroll, :source_position, :steps, :target_position, :trial]},
+    press_sequentially: {PlaywrightEx.Locator, :press_sequentially, 3, [:delay]},
+    go_back: {PlaywrightEx.Page, :go_back, 2, [:wait_until]},
+    go_forward: {PlaywrightEx.Page, :go_forward, 2, [:wait_until]}
+  ]
+
+  @fluffy_native_keys [:timeout]
+  @denied_native_keys [:no_wait_after, :signal]
+
+  @action_schemas Map.new(@native_actions ++ @playwright_actions, fn {action, {module, fun, arity, keys}} ->
+                    {action, NimbleOptions.new!(@timeout_options ++ Native.schema(module, fun, arity, keys))}
+                  end)
+
+  # The upstream assertion behind each expectation and the options Fluffy mirrors on
+  # every driver. No assertion option passes through to the browser.
+  @native_expectations [
+    to_have_count: {PlaywrightEx.Expect, :to_have_count, 3, []},
+    to_be_visible: {PlaywrightEx.Expect, :to_be_visible, 2, [:visible]},
+    to_be_disabled: {PlaywrightEx.Expect, :to_be_disabled, 2, []},
+    to_be_editable: {PlaywrightEx.Expect, :to_be_editable, 2, [:editable]},
+    to_be_enabled: {PlaywrightEx.Expect, :to_be_enabled, 2, [:enabled]},
+    to_be_focused: {PlaywrightEx.Expect, :to_be_focused, 2, []},
+    to_be_checked: {PlaywrightEx.Expect, :to_be_checked, 2, [:checked, :indeterminate]},
+    to_have_value: {PlaywrightEx.Expect, :to_have_value, 3, []},
+    to_have_values: {PlaywrightEx.Expect, :to_have_values, 3, []},
+    page_to_have_title: {PlaywrightEx.Expect, :to_have_title, 3, []},
+    page_to_have_url: {PlaywrightEx.Expect, :to_have_url, 3, [:ignore_case]}
+  ]
+
+  @denied_expectation_keys [:signal]
+
+  @mirrored_expectation_options [
+    visible: [type: :boolean, doc: "Set to false to expect a hidden target, like `not_/1`."],
+    editable: [type: :boolean, doc: "Set to false to expect a read-only target, like `not_/1`."],
+    enabled: [type: :boolean, doc: "Set to false to expect a disabled target, like `not_/1`."],
+    checked: [type: :boolean, doc: "Set to false to expect an unchecked control."],
+    indeterminate: [type: :boolean, doc: "Expect the browser-owned indeterminate state."],
+    ignore_case: [type: :boolean, doc: "Match a string or regular expression case-insensitively."]
+  ]
+
+  @expectation_schemas Map.new(@native_expectations, fn {matcher, {_module, _fun, _arity, mirrored}} ->
+                         mirrored = Keyword.take(@mirrored_expectation_options, mirrored)
+                         {matcher, NimbleOptions.new!(@timeout_options ++ mirrored)}
+                       end)
+
+  @playwright_option_keys @native_actions |> Enum.flat_map(fn {_, {_, _, _, keys}} -> keys end) |> Enum.uniq()
   @expectation_schema NimbleOptions.new!(@timeout_options)
-  @checked_expectation_schema NimbleOptions.new!(
-                                @timeout_options ++
-                                  [
-                                    checked: [
-                                      type: :boolean,
-                                      doc: "Set to false to expect an unchecked control."
-                                    ],
-                                    indeterminate: [
-                                      type: :boolean,
-                                      doc: "Expect the browser-owned indeterminate state."
-                                    ]
-                                  ]
-                              )
 
   @url_matcher_schema NimbleOptions.new!(
                         path: [
@@ -113,58 +167,6 @@ defmodule Fluffy.Options do
                            ]
                          )
 
-  @evaluate_schema NimbleOptions.new!(
-                     arg: [
-                       type: :any,
-                       default: nil,
-                       doc: "Serializable argument passed to a function-style expression."
-                     ],
-                     is_function: [
-                       type: :boolean,
-                       default: false,
-                       doc: "Treat the expression as a JavaScript function."
-                     ],
-                     timeout: [
-                       type: {:or, [nil, :non_neg_integer]},
-                       default: nil,
-                       type_doc: "`t:non_neg_integer/0` or `nil`",
-                       doc: "Maximum evaluation time in milliseconds; defaults to the session timeout."
-                     ]
-                   )
-
-  @viewport_schema [
-    width: [type: :pos_integer, required: true],
-    height: [type: :pos_integer, required: true]
-  ]
-
-  @browser_context_schema [
-    accept_downloads: [type: :boolean],
-    bypass_csp: [type: :boolean],
-    color_scheme: [type: {:in, [:light, :dark, :no_preference, nil]}],
-    contrast: [type: {:in, [:no_preference, :more, nil]}],
-    device_scale_factor: [type: {:or, [:integer, :float]}],
-    extra_http_headers: [type: {:map, :string, :string}],
-    forced_colors: [type: {:in, [:active, :none, nil]}],
-    geolocation: [type: :map],
-    has_touch: [type: :boolean],
-    http_credentials: [type: :map],
-    ignore_https_errors: [type: :boolean],
-    is_mobile: [type: :boolean],
-    java_script_enabled: [type: :boolean],
-    locale: [type: :string],
-    offline: [type: :boolean],
-    permissions: [type: {:list, :string}],
-    proxy: [type: :map],
-    reduced_motion: [type: {:in, [:reduce, :no_preference, nil]}],
-    screen: [type: :map, keys: @viewport_schema],
-    service_workers: [type: {:in, [:allow, :block]}],
-    storage_state: [type: {:or, [:string, {:map, {:or, [:atom, :string]}, :any}]}],
-    strict_selectors: [type: :boolean],
-    timezone_id: [type: :string],
-    user_agent: [type: :string],
-    viewport: [type: {:or, [nil, map: @viewport_schema]}]
-  ]
-
   @setup_schema NimbleOptions.new!(
                   repos: [type: {:list, :atom}],
                   sandbox: [type: :boolean]
@@ -176,28 +178,18 @@ defmodule Fluffy.Options do
                     headers: [type: {:list, {:tuple, [{:or, [:atom, :string]}, :string]}}],
                     conn: [type: {:struct, Plug.Conn}],
                     timeout: [type: :pos_integer],
-                    browser_context: [type: :keyword_list, keys: @browser_context_schema]
+                    browser_context: [type: :keyword_list]
                   )
-
-  @launch_schema [
-    timeout: [type: :pos_integer],
-    args: [type: {:list, :string}],
-    channel: [type: :string],
-    executable_path: [type: {:or, [nil, :string]}],
-    headless: [type: :boolean],
-    slow_mo: [type: {:or, [:integer, :float]}]
-  ]
 
   @playwright_schema NimbleOptions.new!(
                        enabled: [type: :boolean, default: true],
                        engine: [type: {:in, [:chromium, :firefox, :webkit]}, default: :chromium],
                        executable: [type: :string],
-                       assets_dir: [type: :string],
                        timeout: [type: :pos_integer, default: 15_000],
-                       launch_options: [type: :keyword_list, keys: @launch_schema, default: []],
+                       launch_options: [type: :keyword_list, default: []],
                        artifact_dir: [type: {:or, [nil, :string]}],
                        trace_dir: [type: :string, default: "traces"],
-                       js_logger: [type: :atom, default: Fluffy.Playwright.ConsoleLogger]
+                       log_browser_console: [type: :boolean, default: true]
                      )
 
   @type setup_option :: unquote(NimbleOptions.option_typespec(@setup_schema))
@@ -217,10 +209,40 @@ defmodule Fluffy.Options do
   def action_schema, do: @action_schema
 
   @doc false
-  def expectation_schema, do: @expectation_schema
+  def action_schema(action), do: Map.fetch!(@action_schemas, action)
 
   @doc false
-  def checked_expectation_schema, do: @checked_expectation_schema
+  def native_actions, do: @native_actions
+
+  @doc false
+  def playwright_actions, do: @playwright_actions
+
+  @doc false
+  def native_expectations, do: @native_expectations
+
+  @doc false
+  def denied_expectation_keys, do: @denied_expectation_keys
+
+  @doc false
+  def expectation_schema(matcher), do: Map.fetch!(@expectation_schemas, matcher)
+
+  @doc false
+  def native_reference(action) do
+    {module, fun, arity, _keys} = Keyword.fetch!(@native_actions ++ @playwright_actions, action)
+    Native.reference(module, fun, arity)
+  end
+
+  @doc false
+  def fluffy_native_keys, do: @fluffy_native_keys
+
+  @doc false
+  def denied_native_keys, do: @denied_native_keys
+
+  @doc "Options that only a browser can honor."
+  def playwright_option_keys, do: @playwright_option_keys
+
+  @doc false
+  def expectation_schema, do: @expectation_schema
 
   @doc false
   def url_matcher_schema, do: @url_matcher_schema
@@ -240,17 +262,17 @@ defmodule Fluffy.Options do
   @doc false
   def filter_locator_schema, do: @filter_locator_schema
 
-  @doc false
-  def evaluate_schema, do: @evaluate_schema
-
   @spec validate_action!(keyword()) :: keyword()
   def validate_action!(options), do: NimbleOptions.validate!(options, @action_schema)
+
+  @spec validate_action!(atom(), keyword()) :: keyword()
+  def validate_action!(action, options), do: NimbleOptions.validate!(options, action_schema(action))
 
   @spec validate_expectation!(keyword()) :: keyword()
   def validate_expectation!(options), do: NimbleOptions.validate!(options, @expectation_schema)
 
-  @spec validate_checked_expectation!(keyword()) :: keyword()
-  def validate_checked_expectation!(options), do: NimbleOptions.validate!(options, @checked_expectation_schema)
+  @spec validate_expectation!(atom(), keyword()) :: keyword()
+  def validate_expectation!(matcher, options), do: NimbleOptions.validate!(options, expectation_schema(matcher))
 
   @spec validate_url_matcher!(keyword()) :: keyword()
   def validate_url_matcher!(options), do: NimbleOptions.validate!(options, @url_matcher_schema)
@@ -269,9 +291,6 @@ defmodule Fluffy.Options do
 
   @spec validate_filter_locator!(keyword()) :: keyword()
   def validate_filter_locator!(options), do: NimbleOptions.validate!(options, @filter_locator_schema)
-
-  @spec validate_evaluate!(keyword()) :: keyword()
-  def validate_evaluate!(options), do: NimbleOptions.validate!(options, @evaluate_schema)
 
   @spec validate_setup!(keyword()) :: keyword()
   def validate_setup!(options), do: NimbleOptions.validate!(options, @setup_schema)
@@ -299,37 +318,11 @@ defmodule Fluffy.Options do
   @spec validate_playwright!(false | keyword()) :: false | keyword()
   def validate_playwright!(false), do: false
 
-  def validate_playwright!(options) when is_list(options) do
-    options = NimbleOptions.validate!(options, @playwright_schema)
-
-    validate_js_logger!(options[:js_logger])
-
-    options
-    |> Keyword.update!(:launch_options, fn launch_options ->
-      if launch_options[:executable_path] == nil,
-        do: Keyword.delete(launch_options, :executable_path),
-        else: launch_options
-    end)
-    |> resolve_playwright_executable()
-  end
+  def validate_playwright!(options) when is_list(options), do: NimbleOptions.validate!(options, @playwright_schema)
 
   def validate_playwright!(other) do
     raise ArgumentError,
           "expected :fluffy, :playwright configuration to be false or a keyword list, got: #{inspect(other)}"
-  end
-
-  defp resolve_playwright_executable(options) do
-    executable =
-      options
-      |> Keyword.get(:assets_dir, "./assets")
-      |> Path.join("node_modules/playwright/cli.js")
-      |> Path.expand()
-
-    if Keyword.has_key?(options, :assets_dir) or File.regular?(executable) do
-      Keyword.put_new(options, :executable, executable)
-    else
-      options
-    end
   end
 
   defp validate_conn!(nil), do: :ok
@@ -339,16 +332,5 @@ defmodule Fluffy.Options do
   defp validate_conn!(%Plug.Conn{state: state}) do
     raise ArgumentError,
           ":conn must be a fresh, unsent %Plug.Conn{} with state :unset, got: #{inspect(state)}"
-  end
-
-  defp validate_js_logger!(false), do: :ok
-
-  defp validate_js_logger!(module) when is_atom(module) do
-    if Code.ensure_loaded?(module) and function_exported?(module, :log, 3) do
-      :ok
-    else
-      raise ArgumentError,
-            ":js_logger must be false or a module implementing log/3, got: #{inspect(module)}"
-    end
   end
 end

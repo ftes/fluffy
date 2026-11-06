@@ -9,6 +9,7 @@ defmodule Fluffy.PlaywrightEventCaptureTest do
   alias Fluffy.Playwright
   alias Fluffy.Session
   alias Fluffy.TestHTTPFixtures
+  alias PlaywrightEx.Client.EventEmitter
 
   @moduletag driver: :playwright
 
@@ -32,8 +33,8 @@ defmodule Fluffy.PlaywrightEventCaptureTest do
     test "an unawaited wait releases its subscription when its owner exits #{reason}" do
       parent = self()
       session = session_for_html(:playwright, "<h1>Owner cleanup</h1>")
-      context = Session.context(session)
-      key = {context.context_id, "response"}
+      page = Session.page_state(session).page
+      listeners = response_listeners(page)
 
       owner =
         spawn(fn ->
@@ -46,11 +47,11 @@ defmodule Fluffy.PlaywrightEventCaptureTest do
         end)
 
       assert_receive {:pending, pending}
-      assert subscription_active?(context.connection, key)
+      assert response_listeners(page) == listeners + 1
       monitor = Process.monitor(pending.pid)
       send(owner, :finish)
       assert_receive {:DOWN, ^monitor, :process, _, _}
-      refute subscription_active?(context.connection, key)
+      assert response_listeners(page) == listeners
     end
   end
 
@@ -84,18 +85,19 @@ defmodule Fluffy.PlaywrightEventCaptureTest do
     session = session_for_html(:playwright, "<h1>Crash signal</h1>")
     pending = wait_for(session, Event.download())
     # Feed the actual protocol lifecycle signal without crashing the shared browser.
-    send(pending.pid, {:playwright_msg, %{guid: Session.page_state(session).page_id, method: :crash}})
+    send(pending.pid, {:fluffy_playwright_event, :crash, Session.page_state(session).page})
     assert_raise ExUnit.AssertionError, ~r/crashed/, fn -> await(pending) end
   end
 
   test "a settled wait releases managed subscriptions before its value is consumed" do
     fixture = TestHTTPFixtures.register(%{body: "ok"})
     session = session_for_html(:playwright, "<h1>Events</h1>")
-    context = Session.context(session)
+    page = Session.page_state(session).page
+    listeners = response_listeners(page)
     pending = wait_for(session, Event.response())
     visit(session, TestHTTPFixtures.url(fixture))
     assert_eventually(fn -> :sys.get_state(pending.pid).outcome != nil end)
-    refute subscription_active?(context.connection, {context.context_id, "response"})
+    assert response_listeners(page) == listeners
     Subscription.cancel(pending.pid)
     refute Process.alive?(pending.pid)
   end
@@ -103,6 +105,8 @@ defmodule Fluffy.PlaywrightEventCaptureTest do
   test "page discovery and event decoding retain one page subscription" do
     fixture = TestHTTPFixtures.register(%{body: "ok"})
     session = session_for_html(:playwright, "<h1>Main</h1>")
+    # PlaywrightEx keeps a close listener of its own; compare against the first page.
+    close_listeners = EventEmitter.listener_count(Session.page_state(session).page, "close")
     page_wait = wait_for(session, Event.page())
     page = new_page(session)
     assert await(page_wait) == page
@@ -111,20 +115,14 @@ defmodule Fluffy.PlaywrightEventCaptureTest do
     first = wait_for(session, Event.response())
     second = wait_for(session, Event.response())
     visit(session, TestHTTPFixtures.url(fixture))
-    assert await(first).page == current_page(session)
-    assert await(second).page == current_page(session)
+    assert await(first).request.page == current_page(session)
+    assert await(second).request.page == current_page(session)
 
-    context = Session.context(session)
-    page_id = Session.page_state(session).page_id
-    {:started, state} = :sys.get_state(context.connection)
-    assert MapSet.size(state.subscriptions[{page_id, "console"}]) == 1
+    assert EventEmitter.listener_count(Session.page_state(session).page, "close") == close_listeners
     assert length(pages(session)) == 2
   end
 
-  defp subscription_active?(connection, key) do
-    {:started, state} = :sys.get_state(connection)
-    Map.has_key?(state.subscriptions, key)
-  end
+  defp response_listeners(page), do: EventEmitter.listener_count(page, "response")
 
   defp assert_eventually(fun, attempts \\ 100)
   defp assert_eventually(fun, 0), do: assert(fun.())
