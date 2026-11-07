@@ -234,8 +234,9 @@ defmodule Fluffy.Conformance.PageEventTest do
 
     pending = wait_for(session, Event.popup())
     click(session, by_role(:link, name: "Open"))
-    # WebKit requests the popup's document only after Playwright initialized the new page.
-    assert_receive {:stream, server}, 1_000
+    # WebKit requests the popup's document only after Playwright initialized the new page, so
+    # wait as long as the popup wait itself may.
+    assert_receive {:stream, server}, Fluffy.Session.timeout(session)
 
     try do
       page = await(pending)
