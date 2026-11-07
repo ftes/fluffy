@@ -9,6 +9,9 @@ defmodule Fluffy.Conformance.DownloadEventTest do
   alias Fluffy.Event
   alias Fluffy.TestHTTPFixtures
 
+  # WebKit on Linux sniffs the first 512 bytes before it turns a response into a download.
+  @sniff_padding String.duplicate(".", 1024)
+
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver, tmp_dir: true
     test "download handles keep the source page and can be read and saved repeatedly with #{driver}", %{
@@ -136,8 +139,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
   @tag driver: :playwright
   test "download metadata is available before completion, while read waits for the bytes" do
     owner = self()
-    # WebKit on Linux sniffs the first 512 bytes before it turns a response into a download.
-    first = "first" <> String.duplicate(".", 1024)
+    first = "first" <> @sniff_padding
 
     fixture =
       TestHTTPFixtures.register(fn request ->
@@ -255,7 +257,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
             %{
               headers: [{"content-disposition", "attachment; filename=broken.txt"}],
               stream: fn conn ->
-                {:ok, _conn} = Plug.Conn.chunk(conn, "partial")
+                {:ok, _conn} = Plug.Conn.chunk(conn, "partial" <> @sniff_padding)
                 send(owner, {:stream, self()})
 
                 receive do
