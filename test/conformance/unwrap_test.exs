@@ -10,6 +10,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
   alias Fluffy.Event
   alias Fluffy.Page
   alias Fluffy.Session
+  alias Fluffy.TestHTTPFixtures
   alias Fluffy.TestWeb.Endpoint
   alias Phoenix.LiveViewTest.View
   alias PlaywrightEx.BrowserContext
@@ -44,6 +45,17 @@ defmodule Fluffy.Conformance.UnwrapTest do
   end
 
   describe "Static" do
+    test "a LiveView page kept by a no-content response passes that response's conn" do
+      fixture = TestHTTPFixtures.register(%{status: 204})
+
+      :phoenix
+      |> start_test_session()
+      |> visit("/live/no-content?" <> URI.encode_query(to: TestHTTPFixtures.path(fixture, "/save")))
+      |> submit(by_css("#http-form"))
+      |> unwrap(fn %Plug.Conn{status: 204} = conn -> get(conn, "/chamber") end)
+      |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
+    end
+
     test "accepts the unchanged current conn and remains pipeable" do
       session = start_test_session(:phoenix)
 

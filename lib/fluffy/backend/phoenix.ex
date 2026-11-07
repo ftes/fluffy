@@ -356,8 +356,8 @@ defmodule Fluffy.Backend.Phoenix do
     put_http(session, http)
   end
 
-  defp finish_response(session, %HTTPResponse{conn: %{status: status}}, _download_name)
-       when status in @no_content_statuses, do: keep_document(session)
+  defp finish_response(session, %HTTPResponse{conn: %{status: status} = conn}, _download_name)
+       when status in @no_content_statuses, do: keep_document(session, conn)
 
   defp finish_response(session, %HTTPResponse{conn: conn, request: %{url: url}}, download_name) do
     case capture_download(conn, session, url, download_name) do
@@ -367,11 +367,12 @@ defmodule Fluffy.Backend.Phoenix do
   end
 
   # LiveView's client disconnects before every HTTP navigation it lets through,
-  # so a kept LiveView document remains as inert markup.
-  defp keep_document(session) do
+  # so a kept LiveView document remains as inert markup. Its conn is the
+  # no-content response's, the session's latest.
+  defp keep_document(session, conn) do
     case Session.current_page(session) do
       %Page.State{driver: :live, state: state, url: url} ->
-        state = %StaticState{client_dom: state.client_dom}
+        state = %StaticState{client_dom: state.client_dom, conn: conn}
         PageLifecycle.replace_document(session, :static, state, url, [same_document: true], &release_page/3)
 
       %Page.State{} ->
