@@ -4,17 +4,18 @@ defmodule Fluffy.Driver.Live.Retry do
   alias Fluffy.Deadline
   alias Fluffy.Session
 
-  def run(%Session{} = session, options, attempt, refresh, wait_for_retry)
-      when is_list(options) and is_function(attempt, 1) and is_function(refresh, 1) and is_function(wait_for_retry, 2) do
-    timeout = Keyword.get(options, :timeout, Session.context(session).timeout)
-    deadline = Deadline.new(timeout)
-    do_run(session, deadline, attempt, refresh, wait_for_retry)
+  # The deadline an operation's `:timeout` option, or the session default, sets.
+  def deadline(%Session{} = session, options) when is_list(options) do
+    options |> Keyword.get(:timeout, Session.context(session).timeout) |> Deadline.new()
   end
 
-  def run_current(%Session{} = session, options, attempt, refresh, wait_for_retry)
+  def run(%Session{} = session, options, attempt, refresh, wait_for_retry)
       when is_list(options) and is_function(attempt, 1) and is_function(refresh, 1) and is_function(wait_for_retry, 2) do
-    timeout = Keyword.get(options, :timeout, Session.context(session).timeout)
-    deadline = Deadline.new(timeout)
+    do_run(session, deadline(session, options), attempt, refresh, wait_for_retry)
+  end
+
+  def run_current(%Session{} = session, deadline, attempt, refresh, wait_for_retry)
+      when is_integer(deadline) and is_function(attempt, 1) and is_function(refresh, 1) and is_function(wait_for_retry, 2) do
     run_attempt(session, deadline, attempt, refresh, wait_for_retry)
   end
 
