@@ -36,8 +36,17 @@ defmodule Fluffy.Driver.Live.Document do
     %__MODULE__{parts: split(layout, ["<!--#{@view_marker}-->", @title_marker]), title: title}
   end
 
-  @spec compose(t(), String.t(), String.t() | nil) :: LazyHTML.t()
-  def compose(%__MODULE__{} = shell, view_html, page_title) when is_binary(view_html) do
+  # Reading the view takes two LiveViewTest calls. The view can redirect in
+  # between, so the title read may report the redirect too.
+  @spec render(t(), %Phoenix.LiveViewTest.View{}) :: {:ok, LazyHTML.t()} | {:error, {atom(), map()}}
+  def render(%__MODULE__{} = shell, view) do
+    with html when is_binary(html) <- Phoenix.LiveViewTest.render(view),
+         title when is_binary(title) or is_nil(title) <- Phoenix.LiveViewTest.page_title(view) do
+      {:ok, compose(shell, html, title)}
+    end
+  end
+
+  defp compose(shell, view_html, page_title) do
     title_html = title_html(shell.title, page_title)
 
     shell.parts

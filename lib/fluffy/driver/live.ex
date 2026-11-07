@@ -394,12 +394,9 @@ defmodule Fluffy.Driver.Live do
     state = Session.page_state(session)
 
     try do
-      case render(state.view) do
-        html when is_binary(html) ->
-          Session.put_page_state(session, %{
-            state
-            | client_dom: ClientDOM.reconcile(state.client_dom, compose(state, html))
-          })
+      case Document.render(state.document, state.view) do
+        {:ok, document} ->
+          Session.put_page_state(session, %{state | client_dom: ClientDOM.reconcile(state.client_dom, document)})
 
         {:error, redirect} ->
           follow_redirect_result(session, {:error, redirect})
@@ -532,14 +529,14 @@ defmodule Fluffy.Driver.Live do
 
     rendered =
       try do
-        {:ok, render(state.view)}
+        Document.render(state.document, state.view)
       catch
         :exit, reason -> {:exit, reason}
       end
 
     case rendered do
-      {:ok, html} when is_binary(html) ->
-        state = %{state | client_dom: ClientDOM.reconcile(client_dom, compose(state, html))}
+      {:ok, document} ->
+        state = %{state | client_dom: ClientDOM.reconcile(client_dom, document)}
         session = session |> Session.put_page_state(state) |> prune_stale_live_uploads()
 
         case ClientDOM.triggered_submission(state.client_dom) do
@@ -553,7 +550,7 @@ defmodule Fluffy.Driver.Live do
             {:navigate, session, Navigation.submission(submission)}
         end
 
-      {:ok, {:error, redirect}} ->
+      {:error, redirect} ->
         follow_redirect_result(session, {:error, redirect})
 
       {:exit, original_reason} ->
@@ -564,8 +561,6 @@ defmodule Fluffy.Driver.Live do
         end
     end
   end
-
-  defp compose(state, html), do: Document.compose(state.document, html, page_title(state.view))
 
   defp follow_redirect_result(session, {:error, {_kind, %{to: destination} = options}}) do
     {:navigate, session, Navigation.redirect(destination, flash: options[:flash])}

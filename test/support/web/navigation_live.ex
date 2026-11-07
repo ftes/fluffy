@@ -5,8 +5,12 @@ defmodule Fluffy.TestWeb.NavigationLive do
 
   @impl true
   def mount(params, _session, socket) do
-    if connected?(socket) and params["async"] == "true" do
-      Process.send_after(self(), :navigate, 30)
+    if connected?(socket) do
+      case params["async"] do
+        "true" -> Process.send_after(self(), :navigate, 30)
+        "mount" -> send(self(), :navigate)
+        _sync -> :ok
+      end
     end
 
     {:ok, assign(socket, step: params["step"] || "initial", topic: params["topic"], saved_step: nil, saves: 0)}

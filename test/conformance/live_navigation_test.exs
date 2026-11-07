@@ -66,6 +66,15 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     end
 
     @tag driver: driver
+    test "follows Live navigation that races the mount render with #{driver}", %{driver: driver} do
+      driver
+      |> live_session()
+      |> visit("/live/chamber-map?async=mount")
+      |> expect(Fluffy.Expect.page_to_have_url("/live/secret-chamber"))
+      |> expect("The secret chamber is open" |> by_text() |> to_be_visible())
+    end
+
+    @tag driver: driver
     test "follows Live navigation that races the post-action render with #{driver}", %{
       driver: driver
     } do

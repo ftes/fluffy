@@ -282,16 +282,39 @@ defmodule Fluffy.Backend.Phoenix do
 
     document = LiveDocument.new(html, view.id)
 
+    # The view can redirect or exit right after mounting. Commit the mounted
+    # document then, so the view is released like any other: follow a reported
+    # redirect now, and leave an exit to the Live driver's next read.
+    {client_dom, redirect} =
+      try do
+        case LiveDocument.render(document, view) do
+          {:ok, composed} -> {ClientDOM.from_document(composed), nil}
+          {:error, redirect} -> {mounted_client_dom(html), redirect}
+        end
+      catch
+        :exit, _reason -> {mounted_client_dom(html), nil}
+      end
+
     state = %LiveState{
-      client_dom: document |> LiveDocument.compose(render(view), page_title(view)) |> ClientDOM.from_document(),
+      client_dom: client_dom,
       document: document,
       live_uploads: UploadState.new(),
       view: view,
       watcher: watcher
     }
 
-    PageLifecycle.replace_document(session, :live, state, URI.to_string(url), [], &release_page/3)
+    session = PageLifecycle.replace_document(session, :live, state, URI.to_string(url), [], &release_page/3)
+
+    case redirect do
+      nil ->
+        session
+
+      {_kind, %{to: destination} = options} ->
+        navigate(session, %Redirect{destination: destination, flash: options[:flash]})
+    end
   end
+
+  defp mounted_client_dom(html), do: html |> LazyHTML.from_document() |> ClientDOM.from_document()
 
   @doc false
   def commit_conn(%Session{} = session, conn, destination) do

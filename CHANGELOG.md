@@ -51,6 +51,7 @@ Fluffy now runs on PlaywrightEx 0.17, a port of the official Playwright client w
 - On Phoenix, a link, form submission or redirect answered with `204 No Content` or `205 Reset Content` keeps the current page, URL and form state instead of showing an empty document; a LiveView page stays, disconnected, as in a browser. `visit` to such a response raises, like Playwright's.
 - On Chromium, a link or form submission answered with `204 No Content` no longer leaves later actions waiting on the aborted navigation.
 - A Playwright action whose navigation lands on pages that navigate again on load (a client-side redirect chain) follows them instead of raising "Execution context was destroyed".
+- LiveView follows a redirect that lands while Fluffy reads the view after mount, an event or a retry, instead of crashing in `LazyHTML.from_fragment/1` or on a `GenServer.call` exit.
 
 ## 0.8.0 — 2026-11-04
 
