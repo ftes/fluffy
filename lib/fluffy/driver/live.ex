@@ -66,23 +66,24 @@ defmodule Fluffy.Driver.Live do
 
   defp commit_click(session, client_dom, target) do
     state = Session.page_state(session)
-    event_context = owning_view_context(state.view, target)
 
-    case ClientDOM.phoenix_html_submission(client_dom, target) do
-      submission when is_map(submission) ->
-        if competing_live_click_binding?(target) do
-          raise Fluffy.CapabilityError,
-            capability: :phoenix_html_live_action_conflict,
-            driver: :live,
-            detail:
-              "a data-method/data-to link with a competing phx-click or LiveView navigation action requires Playwright"
-        else
-          {:navigate, Session.put_page_state(session, %{state | client_dom: client_dom}),
-           Navigation.submission(submission)}
-        end
+    with {:ok, event_context} <- owning_view_context(session, target) do
+      case ClientDOM.phoenix_html_submission(client_dom, target) do
+        submission when is_map(submission) ->
+          if competing_live_click_binding?(target) do
+            raise Fluffy.CapabilityError,
+              capability: :phoenix_html_live_action_conflict,
+              driver: :live,
+              detail:
+                "a data-method/data-to link with a competing phx-click or LiveView navigation action requires Playwright"
+          else
+            {:navigate, Session.put_page_state(session, %{state | client_dom: client_dom}),
+             Navigation.submission(submission)}
+          end
 
-      nil ->
-        commit_plain_click(session, client_dom, target, event_context)
+        nil ->
+          commit_plain_click(session, client_dom, target, event_context)
+      end
     end
   end
 
@@ -181,17 +182,18 @@ defmodule Fluffy.Driver.Live do
       state = Session.page_state(session)
       client_dom = Map.fetch!(state, :client_dom)
       target = ClientDOM.target!(client_dom, locator)
-      event_context = owning_view_context(state.view, target)
 
-      case ClientDOM.submit_form(client_dom, target, :live) do
-        nil ->
-          raise ArgumentError, "submit/2 requires a form locator, got #{inspect(target.tag)}"
+      with {:ok, event_context} <- owning_view_context(session, target) do
+        case ClientDOM.submit_form(client_dom, target, :live) do
+          nil ->
+            raise ArgumentError, "submit/2 requires a form locator, got #{inspect(target.tag)}"
 
-        %{phx_submit?: true} = submission ->
-          dispatch_live_submit(session, client_dom, submission, event_context)
+          %{phx_submit?: true} = submission ->
+            dispatch_live_submit(session, client_dom, submission, event_context)
 
-        %{phx_submit?: false} = submission ->
-          {:navigate, session, Navigation.submission(submission)}
+          %{phx_submit?: false} = submission ->
+            {:navigate, session, Navigation.submission(submission)}
+        end
       end
     end)
   end
@@ -321,14 +323,15 @@ defmodule Fluffy.Driver.Live do
     case resolve_live_action(session, locator, deadline, &ClientDOM.target!(&1, locator)) do
       {%Session{} = session, target} ->
         state = Session.page_state(session)
-        context = owning_view_context(state.view, target)
 
-        result =
-          dispatch_view_event(session, fn ->
-            render_view_event(state.client_dom, context, target.selector, phase, %{"key" => key})
-          end)
+        with {:ok, context} <- owning_view_context(session, target) do
+          result =
+            dispatch_view_event(session, fn ->
+              render_view_event(state.client_dom, context, target.selector, phase, %{"key" => key})
+            end)
 
-        commit_render_result(session, state.client_dom, result, context.view)
+          commit_render_result(session, state.client_dom, result, context.view)
+        end
 
       navigation ->
         navigation
@@ -456,6 +459,26 @@ defmodule Fluffy.Driver.Live do
     :exit, reason -> {:redirected, exit_redirect!(session, reason)}
   end
 
+  # Reads the view without acting on it, such as its children or its upload
+  # config. When the view navigated away, the read exits, or LiveViewTest hands
+  # the redirect back where the read expected a reply and the caller raises on
+  # it: report that redirect for the action to follow. Any other failure stands.
+  defp read_view(session, read) do
+    {:ok, read.()}
+  catch
+    :exit, reason ->
+      redirected(session, exit_redirect!(session, reason))
+
+    kind, reason ->
+      stacktrace = __STACKTRACE__
+      redirected(session, exit_redirect!(session, reason, fn -> :erlang.raise(kind, reason, stacktrace) end))
+  end
+
+  defp redirected(session, redirect) do
+    {:navigate, session, navigation} = follow_redirect_result(session, {:error, redirect})
+    {:redirected, session, navigation}
+  end
+
   # Runs a Live action within one deadline, recording whether any of its
   # events reached the view. A redirect found before that landed before the
   # action: follow it and retry the whole action on the new page within the
@@ -572,8 +595,7 @@ defmodule Fluffy.Driver.Live do
   end
 
   defp commit_render_result(session, _client_dom, {:redirected, redirect}, _event_view) do
-    {:navigate, session, navigation} = follow_redirect_result(session, {:error, redirect})
-    {:redirected, session, navigation}
+    redirected(session, redirect)
   end
 
   defp commit_render_result(session, client_dom, result, _event_view) when is_binary(result) do
@@ -636,28 +658,28 @@ defmodule Fluffy.Driver.Live do
   end
 
   defp dispatch_live_change(session, client_dom, %Fluffy.HTML.Target{} = target) do
-    state = Session.page_state(session)
-    event_context = owning_view_context(state.view, target)
-    event_view = event_context.view
-    session = Session.put_page_state(session, %{state | client_dom: client_dom})
+    with {:ok, event_context} <- owning_view_context(session, target) do
+      state = Session.page_state(session)
+      session = Session.put_page_state(session, %{state | client_dom: client_dom})
 
-    case ClientDOM.change_event(client_dom, target) do
-      nil ->
-        session
+      case ClientDOM.change_event(client_dom, target) do
+        nil ->
+          session
 
-      event ->
-        payload =
-          event.fields
-          |> Form.to_params()
-          |> Map.put("_target", event.target_name || "undefined")
-          |> decode_merge_target()
+        event ->
+          payload =
+            event.fields
+            |> Form.to_params()
+            |> Map.put("_target", event.target_name || "undefined")
+            |> decode_merge_target()
 
-        result =
-          dispatch_view_event(session, fn ->
-            render_view_event(client_dom, event_context, event.dispatcher_selector, :change, payload)
-          end)
+          result =
+            dispatch_view_event(session, fn ->
+              render_view_event(client_dom, event_context, event.dispatcher_selector, :change, payload)
+            end)
 
-        commit_render_result(session, client_dom, result, event_view)
+          commit_render_result(session, client_dom, result, event_context.view)
+      end
     end
   end
 
@@ -680,8 +702,13 @@ defmodule Fluffy.Driver.Live do
   # owner lookup. Teleported portal content belongs to the view that owns the
   # portal, and elements outside every LiveView fall back to the main view.
   # `root_id` is the container that LiveViewTest selectors are relative to; it
-  # is nil when element/2 cannot reach the target.
-  defp owning_view_context(root_view, target) do
+  # is nil when element/2 cannot reach the target. Finding a nested view reads
+  # the view's children, so a view that navigated away reports its redirect.
+  defp owning_view_context(session, target) do
+    read_view(session, fn -> find_owning_view_context(Session.page_state(session).view, target) end)
+  end
+
+  defp find_owning_view_context(root_view, target) do
     target.ancestors
     |> Kernel.++([target])
     |> Enum.reduce(%{view: root_view, root_id: nil, layout?: true}, fn candidate, context ->
@@ -770,25 +797,33 @@ defmodule Fluffy.Driver.Live do
     end
 
     target = ClientDOM.target!(state.client_dom, locator)
-    event_context = owning_view_context(state.view, target)
-    form_id = Form.owner_id(ClientDOM.index(state.client_dom), target)
 
-    if is_nil(event_context.root_id) do
-      raise Fluffy.CapabilityError,
-        capability: :file_uploads,
-        driver: :live,
-        detail: "LiveView-managed file uploads outside the LiveView container, such as in a portal, require Playwright"
+    with {:ok, event_context} <- owning_view_context(session, target) do
+      if is_nil(event_context.root_id) do
+        raise Fluffy.CapabilityError,
+          capability: :file_uploads,
+          driver: :live,
+          detail: "LiveView-managed file uploads outside the LiveView container, such as in a portal, require Playwright"
+      end
+
+      form_id = Form.owner_id(ClientDOM.index(state.client_dom), target)
+
+      form_selector =
+        selector_for_view(state.client_dom, ClientDOM.selector_for_node_id(state.client_dom, form_id), event_context)
+
+      upload_name = existing_upload_name!(target)
+
+      # Starting the upload client reads the view's upload config.
+      with {:ok, upload} <-
+             read_view(session, fn ->
+               file_input!(session, event_context.view, form_selector, upload_name, selected_files)
+             end) do
+        start_live_upload(session, locator, selected_files, target, event_context, form_id, form_selector, upload)
+      end
     end
+  end
 
-    form_selector =
-      selector_for_view(
-        state.client_dom,
-        ClientDOM.selector_for_node_id(state.client_dom, form_id),
-        event_context
-      )
-
-    upload_name = existing_upload_name!(target)
-
+  defp file_input!(session, view, form_selector, upload_name, selected_files) do
     entries =
       Enum.map(selected_files, fn selected_file ->
         %{
@@ -800,22 +835,7 @@ defmodule Fluffy.Driver.Live do
         }
       end)
 
-    # Starting the upload client reads the view's upload config.
-    case dispatch_view_event(session, fn ->
-           UploadCompat.file_input!(
-             event_context.view,
-             form_selector,
-             upload_name,
-             entries,
-             Session.context(session).http.endpoint
-           )
-         end) do
-      {:redirected, _redirect} = redirected ->
-        commit_render_result(session, state.client_dom, redirected)
-
-      upload ->
-        start_live_upload(session, locator, selected_files, target, event_context, form_id, form_selector, upload)
-    end
+    UploadCompat.file_input!(view, form_selector, upload_name, entries, Session.context(session).http.endpoint)
   end
 
   defp start_live_upload(session, locator, selected_files, target, event_context, form_id, form_selector, upload) do

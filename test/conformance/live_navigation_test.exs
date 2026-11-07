@@ -118,6 +118,34 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     end
 
     @tag driver: driver
+    test "clicks inside a nested LiveView on the document a Live navigation landed on after the last read with #{driver}",
+         %{driver: driver} do
+      driver
+      |> live_session()
+      |> visit("/live/nested?async=return")
+      |> await_unread_navigation(driver, "/live/nested?step=returned")
+      |> click(by_role(:button, name: "Increment child", exact: true))
+      |> expect(Fluffy.Expect.page_to_have_url("/live/nested?step=returned"))
+      |> expect("Child count: 1" |> by_text(exact: true) |> to_be_visible())
+    end
+
+    @tag driver: driver
+    test "uploads inside a nested LiveView on the document a Live navigation landed on after the last read with #{driver}",
+         %{driver: driver} do
+      driver
+      |> live_session()
+      |> visit("/live/nested?async=return")
+      |> await_unread_navigation(driver, "/live/nested?step=returned")
+      |> set_input_files(
+        by_label("Child attachment", exact: true),
+        Path.expand("../support/fixtures/fluffy-upload.txt", __DIR__)
+      )
+      |> click(by_role(:button, name: "Upload child attachment", exact: true))
+      |> expect(Fluffy.Expect.page_to_have_url("/live/nested?step=returned"))
+      |> expect("Child uploaded: fluffy-upload.txt" |> by_text(exact: true) |> to_be_visible())
+    end
+
+    @tag driver: driver
     test "an action whose target a Live navigation removed fails as missing with #{driver}", %{
       driver: driver
     } do

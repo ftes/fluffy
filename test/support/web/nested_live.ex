@@ -4,7 +4,12 @@ defmodule Fluffy.TestWeb.NestedParentLive do
   use Phoenix.LiveView
 
   @impl true
-  def mount(_params, _session, socket) do
+  def mount(params, _session, socket) do
+    # Navigates back here a moment after connecting, without any action.
+    if connected?(socket) and params["async"] == "return" do
+      Process.send_after(self(), :return, 30)
+    end
+
     {:ok, assign(socket, parent_email: "", saved_parent_email: nil, parent_count: 0)}
   end
 
@@ -24,6 +29,9 @@ defmodule Fluffy.TestWeb.NestedParentLive do
   def handle_event("navigate", _params, socket) do
     {:noreply, push_navigate(socket, to: "/chamber?from=wrong-parent")}
   end
+
+  @impl true
+  def handle_info(:return, socket), do: {:noreply, push_navigate(socket, to: "/live/nested?step=returned")}
 
   @impl true
   def handle_params(_params, _uri, socket), do: {:noreply, socket}
