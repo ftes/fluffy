@@ -41,7 +41,7 @@ defmodule Fluffy.Driver.Playwright do
 
   @impl true
   def expect(%Session{} = session, %Expect{} = expectation) do
-    timeout = Keyword.get(expectation.options, :timeout, Session.context(session).timeout)
+    timeout = Session.timeout(session, expectation.options)
 
     {:ok, :expectation, outcome} =
       navigation_aware_action(session, timeout, fn remaining ->
@@ -55,8 +55,9 @@ defmodule Fluffy.Driver.Playwright do
   defp execute_expectation(session, %Expect{target: :page, kind: :url, expected: expected} = expectation) do
     page = Session.page_state(session).page
     matcher = fn url -> URLMatcher.matches?(expected, url) != expectation.negated? end
+    timeout = Session.timeout(session, expectation.options)
 
-    case BrowserPage.wait_for_url(page, matcher, wait_until: :commit, timeout: expect_timeout(session, expectation)) do
+    case BrowserPage.wait_for_url(page, matcher, wait_until: :commit, timeout: timeout) do
       :ok ->
         :ok
 
@@ -72,7 +73,7 @@ defmodule Fluffy.Driver.Playwright do
     {target, assertion, arguments, options} = native_expectation(session, expectation)
     target = if expectation.negated?, do: BrowserExpect.not_(target), else: target
 
-    options = Keyword.put(options, :timeout, expect_timeout(session, expectation))
+    options = Keyword.put(options, :timeout, Session.timeout(session, expectation.options))
 
     case apply(BrowserExpect, assertion, [target | arguments] ++ [options]) do
       :ok ->
@@ -104,9 +105,6 @@ defmodule Fluffy.Driver.Playwright do
       :checked when expected == :indeterminate -> {locator, :to_be_checked, [], [indeterminate: true]}
     end
   end
-
-  defp expect_timeout(session, expectation),
-    do: expectation.options |> Keyword.get(:timeout, Session.context(session).timeout) |> max(1)
 
   @impl true
   def set_html(%Session{} = session, html) when is_binary(html) do
@@ -402,7 +400,7 @@ defmodule Fluffy.Driver.Playwright do
   # blocks the page. Those timers can patch or navigate, as an action can.
   def clock(%Session{} = session, operation, fun, options) do
     clock = BrowserPage.clock(Session.page_state(session).page)
-    timeout = options |> Keyword.get(:timeout) |> Kernel.||(Session.context(session).timeout) |> max(1)
+    timeout = Session.timeout(session, options)
 
     {:ok, :clock, outcome} =
       navigation_aware_action(session, timeout, fn remaining ->
@@ -426,7 +424,7 @@ defmodule Fluffy.Driver.Playwright do
           "Playwright unwrap invalidated the tracked #{kind}; use Fluffy page and session lifecycle APIs"
   end
 
-  defp session_timeout(session), do: max(Session.context(session).timeout, 1)
+  defp session_timeout(session), do: Session.timeout(session)
 
   defp locator(session, locator), do: PlaywrightLocator.locator(Session.page_state(session).frame, locator)
 
@@ -439,7 +437,7 @@ defmodule Fluffy.Driver.Playwright do
   end
 
   defp action(session, operation, target, options, fun) do
-    timeout = options |> Keyword.get(:timeout) |> Kernel.||(Session.context(session).timeout) |> max(1)
+    timeout = Session.timeout(session, options)
 
     case navigation_aware_action(session, timeout, &result(fun.(&1))) do
       {:ok, _value, outcome} -> outcome

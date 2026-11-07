@@ -235,9 +235,11 @@ defmodule Fluffy.Backend.Playwright do
   @impl true
   def reload(%Session{} = session, options \\ []) do
     state = Session.page_state(session)
-    {timeout, options} = Keyword.pop(options, :timeout, Session.context(session).timeout)
-    timeout = max(timeout, 1)
-    _response = navigate!(:reload, [state.page, Keyword.merge([wait_until: :load, timeout: timeout], options)])
+    timeout = Session.timeout(session, options)
+
+    _response =
+      navigate!(:reload, [state.page, Keyword.merge([wait_until: :load], Keyword.put(options, :timeout, timeout))])
+
     adopt_navigated_document(session, state, timeout)
   end
 
@@ -267,10 +269,9 @@ defmodule Fluffy.Backend.Playwright do
   @impl true
   def history(session, direction, options) do
     state = Session.page_state(session)
-    session_timeout = max(Session.context(session).timeout, 1)
-    {timeout, options} = Keyword.pop(options, :timeout, session_timeout)
+    session_timeout = Session.timeout(session)
     previous_url = Session.current_page(session).url
-    native = Keyword.merge([wait_until: :load, timeout: max(timeout, 1)], options)
+    native = Keyword.merge([wait_until: :load], Keyword.put(options, :timeout, Session.timeout(session, options)))
     response = navigate!(direction, [state.page, native])
     # Bookkeeping uses the session timeout, as after other actions.
     probe = Document.probe!(state.frame, nil, session_timeout)
@@ -293,7 +294,7 @@ defmodule Fluffy.Backend.Playwright do
 
   # Like closing the context, closing a page has no timeout of its own.
   defp release_page(session, page, :page_closed) do
-    timeout = max(Session.context(session).timeout, 1)
+    timeout = Session.timeout(session)
     Bounded.within!(timeout, :close_page, fn -> with :ok <- BrowserPage.close(page.state.page), do: {:ok, :ok} end)
     :ok
   end

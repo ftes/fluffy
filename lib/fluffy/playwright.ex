@@ -333,7 +333,7 @@ defmodule Fluffy.Playwright do
   def evaluate(session, expression, arg \\ nil) when is_binary(expression) do
     ensure_playwright!(session)
     frame = Session.page_state(session).frame
-    timeout = max(Session.context(session).timeout, 1)
+    timeout = Session.timeout(session)
     Bounded.within!(timeout, :evaluate, fn -> PlaywrightEx.Frame.evaluate(frame, expression, arg) end)
   end
 
