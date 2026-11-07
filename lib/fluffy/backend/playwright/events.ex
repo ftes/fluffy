@@ -11,12 +11,6 @@ defmodule Fluffy.Backend.Playwright.Events do
   alias PlaywrightEx.BrowserContext
   alias PlaywrightEx.Page, as: BrowserPage
 
-  # What `PlaywrightEx.Request.frame/1` raises for a request without a frame.
-  @no_frame [
-    "Service Worker requests do not have an associated frame",
-    "Frame for this navigation request is not available"
-  ]
-
   def event_source(session, type, scope) do
     if type == :page or (type in [:request, :response] and scope == :context) do
       Session.context(session)
@@ -140,13 +134,13 @@ defmodule Fluffy.Backend.Playwright.Events do
   end
 
   # Service worker requests, and a navigation request issued before its frame
-  # is attached (a popup's first request), have no frame; `Request.frame/1`
-  # raises for both. Other errors surface.
+  # is attached (a popup's first request), have no frame. `Request.frame/1`
+  # reads cached state and raises a plain `RuntimeError` only for a request
+  # without one; a closed connection still raises `TargetClosedError`.
   def request_frame(request) do
-    PlaywrightEx.Request.frame(request)
+    if is_nil(PlaywrightEx.Request.service_worker(request)), do: PlaywrightEx.Request.frame(request)
   rescue
-    error in RuntimeError ->
-      if String.starts_with?(error.message, @no_frame), do: nil, else: reraise(error, __STACKTRACE__)
+    RuntimeError -> nil
   end
 
   defp optional_page_handle(nil, _session), do: nil
