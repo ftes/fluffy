@@ -401,7 +401,7 @@ defmodule Fluffy.Driver.Live do
           follow_redirect_result(session, {:error, redirect})
       end
     catch
-      :exit, reason -> follow_redirect_result(session, {:error, exit_redirect!(session, reason)})
+      :exit, reason -> follow_exit_redirect(session, reason)
     end
   end
 
@@ -426,12 +426,15 @@ defmodule Fluffy.Driver.Live do
               |> render()
               |> then(&commit_render_result(session, client_dom, &1))
             catch
-              :exit, reason ->
-                redirect = exit_redirect!(session, reason, fn -> exit(reason) end)
-                follow_redirect_result(session, {:error, redirect})
+              :exit, reason -> follow_exit_redirect(session, reason, fn -> exit(reason) end)
             end
         end
     end
+  end
+
+  # Follows the redirect a view left when a call to it exited.
+  defp follow_exit_redirect(session, reason, unexplained \\ nil) do
+    follow_redirect_result(session, {:error, exit_redirect!(session, reason, unexplained)})
   end
 
   # A view call exits when the view went away. Return the redirect it left, or
@@ -648,7 +651,7 @@ defmodule Fluffy.Driver.Live do
         follow_redirect_result(session, {:error, redirect})
 
       {:exit, reason} ->
-        follow_redirect_result(session, {:error, exit_redirect!(session, reason)})
+        follow_exit_redirect(session, reason)
     end
   end
 
@@ -1172,7 +1175,7 @@ defmodule Fluffy.Driver.Live do
       case upload_result do
         # A progress callback that navigates returns the redirect.
         {:error, {kind, %{to: _destination}}} when kind in [:live_redirect, :redirect] ->
-          {:halt, {:navigation, commit_render_result(session, nil, upload_result)}}
+          {:halt, {:navigation, follow_redirect_result(session, upload_result)}}
 
         {:error, _entry_errors} ->
           {:halt, {:entry_error, session}}
