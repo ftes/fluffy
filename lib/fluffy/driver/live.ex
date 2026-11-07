@@ -488,14 +488,30 @@ defmodule Fluffy.Driver.Live do
   # it. Either way, return the redirect the view left. Any other failure stands.
   defp call_view(session, call) do
     {:ok, call.()}
+  rescue
+    exception ->
+      stacktrace = __STACKTRACE__
+
+      if redirect_reply_failure?(session, exception) do
+        {:view_left, exit_redirect!(session, exception, fn -> reraise(exception, stacktrace) end)}
+      else
+        reraise(exception, stacktrace)
+      end
   catch
     :exit, reason ->
       {:view_left, exit_redirect!(session, reason)}
-
-    kind, reason ->
-      stacktrace = __STACKTRACE__
-      {:view_left, exit_redirect!(session, reason, fn -> :erlang.raise(kind, reason, stacktrace) end)}
   end
+
+  # LiveViewTest hands back a redirect in place of a reply only once the view's
+  # client stopped on it. Its own failures raise ArgumentError, and Fluffy's
+  # errors are deterministic, so neither is explained by a redirect.
+  defp redirect_reply_failure?(session, exception) do
+    {_reference, _topic, proxy_pid} = Session.page_state(session).view.proxy
+
+    not is_struct(exception, ArgumentError) and not fluffy_error?(exception) and not Process.alive?(proxy_pid)
+  end
+
+  defp fluffy_error?(%module{}), do: match?(["Fluffy" | _], Module.split(module))
 
   defp redirected(session, redirect) do
     {:navigate, session, navigation} = follow_redirect_result(session, {:error, redirect})
