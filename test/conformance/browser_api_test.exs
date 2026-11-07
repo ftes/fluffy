@@ -160,6 +160,11 @@ defmodule Fluffy.Conformance.BrowserAPITest do
       assert_raise Fluffy.CapabilityError, operation
     end
 
+    for history <- [&go_back/1, &go_forward/1] do
+      error = assert_raise Fluffy.CapabilityError, fn -> history.(session) end
+      assert error.capability == :browser_history
+    end
+
     assert :ok = close_session(session)
   end
 end

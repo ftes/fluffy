@@ -131,7 +131,7 @@ defmodule Fluffy.Playwright do
   """
   @spec go_back(Session.t(), [go_back_option()]) :: Session.t()
   def go_back(%Session{} = session, options \\ []) do
-    ensure_playwright_backend!(session, :history)
+    ensure_playwright_backend!(session, :browser_history)
     Backend.history(session, :go_back, Options.validate_action!(:go_back, options))
   end
 
@@ -148,7 +148,7 @@ defmodule Fluffy.Playwright do
   """
   @spec go_forward(Session.t(), [go_forward_option()]) :: Session.t()
   def go_forward(%Session{} = session, options \\ []) do
-    ensure_playwright_backend!(session, :history)
+    ensure_playwright_backend!(session, :browser_history)
     Backend.history(session, :go_forward, Options.validate_action!(:go_forward, options))
   end
 

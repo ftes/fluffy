@@ -17,6 +17,7 @@ Fluffy now runs on PlaywrightEx 0.17, a port of the official Playwright client w
 - Cookie maps of `add_cookies/2` and `cookies/2` use Playwright's camelCase atom keys: `%{name: "a", value: "b", url: url, http_only: true}` becomes `%{name: "a", value: "b", url: url, httpOnly: true}`, likewise `sameSite:` and `partitionKey:`; `add_cookies/2` raises on the old keys. `storage_state/2` returns atom keys instead of strings: `state["cookies"]` becomes `state.cookies`, likewise `:origins`, `:localStorage` and `:httpOnly`. Saved state files and string-keyed maps still load.
 - `browser_context:`, `launch_options:`, and the options of `screenshot`, `storage_state`, cookies and `trace` pass through to PlaywrightEx, which validates them.
 - `go_back`/`go_forward`, `hover`, `drag_to` and `press_sequentially` accept the options of their PlaywrightEx call except `no_wait_after:` and `signal:`, which would bypass navigation tracking.
+- On Phoenix, `go_back`/`go_forward` raise `Fluffy.CapabilityError` with `capability: :browser_history` instead of `:pages`.
 - `trace(coverage:)` is removed.
 - `Fluffy.Dialog.accept/2` and `dismiss/1` take no timeout; `Fluffy.Dialog` loses its `connection`, `id` and `timeout` fields, and `Fluffy.Download` has no timeout.
 - `page_status`, `page_to_have_status` and `Fluffy.Page.status` are removed, as in Playwright; on Playwright, assert on `Event.response` instead.
