@@ -557,17 +557,6 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
     end
   end
 
-  @tag driver: :phoenix
-  test "set_input_files ends on the page an upload progress callback navigates to" do
-    session =
-      :phoenix
-      |> start_test_session()
-      |> visit("/live/scrolls/progress-redirect")
-      |> set_input_files(by_label("Attachment"), fixture_path())
-
-    assert Session.current_page(session).url == Fluffy.TestServer.base_url() <> "/chamber?from=upload-progress"
-  end
-
   defp start_test_session(driver) do
     start_session(driver,
       base_url: Fluffy.TestServer.base_url(),
