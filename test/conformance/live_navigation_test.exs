@@ -133,6 +133,19 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     end
 
     @tag driver: driver
+    test "a press whose page navigates between keydown and keyup is not repeated there with #{driver}", %{
+      driver: driver
+    } do
+      driver
+      |> live_session()
+      |> visit("/live/keyboard")
+      |> press(by_label("Leaving key", exact: true), "Enter")
+      |> expect(Fluffy.Expect.page_to_have_url("/live/keyboard?step=left"))
+      |> expect("Step: left" |> by_text(exact: true) |> to_be_visible())
+      |> expect("Event count: 0" |> by_text(exact: true) |> to_be_visible())
+    end
+
+    @tag driver: driver
     test "follows Live navigation that races the post-action render with #{driver}", %{
       driver: driver
     } do
@@ -176,6 +189,28 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     session
     |> expect(Fluffy.Expect.page_to_have_url("/live/secret-chamber"))
     |> expect("The secret chamber is open" |> by_text() |> to_be_visible())
+  end
+
+  @tag driver: :phoenix
+  test "a connected-mount redirect loop fails at the redirect limit" do
+    session = live_session(:phoenix)
+
+    assert_raise RuntimeError, ~r/exceeded 20 redirects/, fn ->
+      visit(session, "/live/chamber-map?redirect=ping")
+    end
+  end
+
+  @tag driver: :phoenix
+  test "an action without timeout budget fails instead of retrying on the page a navigation landed on" do
+    session =
+      :phoenix
+      |> live_session()
+      |> visit("/live/chamber-map?async=return")
+      |> await_unread_navigation(:phoenix, nil)
+
+    assert_raise Fluffy.OperationError, ~r/navigated away/, fn ->
+      click(session, by_role(:button, name: "Lull guardian", exact: true), timeout: 0)
+    end
   end
 
   # Waits until the view has navigated away without Fluffy reading it, so the

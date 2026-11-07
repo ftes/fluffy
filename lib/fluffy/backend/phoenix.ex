@@ -257,7 +257,7 @@ defmodule Fluffy.Backend.Phoenix do
   defp encode_post_submission(%{fields: fields}), do: Fluffy.Form.url_encode(fields)
 
   @doc false
-  def commit_live(%Session{} = session, view, html, destination) do
+  def commit_live(%Session{} = session, view, html, destination, redirects \\ 0) do
     proxy_pid = live_view_proxy_pid(view)
     Process.unlink(proxy_pid)
 
@@ -308,12 +308,20 @@ defmodule Fluffy.Backend.Phoenix do
     session = PageLifecycle.replace_document(session, :live, state, URI.to_string(url), [], &release_page/3)
 
     case redirect do
-      nil ->
-        session
-
-      {_kind, %{to: destination} = options} ->
-        navigate(session, %Redirect{destination: destination, flash: options[:flash]})
+      nil -> session
+      redirect -> follow_mount_redirect(session, redirect, url, redirects)
     end
+  end
+
+  # A browser follows a redirect from a view's mount like an HTTP redirect, so
+  # it counts toward the same redirect limit.
+  defp follow_mount_redirect(session, {_kind, %{to: destination} = options}, url, redirects) do
+    redirects = HTTP.count_redirect!(redirects, url)
+    destination_url = resolve_url(Session.context(session).http.base_url, destination, session)
+
+    session
+    |> put_live_redirect_flash(destination, options[:flash])
+    |> request(destination_url, :get, nil, nil, redirects)
   end
 
   defp mounted_client_dom(html), do: html |> LazyHTML.from_document() |> ClientDOM.from_document()
@@ -331,8 +339,8 @@ defmodule Fluffy.Backend.Phoenix do
     session |> put_http(http) |> finish_response(response, nil)
   end
 
-  defp request(session, url, method \\ :get, body \\ nil, download_name \\ nil) do
-    {http, response} = HTTP.request(Session.context(session).http, url, method, body)
+  defp request(session, url, method \\ :get, body \\ nil, download_name \\ nil, redirects \\ 0) do
+    {http, response} = HTTP.request(Session.context(session).http, url, method, body, redirects)
     session |> put_http(http) |> finish_response(response, download_name)
   end
 
@@ -359,10 +367,10 @@ defmodule Fluffy.Backend.Phoenix do
   defp finish_response(session, %HTTPResponse{conn: %{status: status} = conn}, _download_name)
        when status in @no_content_statuses, do: keep_document(session, conn)
 
-  defp finish_response(session, %HTTPResponse{conn: conn, request: %{url: url}}, download_name) do
+  defp finish_response(session, %HTTPResponse{conn: conn, request: %{url: url}} = response, download_name) do
     case capture_download(conn, session, url, download_name) do
       {:ok, session} -> session
-      :not_a_download -> commit_response(conn, session, url)
+      :not_a_download -> commit_response(conn, session, url, response.redirects)
     end
   end
 
@@ -380,25 +388,25 @@ defmodule Fluffy.Backend.Phoenix do
     end
   end
 
-  defp commit_response(%{assigns: %{live_module: _module}} = conn, session, url) do
+  defp commit_response(%{assigns: %{live_module: _module}} = conn, session, url, redirects) do
     case live(conn) do
       {:ok, view, html} ->
-        commit_live(session, view, html, URI.to_string(url))
+        commit_live(session, view, html, URI.to_string(url), redirects)
 
       # The view redirected in its connected mount. A browser follows it.
-      {:error, {kind, %{to: destination} = options}} when kind in [:live_redirect, :redirect] ->
-        navigate(session, %Redirect{destination: destination, flash: options[:flash]})
+      {:error, {kind, %{to: _destination}} = redirect} when kind in [:live_redirect, :redirect] ->
+        follow_mount_redirect(session, redirect, url, redirects)
 
       {:error, reason} ->
         raise "LiveView navigation failed: #{inspect(reason)}"
     end
   end
 
-  defp commit_response(%{status: status} = conn, session, url) when status in 200..599 do
+  defp commit_response(%{status: status} = conn, session, url, _redirects) when status in 200..599 do
     commit_static(conn, session, url)
   end
 
-  defp commit_response(conn, _session, url) do
+  defp commit_response(conn, _session, url, _redirects) do
     raise "Phoenix navigation failed with HTTP #{conn.status} for #{URI.to_string(url)}"
   end
 

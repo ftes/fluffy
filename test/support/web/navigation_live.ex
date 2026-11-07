@@ -24,6 +24,8 @@ defmodule Fluffy.TestWeb.NavigationLive do
   end
 
   defp mount_redirect(socket, "static"), do: redirect(socket, to: "/chamber")
+  defp mount_redirect(socket, "ping"), do: push_navigate(socket, to: "/live/chamber-map?redirect=pong")
+  defp mount_redirect(socket, "pong"), do: redirect(socket, to: "/live/chamber-map?redirect=ping")
   defp mount_redirect(socket, _none), do: socket
 
   @impl true

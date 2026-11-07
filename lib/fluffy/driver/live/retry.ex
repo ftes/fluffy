@@ -55,7 +55,7 @@ defmodule Fluffy.Driver.Live.Retry do
     end
   end
 
-  defp retry_after_navigation(session, navigation, deadline) do
+  def retry_after_navigation(%Session{} = session, navigation, deadline) do
     remaining = Deadline.remaining(deadline)
     {:navigate, session, navigation, {:retry, remaining}}
   end

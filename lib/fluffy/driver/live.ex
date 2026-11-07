@@ -24,7 +24,6 @@ defmodule Fluffy.Driver.Live do
   alias Fluffy.URLMatcher
 
   @retry_interval 10
-  @redirected :fluffy_live_view_redirected
 
   @impl true
   def open_browser(%Session{} = session, open_fun) do
@@ -54,7 +53,7 @@ defmodule Fluffy.Driver.Live do
 
   @impl true
   def click(%Session{} = session, %Locator{} = locator, action_options \\ []) do
-    retry_after_redirect(session, action_options, fn ->
+    act(session, :click, locator, action_options, fn ->
       case resolve_live_action(session, locator, action_options, &ClientDOM.click(&1, locator)) do
         {%Session{} = session, {client_dom, target}} -> commit_click(session, client_dom, target)
         navigation -> navigation
@@ -177,7 +176,7 @@ defmodule Fluffy.Driver.Live do
   def submit(%Session{} = session, %Locator{} = locator, options \\ []) do
     Keyword.validate!(options, [:timeout])
 
-    retry_after_redirect(session, options, fn ->
+    act(session, :submit, locator, options, fn ->
       state = Session.page_state(session)
       client_dom = Map.fetch!(state, :client_dom)
       target = ClientDOM.target!(client_dom, locator)
@@ -198,7 +197,7 @@ defmodule Fluffy.Driver.Live do
 
   @impl true
   def fill(%Session{} = session, %Locator{} = locator, value, options \\ []) do
-    retry_after_redirect(session, options, fn ->
+    act(session, :fill, locator, options, fn ->
       case resolve_live_action(session, locator, options, &ClientDOM.fill(&1, locator, value, :live)) do
         {%Session{} = session, {client_dom, target}} -> dispatch_live_change(session, client_dom, target)
         navigation -> navigation
@@ -213,7 +212,7 @@ defmodule Fluffy.Driver.Live do
     if ClientDOM.live_managed_form?(state.client_dom, locator) do
       case selected_files do
         [_selected_file | _remaining_files] ->
-          retry_after_redirect(session, options, fn -> set_live_upload(session, locator, selected_files) end)
+          act(session, :set_input_files, locator, options, fn -> set_live_upload(session, locator, selected_files) end)
 
         [] ->
           client_dom = ClientDOM.set_input_files(state.client_dom, locator, [])
@@ -239,7 +238,7 @@ defmodule Fluffy.Driver.Live do
 
   @impl true
   def set_checked(%Session{} = session, %Locator{} = locator, desired, options \\ []) do
-    retry_after_redirect(session, options, fn ->
+    act(session, if(desired, do: :check, else: :uncheck), locator, options, fn ->
       case resolve_live_action(session, locator, options, &ClientDOM.set_checked(&1, locator, desired)) do
         {%Session{} = session, {candidate_client_dom, target}} ->
           state = Session.page_state(session)
@@ -270,7 +269,9 @@ defmodule Fluffy.Driver.Live do
             session
 
           entry ->
-            dispatch_live_change(session, client_dom, DocumentIndex.target_by_id(ClientDOM.index(client_dom), entry.id))
+            session
+            |> dispatch_live_change(client_dom, DocumentIndex.target_by_id(ClientDOM.index(client_dom), entry.id))
+            |> after_step(live_click_action(target) != :none)
         end
 
       navigation ->
@@ -280,7 +281,7 @@ defmodule Fluffy.Driver.Live do
 
   @impl true
   def select_option(%Session{} = session, %Locator{} = locator, requested, options \\ []) do
-    retry_after_redirect(session, options, fn ->
+    act(session, :select_option, locator, options, fn ->
       case resolve_live_action(session, locator, options, &ClientDOM.select_option(&1, locator, requested)) do
         {%Session{} = session, {client_dom, target}} -> dispatch_live_change(session, client_dom, target)
         navigation -> navigation
@@ -292,7 +293,7 @@ defmodule Fluffy.Driver.Live do
   def press(%Session{} = session, %Locator{} = locator, key, options \\ []) do
     options = Keyword.validate!(options, [:timeout])
 
-    retry_after_redirect(session, options, fn ->
+    act(session, :press, locator, options, fn ->
       case resolve_live_action(session, locator, options, &ClientDOM.target!(&1, locator)) do
         {%Session{} = session, target} -> dispatch_keys(session, locator, target, key, options)
         navigation -> navigation
@@ -304,8 +305,10 @@ defmodule Fluffy.Driver.Live do
     phases = Enum.filter([:keydown, :keyup], &key_binding?(target, &1))
     phases = if phases == [], do: [:keydown], else: phases
 
-    Enum.reduce_while(phases, session, fn phase, session ->
-      case dispatch_key(session, locator, key, phase, options) do
+    phases
+    |> Enum.with_index()
+    |> Enum.reduce_while(session, fn {phase, index}, session ->
+      case session |> dispatch_key(locator, key, phase, options) |> after_step(index > 0) do
         %Session{} = session -> {:cont, session}
         navigation -> {:halt, navigation}
       end
@@ -400,12 +403,7 @@ defmodule Fluffy.Driver.Live do
           follow_redirect_result(session, {:error, redirect})
       end
     catch
-      :exit, original_reason ->
-        case live_view_exit_event(state.view, state.watcher, Session.context(session).timeout) do
-          {:redirect, redirect} -> follow_redirect_result(session, {:error, redirect})
-          {:died, reason} -> raise Fluffy.LiveViewError, reason: reason
-          :none -> raise Fluffy.LiveViewError, reason: original_reason
-        end
+      :exit, reason -> follow_redirect_result(session, {:error, exit_redirect!(session, reason)})
     end
   end
 
@@ -431,47 +429,62 @@ defmodule Fluffy.Driver.Live do
               |> then(&commit_render_result(session, client_dom, &1))
             catch
               :exit, reason ->
-                reconcile_unwrapped_exit(session, state.view, state.watcher, reason)
+                redirect = exit_redirect!(session, reason, fn -> exit(reason) end)
+                follow_redirect_result(session, {:error, redirect})
             end
         end
     end
   end
 
-  defp reconcile_unwrapped_exit(session, view, watcher, original_reason) do
-    case live_view_exit_event(view, watcher, Session.context(session).timeout) do
-      {:redirect, redirect} -> follow_redirect_result(session, {:error, redirect})
+  # A view call exits when the view went away. Return the redirect it left, or
+  # raise when it died or left nothing.
+  defp exit_redirect!(session, original_reason, unexplained \\ nil) do
+    state = Session.page_state(session)
+
+    case live_view_exit_event(state.view, state.watcher, Session.context(session).timeout) do
+      {:redirect, redirect} -> redirect
       {:died, reason} -> raise Fluffy.LiveViewError, reason: reason
-      :none -> exit(original_reason)
+      :none when is_function(unexplained, 0) -> unexplained.()
+      :none -> raise Fluffy.LiveViewError, reason: original_reason
     end
   end
 
-  # An event call exits when the view went away after Fluffy last read it. If
-  # the view redirected, follow that and retry the action on the new document,
-  # like a browser locator acting after the page navigated.
+  # A redirect an event causes comes back as the event call's result. The call
+  # exits only when it finds the view already gone, so the event never reached
+  # it: report that redirect for the action to retry on the new page.
   defp dispatch_view_event(session, dispatch) do
     dispatch.()
   catch
-    :exit, original_reason ->
-      state = Session.page_state(session)
-
-      case live_view_exit_event(state.view, state.watcher, Session.context(session).timeout) do
-        {:redirect, redirect} -> throw({@redirected, session, redirect})
-        {:died, reason} -> raise Fluffy.LiveViewError, reason: reason
-        :none -> raise Fluffy.LiveViewError, reason: original_reason
-      end
+    :exit, reason -> {:redirected, exit_redirect!(session, reason)}
   end
 
-  defp retry_after_redirect(session, options, action) do
-    deadline = Deadline.new(Keyword.get(options, :timeout, Session.context(session).timeout))
+  # Runs a Live action. When the view had navigated away before the action's
+  # first event reached it, follow the navigation and retry the whole action on
+  # the new page within the remaining timeout, as a Playwright locator retries
+  # on the page it finds. Without any budget, fail instead of retrying again.
+  defp act(session, operation, locator, options, action) do
+    timeout = Keyword.get(options, :timeout, Session.context(session).timeout)
+    deadline = Deadline.new(timeout)
 
-    try do
-      action.()
-    catch
-      {@redirected, session, redirect} ->
-        {:navigate, session, navigation} = follow_redirect_result(session, {:error, redirect})
-        {:navigate, session, navigation, {:retry, Deadline.remaining(deadline)}}
+    case action.() do
+      {:redirected, _session, _navigation} when timeout == 0 ->
+        raise Fluffy.ActionabilityError, action: operation, reason: :navigated_away, locator: locator
+
+      {:redirected, session, navigation} ->
+        Retry.retry_after_navigation(session, navigation, deadline)
+
+      result ->
+        result
     end
   end
+
+  # Once an action's event reached the view, the action took effect. A later
+  # step that finds the page gone ends the action on the new page instead of
+  # retrying it, like a browser whose page navigated mid-action.
+  defp after_step(result, false = _delivered?), do: result
+  defp after_step({:redirected, session, navigation}, true), do: {:navigate, session, navigation}
+  defp after_step({:navigate, session, navigation, {:retry, _remaining}}, true), do: {:navigate, session, navigation}
+  defp after_step(result, true), do: result
 
   defp live_view_exit_event(view, watcher, timeout) do
     case current_redirect(view) do
@@ -550,6 +563,11 @@ defmodule Fluffy.Driver.Live do
     follow_redirect_result(session, redirect)
   end
 
+  defp commit_render_result(session, _client_dom, {:redirected, redirect}, _event_view) do
+    {:navigate, session, navigation} = follow_redirect_result(session, {:error, redirect})
+    {:redirected, session, navigation}
+  end
+
   defp commit_render_result(session, client_dom, result, _event_view) when is_binary(result) do
     state = Session.page_state(session)
 
@@ -579,12 +597,8 @@ defmodule Fluffy.Driver.Live do
       {:error, redirect} ->
         follow_redirect_result(session, {:error, redirect})
 
-      {:exit, original_reason} ->
-        case live_view_exit_event(state.view, state.watcher, Session.context(session).timeout) do
-          {:redirect, redirect} -> follow_redirect_result(session, {:error, redirect})
-          {:died, reason} -> raise Fluffy.LiveViewError, reason: reason
-          :none -> raise Fluffy.LiveViewError, reason: original_reason
-        end
+      {:exit, reason} ->
+        follow_redirect_result(session, {:error, exit_redirect!(session, reason)})
     end
   end
 
@@ -766,27 +780,41 @@ defmodule Fluffy.Driver.Live do
       )
 
     upload_name = existing_upload_name!(target)
+
+    entries =
+      Enum.map(selected_files, fn selected_file ->
+        %{
+          content: selected_file.bytes,
+          last_modified: nil,
+          name: selected_file.name,
+          size: selected_file.size,
+          type: selected_file.content_type
+        }
+      end)
+
+    # Starting the upload client reads the view's upload config.
+    case dispatch_view_event(session, fn ->
+           UploadCompat.file_input!(
+             event_context.view,
+             form_selector,
+             upload_name,
+             entries,
+             Session.context(session).http.endpoint
+           )
+         end) do
+      {:redirected, _redirect} = redirected ->
+        commit_render_result(session, state.client_dom, redirected)
+
+      upload ->
+        start_live_upload(session, locator, selected_files, target, event_context, form_id, form_selector, upload)
+    end
+  end
+
+  defp start_live_upload(session, locator, selected_files, target, event_context, form_id, form_selector, upload) do
+    state = Session.page_state(session)
     auto_upload? = live_auto_upload?(target)
     append? = live_multiple_file_input?(target) and live_upload_present?(session, form_id)
     client_dom = ClientDOM.set_input_files(state.client_dom, locator, selected_files)
-
-    upload =
-      UploadCompat.file_input!(
-        event_context.view,
-        form_selector,
-        upload_name,
-        Enum.map(selected_files, fn selected_file ->
-          %{
-            content: selected_file.bytes,
-            last_modified: nil,
-            name: selected_file.name,
-            size: selected_file.size,
-            type: selected_file.content_type
-          }
-        end),
-        Session.context(session).http.endpoint
-      )
-
     session = if append?, do: session, else: release_live_upload_for_form(session, form_id)
 
     :ok =
@@ -830,7 +858,7 @@ defmodule Fluffy.Driver.Live do
                ) do
             {:ok, session} -> mark_live_upload_uploaded(session, form_id, upload.pid)
             {:entry_error, session} -> session
-            {:navigation, navigation} -> navigation
+            {:navigation, navigation} -> after_step(navigation, true)
           end
         else
           session
@@ -1022,23 +1050,25 @@ defmodule Fluffy.Driver.Live do
     session = Session.put_page_state(session, %{state | client_dom: ClientDOM.mark_form_used(state.client_dom, form_id)})
 
     upload_result =
-      Enum.reduce_while(upload_state.batches, {:ok, session}, fn entry_upload, {:ok, session} ->
+      Enum.reduce_while(upload_state.batches, {:ok, session, false}, fn entry_upload, {:ok, session, delivered?} ->
         case entry_upload do
           %{uploaded?: true} ->
-            {:cont, {:ok, session}}
+            {:cont, {:ok, session, delivered?}}
 
           %{entries: entries, upload: upload} ->
             case dispatch_live_upload(session, upload, entry_names(entries), event_context) do
-              {:ok, session} -> {:cont, {:ok, session}}
+              {:ok, session} -> {:cont, {:ok, session, true}}
               {:entry_error, session} -> {:halt, {:entry_error, session}}
-              {:navigation, navigation} -> {:halt, {:navigation, navigation}}
+              {:navigation, navigation} -> {:halt, {:navigation, after_step(navigation, delivered?)}}
             end
         end
       end)
 
     case upload_result do
-      {:ok, session} ->
-        dispatch_live_upload_submit_event(session, form_id, submission, event_context)
+      {:ok, session, delivered?} ->
+        session
+        |> dispatch_live_upload_submit_event(form_id, submission, event_context)
+        |> after_step(delivered?)
 
       {:entry_error, session} ->
         session
@@ -1063,8 +1093,8 @@ defmodule Fluffy.Driver.Live do
       %Session{} = session ->
         release_live_upload_for_form(session, form_id)
 
-      {:navigate, %Session{} = session, navigation} ->
-        {:navigate, release_live_upload_for_form(session, form_id), navigation}
+      {kind, %Session{} = session, navigation} when kind in [:navigate, :redirected] ->
+        {kind, release_live_upload_for_form(session, form_id), navigation}
     end
   end
 
@@ -1090,27 +1120,25 @@ defmodule Fluffy.Driver.Live do
   end
 
   defp dispatch_live_upload(session, upload, entry_names, event_context) do
-    Enum.reduce_while(entry_names, {:ok, session}, fn entry_name, {:ok, session} ->
-      upload_result =
-        dispatch_view_event(session, fn ->
-          render_upload(upload, entry_name)
-        end)
+    entry_names
+    |> Enum.with_index()
+    |> Enum.reduce_while({:ok, session}, fn {entry_name, index}, {:ok, session} ->
+      upload_result = dispatch_view_event(session, fn -> render_upload(upload, entry_name) end)
 
       case upload_result do
+        # A progress callback that navigates returns the redirect.
+        {:error, {kind, %{to: _destination}}} when kind in [:live_redirect, :redirect] ->
+          {:halt, {:navigation, commit_render_result(session, nil, upload_result)}}
+
         {:error, _entry_errors} ->
           {:halt, {:entry_error, session}}
 
         _result ->
           state = Session.page_state(session)
 
-          case commit_render_result(
-                 session,
-                 state.client_dom,
-                 upload_result,
-                 event_context.view
-               ) do
+          case commit_render_result(session, state.client_dom, upload_result, event_context.view) do
             %Session{} = session -> {:cont, {:ok, session}}
-            navigation -> {:halt, {:navigation, navigation}}
+            navigation -> {:halt, {:navigation, after_step(navigation, index > 0)}}
           end
       end
     end)

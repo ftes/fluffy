@@ -35,5 +35,6 @@ defmodule Fluffy.ActionabilityError do
   defp reason_label(:cannot_uncheck_radio), do: "cannot uncheck a selected radio"
   defp reason_label(:disabled_option), do: "a disabled option"
   defp reason_label(:option_not_found), do: "the requested option was not found"
+  defp reason_label(:navigated_away), do: "on a page that navigated away before the action reached it"
   defp reason_label(reason), do: to_string(reason)
 end

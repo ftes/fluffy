@@ -48,11 +48,19 @@ defmodule Fluffy.Backend.Phoenix.HTTP do
   @redirect_statuses [301, 302, 303, 307, 308]
   @max_redirects 20
 
-  def request(%Client{} = client, %URI{} = url, method \\ :get, body \\ nil) do
+  # `redirects` counts the hops that led here, including LiveView mount
+  # redirects, so a redirect loop through either fails at the same limit.
+  def request(%Client{} = client, %URI{} = url, method \\ :get, body \\ nil, redirects \\ 0) do
     client
     |> dispatch_request(%Request{body: body, method: method, url: validate_url!(client, url)})
-    |> follow_redirects(0)
+    |> follow_redirects(redirects)
   end
+
+  def count_redirect!(redirects, %URI{} = url) when redirects >= @max_redirects do
+    raise "Phoenix request exceeded #{@max_redirects} redirects at #{URI.to_string(url)}"
+  end
+
+  def count_redirect!(redirects, %URI{}), do: redirects + 1
 
   def follow(%Client{} = client, %Plug.Conn{} = conn, %URI{} = url, method \\ :get, body \\ nil) do
     request = %Request{body: body, method: method, url: validate_url!(client, url)}
@@ -76,10 +84,8 @@ defmodule Fluffy.Backend.Phoenix.HTTP do
         [] ->
           {client, response}
 
-        [_location | _rest] when redirects >= @max_redirects ->
-          raise "Phoenix request exceeded #{@max_redirects} redirects at #{URI.to_string(response.request.url)}"
-
         [location | _rest] ->
+          redirects = count_redirect!(redirects, response.request.url)
           url = response.request.url |> redirect_url(location) |> validate_url!(client)
 
           {method, body} =
@@ -87,7 +93,7 @@ defmodule Fluffy.Backend.Phoenix.HTTP do
 
           client
           |> dispatch_request(%Request{body: body, method: method, url: url})
-          |> follow_redirects(redirects + 1)
+          |> follow_redirects(redirects)
       end
     else
       {client, %{response | redirects: redirects}}
