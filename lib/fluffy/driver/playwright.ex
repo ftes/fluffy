@@ -288,12 +288,14 @@ defmodule Fluffy.Driver.Playwright do
     {operation, set} = if desired, do: {:check, &BrowserLocator.check/2}, else: {:uncheck, &BrowserLocator.uncheck/2}
 
     locator_action(session, operation, locator, options, fn native, remaining ->
-      timeout = session_timeout(session)
+      deadline = Deadline.new(remaining)
       # Only the activations after this point count, so the cursor is read
-      # before the click even though the fallback below rarely needs it.
-      cursor = Document.activation_cursor(native, timeout)
+      # before the click even though the fallback below rarely needs it. The
+      # read shares the action's timeout; the one after the click is
+      # bookkeeping for a click that has happened.
+      cursor = Document.activation_cursor(native, remaining)
 
-      case set.(native, native(options, remaining)) do
+      case set.(native, native(options, Deadline.remaining(deadline, 1))) do
         # Playwright reads the state after its click, which a LiveView patch
         # may already have changed (in Firefox and WebKit it usually has). As on
         # Phoenix, the action succeeds once the click set the requested state.
@@ -301,7 +303,7 @@ defmodule Fluffy.Driver.Playwright do
         # check_action_test pins it.
         {:error, %PlaywrightError{message: message}} = error ->
           if message =~ "Clicking the checkbox did not change its state" and
-               Document.activated?(native, cursor, desired, timeout),
+               Document.activated?(native, cursor, desired, session_timeout(session)),
              do: :ok,
              else: error
 
