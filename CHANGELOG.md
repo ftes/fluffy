@@ -61,7 +61,7 @@ Fluffy now runs on PlaywrightEx 0.17, a port of the official Playwright client w
 - A Playwright action whose navigation lands on pages that navigate again on load (a client-side redirect chain) follows them instead of raising "Execution context was destroyed".
 - LiveView follows a redirect that lands while Fluffy reads the view after mount, an event or a retry, instead of crashing in `LazyHTML.from_fragment/1` or on a `GenServer.call` exit.
 - LiveView follows a `push_navigate` or `redirect` from a view's connected mount, as a browser does, instead of raising "LiveView navigation failed". Mount redirects count toward the 20-redirect limit, so a loop fails instead of hanging.
-- A LiveView action on a view that navigated away since Fluffy last read it follows the navigation and acts on the new page, as Playwright does, instead of raising `Fluffy.LiveViewError`. A target missing there fails like any missing target, and with `timeout: 0` the action fails instead of retrying. An action whose page navigates partway, such as between a press's keydown and keyup, ends on the new page without repeating there.
+- A LiveView action on a view that navigated away since Fluffy last read it follows the navigation and acts on the new page, as Playwright does, instead of failing with a LiveView error. A target missing there fails like any missing target, and with `timeout: 0` the action fails instead of retrying. An action whose page navigates partway, such as between a press's keydown and keyup, ends on the new page without repeating there.
 - LiveView `set_input_files` and upload submits follow a navigation from an upload progress callback right away instead of treating it as an entry error.
 
 ## 0.8.0 — 2026-11-04
