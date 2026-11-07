@@ -450,15 +450,15 @@ defmodule Fluffy.Driver.Live do
   # A redirect an event causes comes back as the event call's result, and the
   # event reached the view: record that for the running action. The call fails
   # only when it finds the view already gone, so the event never reached it:
-  # report the redirect the view left instead.
+  # follow the redirect the view left instead.
   defp dispatch_view_event(session, dispatch) do
     case call_view(session, dispatch) do
       {:ok, result} ->
         Process.put(@delivered, true)
         result
 
-      {:redirected, _redirect} = redirected ->
-        redirected
+      {:view_left, redirect} ->
+        redirected(session, redirect)
     end
   end
 
@@ -476,7 +476,7 @@ defmodule Fluffy.Driver.Live do
   defp read_view(session, read) do
     case call_view(session, read) do
       {:ok, value} -> {:ok, value}
-      {:redirected, redirect} -> redirected(session, redirect)
+      {:view_left, redirect} -> redirected(session, redirect)
     end
   end
 
@@ -487,11 +487,11 @@ defmodule Fluffy.Driver.Live do
     {:ok, call.()}
   catch
     :exit, reason ->
-      {:redirected, exit_redirect!(session, reason)}
+      {:view_left, exit_redirect!(session, reason)}
 
     kind, reason ->
       stacktrace = __STACKTRACE__
-      {:redirected, exit_redirect!(session, reason, fn -> :erlang.raise(kind, reason, stacktrace) end)}
+      {:view_left, exit_redirect!(session, reason, fn -> :erlang.raise(kind, reason, stacktrace) end)}
   end
 
   defp redirected(session, redirect) do
@@ -614,8 +614,8 @@ defmodule Fluffy.Driver.Live do
     follow_redirect_result(session, redirect)
   end
 
-  defp commit_render_result(session, _client_dom, {:redirected, redirect}, _event_view) do
-    redirected(session, redirect)
+  defp commit_render_result(_session, _client_dom, {:redirected, %Session{}, _navigation} = redirected, _event_view) do
+    redirected
   end
 
   defp commit_render_result(session, client_dom, result, _event_view) when is_binary(result) do
