@@ -6,7 +6,6 @@ defmodule Fluffy.Frame do
   current state; the navigation event does not wait for page loading to finish.
   """
   alias Fluffy.Page
-  alias Fluffy.SessionRuntime
 
   @enforce_keys [:page, :native]
   defstruct [:page, :native]
@@ -48,10 +47,6 @@ defmodule Fluffy.Frame do
 
   defp ensure_session!(frame) do
     Page.record(frame.page)
-
-    case SessionRuntime.context(frame.page.runtime) do
-      {:ok, _context} -> :ok
-      {:error, reason} -> raise ArgumentError, reason
-    end
+    Page.ensure_session!(frame.page)
   end
 end

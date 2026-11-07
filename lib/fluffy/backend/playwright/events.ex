@@ -94,7 +94,6 @@ defmodule Fluffy.Backend.Playwright.Events do
       suggested_filename: PlaywrightEx.Download.suggested_filename(download),
       url: PlaywrightEx.Download.url(download),
       page: page_handle(session, PlaywrightEx.Download.page(download)),
-      runtime: session.runtime,
       native: download
     }
   end

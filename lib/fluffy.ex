@@ -224,14 +224,9 @@ defmodule Fluffy do
       detail: "a Phoenix download has no native counterpart"
   end
 
-  defp native!(%Fluffy.Download{} = download) do
-    Fluffy.Download.ensure_session!(download)
-    download.native
-  end
-
   defp native!(%Fluffy.Frame{} = frame), do: Fluffy.Frame.native!(frame)
 
-  # Like a download, the value outlives its page but not its session.
+  # A value such as a download outlives its page but not its session.
   defp native!(%{native: native} = value) when is_struct(native) do
     if page = owner_page(value), do: Fluffy.Page.ensure_session!(page)
     native

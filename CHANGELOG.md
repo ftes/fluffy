@@ -22,7 +22,7 @@ Fluffy now runs on PlaywrightEx 0.17, a port of the official Playwright client w
 - `page_status`, `page_to_have_status` and `Fluffy.Page.status` are removed, as in Playwright; on Playwright, assert on `Event.response` instead.
 - `OperationError.cause` and Playwright assertion messages carry native PlaywrightEx exceptions.
 - `Fluffy.Expect.checked_option` is now `to_be_checked_option`.
-- `Fluffy.Download`'s `source` and `runtime` fields are private. On Playwright, `unwrap(download, fun)` passes the `PlaywrightEx.Download`.
+- `Fluffy.Download` loses its `source` and `runtime` fields; its other fields besides `suggested_filename`, `url` and `page` are private. On Playwright, `unwrap(download, fun)` passes the `PlaywrightEx.Download`.
 - `Fluffy.Locator.describe`, `new` and `append` are internal; `inspect/1` renders a locator.
 
 ### Added

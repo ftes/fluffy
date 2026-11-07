@@ -435,7 +435,6 @@ defmodule Fluffy.Backend.Phoenix do
         suggested_filename: suggested_filename(disposition, download_name, url),
         url: URI.to_string(url),
         page: Session.handle(session),
-        runtime: session.runtime,
         body: conn.resp_body
       }
 
