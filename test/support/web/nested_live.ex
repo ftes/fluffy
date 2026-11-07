@@ -6,11 +6,13 @@ defmodule Fluffy.TestWeb.NestedParentLive do
   @impl true
   def mount(params, _session, socket) do
     # Navigates back here a moment after connecting, without any action.
-    if connected?(socket) and params["async"] == "return" do
-      Process.send_after(self(), :return, 30)
+    case connected?(socket) && params["async"] do
+      "return" -> Process.send_after(self(), {:return, "/live/nested?step=returned"}, 30)
+      "return-late" -> Process.send_after(self(), {:return, "/live/nested?step=returned&late=true"}, 30)
+      _none -> :ok
     end
 
-    {:ok, assign(socket, parent_email: "", saved_parent_email: nil, parent_count: 0)}
+    {:ok, assign(socket, late?: params["late"] == "true", parent_email: "", saved_parent_email: nil, parent_count: 0)}
   end
 
   @impl true
@@ -31,7 +33,7 @@ defmodule Fluffy.TestWeb.NestedParentLive do
   end
 
   @impl true
-  def handle_info(:return, socket), do: {:noreply, push_navigate(socket, to: "/live/nested?step=returned")}
+  def handle_info({:return, to}, socket), do: {:noreply, push_navigate(socket, to: to)}
 
   @impl true
   def handle_params(_params, _uri, socket), do: {:noreply, socket}
@@ -47,7 +49,10 @@ defmodule Fluffy.TestWeb.NestedParentLive do
 
       <p>Parent saved: {@saved_parent_email || "none"}</p>
       <p>Parent count: {@parent_count}</p>
-      {live_render(@socket, Fluffy.TestWeb.NestedChildLive, id: "nested-child")}
+      {live_render(@socket, Fluffy.TestWeb.NestedChildLive,
+        id: "nested-child",
+        session: %{"late" => @late?}
+      )}
     </main>
     """
   end
@@ -59,11 +64,16 @@ defmodule Fluffy.TestWeb.NestedChildLive do
   use Phoenix.LiveView
 
   @impl true
-  def mount(_params, _session, socket) do
+  def mount(_params, session, socket) do
+    # Renders the upload form a moment after connecting.
+    late? = session["late"] == true
+    if connected?(socket) and late?, do: Process.send_after(self(), :reveal_upload, 40)
+
     {:ok,
      socket
      |> allow_upload(:attachment, accept: ~w(.txt), max_entries: 1)
      |> assign(
+       upload_late?: late?,
        child_email: "",
        saved_child_email: nil,
        child_count: 0,
@@ -114,6 +124,8 @@ defmodule Fluffy.TestWeb.NestedChildLive do
     {:noreply, assign(socket, :delayed_button?, true)}
   end
 
+  def handle_info(:reveal_upload, socket), do: {:noreply, assign(socket, :upload_late?, false)}
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -132,7 +144,12 @@ defmodule Fluffy.TestWeb.NestedChildLive do
       <button type="button" phx-click="navigate">Navigate from child</button>
       <button type="button" phx-click="patch">Patch from child</button>
 
-      <form id="child-upload-form" phx-change="validate-upload" phx-submit="save-upload">
+      <form
+        :if={!@upload_late?}
+        id="child-upload-form"
+        phx-change="validate-upload"
+        phx-submit="save-upload"
+      >
         <label>Child attachment <.live_file_input upload={@uploads.attachment} /></label>
         <button type="submit">Upload child attachment</button>
       </form>

@@ -176,24 +176,29 @@ defmodule Fluffy.Driver.Live do
 
   @impl true
   def submit(%Session{} = session, %Locator{} = locator, options \\ []) do
-    act(session, :submit, locator, options, fn _deadline ->
-      state = Session.page_state(session)
-      client_dom = Map.fetch!(state, :client_dom)
-      target = ClientDOM.target!(client_dom, locator)
-
-      with {:ok, event_context} <- owning_view_context(session, target) do
-        case ClientDOM.submit_form(client_dom, target, :live) do
-          nil ->
-            raise ArgumentError, "submit/2 requires a form locator, got #{inspect(target.tag)}"
-
-          %{phx_submit?: true} = submission ->
-            dispatch_live_submit(session, client_dom, submission, event_context)
-
-          %{phx_submit?: false} = submission ->
-            {:navigate, session, Navigation.submission(submission)}
-        end
+    act(session, :submit, locator, options, fn deadline ->
+      case resolve_live_action(session, locator, deadline, &ClientDOM.target!(&1, locator)) do
+        {%Session{} = session, target} -> commit_submit(session, target)
+        navigation -> navigation
       end
     end)
+  end
+
+  defp commit_submit(session, target) do
+    client_dom = Session.page_state(session).client_dom
+
+    with {:ok, event_context} <- owning_view_context(session, target) do
+      case ClientDOM.submit_form(client_dom, target, :live) do
+        nil ->
+          raise ArgumentError, "submit/2 requires a form locator, got #{inspect(target.tag)}"
+
+        %{phx_submit?: true} = submission ->
+          dispatch_live_submit(session, client_dom, submission, event_context)
+
+        %{phx_submit?: false} = submission ->
+          {:navigate, session, Navigation.submission(submission)}
+      end
+    end
   end
 
   @impl true
@@ -208,22 +213,28 @@ defmodule Fluffy.Driver.Live do
 
   @impl true
   def set_input_files(%Session{} = session, %Locator{} = locator, _source_paths, selected_files, options \\ []) do
-    state = Session.page_state(session)
+    act(session, :set_input_files, locator, options, fn deadline ->
+      case resolve_live_action(session, locator, deadline, &select_files(&1, locator, selected_files)) do
+        {%Session{} = session, :live_upload} ->
+          set_live_upload(session, locator, selected_files)
 
-    if ClientDOM.live_managed_form?(state.client_dom, locator) do
-      case selected_files do
-        [_selected_file | _remaining_files] ->
-          act(session, :set_input_files, locator, options, fn _deadline ->
-            set_live_upload(session, locator, selected_files)
-          end)
-
-        [] ->
-          client_dom = ClientDOM.set_input_files(state.client_dom, locator, [])
+        {%Session{} = session, %ClientDOM{} = client_dom} ->
+          state = Session.page_state(session)
           Session.put_page_state(session, %{state | client_dom: client_dom})
+
+        navigation ->
+          navigation
       end
+    end)
+  end
+
+  # Files selected in a LiveView-managed form upload through the view, while
+  # any other input, or clearing one, only keeps the selection.
+  defp select_files(client_dom, locator, selected_files) do
+    if selected_files != [] and ClientDOM.live_managed_form?(client_dom, locator) do
+      :live_upload
     else
-      client_dom = ClientDOM.set_input_files(state.client_dom, locator, selected_files)
-      Session.put_page_state(session, %{state | client_dom: client_dom})
+      ClientDOM.set_input_files(client_dom, locator, selected_files)
     end
   end
 

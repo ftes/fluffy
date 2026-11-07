@@ -146,6 +146,32 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     end
 
     @tag driver: driver
+    test "submits a form that appears late on the document a Live navigation landed on after the last read with #{driver}",
+         %{driver: driver} do
+      driver
+      |> live_session()
+      |> visit("/live/chamber-map?async=return-late")
+      |> await_unread_navigation(driver, "/live/chamber-map?step=returned&late=true")
+      |> submit(by_css("#map-form"))
+      |> expect("Saved step: returned" |> by_text(exact: true) |> to_be_visible())
+    end
+
+    @tag driver: driver
+    test "uploads to an input that appears late on the document a Live navigation landed on after the last read with #{driver}",
+         %{driver: driver} do
+      driver
+      |> live_session()
+      |> visit("/live/nested?async=return-late")
+      |> await_unread_navigation(driver, "/live/nested?step=returned&late=true")
+      |> set_input_files(
+        by_label("Child attachment", exact: true),
+        Path.expand("../support/fixtures/fluffy-upload.txt", __DIR__)
+      )
+      |> click(by_role(:button, name: "Upload child attachment", exact: true))
+      |> expect("Child uploaded: fluffy-upload.txt" |> by_text(exact: true) |> to_be_visible())
+    end
+
+    @tag driver: driver
     test "an action whose target a Live navigation removed fails as missing with #{driver}", %{
       driver: driver
     } do

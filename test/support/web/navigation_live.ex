@@ -12,11 +12,23 @@ defmodule Fluffy.TestWeb.NavigationLive do
         "true" -> Process.send_after(self(), :navigate, 30)
         "mount" -> send(self(), :navigate)
         "return" -> Process.send_after(self(), {:navigate, "/live/chamber-map?step=returned"}, 30)
+        "return-late" -> Process.send_after(self(), {:navigate, "/live/chamber-map?step=returned&late=true"}, 30)
         _sync -> :ok
       end
     end
 
-    socket = assign(socket, step: params["step"] || "initial", topic: params["topic"], saved_step: nil, saves: 0)
+    # Renders the form a moment after connecting.
+    late? = params["late"] == "true"
+    if connected?(socket) and late?, do: Process.send_after(self(), :reveal, 40)
+
+    socket =
+      assign(socket,
+        late?: late?,
+        step: params["step"] || "initial",
+        topic: params["topic"],
+        saved_step: nil,
+        saves: 0
+      )
 
     {:ok, mount_redirect(socket, connected?(socket) && params["redirect"])}
   end
@@ -76,6 +88,8 @@ defmodule Fluffy.TestWeb.NavigationLive do
     {:noreply, push_navigate(socket, to: to)}
   end
 
+  def handle_info(:reveal, socket), do: {:noreply, assign(socket, :late?, false)}
+
   def handle_info(:patch, socket) do
     {:noreply, push_patch(socket, to: "/live/chamber-map?step=late-patched")}
   end
@@ -85,7 +99,7 @@ defmodule Fluffy.TestWeb.NavigationLive do
     ~H"""
     <main>
       <p>Map position: {@step}</p>
-      <form id="map-form" phx-change="change_step" phx-submit="save_step">
+      <form :if={!@late?} id="map-form" phx-change="change_step" phx-submit="save_step">
         <label for="map-step">Map step</label>
         <input id="map-step" name="step" value={@step} />
       </form>
