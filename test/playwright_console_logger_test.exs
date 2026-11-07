@@ -60,5 +60,20 @@ defmodule Fluffy.PlaywrightConsoleLoggerTest do
     assert log =~ "uncaught page failure"
   end
 
+  test "logs uncaught non-Error values thrown by page code" do
+    session = start_session(:playwright, base_url: Fluffy.TestServer.base_url())
+
+    log =
+      capture_log(fn ->
+        Playwright.evaluate(session, "setTimeout(() => { throw 'thrown string' }, 0); Promise.reject(4242); 1")
+        Process.sleep(100)
+        # The session still answers.
+        assert Playwright.evaluate(session, "1 + 1") == 2
+      end)
+
+    assert log =~ "thrown string"
+    assert log =~ "4242"
+  end
+
   defp html(body), do: "<!doctype html><html><body>#{body}</body></html>"
 end

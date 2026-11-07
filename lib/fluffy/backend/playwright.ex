@@ -172,7 +172,7 @@ defmodule Fluffy.Backend.Playwright do
   end
 
   def runtime_event(_context, {:fluffy_playwright, :web_error, error}) do
-    log(:error, Exception.message(WebError.error(error)), nil)
+    log(:error, web_error_text(WebError.error(error)), nil)
   end
 
   def runtime_event(_context, _message), do: :ignore
@@ -181,6 +181,13 @@ defmodule Fluffy.Backend.Playwright do
     Logger.log(level, append_location(text, location), fluffy: :playwright)
     :ignore
   end
+
+  # PlaywrightEx can return a value page code threw that is not an Error as it is, though
+  # `WebError.error/1` is specced as an exception.
+  @dialyzer {:nowarn_function, web_error_text: 1}
+  defp web_error_text(error) when is_exception(error), do: Exception.message(error)
+  defp web_error_text(error) when is_binary(error), do: error
+  defp web_error_text(error), do: inspect(error)
 
   defp console_level("error"), do: :error
   defp console_level("warning"), do: :warning
