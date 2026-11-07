@@ -55,6 +55,15 @@ defmodule Fluffy.Page do
   end
 
   @doc false
+  @spec ensure_session!(t()) :: :ok
+  def ensure_session!(%__MODULE__{runtime: runtime}) do
+    case SessionRuntime.context(runtime) do
+      {:ok, _context} -> :ok
+      {:error, message} -> raise ArgumentError, message
+    end
+  end
+
+  @doc false
   @spec snapshot(t()) :: map()
   def snapshot(%__MODULE__{runtime: runtime} = page), do: Fluffy.Backend.page_snapshot(runtime, record(page))
 end

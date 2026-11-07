@@ -101,6 +101,31 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
       assert length(TestHTTPFixtures.requests(fixture)) >= 20
     end
 
+    # The browser aborts the navigation and stays where it was; Playwright's goto fails.
+    for status <- [204, 205] do
+      @tag driver: driver
+      test "visit fails on a #{status} response with #{driver}", %{driver: driver} do
+        fixture =
+          TestHTTPFixtures.register_sequence([
+            %{status: unquote(status)},
+            %{body: html("Orders")},
+            %{status: unquote(status)}
+          ])
+
+        assert_raise RuntimeError, ~r/abort|interrupt/i, fn ->
+          driver |> start_test_session() |> visit(TestHTTPFixtures.path(fixture, "/empty"))
+        end
+
+        session = driver |> start_test_session() |> visit(TestHTTPFixtures.path(fixture, "/orders"))
+
+        assert_raise RuntimeError, ~r/abort|interrupt/i, fn ->
+          visit(session, TestHTTPFixtures.path(fixture, "/empty"))
+        end
+
+        assert Enum.map(TestHTTPFixtures.requests(fixture), & &1.path) == ["/empty", "/orders", "/empty"]
+      end
+    end
+
     @tag driver: driver
     test "keeps configured request headers for the #{driver} session", %{driver: driver} do
       fixture = TestHTTPFixtures.register(%{body: html("Header destination")})

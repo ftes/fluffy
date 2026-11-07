@@ -47,6 +47,20 @@ defmodule Fluffy.Capability do
         "Static and LiveView implement the documented HTML/ARIA subset from markup. They do not interpret CSS-generated content or computed visibility."
     },
     %{
+      id: :playwright_locator_options,
+      feature: "Role-state and regular-expression locator options",
+      drivers: %{static: :browser_only, live: :browser_only, playwright: :equivalent},
+      detail:
+        "Options such as `pressed:` and `level:`, and regular expressions for `name:` and `has_text:`, compile into the Playwright selector. Static and LiveView raise when they resolve such a locator."
+    },
+    %{
+      id: :playwright_action_options,
+      feature: "Playwright action options",
+      drivers: %{static: :browser_only, live: :browser_only, playwright: :equivalent},
+      detail:
+        "Options such as `force:`, `modifiers:`, and `wait_until:` pass through to the PlaywrightEx call behind `click`, `reload`, and other actions. Static and LiveView raise when an action receives one."
+    },
+    %{
       id: :dom_assertions,
       feature: "DOM assertions and strictness",
       drivers: %{static: :equivalent, live: :equivalent, playwright: :equivalent},
@@ -216,6 +230,12 @@ defmodule Fluffy.Capability do
       feature: "Active-page JavaScript evaluation",
       drivers: %{static: :browser_only, live: :browser_only, playwright: :equivalent},
       detail: "Only the Playwright driver can execute JavaScript in a real browser context."
+    },
+    %{
+      id: :clock,
+      feature: "Fake page clock and timers",
+      drivers: %{static: :browser_only, live: :browser_only, playwright: :equivalent},
+      detail: "Only browser pages run JavaScript timers and Date for Playwright's clock to control."
     },
     %{
       id: :scripted_default_actions,

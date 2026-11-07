@@ -1,12 +1,12 @@
 defmodule Mix.Tasks.Fluffy.Gen.NativeOptions do
-  @shortdoc "Generates the Playwright-only option docs and types of Fluffy actions"
+  @shortdoc "Generates the Playwright-only option docs and types of Fluffy actions and locators"
   @moduledoc """
   Reads the option docs and types of the PlaywrightEx calls behind Fluffy's actions
-  from their facade's `__options__/1` and writes them to
+  and Playwright-only locator options from their facade's `__options__/1` and writes them to
   `lib/fluffy/options/native_generated.ex`, so Fluffy's option schemas do not
   call into PlaywrightEx at compile time.
 
-  Run it after upgrading PlaywrightEx or adding an action to `Fluffy.Options`.
+  Run it after upgrading PlaywrightEx or adding an action or locator option to `Fluffy.Options`.
 
       mix fluffy.gen.native_options [--check]
 
@@ -37,11 +37,25 @@ defmodule Mix.Tasks.Fluffy.Gen.NativeOptions do
   @doc "The path of the generated module."
   def path, do: @path
 
-  @doc "The upstream calls behind Fluffy's actions, as `{module, fun, arity}`."
-  def calls do
-    for {_action, {module, fun, arity, _keys}} <- Fluffy.Options.native_actions() ++ Fluffy.Options.playwright_actions(),
-        uniq: true,
-        do: {module, fun, arity}
+  @doc "The upstream calls behind Fluffy's actions and Playwright-only locator options, as `{module, fun, arity}`."
+  def calls, do: Enum.map(classified(), &elem(&1, 0))
+
+  # Each call with the upstream option keys Fluffy documents from it; calls without any are left out.
+  defp classified do
+    actions =
+      for {_action, {module, fun, arity, keys}} <- Fluffy.Options.native_actions() ++ Fluffy.Options.playwright_actions(),
+          do: {{module, fun, arity}, keys}
+
+    locators =
+      for {_locator, {module, fun, arity, classes}} <- Fluffy.Options.native_locators(),
+          do: {{module, fun, arity}, Keyword.get(classes, :playwright, [])}
+
+    (actions ++ locators)
+    |> Enum.reduce([], fn {call, keys}, acc ->
+      {_call, known} = List.keyfind(acc, call, 0, {call, []})
+      List.keystore(acc, call, 0, {call, Enum.uniq(known ++ keys)})
+    end)
+    |> Enum.reject(fn {_call, keys} -> keys == [] end)
   end
 
   @doc "The formatted source of the generated module for the current PlaywrightEx."
@@ -73,13 +87,15 @@ defmodule Mix.Tasks.Fluffy.Gen.NativeOptions do
   end
 
   @doc """
-  The options documented for `module.fun/arity` as `{key, {type_doc, doc, type_spec}}`,
+  The options of `module.fun/arity` that Fluffy documents, as `{key, {type_doc, doc, type_spec}}`,
   read from the facade's `__options__/1`.
   """
-  # `arity` keeps the generated lookup per call; `__options__/1` covers both forms of a member.
+  # `__options__/1` covers both forms of a member; the classified keys are per call.
   # `since` is dropped: every option Fluffy passes on predates the Playwright it requires.
-  def options(module, fun, _arity) do
-    for {key, %{type_doc: type_doc, doc: doc, spec: spec}} <- module.__options__(fun) do
+  def options(module, fun, arity) do
+    {_call, keys} = List.keyfind(classified(), {module, fun, arity}, 0, {nil, []})
+
+    for {key, %{type_doc: type_doc, doc: doc, spec: spec}} <- module.__options__(fun), key in keys do
       {key, {type_doc, doc, spec}}
     end
   end

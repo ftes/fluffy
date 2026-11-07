@@ -24,6 +24,20 @@ defmodule Fluffy.PublicOptionValidationTest do
     end
   end
 
+  # `import` skips `__name__` functions such as `__struct__`.
+  test "importing Fluffy.Locator or Fluffy.Expect brings in no hidden helpers" do
+    for module <- [Locator, Expect] do
+      {:docs_v1, _, _, _, _, _, docs} = Code.fetch_docs(module)
+
+      hidden =
+        for {{:function, name, arity}, _, _, :hidden, _} <- docs,
+            not String.starts_with?(Atom.to_string(name), "__"),
+            do: {name, arity}
+
+      assert hidden == [], "move #{inspect(module)}'s hidden functions #{inspect(hidden)} to its Internal module"
+    end
+  end
+
   test "event options are validated before registration", %{session: session} do
     assert_raise NimbleOptions.ValidationError, ~r/:timeout.*non[- ]negative integer/, fn ->
       Fluffy.wait_for(session, Event.download(), timeout: -1)

@@ -17,6 +17,7 @@ defmodule Fluffy.Expect do
   @moduledoc groups: ["Locator assertions"]
 
   alias Fluffy.Expect
+  alias Fluffy.Expect.Internal
   alias Fluffy.Locator
   alias Fluffy.Options
   alias Fluffy.Session
@@ -70,7 +71,7 @@ defmodule Fluffy.Expect do
   def expect(%Session{} = session, %Expect{} = expectation, options \\ []) do
     expectation =
       expectation
-      |> Expect.merge_options(options)
+      |> Internal.merge_options(options)
       |> normalize_expectation(session)
 
     case expectation.target do
@@ -102,7 +103,7 @@ defmodule Fluffy.Expect do
 
   @doc "Negates an expectation while preserving its target and options."
   @spec not_(t()) :: t()
-  def not_(%__MODULE__{} = expectation), do: negate(expectation)
+  def not_(%__MODULE__{} = expectation), do: Internal.negate(expectation)
 
   @doc group: "Locator assertions"
   @doc """
@@ -213,7 +214,7 @@ defmodule Fluffy.Expect do
         true -> :checked
       end
 
-    new({:locator, locator}, :checked, expected, options)
+    Internal.new({:locator, locator}, :checked, expected, options)
   end
 
   @doc group: "Locator assertions"
@@ -246,12 +247,12 @@ defmodule Fluffy.Expect do
   defp state_expectation(matcher, locator, kind, options) do
     options = Options.validate_expectation!(matcher, options)
     {state, options} = Keyword.pop(options, kind, true)
-    expectation = new({:locator, locator}, kind, true, options)
-    if state, do: expectation, else: negate(expectation)
+    expectation = Internal.new({:locator, locator}, kind, true, options)
+    if state, do: expectation, else: Internal.negate(expectation)
   end
 
   defp native_expectation(matcher, target, kind, expected, options),
-    do: new(target, kind, expected, Options.validate_expectation!(matcher, options))
+    do: Internal.new(target, kind, expected, Options.validate_expectation!(matcher, options))
 
   @doc group: "Assertions"
   @doc """
@@ -307,17 +308,14 @@ defmodule Fluffy.Expect do
       when (is_binary(expected) or is_struct(expected, Regex) or is_function(expected, 1)) and is_list(options) do
     options = Options.validate_expectation!(:page_to_have_url, options)
     {ignore_case, options} = Keyword.pop(options, :ignore_case)
-    Expect.new(:page, :url, URLMatcher.ignore_case(expected, ignore_case), options)
+    Internal.new(:page, :url, URLMatcher.ignore_case(expected, ignore_case), options)
   end
 
   def page_to_have_url(components, options) when is_list(components) and is_list(options) do
     options = Options.validate_expectation!(:page_to_have_url, options)
-
-    if Keyword.has_key?(options, :ignore_case) do
-      raise ArgumentError, "ignore_case: requires a string or regular expression URL"
-    end
-
-    Expect.new(:page, :url, URLMatcher.new!(components), options)
+    {ignore_case, options} = Keyword.pop(options, :ignore_case)
+    if ignore_case, do: raise(ArgumentError, "ignore_case: requires a string or regular expression URL")
+    Internal.new(:page, :url, URLMatcher.new!(components), options)
   end
 
   @doc group: "Assertions"
@@ -325,91 +323,7 @@ defmodule Fluffy.Expect do
   @spec page_to_have_opener(Fluffy.Page.t() | nil, [Expect.option()]) :: Expect.t()
   def page_to_have_opener(expected, options \\ [])
       when (is_struct(expected, Fluffy.Page) or is_nil(expected)) and is_list(options) do
-    Expect.new(:page, :opener, expected, options)
-  end
-
-  @doc false
-  def matches?(%Regex{} = expected, actual) when is_binary(actual), do: Regex.match?(expected, actual)
-
-  def matches?(expected, actual), do: actual == expected
-
-  @doc false
-  def title_matches?(expected, actual) when is_binary(actual) do
-    actual = normalize_title(actual)
-
-    case expected do
-      %Regex{} -> matches?(expected, actual)
-      expected when is_binary(expected) -> normalize_title(expected) == actual
-    end
-  end
-
-  def title_matches?(_expected, _actual), do: false
-
-  @doc false
-  def new(target, kind, expected, options \\ []) when is_atom(kind) and is_list(options) do
-    %__MODULE__{
-      target: target,
-      kind: kind,
-      expected: expected,
-      options: validate_options!(options)
-    }
-  end
-
-  @doc false
-  def negate(%__MODULE__{} = expectation) do
-    %{expectation | negated?: not expectation.negated?}
-  end
-
-  @doc false
-  def merge_options(%__MODULE__{} = expectation, options) when is_list(options) do
-    %{expectation | options: Keyword.merge(expectation.options, validate_options!(options))}
-  end
-
-  @doc false
-  def describe(%__MODULE__{} = expectation) do
-    expectation
-    |> positive_description()
-    |> maybe_negated(expectation.negated?)
-  end
-
-  defp validate_options!(options), do: Options.validate_expectation!(options)
-
-  defp positive_description(%__MODULE__{target: {:locator, locator}, kind: kind, expected: expected}) do
-    "#{Locator.describe(locator)} #{locator_matcher_description(kind, expected)}"
-  end
-
-  defp positive_description(%__MODULE__{target: :page, kind: :url, expected: expected}) do
-    "active page to have URL #{URLMatcher.describe(expected)}"
-  end
-
-  defp positive_description(%__MODULE__{target: :page, kind: :title, expected: expected}) do
-    "active page to have title #{inspect(expected)}"
-  end
-
-  defp positive_description(%__MODULE__{target: :page, kind: :opener, expected: expected}) do
-    "active page to have opener #{inspect(expected)}"
-  end
-
-  defp locator_matcher_description(:checked, :checked), do: "to be checked"
-  defp locator_matcher_description(:checked, :unchecked), do: "to be unchecked"
-  defp locator_matcher_description(:checked, :indeterminate), do: "to be indeterminate"
-  defp locator_matcher_description(:count, expected), do: "to have count #{inspect(expected)}"
-  defp locator_matcher_description(:disabled, _expected), do: "to be disabled"
-  defp locator_matcher_description(:editable, _expected), do: "to be editable"
-  defp locator_matcher_description(:enabled, _expected), do: "to be enabled"
-  defp locator_matcher_description(:focused, _expected), do: "to be focused"
-  defp locator_matcher_description(:value, expected), do: "to have value #{inspect(expected)}"
-  defp locator_matcher_description(:values, expected), do: "to have values #{inspect(expected)}"
-  defp locator_matcher_description(:visible, _expected), do: "to be visible"
-
-  defp maybe_negated(description, false), do: description
-  defp maybe_negated(description, true), do: "not " <> description
-
-  defp normalize_title(title) do
-    title
-    |> String.replace(["\u200B", "\u00AD"], "")
-    |> String.replace(~r/\s+/u, " ")
-    |> String.trim()
+    Internal.new(:page, :opener, expected, options)
   end
 
   defp expect_active_page(%Session{} = session, %Expect{kind: :url} = expectation) do
@@ -427,17 +341,17 @@ defmodule Fluffy.Expect do
   end
 
   defp expect_active_page(_session, %Expect{} = expectation) do
-    raise ArgumentError, "unsupported active page expectation: #{Expect.describe(expectation)}"
+    raise ArgumentError, "unsupported active page expectation: #{Internal.describe(expectation)}"
   end
 
   defp assert_expected!(%Expect{} = expectation, actual) do
-    assert_expectation_truth!(expectation, Expect.matches?(expectation.expected, actual), actual)
+    assert_expectation_truth!(expectation, Internal.matches?(expectation.expected, actual), actual)
   end
 
   defp assert_expectation_truth!(%Expect{} = expectation, passed?, actual) do
     if passed? == expectation.negated? do
       raise ExUnit.AssertionError,
-        message: "Expected #{Expect.describe(expectation)}, got #{inspect(actual)}"
+        message: "Expected #{Internal.describe(expectation)}, got #{inspect(actual)}"
     end
 
     :ok

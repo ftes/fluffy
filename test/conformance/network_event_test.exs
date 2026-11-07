@@ -31,6 +31,21 @@ defmodule Fluffy.Conformance.NetworkEventTest do
   end
 
   @tag driver: :playwright
+  test "unwrap reaches the native request and response" do
+    {session, _fixture} = session()
+    response_wait = wait_for(session, Event.response(&String.ends_with?(&1.url, "/api?source=button")))
+    click(session, by_role(:button, name: "Save"))
+    response = await(response_wait)
+
+    assert unwrap(response, &PlaywrightEx.Response.text!/1) == ~s({"saved":true})
+    assert unwrap(response.request, &PlaywrightEx.Request.is_navigation_request/1) == false
+
+    close_session(session)
+    assert_raise ArgumentError, ~r/session is closed/, fn -> unwrap(response, & &1) end
+    assert_raise ArgumentError, ~r/session is closed/, fn -> unwrap(response.request, & &1) end
+  end
+
+  @tag driver: :playwright
   test "page and context waits observe the same request, including child-frame requests" do
     {session, fixture} = session()
     frame_url = TestHTTPFixtures.url(fixture, "/child")

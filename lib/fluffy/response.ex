@@ -4,7 +4,10 @@ defmodule Fluffy.Response do
   arrive.
 
   Fields follow Playwright's `Response` accessors; `request` is the
-  `Fluffy.Request` that received it. Bodies are not retained.
+  `Fluffy.Request` that received it. Bodies are not retained; read one from the
+  `PlaywrightEx.Response` that `Fluffy.unwrap/2` passes:
+
+      body = Fluffy.unwrap(response, &PlaywrightEx.Response.text!/1)
   """
 
   @enforce_keys [:url, :status, :status_text, :headers, :request]
@@ -15,7 +18,6 @@ defmodule Fluffy.Response do
           status: non_neg_integer(),
           status_text: String.t(),
           headers: %{optional(String.t()) => String.t()},
-          request: Fluffy.Request.t(),
-          native: PlaywrightEx.Response.t() | nil
+          request: Fluffy.Request.t()
         }
 end

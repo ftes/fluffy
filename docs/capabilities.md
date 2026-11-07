@@ -15,6 +15,8 @@ boundaries described below.
 | Documented CSS locator subset | equivalent | equivalent |
 | Text, label, and attribute locators | equivalent | equivalent |
 | Structural role and accessible-name subset | structural subset | equivalent |
+| Role-state and regular-expression locator options | - | equivalent |
+| Playwright action options | - | equivalent |
 | DOM assertions and strictness | equivalent | equivalent |
 | Page title assertions | equivalent | equivalent |
 | Indeterminate checkbox/radio DOM property | - | equivalent |
@@ -38,6 +40,7 @@ boundaries described below.
 | Hover, drag-and-drop, and sequential typing | - | equivalent |
 | Dialogs, frame navigation, and browser request/response events | - | equivalent |
 | Active-page JavaScript evaluation | - | equivalent |
+| Fake page clock and timers | - | equivalent |
 | JavaScript-owned DOM and default actions | - | equivalent |
 | Native invalid, submit, and formdata event ordering | - | equivalent |
 | Hard-wrapped textarea, object, and custom-element entries | - | equivalent |
@@ -135,6 +138,11 @@ for how pages, browser contexts, and frames relate.
 
 Fluffy verifies compatibility against pinned Chromium. Firefox and WebKit are
 available through Playwright but are not covered by Fluffy's conformance suite.
+Known engine differences: WebKit, like Safari, does not focus a button when
+clicking it, and does not send `Secure` cookies to `http://` loopback origins.
+Playwright's `set_input_files` checks only that the target is an `<input>`;
+Firefox and WebKit, and in-memory payloads on every engine, accept a non-file
+input without an error.
 
 ### Phoenix.HTML actions and dialogs
 
@@ -174,6 +182,29 @@ because application JavaScript opens the chooser.
 ### Native escape hatch
 
 `Fluffy.unwrap/2` exposes driver-specific APIs: `Plug.Conn`,
-`Phoenix.LiveViewTest.View`, or `PlaywrightEx.Page`. Use the shared event
-and page APIs for lifecycle operations. See
-[Native escape hatch](usage.md#native-escape-hatch) for callback behavior.
+`Phoenix.LiveViewTest.View`, or `PlaywrightEx.Page`. `Fluffy.Playwright.unwrap/3`
+passes a `PlaywrightEx.Locator`. Use the shared event and page APIs for lifecycle
+operations. See [Native escape hatch](usage.md#native-escape-hatch) for callback
+behavior.
+
+### PlaywrightEx coverage
+
+Fluffy classifies every member of the PlaywrightEx facade it builds on, and a test
+fails when PlaywrightEx adds or removes one.
+
+- **Wrapped:** locator builders (`get_by_role` as `by_role`, and so on), the
+  cross-driver actions, `hover`, `drag_to`, `press_sequentially`, `focus`, `blur`,
+  the expectations in `Fluffy.Expect`, navigation, page management, cookies,
+  storage state, tracing, screenshots, page evaluation, the clock, and the events in
+  `Fluffy.Event`. Their options pass through as documented.
+- **Unwrap:** everything page-, locator-, or value-local, such as `dblclick`, reads
+  like `text_content`, assertions like `to_have_text`, keyboard and mouse input,
+  routing, viewport, media emulation, permissions, and response bodies. Navigation
+  these cause is adopted.
+- **Unsafe natively:** closing the page or context (use `Fluffy.Playwright.close_page/2`
+  and `Fluffy.close_session/1`), `remove_all_listeners`, `set_default_timeout` and
+  `set_default_navigation_timeout`, the `no_wait_after:` and `signal:` options,
+  `set_content`, and stopping tracing. They break Fluffy's page tracking,
+  listeners, or timeouts.
+- **Not applicable:** selector-string duplicates of locator methods, deprecated
+  waits, and authoring tools.

@@ -15,6 +15,7 @@ defmodule Fluffy.Playwright do
   alias Fluffy.Playwright.Trace
   alias Fluffy.Session
   alias PlaywrightEx.BrowserContext
+  alias PlaywrightEx.Clock
 
   @trace_schema NimbleOptions.new!(
                   directory: [
@@ -48,6 +49,13 @@ defmodule Fluffy.Playwright do
   @type drag_to_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:drag_to)))
   @type press_sequentially_option ::
           unquote(NimbleOptions.option_typespec(Options.action_schema(:press_sequentially)))
+  @type install_clock_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:install_clock)))
+
+  @typedoc "A time: epoch milliseconds, a `DateTime` or a string `Date` parses, such as `\"2024-02-02\"`."
+  @type clock_time :: integer() | String.t() | DateTime.t()
+
+  @typedoc ~s(A duration: milliseconds or `"ss"`, `"mm:ss"` or `"hh:mm:ss"`.)
+  @type clock_ticks :: integer() | String.t()
 
   @doc group: "Lifecycle and navigation"
   @doc playwright_only: true
@@ -157,7 +165,7 @@ defmodule Fluffy.Playwright do
   @spec focus(Session.t(), Fluffy.Locator.t(), [Fluffy.action_option()]) :: Session.t()
   def focus(%Session{} = session, locator, options \\ []) do
     ensure_playwright_backend!(session, :focus)
-    options = Options.validate_action!(options)
+    options = Options.validate_action!(:focus, options)
     Fluffy.__dispatch_driver__(session, :focus, [locator, options])
   end
 
@@ -167,7 +175,7 @@ defmodule Fluffy.Playwright do
   @spec blur(Session.t(), Fluffy.Locator.t(), [Fluffy.action_option()]) :: Session.t()
   def blur(%Session{} = session, locator, options \\ []) do
     ensure_playwright_backend!(session, :blur)
-    options = Options.validate_action!(options)
+    options = Options.validate_action!(:blur, options)
     Fluffy.__dispatch_driver__(session, :blur, [locator, options])
   end
 
@@ -221,6 +229,157 @@ defmodule Fluffy.Playwright do
     ensure_playwright_backend!(session, :press_sequentially)
     options = Options.validate_action!(:press_sequentially, options)
     Fluffy.__dispatch_driver__(session, :press_sequentially, [locator, text, options])
+  end
+
+  @doc group: "Clock"
+  @doc playwright_only: true
+  @doc """
+  Installs fake timers with the clock at `time:`, the current time by default; time
+  then flows normally.
+
+  The clock replaces `Date`, `setTimeout`, `setInterval`, `requestAnimationFrame`,
+  `performance` and the other timer functions of `PlaywrightEx.Clock.install/2` in
+  every page of the session, including documents loaded later. Install it before
+  visiting the page whose timers a test controls. The other clock functions
+  install it if needed. See [Controlling time](usage.md#controlling-time).
+
+  ## Options
+
+  Playwright-only options pass through to #{Options.native_reference(:install_clock)}.
+
+  #{NimbleOptions.docs(Options.action_schema(:install_clock))}
+  """
+  @spec install_clock(Session.t(), [install_clock_option()]) :: Session.t()
+  def install_clock(%Session{} = session, options \\ []) do
+    ensure_playwright_backend!(session, :clock)
+    {timeout, native} = Keyword.split(Options.validate_action!(:install_clock, options), [:timeout])
+    clock(session, :install_clock, &Clock.install(&1, native), timeout)
+  end
+
+  @doc group: "Clock"
+  @doc playwright_only: true
+  @doc """
+  Jumps the clock to `time` and pauses it, firing due timers at most once.
+
+  No timer fires until `run_clock_for/3`, `fast_forward_clock/3`,
+  `pause_clock_at/3` or `resume_clock/2`. That includes the application's own
+  timers, such as a LiveView `phx-debounce` or a `JS.transition/2`, which defers
+  LiveView's DOM updates until it finishes. Fluffy's actions and waits do not
+  rely on page timers. Install the clock at an earlier time and visit first, so
+  the page loads with running timers. See `PlaywrightEx.Clock.pause_at/2`.
+
+  Accepts `timeout:`, which defaults to the session's `timeout:`.
+  """
+  @spec pause_clock_at(Session.t(), clock_time(), [Fluffy.action_option()]) :: Session.t()
+  def pause_clock_at(%Session{} = session, time, options \\ []) do
+    clock_call(session, :pause_clock_at, options, &Clock.pause_at(&1, time))
+  end
+
+  @doc group: "Clock"
+  @doc playwright_only: true
+  @doc """
+  Advances the clock by `ticks`, firing every timer due on the way.
+
+  `ticks` is milliseconds or a string such as `"30"` (seconds), `"01:30"` or
+  `"02:34:10"`. A navigation the timers start is adopted, as after an action.
+  See `PlaywrightEx.Clock.run_for/2`.
+
+  Accepts `timeout:`, which defaults to the session's `timeout:`.
+
+      session
+      |> install_clock(time: ~U[2024-02-02 09:00:00Z])
+      |> visit("/spells")
+      |> pause_clock_at(~U[2024-02-02 10:00:00Z])
+      |> fill(by_label("Spell"), "Lumos")
+      |> run_clock_for(500)
+      |> expect(to_be_visible(by_text("Lumos found")))
+  """
+  @spec run_clock_for(Session.t(), clock_ticks(), [Fluffy.action_option()]) :: Session.t()
+  def run_clock_for(%Session{} = session, ticks, options \\ []) do
+    clock_call(session, :run_clock_for, options, &Clock.run_for(&1, ticks))
+  end
+
+  @doc group: "Clock"
+  @doc playwright_only: true
+  @doc """
+  Jumps the clock forward by `ticks`, firing due timers at most once, like a laptop
+  waking from sleep.
+
+  Takes `ticks` and `timeout:` like `run_clock_for/3`. See
+  `PlaywrightEx.Clock.fast_forward/2`.
+  """
+  @spec fast_forward_clock(Session.t(), clock_ticks(), [Fluffy.action_option()]) :: Session.t()
+  def fast_forward_clock(%Session{} = session, ticks, options \\ []) do
+    clock_call(session, :fast_forward_clock, options, &Clock.fast_forward(&1, ticks))
+  end
+
+  @doc group: "Clock"
+  @doc playwright_only: true
+  @doc """
+  Resumes a paused clock; time flows and timers fire again.
+
+  Accepts `timeout:`, which defaults to the session's `timeout:`. See
+  `PlaywrightEx.Clock.resume/1`.
+  """
+  @spec resume_clock(Session.t(), [Fluffy.action_option()]) :: Session.t()
+  def resume_clock(%Session{} = session, options \\ []) do
+    clock_call(session, :resume_clock, options, &Clock.resume/1)
+  end
+
+  @doc group: "Clock"
+  @doc playwright_only: true
+  @doc """
+  Makes `Date` always return `time`, while timers keep running.
+
+  Accepts `timeout:`, which defaults to the session's `timeout:`. See
+  `PlaywrightEx.Clock.set_fixed_time/2`.
+  """
+  @spec set_fixed_time(Session.t(), clock_time(), [Fluffy.action_option()]) :: Session.t()
+  def set_fixed_time(%Session{} = session, time, options \\ []) do
+    clock_call(session, :set_fixed_time, options, &Clock.set_fixed_time(&1, time))
+  end
+
+  @doc group: "Clock"
+  @doc playwright_only: true
+  @doc """
+  Sets the clock's current time without firing timers, such as to test a time-zone
+  or daylight saving shift.
+
+  Accepts `timeout:`, which defaults to the session's `timeout:`. See
+  `PlaywrightEx.Clock.set_system_time/2`.
+  """
+  @spec set_system_time(Session.t(), clock_time(), [Fluffy.action_option()]) :: Session.t()
+  def set_system_time(%Session{} = session, time, options \\ []) do
+    clock_call(session, :set_system_time, options, &Clock.set_system_time(&1, time))
+  end
+
+  defp clock_call(session, operation, options, fun) do
+    ensure_playwright_backend!(session, :clock)
+    clock(session, operation, fun, Options.validate_action!(options))
+  end
+
+  defp clock(session, operation, fun, options), do: Fluffy.__dispatch_driver__(session, :clock, [operation, fun, options])
+
+  @doc playwright_only: true
+  @doc """
+  Runs `fun` with the `PlaywrightEx.Locator` for `locator` and returns the reconciled session.
+
+  Like `Fluffy.unwrap/2`, for native locator operations that have no Fluffy
+  API. The locator resolves in the active page, through any frame locators, and
+  is not checked for strictness until the callback uses it. The callback's
+  return value is ignored, and a document it navigates is adopted.
+
+      session
+      |> Fluffy.Playwright.unwrap(by_role(:button, name: "Edit"), &PlaywrightEx.Locator.dblclick!/1)
+      |> expect(to_be_visible(by_label("Title")))
+
+  Prefer PlaywrightEx bang functions inside the callback when failure should
+  stop the test. Phoenix sessions raise `Fluffy.CapabilityError`.
+  """
+  @spec unwrap(Session.t(), Fluffy.Locator.t(), (PlaywrightEx.Locator.t() -> term())) :: Session.t()
+  def unwrap(%Session{} = session, %Fluffy.Locator{} = locator, fun) when is_function(fun, 1) do
+    ensure_playwright_backend!(session, :native_locator)
+    Fluffy.__dispatch_driver__(session, :unwrap_locator, [locator, fun])
   end
 
   @doc playwright_only: true
@@ -315,12 +474,31 @@ defmodule Fluffy.Playwright do
   end
 
   @doc playwright_only: true
-  @doc "Adds cookies to the browser context and returns the session. See `PlaywrightEx.BrowserContext.add_cookies/2`."
+  @doc """
+  Adds cookies to the browser context and returns the session.
+
+  Cookie maps use the keys of `PlaywrightEx.BrowserContext.add_cookies/2`, such as
+  `%{name: "token", value: "abc", url: url, httpOnly: true, sameSite: "Lax"}`.
+  """
   @spec add_cookies(Session.t(), [map()]) :: Session.t()
   def add_cookies(session, cookies) when is_list(cookies) do
+    Enum.each(cookies, &reject_snake_case_cookie_keys!/1)
     session |> browser_context!(:add_cookies) |> BrowserContext.add_cookies!(cookies)
     session
   end
+
+  # Playwright ignores unknown cookie keys, such as the snake_case ones Fluffy 0.8 took.
+  @snake_case_cookie_keys %{http_only: :httpOnly, same_site: :sameSite, partition_key: :partitionKey}
+
+  defp reject_snake_case_cookie_keys!(cookie) when is_map(cookie) do
+    for {key, _value} <- cookie,
+        {snake_case, camel_case} <- @snake_case_cookie_keys,
+        key in [snake_case, Atom.to_string(snake_case)] do
+      raise ArgumentError, "cookie key #{inspect(key)} is not a Playwright cookie field; use #{inspect(camel_case)}"
+    end
+  end
+
+  defp reject_snake_case_cookie_keys!(_cookie), do: :ok
 
   @doc playwright_only: true
   @doc "Returns browser cookies, optionally only those for `urls`. See `PlaywrightEx.BrowserContext.cookies/2`."

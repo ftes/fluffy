@@ -64,8 +64,6 @@ defmodule Fluffy.URLMatcher do
   regular expression's own `i` flag, as in PlaywrightEx.
   """
   def ignore_case(expected, nil), do: expected
-  def ignore_case(expected, false) when is_binary(expected), do: expected
-  def ignore_case(expected, true) when is_binary(expected), do: {:ignore_case, expected}
 
   # A leading inline flag overrides the regex's own `i` option.
   def ignore_case(%Regex{} = expected, ignore_case) do
@@ -73,8 +71,10 @@ defmodule Fluffy.URLMatcher do
     Regex.compile!(flag <> Regex.source(expected), Regex.opts(expected))
   end
 
-  def ignore_case(_expected, _ignore_case),
-    do: raise(ArgumentError, "ignore_case: requires a string or regular expression URL")
+  def ignore_case(expected, false), do: expected
+  def ignore_case(expected, true) when is_binary(expected), do: {:ignore_case, expected}
+
+  def ignore_case(_expected, true), do: raise(ArgumentError, "ignore_case: requires a string or regular expression URL")
 
   defp ensure_component!(components) do
     if Enum.any?([:path, :query, :fragment], &Keyword.has_key?(components, &1)) do

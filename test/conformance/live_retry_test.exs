@@ -5,6 +5,10 @@ defmodule Fluffy.Conformance.LiveRetryTest do
   import Fluffy.Expect
   import Fluffy.Locator
 
+  # Firefox dispatches input for one page of the shared browser at a time, so
+  # with many parallel cases an action can queue behind others for seconds.
+  @action_timeout 5_000
+
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
     test "waits for an asynchronous Live render with #{driver}", %{driver: driver} do
@@ -22,8 +26,8 @@ defmodule Fluffy.Conformance.LiveRetryTest do
 
       session
       |> visit("/live/async?delay=40")
-      |> click(by_role(:button, name: "Appeared"), timeout: 1_000)
-      |> expect("Activated" |> by_text() |> to_be_visible(), timeout: 1_000)
+      |> click(by_role(:button, name: "Appeared"), timeout: @action_timeout)
+      |> expect("Activated" |> by_text() |> to_be_visible(), timeout: @action_timeout)
     end
   end
 

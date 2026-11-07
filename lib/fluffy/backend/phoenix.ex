@@ -33,6 +33,9 @@ defmodule Fluffy.Backend.Phoenix do
   # through the endpoint stored in the session, so this value is never used.
   @endpoint nil
   @live_flash_cookie "__phoenix_flash__"
+  # A browser aborts a navigation answered with no content and keeps the
+  # current document; 205 does not reset forms in any engine.
+  @no_content_statuses [204, 205]
 
   @impl true
   def start_session(options, attachment) do
@@ -116,13 +119,20 @@ defmodule Fluffy.Backend.Phoenix do
   @impl true
   def visit(%Session{} = session, path) do
     url = resolve_url(Session.context(session).http.base_url, path, session)
+    {http, response} = HTTP.request(Session.context(session).http, url)
 
-    request(session, url)
+    # Playwright's goto fails when the browser aborts the navigation.
+    if response.conn.status in @no_content_statuses do
+      raise "Phoenix visit to #{URI.to_string(response.request.url)} was aborted by HTTP #{response.conn.status}"
+    end
+
+    session |> put_http(http) |> finish_response(response, nil)
   end
 
   @impl true
   def reload(%Session{} = session, options \\ []) do
-    _options = Keyword.validate!(options, [:timeout])
+    # Playwright-only options such as `wait_until:` raise, as for other actions.
+    :ok = Fluffy.Driver.PhoenixValidation.validate_operation!(session, :reload, [options])
 
     case Session.current_page(session).url do
       nil ->
@@ -143,9 +153,11 @@ defmodule Fluffy.Backend.Phoenix do
   end
 
   def navigate(%Session{} = session, %Redirect{} = navigation) do
+    url = resolve_url(Session.context(session).http.base_url, navigation.destination, session)
+
     session
     |> put_live_redirect_flash(navigation.destination, navigation.flash)
-    |> visit(navigation.destination)
+    |> request(url)
   end
 
   def navigate(%Session{} = session, %Patch{} = navigation) do
@@ -319,10 +331,26 @@ defmodule Fluffy.Backend.Phoenix do
     put_http(session, http)
   end
 
+  defp finish_response(session, %HTTPResponse{conn: %{status: status}}, _download_name)
+       when status in @no_content_statuses, do: keep_document(session)
+
   defp finish_response(session, %HTTPResponse{conn: conn, request: %{url: url}}, download_name) do
     case capture_download(conn, session, url, download_name) do
       {:ok, session} -> session
       :not_a_download -> commit_response(conn, session, url)
+    end
+  end
+
+  # LiveView's client disconnects before every HTTP navigation it lets through,
+  # so a kept LiveView document remains as inert markup.
+  defp keep_document(session) do
+    case Session.current_page(session) do
+      %Page.State{driver: :live, state: state, url: url} ->
+        state = %StaticState{client_dom: state.client_dom}
+        PageLifecycle.replace_document(session, :static, state, url, [same_document: true], &release_page/3)
+
+      %Page.State{} ->
+        session
     end
   end
 
@@ -381,8 +409,9 @@ defmodule Fluffy.Backend.Phoenix do
       download = %Download{
         suggested_filename: suggested_filename(disposition, download_name, url),
         url: URI.to_string(url),
+        page: Session.handle(session),
         runtime: session.runtime,
-        source: conn.resp_body
+        body: conn.resp_body
       }
 
       :ok = Fluffy.SessionRuntime.emit_event(session.runtime, session.active_page, :download, download)

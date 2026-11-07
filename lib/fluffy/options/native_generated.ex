@@ -20,10 +20,6 @@ defmodule Fluffy.Options.NativeGenerated do
         {"list of `:alt` | `:control` | `:control_or_meta` | `:meta` | `:shift`",
          ~s(Modifier keys to press. Ensures that only these modifiers are pressed during the operation, and then restores current modifiers back. If not specified, currently pressed modifiers are used. "ControlOrMeta" resolves to "Control" on Windows and Linux and to "Meta" on macOS.),
          quote(do: [:alt | :control | :control_or_meta | :meta | :shift])},
-      no_wait_after:
-        {"`t:boolean/0`",
-         "Actions that initiate navigations are waiting for these navigations to happen and for pages to start loading. You can opt out of waiting via setting this flag. You would only need this option in the exceptional cases such as navigating to inaccessible pages. Defaults to `false`.",
-         quote(do: boolean())},
       position:
         {"`t:map/0`",
          "A point to use relative to the top-left corner of element padding box. If not specified, uses some visible point of the element.",
@@ -32,18 +28,10 @@ defmodule Fluffy.Options.NativeGenerated do
         {"`:auto` | `:none`",
          "Controls whether Playwright scrolls the element into view before performing the action. Defaults to `:auto`, which scrolls the element into view when necessary, including scrolling nested scrollable containers. When set to `:none`, Playwright does not scroll the element and the action fails if the element is not already in the viewport. This is useful to assert that an element is reachable by the user without additional scrolling.",
          quote(do: :auto | :none)},
-      signal:
-        {"`t:PlaywrightEx.AbortSignal.t/0`",
-         "Allows to cancel the operation using an [`AbortSignal`](https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal). If the signal is aborted, the operation will be aborted and fail. Note that providing a signal does not disable the default timeout, which can be changed using `PlaywrightEx.BrowserContext.set_default_timeout/2` or `PlaywrightEx.Page.set_default_timeout/2`; pass `timeout: 0` to disable the timeout entirely.",
-         quote(do: PlaywrightEx.AbortSignal.t())},
       steps:
         {"`t:integer/0`",
          "Defaults to 1. Sends `n` interpolated `mousemove` events to represent travel between Playwright's current cursor position and the provided destination. When set to 1, emits a single `mousemove` event at the destination location.",
          quote(do: integer())},
-      timeout:
-        {"`t:number/0` | `:infinity`",
-         "Maximum time in milliseconds. Defaults to `30000` (30 seconds). Pass `0` to disable timeout. The default value can be changed by using the `PlaywrightEx.BrowserContext.set_default_timeout/2` or `PlaywrightEx.Page.set_default_timeout/2` methods.",
-         quote(do: number() | :infinity)},
       trial:
         {"`t:boolean/0`",
          "When set, this method only performs the [actionability](https://playwright.dev/docs/actionability) checks and skips the action. Defaults to `false`. Useful to wait until the element is ready for the action without performing it. Note that keyboard `:modifiers` will be pressed regardless of `:trial` to allow testing elements which are only visible when those keys are pressed.",
@@ -53,23 +41,13 @@ defmodule Fluffy.Options.NativeGenerated do
       force:
         {"`t:boolean/0`",
          "Whether to bypass the [actionability](https://playwright.dev/docs/actionability) checks. Defaults to `false`.",
-         quote(do: boolean())},
-      no_wait_after: {"`t:boolean/0`", "This option has no effect.", quote(do: boolean())},
-      signal:
-        {"`t:PlaywrightEx.AbortSignal.t/0`",
-         "Allows to cancel the operation using an [`AbortSignal`](https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal). If the signal is aborted, the operation will be aborted and fail. Note that providing a signal does not disable the default timeout, which can be changed using `PlaywrightEx.BrowserContext.set_default_timeout/2` or `PlaywrightEx.Page.set_default_timeout/2`; pass `timeout: 0` to disable the timeout entirely.",
-         quote(do: PlaywrightEx.AbortSignal.t())},
-      timeout:
-        {"`t:number/0` | `:infinity`",
-         "Maximum time in milliseconds. Defaults to `30000` (30 seconds). Pass `0` to disable timeout. The default value can be changed by using the `PlaywrightEx.BrowserContext.set_default_timeout/2` or `PlaywrightEx.Page.set_default_timeout/2` methods.",
-         quote(do: number() | :infinity)}
+         quote(do: boolean())}
     ],
     {PlaywrightEx.Locator, :check, 2} => [
       force:
         {"`t:boolean/0`",
          "Whether to bypass the [actionability](https://playwright.dev/docs/actionability) checks. Defaults to `false`.",
          quote(do: boolean())},
-      no_wait_after: {"`t:boolean/0`", "This option has no effect.", quote(do: boolean())},
       position:
         {"`t:map/0`",
          "A point to use relative to the top-left corner of element padding box. If not specified, uses some visible point of the element.",
@@ -78,14 +56,6 @@ defmodule Fluffy.Options.NativeGenerated do
         {"`:auto` | `:none`",
          "Controls whether Playwright scrolls the element into view before performing the action. Defaults to `:auto`, which scrolls the element into view when necessary, including scrolling nested scrollable containers. When set to `:none`, Playwright does not scroll the element and the action fails if the element is not already in the viewport. This is useful to assert that an element is reachable by the user without additional scrolling.",
          quote(do: :auto | :none)},
-      signal:
-        {"`t:PlaywrightEx.AbortSignal.t/0`",
-         "Allows to cancel the operation using an [`AbortSignal`](https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal). If the signal is aborted, the operation will be aborted and fail. Note that providing a signal does not disable the default timeout, which can be changed using `PlaywrightEx.BrowserContext.set_default_timeout/2` or `PlaywrightEx.Page.set_default_timeout/2`; pass `timeout: 0` to disable the timeout entirely.",
-         quote(do: PlaywrightEx.AbortSignal.t())},
-      timeout:
-        {"`t:number/0` | `:infinity`",
-         "Maximum time in milliseconds. Defaults to `30000` (30 seconds). Pass `0` to disable timeout. The default value can be changed by using the `PlaywrightEx.BrowserContext.set_default_timeout/2` or `PlaywrightEx.Page.set_default_timeout/2` methods.",
-         quote(do: number() | :infinity)},
       trial:
         {"`t:boolean/0`",
          "When set, this method only performs the [actionability](https://playwright.dev/docs/actionability) checks and skips the action. Defaults to `false`. Useful to wait until the element is ready for the action without performing it.",
@@ -96,7 +66,6 @@ defmodule Fluffy.Options.NativeGenerated do
         {"`t:boolean/0`",
          "Whether to bypass the [actionability](https://playwright.dev/docs/actionability) checks. Defaults to `false`.",
          quote(do: boolean())},
-      no_wait_after: {"`t:boolean/0`", "This option has no effect.", quote(do: boolean())},
       position:
         {"`t:map/0`",
          "A point to use relative to the top-left corner of element padding box. If not specified, uses some visible point of the element.",
@@ -105,14 +74,6 @@ defmodule Fluffy.Options.NativeGenerated do
         {"`:auto` | `:none`",
          "Controls whether Playwright scrolls the element into view before performing the action. Defaults to `:auto`, which scrolls the element into view when necessary, including scrolling nested scrollable containers. When set to `:none`, Playwright does not scroll the element and the action fails if the element is not already in the viewport. This is useful to assert that an element is reachable by the user without additional scrolling.",
          quote(do: :auto | :none)},
-      signal:
-        {"`t:PlaywrightEx.AbortSignal.t/0`",
-         "Allows to cancel the operation using an [`AbortSignal`](https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal). If the signal is aborted, the operation will be aborted and fail. Note that providing a signal does not disable the default timeout, which can be changed using `PlaywrightEx.BrowserContext.set_default_timeout/2` or `PlaywrightEx.Page.set_default_timeout/2`; pass `timeout: 0` to disable the timeout entirely.",
-         quote(do: PlaywrightEx.AbortSignal.t())},
-      timeout:
-        {"`t:number/0` | `:infinity`",
-         "Maximum time in milliseconds. Defaults to `30000` (30 seconds). Pass `0` to disable timeout. The default value can be changed by using the `PlaywrightEx.BrowserContext.set_default_timeout/2` or `PlaywrightEx.Page.set_default_timeout/2` methods.",
-         quote(do: number() | :infinity)},
       trial:
         {"`t:boolean/0`",
          "When set, this method only performs the [actionability](https://playwright.dev/docs/actionability) checks and skips the action. Defaults to `false`. Useful to wait until the element is ready for the action without performing it.",
@@ -122,44 +83,18 @@ defmodule Fluffy.Options.NativeGenerated do
       force:
         {"`t:boolean/0`",
          "Whether to bypass the [actionability](https://playwright.dev/docs/actionability) checks. Defaults to `false`.",
-         quote(do: boolean())},
-      no_wait_after: {"`t:boolean/0`", "This option has no effect.", quote(do: boolean())},
-      signal:
-        {"`t:PlaywrightEx.AbortSignal.t/0`",
-         "Allows to cancel the operation using an [`AbortSignal`](https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal). If the signal is aborted, the operation will be aborted and fail. Note that providing a signal does not disable the default timeout, which can be changed using `PlaywrightEx.BrowserContext.set_default_timeout/2` or `PlaywrightEx.Page.set_default_timeout/2`; pass `timeout: 0` to disable the timeout entirely.",
-         quote(do: PlaywrightEx.AbortSignal.t())},
-      timeout:
-        {"`t:number/0` | `:infinity`",
-         "Maximum time in milliseconds. Defaults to `30000` (30 seconds). Pass `0` to disable timeout. The default value can be changed by using the `PlaywrightEx.BrowserContext.set_default_timeout/2` or `PlaywrightEx.Page.set_default_timeout/2` methods.",
-         quote(do: number() | :infinity)}
+         quote(do: boolean())}
     ],
     {PlaywrightEx.Locator, :press, 3} => [
       delay:
         {"`t:number/0`", "Time to wait between `keydown` and `keyup` in milliseconds. Defaults to 0.",
-         quote(do: number())},
-      no_wait_after:
-        {"`t:boolean/0`",
-         "Actions that initiate navigations are waiting for these navigations to happen and for pages to start loading. You can opt out of waiting via setting this flag. You would only need this option in the exceptional cases such as navigating to inaccessible pages. Defaults to `false`.",
-         quote(do: boolean())},
-      signal:
-        {"`t:PlaywrightEx.AbortSignal.t/0`",
-         "Allows to cancel the operation using an [`AbortSignal`](https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal). If the signal is aborted, the operation will be aborted and fail. Note that providing a signal does not disable the default timeout, which can be changed using `PlaywrightEx.BrowserContext.set_default_timeout/2` or `PlaywrightEx.Page.set_default_timeout/2`; pass `timeout: 0` to disable the timeout entirely.",
-         quote(do: PlaywrightEx.AbortSignal.t())},
-      timeout:
-        {"`t:number/0` | `:infinity`",
-         "Maximum time in milliseconds. Defaults to `30000` (30 seconds). Pass `0` to disable timeout. The default value can be changed by using the `PlaywrightEx.BrowserContext.set_default_timeout/2` or `PlaywrightEx.Page.set_default_timeout/2` methods.",
-         quote(do: number() | :infinity)}
+         quote(do: number())}
     ],
-    {PlaywrightEx.Locator, :set_input_files, 3} => [
-      no_wait_after: {"`t:boolean/0`", "This option has no effect.", quote(do: boolean())},
-      signal:
-        {"`t:PlaywrightEx.AbortSignal.t/0`",
-         "Allows to cancel the operation using an [`AbortSignal`](https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal). If the signal is aborted, the operation will be aborted and fail. Note that providing a signal does not disable the default timeout, which can be changed using `PlaywrightEx.BrowserContext.set_default_timeout/2` or `PlaywrightEx.Page.set_default_timeout/2`; pass `timeout: 0` to disable the timeout entirely.",
-         quote(do: PlaywrightEx.AbortSignal.t())},
-      timeout:
-        {"`t:number/0` | `:infinity`",
-         "Maximum time in milliseconds. Defaults to `30000` (30 seconds). Pass `0` to disable timeout. The default value can be changed by using the `PlaywrightEx.BrowserContext.set_default_timeout/2` or `PlaywrightEx.Page.set_default_timeout/2` methods.",
-         quote(do: number() | :infinity)}
+    {PlaywrightEx.Page, :reload, 2} => [
+      wait_until:
+        {"`:load` | `:domcontentloaded` | `:networkidle` | `:commit`",
+         "When to consider operation succeeded, defaults to `:load`. Events can be either:",
+         quote(do: :load | :domcontentloaded | :networkidle | :commit)}
     ],
     {PlaywrightEx.Locator, :hover, 2} => [
       force:
@@ -170,7 +105,6 @@ defmodule Fluffy.Options.NativeGenerated do
         {"list of `:alt` | `:control` | `:control_or_meta` | `:meta` | `:shift`",
          ~s(Modifier keys to press. Ensures that only these modifiers are pressed during the operation, and then restores current modifiers back. If not specified, currently pressed modifiers are used. "ControlOrMeta" resolves to "Control" on Windows and Linux and to "Meta" on macOS.),
          quote(do: [:alt | :control | :control_or_meta | :meta | :shift])},
-      no_wait_after: {"`t:boolean/0`", "This option has no effect.", quote(do: boolean())},
       position:
         {"`t:map/0`",
          "A point to use relative to the top-left corner of element padding box. If not specified, uses some visible point of the element.",
@@ -179,14 +113,6 @@ defmodule Fluffy.Options.NativeGenerated do
         {"`:auto` | `:none`",
          "Controls whether Playwright scrolls the element into view before performing the action. Defaults to `:auto`, which scrolls the element into view when necessary, including scrolling nested scrollable containers. When set to `:none`, Playwright does not scroll the element and the action fails if the element is not already in the viewport. This is useful to assert that an element is reachable by the user without additional scrolling.",
          quote(do: :auto | :none)},
-      signal:
-        {"`t:PlaywrightEx.AbortSignal.t/0`",
-         "Allows to cancel the operation using an [`AbortSignal`](https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal). If the signal is aborted, the operation will be aborted and fail. Note that providing a signal does not disable the default timeout, which can be changed using `PlaywrightEx.BrowserContext.set_default_timeout/2` or `PlaywrightEx.Page.set_default_timeout/2`; pass `timeout: 0` to disable the timeout entirely.",
-         quote(do: PlaywrightEx.AbortSignal.t())},
-      timeout:
-        {"`t:number/0` | `:infinity`",
-         "Maximum time in milliseconds. Defaults to `30000` (30 seconds). Pass `0` to disable timeout. The default value can be changed by using the `PlaywrightEx.BrowserContext.set_default_timeout/2` or `PlaywrightEx.Page.set_default_timeout/2` methods.",
-         quote(do: number() | :infinity)},
       trial:
         {"`t:boolean/0`",
          "When set, this method only performs the [actionability](https://playwright.dev/docs/actionability) checks and skips the action. Defaults to `false`. Useful to wait until the element is ready for the action without performing it. Note that keyboard `:modifiers` will be pressed regardless of `:trial` to allow testing elements which are only visible when those keys are pressed.",
@@ -197,15 +123,10 @@ defmodule Fluffy.Options.NativeGenerated do
         {"`t:boolean/0`",
          "Whether to bypass the [actionability](https://playwright.dev/docs/actionability) checks. Defaults to `false`.",
          quote(do: boolean())},
-      no_wait_after: {"`t:boolean/0`", "This option has no effect.", quote(do: boolean())},
       scroll:
         {"`:auto` | `:none`",
          "Controls whether Playwright scrolls the element into view before performing the action. Defaults to `:auto`, which scrolls the element into view when necessary, including scrolling nested scrollable containers. When set to `:none`, Playwright does not scroll the element and the action fails if the element is not already in the viewport. This is useful to assert that an element is reachable by the user without additional scrolling.",
          quote(do: :auto | :none)},
-      signal:
-        {"`t:PlaywrightEx.AbortSignal.t/0`",
-         "Allows to cancel the operation using an [`AbortSignal`](https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal). If the signal is aborted, the operation will be aborted and fail. Note that providing a signal does not disable the default timeout, which can be changed using `PlaywrightEx.BrowserContext.set_default_timeout/2` or `PlaywrightEx.Page.set_default_timeout/2`; pass `timeout: 0` to disable the timeout entirely.",
-         quote(do: PlaywrightEx.AbortSignal.t())},
       source_position:
         {"`t:map/0`",
          "Clicks on the source element at this point relative to the top-left corner of the element's padding box. If not specified, some visible point of the element is used.",
@@ -218,54 +139,53 @@ defmodule Fluffy.Options.NativeGenerated do
         {"`t:map/0`",
          "Drops on the target element at this point relative to the top-left corner of the element's padding box. If not specified, some visible point of the element is used.",
          quote(do: %{x: number(), y: number()})},
-      timeout:
-        {"`t:number/0` | `:infinity`",
-         "Maximum time in milliseconds. Defaults to `30000` (30 seconds). Pass `0` to disable timeout. The default value can be changed by using the `PlaywrightEx.BrowserContext.set_default_timeout/2` or `PlaywrightEx.Page.set_default_timeout/2` methods.",
-         quote(do: number() | :infinity)},
       trial:
         {"`t:boolean/0`",
          "When set, this method only performs the [actionability](https://playwright.dev/docs/actionability) checks and skips the action. Defaults to `false`. Useful to wait until the element is ready for the action without performing it.",
          quote(do: boolean())}
     ],
     {PlaywrightEx.Locator, :press_sequentially, 3} => [
-      delay: {"`t:number/0`", "Time to wait between key presses in milliseconds. Defaults to 0.", quote(do: number())},
-      no_wait_after: {"`t:boolean/0`", "This option has no effect.", quote(do: boolean())},
-      signal:
-        {"`t:PlaywrightEx.AbortSignal.t/0`",
-         "Allows to cancel the operation using an [`AbortSignal`](https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal). If the signal is aborted, the operation will be aborted and fail. Note that providing a signal does not disable the default timeout, which can be changed using `PlaywrightEx.BrowserContext.set_default_timeout/2` or `PlaywrightEx.Page.set_default_timeout/2`; pass `timeout: 0` to disable the timeout entirely.",
-         quote(do: PlaywrightEx.AbortSignal.t())},
-      timeout:
-        {"`t:number/0` | `:infinity`",
-         "Maximum time in milliseconds. Defaults to `30000` (30 seconds). Pass `0` to disable timeout. The default value can be changed by using the `PlaywrightEx.BrowserContext.set_default_timeout/2` or `PlaywrightEx.Page.set_default_timeout/2` methods.",
-         quote(do: number() | :infinity)}
+      delay: {"`t:number/0`", "Time to wait between key presses in milliseconds. Defaults to 0.", quote(do: number())}
     ],
     {PlaywrightEx.Page, :go_back, 2} => [
-      signal:
-        {"`t:PlaywrightEx.AbortSignal.t/0`",
-         "Allows to cancel the operation using an [`AbortSignal`](https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal). If the signal is aborted, the operation will be aborted and fail. Note that providing a signal does not disable the default timeout, which can be changed using `PlaywrightEx.BrowserContext.set_default_timeout/2` or `PlaywrightEx.Page.set_default_timeout/2`; pass `timeout: 0` to disable the timeout entirely.",
-         quote(do: PlaywrightEx.AbortSignal.t())},
-      timeout:
-        {"`t:number/0` | `:infinity`",
-         "Maximum operation time in milliseconds, defaults to 30 seconds, pass `0` to disable timeout. The default value can be changed by using the `PlaywrightEx.BrowserContext.set_default_navigation_timeout/2`, `PlaywrightEx.BrowserContext.set_default_timeout/2`, `PlaywrightEx.Page.set_default_navigation_timeout/2` or `PlaywrightEx.Page.set_default_timeout/2` methods.",
-         quote(do: number() | :infinity)},
       wait_until:
         {"`:load` | `:domcontentloaded` | `:networkidle` | `:commit`",
          "When to consider operation succeeded, defaults to `:load`. Events can be either:",
          quote(do: :load | :domcontentloaded | :networkidle | :commit)}
     ],
     {PlaywrightEx.Page, :go_forward, 2} => [
-      signal:
-        {"`t:PlaywrightEx.AbortSignal.t/0`",
-         "Allows to cancel the operation using an [`AbortSignal`](https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal). If the signal is aborted, the operation will be aborted and fail. Note that providing a signal does not disable the default timeout, which can be changed using `PlaywrightEx.BrowserContext.set_default_timeout/2` or `PlaywrightEx.Page.set_default_timeout/2`; pass `timeout: 0` to disable the timeout entirely.",
-         quote(do: PlaywrightEx.AbortSignal.t())},
-      timeout:
-        {"`t:number/0` | `:infinity`",
-         "Maximum operation time in milliseconds, defaults to 30 seconds, pass `0` to disable timeout. The default value can be changed by using the `PlaywrightEx.BrowserContext.set_default_navigation_timeout/2`, `PlaywrightEx.BrowserContext.set_default_timeout/2`, `PlaywrightEx.Page.set_default_navigation_timeout/2` or `PlaywrightEx.Page.set_default_timeout/2` methods.",
-         quote(do: number() | :infinity)},
       wait_until:
         {"`:load` | `:domcontentloaded` | `:networkidle` | `:commit`",
          "When to consider operation succeeded, defaults to `:load`. Events can be either:",
          quote(do: :load | :domcontentloaded | :networkidle | :commit)}
+    ],
+    {PlaywrightEx.Clock, :install, 2} => [
+      time:
+        {"`t:integer/0` | `t:String.t/0` | `t:DateTime.t/0`", "Time to initialize with, current system time by default.",
+         quote(do: integer() | String.t() | DateTime.t())}
+    ],
+    {PlaywrightEx.Locator, :get_by_role, 3} => [
+      checked:
+        {"`t:boolean/0`",
+         "An attribute that is usually set by `aria-checked` or native `<input type=checkbox>` controls.",
+         quote(do: boolean())},
+      description:
+        {"`t:String.t/0` | `t:Regex.t/0` | `t:PlaywrightEx.RegExp.t/0`",
+         "Option to match the [accessible description](https://w3c.github.io/accname/#dfn-accessible-description). By default, matching is case-insensitive and searches for a substring, use `:exact` to control this behavior.",
+         quote(do: String.t() | Regex.t() | PlaywrightEx.RegExp.t())},
+      disabled:
+        {"`t:boolean/0`", "An attribute that is usually set by `aria-disabled` or `disabled`.", quote(do: boolean())},
+      expanded: {"`t:boolean/0`", "An attribute that is usually set by `aria-expanded`.", quote(do: boolean())},
+      include_hidden:
+        {"`t:boolean/0`",
+         "Option that controls whether hidden elements are matched. By default, only non-hidden elements, as [defined by ARIA](https://www.w3.org/TR/wai-aria-1.2/#tree_exclusion), are matched by role selector.",
+         quote(do: boolean())},
+      level:
+        {"`t:integer/0`",
+         "A number attribute that is usually present for roles `heading`, `listitem`, `row`, `treeitem`, with default values for `<h1>-<h6>` elements.",
+         quote(do: integer())},
+      pressed: {"`t:boolean/0`", "An attribute that is usually set by `aria-pressed`.", quote(do: boolean())},
+      selected: {"`t:boolean/0`", "An attribute that is usually set by `aria-selected`.", quote(do: boolean())}
     ]
   }
 

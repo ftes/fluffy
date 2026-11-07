@@ -93,18 +93,20 @@ defmodule Fluffy.Backend.Playwright.Events do
     %Download{
       suggested_filename: PlaywrightEx.Download.suggested_filename(download),
       url: PlaywrightEx.Download.url(download),
+      page: page_handle(session, PlaywrightEx.Download.page(download)),
       runtime: session.runtime,
-      source: download
+      native: download
     }
   end
 
   defp value(session, type, browser_page) when type in [:page, :popup], do: page_handle(session, browser_page)
 
-  defp value(_session, :dialog, dialog) do
+  defp value(session, :dialog, dialog) do
     %Dialog{
       type: dialog_type(PlaywrightEx.Dialog.type(dialog)),
       message: PlaywrightEx.Dialog.message(dialog),
       default_value: PlaywrightEx.Dialog.default_value(dialog),
+      page: dialog |> PlaywrightEx.Dialog.page() |> optional_page_handle(session),
       native: dialog
     }
   end
@@ -155,12 +157,15 @@ defmodule Fluffy.Backend.Playwright.Events do
       if String.starts_with?(error.message, @no_frame), do: nil, else: reraise(error, __STACKTRACE__)
   end
 
+  defp optional_page_handle(nil, _session), do: nil
+  defp optional_page_handle(browser_page, session), do: page_handle(session, browser_page)
+
   defp dialog_type("alert"), do: :alert
   defp dialog_type("confirm"), do: :confirm
   defp dialog_type("prompt"), do: :prompt
   defp dialog_type("beforeunload"), do: :beforeunload
 
-  def page_handle(session, browser_page) do
+  defp page_handle(session, browser_page) do
     case SessionRuntime.external_page(session.runtime, browser_page.guid) do
       {:ok, nil} -> register_page(session, browser_page)
       {:ok, id} -> Page.new(session.runtime, id)

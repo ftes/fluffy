@@ -87,6 +87,28 @@ defmodule Fluffy.Conformance.ClientNavigationReadinessTest do
   end
 
   @tag driver: :playwright
+  test "an action follows documents that navigate on load" do
+    # Each hop replaces the execution context of Fluffy's post-action check.
+    fixture =
+      Fluffy.TestHTTPFixtures.register(fn request ->
+        case request.path do
+          "/start" -> %{body: ~s|<button onclick="location.assign('hop-1')">Enter</button>|}
+          "/hop-1" -> %{body: ~s|<script>location.replace('hop-2')</script>|}
+          "/hop-2" -> %{body: ~s|<script>location.replace('hop-3')</script>|}
+          "/hop-3" -> %{body: ~s|<script>location.replace('arrived')</script>|}
+          "/arrived" -> %{body: "<p>Arrived</p>"}
+        end
+      end)
+
+    :playwright
+    |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+    |> visit(Fluffy.TestHTTPFixtures.path(fixture, "/start"))
+    |> click(by_role(:button, name: "Enter"))
+    |> expect(Expect.page_to_have_url(Fluffy.TestHTTPFixtures.path(fixture, "/arrived")))
+    |> expect("Arrived" |> by_text(exact: true) |> Expect.to_be_visible())
+  end
+
+  @tag driver: :playwright
   test "a requestless document is adopted" do
     fixture = Fluffy.TestHTTPFixtures.register(%{body: ~s(<a href="about:blank">Blank</a>)})
 

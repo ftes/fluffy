@@ -5,11 +5,14 @@ defmodule Fluffy.Backend.Playwright.Document do
   # live in the page.
   # A context init script stamps each document; one probe reads the stamp, the
   # URL and the LiveView navigations recorded since a cursor.
+  # Page timers may be faked and paused (`Fluffy.Playwright.install_clock/2`), so
+  # these scripts never wait on them, and waits poll through Playwright's own.
 
   alias Fluffy.Backend.Playwright.Bounded
   alias Fluffy.Deadline
   alias PlaywrightEx.Frame
   alias PlaywrightEx.JSHandle
+  alias PlaywrightEx.Locator
 
   @state """
   (() => {
@@ -79,21 +82,19 @@ defmodule Fluffy.Backend.Playwright.Document do
   `evaluate` has no timeout and waits while a script blocks the page's main
   thread, so the read gives up after `timeout`.
   """
-  def probe!(frame, cursor, timeout), do: probe!(frame, cursor, timeout, Deadline.new(timeout), 1)
+  def probe!(frame, cursor, timeout), do: probe!(frame, cursor, timeout, Deadline.new(timeout))
 
-  defp probe!(frame, cursor, timeout, deadline, retries) do
+  defp probe!(frame, cursor, timeout, deadline) do
     case Bounded.within(Deadline.remaining(deadline, 1), fn -> Frame.evaluate(frame, @probe, cursor) end) do
       {:ok, {:ok, %{"url" => url, "document" => document, "cursor" => next, "kind" => kind}}} ->
         %{url: url, document: document, cursor: next, kind: kind(kind)}
 
       # A navigation replaced the execution context mid-call; read the new one.
-      {:ok, {:error, error}} when retries > 0 ->
-        if context_destroyed?(error),
-          do: probe!(frame, cursor, timeout, deadline, retries - 1),
-          else: raise(error)
-
+      # A redirect chain (a page that navigates on load) replaces several.
       {:ok, {:error, error}} ->
-        raise error
+        if context_destroyed?(error) and not Deadline.expired?(deadline),
+          do: probe!(frame, cursor, timeout, deadline),
+          else: raise(error)
 
       :timeout ->
         raise "the page did not respond to Fluffy's document check within #{timeout}ms; " <>
@@ -110,26 +111,30 @@ defmodule Fluffy.Backend.Playwright.Document do
   def context_destroyed?(error),
     do: Exception.message(error) =~ "Execution context was destroyed, most likely because of a navigation"
 
+  # The activation state lives in the document of the frame `locator` resolves
+  # in, possibly a child frame. `evaluate_all` runs there without waiting for a
+  # match, and has no timeout of its own.
+
   @doc "Marks the checkbox and radio activations `activated?/4` reads; `nil` if the frame cannot be read."
-  def activation_cursor(frame, timeout) do
+  def activation_cursor(locator, timeout) do
     expression = "() => { const state = #{@state}; return [state.document, state.activations.count] }"
 
-    case Bounded.within(timeout, fn -> Frame.evaluate(frame, expression) end) do
+    case Bounded.within(timeout, fn -> Locator.evaluate_all(locator, expression) end) do
       {:ok, {:ok, cursor}} -> cursor
       _unreadable -> nil
     end
   end
 
   @doc "Whether a checkbox or radio activation in the same document since `cursor` left it `checked`."
-  def activated?(_frame, nil, _checked, _timeout), do: false
+  def activated?(_locator, nil, _checked, _timeout), do: false
 
-  def activated?(frame, [document, count], checked, timeout) do
+  def activated?(locator, [document, count], checked, timeout) do
     expression = """
-    ([document, count, checked]) => window.__fluffy?.document === document &&
+    (_elements, [document, count, checked]) => window.__fluffy?.document === document &&
       window.__fluffy.activations.count > count && window.__fluffy.activations.checked === checked
     """
 
-    read = Bounded.within(timeout, fn -> Frame.evaluate(frame, expression, [document, count, checked]) end)
+    read = Bounded.within(timeout, fn -> Locator.evaluate_all(locator, expression, [document, count, checked]) end)
     match?({:ok, {:ok, true}}, read)
   end
 

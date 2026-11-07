@@ -7,8 +7,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# A new push to a PR cancels its running CI. Other events (main pushes, dispatches) get a group of
+# their own, so a main push is not cancelled before its cache save.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: true
 
 permissions:
@@ -18,121 +20,48 @@ env:
   # Temporary workaround for mise.jdx.dev/VERSION racing GitHub release assets.
   # Remove once upstream guarantees that advertised versions are downloadable.
   MISE_VERSION: "2026.8.14"
+  MIX_ENV: test
 
 jobs:
-  quality:
+  # Compile, lint and docs per lane; the newest lane also checks formatting, the generated
+  # options and Dialyzer. No browser or database. Saves the deps and _build cache on main.
+  checks:
+    name: checks (${{ matrix.lane }})
     runs-on: ubuntu-26.04
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         lane: [oldest, newest]
-    services:
-      postgres:
-        image: postgres:18.6@sha256:edb0c08dc33befd0262ab3b5cf1c4f3f8cfd8b09e88c05b45adee29d6761ddb6
-        env:
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    env:
-      FLUFFY_ARTIFACT_DIR: tmp/fluffy-artifacts
-      FLUFFY_BROWSER: chromium
-      MIX_ENV: test
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - name: Select toolchain
-        id: toolchain
-        env:
-          TOOLCHAIN_LANE: ${{ matrix.lane }}
-        run: |
-          if [ "$TOOLCHAIN_LANE" = oldest ]; then
-            cp .tool-versions.oldest .tool-versions
-            # Keep Corepack and mise on the same pnpm version for this lane.
-            pnpm_version=$(awk '$1 == "pnpm" { print $2 }' .tool-versions)
-            jq --arg version "pnpm@$pnpm_version" '.packageManager = $version' package.json > package.json.tmp
-            mv package.json.tmp package.json
-          fi
-          awk '$1 == "elixir" || $1 == "erlang" { print $1 "=" $2 }' .tool-versions >> "$GITHUB_OUTPUT"
-          echo "image=$ImageOS" >> "$GITHUB_OUTPUT"
-      - name: Setup toolchain
-        uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+      - name: Set up toolchain and deps
+        id: setup
+        uses: ./.github/actions/setup
         with:
-          version: ${{ env.MISE_VERSION }}
+          lane: ${{ matrix.lane }}
+      # After the deps and _build restore, so a fresher PLT wins.
       - name: Restore Dialyzer PLTs
+        if: matrix.lane == 'newest'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: |
             ~/.mix/dialyxir*.plt*
             _build/test/dialyxir*.plt*
-          key: dialyzer-${{ steps.toolchain.outputs.image }}-erlang-${{ steps.toolchain.outputs.erlang }}-elixir-${{ steps.toolchain.outputs.elixir }}-${{ hashFiles('mix.lock') }}
+          key: dialyzer-${{ steps.setup.outputs.image }}-erlang-${{ steps.setup.outputs.erlang }}-elixir-${{ steps.setup.outputs.elixir }}-${{ hashFiles('mix.lock') }}
           restore-keys: |
-            dialyzer-${{ steps.toolchain.outputs.image }}-erlang-${{ steps.toolchain.outputs.erlang }}-elixir-${{ steps.toolchain.outputs.elixir }}-
-      - run: mix deps.get
-      - name: Restore Playwright browsers
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
-        with:
-          path: |
-            ~/.cache/ms-playwright
-            ~/.cache/playwright_ex
-          key: playwright-${{ runner.os }}-${{ hashFiles('deps/playwright_ex/DRIVER_VERSION', 'deps/playwright_ex/NODE_VERSION') }}-chromium
-      # As in PlaywrightEx's CI: --with-deps runs apt-get against the runner's Azure mirror, which
-      # can stall. The .debs are cached per driver version, so a warm run installs offline;
-      # archive.ubuntu.com is a fallback mirror, apt times out stalled fetches, and each attempt is
-      # capped (a killed attempt's apt-get, out of timeout's reach under sudo, is killed before the next).
-      - name: Restore browser system packages
-        id: apt-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
-        with:
-          key: apt-chromium-${{ hashFiles('deps/playwright_ex/DRIVER_VERSION', 'deps/playwright_ex/NODE_VERSION') }}-${{ steps.toolchain.outputs.image }}
-          path: ~/apt-cache
-      - name: Install driver, browser and system packages
-        run: |
-          printf 'Acquire::http::Timeout "30";\nAcquire::https::Timeout "30";\nAcquire::Retries "5";\nDPkg::Lock::Timeout "60";\nAPT::Keep-Downloaded-Packages "true";\n' | sudo tee /etc/apt/apt.conf.d/99timeouts
-          if [[ -f /etc/apt/apt-mirrors.txt ]]; then echo "http://archive.ubuntu.com/ubuntu/" | sudo tee -a /etc/apt/apt-mirrors.txt; fi
-          if compgen -G ~/apt-cache/'*.deb' > /dev/null; then sudo cp ~/apt-cache/*.deb /var/cache/apt/archives/; fi
-          for attempt in 1 2 3; do
-            if timeout 300 mix playwright_ex.install -- --with-deps chromium; then
-              mkdir -p ~/apt-cache && cp /var/cache/apt/archives/*.deb ~/apt-cache/ 2>/dev/null || true
-              exit 0
-            fi
-            echo "::warning::browser install attempt $attempt failed or timed out"
-            sudo pkill -x apt-get || true
-          done
-          exit 1
-      # One lane saves (both would race for the same key).
-      - name: Save browser system packages
-        if: matrix.lane == 'newest' && steps.apt-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
-        with:
-          key: ${{ steps.apt-cache.outputs.cache-primary-key }}
-          path: ~/apt-cache
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm run build:test
+            dialyzer-${{ steps.setup.outputs.image }}-erlang-${{ steps.setup.outputs.erlang }}-elixir-${{ steps.setup.outputs.elixir }}-
       - name: Check formatting
         if: matrix.lane == 'newest'
         run: mix format --check-formatted
-      - name: Check generated PlaywrightEx options
-        if: matrix.lane == 'newest'
-        run: mix fluffy.gen.native_options --check
+      # Compiles strictly before the generator's own compile could satisfy it (as `mix lint`).
       - name: Compile and lint
         run: |
           mix compile --warnings-as-errors
           mix credo --format oneline
-      - name: Run tests with one retry
-        id: tests
-        run: |
-          fluffy_test_seed=$RANDOM
-          if FLUFFY_ARTIFACT_DIR="$FLUFFY_ARTIFACT_DIR/first" mix test --warnings-as-errors --max-cases 4 --seed "$fluffy_test_seed"; then
-            exit 0
-          fi
-
-          echo "retried=true" >> "$GITHUB_OUTPUT"
-          echo "::warning::Tests failed; retrying once with seed $fluffy_test_seed. Both attempts' failure artifacts will be uploaded."
-          FLUFFY_ARTIFACT_DIR="$FLUFFY_ARTIFACT_DIR/retry" mix test --warnings-as-errors --max-cases 4 --seed "$fluffy_test_seed"
+      - name: Check generated PlaywrightEx options
+        if: matrix.lane == 'newest'
+        run: mix fluffy.gen.native_options --check
       - name: Run Dialyzer
         if: matrix.lane == 'newest'
         run: mix dialyzer --format short --list-unused-filters
@@ -140,16 +69,140 @@ jobs:
         env:
           MIX_ENV: dev
         run: mix docs --warnings-as-errors
-      - name: Verify external consumer fixture
-        if: matrix.lane == 'newest'
-        working-directory: integration/consumer
+      # Last, so only a green job saves; under the key computed before deps.get. On main only: a
+      # PR restores main's cache but never writes the shared one.
+      - name: Save deps and _build
+        if: success() && github.ref == 'refs/heads/main' && steps.setup.outputs.mix-cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          key: ${{ steps.setup.outputs.mix-cache-key }}
+          path: |
+            deps
+            _build
+
+  # Each lane's suite in `partitions` jobs (`mix test --partitions`: test files round-robin by
+  # sorted path). Each job has its own Postgres, browser and FLUFFY_ARTIFACT_DIR.
+  test:
+    name: test (${{ matrix.lane }}, ${{ matrix.partition }}/${{ matrix.partitions }})
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        lane: [oldest, newest]
+        # `partition` lists 1..partitions.
+        partitions: [3]
+        partition: [1, 2, 3]
+    services:
+      postgres:
+        image: postgres:18.6@sha256:edb0c08dc33befd0262ab3b5cf1c4f3f8cfd8b09e88c05b45adee29d6761ddb6
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        # A short interval: the first check runs one interval after start, and the runner waits for it.
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 1s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      FLUFFY_ARTIFACT_DIR: tmp/fluffy-artifacts
+      FLUFFY_BROWSER: chromium
+      MIX_TEST_PARTITION: ${{ matrix.partition }}
+      TEST_PARTITIONS: ${{ matrix.partitions }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Set up toolchain and deps
+        id: setup
+        uses: ./.github/actions/setup
+        with:
+          lane: ${{ matrix.lane }}
+      - name: Install Playwright browser
+        uses: ./.github/actions/browser
+        with:
+          save-apt-cache: ${{ matrix.lane == 'newest' && matrix.partition == 1 }}
+      # build:test's npm deps, not left to the browser action, whose driver install needn't be npm.
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build:test
+      # The retry reruns this partition's files with the same seed.
+      - name: Run tests with one retry
+        id: tests
         run: |
-          mix deps.get
-          mix test
+          fluffy_test_seed=$RANDOM
+          if FLUFFY_ARTIFACT_DIR="$FLUFFY_ARTIFACT_DIR/first" mix test --warnings-as-errors --max-cases 4 --seed "$fluffy_test_seed" --partitions "$TEST_PARTITIONS"; then
+            exit 0
+          fi
+
+          echo "retried=true" >> "$GITHUB_OUTPUT"
+          echo "::warning::Tests failed; retrying once with seed $fluffy_test_seed. Both attempts' failure artifacts will be uploaded."
+          FLUFFY_ARTIFACT_DIR="$FLUFFY_ARTIFACT_DIR/retry" mix test --warnings-as-errors --max-cases 4 --seed "$fluffy_test_seed" --partitions "$TEST_PARTITIONS"
       - name: Upload browser failure artifacts
         if: failure() || steps.tests.outputs.retried == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: browser-failures-${{ matrix.lane }}-elixir-${{ steps.toolchain.outputs.elixir }}-erlang-${{ steps.toolchain.outputs.erlang }}
+          name: browser-failures-${{ matrix.lane }}-${{ matrix.partition }}of${{ matrix.partitions }}-elixir-${{ steps.setup.outputs.elixir }}-erlang-${{ steps.setup.outputs.erlang }}
           path: tmp/fluffy-artifacts
           if-no-files-found: ignore
+
+  consumer:
+    name: consumer fixture
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    env:
+      FLUFFY_ARTIFACT_DIR: tmp/fluffy-artifacts
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Set up toolchain and deps
+        id: setup
+        uses: ./.github/actions/setup
+        with:
+          lane: newest
+      - name: Install Playwright browser
+        uses: ./.github/actions/browser
+      # Per commit, as the main deps and _build: the fixture compiles Fluffy as a path dep.
+      - name: Restore consumer deps and _build
+        id: consumer-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          key: consumer-mix-${{ steps.setup.outputs.image }}-erlang-${{ steps.setup.outputs.erlang }}-elixir-${{ steps.setup.outputs.elixir }}-${{ env.MIX_ENV }}-${{ hashFiles('integration/consumer/mix.lock') }}-${{ github.sha }}
+          restore-keys: |
+            consumer-mix-${{ steps.setup.outputs.image }}-erlang-${{ steps.setup.outputs.erlang }}-elixir-${{ steps.setup.outputs.elixir }}-${{ env.MIX_ENV }}-${{ hashFiles('integration/consumer/mix.lock') }}-
+            consumer-mix-${{ steps.setup.outputs.image }}-erlang-${{ steps.setup.outputs.erlang }}-elixir-${{ steps.setup.outputs.elixir }}-${{ env.MIX_ENV }}-
+          path: |
+            integration/consumer/deps
+            integration/consumer/_build
+      - name: Verify external consumer fixture
+        working-directory: integration/consumer
+        run: |
+          mix deps.get
+          mix test
+      - name: Save consumer deps and _build
+        if: success() && github.ref == 'refs/heads/main' && steps.consumer-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          key: ${{ steps.consumer-cache.outputs.cache-primary-key }}
+          path: |
+            integration/consumer/deps
+            integration/consumer/_build
+
+  # The required status checks are `quality (oldest)` and `quality (newest)`, the names of the
+  # jobs before the split. Each is green when every job above is.
+  quality:
+    name: quality (${{ matrix.lane }})
+    if: always()
+    needs: [checks, test, consumer]
+    runs-on: ubuntu-slim
+    strategy:
+      matrix:
+        lane: [oldest, newest]
+    steps:
+      - env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          for result in $RESULTS; do
+            if [ "$result" != success ]; then
+              echo "::error::A required job finished with: $result"
+              exit 1
+            fi
+          done

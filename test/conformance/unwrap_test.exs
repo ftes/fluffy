@@ -13,6 +13,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
   alias Fluffy.TestWeb.Endpoint
   alias Phoenix.LiveViewTest.View
   alias PlaywrightEx.BrowserContext
+  alias PlaywrightEx.Locator, as: BrowserLocator
   alias PlaywrightEx.Page, as: BrowserPage
 
   @endpoint Endpoint
@@ -28,6 +29,18 @@ defmodule Fluffy.Conformance.UnwrapTest do
     end
 
     refute Process.get(:unwrap_callback_ran)
+  end
+
+  for driver <- [:static, :live] do
+    @tag driver: driver
+    test "rejects a native locator with #{driver}" do
+      path = if unquote(driver) == :static, do: "/chamber", else: "/live/nested"
+      session = :phoenix |> start_test_session() |> visit(path)
+
+      assert_raise Fluffy.CapabilityError, ~r/:native_locator requires a Playwright session/, fn ->
+        unwrap(session, by_css("body"), fn _locator -> flunk("callback ran") end)
+      end
+    end
   end
 
   describe "Static" do
@@ -417,6 +430,43 @@ defmodule Fluffy.Conformance.UnwrapTest do
       :ok = GenServer.stop(Fluffy.TestScope.current())
 
       refute browser_context.guid in Enum.map(PlaywrightEx.Browser.contexts(Fluffy.BrowserRuntime.browser()), & &1.guid)
+    end
+
+    @tag driver: :playwright
+    test "passes a native locator for actions Fluffy does not wrap" do
+      test_pid = self()
+      session = playwright_html(~s(<button ondblclick="this.textContent = 'Twice'">Once</button>))
+
+      session
+      |> unwrap(by_role(:button, name: "Once"), fn %BrowserLocator{} = locator ->
+        send(test_pid, {:count, BrowserLocator.count!(locator)})
+        BrowserLocator.dblclick!(locator)
+      end)
+      |> expect(:button |> by_role(name: "Twice") |> to_be_visible())
+
+      assert_receive {:count, 1}
+    end
+
+    @tag driver: :playwright
+    test "adopts a navigation through a native locator" do
+      ~s(<a href="/chamber">Chamber</a>)
+      |> playwright_html()
+      |> unwrap(by_role(:link, name: "Chamber"), &BrowserLocator.click!/1)
+      |> expect(Fluffy.Expect.page_to_have_url("/chamber"))
+      |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
+    end
+
+    @tag driver: :playwright
+    test "resolves a native locator inside its frame" do
+      frame = ~s(<button ondblclick="this.textContent = 'Twice'">Once</button><button>Once</button>)
+      srcdoc = String.replace(frame, "\"", "&quot;")
+      session = playwright_html(~s(<button>Once</button><iframe id="inner" srcdoc="#{srcdoc}"></iframe>))
+      inner = frame_locator("#inner")
+
+      session
+      |> unwrap(inner |> by_role(:button, name: "Once") |> first(), &BrowserLocator.dblclick!/1)
+      |> expect(inner |> by_role(:button, name: "Twice") |> to_be_visible())
+      |> expect(:button |> by_role(name: "Once") |> to_have_count(1))
     end
 
     @tag driver: :playwright

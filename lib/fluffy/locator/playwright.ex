@@ -2,6 +2,8 @@ defmodule Fluffy.Locator.Playwright do
   @moduledoc false
 
   alias Fluffy.Locator
+  alias PlaywrightEx.Isomorphic.LocatorUtils
+  alias PlaywrightEx.Isomorphic.StringUtils
 
   def selector(%Locator{} = locator) do
     case Enum.reduce(locator.operations, :none, &apply_operation/2) do
@@ -18,17 +20,16 @@ defmodule Fluffy.Locator.Playwright do
     concat(selector, "css=#{css}")
   end
 
+  # Upstream builds role selectors with its options in a fixed order, including
+  # Playwright-only states such as `[pressed=true]`.
   defp apply_operation({:role, role, options}, selector) do
-    role_selector =
-      case Keyword.get(options, :name) do
-        nil ->
-          "internal:role=#{role}"
+    options =
+      Map.new(options, fn
+        {:include_hidden, include_hidden} -> {:includeHidden, include_hidden}
+        option -> option
+      end)
 
-        name ->
-          "internal:role=#{role}[name=#{attribute_value(name, Keyword.get(options, :exact, false))}]"
-      end
-
-    concat(selector, role_selector)
+    concat(selector, LocatorUtils.get_by_role_selector(role, options))
   end
 
   defp apply_operation({:text, text, options}, selector) do
@@ -102,17 +103,9 @@ defmodule Fluffy.Locator.Playwright do
   defp concat(left, right), do: "#{left} >> #{right}"
 
   defp internal_attribute_selector(engine, attribute_name, value, exact?) do
-    ~s(#{engine}=[#{attribute_name}=#{attribute_value(value, exact?)}])
+    ~s(#{engine}=[#{attribute_name}=#{StringUtils.escape_for_attribute_selector(value, exact?)}])
   end
 
-  defp text_selector(engine, value, exact?) do
-    suffix = if exact?, do: "s", else: "i"
-    "#{engine}=#{JSON.encode!(value)}#{suffix}"
-  end
-
-  defp attribute_value(value, exact?) do
-    suffix = if exact?, do: "s", else: "i"
-    escaped = value |> String.replace("\\", "\\\\") |> String.replace("\"", "\\\"")
-    ~s("#{escaped}"#{suffix})
-  end
+  # A regular expression ignores `exact?`, as upstream.
+  defp text_selector(engine, value, exact?), do: "#{engine}=#{StringUtils.escape_for_text_selector(value, exact?)}"
 end

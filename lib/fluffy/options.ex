@@ -26,7 +26,8 @@ defmodule Fluffy.Options do
     uncheck: {PlaywrightEx.Locator, :uncheck, 2, [:force, :position, :scroll, :trial]},
     select_option: {PlaywrightEx.Locator, :select_option, 3, [:force]},
     press: {PlaywrightEx.Locator, :press, 3, [:delay]},
-    set_input_files: {PlaywrightEx.Locator, :set_input_files, 3, []}
+    set_input_files: {PlaywrightEx.Locator, :set_input_files, 3, []},
+    reload: {PlaywrightEx.Page, :reload, 2, [:wait_until]}
   ]
 
   # Playwright-only actions, classified like the cross-driver ones.
@@ -34,15 +35,31 @@ defmodule Fluffy.Options do
     hover: {PlaywrightEx.Locator, :hover, 2, [:force, :modifiers, :position, :scroll, :trial]},
     drag_to: {PlaywrightEx.Locator, :drag_to, 3, [:force, :scroll, :source_position, :steps, :target_position, :trial]},
     press_sequentially: {PlaywrightEx.Locator, :press_sequentially, 3, [:delay]},
+    focus: {PlaywrightEx.Locator, :focus, 2, []},
+    blur: {PlaywrightEx.Locator, :blur, 2, []},
     go_back: {PlaywrightEx.Page, :go_back, 2, [:wait_until]},
-    go_forward: {PlaywrightEx.Page, :go_forward, 2, [:wait_until]}
+    go_forward: {PlaywrightEx.Page, :go_forward, 2, [:wait_until]},
+    install_clock: {PlaywrightEx.Clock, :install, 2, [:time]}
   ]
 
   @fluffy_native_keys [:timeout]
   @denied_native_keys [:no_wait_after, :signal]
 
+  # Upstream docs of a passed-through option that Fluffy's behavior completes.
+  @native_option_docs [
+    wait_until:
+      "*Playwright only.* When Playwright considers the navigation done: `:commit`, `:domcontentloaded`, " <>
+        "`:load` (the default) or `:networkidle`. Fluffy then still waits until the document is parsed " <>
+        "and its LiveViews are connected, as after every navigation."
+  ]
+
   @action_schemas Map.new(@native_actions ++ @playwright_actions, fn {action, {module, fun, arity, keys}} ->
-                    {action, NimbleOptions.new!(@timeout_options ++ Native.schema(module, fun, arity, keys))}
+                    native =
+                      for {key, entry} <- Native.schema(module, fun, arity, keys) do
+                        if doc = @native_option_docs[key], do: {key, Keyword.put(entry, :doc, doc)}, else: {key, entry}
+                      end
+
+                    {action, NimbleOptions.new!(@timeout_options ++ native)}
                   end)
 
   # The upstream assertion behind each expectation and the options Fluffy mirrors on
@@ -76,6 +93,55 @@ defmodule Fluffy.Options do
                          mirrored = Keyword.take(@mirrored_expectation_options, mirrored)
                          {matcher, NimbleOptions.new!(@timeout_options ++ mirrored)}
                        end)
+
+  # The upstream factory behind each locator constructor and how Fluffy covers its
+  # options: `fluffy` ones work on every driver, `playwright` ones compile into the
+  # Playwright selector and raise on Phoenix, and `denied` ones have a Fluffy
+  # replacement. `by_css` takes no options; chain `filter/2` instead.
+  @native_locators [
+    by_role:
+      {PlaywrightEx.Locator, :get_by_role, 3,
+       fluffy: [:exact, :name],
+       playwright: [:checked, :description, :disabled, :expanded, :include_hidden, :level, :pressed, :selected]},
+    by_text: {PlaywrightEx.Locator, :get_by_text, 3, fluffy: [:exact]},
+    by_label: {PlaywrightEx.Locator, :get_by_label, 3, fluffy: [:exact]},
+    by_placeholder: {PlaywrightEx.Locator, :get_by_placeholder, 3, fluffy: [:exact]},
+    by_alt_text: {PlaywrightEx.Locator, :get_by_alt_text, 3, fluffy: [:exact]},
+    by_title: {PlaywrightEx.Locator, :get_by_title, 3, fluffy: [:exact]},
+    by_test_id: {PlaywrightEx.Locator, :get_by_test_id, 2, []},
+    by_css: {PlaywrightEx.Locator, :locator, 3, denied: [:has, :has_not, :has_not_text, :has_text]},
+    filter: {PlaywrightEx.Locator, :filter, 2, fluffy: [:has, :has_not, :has_not_text, :has_text, :visible]}
+  ]
+
+  # Fluffy-owned locator options whose regular-expression form only Playwright matches.
+  @playwright_regex_locator_keys [:name, :has_text, :has_not_text]
+
+  @text_or_regex [
+    type: {:or, [:string, {:struct, Regex}]},
+    type_spec: quote(do: String.t() | Regex.t()),
+    type_doc: "`t:String.t/0` | `t:Regex.t/0`"
+  ]
+
+  # Fluffy compiles locator selectors itself, so it validates what PlaywrightEx would.
+  # Text options take a string or an Elixir regex, like `name:` and `has_text:`.
+  @playwright_locator_types [
+    checked: :boolean,
+    description: @text_or_regex,
+    disabled: :boolean,
+    expanded: :boolean,
+    include_hidden: :boolean,
+    level: :integer,
+    pressed: :boolean,
+    selected: :boolean
+  ]
+
+  {module, fun, arity, classes} = @native_locators[:by_role]
+
+  @playwright_role_locator_options Native.schema(module, fun, arity, classes[:playwright], @playwright_locator_types)
+
+  @playwright_locator_keys @native_locators
+                           |> Enum.flat_map(fn {_, {_, _, _, classes}} -> Keyword.get(classes, :playwright, []) end)
+                           |> Enum.uniq()
 
   @playwright_option_keys @native_actions |> Enum.flat_map(fn {_, {_, _, _, keys}} -> keys end) |> Enum.uniq()
   @expectation_schema NimbleOptions.new!(@timeout_options)
@@ -120,14 +186,19 @@ defmodule Fluffy.Options do
                         )
 
   @role_locator_schema NimbleOptions.new!(
-                         name: [
-                           type: :string,
-                           doc: "Restrict the role locator by accessible name."
-                         ],
-                         exact: [
-                           type: :boolean,
-                           doc: "Require an exact, case-sensitive accessible-name match."
-                         ]
+                         [
+                           name:
+                             @text_or_regex ++
+                               [
+                                 doc:
+                                   "Restrict the role locator by accessible name. " <>
+                                     "A regular expression is *Playwright only.*"
+                               ],
+                           exact: [
+                             type: :boolean,
+                             doc: "Require an exact, case-sensitive accessible-name match."
+                           ]
+                         ] ++ @playwright_role_locator_options
                        )
 
   @test_id_locator_schema NimbleOptions.new!(
@@ -152,19 +223,25 @@ defmodule Fluffy.Options do
                              type_spec: quote(do: Fluffy.Locator.t()),
                              doc: "Keep elements containing a match for this locator."
                            ],
-                           has_text: [
-                             type: :string,
-                             doc: "Keep elements containing this normalized text."
-                           ],
+                           has_text:
+                             @text_or_regex ++
+                               [
+                                 doc:
+                                   "Keep elements containing this normalized text. " <>
+                                     "A regular expression is *Playwright only.*"
+                               ],
                            has_not: [
                              type: {:struct, Fluffy.Locator},
                              type_spec: quote(do: Fluffy.Locator.t()),
                              doc: "Keep elements containing no match for this locator."
                            ],
-                           has_not_text: [
-                             type: :string,
-                             doc: "Keep elements that do not contain this normalized text."
-                           ]
+                           has_not_text:
+                             @text_or_regex ++
+                               [
+                                 doc:
+                                   "Keep elements that do not contain this normalized text. " <>
+                                     "A regular expression is *Playwright only.*"
+                               ]
                          )
 
   @setup_schema NimbleOptions.new!(
@@ -216,6 +293,15 @@ defmodule Fluffy.Options do
 
   @doc false
   def playwright_actions, do: @playwright_actions
+
+  @doc false
+  def native_locators, do: @native_locators
+
+  @doc "Locator options that only a browser can honor."
+  def playwright_locator_keys, do: @playwright_locator_keys
+
+  @doc "Locator options whose regular-expression form only a browser can honor."
+  def playwright_regex_locator_keys, do: @playwright_regex_locator_keys
 
   @doc false
   def native_expectations, do: @native_expectations

@@ -24,6 +24,6 @@ defimpl Inspect, for: Fluffy.FrameLocator do
   import Inspect.Algebra
 
   def inspect(frame, _options) do
-    concat(["#Fluffy.FrameLocator<", Fluffy.Locator.describe(frame.owner), " |> content_frame()>"])
+    concat(["#Fluffy.FrameLocator<", Fluffy.Locator.Internal.describe(frame.owner), " |> content_frame()>"])
   end
 end
