@@ -50,6 +50,21 @@ defmodule Fluffy.Conformance.ReloadTest do
     end
   end
 
+  # Each LiveView sleeps 1s in its connected mount before it subscribes.
+  @tag driver: :playwright
+  test "Playwright reload's timeout: bounds the reload, not the LiveView connection wait after it" do
+    topic = "reload-ready-#{System.unique_integer([:positive])}"
+
+    session =
+      :playwright
+      |> start_test_session()
+      |> visit("/embedded-ready?topic=#{topic}&delay=1000")
+      |> reload(wait_until: :commit, timeout: 500)
+
+    :ok = Phoenix.PubSub.broadcast(Fluffy.TestPubSub, topic, {:redirect_ready, "connected"})
+    expect(session, "Broadcast: connected" |> by_text(exact: true) |> Fluffy.Expect.to_have_count(2))
+  end
+
   @tag driver: :phoenix
   test "Phoenix reload raises a capability error for wait_until:" do
     fixture = TestHTTPFixtures.register_sequence([%{body: html("<h1>First render</h1>")}])

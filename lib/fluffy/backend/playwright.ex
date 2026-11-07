@@ -246,12 +246,10 @@ defmodule Fluffy.Backend.Playwright do
   @impl true
   def reload(%Session{} = session, options \\ []) do
     state = Session.page_state(session)
-    timeout = Session.timeout(session, options)
-
-    _response =
-      navigate!(:reload, [state.page, Keyword.merge([wait_until: :load], Keyword.put(options, :timeout, timeout))])
-
-    adopt_navigated_document(session, state, timeout)
+    native = Keyword.merge([wait_until: :load], Keyword.put(options, :timeout, Session.timeout(session, options)))
+    _response = navigate!(:reload, [state.page, native])
+    # Bookkeeping uses the session timeout, as after other actions.
+    adopt_navigated_document(session, state, Session.timeout(session))
   end
 
   @impl true

@@ -45,6 +45,7 @@ Fluffy now runs on PlaywrightEx 0.17, a port of the official Playwright client w
 
 - No unused-function warning when Fluffy is compiled without Ecto.
 - Playwright actions and expectations default to the session's `timeout:`, like LiveView.
+- Playwright `reload(timeout:)` bounds the reload only; the LiveView connection wait after it uses the session's `timeout:`, as after other actions.
 - An action that closes its own page, such as a popup's `window.close()`, succeeds instead of raising `PlaywrightEx.TargetClosedError`.
 - A browser that fails to launch raises in the session that needed it, instead of restarting every running session.
 - Playwright `check` and `uncheck` succeed once the click sets the requested state, as on Phoenix, even if page code such as a LiveView patch changes it before Playwright reads it back (common in Firefox and WebKit).

@@ -33,13 +33,15 @@ defmodule Fluffy.TestWeb.PageController do
     """)
   end
 
-  def embedded_ready(conn, %{"topic" => topic}) do
+  def embedded_ready(conn, %{"topic" => topic} = params) do
+    delay = String.to_integer(params["delay"] || "100")
+
     views =
       for id <- ["first", "second"] do
         conn
         |> Phoenix.Component.live_render(Fluffy.TestWeb.RedirectReadyLive,
           id: id,
-          session: %{"topic" => topic, "delay" => 100}
+          session: %{"topic" => topic, "delay" => delay}
         )
         |> Phoenix.HTML.Safe.to_iodata()
       end
