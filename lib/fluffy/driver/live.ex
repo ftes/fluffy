@@ -448,30 +448,50 @@ defmodule Fluffy.Driver.Live do
   end
 
   # A redirect an event causes comes back as the event call's result, and the
-  # event reached the view: record that for the running action. The call exits
+  # event reached the view: record that for the running action. The call fails
   # only when it finds the view already gone, so the event never reached it:
   # report the redirect the view left instead.
   defp dispatch_view_event(session, dispatch) do
-    result = dispatch.()
-    Process.put(@delivered, true)
-    result
-  catch
-    :exit, reason -> {:redirected, exit_redirect!(session, reason)}
+    case call_view(session, dispatch) do
+      {:ok, result} ->
+        Process.put(@delivered, true)
+        result
+
+      {:redirected, _redirect} = redirected ->
+        redirected
+    end
+  end
+
+  # render_upload can deliver a chunk and then exit on the view's redirect, so
+  # once it starts on a view that is still there, the view may have seen the
+  # action.
+  defp dispatch_view_upload(session, upload, entry_name) do
+    {_reference, _topic, proxy_pid} = upload.view.proxy
+    if Process.alive?(proxy_pid), do: Process.put(@delivered, true)
+    dispatch_view_event(session, fn -> render_upload(upload, entry_name) end)
   end
 
   # Reads the view without acting on it, such as its children or its upload
-  # config. When the view navigated away, the read exits, or LiveViewTest hands
-  # the redirect back where the read expected a reply and the caller raises on
-  # it: report that redirect for the action to follow. Any other failure stands.
+  # config, and reports a redirect the view left for the action to follow.
   defp read_view(session, read) do
-    {:ok, read.()}
+    case call_view(session, read) do
+      {:ok, value} -> {:ok, value}
+      {:redirected, redirect} -> redirected(session, redirect)
+    end
+  end
+
+  # When the view navigated away, a call exits, or LiveViewTest hands the
+  # redirect back where the caller expected a reply and the caller raises on
+  # it. Either way, return the redirect the view left. Any other failure stands.
+  defp call_view(session, call) do
+    {:ok, call.()}
   catch
     :exit, reason ->
-      redirected(session, exit_redirect!(session, reason))
+      {:redirected, exit_redirect!(session, reason)}
 
     kind, reason ->
       stacktrace = __STACKTRACE__
-      redirected(session, exit_redirect!(session, reason, fn -> :erlang.raise(kind, reason, stacktrace) end))
+      {:redirected, exit_redirect!(session, reason, fn -> :erlang.raise(kind, reason, stacktrace) end)}
   end
 
   defp redirected(session, redirect) do
@@ -1147,7 +1167,7 @@ defmodule Fluffy.Driver.Live do
 
   defp dispatch_live_upload(session, upload, entry_names, event_context) do
     Enum.reduce_while(entry_names, {:ok, session}, fn entry_name, {:ok, session} ->
-      upload_result = dispatch_view_event(session, fn -> render_upload(upload, entry_name) end)
+      upload_result = dispatch_view_upload(session, upload, entry_name)
 
       case upload_result do
         # A progress callback that navigates returns the redirect.
