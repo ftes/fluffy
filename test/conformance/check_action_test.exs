@@ -176,6 +176,27 @@ defmodule Fluffy.Conformance.CheckActionTest do
     end)
   end
 
+  test "Playwright check and uncheck succeed when page code in a shadow root reverts the click" do
+    shadow = """
+    () => {
+      const root = document.querySelector('#host').attachShadow({mode: 'open'})
+      root.innerHTML = '<label><input type="checkbox">Updates</label><label><input type="checkbox" checked>Digest</label>'
+      for (const input of root.querySelectorAll('input'))
+        input.addEventListener('input', () => queueMicrotask(() => input.checked = !input.checked))
+    }
+    """
+
+    with_html(:playwright, ~s(<div id="host"></div>), fn session ->
+      Playwright.evaluate(session, shadow)
+
+      session
+      |> check(by_role(:checkbox, name: "Updates"))
+      |> expect(to_be_checked(by_role(:checkbox, name: "Updates"), checked: false))
+      |> uncheck(by_role(:checkbox, name: "Digest"))
+      |> expect(to_be_checked(by_role(:checkbox, name: "Digest")))
+    end)
+  end
+
   test "the Static driver rejects browser-owned indeterminate checkbox state" do
     checkbox = by_role(:checkbox, name: "Construction")
     html = ~s(<label><input type="checkbox">Construction</label>)

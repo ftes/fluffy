@@ -34,10 +34,12 @@ defmodule Fluffy.Backend.Playwright.Document do
     })
 
     // What the last trusted click did to a checkbox or radio, before page code
-    // (such as a LiveView patch) can change it again.
+    // (such as a LiveView patch) can change it again. The event's target is
+    // retargeted to the host of a shadow root the input is in.
     state.activations = {count: 0, checked: null}
-    window.addEventListener('input', ({isTrusted, target}) => {
-      if (isTrusted && target instanceof HTMLInputElement && ['checkbox', 'radio'].includes(target.type))
+    window.addEventListener('input', event => {
+      const target = event.composedPath()[0]
+      if (event.isTrusted && target instanceof HTMLInputElement && ['checkbox', 'radio'].includes(target.type))
         state.activations = {count: state.activations.count + 1, checked: target.checked}
     }, true)
 
