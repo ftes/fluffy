@@ -9,6 +9,7 @@ defmodule Fluffy.Driver.Live do
   alias Fluffy.Deadline
   alias Fluffy.Driver.Live.ActionResolver
   alias Fluffy.Driver.Live.Click
+  alias Fluffy.Driver.Live.Delivery
   alias Fluffy.Driver.Live.Document
   alias Fluffy.Driver.Live.Event
   alias Fluffy.Driver.Live.Retry
@@ -24,9 +25,6 @@ defmodule Fluffy.Driver.Live do
   alias Fluffy.URLMatcher
 
   @retry_interval 10
-
-  # Whether one of the running action's events reached the view. `act` owns it.
-  @delivered {__MODULE__, :delivered}
 
   @impl true
   def open_browser(%Session{} = session, open_fun) do
@@ -457,7 +455,7 @@ defmodule Fluffy.Driver.Live do
   defp dispatch_view_event(session, dispatch) do
     case call_view(session, dispatch) do
       {:ok, result} ->
-        Process.put(@delivered, true)
+        Delivery.record()
         result
 
       {:view_left, redirect} ->
@@ -470,7 +468,7 @@ defmodule Fluffy.Driver.Live do
   # action.
   defp dispatch_view_upload(session, upload, entry_name) do
     {_reference, _topic, proxy_pid} = upload.view.proxy
-    if Process.alive?(proxy_pid), do: Process.put(@delivered, true)
+    if Process.alive?(proxy_pid), do: Delivery.record()
     dispatch_view_event(session, fn -> render_upload(upload, entry_name) end)
   end
 
@@ -527,15 +525,7 @@ defmodule Fluffy.Driver.Live do
   # page instead, like a browser whose page navigated mid-action.
   defp act(session, operation, locator, options, action) do
     deadline = Retry.deadline(session, Keyword.validate!(options, [:timeout]))
-    Process.put(@delivered, false)
-
-    {result, delivered?} =
-      try do
-        result = action.(deadline)
-        {result, Process.get(@delivered)}
-      after
-        Process.delete(@delivered)
-      end
+    {result, delivered?} = Delivery.track(fn -> action.(deadline) end)
 
     case {result, delivered?} do
       {{:redirected, session, navigation}, true} ->

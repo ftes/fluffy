@@ -1,0 +1,26 @@
+defmodule Fluffy.Driver.Live.Delivery do
+  @moduledoc false
+
+  # Whether one of the running Live action's events reached the view. The
+  # driver's `act` tracks it around the action, and each view call that
+  # delivers an event records it, so an action whose later call finds the view
+  # gone still counts the events that reached it before.
+
+  @delivered {__MODULE__, :delivered}
+
+  def track(action) when is_function(action, 0) do
+    Process.put(@delivered, false)
+
+    try do
+      result = action.()
+      {result, Process.get(@delivered)}
+    after
+      Process.delete(@delivered)
+    end
+  end
+
+  def record do
+    Process.put(@delivered, true)
+    :ok
+  end
+end

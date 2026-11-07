@@ -3,6 +3,8 @@ defmodule Fluffy.TestWeb.NavigationLive do
 
   use Phoenix.LiveView
 
+  alias Phoenix.LiveView.JS
+
   @impl true
   def mount(params, _session, socket) do
     if connected?(socket) do
@@ -99,6 +101,15 @@ defmodule Fluffy.TestWeb.NavigationLive do
       <button type="button" phx-click="navigate_after_event">Enter chamber after event</button>
       <button type="button" phx-click="patch_after_event">Reveal passage after event</button>
       <button :if={@topic} type="button" phx-click="navigate_ready">Navigate ready</button>
+      <label>
+        <input
+          type="checkbox"
+          phx-click={
+            JS.push("navigate_after_event")
+            |> JS.push("save_step", value: %{step: "after-navigation"})
+          }
+        /> Enter chamber and save
+      </label>
     </main>
     """
   end

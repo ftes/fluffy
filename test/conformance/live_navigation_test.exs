@@ -174,6 +174,18 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     end
 
     @tag driver: driver
+    test "a click whose first pushed event navigates is not repeated on the new page with #{driver}", %{
+      driver: driver
+    } do
+      driver
+      |> live_session()
+      |> visit("/live/chamber-map")
+      |> click(by_label("Enter chamber and save", exact: true))
+      |> expect(Fluffy.Expect.page_to_have_url("/live/secret-chamber"))
+      |> expect("The secret chamber is open" |> by_text() |> to_be_visible())
+    end
+
+    @tag driver: driver
     test "follows Live navigation that races the post-action render with #{driver}", %{
       driver: driver
     } do
