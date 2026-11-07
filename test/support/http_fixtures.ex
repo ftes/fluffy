@@ -37,6 +37,10 @@ defmodule Fluffy.TestHTTPFixtures do
     append_suffix(base_path, suffix)
   end
 
+  # WebKit on Linux sniffs a response's first 512 bytes before it commits a navigation or a
+  # download, so a streamed first chunk needs more.
+  def sniff_padding, do: String.duplicate(" ", 1024)
+
   def url(%Fixture{} = fixture, suffix \\ "") do
     Fluffy.TestServer.base_url() <> path(fixture, suffix)
   end

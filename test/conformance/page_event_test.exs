@@ -199,7 +199,6 @@ defmodule Fluffy.Conformance.PageEventTest do
   @tag driver: :playwright
   test "popup waiting resolves before the new document finishes loading" do
     owner = self()
-    padding = String.duplicate(" ", 1024)
 
     fixture =
       TestHTTPFixtures.register(fn request ->
@@ -210,8 +209,9 @@ defmodule Fluffy.Conformance.PageEventTest do
           "/slow" ->
             %{
               stream: fn conn ->
-                # WebKit on Linux sniffs the first 512 bytes before it commits the navigation.
-                {:ok, conn} = Plug.Conn.chunk(conn, "<!doctype html><html><body><h1>Loading</h1>" <> padding)
+                {:ok, conn} =
+                  Plug.Conn.chunk(conn, "<!doctype html><html><body><h1>Loading</h1>" <> TestHTTPFixtures.sniff_padding())
+
                 send(owner, {:stream, self()})
 
                 receive do
