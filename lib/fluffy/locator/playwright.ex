@@ -2,41 +2,44 @@ defmodule Fluffy.Locator.Playwright do
   @moduledoc false
 
   alias Fluffy.Locator
-  alias PlaywrightEx.Selector
+  alias PlaywrightEx.Isomorphic.LocatorUtils
+  alias PlaywrightEx.Isomorphic.StringUtils
 
   def selector(%Locator{} = locator) do
-    locator.operations
-    |> Enum.reduce(Selector.none(), &apply_operation/2)
-    |> Selector.build()
+    case Enum.reduce(locator.operations, :none, &apply_operation/2) do
+      :none -> "*"
+      selector -> selector
+    end
   end
 
-  defp apply_operation(:enter_frame, selector), do: Selector.concat(selector, "internal:control=enter-frame")
+  def locator(frame, %Locator{} = locator), do: PlaywrightEx.Frame.locator(frame, selector(locator))
+
+  defp apply_operation(:enter_frame, selector), do: concat(selector, "internal:control=enter-frame")
 
   defp apply_operation({:css, css}, selector) do
-    Selector.concat(selector, Selector.css(css))
+    concat(selector, "css=#{css}")
   end
 
+  # Upstream builds role selectors with its options in a fixed order, including
+  # Playwright-only states such as `[pressed=true]`.
   defp apply_operation({:role, role, options}, selector) do
-    role_selector =
-      case Keyword.get(options, :name) do
-        nil ->
-          "internal:role=#{role}"
+    options =
+      Map.new(options, fn
+        {:include_hidden, include_hidden} -> {:includeHidden, include_hidden}
+        option -> option
+      end)
 
-        name ->
-          "internal:role=#{role}[name=#{attribute_value(name, Keyword.get(options, :exact, false))}]"
-      end
-
-    Selector.concat(selector, role_selector)
+    concat(selector, LocatorUtils.get_by_role_selector(role, options))
   end
 
   defp apply_operation({:text, text, options}, selector) do
     text_selector = text_selector("internal:text", text, Keyword.get(options, :exact, false))
-    Selector.concat(selector, text_selector)
+    concat(selector, text_selector)
   end
 
   defp apply_operation({:label, text, options}, selector) do
     label_selector = text_selector("internal:label", text, Keyword.get(options, :exact, false))
-    Selector.concat(selector, label_selector)
+    concat(selector, label_selector)
   end
 
   defp apply_operation({:attribute, attribute_name, text, options}, selector) do
@@ -48,22 +51,22 @@ defmodule Fluffy.Locator.Playwright do
         Keyword.get(options, :exact, false)
       )
 
-    Selector.concat(selector, attribute_selector)
+    concat(selector, attribute_selector)
   end
 
   defp apply_operation({:test_id, attribute_name, test_id}, selector) do
-    Selector.concat(
+    concat(
       selector,
       internal_attribute_selector("internal:testid", attribute_name, test_id, true)
     )
   end
 
   defp apply_operation({:and, right}, selector) do
-    Selector.and(selector, selector(right))
+    concat(selector, "internal:and=#{JSON.encode!(selector(right))}")
   end
 
   defp apply_operation({:or, right}, selector) do
-    Selector.concat(selector, "internal:or=#{JSON.encode!(selector(right))}")
+    concat(selector, "internal:or=#{JSON.encode!(selector(right))}")
   end
 
   defp apply_operation({:filter, options}, selector) do
@@ -71,21 +74,21 @@ defmodule Fluffy.Locator.Playwright do
       {:has_text, text}, current ->
         has_text = text_selector("internal:has-text", text, Keyword.get(options, :exact, false))
 
-        Selector.concat(current, has_text)
+        concat(current, has_text)
 
       {:has_not_text, text}, current ->
         has_not_text = text_selector("internal:has-not-text", text, Keyword.get(options, :exact, false))
 
-        Selector.concat(current, has_not_text)
+        concat(current, has_not_text)
 
       {:has, %Locator{} = child}, current ->
-        Selector.has(current, selector(child))
+        concat(current, "internal:has=#{JSON.encode!(selector(child))}")
 
       {:has_not, %Locator{} = child}, current ->
-        Selector.concat(current, "internal:has-not=#{JSON.encode!(selector(child))}")
+        concat(current, "internal:has-not=#{JSON.encode!(selector(child))}")
 
       {:visible, visible?}, current ->
-        Selector.concat(current, "visible=#{visible?}")
+        concat(current, "visible=#{visible?}")
 
       {:exact, _exact?}, current ->
         current
@@ -93,21 +96,16 @@ defmodule Fluffy.Locator.Playwright do
   end
 
   defp apply_operation({:nth, index}, selector) do
-    Selector.concat(selector, Selector.at(index))
+    concat(selector, "nth=#{index}")
   end
+
+  defp concat(:none, right), do: right
+  defp concat(left, right), do: "#{left} >> #{right}"
 
   defp internal_attribute_selector(engine, attribute_name, value, exact?) do
-    ~s(#{engine}=[#{attribute_name}=#{attribute_value(value, exact?)}])
+    ~s(#{engine}=[#{attribute_name}=#{StringUtils.escape_for_attribute_selector(value, exact?)}])
   end
 
-  defp text_selector(engine, value, exact?) do
-    suffix = if exact?, do: "s", else: "i"
-    "#{engine}=#{JSON.encode!(value)}#{suffix}"
-  end
-
-  defp attribute_value(value, exact?) do
-    suffix = if exact?, do: "s", else: "i"
-    escaped = value |> String.replace("\\", "\\\\") |> String.replace("\"", "\\\"")
-    ~s("#{escaped}"#{suffix})
-  end
+  # A regular expression ignores `exact?`, as upstream.
+  defp text_selector(engine, value, exact?), do: "#{engine}=#{StringUtils.escape_for_text_selector(value, exact?)}"
 end

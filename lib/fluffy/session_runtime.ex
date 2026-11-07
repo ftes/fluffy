@@ -29,7 +29,15 @@ defmodule Fluffy.SessionRuntime do
     do: call(runtime, {:register_resource, resource, cleanup})
 
   def release(runtime, resource), do: call(runtime, {:release_resource, resource})
-  def monitor(runtime, pid), do: call(runtime, {:monitor, pid})
+
+  # Runs `fun` in the runtime process, so the runtime owns what it creates.
+  def run(runtime, fun) when is_function(fun, 0) do
+    case call(runtime, {:run, fun}) do
+      {:ok, value} -> value
+      {:raise, kind, reason, stacktrace} -> :erlang.raise(kind, reason, stacktrace)
+      {:error, message} -> raise ArgumentError, message
+    end
+  end
 
   def subscribe(runtime, pid, source, type, handler), do: call(runtime, {:subscribe, pid, source, type, handler})
   def unsubscribe(runtime, pid), do: call(runtime, {:unsubscribe, pid})
@@ -135,8 +143,11 @@ defmodule Fluffy.SessionRuntime do
   def handle_call({:release_resource, resource}, _from, state),
     do: {:reply, :ok, %{state | resources: List.keydelete(state.resources, resource, 0)}}
 
-  def handle_call({:monitor, pid}, _from, state),
-    do: {:reply, :ok, %{state | monitors: [Process.monitor(pid) | state.monitors]}}
+  def handle_call({:run, fun}, _from, state) do
+    {:reply, {:ok, fun.()}, state}
+  catch
+    kind, reason -> {:reply, {:raise, kind, reason, __STACKTRACE__}, state}
+  end
 
   def handle_call({:subscribe, pid, source, type, handler}, _from, state) do
     if source == :context or Map.has_key?(state.pages, source) do

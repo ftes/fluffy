@@ -32,11 +32,6 @@ defmodule Fluffy.Page do
   def url(page), do: snapshot(page).url
 
   @doc group: "Metadata"
-  @doc "Returns the main-document response status, when known."
-  @spec status(t()) :: non_neg_integer() | nil
-  def status(%__MODULE__{runtime: runtime} = page), do: Fluffy.Backend.page_status(runtime, record(page))
-
-  @doc group: "Metadata"
   @doc "Returns the opener's page handle, or nil if there is no opener or it has closed."
   @spec opener(t()) :: t() | nil
   def opener(page) do
@@ -55,6 +50,15 @@ defmodule Fluffy.Page do
   def record(%__MODULE__{runtime: runtime, id: id}) do
     case SessionRuntime.page(runtime, id) do
       {:ok, record} -> record
+      {:error, message} -> raise ArgumentError, message
+    end
+  end
+
+  @doc false
+  @spec ensure_session!(t()) :: :ok
+  def ensure_session!(%__MODULE__{runtime: runtime}) do
+    case SessionRuntime.context(runtime) do
+      {:ok, _context} -> :ok
       {:error, message} -> raise ArgumentError, message
     end
   end

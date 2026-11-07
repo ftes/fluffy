@@ -51,13 +51,11 @@ defmodule FluffyConsumer.AdoptionTest do
             | resp_body: String.replace(conn.resp_body, "External consumer", "Native result")
           }
 
-        %Fluffy.Playwright.Handle{} = handle ->
-          {:ok, _result} =
-            PlaywrightEx.Frame.evaluate(handle.frame_id,
-              expression: "document.querySelector('h1').textContent = 'Native result'",
-              connection: handle.connection,
-              timeout: handle.timeout
-            )
+        %PlaywrightEx.Page{} = page ->
+          PlaywrightEx.Page.evaluate!(
+            page,
+            "document.querySelector('h1').textContent = 'Native result'"
+          )
       end)
       |> assert(by_text("Native result") |> visible())
     end

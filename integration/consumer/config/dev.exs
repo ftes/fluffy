@@ -13,7 +13,7 @@ config :fluffy_consumer, FluffyConsumerWeb.Endpoint,
   check_origin: false,
   code_reloader: true,
   debug_errors: true,
-  secret_key_base: "dlXo0ZDKbGoxIPjfmIX4O64Co6yOmjWRMwj02ug8Ybf6UADbzyoJGkk4gUzZotMK",
+  secret_key_base: "xmvyHQgcHWTQkDu2Aujvp9h2Tpb4zbxTSPDHDKuDBjxfLiP918ogZ78TmUOCwW94",
   watchers: []
 
 # ## SSL Support

@@ -7,7 +7,7 @@ defmodule FluffyConsumerWeb.Endpoint do
   @session_options [
     store: :cookie,
     key: "_fluffy_consumer_key",
-    signing_salt: "LgLCX0e8",
+    signing_salt: "xpuHz2MS",
     same_site: "Lax"
   ]
 

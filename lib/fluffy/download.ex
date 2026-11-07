@@ -2,21 +2,23 @@ defmodule Fluffy.Download do
   @moduledoc """
   A download available as soon as downloading starts.
 
-  `suggested_filename` and `url` are available to event predicates. Read or save
-  the contents separately; those operations wait for completion and raise on
-  download failure. Handles belong to their session; saved files outlive it.
+  `suggested_filename`, `url` and `page` are available to event predicates. Read
+  or save the contents separately; those operations wait for completion and raise
+  on download failure. Like Playwright, they have no timeout; on Firefox, an
+  interrupted download never completes. Handles belong to their session; saved
+  files outlive it. On Playwright, reach the `PlaywrightEx.Download` with
+  `Fluffy.unwrap/2`.
   """
 
-  @enforce_keys [:suggested_filename, :url, :runtime, :source]
-  defstruct [:suggested_filename, :url, :runtime, :source, :timeout]
+  # A Phoenix download carries its `body`, a Playwright download its `native` handle.
+  @enforce_keys [:suggested_filename, :url, :page, :runtime]
+  defstruct [:suggested_filename, :url, :page, :runtime, :body, :native]
 
-  @type t :: %__MODULE__{
-          suggested_filename: String.t(),
-          url: String.t(),
-          runtime: pid(),
-          source: binary() | PlaywrightEx.Download.t(),
-          timeout: non_neg_integer() | nil
-        }
+  @type t :: %__MODULE__{suggested_filename: String.t(), url: String.t(), page: Fluffy.Page.t()}
+
+  @doc "Returns the page that started the download."
+  @spec page(t()) :: Fluffy.Page.t()
+  def page(%__MODULE__{page: page}), do: page
 
   @doc "Waits for completion and reads the bytes, limited to 10 MB by default."
   @spec read!(t(), keyword()) :: binary()
@@ -33,7 +35,15 @@ defmodule Fluffy.Download do
     save_source!(download, destination)
   end
 
-  defp read_source!(%{source: bytes}, limit) when is_binary(bytes) do
+  @doc false
+  def ensure_session!(download) do
+    case Fluffy.SessionRuntime.context(download.runtime) do
+      {:ok, _} -> :ok
+      {:error, reason} -> raise ArgumentError, reason
+    end
+  end
+
+  defp read_source!(%{body: bytes}, limit) when is_binary(bytes) do
     check_size!(byte_size(bytes), limit)
     bytes
   end
@@ -50,14 +60,10 @@ defmodule Fluffy.Download do
     end
   end
 
-  defp save_source!(%{source: bytes}, destination) when is_binary(bytes), do: File.write!(destination, bytes)
+  defp save_source!(%{body: bytes}, destination) when is_binary(bytes), do: File.write!(destination, bytes)
 
-  defp save_source!(%{source: %PlaywrightEx.Download{} = source, timeout: timeout}, destination) do
-    case PlaywrightEx.Download.save_as(source, destination, timeout: timeout) do
-      :ok -> :ok
-      {:error, error} -> raise "Could not save download: #{inspect(error)}"
-    end
-  end
+  defp save_source!(%{native: %PlaywrightEx.Download{} = native}, destination),
+    do: PlaywrightEx.Download.save_as!(native, destination)
 
   defp check_size!(size, limit) when size > limit do
     raise ExUnit.AssertionError,
@@ -65,11 +71,4 @@ defmodule Fluffy.Download do
   end
 
   defp check_size!(_size, _limit), do: :ok
-
-  defp ensure_session!(download) do
-    case Fluffy.SessionRuntime.context(download.runtime) do
-      {:ok, _} -> :ok
-      {:error, reason} -> raise ArgumentError, reason
-    end
-  end
 end

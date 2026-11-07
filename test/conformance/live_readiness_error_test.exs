@@ -9,9 +9,11 @@ defmodule Fluffy.Conformance.LiveReadinessErrorTest do
 
   @tag driver: :playwright
   test "a parent patch does not make a connected nested LiveView unready" do
+    # Firefox dispatches input for one page of the shared browser at a time, so
+    # with many parallel cases an action can queue behind others for seconds.
     session =
       :playwright
-      |> start_session(base_url: Fluffy.TestServer.base_url(), timeout: 1_000)
+      |> start_session(base_url: Fluffy.TestServer.base_url(), timeout: 5_000)
       |> visit("/live/nested")
       |> fill(by_label("Parent email"), "parent@example.com")
       |> click(by_role(:button, name: "Save parent"))
@@ -46,8 +48,7 @@ defmodule Fluffy.Conformance.LiveReadinessErrorTest do
         await new Promise(resolve => view.channel.leave().receive('ok', resolve))
         element.classList.add('phx-connected')
       }
-      """,
-      is_function: true
+      """
     )
 
     assert_raise RuntimeError, ~r/expected every LiveView root to be connected/, fn ->
@@ -56,7 +57,7 @@ defmodule Fluffy.Conformance.LiveReadinessErrorTest do
   end
 
   @tag driver: :playwright
-  test "names the destination, page, frame, and expected marker on a readiness timeout" do
+  test "names the destination and expected marker on a readiness timeout" do
     session =
       start_session(:playwright,
         base_url: Fluffy.TestServer.base_url(),
@@ -70,8 +71,6 @@ defmodule Fluffy.Conformance.LiveReadinessErrorTest do
       end
 
     assert error.message =~ "/actions/disconnected-live-root"
-    assert error.message =~ "page \""
-    assert error.message =~ "frame \""
     assert error.message =~ "every LiveView root to be connected with its join complete"
   end
 end

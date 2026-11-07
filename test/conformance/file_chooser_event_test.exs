@@ -20,6 +20,7 @@ defmodule Fluffy.Conformance.FileChooserEventTest do
     chooser = await(pending)
     set_input_files(session, chooser, %FilePayload{name: "chosen.txt", bytes: "chosen", content_type: "text/plain"})
     refute FileChooser.multiple?(chooser)
+    refute unwrap(chooser, &PlaywrightEx.FileChooser.is_multiple/1)
 
     assert %{"contents" => "chosen", "name" => "chosen.txt", "type" => "text/plain"} =
              Playwright.evaluate(
@@ -29,9 +30,11 @@ defmodule Fluffy.Conformance.FileChooserEventTest do
                  const file = document.querySelector('#attachment').files[0];
                  return {name: file.name, type: file.type, contents: await file.text()};
                }
-               """,
-               is_function: true
+               """
              )
+
+    close_session(session)
+    assert_raise ArgumentError, ~r/session is closed/, fn -> unwrap(chooser, & &1) end
   end
 
   @tag driver: :playwright
@@ -137,8 +140,7 @@ defmodule Fluffy.Conformance.FileChooserEventTest do
       Playwright.evaluate(
         original,
         "destination => { document.querySelector('#attachment').onchange = () => { location.href = destination } }",
-        arg: destination,
-        is_function: true
+        destination
       )
 
       pending = wait_for(original, Event.file_chooser())

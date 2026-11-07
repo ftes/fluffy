@@ -16,14 +16,14 @@ defmodule Fluffy.Expectation do
 
   def count_message(locator, expected, actual, candidates) do
     String.trim("""
-    Expected #{Locator.describe(locator)} to match #{expected} element(s), but it matched #{actual}.
+    Expected #{Locator.Internal.describe(locator)} to match #{expected} element(s), but it matched #{actual}.
     #{candidate_section(candidates)}
     """)
   end
 
   def strictness_message(locator, candidates) do
     String.trim("""
-    Expected #{Locator.describe(locator)} to resolve to exactly one element, but it matched #{length(candidates)}.
+    Expected #{Locator.Internal.describe(locator)} to resolve to exactly one element, but it matched #{length(candidates)}.
     #{candidate_section(candidates)}
     """)
   end

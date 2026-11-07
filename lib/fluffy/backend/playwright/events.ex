@@ -4,12 +4,17 @@ defmodule Fluffy.Backend.Playwright.Events do
   alias Fluffy.Dialog
   alias Fluffy.Download
   alias Fluffy.FileChooser
-  alias Fluffy.HTTPEvent
   alias Fluffy.Page
   alias Fluffy.Session
   alias Fluffy.SessionRuntime
-  alias PlaywrightEx.Connection
-  alias PlaywrightEx.Download, as: BrowserDownload
+  alias PlaywrightEx.BrowserContext
+  alias PlaywrightEx.Page, as: BrowserPage
+
+  # What `PlaywrightEx.Request.frame/1` raises for a request without a frame.
+  @no_frame [
+    "Service Worker requests do not have an associated frame",
+    "Frame for this navigation request is not available"
+  ]
 
   def event_source(session, type, scope) do
     if type == :page or (type in [:request, :response] and scope == :context) do
@@ -20,54 +25,63 @@ defmodule Fluffy.Backend.Playwright.Events do
     end
   end
 
+  # Native listeners only forward to the subscription process, which decodes.
   def subscribe_event(session, type, source, recipient) do
-    context = Session.context(session)
-    page_id = if source != :context, do: Page.record(Page.new(session.runtime, source)).state.page_id
-    subscriptions = subscriptions(context.context_id, page_id, type)
-    Code.ensure_loaded!(BrowserDownload)
-    Code.ensure_loaded!(Fluffy.Frame)
+    listeners =
+      case source do
+        :context ->
+          [{BrowserContext, Session.context(session).browser_context, type}]
 
-    unsubscribe = fn ->
+        # The runtime reports a source page's close (see decode); a native close
+        # listener would race that report.
+        _page_id when type == :close ->
+          []
+
+        page_id ->
+          page = Page.record(Page.new(session.runtime, page_id)).state.page
+          [{BrowserPage, page, type}, {BrowserPage, page, :crash}]
+      end
+
+    # A failed registration releases the listeners registered before it.
+    listeners =
+      Enum.reduce(listeners, [], fn {module, target, event}, registered ->
+        listener = fn native -> send(recipient, {:fluffy_playwright_event, event, native}) end
+
+        try do
+          module.on(target, event, listener)
+        catch
+          kind, reason ->
+            unsubscribe(registered)
+            :erlang.raise(kind, reason, __STACKTRACE__)
+        end
+
+        [{module, target, event, listener} | registered]
+      end)
+
+    unsubscribe = fn -> unsubscribe(listeners) end
+
+    decode = fn
+      {:source_closed, _reason} when type == :close -> {:ok, Page.new(session.runtime, source)}
+      {:fluffy_playwright_event, :crash, _page} -> {:error, "event source crashed"}
+      {:fluffy_playwright_event, _event, native} -> {:ok, value(session, type, native)}
+      _message -> :ignore
+    end
+
+    {decode, unsubscribe}
+  end
+
+  defp unsubscribe(listeners) do
+    for {module, target, event, listener} <- listeners do
       try do
-        for {guid, _event} <- subscriptions do
-          Connection.unsubscribe_sync(context.connection, recipient, guid)
-        end
-
-        :ok
+        module.off(target, event, listener)
       catch
-        # A lost connection already released its subscriptions. Cleanup must
+        # A lost driver already released its listeners. Cleanup must
         # preserve the event outcome or the caller's original callback failure.
-        :exit, _reason -> :ok
+        _kind, _reason -> :ok
       end
     end
 
-    try do
-      for {guid, event} <- subscriptions do
-        case Connection.subscribe_event(context.connection, recipient, guid, event) do
-          :ok -> :ok
-          {:error, reason} -> raise ArgumentError, "event source is closed: #{inspect(reason)}"
-        end
-      end
-
-      decode = fn
-        {:playwright_msg, %{guid: guid, method: method}} when method in [:close, :crash, :__dispose__] ->
-          if guid in Enum.map(subscriptions, &elem(&1, 0)),
-            do: {:error, "event source #{if method == :crash, do: "crashed", else: "is closed"}"},
-            else: :ignore
-
-        {:playwright_msg, message} ->
-          decode(session, context, page_id, type, message)
-
-        _message ->
-          :ignore
-      end
-
-      {decode, unsubscribe}
-    catch
-      kind, reason ->
-        unsubscribe.()
-        :erlang.raise(kind, reason, __STACKTRACE__)
-    end
+    :ok
   end
 
   defp checked_page(page) do
@@ -75,116 +89,92 @@ defmodule Fluffy.Backend.Playwright.Events do
     page
   end
 
-  defp subscriptions(context_id, _page_id, :page), do: [{context_id, :page}]
-  defp subscriptions(context_id, page_id, :popup), do: [{context_id, :page}, {page_id, :close}]
-  defp subscriptions(context_id, nil, type) when type in [:request, :response], do: [{context_id, type}]
-
-  defp subscriptions(context_id, page_id, type) when type in [:request, :response],
-    do: [{context_id, type}, {page_id, :close}]
-
-  defp subscriptions(_context_id, page_id, type), do: [{page_id, type}]
-
-  defp decode(session, context, _page_id, :download, %{method: :download} = message) do
-    source = BrowserDownload.from_event(message, connection: context.connection)
-
-    {:ok,
-     %Download{
-       suggested_filename: source.suggested_filename,
-       url: source.url,
-       runtime: session.runtime,
-       source: source,
-       timeout: context.timeout
-     }}
-  end
-
-  defp decode(session, context, opener_id, type, %{method: :page, params: %{page: %{guid: guid}}})
-       when type in [:page, :popup] do
-    initializer = Connection.initializer!(context.connection, guid)
-
-    if type == :page or initializer[:opener] == %{guid: opener_id},
-      do: {:ok, page_handle(session, context, guid)},
-      else: :ignore
-  end
-
-  defp decode(_session, context, _page_id, :dialog, %{method: :__create__, params: %{type: "Dialog"} = params}) do
-    initializer = params.initializer
-
-    type =
-      case initializer.type do
-        "alert" -> :alert
-        "confirm" -> :confirm
-        "prompt" -> :prompt
-        "beforeunload" -> :beforeunload
-      end
-
-    {:ok,
-     %Dialog{
-       type: type,
-       message: initializer.message,
-       default_value: initializer[:default_value] || "",
-       connection: context.connection,
-       id: params.guid,
-       timeout: context.timeout
-     }}
-  end
-
-  defp decode(session, context, page_id, :file_chooser, %{method: :file_chooser, params: params}) do
-    {:ok,
-     %FileChooser{
-       element_id: params.element.guid,
-       page: page_handle(session, context, page_id),
-       multiple?: params.is_multiple
-     }}
-  end
-
-  defp decode(session, context, page_id, :frame_navigated, %{method: :frame_navigated, params: params}) do
-    {:ok, Fluffy.Frame.new(page_handle(session, context, page_id), params.frame.guid)}
-  end
-
-  defp decode(session, context, page_id, type, %{method: type, params: params}) when type in [:request, :response] do
-    if is_nil(page_id) or params[:page] == %{guid: page_id} do
-      {:ok, http_event(session, context, type, params)}
-    else
-      :ignore
-    end
-  end
-
-  defp decode(_session, _context, _page_id, _type, _message), do: :ignore
-
-  defp http_event(session, context, type, params) do
-    response = if type == :response, do: Connection.initializer!(context.connection, params.response.guid)
-    request_guid = if response, do: response.request.guid, else: params.request.guid
-    request = Connection.initializer!(context.connection, request_guid)
-    metadata = response || request
-
-    %HTTPEvent{
-      kind: type,
-      method: request.method,
-      url: metadata.url,
-      headers: Map.new(metadata.headers, fn %{name: name, value: value} -> {String.downcase(name), value} end),
-      resource_type: request.resource_type,
-      post_data: decode_binary(request[:post_data]),
-      status: metadata[:status],
-      status_text: metadata[:status_text],
-      page: if(params[:page], do: page_handle(session, context, params.page.guid))
+  defp value(session, :download, download) do
+    %Download{
+      suggested_filename: PlaywrightEx.Download.suggested_filename(download),
+      url: PlaywrightEx.Download.url(download),
+      page: page_handle(session, PlaywrightEx.Download.page(download)),
+      runtime: session.runtime,
+      native: download
     }
   end
 
-  defp decode_binary(nil), do: nil
-  defp decode_binary(value), do: Base.decode64!(value)
+  defp value(session, type, browser_page) when type in [:page, :popup], do: page_handle(session, browser_page)
 
-  defp page_handle(session, context, guid) do
-    case SessionRuntime.external_page(session.runtime, guid) do
-      {:ok, nil} -> register_page(session, context, guid)
+  defp value(session, :dialog, dialog) do
+    %Dialog{
+      type: dialog_type(PlaywrightEx.Dialog.type(dialog)),
+      message: PlaywrightEx.Dialog.message(dialog),
+      default_value: PlaywrightEx.Dialog.default_value(dialog),
+      page: dialog |> PlaywrightEx.Dialog.page() |> optional_page_handle(session),
+      native: dialog
+    }
+  end
+
+  defp value(session, :file_chooser, chooser) do
+    %FileChooser{
+      native: chooser,
+      page: page_handle(session, PlaywrightEx.FileChooser.page(chooser)),
+      multiple?: PlaywrightEx.FileChooser.is_multiple(chooser)
+    }
+  end
+
+  defp value(session, :frame_navigated, frame) do
+    Fluffy.Frame.new(page_handle(session, PlaywrightEx.Frame.page(frame)), frame)
+  end
+
+  defp value(session, :request, request), do: request(session, request)
+
+  defp value(session, :response, response) do
+    %Fluffy.Response{
+      url: PlaywrightEx.Response.url(response),
+      status: PlaywrightEx.Response.status(response),
+      status_text: PlaywrightEx.Response.status_text(response),
+      headers: PlaywrightEx.Response.headers(response),
+      request: request(session, PlaywrightEx.Response.request(response)),
+      native: response
+    }
+  end
+
+  defp request(session, request) do
+    %Fluffy.Request{
+      url: PlaywrightEx.Request.url(request),
+      method: PlaywrightEx.Request.method(request),
+      headers: PlaywrightEx.Request.headers(request),
+      resource_type: PlaywrightEx.Request.resource_type(request),
+      post_data: PlaywrightEx.Request.post_data(request),
+      page: request_page(session, request),
+      native: request
+    }
+  end
+
+  # Service worker requests, and a popup's first request, have no frame yet.
+  # `Request.frame/1` raises for both; other errors surface.
+  defp request_page(session, request) do
+    page_handle(session, request |> PlaywrightEx.Request.frame() |> PlaywrightEx.Frame.page())
+  rescue
+    error in RuntimeError ->
+      if String.starts_with?(error.message, @no_frame), do: nil, else: reraise(error, __STACKTRACE__)
+  end
+
+  defp optional_page_handle(nil, _session), do: nil
+  defp optional_page_handle(browser_page, session), do: page_handle(session, browser_page)
+
+  defp dialog_type("alert"), do: :alert
+  defp dialog_type("confirm"), do: :confirm
+  defp dialog_type("prompt"), do: :prompt
+  defp dialog_type("beforeunload"), do: :beforeunload
+
+  defp page_handle(session, browser_page) do
+    case SessionRuntime.external_page(session.runtime, browser_page.guid) do
+      {:ok, nil} -> register_page(session, browser_page)
       {:ok, id} -> Page.new(session.runtime, id)
       {:error, message} -> raise ArgumentError, message
     end
   end
 
-  defp register_page(session, context, guid) do
-    page = Fluffy.Backend.Playwright.page_record(context, guid)
-
-    case SessionRuntime.register_page(session.runtime, page) do
+  defp register_page(session, browser_page) do
+    case SessionRuntime.register_page(session.runtime, Fluffy.Backend.Playwright.page_record(browser_page)) do
       {:ok, id} -> Page.new(session.runtime, id)
       {:error, message} -> raise ArgumentError, message
     end

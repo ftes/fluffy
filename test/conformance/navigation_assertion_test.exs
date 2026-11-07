@@ -9,12 +9,12 @@ defmodule Fluffy.Conformance.NavigationAssertionTest do
 
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
-    test "asserts link navigation URL and status with #{driver}", %{driver: driver} do
+    test "asserts link navigation URL and content with #{driver}", %{driver: driver} do
       fixture =
         TestHTTPFixtures.register(fn request ->
           case request.path do
             "/start" -> %{body: html(~s(<a href="destination?source=link">Continue</a>))}
-            "/destination" -> %{status: 202, body: html("<h1>Arrived</h1>")}
+            "/destination" -> %{body: html("<h1>Arrived</h1>")}
           end
         end)
 
@@ -25,7 +25,6 @@ defmodule Fluffy.Conformance.NavigationAssertionTest do
       |> visit(TestHTTPFixtures.path(fixture, "/start"))
       |> click(by_role(:link, name: "Continue"))
       |> expect(page_to_have_url(destination))
-      |> expect(page_to_have_status(202))
       |> expect("Arrived" |> by_text() |> to_be_visible())
     end
 
@@ -46,7 +45,7 @@ defmodule Fluffy.Conformance.NavigationAssertionTest do
               }
 
             "/submit" ->
-              %{status: 201, body: html("<h1>Submitted</h1>")}
+              %{body: html("<h1>Submitted</h1>")}
           end
         end)
 
@@ -58,7 +57,6 @@ defmodule Fluffy.Conformance.NavigationAssertionTest do
       |> fill(by_label("Query"), "fluffy")
       |> click(by_role(:button, name: "Search"))
       |> expect(page_to_have_url(destination))
-      |> expect(page_to_have_status(201))
       |> expect("Submitted" |> by_text() |> to_be_visible())
 
       [request] =
@@ -71,13 +69,13 @@ defmodule Fluffy.Conformance.NavigationAssertionTest do
     end
 
     @tag driver: driver
-    test "asserts the final response after a redirect with #{driver}", %{driver: driver} do
+    test "asserts the final document after a redirect with #{driver}", %{driver: driver} do
       fixture =
         TestHTTPFixtures.register(fn request ->
           case request.path do
             "/start" -> %{body: html(~s(<a href="redirect">Continue</a>))}
             "/redirect" -> %{status: 302, headers: [{"location", "final"}], body: ""}
-            "/final" -> %{status: 203, body: html("<h1>Final</h1>")}
+            "/final" -> %{body: html("<h1>Final</h1>")}
           end
         end)
 
@@ -88,7 +86,6 @@ defmodule Fluffy.Conformance.NavigationAssertionTest do
       |> visit(TestHTTPFixtures.path(fixture, "/start"))
       |> click(by_role(:link, name: "Continue"))
       |> expect(page_to_have_url(destination))
-      |> expect(page_to_have_status(203))
       |> expect("Final" |> by_text() |> to_be_visible())
     end
   end
@@ -114,8 +111,8 @@ defmodule Fluffy.Conformance.NavigationAssertionTest do
           case request.path do
             "/start" -> %{body: html(~s(<a href="#{first_path}">First</a>))}
             "/redirect" -> %{status: 302, headers: [{"location", "first"}], body: ""}
-            "/first" -> %{status: 201, body: html(~s(<a href="second">Second</a>))}
-            "/second" -> %{status: 202, body: html("<h1>Second document</h1>")}
+            "/first" -> %{body: html(~s(<a href="second">Second</a>))}
+            "/second" -> %{body: html("<h1>Second document</h1>")}
           end
         end)
 
@@ -124,10 +121,10 @@ defmodule Fluffy.Conformance.NavigationAssertionTest do
       |> visit(TestHTTPFixtures.path(fixture, "/start"))
       |> click(by_role(:link, name: "First"))
       |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/first")))
-      |> expect(page_to_have_status(201))
+      |> expect(:link |> by_role(name: "First") |> to_have_count(0))
       |> click(by_role(:link, name: "Second"))
       |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/second")))
-      |> expect(page_to_have_status(202))
+      |> expect(:heading |> by_role(name: "Second document") |> to_be_visible())
     end
   end
 
@@ -144,7 +141,7 @@ defmodule Fluffy.Conformance.NavigationAssertionTest do
               }
 
             "/second" ->
-              %{status: 202, body: html("<h1>Second document</h1>")}
+              %{body: html("<h1>Second document</h1>")}
           end
         end)
 
@@ -153,20 +150,20 @@ defmodule Fluffy.Conformance.NavigationAssertionTest do
       |> visit(TestHTTPFixtures.path(fixture, "/start"))
       |> click(by_role(:link, name: "Section", exact: true))
       |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/start#section")))
-      |> expect(page_to_have_status(200))
+      |> expect("Section content" |> by_text() |> to_be_visible())
       |> click(by_role(:link, name: "Second"))
       |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/second")))
-      |> expect(page_to_have_status(202))
+      |> expect(:heading |> by_role(name: "Second document") |> to_be_visible())
     end
   end
 
   for driver <- [:phoenix, :playwright], kind <- [:patch, :navigate] do
     @tag driver: driver
     test "asserts a LiveView #{kind} before another navigation with #{driver}", %{driver: driver} do
-      {link, destination} =
+      {link, destination, content} =
         case unquote(kind) do
-          :patch -> {"Reveal passage", "/live/chamber-map?step=patched"}
-          :navigate -> {"Secret chamber", "/live/secret-chamber"}
+          :patch -> {"Reveal passage", "/live/chamber-map?step=patched", "Map position: patched"}
+          :navigate -> {"Secret chamber", "/live/secret-chamber", "The secret chamber is open"}
         end
 
       driver
@@ -174,10 +171,10 @@ defmodule Fluffy.Conformance.NavigationAssertionTest do
       |> visit("/live/chamber-map")
       |> click(by_role(:link, name: link, exact: true))
       |> expect(page_to_have_url(destination))
-      |> expect(page_to_have_status(200))
+      |> expect(content |> by_text(exact: true) |> to_be_visible())
       |> visit("/chamber")
       |> expect(page_to_have_url("/chamber"))
-      |> expect(page_to_have_status(200))
+      |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
     end
   end
 
@@ -189,7 +186,7 @@ defmodule Fluffy.Conformance.NavigationAssertionTest do
       |> visit("/chamber")
       |> reload()
       |> expect(page_to_have_url("/chamber"))
-      |> expect(page_to_have_status(200))
+      |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
       |> visit("/live/chamber-map")
       |> expect(page_to_have_url("/live/chamber-map"))
     end

@@ -1,6 +1,6 @@
 # Fluffy
 
-![A friendly three-headed Fluffy asleep beside an Elixir wizard playing a flute, with the heads labeled Live, Static, and Playwright](docs/images/fluffy-banner.webp)
+![A friendly three-headed Fluffy asleep beside an Elixir wizard playing a flute, with the heads labeled Live, Static, and Playwright](https://raw.githubusercontent.com/ftes/fluffy/main/docs/images/fluffy-banner.webp)
 
 **Phoenix feature tests. Three drivers, one Playwright-shaped API.**
 

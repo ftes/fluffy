@@ -39,6 +39,8 @@ defmodule Fluffy.Conformance.FrameEventTest do
     parent = Frame.parent_frame(child)
     assert Frame.page(parent) == current_page(session)
     assert Frame.parent_frame(parent) == nil
+    assert unwrap(child, &PlaywrightEx.Frame.name/1) == ""
+    assert parent |> unwrap(&PlaywrightEx.Frame.child_frames/1) |> length() == 1
 
     pending = wait_for(session, Event.frame_navigated())
     other = switch_page(session, new_page(session))

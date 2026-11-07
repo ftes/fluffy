@@ -9,7 +9,8 @@ defmodule Fluffy.Application do
     validate_playwright_config()
 
     Supervisor.start_link(
-      children() ++ [{DynamicSupervisor, strategy: :one_for_one, name: Fluffy.SessionRuntime.Supervisor}],
+      [{Task.Supervisor, name: Fluffy.TaskSupervisor}] ++
+        children() ++ [{DynamicSupervisor, strategy: :one_for_one, name: Fluffy.SessionRuntime.Supervisor}],
       strategy: :rest_for_one,
       name: Fluffy.Supervisor
     )
@@ -29,12 +30,7 @@ defmodule Fluffy.Application do
             {Fluffy.BrowserRuntime,
              timeout: timeout,
              engine: Keyword.get(config, :engine, :chromium),
-             playwright_options:
-               Keyword.take(config, [:executable]) ++
-                 [
-                   js_logger: normalize_js_logger(Keyword.fetch!(config, :js_logger)),
-                   timeout: timeout
-                 ],
+             playwright_options: Keyword.take(config, [:executable]),
              launch_options: Keyword.fetch!(config, :launch_options)}
           ]
         else
@@ -53,7 +49,4 @@ defmodule Fluffy.Application do
     |> Application.get_env(:playwright, false)
     |> Fluffy.Options.validate_playwright!()
   end
-
-  defp normalize_js_logger(false), do: nil
-  defp normalize_js_logger(module), do: module
 end

@@ -25,4 +25,11 @@ defmodule Fluffy.FailureArtifactTest do
     assert png |> File.read!() |> byte_size() > 0
     assert File.read!(failure) =~ "original failure"
   end
+
+  # A linked call would kill the caller, skipping capture's own error handling.
+  @tag :capture_log
+  test "a crash in a bounded Playwright call exits the caller instead of killing it" do
+    assert {%RuntimeError{message: "boom"}, _stacktrace} =
+             catch_exit(Fluffy.Backend.Playwright.Bounded.within(1_000, fn -> raise "boom" end))
+  end
 end

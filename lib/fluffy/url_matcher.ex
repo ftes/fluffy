@@ -31,8 +31,13 @@ defmodule Fluffy.URLMatcher do
     }
   end
 
-  @spec matches?(String.t() | Regex.t() | t() | (URI.t() -> boolean()), String.t()) :: boolean()
+  @spec matches?(String.t() | {:ignore_case, String.t()} | Regex.t() | t() | (URI.t() -> boolean()), String.t()) ::
+          boolean()
   def matches?(expected, actual) when is_binary(expected) and is_binary(actual), do: actual == expected
+
+  def matches?({:ignore_case, expected}, actual) when is_binary(actual),
+    do: String.downcase(actual) == String.downcase(expected)
+
   def matches?(%Regex{} = expected, actual) when is_binary(actual), do: Regex.match?(expected, actual)
 
   def matches?(%__MODULE__{} = matcher, actual) when is_binary(actual) do
@@ -49,9 +54,27 @@ defmodule Fluffy.URLMatcher do
 
   def matches?(_expected, _actual), do: false
 
-  @spec describe(String.t() | Regex.t() | t() | (URI.t() -> boolean())) :: String.t()
+  @spec describe(String.t() | {:ignore_case, String.t()} | Regex.t() | t() | (URI.t() -> boolean())) :: String.t()
   def describe(%__MODULE__{source: source}), do: inspect(source)
+  def describe({:ignore_case, expected}), do: "#{inspect(expected)}, ignoring case"
   def describe(expected), do: inspect(expected)
+
+  @doc """
+  Applies `ignore_case:` to a string or regular expression. It takes precedence over a
+  regular expression's own `i` flag, as in PlaywrightEx.
+  """
+  def ignore_case(expected, nil), do: expected
+
+  # A leading inline flag overrides the regex's own `i` option.
+  def ignore_case(%Regex{} = expected, ignore_case) do
+    flag = if ignore_case, do: "(?i)", else: "(?-i)"
+    Regex.compile!(flag <> Regex.source(expected), Regex.opts(expected))
+  end
+
+  def ignore_case(expected, false), do: expected
+  def ignore_case(expected, true) when is_binary(expected), do: {:ignore_case, expected}
+
+  def ignore_case(_expected, true), do: raise(ArgumentError, "ignore_case: requires a string or regular expression URL")
 
   defp ensure_component!(components) do
     if Enum.any?([:path, :query, :fragment], &Keyword.has_key?(components, &1)) do

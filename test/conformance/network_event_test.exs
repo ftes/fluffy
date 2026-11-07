@@ -7,7 +7,6 @@ defmodule Fluffy.Conformance.NetworkEventTest do
   import Fluffy.Playwright
 
   alias Fluffy.Event
-  alias Fluffy.HTTPEvent
   alias Fluffy.Playwright
   alias Fluffy.TestHTTPFixtures
 
@@ -18,21 +17,32 @@ defmodule Fluffy.Conformance.NetworkEventTest do
     response_wait = wait_for(session, Event.response(&String.ends_with?(&1.url, "/api?source=button")))
     click(session, by_role(:button, name: "Save"))
 
-    assert %HTTPEvent{kind: :request, method: "POST", status: nil, resource_type: "fetch", post_data: "payload"} =
+    assert %Fluffy.Request{method: "POST", resource_type: "fetch", post_data: "payload"} =
              request = await(request_wait)
 
     assert request.url == TestHTTPFixtures.url(fixture, "/api?source=button")
     assert request.headers["x-fluffy"] == "network-test"
     assert request.page == current_page(session)
 
-    assert %HTTPEvent{kind: :response, method: "POST", status: 207, status_text: "Multi-Status"} =
-             response = await(response_wait)
-
+    assert %Fluffy.Response{status: 207, status_text: "Multi-Status"} = response = await(response_wait)
     assert response.url == request.url
     assert response.headers["content-type"] == "application/json"
-    assert response.resource_type == "fetch"
-    assert response.post_data == "payload"
-    assert response.page == request.page
+    assert response.request == request
+  end
+
+  @tag driver: :playwright
+  test "unwrap reaches the native request and response" do
+    {session, _fixture} = session()
+    response_wait = wait_for(session, Event.response(&String.ends_with?(&1.url, "/api?source=button")))
+    click(session, by_role(:button, name: "Save"))
+    response = await(response_wait)
+
+    assert unwrap(response, &PlaywrightEx.Response.text!/1) == ~s({"saved":true})
+    assert unwrap(response.request, &PlaywrightEx.Request.is_navigation_request/1) == false
+
+    close_session(session)
+    assert_raise ArgumentError, ~r/session is closed/, fn -> unwrap(response, & &1) end
+    assert_raise ArgumentError, ~r/session is closed/, fn -> unwrap(response.request, & &1) end
   end
 
   @tag driver: :playwright
@@ -44,8 +54,7 @@ defmodule Fluffy.Conformance.NetworkEventTest do
     Playwright.evaluate(
       session,
       "url => { const f = document.createElement('iframe'); f.src = url; document.body.appendChild(f) }",
-      arg: frame_url,
-      is_function: true
+      frame_url
     )
 
     await(frame_wait)
@@ -53,9 +62,10 @@ defmodule Fluffy.Conformance.NetworkEventTest do
     page_wait = wait_for(session, event)
     context_wait = wait_for(session, event, scope: :context)
 
-    Playwright.evaluate(session, "url => { document.querySelector('iframe').contentWindow.fetch(url); return true }",
-      arg: TestHTTPFixtures.url(fixture, "/api"),
-      is_function: true
+    Playwright.evaluate(
+      session,
+      "url => { document.querySelector('iframe').contentWindow.fetch(url); return true }",
+      TestHTTPFixtures.url(fixture, "/api")
     )
 
     request = await(page_wait)

@@ -50,7 +50,7 @@ defmodule Fluffy.Driver.Static do
 
       %Expect{target: :page, kind: :title, expected: expected} ->
         actual = session |> Session.page_state() |> document() |> page_title()
-        assert_truth!(expectation, Expect.title_matches?(expected, actual), actual)
+        assert_truth!(expectation, Expect.Internal.title_matches?(expected, actual), actual)
     end
 
     session
@@ -193,7 +193,7 @@ defmodule Fluffy.Driver.Static do
   defp assert_truth!(%Expect{} = expectation, passed?, actual) do
     if passed? == expectation.negated? do
       raise ExUnit.AssertionError,
-        message: "Expected #{Expect.describe(expectation)}, got #{inspect(actual)}"
+        message: "Expected #{Expect.Internal.describe(expectation)}, got #{inspect(actual)}"
     end
 
     :ok

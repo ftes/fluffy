@@ -5,7 +5,9 @@ defmodule Fluffy.Conformance.LiveStructuralActionRetryTest do
   import Fluffy.Expect
   import Fluffy.Locator
 
-  @action_timeout 1_000
+  # Firefox dispatches input for one page of the shared browser at a time, so
+  # with many parallel cases an action can queue behind others for seconds.
+  @action_timeout 5_000
 
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver

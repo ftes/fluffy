@@ -15,7 +15,7 @@ defmodule Fluffy.ActionabilityError do
 
     description =
       cond do
-        locator -> Fluffy.Locator.describe(locator)
+        locator -> Fluffy.Locator.Internal.describe(locator)
         is_binary(target) -> target
         true -> raise ArgumentError, "ActionabilityError requires :locator or :target"
       end

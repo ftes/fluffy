@@ -35,8 +35,8 @@ end
 
 For tests using browser-only helpers, also `import Fluffy.Playwright`. This
 lets you call `new_page`, `current_page`, `pages`, `switch_page`, `close_page`,
-`go_back`, `go_forward`, `hover`, `drag_to`, and
-`press_sequentially` without module qualifiers:
+`go_back`, `go_forward`, `hover`, `drag_to`, `press_sequentially`, and the
+[clock functions](#controlling-time) without module qualifiers:
 
 ```elixir
 import Fluffy
@@ -188,6 +188,11 @@ precedence: `aria-labelledby`, then `aria-label`, then native labels. Explicit
 ARIA roles override implicit roles. CSS must be valid browser CSS; escape
 special characters in IDs or use a semantic/test-id locator.
 
+Options marked *Playwright only.* in `Fluffy.Locator`, such as
+`by_role(:button, pressed: true)`, `by_role(:heading, level: 2)` or a regex
+`name:` or `has_text:`, compile into the browser's selector. Static and LiveView
+sessions raise `Fluffy.CapabilityError` when they resolve such a locator.
+
 Refine a locator with `filter`, `first`, `last`, or zero-based `nth`.
 Use `and_` to require both locators to match the same element:
 
@@ -317,7 +322,8 @@ Static and LiveView raise `Fluffy.CapabilityError` for indeterminate state.
 LiveView expectations observe fresh renders and retry until they pass or reach
 their deadline. Supported LiveView actions also retry transient missing or
 actionability failures, as listed below. Waiting is enabled by default; pass
-`timeout:` to an action or expectation to change its deadline. Static checks
+`timeout:` to an action or expectation to change its deadline. It defaults to the
+session's `timeout:` from `start_session/2`, then the configured timeout. Static checks
 are immediate. Playwright uses the browser's native waiting behavior.
 
 When a Playwright visit finds LiveView roots, it waits for every root, including
@@ -490,6 +496,18 @@ session |> assert(page_url(fn uri -> uri.path == "/potions" and uri.fragment == 
 Predicates work with both backends and with negated assertions. Keep them quick
 and nonblocking.
 
+Like Playwright, Fluffy has no page status assertion. On Playwright, assert on the
+navigation's response instead:
+
+```elixir
+session
+|> assert_event(
+  Event.response(&String.ends_with?(&1.url, "/potions")),
+  &click(&1, by_role(:link, name: "Potions")),
+  fn response -> assert response.status == 200 end
+)
+```
+
 Structured queries decode like `URLSearchParams`: distinct parameter-name
 order is ignored, and repeated values retain their order and duplicates.
 Exact query mode rejects unrelated names; `query_mode: :subset` allows them
@@ -557,8 +575,8 @@ Element-action failures raise `Fluffy.OperationError` across drivers. Rescue it
 uniformly and inspect `backend`, `driver`, `operation`, `locator` (or file-chooser
 handle), and `cause` for details. This includes `submit` and file selection.
 
-For Playwright, `cause` preserves the original adapter error, including native
-error names and call logs. For Phoenix, it retains `Fluffy.StrictnessError` or
+For Playwright, `cause` is the native PlaywrightEx exception (such as
+`PlaywrightEx.TimeoutError`), including its call log. For Phoenix, it retains `Fluffy.StrictnessError` or
 `Fluffy.ActionabilityError`, including structural reasons and candidates. LiveView
 finishes its action retries before wrapping the final failure. Browser failures
 are not classified by parsing messages or inspecting a later DOM snapshot.
@@ -607,7 +625,7 @@ for downloads, popups, dialogs, and network events.
 
 ## Browser-only evaluation
 
-Use `Fluffy.Playwright.evaluate/2` when a Playwright test needs a value from
+Use `Fluffy.Playwright.evaluate/3` when a Playwright test needs a value from
 the active page:
 
 ```elixir
@@ -623,10 +641,46 @@ end)
 |> click(by_role(:button, name: "Reveal diary message"))
 ```
 
-`Fluffy.Playwright.evaluate/2` returns the JavaScript result, not the session. Use
-`then/2`, as above, to continue a pipeline. Function-style expressions can pass
-`is_function: true` and `arg:`. Phoenix sessions raise a capability error because
+`Fluffy.Playwright.evaluate/3` returns the JavaScript result, not the session. Use
+`then/2`, as above, to continue a pipeline. A function expression receives the
+optional third argument, as in `PlaywrightEx.Frame.evaluate/3`. Phoenix sessions raise a capability error because
 Phoenix does not execute client code.
+
+## Controlling time
+
+On Playwright, `Fluffy.Playwright.install_clock/2` fakes the page's `Date` and
+timers (`setTimeout`, `setInterval`, `requestAnimationFrame`, and so on) for every
+page of the session, including documents loaded later. Install the clock before
+visiting the page, then pause it and advance it explicitly:
+
+```elixir
+import Fluffy
+import Fluffy.Expect
+import Fluffy.Locator
+import Fluffy.Playwright
+
+session
+|> install_clock(time: ~U[2024-02-02 08:00:00Z])
+|> visit("/spellbook")
+|> pause_clock_at(~U[2024-02-02 09:00:00Z])
+# The search input has phx-debounce="500": nothing is sent yet.
+|> fill(by_label("Search"), "Lumos")
+|> run_clock_for(500)
+|> expect(to_be_visible(by_text("1 spell found")))
+```
+
+`run_clock_for/3` fires every timer due on the way, `fast_forward_clock/3` jumps
+ahead firing due timers once, and `resume_clock/2` lets time flow again.
+`set_fixed_time/3` freezes only `Date`; `set_system_time/3` shifts it without
+firing timers. Timer-started navigation is adopted, as after an action.
+
+While the clock is paused, actions, assertions, and navigation keep working:
+Fluffy's waits do not use page timers. The application's own timers are frozen
+though: LiveView's `phx-debounce` and `phx-throttle`, `JS.transition/2` (which
+also holds back LiveView's DOM updates until it ends), page title updates, and the
+socket's heartbeat and reconnects. An assertion that depends on them fails
+after its timeout until the test advances or resumes the clock. Phoenix sessions
+raise `Fluffy.CapabilityError`.
 
 ## Native escape hatch
 
@@ -644,18 +698,35 @@ end)
 
 The callback receives the current `%Plug.Conn{}` on a Static page, a
 `%Phoenix.LiveViewTest.View{}` on a LiveView page, or a
-`%Fluffy.Playwright.Handle{}` on a Playwright page.
+`%PlaywrightEx.Page{}` on a Playwright page.
 
 A Static callback must return its updated `Plug.Conn` because connections are
 immutable. LiveView and Playwright callback results are ignored: Fluffy retains
-and reconciles the original View or Handle. Exceptions, throws, and exits pass
-through unchanged. Match PlaywrightEx `{:error, reason}` results inside the
-callback when failure should stop the test.
+and reconciles the original View or Page. Exceptions, throws, and exits pass
+through unchanged. Prefer PlaywrightEx bang functions inside the callback when
+failure should stop the test.
 
 Do not consume `assert_patch` or `assert_redirect` notifications inside a LiveView
 callback: Fluffy uses them to reconcile navigation. Assert the resulting page or URL
 after `Fluffy.unwrap/2`.
 
-The Playwright handle exposes only `context_id`, `page_id`, `frame_id`,
-`connection`, and `timeout`. Use the [event and page APIs](advanced-events.md)
-for lifecycle operations and registrations that must precede an action.
+Reach the context and frame with `PlaywrightEx.Page.context/1` and
+`PlaywrightEx.Page.main_frame/1`. A document navigated natively, inside or after the
+callback, is adopted before the next Fluffy action. Do not close the page or
+context natively; use the [event and page APIs](advanced-events.md) for lifecycle
+operations and registrations that must precede an action.
+
+`Fluffy.Playwright.unwrap/3` passes the `%PlaywrightEx.Locator{}` for a Fluffy
+locator instead, resolved in the active page and through its frame locators, with
+the same navigation handling:
+
+```elixir
+session
+|> Fluffy.Playwright.unwrap(by_role(:button, name: "Rename"), &PlaywrightEx.Locator.dblclick!/1)
+|> assert(visible(by_label("Name")))
+```
+
+Event values such as `Fluffy.Response` unwrap to their PlaywrightEx counterpart too;
+see [Native values](advanced-events.md#native-values). See
+[PlaywrightEx coverage](capabilities.md#playwrightex-coverage) for which native
+calls are safe.
