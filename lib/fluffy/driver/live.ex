@@ -63,25 +63,29 @@ defmodule Fluffy.Driver.Live do
   end
 
   defp commit_click(session, client_dom, target) do
+    with {:ok, event_context} <- owning_view_context(session, target) do
+      commit_click(session, client_dom, target, event_context)
+    end
+  end
+
+  defp commit_click(session, client_dom, target, event_context) do
     state = Session.page_state(session)
 
-    with {:ok, event_context} <- owning_view_context(session, target) do
-      case ClientDOM.phoenix_html_submission(client_dom, target) do
-        submission when is_map(submission) ->
-          if competing_live_click_binding?(target) do
-            raise Fluffy.CapabilityError,
-              capability: :phoenix_html_live_action_conflict,
-              driver: :live,
-              detail:
-                "a data-method/data-to link with a competing phx-click or LiveView navigation action requires Playwright"
-          else
-            {:navigate, Session.put_page_state(session, %{state | client_dom: client_dom}),
-             Navigation.submission(submission)}
-          end
+    case ClientDOM.phoenix_html_submission(client_dom, target) do
+      submission when is_map(submission) ->
+        if competing_live_click_binding?(target) do
+          raise Fluffy.CapabilityError,
+            capability: :phoenix_html_live_action_conflict,
+            driver: :live,
+            detail:
+              "a data-method/data-to link with a competing phx-click or LiveView navigation action requires Playwright"
+        else
+          {:navigate, Session.put_page_state(session, %{state | client_dom: client_dom}),
+           Navigation.submission(submission)}
+        end
 
-        nil ->
-          commit_plain_click(session, client_dom, target, event_context)
-      end
+      nil ->
+        commit_plain_click(session, client_dom, target, event_context)
     end
   end
 
@@ -272,22 +276,25 @@ defmodule Fluffy.Driver.Live do
   defp commit_checked(session, client_dom, target) do
     identity = Map.fetch!(ClientDOM.index(client_dom).nodes_by_id, target.id).identity
 
-    case commit_click(session, client_dom, target) do
-      %Session{} = session ->
-        client_dom = Session.page_state(session).client_dom
+    with {:ok, event_context} <- owning_view_context(session, target) do
+      case commit_click(session, client_dom, target, event_context) do
+        %Session{} = session ->
+          client_dom = Session.page_state(session).client_dom
 
-        # A selector such as :checked stops matching after uncheck. Follow the
-        # original control across any click patch instead of resolving it again.
-        case Enum.find(ClientDOM.index(client_dom).entries, &(&1.identity == identity)) do
-          nil ->
-            session
+          # A selector such as :checked stops matching after uncheck. Follow the
+          # original control across any click patch instead of resolving it again.
+          case Enum.find(ClientDOM.index(client_dom).entries, &(&1.identity == identity)) do
+            nil ->
+              session
 
-          entry ->
-            dispatch_live_change(session, client_dom, DocumentIndex.target_by_id(ClientDOM.index(client_dom), entry.id))
-        end
+            entry ->
+              target = DocumentIndex.target_by_id(ClientDOM.index(client_dom), entry.id)
+              dispatch_live_change(session, client_dom, target, event_context)
+          end
 
-      navigation ->
-        navigation
+        navigation ->
+          navigation
+      end
     end
   end
 
@@ -710,27 +717,31 @@ defmodule Fluffy.Driver.Live do
 
   defp dispatch_live_change(session, client_dom, %Fluffy.HTML.Target{} = target) do
     with {:ok, event_context} <- owning_view_context(session, target) do
-      state = Session.page_state(session)
-      session = Session.put_page_state(session, %{state | client_dom: client_dom})
+      dispatch_live_change(session, client_dom, target, event_context)
+    end
+  end
 
-      case ClientDOM.change_event(client_dom, target) do
-        nil ->
-          session
+  defp dispatch_live_change(session, client_dom, target, event_context) do
+    state = Session.page_state(session)
+    session = Session.put_page_state(session, %{state | client_dom: client_dom})
 
-        event ->
-          payload =
-            event.fields
-            |> Form.to_params()
-            |> Map.put("_target", event.target_name || "undefined")
-            |> decode_merge_target()
+    case ClientDOM.change_event(client_dom, target) do
+      nil ->
+        session
 
-          result =
-            dispatch_view_event(session, fn ->
-              render_view_event(client_dom, event_context, event.dispatcher_selector, :change, payload)
-            end)
+      event ->
+        payload =
+          event.fields
+          |> Form.to_params()
+          |> Map.put("_target", event.target_name || "undefined")
+          |> decode_merge_target()
 
-          commit_render_result(session, client_dom, result, event_context.view)
-      end
+        result =
+          dispatch_view_event(session, fn ->
+            render_view_event(client_dom, event_context, event.dispatcher_selector, :change, payload)
+          end)
+
+        commit_render_result(session, client_dom, result, event_context.view)
     end
   end
 
