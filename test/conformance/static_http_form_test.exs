@@ -7,8 +7,6 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
 
   alias Fluffy.TestHTTPFixtures
 
-  @chromium? Application.compile_env!(:fluffy, :playwright)[:engine] == :chromium
-
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
     test "submits ordered successful controls with GET using #{driver}", %{driver: driver} do
@@ -108,8 +106,8 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       assert submission.body == "note=kept"
     end
 
-    # Nothing reads the page after the submit: on Chromium, Playwright then waits
-    # on the aborted navigation (microsoft/playwright#43279).
+    # Nothing reads the page after the submit, so submit itself must return. Before
+    # Playwright 1.65, Chromium waited on the aborted navigation (microsoft/playwright#43279).
     @tag driver: driver
     test "submit returns after a no-content response using #{driver}", %{driver: driver} do
       fixture =
@@ -129,12 +127,6 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
     # Browsers abort the navigation and keep the document; none resets the form on 205.
     for status <- [204, 205] do
       @tag driver: driver
-      @tag skip:
-             if(driver == :playwright and status == 204 and @chromium?,
-               do:
-                 "Playwright's actions and assertions wait on Chromium's aborted 204 navigation " <>
-                   "(microsoft/playwright#43279, fixed in Playwright 1.65)"
-             )
       test "a #{status} response to submit keeps the current page and form state using #{driver}", %{driver: driver} do
         fixture =
           TestHTTPFixtures.register_sequence([

@@ -8,8 +8,6 @@ defmodule Fluffy.Conformance.LiveFormTest do
 
   alias Fluffy.TestHTTPFixtures
 
-  @chromium? Application.compile_env!(:fluffy, :playwright)[:engine] == :chromium
-
   test "Live reset buttons do not reset fields and still dispatch server events" do
     session = :phoenix |> start_test_session() |> visit("/live/potions")
 
@@ -141,12 +139,6 @@ defmodule Fluffy.Conformance.LiveFormTest do
 
     for status <- [204, 205] do
       @tag driver: driver
-      @tag skip:
-             if(driver == :playwright and status == 204 and @chromium?,
-               do:
-                 "Playwright's actions and assertions wait on Chromium's aborted 204 navigation " <>
-                   "(microsoft/playwright#43279, fixed in Playwright 1.65)"
-             )
       # LiveView's client disconnects as the form submits, so the kept page stays inert.
       test "a #{status} response to an HTTP form keeps the disconnected LiveView page with #{driver}", %{
         driver: driver

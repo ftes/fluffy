@@ -2,11 +2,12 @@
 
 ## 0.9.0 — Unreleased
 
-Fluffy now runs on PlaywrightEx 0.17, a port of the official Playwright client with a pinned driver.
+Fluffy now runs on PlaywrightEx 0.17, a port of the official Playwright client with a pinned Playwright 1.65 driver.
 
 ### Upgrading from 0.8
 
 - Install the driver and browsers with `mix playwright_ex.install -- chromium`; drop the npm `playwright` package and the `assets_dir` config.
+- Playwright 1.65 is required. Its breaking changes apply: actions wait for an element to be not inert, and text the browser does not render is no longer part of accessible names.
 - Replace `js_logger:` with `log_browser_console: true | false`; `Fluffy.Playwright.ConsoleLogger` is removed and custom `PlaywrightEx.JsLogger` modules are not supported.
 - `executable:` now names a Playwright driver executable instead of the npm `cli.js`; drop it if it pointed at npm `playwright`.
 - `unwrap/2` passes a `%PlaywrightEx.Page{}`; `Fluffy.Playwright.Handle` is removed.
@@ -48,6 +49,7 @@ Fluffy now runs on PlaywrightEx 0.17, a port of the official Playwright client w
 - Playwright `check` and `uncheck` succeed once the click sets the requested state, as on Phoenix, even if page code such as a LiveView patch changes it before Playwright reads it back (common in Firefox and WebKit).
 - Playwright `submit` waits for the server to answer the navigation it starts, so it no longer returns before WebKit has sent the form. A submission the browser handles within the document (a GET to a fragment of the current URL, a Navigation API `intercept()`) ends the wait.
 - On Phoenix, a link, form submission or redirect answered with `204 No Content` or `205 Reset Content` keeps the current page, URL and form state instead of showing an empty document; a LiveView page stays, disconnected, as in a browser. `visit` to such a response raises, like Playwright's.
+- On Chromium, a link or form submission answered with `204 No Content` no longer leaves later actions waiting on the aborted navigation.
 - A Playwright action whose navigation lands on pages that navigate again on load (a client-side redirect chain) follows them instead of raising "Execution context was destroyed".
 
 ## 0.8.0 — 2026-11-04

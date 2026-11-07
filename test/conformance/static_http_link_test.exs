@@ -8,8 +8,6 @@ defmodule Fluffy.Conformance.StaticHTTPLinkTest do
   alias Fluffy.Session
   alias Fluffy.TestHTTPFixtures
 
-  @chromium? Application.compile_env!(:fluffy, :playwright)[:engine] == :chromium
-
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
     test "resolves a relative link against the current document with #{driver}", %{driver: driver} do
@@ -73,12 +71,6 @@ defmodule Fluffy.Conformance.StaticHTTPLinkTest do
 
     for status <- [204, 205] do
       @tag driver: driver
-      @tag skip:
-             if(driver == :playwright and status == 204 and @chromium?,
-               do:
-                 "Playwright's click waits on Chromium's aborted 204 navigation " <>
-                   "(microsoft/playwright#43279, fixed in Playwright 1.65)"
-             )
       test "a link to a #{status} response keeps the current page with #{driver}", %{driver: driver} do
         fixture =
           TestHTTPFixtures.register_sequence([

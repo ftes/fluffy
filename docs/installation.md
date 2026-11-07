@@ -62,7 +62,7 @@ config :fluffy,
   ]
 ```
 
-`executable` optionally points at another Playwright 1.64 driver; by default the
+`executable` optionally points at another Playwright 1.65 driver; by default the
 pinned driver is used.
 
 `launch_options` are passed to `PlaywrightEx.BrowserType.launch/2` unchanged. Set
