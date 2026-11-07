@@ -186,6 +186,27 @@ defmodule Fluffy.Conformance.SelectOptionActionTest do
     end)
   end
 
+  # A mixed list resolves its strings before selecting; both share the timeout.
+  @tag driver: :playwright
+  test "select_option with a mixed list fails within its timeout" do
+    with_html(:playwright, "<main id=\"late\"></main>", fn session ->
+      Fluffy.Playwright.evaluate(session, """
+      () => setTimeout(() => {
+        document.querySelector('#late').innerHTML =
+          '<select aria-label="Plan" multiple disabled><option>Free</option><option>Pro</option></select>'
+      }, 1000)
+      """)
+
+      started = System.monotonic_time(:millisecond)
+
+      assert_raise Fluffy.OperationError, fn ->
+        select_option(session, by_label("Plan"), ["Free", %{index: 1}], timeout: 1_500)
+      end
+
+      assert System.monotonic_time(:millisecond) - started < 2_200
+    end)
+  end
+
   defp with_html(driver, html, fun) do
     session = session_for_html(driver, html, base_url: Fluffy.TestServer.base_url())
     fun.(session)

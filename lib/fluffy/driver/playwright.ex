@@ -308,8 +308,10 @@ defmodule Fluffy.Driver.Playwright do
   @impl true
   def select_option(%Session{} = session, %Locator{} = locator, requested, options \\ []) do
     locator_action(session, :select_option, locator, options, fn native, remaining ->
+      deadline = Deadline.new(remaining)
+
       with {:ok, values} <- uniform_option_values(native, requested, remaining) do
-        BrowserLocator.select_option(native, values, native(options, remaining))
+        BrowserLocator.select_option(native, values, native(options, Deadline.remaining(deadline, 1)))
       end
     end)
   end
