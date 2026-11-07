@@ -16,13 +16,17 @@ runs:
       id: image
       shell: bash
       run: echo "os=$ImageOS" >> "$GITHUB_OUTPUT"
-    - name: Restore Playwright browsers
+    # The driver (with its Node.js) is the same for every browser, so it is cached once.
+    - name: Restore Playwright driver
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
       with:
-        path: |
-          ~/.cache/ms-playwright
-          ~/.cache/playwright_ex
-        key: playwright-${{ runner.os }}-${{ hashFiles('deps/playwright_ex/DRIVER_VERSION', 'deps/playwright_ex/NODE_VERSION') }}-${{ inputs.browser }}
+        path: ~/.cache/playwright_ex
+        key: playwright-driver-${{ runner.os }}-${{ hashFiles('deps/playwright_ex/DRIVER_VERSION', 'deps/playwright_ex/NODE_VERSION') }}
+    - name: Restore Playwright browser
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-browser-${{ runner.os }}-${{ hashFiles('deps/playwright_ex/DRIVER_VERSION', 'deps/playwright_ex/NODE_VERSION') }}-${{ inputs.browser }}
     # As in PlaywrightEx's CI: --with-deps runs apt-get against the runner's Azure mirror, which
     # can stall. The .debs are cached per browser and driver version, so a warm run installs
     # offline; archive.ubuntu.com is a fallback mirror, apt times out stalled fetches, and each
