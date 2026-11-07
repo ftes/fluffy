@@ -142,7 +142,7 @@ defmodule Fluffy.Backend.Playwright.Events do
       method: PlaywrightEx.Request.method(request),
       headers: PlaywrightEx.Request.headers(request),
       resource_type: PlaywrightEx.Request.resource_type(request),
-      post_data: PlaywrightEx.Request.post_data(request),
+      post_data: PlaywrightEx.Request.post_data_buffer(request),
       page: request_page(session, request),
       native: request
     }

@@ -31,6 +31,20 @@ defmodule Fluffy.Conformance.NetworkEventTest do
   end
 
   @tag driver: :playwright
+  test "a request's post_data keeps a binary body's bytes" do
+    {session, fixture} = session()
+    request_wait = wait_for(session, Event.request(&String.ends_with?(&1.url, "/api?source=bytes")))
+
+    Playwright.evaluate(
+      session,
+      "url => { fetch(url, {method: 'POST', body: new Uint8Array([0xff, 0x00, 0x89, 0x50])}); return true }",
+      TestHTTPFixtures.url(fixture, "/api?source=bytes")
+    )
+
+    assert await(request_wait).post_data == <<0xFF, 0x00, 0x89, 0x50>>
+  end
+
+  @tag driver: :playwright
   test "unwrap reaches the native request and response" do
     {session, _fixture} = session()
     response_wait = wait_for(session, Event.response(&String.ends_with?(&1.url, "/api?source=button")))

@@ -4,9 +4,9 @@ defmodule Fluffy.Request do
   a `Fluffy.Response`.
 
   Fields follow Playwright's `Request` accessors. `headers` has lowercase names.
-  `post_data` is the buffered request body, or nil. `page` is the live page
-  handle when known, or nil (for example, a popup's initial request). Reach the
-  `PlaywrightEx.Request` with `Fluffy.unwrap/2`.
+  `post_data` is the buffered request body, as raw bytes (`postDataBuffer`), or
+  nil. `page` is the live page handle when known, or nil (for example, a popup's
+  initial request). Reach the `PlaywrightEx.Request` with `Fluffy.unwrap/2`.
   """
 
   @enforce_keys [:url, :method, :headers, :resource_type]
@@ -17,7 +17,7 @@ defmodule Fluffy.Request do
           method: String.t(),
           headers: %{optional(String.t()) => String.t()},
           resource_type: String.t(),
-          post_data: String.t() | nil,
+          post_data: binary() | nil,
           page: Fluffy.Page.t() | nil
         }
 end
