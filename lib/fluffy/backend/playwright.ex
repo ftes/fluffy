@@ -39,10 +39,7 @@ defmodule Fluffy.Backend.Playwright do
       |> Keyword.get(:extra_http_headers, %{})
       |> Enum.concat(Keyword.get(options, :headers, []))
       |> Enum.concat(List.wrap(sandbox_header))
-      |> Enum.reduce(%{}, fn {name, value}, headers ->
-        name = String.downcase(to_string(name))
-        headers |> Map.reject(fn {existing, _value} -> String.downcase(existing) == name end) |> Map.put(name, value)
-      end)
+      |> Map.new(fn {name, value} -> {String.downcase(to_string(name)), value} end)
 
     context_options =
       browser_context_options
