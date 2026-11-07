@@ -122,6 +122,14 @@ defmodule Fluffy.Conformance.ClockTest do
 
       assert System.monotonic_time(:millisecond) - started < 5_000
     end
+
+    # The call runs in a task, which logs the crash.
+    @tag :capture_log
+    test "a clock call that PlaywrightEx rejects raises its exception" do
+      session = session_for_html(:playwright, @dates, base_url: Fluffy.TestServer.base_url())
+
+      assert_raise FunctionClauseError, fn -> Clock.install(session, time: :bogus) end
+    end
   end
 
   @tag driver: :live

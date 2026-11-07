@@ -3,6 +3,7 @@ defmodule Fluffy.FailureArtifactTest do
 
   import Fluffy
 
+  alias Fluffy.Backend.Playwright.Bounded
   alias Fluffy.FailureArtifact
 
   @tag :tmp_dir
@@ -28,8 +29,8 @@ defmodule Fluffy.FailureArtifactTest do
 
   # A linked call would kill the caller, skipping capture's own error handling.
   @tag :capture_log
-  test "a crash in a bounded Playwright call exits the caller instead of killing it" do
-    assert {%RuntimeError{message: "boom"}, _stacktrace} =
-             catch_exit(Fluffy.Backend.Playwright.Bounded.within(1_000, fn -> raise "boom" end))
+  test "a crash in a bounded Playwright call raises in the caller instead of killing it" do
+    assert_raise RuntimeError, "boom", fn -> Bounded.within(1_000, fn -> raise "boom" end) end
+    assert catch_exit(Bounded.within(1_000, fn -> exit(:boom) end)) == :boom
   end
 end

@@ -7,14 +7,15 @@ defmodule Fluffy.Backend.Playwright.Bounded do
   @doc """
   Runs a Playwright call that has no timeout of its own for at most `timeout` ms.
 
-  The call runs unlinked, so a crash exits the caller with its reason instead of
-  killing it.
+  The call runs unlinked, so a crash does not kill the caller: an exception is
+  raised again in the caller, any other crash exits it with its reason.
   """
   def within(timeout, fun) do
     task = Task.Supervisor.async_nolink(Fluffy.TaskSupervisor, fun)
 
     case Task.yield(task, timeout) || Task.shutdown(task, :brutal_kill) do
       {:ok, result} -> {:ok, result}
+      {:exit, {exception, stacktrace}} when is_exception(exception) -> reraise exception, stacktrace
       {:exit, reason} -> exit(reason)
       nil -> :timeout
     end
