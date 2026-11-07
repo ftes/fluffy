@@ -23,10 +23,11 @@ on:
         type: string
         default: ""
       partitions:
-        description: "Partitions per lane and browser (1-8), default: 6"
+        description: "Partitions per lane and browser"
         required: false
-        type: string
-        default: ""
+        type: choice
+        options: ["1", "2", "3", "4", "5", "6", "7", "8"]
+        default: "6"
 
 # A new push to a PR cancels its running CI. Other events (main pushes, the nightly, dispatched
 # experiments) get a group of their own: in a shared group GitHub keeps one run pending and cancels
@@ -121,7 +122,7 @@ jobs:
       matrix:
         lane: [oldest, newest]
         browser: [chromium, firefox, webkit]
-        # Without inputs (any event but a dispatch that sets them): 6 partitions; `partition`
+        # Any event but a dispatch has no inputs: 6 partitions, the dispatch default. `partition`
         # lists 1..partitions.
         partitions: ${{ fromJSON(format('[{0}]', inputs.partitions || '6')) }}
         partition: ${{ fromJSON('{"1":[1],"2":[1,2],"3":[1,2,3],"4":[1,2,3,4],"5":[1,2,3,4,5],"6":[1,2,3,4,5,6],"7":[1,2,3,4,5,6,7],"8":[1,2,3,4,5,6,7,8]}')[inputs.partitions || '6'] }}
