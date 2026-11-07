@@ -20,6 +20,7 @@ defmodule Fluffy.Driver.Playwright do
   alias PlaywrightEx.Frame
   alias PlaywrightEx.Locator, as: BrowserLocator
   alias PlaywrightEx.Page, as: BrowserPage
+  alias PlaywrightEx.PlaywrightError
   alias PlaywrightEx.Request
   alias PlaywrightEx.Response
   alias PlaywrightEx.TargetClosedError
@@ -289,15 +290,20 @@ defmodule Fluffy.Driver.Playwright do
     {operation, set} = if desired, do: {:check, &BrowserLocator.check/2}, else: {:uncheck, &BrowserLocator.uncheck/2}
 
     locator_action(session, operation, locator, options, fn native, remaining ->
-      cursor = Document.activation_cursor(native, session_timeout(session))
+      timeout = session_timeout(session)
+      # Only the activations after this point count, so the cursor is read
+      # before the click even though the fallback below rarely needs it.
+      cursor = Document.activation_cursor(native, timeout)
 
       case set.(native, native(options, remaining)) do
         # Playwright reads the state after its click, which a LiveView patch
         # may already have changed (in Firefox and WebKit it usually has). As on
         # Phoenix, the action succeeds once the click set the requested state.
-        {:error, %{message: message}} = error ->
+        # The driver reports that as a plain `Error`, known only by its message;
+        # check_action_test pins it.
+        {:error, %PlaywrightError{message: message}} = error ->
           if message =~ "Clicking the checkbox did not change its state" and
-               Document.activated?(native, cursor, desired, session_timeout(session)),
+               Document.activated?(native, cursor, desired, timeout),
              do: :ok,
              else: error
 
