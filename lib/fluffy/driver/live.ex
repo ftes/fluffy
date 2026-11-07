@@ -535,24 +535,27 @@ defmodule Fluffy.Driver.Live do
     deadline = Retry.deadline(session, Keyword.validate!(options, [:timeout]))
     {result, delivered?} = Delivery.track(fn -> action.(deadline) end)
 
-    case {result, delivered?} do
-      {{:redirected, session, navigation}, true} ->
+    case {navigation_found(result), delivered?} do
+      {{session, navigation}, true} ->
         {:navigate, session, navigation}
 
-      {{:navigate, session, navigation, {:retry, _remaining}}, true} ->
-        {:navigate, session, navigation}
-
-      {{:redirected, session, navigation}, false} ->
+      {{session, navigation}, false} ->
         if Deadline.expired?(deadline) do
           raise Fluffy.ActionabilityError, action: operation, reason: :navigated_away, locator: locator
         end
 
         Retry.retry_after_navigation(session, navigation, deadline)
 
-      {result, _delivered?} ->
+      {:none, _delivered?} ->
         result
     end
   end
+
+  # A navigation the action found before it finished, whether a view call or
+  # the wait for its target saw it.
+  defp navigation_found({:redirected, session, navigation}), do: {session, navigation}
+  defp navigation_found({:navigate, session, navigation, {:retry, _remaining}}), do: {session, navigation}
+  defp navigation_found(_result), do: :none
 
   defp live_view_exit_event(view, watcher, timeout) do
     case current_redirect(view) do
