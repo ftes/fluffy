@@ -9,12 +9,22 @@ defmodule Fluffy.TestWeb.NavigationLive do
       case params["async"] do
         "true" -> Process.send_after(self(), :navigate, 30)
         "mount" -> send(self(), :navigate)
+        "return" -> Process.send_after(self(), {:navigate, "/live/chamber-map?step=returned"}, 30)
         _sync -> :ok
       end
     end
 
-    {:ok, assign(socket, step: params["step"] || "initial", topic: params["topic"], saved_step: nil, saves: 0)}
+    socket = assign(socket, step: params["step"] || "initial", topic: params["topic"], saved_step: nil, saves: 0)
+
+    {:ok, mount_redirect(socket, connected?(socket) && params["redirect"])}
   end
+
+  defp mount_redirect(socket, "live") do
+    socket |> put_flash(:info, "The secret passage opened") |> push_navigate(to: "/live/secret-chamber")
+  end
+
+  defp mount_redirect(socket, "static"), do: redirect(socket, to: "/chamber")
+  defp mount_redirect(socket, _none), do: socket
 
   @impl true
   def handle_params(params, _uri, socket) do
@@ -56,6 +66,10 @@ defmodule Fluffy.TestWeb.NavigationLive do
   @impl true
   def handle_info(:navigate, socket) do
     {:noreply, push_navigate(socket, to: "/live/secret-chamber")}
+  end
+
+  def handle_info({:navigate, to}, socket) do
+    {:noreply, push_navigate(socket, to: to)}
   end
 
   def handle_info(:patch, socket) do

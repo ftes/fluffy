@@ -385,6 +385,10 @@ defmodule Fluffy.Backend.Phoenix do
       {:ok, view, html} ->
         commit_live(session, view, html, URI.to_string(url))
 
+      # The view redirected in its connected mount. A browser follows it.
+      {:error, {kind, %{to: destination} = options}} when kind in [:live_redirect, :redirect] ->
+        navigate(session, %Redirect{destination: destination, flash: options[:flash]})
+
       {:error, reason} ->
         raise "LiveView navigation failed: #{inspect(reason)}"
     end

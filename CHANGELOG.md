@@ -60,6 +60,8 @@ Fluffy now runs on PlaywrightEx 0.17, a port of the official Playwright client w
 - On Playwright, a LiveView navigation whose new view patches as it mounts (`phx-mounted={JS.patch(...)}`) is followed as a navigation instead of a patch, so Fluffy awaits the new view and the PhoenixTest facade drops the old page's active form.
 - A Playwright action whose navigation lands on pages that navigate again on load (a client-side redirect chain) follows them instead of raising "Execution context was destroyed".
 - LiveView follows a redirect that lands while Fluffy reads the view after mount, an event or a retry, instead of crashing in `LazyHTML.from_fragment/1` or on a `GenServer.call` exit.
+- LiveView follows a `push_navigate` or `redirect` from a view's connected mount, as a browser does, instead of raising "LiveView navigation failed".
+- A LiveView action on a view that navigated away since Fluffy last read it follows the navigation and acts on the new page, as Playwright does, instead of raising `Fluffy.LiveViewError`. A target missing there fails like any missing target.
 
 ## 0.8.0 — 2026-11-04
 

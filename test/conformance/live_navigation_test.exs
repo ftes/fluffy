@@ -75,6 +75,64 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     end
 
     @tag driver: driver
+    test "follows Live navigation from the connected mount with #{driver}", %{driver: driver} do
+      driver
+      |> live_session()
+      |> visit("/live/chamber-map?redirect=live")
+      |> expect(Fluffy.Expect.page_to_have_url("/live/secret-chamber"))
+      |> expect("The secret passage opened" |> by_text() |> to_be_visible())
+    end
+
+    @tag driver: driver
+    test "follows a redirect from the connected mount to a static page with #{driver}", %{driver: driver} do
+      driver
+      |> live_session()
+      |> visit("/live/chamber-map?redirect=static")
+      |> expect(Fluffy.Expect.page_to_have_url("/chamber"))
+      |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
+    end
+
+    @tag driver: driver
+    test "clicks on the document a Live navigation landed on after the last read with #{driver}", %{
+      driver: driver
+    } do
+      driver
+      |> live_session()
+      |> visit("/live/chamber-map?async=return")
+      |> await_unread_navigation(driver, "/live/chamber-map?step=returned")
+      |> click(by_role(:button, name: "Lull guardian", exact: true))
+      |> expect(Fluffy.Expect.page_to_have_url("/chamber"))
+    end
+
+    @tag driver: driver
+    test "fills on the document a Live navigation landed on after the last read with #{driver}", %{
+      driver: driver
+    } do
+      driver
+      |> live_session()
+      |> visit("/live/chamber-map?async=return")
+      |> await_unread_navigation(driver, "/live/chamber-map?step=returned")
+      |> fill(by_label("Map step"), "north")
+      |> expect(Fluffy.Expect.page_to_have_url("/live/chamber-map?step=north"))
+      |> expect("Map position: north" |> by_text() |> to_be_visible())
+    end
+
+    @tag driver: driver
+    test "an action whose target a Live navigation removed fails as missing with #{driver}", %{
+      driver: driver
+    } do
+      session =
+        driver
+        |> live_session()
+        |> visit("/live/chamber-map?async=true")
+        |> await_unread_navigation(driver, "/live/secret-chamber")
+
+      assert_raise Fluffy.OperationError, ~r/Lull guardian/, fn ->
+        click(session, by_role(:button, name: "Lull guardian", exact: true), timeout: 200)
+      end
+    end
+
+    @tag driver: driver
     test "follows Live navigation that races the post-action render with #{driver}", %{
       driver: driver
     } do
@@ -119,6 +177,17 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     |> expect(Fluffy.Expect.page_to_have_url("/live/secret-chamber"))
     |> expect("The secret chamber is open" |> by_text() |> to_be_visible())
   end
+
+  # Waits until the view has navigated away without Fluffy reading it, so the
+  # next action still targets the document Fluffy last saw.
+  defp await_unread_navigation(session, :phoenix, _url) do
+    {_reference, _topic, proxy_pid} = Fluffy.Session.page_state(session).view.proxy
+    proxy_reference = Process.monitor(proxy_pid)
+    assert_receive {:DOWN, ^proxy_reference, :process, ^proxy_pid, _reason}, 1_000
+    session
+  end
+
+  defp await_unread_navigation(session, :playwright, url), do: expect(session, Fluffy.Expect.page_to_have_url(url))
 
   defp live_session(driver) do
     start_session(driver,
