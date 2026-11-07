@@ -124,6 +124,27 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
 
         assert Enum.map(TestHTTPFixtures.requests(fixture), & &1.path) == ["/empty", "/orders", "/empty"]
       end
+
+      @tag driver: driver
+      test "a failed visit keeps the cookies of its #{status} response with #{driver}", %{driver: driver} do
+        fixture =
+          TestHTTPFixtures.register_sequence([
+            %{body: html("Orders")},
+            %{status: unquote(status), headers: [{"set-cookie", "seen=1; Path=/"}]},
+            %{body: html("Orders")}
+          ])
+
+        session = driver |> start_test_session() |> visit(TestHTTPFixtures.path(fixture, "/orders"))
+
+        assert_raise RuntimeError, ~r/abort|interrupt/i, fn ->
+          visit(session, TestHTTPFixtures.path(fixture, "/beacon"))
+        end
+
+        visit(session, TestHTTPFixtures.path(fixture, "/orders"))
+
+        assert [_orders, _beacon, %{headers: headers}] = TestHTTPFixtures.requests(fixture)
+        assert {"cookie", "seen=1"} in headers
+      end
     end
 
     @tag driver: driver

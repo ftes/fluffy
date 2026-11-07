@@ -120,13 +120,15 @@ defmodule Fluffy.Backend.Phoenix do
   def visit(%Session{} = session, path) do
     url = resolve_url(Session.context(session).http.base_url, path, session)
     {http, response} = HTTP.request(Session.context(session).http, url)
+    session = put_http(session, http)
 
-    # Playwright's goto fails when the browser aborts the navigation.
+    # Playwright's goto fails when the browser aborts the navigation; the
+    # browser keeps the cookies the response set.
     if response.conn.status in @no_content_statuses do
       raise "Phoenix visit to #{URI.to_string(response.request.url)} was aborted by HTTP #{response.conn.status}"
     end
 
-    session |> put_http(http) |> finish_response(response, nil)
+    finish_response(session, response, nil)
   end
 
   @impl true
