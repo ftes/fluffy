@@ -186,6 +186,31 @@ defmodule Fluffy.Conformance.SelectOptionActionTest do
     end)
   end
 
+  # As for a list of strings alone, Playwright waits for the options to appear.
+  @tag driver: :playwright
+  test "select_option with a mixed list waits for its options" do
+    html = """
+    <select aria-label="Plan" multiple><option>Free</option></select>
+    <button onclick="setTimeout(() => this.previousElementSibling.add(new Option('Pro', 'pro')), 300)">Add</button>
+    """
+
+    with_html(:playwright, html, fn session ->
+      session
+      |> click(by_role(:button, name: "Add"))
+      |> select_option(by_label("Plan"), [%{index: 0}, "Pro"])
+      |> expect(to_have_values(by_label("Plan"), ["Free", "pro"]))
+    end)
+  end
+
+  @tag driver: :playwright
+  test "select_option with a mixed list names the option it waited for" do
+    with_html(:playwright, ~s(<select aria-label="Plan" multiple><option>Free</option></select>), fn session ->
+      assert_raise Fluffy.OperationError, ~r/option with value or label "Pro"/, fn ->
+        select_option(session, by_label("Plan"), [%{index: 0}, "Pro"], timeout: 300)
+      end
+    end)
+  end
+
   # A mixed list resolves its strings before selecting; both share the timeout.
   @tag driver: :playwright
   test "select_option with a mixed list fails within its timeout" do
