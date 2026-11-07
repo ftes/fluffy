@@ -6,6 +6,7 @@ defmodule Fluffy.Driver.Playwright do
   alias Fluffy.Backend.Playwright.Bounded
   alias Fluffy.Backend.Playwright.Document
   alias Fluffy.Backend.Playwright.Events
+  alias Fluffy.Backend.Playwright.Listeners
   alias Fluffy.Deadline
   alias Fluffy.Expect
   alias Fluffy.FileChooser
@@ -177,44 +178,40 @@ defmodule Fluffy.Driver.Playwright do
 
     locator_action(session, :submit, locator, options, fn native, remaining ->
       deadline = Deadline.new(remaining)
-      # Listening first misses no request the submit starts.
-      listeners = listen_for_submission(page, frame)
 
-      try do
+      # Listening first misses no request the submit starts.
+      Listeners.listening(submission_listeners(page, frame), fn ref ->
         case BrowserLocator.evaluate(native, @submit, nil, timeout: remaining) do
-          {:ok, true} -> await_submission(listeners, deadline)
+          {:ok, true} -> await_submission(ref, deadline)
           {:ok, false} -> :ok
           {:error, error} -> {:error, error}
         end
-      after
-        unlisten(page, listeners)
-      end
+      end)
     end)
   end
 
   # A navigation request comes before the frame commits to another document, so
   # a commit seen first navigated within the document.
-  defp listen_for_submission(page, frame) do
+  defp submission_listeners(page, frame) do
     owner = self()
-    ref = make_ref()
     guid = frame.guid
 
-    request = fn request ->
-      if Request.is_navigation_request(request) and match?(%{guid: ^guid}, Events.request_frame(request)),
-        do: send(owner, {ref, :request, request})
-    end
+    fn ref ->
+      request = fn request ->
+        if Request.is_navigation_request(request) and match?(%{guid: ^guid}, Events.request_frame(request)),
+          do: send(owner, {ref, :request, request})
+      end
 
-    navigated = fn navigated -> if navigated.guid == frame.guid, do: send(owner, {ref, :navigated}) end
-    BrowserPage.on(page, :request, request)
-    BrowserPage.on(page, :frame_navigated, navigated)
-    %{ref: ref, request: request, frame_navigated: navigated}
+      navigated = fn navigated -> if navigated.guid == guid, do: send(owner, {ref, :navigated}) end
+      [{BrowserPage, page, :request, request}, {BrowserPage, page, :frame_navigated, navigated}]
+    end
   end
 
-  defp await_submission(%{ref: ref} = listeners, deadline) do
+  defp await_submission(ref, deadline) do
     timeout = Deadline.remaining(deadline, 1)
 
     receive do
-      {^ref, :request, request} -> await_response(listeners, request, deadline)
+      {^ref, :request, request} -> await_response(ref, request, deadline)
       {^ref, :navigated} -> :ok
     after
       timeout ->
@@ -227,29 +224,14 @@ defmodule Fluffy.Driver.Playwright do
     end
   end
 
-  defp unlisten(page, %{ref: ref} = listeners) do
-    BrowserPage.off(page, :request, listeners.request)
-    BrowserPage.off(page, :frame_navigated, listeners.frame_navigated)
-    flush(ref)
-  end
-
-  defp flush(ref) do
-    receive do
-      {^ref, _event} -> flush(ref)
-      {^ref, _event, _value} -> flush(ref)
-    after
-      0 -> :ok
-    end
-  end
-
   # Reading the response has no timeout of its own; a failed request has none.
   # A redirect continues the navigation with another request.
-  defp await_response(listeners, request, deadline) do
+  defp await_response(ref, request, deadline) do
     timeout = Deadline.remaining(deadline, 1)
 
     case Bounded.within(timeout, fn -> Request.response(request) end) do
       {:ok, {:ok, response}} ->
-        if redirect?(response), do: await_submission(listeners, deadline), else: :ok
+        if redirect?(response), do: await_submission(ref, deadline), else: :ok
 
       {:ok, {:error, error}} ->
         {:error, error}
@@ -514,11 +496,9 @@ defmodule Fluffy.Driver.Playwright do
 
   defp page_closes?(page, deadline) do
     owner = self()
-    ref = make_ref()
-    listener = fn _page -> send(owner, {ref, :closed}) end
-    BrowserPage.on(page, :close, listener)
+    listen = fn ref -> [{BrowserPage, page, :close, fn _page -> send(owner, {ref, :closed}) end}] end
 
-    try do
+    Listeners.listening(listen, fn ref ->
       BrowserPage.is_closed(page) or
         (target_closed?(page, deadline) and
            receive do
@@ -526,10 +506,7 @@ defmodule Fluffy.Driver.Playwright do
            after
              Deadline.remaining(deadline) -> false
            end)
-    after
-      BrowserPage.off(page, :close, listener)
-      flush(ref)
-    end
+    end)
   end
 
   defp target_closed?(page, deadline) do

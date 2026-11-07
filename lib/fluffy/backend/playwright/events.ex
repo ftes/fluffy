@@ -1,6 +1,7 @@
 defmodule Fluffy.Backend.Playwright.Events do
   @moduledoc false
 
+  alias Fluffy.Backend.Playwright.Listeners
   alias Fluffy.Dialog
   alias Fluffy.Download
   alias Fluffy.FileChooser
@@ -42,23 +43,13 @@ defmodule Fluffy.Backend.Playwright.Events do
           [{BrowserPage, page, type}, {BrowserPage, page, :crash}]
       end
 
-    # A failed registration releases the listeners registered before it.
     listeners =
-      Enum.reduce(listeners, [], fn {module, target, event}, registered ->
-        listener = fn native -> send(recipient, {:fluffy_playwright_event, event, native}) end
+      Listeners.register(
+        for {module, target, event} <- listeners,
+            do: {module, target, event, fn native -> send(recipient, {:fluffy_playwright_event, event, native}) end}
+      )
 
-        try do
-          module.on(target, event, listener)
-        catch
-          kind, reason ->
-            unsubscribe(registered)
-            :erlang.raise(kind, reason, __STACKTRACE__)
-        end
-
-        [{module, target, event, listener} | registered]
-      end)
-
-    unsubscribe = fn -> unsubscribe(listeners) end
+    unsubscribe = fn -> Listeners.release(listeners) end
 
     decode = fn
       {:source_closed, _reason} when type == :close -> {:ok, Page.new(session.runtime, source)}
@@ -76,20 +67,6 @@ defmodule Fluffy.Backend.Playwright.Events do
     {:ok, value(session, type, native)}
   catch
     :unregistered_page -> :ignore
-  end
-
-  defp unsubscribe(listeners) do
-    for {module, target, event, listener} <- listeners do
-      try do
-        module.off(target, event, listener)
-      catch
-        # A lost driver already released its listeners. Cleanup must
-        # preserve the event outcome or the caller's original callback failure.
-        _kind, _reason -> :ok
-      end
-    end
-
-    :ok
   end
 
   defp checked_page(page) do
