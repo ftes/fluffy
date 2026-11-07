@@ -450,16 +450,19 @@ defmodule Fluffy.Driver.Playwright do
     {session, before} = prepare_document(session)
     state = Session.page_state(session)
     browser_context = Session.context(session).browser_context
+    bookkeeping_timeout = session_timeout(session)
 
     case action.(operation_timeout) do
       {:ok, value} ->
-        deadline = Deadline.new(session_timeout(session))
+        deadline = Deadline.new(bookkeeping_timeout)
         {:ok, value, reconcile_action_navigation(session, state, before, deadline)}
 
       # Playwright intends an action that closes its own page to succeed, but
       # Firefox can fail it. The page was open before the action.
       {:error, %TargetClosedError{} = error} ->
-        if closed_own_page?(browser_context, state.page), do: {:ok, nil, session}, else: {:error, error}
+        if closed_own_page?(browser_context, state.page, bookkeeping_timeout),
+          do: {:ok, nil, session},
+          else: {:error, error}
 
       {:error, error} ->
         {:error, error}
@@ -467,10 +470,31 @@ defmodule Fluffy.Driver.Playwright do
   end
 
   # A lost driver or a closed context closes the page too. The context's
-  # closed flag may still lag a lost driver, unlike a call on it.
-  defp closed_own_page?(browser_context, page) do
-    BrowserPage.is_closed(page) and not BrowserContext.is_closed(browser_context) and
-      match?({:ok, _cookies}, BrowserContext.cookies(browser_context, []))
+  # closed flag may still lag a lost driver, unlike a call on it. The page's
+  # close event may still be on its way when the action fails.
+  defp closed_own_page?(browser_context, page, timeout) do
+    not BrowserContext.is_closed(browser_context) and
+      match?({:ok, _cookies}, BrowserContext.cookies(browser_context, [])) and
+      page_closes?(page, timeout)
+  end
+
+  defp page_closes?(page, timeout) do
+    owner = self()
+    ref = make_ref()
+    listener = fn _page -> send(owner, {ref, :closed}) end
+    BrowserPage.on(page, :close, listener)
+
+    try do
+      BrowserPage.is_closed(page) or
+        receive do
+          {^ref, :closed} -> true
+        after
+          timeout -> false
+        end
+    after
+      BrowserPage.off(page, :close, listener)
+      flush(ref)
+    end
   end
 
   # Adopts a document Fluffy has not seen: a new page's first document, or a
