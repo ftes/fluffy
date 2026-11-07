@@ -181,7 +181,7 @@ end)
 
 Use `Dialog.accept(dialog, "prompt text")` for prompts or `Dialog.dismiss(dialog)`.
 Types are `:alert`, `:confirm`, `:prompt`, and `:beforeunload`; metadata also includes
-`message` and `default_value`. Register a persistent catch-all handler when needed:
+`message`, `default_value`, and the `page` that opened it (also `Dialog.page/1`). Register a persistent catch-all handler when needed:
 
 ```elixir
 accept_dialog = &Dialog.accept/1
@@ -219,7 +219,12 @@ Requests signal issuance; responses signal status and headers, without waiting f
 the response body. Values are `Fluffy.Request` (URL, method, headers, resource type,
 post data, page) and `Fluffy.Response` (URL, status, status text, headers, and its
 `request`). The page can be nil when it
-is not yet known, such as for a popup's initial request.
+is not yet known, such as for a popup's initial request. Bodies are not retained;
+read one from the native response:
+
+```elixir
+body = unwrap(response, &PlaywrightEx.Response.text!/1)
+```
 
 ## File choosers
 
@@ -242,11 +247,12 @@ does not operate the OS picker. Choosers require Playwright.
 
 `Fluffy.Playwright.add_cookies/2` and `Fluffy.Playwright.clear_cookies/2` return the
 session. `Fluffy.Playwright.cookies/2` returns cookie maps; its optional URL list
-filters by URL. `Fluffy.Playwright.clear_cookies/2` accepts string or regex filters for
+filters by URL. Cookie maps use Playwright's camelCase atom keys, such as
+`httpOnly:` and `sameSite:`. `Fluffy.Playwright.clear_cookies/2` accepts string or regex filters for
 `name:`, `domain:`, and `path:`. These helpers operate on the entire browser context.
 
-`Fluffy.Playwright.storage_state/2` returns a state map and optionally writes
-JSON with `path:`. Include IndexedDB with `indexed_db: true`. Reuse the result
+`Fluffy.Playwright.storage_state/2` returns a state map with atom keys
+(`:cookies`, `:origins`) and optionally writes JSON with `path:`. Include IndexedDB with `indexed_db: true`. Reuse the result
 with `start_session(:playwright, browser_context: [storage_state: state])`.
 
 For browser interaction, use `Fluffy.Playwright.hover(session, locator)`,
@@ -256,3 +262,11 @@ For browser interaction, use `Fluffy.Playwright.hover(session, locator)`,
 Sequential typing emits keyboard events for each character and appends at the
 current caret position. Drag source and target must belong to the same frame.
 These actions require Playwright and reconcile navigation caused by the action.
+
+## Native values
+
+Event values keep their PlaywrightEx counterpart private. `Fluffy.unwrap/2` passes
+it to a callback and returns the callback's result, for members Fluffy does not
+wrap: `PlaywrightEx.Request`, `PlaywrightEx.Response`, `PlaywrightEx.Dialog`,
+`PlaywrightEx.Download`, `PlaywrightEx.FileChooser`, and `PlaywrightEx.Frame`.
+Phoenix downloads have none and raise `Fluffy.CapabilityError`.

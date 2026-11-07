@@ -28,4 +28,18 @@ defmodule Fluffy.Options.Native do
       end
     end
   end
+
+  @doc """
+  Like `schema/4`, but validated with the NimbleOptions `types` of `keys`, for options
+  that Fluffy compiles itself instead of passing them to the facade. A type given as
+  a keyword list also replaces the documented `type_spec` and `type_doc`.
+  """
+  def schema(module, fun, arity, keys, types) do
+    for {key, entry} <- schema(module, fun, arity, keys) do
+      case Keyword.fetch!(types, key) do
+        [{:type, _type} | _docs] = type -> {key, Keyword.merge(entry, type)}
+        type -> {key, Keyword.put(entry, :type, type)}
+      end
+    end
+  end
 end

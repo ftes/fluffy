@@ -35,8 +35,8 @@ end
 
 For tests using browser-only helpers, also `import Fluffy.Playwright`. This
 lets you call `new_page`, `current_page`, `pages`, `switch_page`, `close_page`,
-`go_back`, `go_forward`, `hover`, `drag_to`, and
-`press_sequentially` without module qualifiers:
+`go_back`, `go_forward`, `hover`, `drag_to`, and `press_sequentially` without
+module qualifiers:
 
 ```elixir
 import Fluffy
@@ -187,6 +187,11 @@ use `exact: true` for a complete match. Role names follow accessible-name
 precedence: `aria-labelledby`, then `aria-label`, then native labels. Explicit
 ARIA roles override implicit roles. CSS must be valid browser CSS; escape
 special characters in IDs or use a semantic/test-id locator.
+
+Options marked *Playwright only.* in `Fluffy.Locator`, such as
+`by_role(:button, pressed: true)`, `by_role(:heading, level: 2)` or a regex
+`name:` or `has_text:`, compile into the browser's selector. Static and LiveView
+sessions raise `Fluffy.CapabilityError` when they resolve such a locator.
 
 Refine a locator with `filter`, `first`, `last`, or zero-based `nth`.
 Use `and_` to require both locators to match the same element:
@@ -641,6 +646,43 @@ end)
 optional third argument, as in `PlaywrightEx.Frame.evaluate/3`. Phoenix sessions raise a capability error because
 Phoenix does not execute client code.
 
+## Controlling time
+
+On Playwright, `Fluffy.Playwright.Clock.install/2` fakes the page's `Date` and
+timers (`setTimeout`, `setInterval`, `requestAnimationFrame`, and so on) for every
+page of the session, including documents loaded later. Install the clock before
+visiting the page, then pause it and advance it explicitly:
+
+```elixir
+import Fluffy
+import Fluffy.Expect
+import Fluffy.Locator
+
+alias Fluffy.Playwright.Clock
+
+session
+|> Clock.install(time: ~U[2024-02-02 08:00:00Z])
+|> visit("/spellbook")
+|> Clock.pause_at(~U[2024-02-02 09:00:00Z])
+# The search input has phx-debounce="500": nothing is sent yet.
+|> fill(by_label("Search"), "Lumos")
+|> Clock.run_for(500)
+|> expect(to_be_visible(by_text("1 spell found")))
+```
+
+`Clock.run_for/3` fires every timer due on the way, `Clock.fast_forward/3` jumps
+ahead firing due timers once, and `Clock.resume/2` lets time flow again.
+`Clock.set_fixed_time/3` freezes only `Date`; `Clock.set_system_time/3` shifts it
+without firing timers. Timer-started navigation is adopted, as after an action.
+
+While the clock is paused, actions, assertions, and navigation keep working:
+Fluffy's waits do not use page timers. The application's own timers are frozen
+though: LiveView's `phx-debounce` and `phx-throttle`, `JS.transition/2` (which
+also holds back LiveView's DOM updates until it ends), page title updates, and the
+socket's heartbeat and reconnects. An assertion that depends on them fails
+after its timeout until the test advances or resumes the clock. Phoenix sessions
+raise `Fluffy.CapabilityError`.
+
 ## Native escape hatch
 
 Use `Fluffy.unwrap/2` for an uncommon driver-native operation that has no first-class
@@ -674,3 +716,18 @@ Reach the context and frame with `PlaywrightEx.Page.context/1` and
 callback, is adopted before the next Fluffy action. Do not close the page or
 context natively; use the [event and page APIs](advanced-events.md) for lifecycle
 operations and registrations that must precede an action.
+
+`Fluffy.Playwright.unwrap/3` passes the `%PlaywrightEx.Locator{}` for a Fluffy
+locator instead, resolved in the active page and through its frame locators, with
+the same navigation handling:
+
+```elixir
+session
+|> Fluffy.Playwright.unwrap(by_role(:button, name: "Rename"), &PlaywrightEx.Locator.dblclick!/1)
+|> assert(visible(by_label("Name")))
+```
+
+Event values such as `Fluffy.Response` unwrap to their PlaywrightEx counterpart too;
+see [Native values](advanced-events.md#native-values). See
+[PlaywrightEx coverage](capabilities.md#playwrightex-coverage) for which native
+calls are safe.

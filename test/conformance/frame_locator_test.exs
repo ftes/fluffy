@@ -33,7 +33,7 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
           by_test_id(frame, "email")
         ] do
       assert %Fluffy.Locator{} = locator
-      assert Fluffy.Locator.crosses_frame?(locator)
+      assert Fluffy.Locator.Internal.crosses_frame?(locator)
     end
   end
 
@@ -237,6 +237,11 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
     test "#{action} rejects ambiguous frame owners and ambiguous elements" do
       body = "<input aria-label='Email'><input aria-label='Email'>"
       session = browser_html(iframe("first", body) <> iframe("second", body))
+      # srcdoc frames load asynchronously; under load Firefox can take longer than the 200ms
+      # action budget, which then times out before Playwright can report the strict violation.
+      for frame <- ["#first", "#second"] do
+        expect(session, frame |> frame_locator() |> by_role(:textbox) |> to_have_count(2))
+      end
 
       for locator <- [
             "iframe" |> frame_locator() |> by_role(:textbox) |> first(),

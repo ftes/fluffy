@@ -41,6 +41,27 @@ defmodule Fluffy.Conformance.NativeOptionsTest do
     end
   end
 
+  # Page, Frame and FrameLocator factories take the options of their Locator counterpart.
+  test "every upstream option of a locator is classified" do
+    for {locator, {module, fun, _arity, classes}} <- Options.native_locators() do
+      classified = classes |> Keyword.values() |> List.flatten()
+
+      for factory <- [module, PlaywrightEx.Page, PlaywrightEx.Frame, PlaywrightEx.FrameLocator],
+          Keyword.has_key?(factory.__info__(:functions), fun) do
+        assert Enum.sort(locator_keys(factory, fun)) == Enum.sort(classified),
+               "classify the upstream options of #{inspect(factory)}.#{fun} for #{inspect(locator)} in Fluffy.Options"
+      end
+
+      accepted = locator |> locator_schema() |> Map.fetch!(:schema) |> Keyword.keys()
+      supported = Keyword.get(classes, :fluffy, []) ++ Keyword.get(classes, :playwright, [])
+
+      assert supported -- accepted == [], "#{inspect(locator)} must accept its Fluffy-owned and Playwright options"
+
+      assert Enum.filter(Keyword.get(classes, :denied, []), &(&1 in accepted)) == [],
+             "#{inspect(locator)} accepts a denied option"
+    end
+  end
+
   for driver <- [:static, :playwright] do
     @tag driver: driver
     test "state flags and ignore_case mirror Playwright with #{driver}" do
@@ -56,6 +77,18 @@ defmodule Fluffy.Conformance.NativeOptionsTest do
       |> expect(page_to_have_url("/STAGE", ignore_case: true))
       |> expect(page_to_have_url(~r/STAGE$/, ignore_case: true))
       |> expect(not_(page_to_have_url(~r/STAGE$/i, ignore_case: false)))
+    end
+  end
+
+  for driver <- [:static, :live, :playwright] do
+    @tag driver: driver
+    test "ignore_case: false leaves a predicate or structured URL unchanged with #{driver}" do
+      path = if unquote(driver) == :live, do: "/live/nested", else: "/stage"
+
+      unquote(driver)
+      |> visited_session(path)
+      |> expect(page_to_have_url(&(&1.path == path), ignore_case: false))
+      |> expect(page_to_have_url([path: path], ignore_case: false))
     end
   end
 
@@ -82,9 +115,13 @@ defmodule Fluffy.Conformance.NativeOptionsTest do
     @tag driver: driver
     test "Playwright-only options raise a capability error with #{driver}" do
       with_session(unquote(driver), fn session ->
-        assert_raise Fluffy.CapabilityError, ~r/:force is a Playwright option/, fn ->
-          click(session, by_role(:button, name: "Cast"), force: true)
-        end
+        error =
+          assert_raise Fluffy.CapabilityError, ~r/:force is a Playwright option/, fn ->
+            click(session, by_role(:button, name: "Cast"), force: true)
+          end
+
+        assert error.capability == :playwright_action_options
+        assert Fluffy.Capability.status(error.capability, unquote(driver)) == :browser_only
       end)
     end
   end
@@ -106,8 +143,11 @@ defmodule Fluffy.Conformance.NativeOptionsTest do
             &Fluffy.Playwright.hover(session, button, &1),
             &Fluffy.Playwright.drag_to(session, button, button, &1),
             &Fluffy.Playwright.press_sequentially(session, button, "x", &1),
+            &Fluffy.Playwright.focus(session, button, &1),
+            &Fluffy.Playwright.blur(session, button, &1),
             &Fluffy.Playwright.go_back(session, &1),
-            &Fluffy.Playwright.go_forward(session, &1)
+            &Fluffy.Playwright.go_forward(session, &1),
+            &Fluffy.Playwright.Clock.install(session, &1)
           ],
           option <- [no_wait_after: true, signal: nil, timeout: :infinity] do
         assert_raise NimbleOptions.ValidationError, fn -> call.([option]) end
@@ -120,7 +160,21 @@ defmodule Fluffy.Conformance.NativeOptionsTest do
 
   defp upstream_keys(module, fun), do: fun |> module.__options__() |> Keyword.keys()
 
-  defp visited_session(:static, path), do: :phoenix |> start_session(endpoint: Endpoint) |> visit(path)
+  # `__options__/1` has no clause for a factory without options.
+  defp locator_keys(module, fun) do
+    upstream_keys(module, fun)
+  rescue
+    FunctionClauseError -> []
+  end
+
+  defp locator_schema(:by_role), do: Options.role_locator_schema()
+  defp locator_schema(:by_test_id), do: Options.test_id_locator_schema()
+  defp locator_schema(:filter), do: Options.filter_locator_schema()
+  defp locator_schema(:by_css), do: NimbleOptions.new!([])
+  defp locator_schema(_text_locator), do: Options.exact_locator_schema()
+
+  defp visited_session(driver, path) when driver in [:static, :live],
+    do: :phoenix |> start_session(endpoint: Endpoint) |> visit(path)
 
   defp visited_session(:playwright, path),
     do: :playwright |> start_session(base_url: Fluffy.TestServer.base_url()) |> visit(path)

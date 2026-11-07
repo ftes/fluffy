@@ -14,13 +14,11 @@ defmodule Fluffy.Driver.Playwright do
   alias Fluffy.Locator.Playwright, as: PlaywrightLocator
   alias Fluffy.Session
   alias Fluffy.URLMatcher
-  alias PlaywrightEx.AbortController
   alias PlaywrightEx.BrowserContext
   alias PlaywrightEx.Expect, as: BrowserExpect
   alias PlaywrightEx.Frame
   alias PlaywrightEx.Locator, as: BrowserLocator
   alias PlaywrightEx.Page, as: BrowserPage
-  alias PlaywrightEx.Promise
   alias PlaywrightEx.Request
   alias PlaywrightEx.TargetClosedError
   alias PlaywrightEx.TimeoutError
@@ -44,7 +42,7 @@ defmodule Fluffy.Driver.Playwright do
 
     {:ok, :expectation, outcome} =
       navigation_aware_action(session, timeout, fn remaining ->
-        execute_expectation(session, Expect.merge_options(expectation, timeout: remaining))
+        execute_expectation(session, Expect.Internal.merge_options(expectation, timeout: remaining))
         {:ok, :expectation}
       end)
 
@@ -62,7 +60,7 @@ defmodule Fluffy.Driver.Playwright do
       {:error, error} ->
         raise ExUnit.AssertionError,
           message:
-            "Expected #{Expect.describe(expectation)}, got #{inspect(BrowserPage.url(page))}\n" <>
+            "Expected #{Expect.Internal.describe(expectation)}, got #{inspect(BrowserPage.url(page))}\n" <>
               Exception.message(error)
     end
   end
@@ -78,7 +76,8 @@ defmodule Fluffy.Driver.Playwright do
         :ok
 
       {:error, error} ->
-        raise ExUnit.AssertionError, message: "Expected #{Expect.describe(expectation)}\n" <> Exception.message(error)
+        raise ExUnit.AssertionError,
+          message: "Expected #{Expect.Internal.describe(expectation)}\n" <> Exception.message(error)
     end
   end
 
@@ -119,35 +118,58 @@ defmodule Fluffy.Driver.Playwright do
     locator_action(session, :click, locator, options, &BrowserLocator.click(&1, native(options, &2)))
   end
 
-  # Submits the form and reports whether it navigates the page's main frame:
-  # validation let the submit event fire, no handler (such as LiveView's
-  # phx-submit) cancelled it, and its target is that frame. Page inputs can
-  # shadow form properties, so they are read from the prototype.
+  # Submits the form and reports whether it navigates the page's main frame to
+  # another document: validation let the submit event fire, no handler (such as
+  # LiveView's phx-submit) cancelled it, its target is that frame, and it is not
+  # a GET to the current URL with a fragment, which the browser navigates to
+  # within the document. Page inputs can shadow form properties, so they are
+  # read from the prototype.
   @submit """
   form => {
     if (form.localName !== 'form')
       throw new Error(`submit/2 requires a form locator, got ${form.localName}`)
     const view = form.ownerDocument.defaultView
     const property = name => Object.getOwnPropertyDescriptor(HTMLFormElement.prototype, name).get.call(form)
-    let submitted
-    const listen = event => { if (event.target === form) submitted = event }
+    let submitted, data
+    const listen = event => {
+      if (event.target !== form) return
+      if (event.type === 'submit') submitted = event
+      else data = event.formData
+    }
     view.addEventListener('submit', listen, true)
-    try { HTMLFormElement.prototype.requestSubmit.call(form) } finally { view.removeEventListener('submit', listen, true) }
+    view.addEventListener('formdata', listen, true)
+    try { HTMLFormElement.prototype.requestSubmit.call(form) } finally {
+      view.removeEventListener('submit', listen, true)
+      view.removeEventListener('formdata', listen, true)
+    }
 
-    if (!submitted || submitted.defaultPrevented || !form.isConnected || property('method') === 'dialog') return false
-    if (!['http:', 'https:'].includes(new URL(property('action')).protocol)) return false
+    const method = property('method')
+    if (!submitted || submitted.defaultPrevented || !form.isConnected || method === 'dialog') return false
+    const url = new URL(property('action'))
+    if (!['http:', 'https:'].includes(url.protocol)) return false
     const name = property('target') || form.ownerDocument.querySelector('base[target]')?.getAttribute('target') || '_self'
     const keyword = name.toLowerCase()
     const target = keyword === '_self' ? view : keyword === '_parent' ? view.parent : keyword === '_top' ? view.top
       : name === view.name ? view : null
-    return target === view.top
+    if (target !== view.top) return false
+    if (method !== 'get' || !data) return true
+
+    // A GET replaces the action's query with the form data, keeping its fragment.
+    const entries = [...data].map(([key, value]) => [key, typeof value === 'string' ? value : value.name])
+    url.search = '?' + new URLSearchParams(entries)
+    let current
+    try { current = target.location.href } catch { return true }
+    const withoutFragment = href => href.split('#')[0]
+    return !(url.href.includes('#') && withoutFragment(url.href) === withoutFragment(current))
   }
   """
 
   # Like a Playwright action, submit waits for a navigation it initiates;
   # WebKit can start it after requestSubmit has returned. The wait ends with the
   # response, when the server has handled the request, not the commit, which a
-  # no-content or download response never makes.
+  # no-content or download response never makes. Page code can still turn the
+  # navigation into a same-document one (the Navigation API's `intercept()`),
+  # which ends the wait too.
   @impl true
   def submit(%Session{} = session, %Locator{} = locator, options \\ []) do
     %{page: page, frame: frame} = Session.page_state(session)
@@ -155,25 +177,70 @@ defmodule Fluffy.Driver.Playwright do
     locator_action(session, :submit, locator, options, fn native, remaining ->
       deadline = Deadline.new(remaining)
       # Listening first misses no request the submit starts.
-      controller = AbortController.new()
-      predicate = &(Request.is_navigation_request(&1) and Request.frame(&1).guid == frame.guid)
-      signal = AbortController.signal(controller)
-      navigation = BrowserPage.wait_for_event(page, :request, predicate: predicate, timeout: remaining, signal: signal)
+      listeners = listen_for_submission(page, frame)
 
       try do
         case BrowserLocator.evaluate(native, @submit, nil, timeout: remaining) do
-          {:ok, true} -> with {:ok, request} <- Promise.await(navigation), do: await_response(request, deadline)
+          {:ok, true} -> await_submission(listeners, deadline)
           {:ok, false} -> :ok
           {:error, error} -> {:error, error}
         end
       after
-        AbortController.abort(controller)
-        Promise.free(navigation)
+        unlisten(page, listeners)
       end
     end)
   end
 
-  # A response has no timeout of its own; a failed request has none.
+  # A navigation request comes before the frame commits to another document, so
+  # a commit seen first navigated within the document.
+  defp listen_for_submission(page, frame) do
+    owner = self()
+    ref = make_ref()
+
+    request = fn request ->
+      if Request.is_navigation_request(request) and Request.frame(request).guid == frame.guid,
+        do: send(owner, {ref, :request, request})
+    end
+
+    navigated = fn navigated -> if navigated.guid == frame.guid, do: send(owner, {ref, :navigated}) end
+    BrowserPage.on(page, :request, request)
+    BrowserPage.on(page, :frame_navigated, navigated)
+    %{ref: ref, request: request, frame_navigated: navigated}
+  end
+
+  defp await_submission(%{ref: ref}, deadline) do
+    timeout = Deadline.remaining(deadline, 1)
+
+    receive do
+      {^ref, :request, request} -> await_response(request, deadline)
+      {^ref, :navigated} -> :ok
+    after
+      timeout ->
+        {:error,
+         %TimeoutError{
+           message:
+             "Timeout #{timeout}ms exceeded while waiting for the submitted form's navigation request; " <>
+               "the browser sent none (a Content-Security-Policy form-action can block it silently)"
+         }}
+    end
+  end
+
+  defp unlisten(page, %{ref: ref} = listeners) do
+    BrowserPage.off(page, :request, listeners.request)
+    BrowserPage.off(page, :frame_navigated, listeners.frame_navigated)
+    flush(ref)
+  end
+
+  defp flush(ref) do
+    receive do
+      {^ref, _event} -> flush(ref)
+      {^ref, _event, _value} -> flush(ref)
+    after
+      0 -> :ok
+    end
+  end
+
+  # Reading the response has no timeout of its own; a failed request has none.
   defp await_response(request, deadline) do
     timeout = Deadline.remaining(deadline, 1)
 
@@ -211,10 +278,9 @@ defmodule Fluffy.Driver.Playwright do
   @impl true
   def set_checked(%Session{} = session, %Locator{} = locator, desired, options \\ []) when is_boolean(desired) do
     {operation, set} = if desired, do: {:check, &BrowserLocator.check/2}, else: {:uncheck, &BrowserLocator.uncheck/2}
-    frame = Session.page_state(session).frame
 
     locator_action(session, operation, locator, options, fn native, remaining ->
-      cursor = Document.activation_cursor(frame, session_timeout(session))
+      cursor = Document.activation_cursor(native, session_timeout(session))
 
       case set.(native, native(options, remaining)) do
         # Playwright reads the state after its click, which a LiveView patch
@@ -222,7 +288,7 @@ defmodule Fluffy.Driver.Playwright do
         # Phoenix, the action succeeds once the click set the requested state.
         {:error, %{message: message}} = error ->
           if message =~ "Clicking the checkbox did not change its state" and
-               Document.activated?(frame, cursor, desired, session_timeout(session)),
+               Document.activated?(native, cursor, desired, session_timeout(session)),
              do: :ok,
              else: error
 
@@ -294,15 +360,37 @@ defmodule Fluffy.Driver.Playwright do
   end
 
   @impl true
-  def unwrap(%Session{} = session, fun) when is_function(fun, 1) do
+  def unwrap(%Session{} = session, fun) when is_function(fun, 1),
+    do: run_unwrapped(session, Session.page_state(session).page, fun)
+
+  # Like unwrap/2, with the locator resolved in the current frame.
+  def unwrap_locator(%Session{} = session, %Locator{} = locator, fun) when is_function(fun, 1),
+    do: run_unwrapped(session, locator(session, locator), fun)
+
+  defp run_unwrapped(session, native, fun) do
     page = Session.page_state(session).page
     context = Session.context(session)
 
     {:ok, :unwrap, outcome} =
       navigation_aware_action(session, context.timeout, fn _remaining ->
-        _ignored = fun.(page)
+        _ignored = fun.(native)
         validate_unwrapped!(context.browser_context, page)
         {:ok, :unwrap}
+      end)
+
+    outcome
+  end
+
+  # A clock call has no timeout of its own and waits while a timer it fires
+  # blocks the page. Those timers can patch or navigate, as an action can.
+  def clock(%Session{} = session, operation, fun, options) do
+    clock = BrowserPage.clock(Session.page_state(session).page)
+    timeout = options |> Keyword.get(:timeout) |> Kernel.||(Session.context(session).timeout) |> max(1)
+
+    {:ok, :clock, outcome} =
+      navigation_aware_action(session, timeout, fn remaining ->
+        Bounded.within!(remaining, operation, fn -> with :ok <- fun.(clock), do: {:ok, :ok} end)
+        {:ok, :clock}
       end)
 
     outcome
@@ -326,7 +414,7 @@ defmodule Fluffy.Driver.Playwright do
   defp locator(session, locator), do: PlaywrightLocator.locator(Session.page_state(session).frame, locator)
 
   # Fluffy's own options stay here; the rest pass through to the PlaywrightEx call.
-  defp native(options, remaining), do: options |> Keyword.drop([:timeout, :max_bytes]) |> Keyword.put(:timeout, remaining)
+  defp native(options, remaining), do: Keyword.put(options, :timeout, remaining)
 
   defp locator_action(session, operation, locator, options, fun) do
     native = locator(session, locator)

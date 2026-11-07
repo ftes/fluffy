@@ -24,7 +24,7 @@ defmodule Fluffy.OperationError do
 
     description =
       case locator do
-        %Fluffy.Locator{} -> Fluffy.Locator.describe(locator)
+        %Fluffy.Locator{} -> Fluffy.Locator.Internal.describe(locator)
         %Fluffy.FileChooser{} -> "file chooser"
       end
 

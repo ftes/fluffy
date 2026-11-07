@@ -7,27 +7,37 @@ Fluffy now runs on PlaywrightEx 0.17, a port of the official Playwright client w
 ### Upgrading from 0.8
 
 - Install the driver and browsers with `mix playwright_ex.install -- chromium`; drop the npm `playwright` package and the `assets_dir` config.
-- Replace `js_logger:` with `log_browser_console: true | false`.
+- Replace `js_logger:` with `log_browser_console: true | false`; `Fluffy.Playwright.ConsoleLogger` is removed and custom `PlaywrightEx.JsLogger` modules are not supported.
+- `executable:` now names a Playwright driver executable instead of the npm `cli.js`; drop it if it pointed at npm `playwright`.
 - `unwrap/2` passes a `%PlaywrightEx.Page{}`; `Fluffy.Playwright.Handle` is removed.
 - `Fluffy.HTTPEvent` is replaced by `Fluffy.Request` and `Fluffy.Response` (`response.request` is the request).
 - `Fluffy.Playwright.evaluate(session, expression, arg \\ nil)` replaces the `is_function:`, `arg:` and `timeout:` options and raises after the session's `timeout:`; JavaScript `null` returns `:null`.
 - `Fluffy.Playwright.cookies(session, urls)` takes the URL list directly.
+- Cookie maps of `add_cookies/2` and `cookies/2` use Playwright's camelCase atom keys: `%{name: "a", value: "b", url: url, http_only: true}` becomes `%{name: "a", value: "b", url: url, httpOnly: true}`, likewise `sameSite:` and `partitionKey:`; `add_cookies/2` raises on the old keys. `storage_state/2` returns atom keys instead of strings: `state["cookies"]` becomes `state.cookies`, likewise `:origins`, `:localStorage` and `:httpOnly`. Saved state files and string-keyed maps still load.
 - `browser_context:`, `launch_options:`, and the options of `screenshot`, `storage_state`, cookies and `trace` pass through to PlaywrightEx, which validates them.
 - `go_back`/`go_forward`, `hover`, `drag_to` and `press_sequentially` accept the options of their PlaywrightEx call except `no_wait_after:` and `signal:`, which would bypass navigation tracking.
 - `trace(coverage:)` is removed.
-- `Fluffy.Dialog.accept/2` and `dismiss/1` take no timeout; `Fluffy.Download` has none.
+- `Fluffy.Dialog.accept/2` and `dismiss/1` take no timeout; `Fluffy.Dialog` loses its `connection`, `id` and `timeout` fields, and `Fluffy.Download` has no timeout.
 - `page_status`, `page_to_have_status` and `Fluffy.Page.status` are removed, as in Playwright; on Playwright, assert on `Event.response` instead.
 - `OperationError.cause` and Playwright assertion messages carry native PlaywrightEx exceptions.
 - `Fluffy.Expect.checked_option` is now `to_be_checked_option`.
+- `Fluffy.Download`'s `source` and `runtime` fields are private. On Playwright, `unwrap(download, fun)` passes the `PlaywrightEx.Download`.
+- `Fluffy.Locator.describe`, `new` and `append` are internal; `inspect/1` renders a locator.
 
 ### Added
 
 - `click`, `fill`, `check`, `uncheck`, `select_option` and `press` accept the options of their PlaywrightEx call on Playwright (e.g. `modifiers: [:shift]`, `force: true`); Phoenix raises `Fluffy.CapabilityError` for them.
+- `reload` accepts `wait_until:` on Playwright; Phoenix raises `Fluffy.CapabilityError` for it.
+- `by_role` accepts Playwright's `checked:`, `disabled:`, `expanded:`, `include_hidden:`, `level:`, `pressed:`, `selected:` and `description:`, and `name:`, `has_text:` and `has_not_text:` accept a regex. These are Playwright only; Phoenix raises `Fluffy.CapabilityError` when it resolves such a locator.
 - Expectations accept the options of their PlaywrightEx assertion on every driver: `visible:`, `enabled:` and `editable:` (`false` asserts the opposite state) and `ignore_case:` for `page_to_have_url`. Options and types are generated per constructor.
 - A document navigated natively (inside or after `unwrap/2`) is adopted before the next action.
 - Fluffy relaunches the browser after it disconnects.
-- `Fluffy.FileChooser.page/1`.
+- `Fluffy.Playwright.unwrap/3` runs a callback with the `PlaywrightEx.Locator` of a Fluffy locator, resolved through frame locators, and adopts the navigation it causes.
+- `unwrap/2` accepts a `Fluffy.Request`, `Fluffy.Response`, `Fluffy.Dialog`, `Fluffy.Download`, `Fluffy.FileChooser` or `Fluffy.Frame` and returns the callback's result with its PlaywrightEx counterpart, such as a response body.
+- `Fluffy.FileChooser.page/1`, and `Fluffy.Dialog.page/1` with a `page` field.
+- `Fluffy.Download.page/1` with a `page` field; on Phoenix, the page that started the download.
 - `Fluffy.Event.close()` resolves with the selected page's handle when it closes.
+- Playwright clock control in `Fluffy.Playwright.Clock`: `install`, `pause_at`, `run_for`, `fast_forward`, `resume`, `set_fixed_time` and `set_system_time`. Fluffy's waits work with a paused clock.
 
 ### Fixed
 
@@ -36,6 +46,9 @@ Fluffy now runs on PlaywrightEx 0.17, a port of the official Playwright client w
 - An action that closes its own page, such as a popup's `window.close()`, succeeds instead of raising `PlaywrightEx.TargetClosedError`.
 - A browser that fails to launch raises in the session that needed it, instead of restarting every running session.
 - Playwright `check` and `uncheck` succeed once the click sets the requested state, as on Phoenix, even if page code such as a LiveView patch changes it before Playwright reads it back (common in Firefox and WebKit).
+- Playwright `submit` waits for the server to answer the navigation it starts, so it no longer returns before WebKit has sent the form. A submission the browser handles within the document (a GET to a fragment of the current URL, a Navigation API `intercept()`) ends the wait.
+- On Phoenix, a link, form submission or redirect answered with `204 No Content` or `205 Reset Content` keeps the current page, URL and form state instead of showing an empty document; a LiveView page stays, disconnected, as in a browser. `visit` to such a response raises, like Playwright's.
+- A Playwright action whose navigation lands on pages that navigate again on load (a client-side redirect chain) follows them instead of raising "Execution context was destroyed".
 
 ## 0.8.0 — 2026-11-04
 

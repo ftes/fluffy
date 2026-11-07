@@ -90,9 +90,17 @@ defmodule Fluffy.Conformance.StaticHTTPCookieTest do
         |> visit(TestHTTPFixtures.path(fixture, "/read"))
 
       [_set, read] = TestHTTPFixtures.requests(fixture)
-      assert cookie_map(read)["secure_session"] == "present"
+
+      if sends_secure_loopback_cookies?(driver),
+        do: assert(cookie_map(read)["secure_session"] == "present"),
+        else: refute(Map.has_key?(cookie_map(read), "secure_session"))
     end
   end
+
+  # WebKit does not treat http loopback as trustworthy for Secure cookies (upstream Playwright
+  # browsercontext-proxy.spec.ts PR-022 expects WebKit to omit them over http).
+  defp sends_secure_loopback_cookies?(:playwright), do: Application.fetch_env!(:fluffy, :playwright)[:engine] != :webkit
+  defp sends_secure_loopback_cookies?(_driver), do: true
 
   defp cookie_response(request) do
     fixture_path = String.trim_trailing(request.request_path, request.path)

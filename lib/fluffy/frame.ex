@@ -40,6 +40,12 @@ defmodule Fluffy.Frame do
     end
   end
 
+  @doc false
+  def native!(%__MODULE__{} = frame) do
+    ensure_session!(frame)
+    frame.native
+  end
+
   defp ensure_session!(frame) do
     Page.record(frame.page)
 

@@ -64,6 +64,25 @@ defmodule Fluffy.Conformance.BrowserAPITest do
   end
 
   @tag driver: :playwright
+  test "cookie and storage maps use Playwright's camelCase keys" do
+    session = :playwright |> start_session() |> visit("/harness")
+    url = Fluffy.TestServer.base_url()
+
+    session = Playwright.add_cookies(session, [%{name: "token", value: "abc", url: url, httpOnly: true, sameSite: "Lax"}])
+    assert [%{name: "token", httpOnly: true, sameSite: "Lax"}] = Playwright.cookies(session)
+    assert %{cookies: [%{httpOnly: true}], origins: _origins} = Playwright.storage_state(session)
+
+    # Playwright would drop these silently.
+    for {key, camel_case} <- [http_only: :httpOnly, same_site: :sameSite], cookie_key <- [key, Atom.to_string(key)] do
+      assert_raise ArgumentError,
+                   ~r/#{inspect(cookie_key)} is not a Playwright cookie field; use #{inspect(camel_case)}/,
+                   fn ->
+                     Playwright.add_cookies(session, [%{:name => "old", :value => "x", :url => url, cookie_key => true}])
+                   end
+    end
+  end
+
+  @tag driver: :playwright
   test "hover, drag, and typing emit native browser events" do
     session =
       Fluffy.session_for_html(:playwright, """

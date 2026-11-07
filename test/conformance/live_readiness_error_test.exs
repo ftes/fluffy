@@ -9,9 +9,11 @@ defmodule Fluffy.Conformance.LiveReadinessErrorTest do
 
   @tag driver: :playwright
   test "a parent patch does not make a connected nested LiveView unready" do
+    # Firefox dispatches input for one page of the shared browser at a time, so
+    # with many parallel cases an action can queue behind others for seconds.
     session =
       :playwright
-      |> start_session(base_url: Fluffy.TestServer.base_url(), timeout: 1_000)
+      |> start_session(base_url: Fluffy.TestServer.base_url(), timeout: 5_000)
       |> visit("/live/nested")
       |> fill(by_label("Parent email"), "parent@example.com")
       |> click(by_role(:button, name: "Save parent"))

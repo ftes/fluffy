@@ -147,6 +147,25 @@ defmodule Fluffy.Conformance.CheckActionTest do
     end)
   end
 
+  test "Playwright check and uncheck succeed when page code in an iframe reverts the click" do
+    revert = ~s|oninput="queueMicrotask(() => this.checked = !this.checked)"|
+
+    inner = """
+    <label><input type="checkbox" #{revert}>Updates</label>
+    <label><input type="checkbox" checked #{revert}>Digest</label>
+    """
+
+    frame = frame_locator("iframe")
+
+    with_html(:playwright, ~s(<iframe srcdoc="#{String.replace(inner, "\"", "&quot;")}"></iframe>), fn session ->
+      session
+      |> check(by_role(frame, :checkbox, name: "Updates"))
+      |> expect(to_be_checked(by_role(frame, :checkbox, name: "Updates"), checked: false))
+      |> uncheck(by_role(frame, :checkbox, name: "Digest"))
+      |> expect(to_be_checked(by_role(frame, :checkbox, name: "Digest")))
+    end)
+  end
+
   test "Playwright check fails when the click does not change the state" do
     html = ~s|<label><input type="checkbox" onclick="event.preventDefault()">Updates</label>|
 

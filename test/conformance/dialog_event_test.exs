@@ -45,6 +45,29 @@ defmodule Fluffy.Conformance.DialogEventTest do
   end
 
   @tag driver: :playwright
+  test "a dialog knows its page and unwraps to the native dialog" do
+    session = session()
+    pending = wait_for(session, Event.dialog())
+    owner = self()
+
+    once(session, Event.dialog(), fn dialog ->
+      send(owner, {:native_type, unwrap(dialog, &PlaywrightEx.Dialog.type/1)})
+      Dialog.dismiss(dialog)
+    end)
+
+    click(session, by_role(:button, name: "Confirm"))
+    dialog = await(pending)
+
+    assert Dialog.page(dialog) == current_page(session)
+    assert dialog.page == current_page(session)
+    assert_receive {:native_type, "confirm"}
+    expect(session, "dismissed" |> by_text(exact: true) |> to_be_visible())
+
+    close_session(session)
+    assert_raise ArgumentError, ~r/session is closed/, fn -> unwrap(dialog, & &1) end
+  end
+
+  @tag driver: :playwright
   test "dismisses a dialog explicitly" do
     session()
     |> once(Event.dialog(), &Dialog.dismiss/1)

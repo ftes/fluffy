@@ -105,6 +105,7 @@ defmodule Fluffy.MixProject do
           Fluffy.Page,
           Fluffy.Event,
           Fluffy.Playwright,
+          Fluffy.Playwright.Clock,
           Fluffy.Sandbox
         ],
         "Sessions and results": [

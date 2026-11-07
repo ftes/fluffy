@@ -4,7 +4,8 @@ defmodule Fluffy.Playwright do
 
   These functions intentionally live under `Fluffy.Playwright` because they
   depend on a real browser. Use them when behavior requires one; they are not
-  implemented by the Static or LiveView drivers.
+  implemented by the Static or LiveView drivers. The page clock lives in
+  `Fluffy.Playwright.Clock`.
   """
 
   alias Fluffy.Backend
@@ -157,7 +158,7 @@ defmodule Fluffy.Playwright do
   @spec focus(Session.t(), Fluffy.Locator.t(), [Fluffy.action_option()]) :: Session.t()
   def focus(%Session{} = session, locator, options \\ []) do
     ensure_playwright_backend!(session, :focus)
-    options = Options.validate_action!(options)
+    options = Options.validate_action!(:focus, options)
     Fluffy.__dispatch_driver__(session, :focus, [locator, options])
   end
 
@@ -167,7 +168,7 @@ defmodule Fluffy.Playwright do
   @spec blur(Session.t(), Fluffy.Locator.t(), [Fluffy.action_option()]) :: Session.t()
   def blur(%Session{} = session, locator, options \\ []) do
     ensure_playwright_backend!(session, :blur)
-    options = Options.validate_action!(options)
+    options = Options.validate_action!(:blur, options)
     Fluffy.__dispatch_driver__(session, :blur, [locator, options])
   end
 
@@ -221,6 +222,28 @@ defmodule Fluffy.Playwright do
     ensure_playwright_backend!(session, :press_sequentially)
     options = Options.validate_action!(:press_sequentially, options)
     Fluffy.__dispatch_driver__(session, :press_sequentially, [locator, text, options])
+  end
+
+  @doc playwright_only: true
+  @doc """
+  Runs `fun` with the `PlaywrightEx.Locator` for `locator` and returns the reconciled session.
+
+  Like `Fluffy.unwrap/2`, for native locator operations that have no Fluffy
+  API. The locator resolves in the active page, through any frame locators, and
+  is not checked for strictness until the callback uses it. The callback's
+  return value is ignored, and a document it navigates is adopted.
+
+      session
+      |> Fluffy.Playwright.unwrap(by_role(:button, name: "Edit"), &PlaywrightEx.Locator.dblclick!/1)
+      |> expect(to_be_visible(by_label("Title")))
+
+  Prefer PlaywrightEx bang functions inside the callback when failure should
+  stop the test. Phoenix sessions raise `Fluffy.CapabilityError`.
+  """
+  @spec unwrap(Session.t(), Fluffy.Locator.t(), (PlaywrightEx.Locator.t() -> term())) :: Session.t()
+  def unwrap(%Session{} = session, %Fluffy.Locator{} = locator, fun) when is_function(fun, 1) do
+    ensure_playwright_backend!(session, :native_locator)
+    Fluffy.__dispatch_driver__(session, :unwrap_locator, [locator, fun])
   end
 
   @doc playwright_only: true
@@ -315,12 +338,31 @@ defmodule Fluffy.Playwright do
   end
 
   @doc playwright_only: true
-  @doc "Adds cookies to the browser context and returns the session. See `PlaywrightEx.BrowserContext.add_cookies/2`."
+  @doc """
+  Adds cookies to the browser context and returns the session.
+
+  Cookie maps use the keys of `PlaywrightEx.BrowserContext.add_cookies/2`, such as
+  `%{name: "token", value: "abc", url: url, httpOnly: true, sameSite: "Lax"}`.
+  """
   @spec add_cookies(Session.t(), [map()]) :: Session.t()
   def add_cookies(session, cookies) when is_list(cookies) do
+    Enum.each(cookies, &reject_snake_case_cookie_keys!/1)
     session |> browser_context!(:add_cookies) |> BrowserContext.add_cookies!(cookies)
     session
   end
+
+  # Playwright ignores unknown cookie keys, such as the snake_case ones Fluffy 0.8 took.
+  @snake_case_cookie_keys %{http_only: :httpOnly, same_site: :sameSite, partition_key: :partitionKey}
+
+  defp reject_snake_case_cookie_keys!(cookie) when is_map(cookie) do
+    for {key, _value} <- cookie,
+        {snake_case, camel_case} <- @snake_case_cookie_keys,
+        key in [snake_case, Atom.to_string(snake_case)] do
+      raise ArgumentError, "cookie key #{inspect(key)} is not a Playwright cookie field; use #{inspect(camel_case)}"
+    end
+  end
+
+  defp reject_snake_case_cookie_keys!(_cookie), do: :ok
 
   @doc playwright_only: true
   @doc "Returns browser cookies, optionally only those for `urls`. See `PlaywrightEx.BrowserContext.cookies/2`."
@@ -370,6 +412,9 @@ defmodule Fluffy.Playwright do
             "JavaScript evaluation requires an active Playwright page; the current page driver is #{inspect(driver)}"
     end
   end
+
+  @doc false
+  def __ensure_playwright_backend__!(session, capability), do: ensure_playwright_backend!(session, capability)
 
   defp ensure_playwright_backend!(session, capability) do
     if Session.backend(session) != PlaywrightBackend do

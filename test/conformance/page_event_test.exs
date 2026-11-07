@@ -81,17 +81,20 @@ defmodule Fluffy.Conformance.PageEventTest do
   test "a settled popup stays available when the action outlives the wait deadline" do
     {session, fixture} = browser_session()
 
+    # The deadline leaves room for a browser click under parallel cases
+    # (Firefox dispatches input for one page at a time); the action still
+    # outlives it.
     expect_event(
       session,
       Event.popup(),
       fn input ->
         click(input, by_role(:link, name: "Redirect", exact: true))
-        Process.sleep(1_000)
+        Process.sleep(3_000)
       end,
       fn page ->
         session |> switch_page(page) |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/details")))
       end,
-      timeout: 1_000
+      timeout: 3_000
     )
   end
 

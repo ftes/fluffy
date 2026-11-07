@@ -234,10 +234,10 @@ defmodule Fluffy.Backend.Playwright do
 
   @impl true
   def reload(%Session{} = session, options \\ []) do
-    options = Keyword.validate!(options, [:timeout])
     state = Session.page_state(session)
-    timeout = options |> Keyword.get(:timeout, Session.context(session).timeout) |> max(1)
-    _response = navigate!(:reload, [state.page, [wait_until: :load, timeout: timeout]])
+    {timeout, options} = Keyword.pop(options, :timeout, Session.context(session).timeout)
+    timeout = max(timeout, 1)
+    _response = navigate!(:reload, [state.page, Keyword.merge([wait_until: :load, timeout: timeout], options)])
     adopt_navigated_document(session, state, timeout)
   end
 
@@ -291,8 +291,11 @@ defmodule Fluffy.Backend.Playwright do
   @impl true
   defdelegate subscribe_event(session, type, source, pid), to: Events
 
-  defp release_page(_session, page, :page_closed) do
-    BrowserPage.close!(page.state.page)
+  # Like closing the context, closing a page has no timeout of its own.
+  defp release_page(session, page, :page_closed) do
+    timeout = max(Session.context(session).timeout, 1)
+    Bounded.within!(timeout, :close_page, fn -> with :ok <- BrowserPage.close(page.state.page), do: {:ok, :ok} end)
+    :ok
   end
 
   defp navigate!(operation, arguments) do
