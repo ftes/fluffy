@@ -5,9 +5,14 @@ defmodule Fluffy.TestCase do
 
   using do
     quote do
-      import Fluffy.TestCase, only: [assert_action_error: 4]
+      import Fluffy.TestCase, only: [assert_action_error: 4, playwright_engine?: 1]
     end
   end
+
+  @playwright_engine Application.compile_env!(:fluffy, :playwright)[:engine]
+
+  # A plain function, compiled before the tests, so `@tag skip:` can call it at compile time.
+  def playwright_engine?(engine), do: engine == @playwright_engine
 
   def assert_action_error(session, structural_exception, structural_message, action) do
     error = ExUnit.Assertions.assert_raise(Fluffy.OperationError, action)

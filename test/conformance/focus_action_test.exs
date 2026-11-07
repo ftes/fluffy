@@ -6,8 +6,6 @@ defmodule Fluffy.Conformance.FocusActionTest do
   import Fluffy.Locator
   import Fluffy.Playwright
 
-  @webkit? Application.compile_env!(:fluffy, :playwright)[:engine] == :webkit
-
   @tag driver: :playwright
   test "focusing another control implicitly blurs the previous control with playwright" do
     first = by_label("First")
@@ -126,7 +124,7 @@ defmodule Fluffy.Conformance.FocusActionTest do
   # WebKit on macOS, like Safari, does not focus a clicked button; WebKit on Linux does
   # (upstream Playwright skips page-focus.spec.ts FO-007 on WebKit).
   defp expect_button_focus_after_click(session, button) do
-    if @webkit? and match?({:unix, :darwin}, :os.type()),
+    if playwright_engine?(:webkit) and match?({:unix, :darwin}, :os.type()),
       do: expect(session, not_(to_be_focused(button))),
       else: expect(session, to_be_focused(button))
   end

@@ -238,7 +238,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
 
   @tag driver: :playwright, tmp_dir: true, capture_log: true
   @tag skip:
-         if(Application.compile_env!(:fluffy, :playwright)[:engine] == :firefox,
+         if(playwright_engine?(:firefox),
            do: "Firefox never completes or fails an interrupted download"
          )
   test "failed downloads expose metadata but raise when reading or saving", %{tmp_dir: tmp_dir} do

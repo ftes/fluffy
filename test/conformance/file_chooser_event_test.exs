@@ -87,7 +87,7 @@ defmodule Fluffy.Conformance.FileChooserEventTest do
   # event: a one-shot wait that has just ended lets Firefox open a real dialog that swallows
   # the next click (reproduces in Playwright JS, about 1 in 30).
   @tag skip:
-         if(Application.compile_env!(:fluffy, :playwright)[:engine] == :firefox,
+         if(playwright_engine?(:firefox),
            do: "Playwright 1.65 Firefox races chooser interception against a one-shot wait"
          )
   test "releases each chooser subscription and can capture another chooser" do

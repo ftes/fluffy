@@ -99,7 +99,7 @@ defmodule Fluffy.Conformance.StaticHTTPCookieTest do
 
   # WebKit does not treat http loopback as trustworthy for Secure cookies (upstream Playwright
   # browsercontext-proxy.spec.ts PR-022 expects WebKit to omit them over http).
-  defp sends_secure_loopback_cookies?(:playwright), do: Application.fetch_env!(:fluffy, :playwright)[:engine] != :webkit
+  defp sends_secure_loopback_cookies?(:playwright), do: not playwright_engine?(:webkit)
   defp sends_secure_loopback_cookies?(_driver), do: true
 
   defp cookie_response(request) do
