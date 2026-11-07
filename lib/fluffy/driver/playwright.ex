@@ -502,14 +502,17 @@ defmodule Fluffy.Driver.Playwright do
 
   # A lost driver or a closed context closes the page too. The context's
   # closed flag may still lag a lost driver, unlike a call on it. The page's
-  # close event may still be on its way when the action fails.
+  # close event may still be on its way when the action fails; a call on the
+  # page tells whether it is closed without waiting for it.
   defp closed_own_page?(browser_context, page, timeout) do
+    deadline = Deadline.new(timeout)
+
     not BrowserContext.is_closed(browser_context) and
-      match?({:ok, _cookies}, BrowserContext.cookies(browser_context, [])) and
-      page_closes?(page, timeout)
+      match?({:ok, {:ok, _cookies}}, Bounded.within(timeout, fn -> BrowserContext.cookies(browser_context, []) end)) and
+      page_closes?(page, deadline)
   end
 
-  defp page_closes?(page, timeout) do
+  defp page_closes?(page, deadline) do
     owner = self()
     ref = make_ref()
     listener = fn _page -> send(owner, {ref, :closed}) end
@@ -517,15 +520,22 @@ defmodule Fluffy.Driver.Playwright do
 
     try do
       BrowserPage.is_closed(page) or
-        receive do
-          {^ref, :closed} -> true
-        after
-          timeout -> false
-        end
+        (target_closed?(page, deadline) and
+           receive do
+             {^ref, :closed} -> true
+           after
+             Deadline.remaining(deadline) -> false
+           end)
     after
       BrowserPage.off(page, :close, listener)
       flush(ref)
     end
+  end
+
+  defp target_closed?(page, deadline) do
+    frame = BrowserPage.main_frame(page)
+    read = Bounded.within(Deadline.remaining(deadline, 1), fn -> Frame.evaluate(frame, "1") end)
+    match?({:ok, {:error, %TargetClosedError{}}}, read)
   end
 
   # Adopts a document Fluffy has not seen: a new page's first document, or a
