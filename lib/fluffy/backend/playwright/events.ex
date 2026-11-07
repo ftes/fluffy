@@ -63,11 +63,19 @@ defmodule Fluffy.Backend.Playwright.Events do
     decode = fn
       {:source_closed, _reason} when type == :close -> {:ok, Page.new(session.runtime, source)}
       {:fluffy_playwright_event, :crash, _page} -> {:error, "event source crashed"}
-      {:fluffy_playwright_event, _event, native} -> {:ok, value(session, type, native)}
+      {:fluffy_playwright_event, _event, native} -> decoded(session, type, native)
       _message -> :ignore
     end
 
     {decode, unsubscribe}
+  end
+
+  # An event whose page closed before Fluffy saw it, such as a popup closed at
+  # once, has no page handle to deliver; it is not the one a wait is for.
+  defp decoded(session, type, native) do
+    {:ok, value(session, type, native)}
+  catch
+    :unregistered_page -> :ignore
   end
 
   defp unsubscribe(listeners) do
@@ -147,8 +155,11 @@ defmodule Fluffy.Backend.Playwright.Events do
     }
   end
 
+  # A request's page is optional, so a page that closed unseen leaves it nil.
   defp request_page(session, request) do
     if frame = request_frame(request), do: page_handle(session, PlaywrightEx.Frame.page(frame))
+  catch
+    :unregistered_page -> nil
   end
 
   # Service worker requests, and a navigation request issued before its frame
@@ -180,7 +191,7 @@ defmodule Fluffy.Backend.Playwright.Events do
   defp register_page(session, browser_page) do
     case SessionRuntime.register_page(session.runtime, Fluffy.Backend.Playwright.page_record(browser_page)) do
       {:ok, id} -> Page.new(session.runtime, id)
-      {:error, message} -> raise ArgumentError, message
+      {:error, _closed} -> throw(:unregistered_page)
     end
   end
 end

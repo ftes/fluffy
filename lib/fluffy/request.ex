@@ -6,7 +6,8 @@ defmodule Fluffy.Request do
   Fields follow Playwright's `Request` accessors. `headers` has lowercase names.
   `post_data` is the buffered request body, as raw bytes (`postDataBuffer`), or
   nil. `page` is the live page handle when known, or nil (for example, a popup's
-  initial request). Reach the `PlaywrightEx.Request` with `Fluffy.unwrap/2`.
+  initial request, or a request of a page that closed before Fluffy saw it).
+  Reach the `PlaywrightEx.Request` with `Fluffy.unwrap/2`.
   """
 
   @enforce_keys [:url, :method, :headers, :resource_type]

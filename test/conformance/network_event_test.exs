@@ -8,6 +8,7 @@ defmodule Fluffy.Conformance.NetworkEventTest do
 
   alias Fluffy.Event
   alias Fluffy.Playwright
+  alias Fluffy.SessionRuntime
   alias Fluffy.TestHTTPFixtures
 
   @tag driver: :playwright
@@ -114,6 +115,42 @@ defmodule Fluffy.Conformance.NetworkEventTest do
     assert Fluffy.Page.opener(await(popup)) == current_page(session)
   end
 
+  # Holding the session runtime while the popup opens and closes keeps Fluffy
+  # from registering the popup, as when it closes before Fluffy sees it.
+  @tag driver: :playwright
+  test "a context wait ignores an event from a page that closed before Fluffy saw it" do
+    {session, _fixture} = session()
+    pending = wait_for(session, Event.response(&String.ends_with?(&1.url, "/api?source=last")), scope: :context)
+    frame = Fluffy.Session.page_state(session).frame
+    owner = self()
+
+    holder =
+      Task.async(fn ->
+        SessionRuntime.run(session.runtime, fn ->
+          send(owner, :held)
+
+          receive do
+            :release -> :ok
+          end
+        end)
+      end)
+
+    assert_receive :held
+
+    assert {:ok, nil} =
+             PlaywrightEx.Frame.evaluate(frame, """
+             async () => {
+               const popup = window.open('closing')
+               while (!popup.closed) await new Promise(resolve => setTimeout(resolve, 20))
+               await fetch('api?source=last')
+             }
+             """)
+
+    send(session.runtime, :release)
+    Task.await(holder)
+    assert await(pending).request.page == current_page(session)
+  end
+
   @tag driver: :playwright
   test "listener removal matches page or context scope" do
     {original, fixture} = session()
@@ -211,6 +248,9 @@ defmodule Fluffy.Conformance.NetworkEventTest do
 
           "/child" ->
             %{body: "<h1>Child</h1>"}
+
+          "/closing" ->
+            %{body: "<script>fetch('api?source=popup').then(() => window.close())</script>"}
 
           "/api" ->
             %{status: 207, headers: [{"content-type", "application/json"}], body: ~s({"saved":true})}
