@@ -464,12 +464,20 @@ defmodule Fluffy.Driver.Live do
   end
 
   # render_upload can deliver a chunk and then exit on the view's redirect, so
-  # once it starts on a view that is still there, the view may have seen the
-  # action.
+  # once it starts, the view may have seen the action. Read the view first, so
+  # a view that already navigated away counts as never having seen it.
   defp dispatch_view_upload(session, upload, entry_name) do
-    {_reference, _topic, proxy_pid} = upload.view.proxy
-    if Process.alive?(proxy_pid), do: Delivery.record()
-    dispatch_view_event(session, fn -> render_upload(upload, entry_name) end)
+    case read_view(session, fn -> render(upload.view) end) do
+      {:ok, {:error, redirect}} ->
+        redirected(session, redirect)
+
+      {:ok, _html} ->
+        Delivery.record()
+        dispatch_view_event(session, fn -> render_upload(upload, entry_name) end)
+
+      redirected ->
+        redirected
+    end
   end
 
   # Reads the view without acting on it, such as its children or its upload
