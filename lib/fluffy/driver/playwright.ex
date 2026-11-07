@@ -5,6 +5,7 @@ defmodule Fluffy.Driver.Playwright do
 
   alias Fluffy.Backend.Playwright.Bounded
   alias Fluffy.Backend.Playwright.Document
+  alias Fluffy.Backend.Playwright.Events
   alias Fluffy.Deadline
   alias Fluffy.Expect
   alias Fluffy.FileChooser
@@ -197,9 +198,10 @@ defmodule Fluffy.Driver.Playwright do
   defp listen_for_submission(page, frame) do
     owner = self()
     ref = make_ref()
+    guid = frame.guid
 
     request = fn request ->
-      if Request.is_navigation_request(request) and Request.frame(request).guid == frame.guid,
+      if Request.is_navigation_request(request) and match?(%{guid: ^guid}, Events.request_frame(request)),
         do: send(owner, {ref, :request, request})
     end
 

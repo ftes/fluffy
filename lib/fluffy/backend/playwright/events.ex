@@ -148,10 +148,15 @@ defmodule Fluffy.Backend.Playwright.Events do
     }
   end
 
-  # Service worker requests, and a popup's first request, have no frame yet.
-  # `Request.frame/1` raises for both; other errors surface.
   defp request_page(session, request) do
-    page_handle(session, request |> PlaywrightEx.Request.frame() |> PlaywrightEx.Frame.page())
+    if frame = request_frame(request), do: page_handle(session, PlaywrightEx.Frame.page(frame))
+  end
+
+  # Service worker requests, and a navigation request issued before its frame
+  # is attached (a popup's first request), have no frame; `Request.frame/1`
+  # raises for both. Other errors surface.
+  def request_frame(request) do
+    PlaywrightEx.Request.frame(request)
   rescue
     error in RuntimeError ->
       if String.starts_with?(error.message, @no_frame), do: nil, else: reraise(error, __STACKTRACE__)
