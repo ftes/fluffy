@@ -55,9 +55,13 @@ defmodule Fluffy.Backend.Playwright do
     # before any further setup can fail.
     browser_context = SessionRuntime.run(runtime, fn -> new_context!(context_options) end)
 
+    # The runtime waits at most `timeout` for the close, which has no timeout of
+    # its own; a slower close continues unlinked rather than leaving the context
+    # open in the shared browser.
     :ok =
       SessionRuntime.register(runtime, {:browser_context, browser_context.guid}, fn ->
-        Bounded.within(timeout, fn -> BrowserContext.close(browser_context) end)
+        task = Task.Supervisor.async_nolink(Fluffy.TaskSupervisor, fn -> BrowserContext.close(browser_context) end)
+        Task.yield(task, timeout)
       end)
 
     SessionRuntime.run(runtime, fn ->
