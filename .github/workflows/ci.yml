@@ -94,8 +94,9 @@ jobs:
           MIX_ENV: dev
         run: mix docs --warnings-as-errors
       # Into _build (as _build/esbuild-linux-x64), so the test jobs restore it instead of each
-      # fetching it from npm for `mix assets.build`.
+      # fetching it from npm for `mix assets.build`. Only when the save below runs.
       - name: Install esbuild
+        if: github.ref == 'refs/heads/main' && steps.setup.outputs.mix-cache-hit != 'true'
         run: mix esbuild.install --if-missing
       # Last, so only a green job saves; under the key computed before deps.get. On main only: a
       # PR restores main's cache but never writes the shared one.
