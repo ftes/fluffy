@@ -20,6 +20,7 @@ defmodule Fluffy.Driver.Playwright do
   alias PlaywrightEx.Locator, as: BrowserLocator
   alias PlaywrightEx.Page, as: BrowserPage
   alias PlaywrightEx.Request
+  alias PlaywrightEx.Response
   alias PlaywrightEx.TargetClosedError
   alias PlaywrightEx.TimeoutError
 
@@ -166,10 +167,10 @@ defmodule Fluffy.Driver.Playwright do
 
   # Like a Playwright action, submit waits for a navigation it initiates;
   # WebKit can start it after requestSubmit has returned. The wait ends with the
-  # response, when the server has handled the request, not the commit, which a
-  # no-content or download response never makes. Page code can still turn the
-  # navigation into a same-document one (the Navigation API's `intercept()`),
-  # which ends the wait too.
+  # final response of its redirect chain, when the server has handled the
+  # request, not the commit, which a no-content or download response never
+  # makes. Page code can still turn the navigation into a same-document one (the
+  # Navigation API's `intercept()`), which ends the wait too.
   @impl true
   def submit(%Session{} = session, %Locator{} = locator, options \\ []) do
     %{page: page, frame: frame} = Session.page_state(session)
@@ -208,11 +209,11 @@ defmodule Fluffy.Driver.Playwright do
     %{ref: ref, request: request, frame_navigated: navigated}
   end
 
-  defp await_submission(%{ref: ref}, deadline) do
+  defp await_submission(%{ref: ref} = listeners, deadline) do
     timeout = Deadline.remaining(deadline, 1)
 
     receive do
-      {^ref, :request, request} -> await_response(request, deadline)
+      {^ref, :request, request} -> await_response(listeners, request, deadline)
       {^ref, :navigated} -> :ok
     after
       timeout ->
@@ -241,12 +242,13 @@ defmodule Fluffy.Driver.Playwright do
   end
 
   # Reading the response has no timeout of its own; a failed request has none.
-  defp await_response(request, deadline) do
+  # A redirect continues the navigation with another request.
+  defp await_response(listeners, request, deadline) do
     timeout = Deadline.remaining(deadline, 1)
 
     case Bounded.within(timeout, fn -> Request.response(request) end) do
-      {:ok, {:ok, _response}} ->
-        :ok
+      {:ok, {:ok, response}} ->
+        if redirect?(response), do: await_submission(listeners, deadline), else: :ok
 
       {:ok, {:error, error}} ->
         {:error, error}
@@ -255,6 +257,11 @@ defmodule Fluffy.Driver.Playwright do
         {:error, %TimeoutError{message: "Timeout #{timeout}ms exceeded while waiting for the form submission response"}}
     end
   end
+
+  defp redirect?(nil), do: false
+
+  defp redirect?(response),
+    do: Response.status(response) in [301, 302, 303, 307, 308] and Map.has_key?(Response.headers(response), "location")
 
   @impl true
   def fill(%Session{} = session, %Locator{} = locator, value, options \\ []) when is_binary(value) do

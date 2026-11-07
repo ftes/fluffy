@@ -106,6 +106,29 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       assert submission.body == "note=kept"
     end
 
+    @tag driver: driver
+    test "submit returns once the server has answered the redirected request using #{driver}", %{driver: driver} do
+      test = self()
+
+      fixture =
+        TestHTTPFixtures.register_sequence([
+          %{body: html(~s(<form id="note" method="post" action="save"><input name="note" value="kept"></form>))},
+          %{status: 303, headers: [{"location", "saved"}]},
+          fn _request ->
+            Process.sleep(300)
+            send(test, :saved_page_served)
+            %{body: html("<h1>Saved</h1>")}
+          end
+        ])
+
+      driver
+      |> start_test_session()
+      |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+      |> submit(by_css("#note"), timeout: 5_000)
+
+      assert_received :saved_page_served
+    end
+
     # Nothing reads the page after the submit, so submit itself must return. Before
     # Playwright 1.65, Chromium waited on the aborted navigation (microsoft/playwright#43279).
     @tag driver: driver
