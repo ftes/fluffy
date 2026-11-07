@@ -1,0 +1,63 @@
+name: Install Playwright browser
+description: Installs the npm packages (the Playwright driver), Chromium and its system packages, from caches when warm.
+
+inputs:
+  save-apt-cache:
+    description: "Save the system packages' .debs on a miss (one job per run, the others would race)"
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Get runner image
+      id: image
+      shell: bash
+      run: echo "os=$ImageOS" >> "$GITHUB_OUTPUT"
+    # The Playwright driver is the npm `playwright` package.
+    - name: Install npm packages
+      shell: bash
+      run: pnpm install --frozen-lockfile
+    - name: Restore Playwright browsers
+      id: playwright-cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-chromium
+    # As in PlaywrightEx's CI: --with-deps runs apt-get against the runner's Azure mirror, which
+    # can stall. The .debs are cached per driver version, so a warm run installs offline;
+    # archive.ubuntu.com is a fallback mirror, apt times out stalled fetches, and each attempt is
+    # capped (a killed attempt's apt-get, out of timeout's reach under sudo, is killed before the next).
+    - name: Restore browser system packages
+      id: apt-cache
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+      with:
+        key: apt-chromium-${{ hashFiles('pnpm-lock.yaml') }}-${{ steps.image.outputs.os }}
+        path: ~/apt-cache
+    - name: Install browser and system packages
+      shell: bash
+      env:
+        BROWSER_CACHE_HIT: ${{ steps.playwright-cache.outputs.cache-hit }}
+      run: |
+        printf 'Acquire::http::Timeout "30";\nAcquire::https::Timeout "30";\nAcquire::Retries "5";\nDPkg::Lock::Timeout "60";\nAPT::Keep-Downloaded-Packages "true";\n' | sudo tee /etc/apt/apt.conf.d/99timeouts
+        if [[ -f /etc/apt/apt-mirrors.txt ]]; then echo "http://archive.ubuntu.com/ubuntu/" | sudo tee -a /etc/apt/apt-mirrors.txt; fi
+        if compgen -G ~/apt-cache/'*.deb' > /dev/null; then sudo cp ~/apt-cache/*.deb /var/cache/apt/archives/; fi
+        if [[ "$BROWSER_CACHE_HIT" == true ]]; then
+          install=(pnpm exec playwright install-deps chromium)
+        else
+          install=(pnpm exec playwright install --with-deps chromium)
+        fi
+        for attempt in 1 2 3; do
+          if timeout 300 "${install[@]}"; then
+            mkdir -p ~/apt-cache && cp /var/cache/apt/archives/*.deb ~/apt-cache/ 2>/dev/null || true
+            exit 0
+          fi
+          echo "::warning::browser install attempt $attempt failed or timed out"
+          sudo pkill -x apt-get || true
+        done
+        exit 1
+    - name: Save browser system packages
+      if: inputs.save-apt-cache == 'true' && steps.apt-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+      with:
+        key: ${{ steps.apt-cache.outputs.cache-primary-key }}
+        path: ~/apt-cache
