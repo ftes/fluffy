@@ -136,10 +136,12 @@ for how pages, browser contexts, and frames relate.
 
 ### Browser baseline
 
-Fluffy verifies compatibility against pinned Chromium. Firefox and WebKit are
-available through Playwright but are not covered by Fluffy's conformance suite.
-Known engine differences: WebKit, like Safari, does not focus a button when
-clicking it, and does not send `Secure` cookies to `http://` loopback origins.
+Fluffy's conformance suite runs against Playwright's pinned Chromium, Firefox,
+and WebKit. Known engine differences: WebKit does not send `Secure` cookies to
+`http://` loopback origins, and focuses a clicked button only on Linux, not on
+macOS. Firefox never completes or fails an interrupted download, and with
+Playwright 1.65 a file chooser awaited right after an earlier one occasionally
+opens a native dialog instead.
 Playwright's `set_input_files` checks only that the target is an `<input>`:
 Firefox and WebKit, and in-memory payloads on every engine, accept a non-file
 input without an error and select nothing, and Chromium rejects a path only

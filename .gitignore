@@ -3,8 +3,6 @@
 /deps/
 /doc/
 /docs/.plan/
-/node_modules/
-/.pnpm-store/
 /priv/static/assets/test_browser.js
 /.elixir_ls/
 /.expert/
@@ -15,3 +13,6 @@
 /.pg/
 .DS_Store
 .claude/
+# Left over in checkouts from before test assets were built with the Hex esbuild package.
+/node_modules/
+/.pnpm-store/

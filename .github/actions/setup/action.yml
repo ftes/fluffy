@@ -29,10 +29,6 @@ runs:
       run: |
         if [ "$TOOLCHAIN_LANE" = oldest ]; then
           cp .tool-versions.oldest .tool-versions
-          # Keep Corepack and mise on the same pnpm version for this lane.
-          pnpm_version=$(awk '$1 == "pnpm" { print $2 }' .tool-versions)
-          jq --arg version "pnpm@$pnpm_version" '.packageManager = $version' package.json > package.json.tmp
-          mv package.json.tmp package.json
         fi
         awk '$1 == "elixir" || $1 == "erlang" { print $1 "=" $2 }' .tool-versions >> "$GITHUB_OUTPUT"
         echo "image=$ImageOS" >> "$GITHUB_OUTPUT"

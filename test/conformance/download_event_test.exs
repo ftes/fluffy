@@ -136,6 +136,8 @@ defmodule Fluffy.Conformance.DownloadEventTest do
   @tag driver: :playwright
   test "download metadata is available before completion, while read waits for the bytes" do
     owner = self()
+    # WebKit on Linux sniffs the first 512 bytes before it turns a response into a download.
+    first = "first" <> String.duplicate(".", 1024)
 
     fixture =
       TestHTTPFixtures.register(fn request ->
@@ -147,7 +149,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
             %{
               headers: [{"content-disposition", "attachment; filename=slow.txt"}],
               stream: fn conn ->
-                {:ok, conn} = Plug.Conn.chunk(conn, "first")
+                {:ok, conn} = Plug.Conn.chunk(conn, first)
                 send(owner, {:stream, self()})
 
                 receive do
@@ -178,7 +180,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
       reader = Task.async(fn -> Download.read!(download) end)
       assert Task.yield(reader, 20) == nil
       send(server, :finish)
-      assert Task.await(reader) == "firstlast"
+      assert Task.await(reader) == first <> "last"
     after
       send(server, :finish)
     end

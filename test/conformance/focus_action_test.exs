@@ -119,14 +119,16 @@ defmodule Fluffy.Conformance.FocusActionTest do
       |> fill(by_label("Name"), "Ada")
       |> expect(to_be_focused(by_label("Name")))
       |> click(by_role(:button, name: "Save"))
-      |> expect(button_focus_after_click(by_role(:button, name: "Save")))
+      |> expect_button_focus_after_click(by_role(:button, name: "Save"))
     end)
   end
 
-  # WebKit, like Safari, does not focus buttons on click (upstream Playwright skips
-  # page-focus.spec.ts FO-007 on WebKit: "Safari does not focus on click").
-  defp button_focus_after_click(button) do
-    if @webkit?, do: not_(to_be_focused(button)), else: to_be_focused(button)
+  # WebKit on macOS, like Safari, does not focus a clicked button; WebKit on Linux does
+  # (upstream Playwright skips page-focus.spec.ts FO-007 on WebKit).
+  defp expect_button_focus_after_click(session, button) do
+    if @webkit? and match?({:unix, :darwin}, :os.type()),
+      do: expect(session, not_(to_be_focused(button))),
+      else: expect(session, to_be_focused(button))
   end
 
   defp with_html(driver, html, fun) do

@@ -199,6 +199,7 @@ defmodule Fluffy.Conformance.PageEventTest do
   @tag driver: :playwright
   test "popup waiting resolves before the new document finishes loading" do
     owner = self()
+    padding = String.duplicate(" ", 1024)
 
     fixture =
       TestHTTPFixtures.register(fn request ->
@@ -209,7 +210,8 @@ defmodule Fluffy.Conformance.PageEventTest do
           "/slow" ->
             %{
               stream: fn conn ->
-                {:ok, conn} = Plug.Conn.chunk(conn, "<!doctype html><html><body><h1>Loading</h1>")
+                # WebKit on Linux sniffs the first 512 bytes before it commits the navigation.
+                {:ok, conn} = Plug.Conn.chunk(conn, "<!doctype html><html><body><h1>Loading</h1>" <> padding)
                 send(owner, {:stream, self()})
 
                 receive do
@@ -232,7 +234,8 @@ defmodule Fluffy.Conformance.PageEventTest do
 
     pending = wait_for(session, Event.popup())
     click(session, by_role(:link, name: "Open"))
-    assert_receive {:stream, server}
+    # WebKit requests the popup's document only after Playwright initialized the new page.
+    assert_receive {:stream, server}, 1_000
 
     try do
       page = await(pending)

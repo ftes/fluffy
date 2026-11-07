@@ -152,8 +152,8 @@ backend supports.
 ## Developing Fluffy
 
 The project pins the current local-development toolchain in `.tool-versions`.
-Fluffy's compatibility floor remains Elixir 1.18 and Node.js 20; development
-also requires pnpm 11.19.0 and PostgreSQL. From a clean checkout:
+Fluffy's compatibility floor is Elixir 1.18 on OTP 27; development also
+requires PostgreSQL. From a clean checkout:
 
 ```bash
 mix setup
