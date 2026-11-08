@@ -432,20 +432,19 @@ defmodule Fluffy.Driver.Live do
           |> render()
           |> then(&commit_render_result(session, client_dom, &1))
         catch
-          :exit, reason ->
-            case exit_redirect(session) do
-              :none -> exit(reason)
-              redirect -> follow_redirect_result(session, {:error, redirect})
-            end
+          :exit, reason -> follow_exit_redirect(session, reason, :exit)
         end
     end
   end
 
-  # Follows the redirect a view left when a call to it exited.
-  defp follow_exit_redirect(session, reason) do
-    case exit_redirect(session) do
-      :none -> raise Fluffy.LiveViewError, reason: reason
-      redirect -> follow_redirect_result(session, {:error, redirect})
+  # Follows the redirect a view left when a call to it exited. An exit the
+  # view left no redirect for raises a LiveViewError, or exits again when
+  # `unexplained` is `:exit`.
+  defp follow_exit_redirect(session, reason, unexplained \\ :raise) do
+    case {exit_redirect(session), unexplained} do
+      {:none, :raise} -> raise Fluffy.LiveViewError, reason: reason
+      {:none, :exit} -> exit(reason)
+      {redirect, _unexplained} -> follow_redirect_result(session, {:error, redirect})
     end
   end
 
@@ -882,55 +881,80 @@ defmodule Fluffy.Driver.Live do
   end
 
   defp find_owning_view_context(root_view, target) do
-    target.ancestors
-    |> Kernel.++([target])
-    |> Enum.reduce(%{view: root_view, root_id: nil, layout?: true}, fn candidate, context ->
-      teleported = attribute(candidate.attributes, "data-phx-teleported")
-
-      case {attribute(candidate.attributes, "data-phx-session"), attribute(candidate.attributes, "id")} do
-        _teleported when is_binary(teleported) ->
-          view =
-            find_view(root_view, teleported) ||
-              raise Fluffy.LiveViewError, reason: {:nested_live_view_not_found, teleported, root_view.id}
-
-          %{view: view, root_id: nil, layout?: false}
-
-        {session, id} when is_binary(session) and session != "" and id == root_view.id ->
-          %{view: root_view, root_id: candidate.id, layout?: false}
-
-        {session, id} when is_binary(session) and session != "" and is_binary(id) and id != "" ->
-          if context.layout? do
-            raise Fluffy.CapabilityError,
-              capability: :root_layout_live_views,
-              driver: :live,
-              detail: "LiveViewTest does not connect LiveView #{inspect(id)} rendered outside the main LiveView"
+    result =
+      Enum.reduce_while(
+        target.ancestors ++ [target],
+        {:ok, %{view: root_view, root_id: nil, layout?: true}},
+        fn candidate, {:ok, context} ->
+          case candidate_view_context(root_view, context, candidate) do
+            {:ok, context} -> {:cont, {:ok, context}}
+            redirect -> {:halt, redirect}
           end
+        end
+      )
 
+    case result do
+      {:ok, context} -> context
+      redirect -> redirect
+    end
+  end
+
+  defp candidate_view_context(root_view, context, candidate) do
+    teleported = attribute(candidate.attributes, "data-phx-teleported")
+
+    case {attribute(candidate.attributes, "data-phx-session"), attribute(candidate.attributes, "id")} do
+      _teleported when is_binary(teleported) ->
+        case find_view(root_view, teleported) do
+          {:ok, nil} -> raise Fluffy.LiveViewError, reason: {:nested_live_view_not_found, teleported, root_view.id}
+          {:ok, view} -> {:ok, %{view: view, root_id: nil, layout?: false}}
+          redirect -> redirect
+        end
+
+      {session, id} when is_binary(session) and session != "" and id == root_view.id ->
+        {:ok, %{view: root_view, root_id: candidate.id, layout?: false}}
+
+      {session, id} when is_binary(session) and session != "" and is_binary(id) and id != "" ->
+        if context.layout? do
+          raise Fluffy.CapabilityError,
+            capability: :root_layout_live_views,
+            driver: :live,
+            detail: "LiveViewTest does not connect LiveView #{inspect(id)} rendered outside the main LiveView"
+        end
+
+        with {:ok, children} <- view_children(context.view) do
           view =
-            Enum.find(live_children!(context.view), &(&1.id == id)) ||
+            Enum.find(children, &(&1.id == id)) ||
               raise Fluffy.LiveViewError,
                 reason: {:nested_live_view_not_found, id, context.view.id}
 
-          %{context | view: view, root_id: candidate.id}
+          {:ok, %{context | view: view, root_id: candidate.id}}
+        end
 
-        _not_a_live_root ->
-          context
-      end
-    end)
-  catch
-    {__MODULE__, :view_left, redirect} -> redirect
+      _not_a_live_root ->
+        {:ok, context}
+    end
   end
 
+  # Returns `{:ok, view}`, or `{:ok, nil}` when no view has the id.
+  defp find_view(%{id: id} = view, id), do: {:ok, view}
+
   defp find_view(view, id) do
-    if view.id == id, do: view, else: Enum.find_value(live_children!(view), &find_view(&1, id))
+    with {:ok, children} <- view_children(view) do
+      Enum.reduce_while(children, {:ok, nil}, fn child, not_found ->
+        case find_view(child, id) do
+          {:ok, nil} -> {:cont, not_found}
+          found -> {:halt, found}
+        end
+      end)
+    end
   end
 
   # A view whose client stopped on a redirect hands the redirect back in place
   # of its children.
-  defp live_children!(view) do
+  defp view_children(view) do
     case live_children(view) do
-      {:error, {_kind, _options}} = redirect -> throw({__MODULE__, :view_left, redirect})
-      children -> children
+      {:error, {_kind, _options}} = redirect -> redirect
+      children -> {:ok, children}
     end
   end
 
