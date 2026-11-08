@@ -184,6 +184,55 @@ defmodule Fluffy.Conformance.DownloadEventTest do
     end
   end
 
+  @tag driver: :playwright, tmp_dir: true
+  test "reading or saving a download that never completes raises after the session timeout", %{tmp_dir: tmp_dir} do
+    owner = self()
+
+    fixture =
+      TestHTTPFixtures.register(fn request ->
+        case request.path do
+          "/start" ->
+            %{body: ~s(<a href="endless">Download</a>)}
+
+          "/endless" ->
+            %{
+              headers: [{"content-disposition", "attachment; filename=endless.txt"}],
+              stream: fn conn ->
+                {:ok, conn} = Plug.Conn.chunk(conn, "first")
+                send(owner, {:stream, self()})
+
+                receive do
+                  :finish -> conn
+                end
+              end
+            }
+        end
+      end)
+
+    session =
+      :playwright
+      |> start_session(base_url: Fluffy.TestServer.base_url(), timeout: 500)
+      |> visit(TestHTTPFixtures.path(fixture, "/start"))
+
+    pending = wait_for(session, Event.download())
+    click(session, by_role(:link, name: "Download"))
+    assert_receive {:stream, server}
+
+    try do
+      download = await(pending)
+
+      assert_raise RuntimeError, ~r/did not complete within the session's timeout of 500ms/, fn ->
+        Download.read!(download)
+      end
+
+      assert_raise RuntimeError, ~r/did not complete within the session's timeout of 500ms/, fn ->
+        Download.save_as!(download, Path.join(tmp_dir, "copy.txt"))
+      end
+    after
+      send(server, :finish)
+    end
+  end
+
   @tag driver: :playwright, tmp_dir: true, capture_log: true
   @tag skip:
          if(Application.compile_env!(:fluffy, :playwright)[:engine] == :firefox,

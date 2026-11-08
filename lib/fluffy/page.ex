@@ -56,9 +56,16 @@ defmodule Fluffy.Page do
 
   @doc false
   @spec ensure_session!(t()) :: :ok
-  def ensure_session!(%__MODULE__{runtime: runtime}) do
+  def ensure_session!(page) do
+    context!(page)
+    :ok
+  end
+
+  @doc false
+  @spec context!(t()) :: map()
+  def context!(%__MODULE__{runtime: runtime}) do
     case SessionRuntime.context(runtime) do
-      {:ok, _context} -> :ok
+      {:ok, context} -> context
       {:error, message} -> raise ArgumentError, message
     end
   end
