@@ -199,7 +199,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
             %{
               headers: [{"content-disposition", "attachment; filename=endless.txt"}],
               stream: fn conn ->
-                {:ok, conn} = Plug.Conn.chunk(conn, "first")
+                {:ok, conn} = Plug.Conn.chunk(conn, "first" <> TestHTTPFixtures.sniff_padding())
                 send(owner, {:stream, self()})
 
                 receive do
@@ -215,9 +215,10 @@ defmodule Fluffy.Conformance.DownloadEventTest do
       |> start_session(base_url: Fluffy.TestServer.base_url(), timeout: 500)
       |> visit(TestHTTPFixtures.path(fixture, "/start"))
 
-    pending = wait_for(session, Event.download())
-    click(session, by_role(:link, name: "Download"))
-    assert_receive {:stream, server}
+    # Only saving is bound by the short session timeout; starting the download is not.
+    pending = wait_for(session, Event.download(), timeout: 15_000)
+    click(session, by_role(:link, name: "Download"), timeout: 15_000)
+    assert_receive {:stream, server}, 15_000
 
     try do
       download = await(pending)
