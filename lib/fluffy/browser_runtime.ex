@@ -12,6 +12,7 @@ defmodule Fluffy.BrowserRuntime do
 
   defstruct [
     :browser,
+    :browser_closer,
     :browser_launcher,
     :engine,
     :launch_options,
@@ -25,6 +26,7 @@ defmodule Fluffy.BrowserRuntime do
 
   @opaque t :: %__MODULE__{
             browser: Browser.t() | nil,
+            browser_closer: function(),
             browser_launcher: function(),
             engine: :chromium | :firefox | :webkit,
             launch_options: keyword(),
@@ -72,7 +74,8 @@ defmodule Fluffy.BrowserRuntime do
       playwright_name: Keyword.get(options, :playwright_name, @driver),
       runtime_supervisor: Keyword.get(options, :runtime_supervisor, Fluffy.BrowserRuntime.Supervisor),
       transport_starter: Keyword.get(options, :transport_starter, &start_transport/3),
-      browser_launcher: Keyword.get(options, :browser_launcher, &launch_browser/3)
+      browser_launcher: Keyword.get(options, :browser_launcher, &launch_browser/3),
+      browser_closer: Keyword.get(options, :browser_closer, &Browser.close/1)
     }
 
     {:ok, state}
@@ -94,8 +97,16 @@ defmodule Fluffy.BrowserRuntime do
     {:reply, {:ok, state.browser}, state}
   end
 
-  def handle_call({:replace, guid}, from, %{browser: %{guid: guid}} = state),
-    do: handle_call(:browser, from, %{state | browser: nil})
+  # The lost browser may still run, refusing contexts; close it without
+  # holding up the callers waiting for its replacement.
+  def handle_call({:replace, guid}, from, %{browser: %{guid: guid} = lost} = state) do
+    {:ok, _pid} =
+      Task.Supervisor.start_child(Fluffy.TaskSupervisor, fn ->
+        Bounded.within(state.timeout, fn -> close_browser(state, lost) end)
+      end)
+
+    handle_call(:browser, from, %{state | browser: nil})
+  end
 
   def handle_call({:replace, _guid}, from, state), do: handle_call(:browser, from, state)
 
@@ -121,15 +132,15 @@ defmodule Fluffy.BrowserRuntime do
   def terminate(_reason, %{browser: nil}), do: :ok
 
   def terminate(_reason, state) do
-    Bounded.within(state.timeout, fn -> close_browser(state.browser) end)
+    Bounded.within(state.timeout, fn -> close_browser(state, state.browser) end)
     :ok
   catch
     _kind, _reason -> :ok
   end
 
   # Shutdown is best effort, and a crash in the unlinked call would only log.
-  defp close_browser(browser) do
-    Browser.close(browser)
+  defp close_browser(state, browser) do
+    state.browser_closer.(browser)
   catch
     _kind, _reason -> :ok
   end

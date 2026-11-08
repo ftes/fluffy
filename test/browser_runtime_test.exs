@@ -43,6 +43,27 @@ defmodule Fluffy.BrowserRuntimeTest do
     assert BrowserRuntime.replace(runtime_name, lost) == replacement
     assert BrowserRuntime.browser(runtime_name) == replacement
     assert BrowserRuntime.status(runtime_name).launch_count == 2
+    assert_receive {:browser_closed, ^lost}
+    refute_receive {:browser_closed, _browser}
+  end
+
+  test "replaces a lost browser without waiting for it to close" do
+    test_process = self()
+
+    runtime_name =
+      start_runtime(test_process, counting_launch(), fn browser ->
+        send(test_process, {:closing, browser, self()})
+        Process.sleep(:infinity)
+      end)
+
+    lost = BrowserRuntime.browser(runtime_name)
+
+    assert %{guid: "browser-2"} = BrowserRuntime.replace(runtime_name, lost)
+    assert_receive {:closing, ^lost, closer}
+    ref = Process.monitor(closer)
+    assert Process.alive?(closer)
+    # The close is bounded by the runtime's timeout.
+    assert_receive {:DOWN, ^ref, :process, ^closer, _reason}, 1_000
   end
 
   test "a failed launch raises in the caller and leaves the runtime to retry" do
@@ -189,12 +210,21 @@ defmodule Fluffy.BrowserRuntimeTest do
     end
   end
 
-  defp start_runtime(test_process) do
-    {:ok, launches} = Agent.start_link(fn -> 0 end)
-    start_runtime(test_process, fn -> {:ok, %{guid: "browser-#{Agent.get_and_update(launches, &{&1 + 1, &1 + 1})}"}} end)
-  end
+  defp start_runtime(test_process), do: start_runtime(test_process, counting_launch())
 
   defp start_runtime(test_process, launch) do
+    start_runtime(test_process, launch, fn browser ->
+      send(test_process, {:browser_closed, browser})
+      :ok
+    end)
+  end
+
+  defp counting_launch do
+    {:ok, launches} = Agent.start_link(fn -> 0 end)
+    fn -> {:ok, %{guid: "browser-#{Agent.get_and_update(launches, &{&1 + 1, &1 + 1})}"}} end
+  end
+
+  defp start_runtime(test_process, launch, close) do
     runtime_name = Module.concat(__MODULE__, "Runtime#{System.unique_integer([:positive])}")
 
     start_supervised!(
@@ -212,7 +242,8 @@ defmodule Fluffy.BrowserRuntimeTest do
        browser_launcher: fn :chromium, _playwright_name, options ->
          send(test_process, {:browser_launched, options})
          launch.()
-       end}
+       end,
+       browser_closer: close}
     )
 
     runtime_name
