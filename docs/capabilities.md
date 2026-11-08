@@ -138,10 +138,9 @@ for how pages, browser contexts, and frames relate.
 
 Fluffy's conformance suite runs against Playwright's pinned Chromium, Firefox,
 and WebKit. Known engine differences: WebKit does not send `Secure` cookies to
-`http://` loopback origins, and on macOS does not focus a clicked button.
-Firefox never completes or fails an interrupted download, and with
-Playwright 1.65 a file chooser awaited right after an earlier one occasionally
-opens a native dialog instead.
+`http://` loopback origins. Firefox never completes or fails an interrupted
+download, and with Playwright 1.65 a file chooser awaited right after an earlier
+one occasionally opens a native dialog instead.
 Playwright's `set_input_files` checks only that the target is an `<input>`:
 Firefox and WebKit, and in-memory payloads on every engine, accept a non-file
 input without an error and select nothing, and Chromium rejects a path only
