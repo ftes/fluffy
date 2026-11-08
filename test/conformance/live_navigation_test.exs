@@ -313,6 +313,33 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
   end
 
   @tag driver: :phoenix
+  test "a final attempt that finds another navigation before reaching the view fails and leaves it unread" do
+    session =
+      :phoenix
+      |> live_session()
+      |> visit("/live/chamber-map?async=return")
+      |> await_unread_navigation(:phoenix, nil)
+
+    {reference, _topic, _proxy_pid} = Fluffy.Session.page_state(session).view.proxy
+
+    # Acts as the final attempt an action without timeout budget makes on the
+    # page a navigation landed on, which a view that navigated again since
+    # leaves before the action reaches it.
+    assert_raise Fluffy.OperationError, ~r/navigated away before the action reached it/, fn ->
+      Fluffy.Driver.Live.ActionScope.final_attempt(fn ->
+        click(session, by_role(:button, name: "Lull guardian", exact: true), timeout: 0)
+      end)
+    end
+
+    {:messages, messages} = Process.info(self(), :messages)
+    assert Enum.any?(messages, &match?({^reference, {:redirect, _topic, %{to: "/live/chamber-map?step=returned"}}}, &1))
+
+    session
+    |> expect(Fluffy.Expect.page_to_have_url("/live/chamber-map?step=returned"))
+    |> expect("Map position: returned" |> by_text(exact: true) |> to_be_visible())
+  end
+
+  @tag driver: :phoenix
   test "a LiveView whose connection LiveView rejects fails with the rejection instead of redirecting to itself" do
     session = live_session(:phoenix)
 
