@@ -125,14 +125,23 @@ defmodule Fluffy.Driver.Playwright do
   # LiveView's phx-submit) cancelled it, its target is that frame, and it is not
   # a GET to the current URL with a fragment, which the browser navigates to
   # within the document. Page inputs can shadow form properties, so they are
-  # read from the prototype.
+  # read from the prototype. The result is false, or else the number of
+  # same-document navigations submit handlers committed in the main frame; the
+  # form's own navigation starts only after requestSubmit has returned.
   @submit """
   form => {
     if (form.localName !== 'form')
       throw new Error(`submit/2 requires a form locator, got ${form.localName}`)
     const view = form.ownerDocument.defaultView
     const property = name => Object.getOwnPropertyDescriptor(HTMLFormElement.prototype, name).get.call(form)
-    let submitted, data
+    let submitted, data, commits = 0
+    const commit = event => { if (event.navigationType) commits++ }
+    // Page code can reuse the name `navigation`. Only a real EventTarget takes
+    // the listener, so without the API no commits are counted.
+    const navigation = view.navigation
+    const listenForCommits = method => {
+      try { EventTarget.prototype[method].call(navigation, 'currententrychange', commit) } catch {}
+    }
     const listen = event => {
       if (event.target !== form) return
       if (event.type === 'submit') submitted = event
@@ -140,9 +149,11 @@ defmodule Fluffy.Driver.Playwright do
     }
     view.addEventListener('submit', listen, true)
     view.addEventListener('formdata', listen, true)
+    listenForCommits('addEventListener')
     try { HTMLFormElement.prototype.requestSubmit.call(form) } finally {
       view.removeEventListener('submit', listen, true)
       view.removeEventListener('formdata', listen, true)
+      listenForCommits('removeEventListener')
     }
 
     const method = property('method')
@@ -154,15 +165,16 @@ defmodule Fluffy.Driver.Playwright do
     const target = keyword === '_self' ? view : keyword === '_parent' ? view.parent : keyword === '_top' ? view.top
       : name === view.name ? view : null
     if (target !== view.top) return false
-    if (method !== 'get' || !data) return true
+    const handlerCommits = view === target ? commits : 0
+    if (method !== 'get' || !data) return handlerCommits
 
     // A GET replaces the action's query with the form data, keeping its fragment.
     const entries = [...data].map(([key, value]) => [key, typeof value === 'string' ? value : value.name])
     url.search = '?' + new URLSearchParams(entries)
     let current
-    try { current = target.location.href } catch { return true }
+    try { current = target.location.href } catch { return handlerCommits }
     const withoutFragment = href => href.split('#')[0]
-    return !(url.href.includes('#') && withoutFragment(url.href) === withoutFragment(current))
+    return url.href.includes('#') && withoutFragment(url.href) === withoutFragment(current) ? false : handlerCommits
   }
   """
 
@@ -171,9 +183,11 @@ defmodule Fluffy.Driver.Playwright do
   # final response of its redirect chain, when the server has handled the
   # request, not the commit, which a no-content or download response never
   # makes. Page code can still turn the navigation into a same-document one (the
-  # Navigation API's `intercept()`), which ends the wait too. So does a
-  # `beforeunload` dialog: dismissing it cancels the navigation, and its close
-  # does not say how it was handled, so submit then returns like click.
+  # Navigation API's `intercept()`), which ends the wait too; the commits of a
+  # submit handler's own `pushState` or fragment change come first and do not.
+  # A `beforeunload` dialog also ends it: dismissing it cancels the navigation,
+  # and its close does not say how it was handled, so submit then returns like
+  # click.
   @impl true
   def submit(%Session{} = session, %Locator{} = locator, options \\ []) do
     %{page: page, frame: frame} = Session.page_state(session)
@@ -184,8 +198,8 @@ defmodule Fluffy.Driver.Playwright do
       # Listening first misses no request the submit starts.
       Listeners.listening(submission_listeners(page, frame), fn ref ->
         case BrowserLocator.evaluate(native, @submit, nil, timeout: remaining) do
-          {:ok, true} -> await_submission(ref, deadline, remaining)
           {:ok, false} -> :ok
+          {:ok, handler_commits} -> await_submission(ref, handler_commits, deadline, remaining)
           {:error, error} -> {:error, error}
         end
       end)
@@ -201,7 +215,7 @@ defmodule Fluffy.Driver.Playwright do
     fn ref ->
       request = fn request ->
         if Request.is_navigation_request(request) and match?(%{guid: ^guid}, Events.request_frame(request)),
-          do: send(ref, {ref, :request, request})
+          do: send(ref, {ref, navigation_request_kind(request), request})
       end
 
       navigated = fn navigated -> if navigated.guid == guid, do: send(ref, {ref, :navigated}) end
@@ -218,12 +232,22 @@ defmodule Fluffy.Driver.Playwright do
     end
   end
 
+  defp navigation_request_kind(request), do: if(Request.redirected_from(request), do: :redirected, else: :request)
+
   # Like Playwright's, a timeout message names the action's timeout.
-  defp await_submission(ref, deadline, timeout) do
+  defp await_submission(ref, handler_commits, deadline, timeout) do
     receive do
-      {^ref, :request, request} -> await_response(ref, request, deadline, timeout)
-      {^ref, :navigated} -> :ok
-      {^ref, :unload_prompted} -> :ok
+      {^ref, kind, request} when kind in [:request, :redirected] ->
+        await_response(ref, handler_commits, request, deadline, timeout)
+
+      {^ref, :navigated} when handler_commits > 0 ->
+        await_submission(ref, handler_commits - 1, deadline, timeout)
+
+      {^ref, :navigated} ->
+        :ok
+
+      {^ref, :unload_prompted} ->
+        :ok
     after
       Deadline.remaining(deadline, 1) ->
         {:error,
@@ -236,11 +260,16 @@ defmodule Fluffy.Driver.Playwright do
   end
 
   # Reading the response has no timeout of its own; a failed request has none.
-  # A redirect continues the navigation with another request.
-  defp await_response(ref, request, deadline, timeout) do
-    case Bounded.within(Deadline.remaining(deadline, 1), fn -> Request.response(request) end) do
+  # A redirect continues the navigation with another request. Firefox reports no
+  # response for a redirect a route fulfills, so the next request of the chain
+  # is what ends that read.
+  defp await_response(ref, handler_commits, request, deadline, timeout) do
+    case Bounded.within_unless(Deadline.remaining(deadline, 1), fn -> Request.response(request) end, {ref, :redirected}) do
+      {:message, next} ->
+        await_response(ref, handler_commits, next, deadline, timeout)
+
       {:ok, {:ok, response}} ->
-        if redirect?(response), do: await_submission(ref, deadline, timeout), else: :ok
+        if redirect?(response), do: await_submission(ref, handler_commits, deadline, timeout), else: :ok
 
       {:ok, {:error, error}} ->
         {:error, error}

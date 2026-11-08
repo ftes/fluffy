@@ -635,6 +635,282 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
     assert [_source] = TestHTTPFixtures.requests(fixture)
   end
 
+  # The handler commits a same-document navigation before the form's own starts.
+  for {name, attributes, change} <- [
+        {"pushState", ~s(action="save"), "history.pushState({}, '', 'edited')"},
+        {"replaceState", ~s(action="save"), "history.replaceState({}, '', 'edited')"},
+        {"location.hash", ~s(action="save"), "location.hash = 'edited'"},
+        {"pushState to the form's URL", ~s(action="save"), "history.pushState({}, '', 'save')"},
+        {"replaceState keeping the URL the form posts to", "", "history.replaceState({}, '')"}
+      ] do
+    @tag driver: :playwright
+    test "Playwright submit waits for the server when a submit handler calls #{name}" do
+      test = self()
+      form = ~s[<form id="note" method="post" #{unquote(attributes)} onsubmit="#{unquote(change)}"></form>]
+
+      fixture =
+        TestHTTPFixtures.register_sequence([
+          %{body: html(form)},
+          fn _request ->
+            Process.sleep(500)
+            send(test, :saved_page_served)
+            %{body: html("<h1>Saved</h1>")}
+          end
+        ])
+
+      :playwright
+      |> start_test_session()
+      |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+      |> submit(by_css("#note"), timeout: 5_000)
+
+      assert_received :saved_page_served
+    end
+  end
+
+  # The handler's commit comes first; the intercepted navigation's is the one
+  # that ends the wait, even at the URL the handler has already moved to.
+  for {name, action, change, destination} <- [
+        {"pushState elsewhere", "save", "history.pushState({}, '', 'edited')", "/forms/save"},
+        {"pushState to the form's URL", "save", "history.pushState({}, '', 'save')", "/forms/save"},
+        {"replaceState to the form's URL", "save", "history.replaceState({}, '', 'save')", "/forms/save"},
+        {"location.hash to the form's fragment", "#done", "location.hash = 'done'", "/forms/start#done"}
+      ] do
+    @tag driver: :playwright
+    test "Playwright submit intercepted after a submit handler's #{name} ends at the intercepted commit" do
+      intercept = """
+      <script>
+        navigation.addEventListener('navigate', event => {
+          if (event.formData) event.intercept({handler: () => { document.querySelector('h1').textContent = 'Intercepted' }})
+        })
+      </script>
+      """
+
+      form =
+        ~s[<h1>Draft</h1><form id="note" method="post" action="#{unquote(action)}" onsubmit="#{unquote(change)}"></form>]
+
+      fixture = TestHTTPFixtures.register(%{body: html(form <> intercept)})
+
+      :playwright
+      |> start_test_session()
+      |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+      |> submit(by_css("#note"), timeout: 2_000)
+      |> expect("Intercepted" |> by_text() |> to_be_visible())
+      |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, unquote(destination))))
+
+      assert [_source] = TestHTTPFixtures.requests(fixture)
+    end
+  end
+
+  # Any commit of the intercepted navigation ends the wait, wherever the browser
+  # encoded it.
+  for {name, head, attributes, controls} <- [
+        {"spaces and line breaks", "", "", ~s(<textarea name="q">fluffy test\nüber</textarea>)},
+        {"no successful controls", "", "", ""},
+        {"accept-charset", "", ~s(accept-charset="iso-8859-1"), ~s(<input name="q" value="&uuml;ber">)},
+        {"a latin1 page", ~s(<meta charset="iso-8859-1">), "", ~s(<input name="q" value="&uuml;ber">)}
+      ] do
+    @tag driver: :playwright
+    test "Playwright submit of an intercepted GET with #{name} ends at the intercepted commit" do
+      intercept = """
+      <script>
+        navigation.addEventListener('navigate', event => {
+          if (event.navigationType === 'push' && event.canIntercept) {
+            event.intercept({handler: () => { document.querySelector('h1').textContent = 'Intercepted' }})
+          }
+        })
+      </script>
+      """
+
+      form =
+        ~s(<h1>Draft</h1><form id="note" action="search?old=1#top" #{unquote(attributes)}>#{unquote(controls)}</form>)
+
+      fixture = TestHTTPFixtures.register(%{body: unquote(head) <> html(form <> intercept)})
+
+      :playwright
+      |> start_test_session()
+      |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+      |> submit(by_css("#note"), timeout: 2_000)
+      |> expect("Intercepted" |> by_text() |> to_be_visible())
+
+      assert [_source] = TestHTTPFixtures.requests(fixture)
+    end
+  end
+
+  @tag driver: :playwright
+  test "Playwright submit redirected by a precommit handler ends at the redirected commit" do
+    intercept = """
+    <script>
+      navigation.addEventListener('navigate', event => {
+        if (event.formData) event.intercept({precommitHandler: controller => controller.redirect('elsewhere')})
+      })
+    </script>
+    """
+
+    fixture =
+      TestHTTPFixtures.register(%{
+        body: html(~s(<h1>Draft</h1><form id="note" method="post" action="save"></form>) <> intercept)
+      })
+
+    :playwright
+    |> start_test_session()
+    |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+    |> submit(by_css("#note"), timeout: 2_000)
+    |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/forms/elsewhere")))
+
+    assert [_source] = TestHTTPFixtures.requests(fixture)
+  end
+
+  # A navigate listener cancels the handler's pushState, so nothing commits and
+  # the intercepted navigation's commit is the first.
+  @tag driver: :playwright
+  test "Playwright submit does not count a submit handler's cancelled pushState" do
+    script = """
+    <script>
+      navigation.addEventListener('navigate', event => {
+        if (event.destination.url.endsWith('/edited')) event.preventDefault()
+        else if (event.formData) event.intercept({handler: () => { document.querySelector('h1').textContent = 'Intercepted' }})
+      })
+    </script>
+    """
+
+    form =
+      ~s[<h1>Draft</h1><form id="note" method="post" action="save" onsubmit="history.pushState({}, '', 'edited')"></form>]
+
+    fixture = TestHTTPFixtures.register(%{body: html(form <> script)})
+
+    :playwright
+    |> start_test_session()
+    |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+    |> submit(by_css("#note"), timeout: 2_000)
+    |> expect("Intercepted" |> by_text() |> to_be_visible())
+  end
+
+  # The handler commits in the iframe, which the wait for the main frame never hears of.
+  @tag driver: :playwright
+  test "Playwright submit does not count a commit in the iframe of a form targeting the top frame" do
+    intercept = """
+    <script>
+      navigation.addEventListener('navigate', event => {
+        if (event.formData) event.intercept({handler: () => { document.querySelector('h1').textContent = 'Intercepted' }})
+      })
+    </script>
+    """
+
+    form =
+      ~s[<form id="note" method="post" action="save" target="_top" onsubmit="history.pushState({}, '', 'edited')"></form>]
+
+    fixture =
+      TestHTTPFixtures.register_sequence([
+        %{body: html(~s(<h1>Draft</h1><iframe id="inner" src="frame"></iframe>) <> intercept)},
+        %{body: html(form)}
+      ])
+
+    session = :playwright |> start_test_session() |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+    frame = frame_locator("#inner")
+
+    session
+    |> submit(by_css(frame, "#note"), timeout: 2_000)
+    |> expect("Intercepted" |> by_text() |> to_be_visible())
+  end
+
+  # Firefox reports no response for a redirect a route fulfills, only the request
+  # it redirects to. WebKit refuses to fulfill a redirect.
+  @tag driver: :playwright
+  @tag skip: if(playwright_engine?(:webkit), do: "WebKit cannot fulfill a redirect")
+  test "Playwright submit waits for the server after a route fulfills a redirect" do
+    test = self()
+
+    fixture =
+      TestHTTPFixtures.register_sequence([
+        %{body: html(~s(<form id="note" method="post" action="save"></form>))},
+        fn _request ->
+          Process.sleep(300)
+          send(test, :saved_page_served)
+          %{body: html("<h1>Saved</h1>")}
+        end
+      ])
+
+    session = :playwright |> start_test_session() |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+
+    unwrap(session, fn page ->
+      PlaywrightEx.Page.route!(page, "**/forms/save", fn route ->
+        PlaywrightEx.Route.fulfill!(route, status: 302, headers: %{"location" => "saved"})
+      end)
+    end)
+
+    session
+    |> submit(by_css("#note"), timeout: 2_000)
+    |> expect("Saved" |> by_text() |> to_be_visible())
+
+    assert_received :saved_page_served
+  end
+
+  # Page code may reuse the name; the form navigates as usual.
+  for {name, script} <- [
+        {"a var named navigation", "var navigation = {}"},
+        {"window.navigation assigned", "window.navigation = 1"},
+        {"window.navigation deleted", "delete window.navigation"}
+      ] do
+    @tag driver: :playwright
+    test "Playwright submit works on a page with #{name}" do
+      form = ~s(<form id="note" method="post" action="save"></form><script>#{unquote(script)}</script>)
+      fixture = TestHTTPFixtures.register_sequence([%{body: html(form)}, %{body: html("<h1>Saved</h1>")}])
+
+      :playwright
+      |> start_test_session()
+      |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+      |> submit(by_css("#note"), timeout: 2_000)
+      |> expect("Saved" |> by_text() |> to_be_visible())
+    end
+  end
+
+  # updateCurrentEntry changes the entry's state without committing a navigation.
+  @tag driver: :playwright
+  test "Playwright submit does not count a submit handler's updateCurrentEntry" do
+    intercept = """
+    <script>
+      navigation.addEventListener('navigate', event => {
+        if (event.formData) event.intercept({handler: () => { document.querySelector('h1').textContent = 'Intercepted' }})
+      })
+    </script>
+    """
+
+    form =
+      ~s[<h1>Draft</h1><form id="note" method="post" action="save" onsubmit="navigation.updateCurrentEntry({state: 1})"></form>]
+
+    fixture = TestHTTPFixtures.register(%{body: html(form <> intercept)})
+
+    :playwright
+    |> start_test_session()
+    |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+    |> submit(by_css("#note"), timeout: 2_000)
+    |> expect("Intercepted" |> by_text() |> to_be_visible())
+
+    assert [_source] = TestHTTPFixtures.requests(fixture)
+  end
+
+  # A handler's commit does not end the wait, so cancelling the navigation
+  # afterwards reads as a browser that sent no request, as it does without one.
+  @tag driver: :playwright
+  @tag :capture_log
+  test "Playwright submit names the navigation request when a page handler blocks it after pushState" do
+    block = """
+    <script>
+      navigation.addEventListener('navigate', event => { if (event.formData) event.preventDefault() })
+    </script>
+    """
+
+    form = ~s[<form id="note" method="post" action="save" onsubmit="history.pushState({}, '', 'edited')"></form>]
+    fixture = TestHTTPFixtures.register(%{body: html(form <> block)})
+    session = :playwright |> start_test_session() |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+
+    assert_raise Fluffy.OperationError,
+                 ~r/Timeout 500ms exceeded while waiting for the submitted form's navigation request/,
+                 fn -> submit(session, by_css("#note"), timeout: 500) end
+
+    assert [_source] = TestHTTPFixtures.requests(fixture)
+  end
+
   # Dismissing the prompt cancels the navigation; accepting it lets it go on.
   # Filling the field gives the page the user activation the prompt requires.
   for {outcome, handle, heading, requests} <- [

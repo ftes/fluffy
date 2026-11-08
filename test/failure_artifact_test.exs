@@ -43,4 +43,20 @@ defmodule Fluffy.FailureArtifactTest do
     assert Bounded.within(10, slow.(), on_timeout: :leave) == :timeout
     assert_receive {:finished, :ok}, 400
   end
+
+  @tag :capture_log
+  test "a bounded Playwright call ends at a message, its result, a crash or its timeout" do
+    owner = self()
+    ref = make_ref()
+    slow = fn -> send(owner, {:finished, Process.sleep(200)}) end
+
+    send(owner, {ref, :stop, :value})
+    assert Bounded.within_unless(1_000, slow, {ref, :stop}) == {:message, :value}
+    refute_receive {:finished, :ok}, 400
+
+    assert Bounded.within_unless(1_000, fn -> :done end, {ref, :stop}) == {:ok, :done}
+    assert_raise RuntimeError, "boom", fn -> Bounded.within_unless(1_000, fn -> raise "boom" end, {ref, :stop}) end
+    assert Bounded.within_unless(10, slow, {ref, :stop}) == :timeout
+    refute_receive {:finished, :ok}, 400
+  end
 end

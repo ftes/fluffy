@@ -16,14 +16,41 @@ defmodule Fluffy.Backend.Playwright.Bounded do
   def within(timeout, fun, options \\ []) do
     on_timeout = Keyword.validate!(options, on_timeout: :kill)[:on_timeout]
     task = Task.Supervisor.async_nolink(Fluffy.TaskSupervisor, fun)
-
-    case Task.yield(task, timeout) || stop(task, on_timeout) do
-      {:ok, result} -> {:ok, result}
-      {:exit, {exception, stacktrace}} when is_exception(exception) -> reraise exception, stacktrace
-      {:exit, reason} -> exit(reason)
-      nil -> :timeout
-    end
+    outcome(Task.yield(task, timeout) || stop(task, on_timeout))
   end
+
+  @doc """
+  Like `within/3`, but a `{ref, tag, value}` message arriving first kills the
+  call and returns `{:message, value}`.
+  """
+  def within_unless(timeout, fun, {ref, tag}) do
+    task = Task.Supervisor.async_nolink(Fluffy.TaskSupervisor, fun)
+    task_ref = task.ref
+
+    received =
+      receive do
+        {^task_ref, result} ->
+          Task.ignore(task)
+          {:ok, result}
+
+        {:DOWN, ^task_ref, :process, _pid, reason} ->
+          {:exit, reason}
+
+        {^ref, ^tag, value} ->
+          Task.shutdown(task, :brutal_kill)
+          {:message, value}
+      after
+        timeout -> stop(task, :kill)
+      end
+
+    outcome(received)
+  end
+
+  defp outcome({:ok, result}), do: {:ok, result}
+  defp outcome({:message, value}), do: {:message, value}
+  defp outcome({:exit, {exception, stacktrace}}) when is_exception(exception), do: reraise(exception, stacktrace)
+  defp outcome({:exit, reason}), do: exit(reason)
+  defp outcome(nil), do: :timeout
 
   defp stop(task, :kill), do: Task.shutdown(task, :brutal_kill)
   defp stop(task, :leave), do: Task.ignore(task)
