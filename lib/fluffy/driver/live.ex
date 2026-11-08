@@ -569,7 +569,8 @@ defmodule Fluffy.Driver.Live do
 
       {{session, navigation}, false} ->
         if Deadline.expired?(deadline) do
-          raise Fluffy.ActionabilityError, action: operation, reason: :navigated_away, locator: locator
+          reason = if match?(%Navigation.Patch{}, navigation), do: :patched_away, else: :navigated_away
+          raise Fluffy.ActionabilityError, action: operation, reason: reason, locator: locator
         end
 
         Retry.retry_after_navigation(session, navigation, deadline)
