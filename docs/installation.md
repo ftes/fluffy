@@ -87,7 +87,11 @@ See [Browser baseline](capabilities.md#browser-baseline) for conformance coverag
 Fluffy launches one browser lazily per configured runtime lane and creates a
 fresh isolated `BrowserContext` for each session. ExUnit `max_cases` is the
 default concurrency bound; Fluffy does not add a second pool limiter.
-Lower it when browser startup or the host becomes resource-constrained.
+Lower it when browser startup or the host becomes resource-constrained, and for
+Firefox: it handles input for all pages of its browser in one queue, so at ExUnit's
+default of twice the cores its actions can time out. Half the cores, as Playwright
+runs workers, is a good start:
+`ExUnit.start(max_cases: max(div(System.schedulers_online(), 2), 1))`.
 
 ## Ecto sandbox
 
