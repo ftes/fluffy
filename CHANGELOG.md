@@ -44,6 +44,7 @@ Fluffy now runs on PlaywrightEx 0.17, a port of the official Playwright client w
 ### Fixed
 
 - No unused-function warning when Fluffy is compiled without Ecto.
+- A Playwright session starts when `config :fluffy, :playwright` leaves out `timeout:`, using its 15 seconds default instead of raising `KeyError`.
 - Playwright actions and expectations default to the session's `timeout:`, like LiveView.
 - Playwright `reload(timeout:)` bounds the reload only; the LiveView connection wait after it uses the session's `timeout:`, as after other actions.
 - An action that closes its own page, such as a popup's `window.close()`, succeeds instead of raising `PlaywrightEx.TargetClosedError`.

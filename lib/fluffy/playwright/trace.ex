@@ -89,7 +89,7 @@ defmodule Fluffy.Playwright.Trace do
     end
   end
 
-  defp configured_directory, do: Keyword.get(config(), :trace_dir, "traces")
+  defp configured_directory, do: Keyword.fetch!(config(), :trace_dir)
 
-  defp config, do: Application.fetch_env!(:fluffy, :playwright)
+  defp config, do: Fluffy.Options.playwright_config()
 end

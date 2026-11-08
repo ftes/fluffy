@@ -13,6 +13,7 @@ defmodule Fluffy.Backend.Playwright do
   alias Fluffy.FailureArtifact
   alias Fluffy.Internal.Navigation.BrowserCommitted
   alias Fluffy.Internal.Navigation.BrowserPatch
+  alias Fluffy.Options
   alias Fluffy.Page
   alias Fluffy.PageLifecycle
   alias Fluffy.Session
@@ -31,7 +32,8 @@ defmodule Fluffy.Backend.Playwright do
   def start_session(options, attachment) do
     {resource_scope, runtime, sandbox_header} = attachment
     base_url = Keyword.fetch!(options, :base_url)
-    timeout = Keyword.get(options, :timeout, timeout())
+    config = Options.playwright_config()
+    timeout = Keyword.get_lazy(options, :timeout, fn -> Keyword.fetch!(config, :timeout) end)
     browser_context_options = Keyword.get(options, :browser_context, [])
 
     headers =
@@ -66,7 +68,7 @@ defmodule Fluffy.Backend.Playwright do
       _disposable = BrowserContext.add_init_script!(browser_context, Document.init_script())
     end)
 
-    listen(browser_context, runtime)
+    listen(browser_context, runtime, Keyword.fetch!(config, :log_browser_console))
     browser_page = BrowserContext.new_page!(browser_context)
 
     context = %Context{
@@ -93,13 +95,13 @@ defmodule Fluffy.Backend.Playwright do
 
   # Listeners only forward. The runtime does the work, and receives each
   # message before the reply of the call that caused it.
-  defp listen(browser_context, runtime) do
+  defp listen(browser_context, runtime, log_browser_console?) do
     forward = fn kind -> fn native -> send(runtime, {:fluffy_playwright, kind, native}) end end
 
     BrowserContext.on(browser_context, :page, forward.(:page))
     BrowserContext.on(browser_context, :close, forward.(:context_close))
 
-    if Keyword.get(Application.fetch_env!(:fluffy, :playwright), :log_browser_console, true) do
+    if log_browser_console? do
       BrowserContext.on(browser_context, :console, forward.(:console))
       BrowserContext.on(browser_context, :web_error, forward.(:web_error))
     end
@@ -353,11 +355,5 @@ defmodule Fluffy.Backend.Playwright do
     deadline = Deadline.new(timeout)
     if cursor, do: Document.wait_for_redirect!(state.frame, destination, cursor, Deadline.remaining(deadline, 1))
     Document.wait_for_live_view!(state.frame, destination, Deadline.remaining(deadline, 1))
-  end
-
-  defp timeout do
-    :fluffy
-    |> Application.fetch_env!(:playwright)
-    |> Keyword.fetch!(:timeout)
   end
 end

@@ -401,6 +401,16 @@ defmodule Fluffy.Options do
     options
   end
 
+  @doc false
+  # The `config :fluffy, :playwright` a session runs with, schema defaults included.
+  @spec playwright_config() :: keyword()
+  def playwright_config do
+    case :fluffy |> Application.get_env(:playwright, false) |> validate_playwright!() do
+      false -> NimbleOptions.validate!([], @playwright_schema)
+      config -> config
+    end
+  end
+
   @spec validate_playwright!(false | keyword()) :: false | keyword()
   def validate_playwright!(false), do: false
 
