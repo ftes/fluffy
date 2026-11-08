@@ -408,22 +408,6 @@ defmodule Fluffy.ClientDOM do
   end
 
   @doc false
-  def target_identity(%{tag: tag, attributes: attributes, selector: selector}) do
-    cond do
-      html_id = attribute(attributes, "id") -> {:html_id, tag, html_id}
-      phx_id = attribute(attributes, "data-phx-id") -> {:phx_id, tag, phx_id}
-      true -> {:selector, selector}
-    end
-  end
-
-  @doc false
-  def target_identity_present?(%__MODULE__{} = _client_dom, {:selector, _selector}), do: false
-
-  def target_identity_present?(%__MODULE__{} = client_dom, identity) do
-    DocumentIndex.identity_present?(index(client_dom), identity)
-  end
-
-  @doc false
   def selector_for_node_id(%__MODULE__{} = client_dom, node_id) do
     DocumentIndex.selector_for_id!(index(client_dom), node_id)
   end

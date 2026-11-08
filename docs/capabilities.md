@@ -175,7 +175,8 @@ not restore form defaults or clear file selections. LiveView reset buttons with
 File selection supports bounded local paths and typed in-memory payloads,
 ordered multiple selection, clearing, and ordinary multipart forms, including
 empty-file entries. Managed LiveView uploads support validation, progress,
-cancellation, replacement, auto-upload, and submission.
+cancellation, replacement, auto-upload, and submission. Their form needs an id,
+as LiveView's form recovery does: LiveView `set_input_files` raises without one.
 
 The LiveView change event sent when files are selected for a managed upload
 carries LiveViewTest's serialization of the rendered form: server-rendered
