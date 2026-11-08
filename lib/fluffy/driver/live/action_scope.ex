@@ -17,7 +17,7 @@ defmodule Fluffy.Driver.Live.ActionScope do
   @final_attempt {__MODULE__, :final_attempt}
 
   def run(action) when is_function(action, 0) do
-    Process.put(@scope, %{delivered?: false, taken: []})
+    previous = Process.put(@scope, %{delivered?: false, taken: []})
 
     try do
       action.()
@@ -26,7 +26,7 @@ defmodule Fluffy.Driver.Live.ActionScope do
         @scope |> Process.get() |> Map.fetch!(:taken) |> Enum.reverse() |> Enum.each(&send(self(), &1))
         :erlang.raise(kind, reason, __STACKTRACE__)
     after
-      Process.delete(@scope)
+      restore(@scope, previous)
     end
   end
 
@@ -36,9 +36,12 @@ defmodule Fluffy.Driver.Live.ActionScope do
     try do
       retry.()
     after
-      if previous, do: Process.put(@final_attempt, previous), else: Process.delete(@final_attempt)
+      restore(@final_attempt, previous)
     end
   end
+
+  defp restore(key, nil), do: Process.delete(key)
+  defp restore(key, previous), do: Process.put(key, previous)
 
   def final_attempt?, do: Process.get(@final_attempt) == true
 
