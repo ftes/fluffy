@@ -37,7 +37,7 @@ runs:
       id: apt-cache
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
       with:
-        key: apt-${{ inputs.browser }}-${{ hashFiles('deps/playwright_ex/DRIVER_VERSION', 'deps/playwright_ex/NODE_VERSION') }}-${{ steps.image.outputs.os }}
+        key: apt-${{ inputs.browser }}-${{ hashFiles('deps/playwright_ex/DRIVER_VERSION') }}-${{ steps.image.outputs.os }}
         path: ~/apt-cache
     - name: Install driver, browser and system packages
       shell: bash

@@ -154,7 +154,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
                 receive do
                   :finish -> :ok
                 after
-                  5_000 -> :ok
+                  30_000 -> :ok
                 end
 
                 {:ok, conn} = Plug.Conn.chunk(conn, "last")
@@ -260,7 +260,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
                 receive do
                   :abort -> exit(:shutdown)
                 after
-                  5_000 -> exit(:shutdown)
+                  30_000 -> exit(:shutdown)
                 end
               end
             }

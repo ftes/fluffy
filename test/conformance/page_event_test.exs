@@ -217,7 +217,7 @@ defmodule Fluffy.Conformance.PageEventTest do
                 receive do
                   :finish -> :ok
                 after
-                  5_000 -> :ok
+                  30_000 -> :ok
                 end
 
                 {:ok, conn} = Plug.Conn.chunk(conn, "<p>Loaded</p></body></html>")

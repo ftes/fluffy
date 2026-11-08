@@ -12,7 +12,8 @@ defmodule Fluffy.TestCase do
   # A plain function, compiled before the tests, so `@tag skip:` can call it at compile time.
   # Read at call time: compile_env would record the whole :playwright config (artifact_dir
   # included) in the app and fail at boot whenever it differs.
-  def playwright_engine?(engine), do: engine == Application.fetch_env!(:fluffy, :playwright)[:engine]
+  def playwright_engine?(engine),
+    do: engine == Keyword.get(Application.fetch_env!(:fluffy, :playwright), :engine, :chromium)
 
   def assert_action_error(session, structural_exception, structural_message, action) do
     error = ExUnit.Assertions.assert_raise(Fluffy.OperationError, action)

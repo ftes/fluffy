@@ -160,6 +160,9 @@ mix setup
 mix test
 ```
 
+`mix setup` installs Chromium. To run the suite on Firefox or WebKit, install it with
+`mix playwright_ex.install -- firefox` (or `webkit`) and set `FLUFFY_BROWSER=firefox`.
+
 Run the ordinary local gate—Styler-backed formatting, warnings-as-errors
 compilation, strict Credo, and the test suite—with:
 
