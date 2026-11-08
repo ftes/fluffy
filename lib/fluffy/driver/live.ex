@@ -518,7 +518,7 @@ defmodule Fluffy.Driver.Live do
     exception ->
       stacktrace = __STACKTRACE__
 
-      if redirect_reply_failure?(session, exception) do
+      if redirect_reply_failure?(session, exception, stacktrace) do
         {:view_left, exit_redirect!(session, exception, fn -> reraise(exception, stacktrace) end)}
       else
         reraise(exception, stacktrace)
@@ -529,15 +529,21 @@ defmodule Fluffy.Driver.Live do
   end
 
   # LiveViewTest hands back a redirect in place of a reply only once the view's
-  # client stopped on it. Its own failures raise ArgumentError, and Fluffy's
-  # errors are deterministic, so neither is explained by a redirect.
-  defp redirect_reply_failure?(session, exception) do
+  # client stopped on it, and its own code then fails on that reply. Its own
+  # failures raise ArgumentError, and an error raised outside its code, such as
+  # Fluffy's, is not explained by a redirect.
+  defp redirect_reply_failure?(session, exception, stacktrace) do
     {_reference, _topic, proxy_pid} = Session.page_state(session).view.proxy
 
-    not is_struct(exception, ArgumentError) and not fluffy_error?(exception) and not Process.alive?(proxy_pid)
+    not is_struct(exception, ArgumentError) and Enum.any?(stacktrace, &live_view_test_frame?/1) and
+      not Process.alive?(proxy_pid)
   end
 
-  defp fluffy_error?(%module{}), do: match?(["Fluffy" | _], Module.split(module))
+  defp live_view_test_frame?({module, _function, _arity, _location}) do
+    module == Phoenix.LiveViewTest or String.starts_with?(Atom.to_string(module), "Elixir.Phoenix.LiveViewTest.")
+  end
+
+  defp live_view_test_frame?(_frame), do: false
 
   defp redirected(session, redirect) do
     {:navigate, session, navigation} = follow_redirect_result(session, {:error, redirect})
@@ -769,7 +775,10 @@ defmodule Fluffy.Driver.Live do
   # is nil when element/2 cannot reach the target. Finding a nested view reads
   # the view's children, so a view that navigated away reports its redirect.
   defp owning_view_context(session, target) do
-    read_view(session, fn -> find_owning_view_context(Session.page_state(session).view, target) end)
+    case read_view(session, fn -> find_owning_view_context(Session.page_state(session).view, target) end) do
+      {:ok, {:error, redirect}} -> redirected(session, redirect)
+      found -> found
+    end
   end
 
   defp find_owning_view_context(root_view, target) do
@@ -798,7 +807,7 @@ defmodule Fluffy.Driver.Live do
           end
 
           view =
-            find_live_child(context.view, id) ||
+            Enum.find(live_children!(context.view), &(&1.id == id)) ||
               raise Fluffy.LiveViewError,
                 reason: {:nested_live_view_not_found, id, context.view.id}
 
@@ -808,10 +817,21 @@ defmodule Fluffy.Driver.Live do
           context
       end
     end)
+  catch
+    {__MODULE__, :view_left, redirect} -> redirect
   end
 
   defp find_view(view, id) do
-    if view.id == id, do: view, else: Enum.find_value(live_children(view), &find_view(&1, id))
+    if view.id == id, do: view, else: Enum.find_value(live_children!(view), &find_view(&1, id))
+  end
+
+  # A view whose client stopped on a redirect hands the redirect back in place
+  # of its children.
+  defp live_children!(view) do
+    case live_children(view) do
+      {:error, {_kind, _options}} = redirect -> throw({__MODULE__, :view_left, redirect})
+      children -> children
+    end
   end
 
   defp view_selector(_client_dom, _selector, %{root_id: nil}), do: nil
