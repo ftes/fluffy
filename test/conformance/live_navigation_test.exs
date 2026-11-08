@@ -355,6 +355,26 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     end
   end
 
+  @tag driver: :phoenix
+  test "the next expectation follows a navigation only the view watcher reported after a retry failed before leaving the page" do
+    session = :phoenix |> live_session() |> visit("/live/chamber-map")
+    state = Fluffy.Session.page_state(session)
+    {_reference, _topic, proxy_pid} = state.view.proxy
+    proxy_reference = Process.monitor(proxy_pid)
+    watcher_reference = Process.monitor(state.watcher)
+
+    Process.exit(state.view.pid, {:shutdown, {:live_redirect, %{kind: :push, to: "/redirect/loop"}}})
+
+    assert_receive {:DOWN, ^proxy_reference, :process, ^proxy_pid, _reason}
+    assert_receive {:DOWN, ^watcher_reference, :process, _watcher, _reason}
+
+    for _attempt <- 1..2 do
+      assert_raise RuntimeError, ~r/exceeded 20 redirects at .*\/redirect\/loop/, fn ->
+        expect(session, Fluffy.Expect.to_be_visible(by_label("Map note")))
+      end
+    end
+  end
+
   # Each navigation used to retry the expectation with the time left, and once
   # none was left, kept retrying it without end.
   @tag driver: :phoenix

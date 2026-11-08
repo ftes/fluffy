@@ -44,27 +44,37 @@ defmodule Fluffy.Driver.Live do
     deadline = Retry.deadline(session, Keyword.validate!(expectation.options, [:timeout]))
 
     result =
-      eventually(session, deadline, fn session ->
-        case evaluate_expectation(session, expectation) do
-          {:ok, passed?, _actual} when passed? != expectation.negated? ->
-            {:ok, session}
+      ActionScope.run(fn ->
+        session
+        |> eventually(deadline, fn session ->
+          case evaluate_expectation(session, expectation) do
+            {:ok, passed?, _actual} when passed? != expectation.negated? ->
+              {:ok, session}
 
-          {:ok, _passed?, actual} ->
-            {:retry, "Expected #{Expect.Internal.describe(expectation)}, got #{inspect(actual)}"}
-        end
+            {:ok, _passed?, actual} ->
+              {:retry, "Expected #{Expect.Internal.describe(expectation)}, got #{inspect(actual)}"}
+          end
+        end)
+        |> finish_expectation()
       end)
 
-    # An expectation goes on on the page a navigation landed on, like an
-    # action, so pages that keep navigating fail it at the redirect limit.
     case result do
-      {:navigate, session, navigation, {:retry, _remaining}} ->
-        {session, redirects} = follow_for_retry(session, navigation)
+      {:retry_on_new_page, session, redirects} ->
         retry_on_new_page(session, redirects, :expect, [expectation], deadline)
 
       session ->
         session
     end
   end
+
+  # An expectation goes on on the page a navigation landed on, like an
+  # action, so pages that keep navigating fail it at the redirect limit.
+  defp finish_expectation({:navigate, session, navigation, {:retry, _remaining}}) do
+    {session, redirects} = follow_for_retry(session, navigation)
+    {:retry_on_new_page, session, redirects}
+  end
+
+  defp finish_expectation(session), do: session
 
   @impl true
   def click(%Session{} = session, %Locator{} = locator, action_options \\ []) do
@@ -621,8 +631,8 @@ defmodule Fluffy.Driver.Live do
   # view, for a retry on the new page. The navigation counts toward the retry's
   # timeout, and its redirect toward the redirect limit of the retries and of
   # the redirects it leads to. Following it can fail before the session left
-  # its page, such as at that limit: the session then stays there, so a failed
-  # action puts back the view messages it took there. Once it left, they are moot.
+  # its page, such as at that limit: the session then stays there, so the failed
+  # call puts back the view messages it took there. Once it left, they are moot.
   defp follow_for_retry(session, %Redirect{} = navigation) do
     state = Session.page_state(session)
     redirects = HTTP.count_redirect!(ActionScope.redirects(), URI.parse(Session.current_page(session).url))

@@ -1,14 +1,14 @@
 defmodule Fluffy.Driver.Live.ActionScope do
   @moduledoc false
 
-  # What the running Live action did to its view. The driver's `act` runs each
-  # action in a scope, which records whether one of its events reached the
-  # view, so an action whose later call finds the view gone still counts the
-  # events that reached it before, and the view messages, such as a redirect,
-  # it took from the mailbox. An action that fails leaves its session on the
-  # page it started on, so the scope puts those messages back for that
-  # session's next call to find, except a patch the action already applied
-  # there. Outside an action, recording does nothing.
+  # What the running Live action did to its view. The driver runs each action
+  # and expectation in a scope, which records whether one of its events reached
+  # the view, so an action whose later call finds the view gone still counts
+  # the events that reached it before, and the view messages, such as a
+  # redirect, it took from the mailbox. An action or expectation that fails
+  # leaves its session on the page it started on, so the scope puts those
+  # messages back for that session's next call to find, except a patch already
+  # applied there. Outside a scope, recording does nothing.
   #
   # An action's retries count the redirects they follow, so pages that keep
   # navigating before the action reaches them fail it at the redirect limit.
