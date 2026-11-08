@@ -50,6 +50,41 @@ defmodule Fluffy.Conformance.ReloadTest do
     end
   end
 
+  @tag driver: :playwright
+  test "a Playwright reload that never loads raises PlaywrightEx's timeout error" do
+    owner = self()
+
+    fixture =
+      TestHTTPFixtures.register_sequence([
+        %{body: html("<h1>First render</h1>")},
+        %{
+          stream: fn conn ->
+            {:ok, conn} = Plug.Conn.chunk(conn, "<!doctype html><html><body><h1>Loading")
+
+            send(owner, {:stream, self()})
+
+            receive do
+              :finish -> conn
+            after
+              30_000 -> conn
+            end
+          end
+        }
+      ])
+
+    session = :playwright |> start_test_session() |> visit(TestHTTPFixtures.path(fixture))
+
+    try do
+      assert_raise PlaywrightEx.TimeoutError, ~r/reload/, fn -> reload(session, timeout: 500) end
+    after
+      receive do
+        {:stream, server} -> send(server, :finish)
+      after
+        0 -> :ok
+      end
+    end
+  end
+
   # Each LiveView sleeps 1s in its connected mount before it subscribes.
   @tag driver: :playwright
   test "Playwright reload's timeout: bounds the reload, not the LiveView connection wait after it" do

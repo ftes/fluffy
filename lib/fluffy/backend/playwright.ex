@@ -337,10 +337,12 @@ defmodule Fluffy.Backend.Playwright do
   defp navigation_options(session, options),
     do: Keyword.merge([wait_until: :load], Keyword.put(options, :timeout, Session.timeout(session, options)))
 
+  # Raises PlaywrightEx's own exception, such as `PlaywrightEx.TimeoutError`,
+  # which keeps Playwright's call log.
   defp navigate!(operation, arguments) do
     case apply(BrowserPage, operation, arguments) do
       {:ok, response} -> response
-      {:error, error} -> raise "Playwright #{operation} failed: " <> Exception.message(error)
+      {:error, error} -> raise error
     end
   end
 

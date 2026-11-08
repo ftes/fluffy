@@ -94,7 +94,7 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
 
       session = start_test_session(driver)
 
-      assert_raise RuntimeError, fn ->
+      assert_raise navigation_error(driver), fn ->
         visit(session, TestHTTPFixtures.path(fixture, "/loop"))
       end
 
@@ -112,13 +112,13 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
             %{status: unquote(status)}
           ])
 
-        assert_raise RuntimeError, ~r/abort|interrupt/i, fn ->
+        assert_raise navigation_error(driver), ~r/abort|interrupt/i, fn ->
           driver |> start_test_session() |> visit(TestHTTPFixtures.path(fixture, "/empty"))
         end
 
         session = driver |> start_test_session() |> visit(TestHTTPFixtures.path(fixture, "/orders"))
 
-        assert_raise RuntimeError, ~r/abort|interrupt/i, fn ->
+        assert_raise navigation_error(driver), ~r/abort|interrupt/i, fn ->
           visit(session, TestHTTPFixtures.path(fixture, "/empty"))
         end
 
@@ -136,7 +136,7 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
 
         session = driver |> start_test_session() |> visit(TestHTTPFixtures.path(fixture, "/orders"))
 
-        assert_raise RuntimeError, ~r/abort|interrupt/i, fn ->
+        assert_raise navigation_error(driver), ~r/abort|interrupt/i, fn ->
           visit(session, TestHTTPFixtures.path(fixture, "/beacon"))
         end
 
@@ -181,4 +181,8 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
   defp html(text) do
     "<!doctype html><html><body><main><h1>#{text}</h1></main></body></html>"
   end
+
+  # Playwright raises its own exception for a failed navigation.
+  defp navigation_error(:playwright), do: PlaywrightEx.PlaywrightError
+  defp navigation_error(:phoenix), do: RuntimeError
 end

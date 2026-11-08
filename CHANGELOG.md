@@ -19,6 +19,7 @@ Fluffy now runs on PlaywrightEx 0.17, a port of the official Playwright client w
 - `browser_context:`, `launch_options:`, and the options of `screenshot`, `storage_state`, cookies and `trace` pass through to PlaywrightEx, which validates them.
 - `go_back`/`go_forward`, `hover`, `drag_to` and `press_sequentially` accept the options of their PlaywrightEx call except `no_wait_after:` and `signal:`, which would bypass navigation tracking.
 - On Phoenix, `go_back`/`go_forward` raise `Fluffy.CapabilityError` with `capability: :browser_history` instead of `:pages`.
+- On Playwright, a failed `visit`, `reload`, `go_back` or `go_forward` raises PlaywrightEx's exception, such as `PlaywrightEx.TimeoutError` or `PlaywrightEx.PlaywrightError`, instead of a `RuntimeError`.
 - `trace(coverage:)` is removed.
 - `Fluffy.Dialog.accept/2` and `dismiss/1` take no timeout; `Fluffy.Dialog` loses its `connection`, `id` and `timeout` fields, and `Fluffy.Download` its `timeout` field; `read!` and `save_as!` still raise after the session's `timeout:`, and now cancel the download so a pending save no longer writes the file later.
 - `page_status`, `page_to_have_status` and `Fluffy.Page.status` are removed, as in Playwright; on Playwright, assert on `Event.response` instead.
