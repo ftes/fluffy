@@ -286,7 +286,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
       {:shutdown, {:live_redirect, %{kind: :push, to: "/live/secret-chamber"}}}
     )
 
-    assert_receive {:DOWN, ^proxy_reference, :process, ^proxy_pid, _reason}
+    assert_receive {:DOWN, ^proxy_reference, :process, ^proxy_pid, _reason}, 1_000
 
     session
     |> expect(Fluffy.Expect.page_to_have_url("/live/secret-chamber"))
@@ -345,8 +345,8 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     # session leaves the page.
     Process.exit(state.view.pid, {:shutdown, {:live_redirect, %{kind: :push, to: "/redirect/loop"}}})
 
-    assert_receive {:DOWN, ^proxy_reference, :process, ^proxy_pid, _reason}
-    assert_receive {:DOWN, ^watcher_reference, :process, _watcher, _reason}
+    assert_receive {:DOWN, ^proxy_reference, :process, ^proxy_pid, _reason}, 1_000
+    assert_receive {:DOWN, ^watcher_reference, :process, _watcher, _reason}, 1_000
 
     for _attempt <- 1..2 do
       assert_raise RuntimeError, ~r/exceeded 20 redirects at .*\/redirect\/loop/, fn ->
@@ -365,14 +365,93 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
 
     Process.exit(state.view.pid, {:shutdown, {:live_redirect, %{kind: :push, to: "/redirect/loop"}}})
 
-    assert_receive {:DOWN, ^proxy_reference, :process, ^proxy_pid, _reason}
-    assert_receive {:DOWN, ^watcher_reference, :process, _watcher, _reason}
+    assert_receive {:DOWN, ^proxy_reference, :process, ^proxy_pid, _reason}, 1_000
+    assert_receive {:DOWN, ^watcher_reference, :process, _watcher, _reason}, 1_000
 
     for _attempt <- 1..2 do
       assert_raise RuntimeError, ~r/exceeded 20 redirects at .*\/redirect\/loop/, fn ->
         expect(session, Fluffy.Expect.to_be_visible(by_label("Map note")))
       end
     end
+  end
+
+  @tag driver: :phoenix
+  test "the next unwrap follows a navigation only the view watcher reported after following it failed before leaving the page" do
+    session = :phoenix |> live_session() |> visit("/live/chamber-map")
+    state = Fluffy.Session.page_state(session)
+    {_reference, _topic, proxy_pid} = state.view.proxy
+    proxy_reference = Process.monitor(proxy_pid)
+    watcher_reference = Process.monitor(state.watcher)
+
+    Process.exit(state.view.pid, {:shutdown, {:live_redirect, %{kind: :push, to: "/redirect/loop"}}})
+
+    assert_receive {:DOWN, ^proxy_reference, :process, ^proxy_pid, _reason}, 1_000
+    assert_receive {:DOWN, ^watcher_reference, :process, _watcher, _reason}, 1_000
+
+    for _attempt <- 1..2 do
+      assert_raise RuntimeError, ~r/exceeded 20 redirects at .*\/redirect\/loop/, fn ->
+        unwrap(session, fn _view -> :ok end)
+      end
+    end
+  end
+
+  @tag driver: :phoenix
+  test "the next call follows a navigation an action that reached the view could not follow" do
+    session = :phoenix |> live_session() |> visit("/live/keyboard")
+
+    assert_raise RuntimeError, ~r/exceeded 20 redirects at .*\/redirect\/loop/, fn ->
+      press(session, by_label("Unfollowable key", exact: true), "Enter")
+    end
+
+    assert_raise RuntimeError, ~r/exceeded 20 redirects at .*\/redirect\/loop/, fn ->
+      expect(session, "Step: initial" |> by_text(exact: true) |> to_be_visible())
+    end
+  end
+
+  @tag driver: :phoenix
+  test "a view redirect to a download downloads once and keeps the page as inert markup" do
+    session = :phoenix |> live_session() |> visit("/live/chamber-map")
+    pending = wait_for(session, Fluffy.Event.download())
+
+    click(session, by_role(:button, name: "Fetch report", exact: true))
+    assert await(pending).suggested_filename == "report.csv"
+
+    second = wait_for(session, Fluffy.Event.download(), timeout: 300)
+    expect(session, to_be_visible(by_label("Map note")))
+
+    assert_raise ExUnit.AssertionError, ~r/no matching download event/, fn -> await(second) end
+  end
+
+  # A patch changes the URL in place, as in a browser, so it stays committed
+  # when the read of the patched view fails.
+  @tag driver: :phoenix
+  test "an action keeps a patch it read when the view died before rendering it" do
+    session = :phoenix |> live_session() |> visit("/live/chamber-map")
+    state = Fluffy.Session.page_state(session)
+    {_reference, _topic, proxy_pid} = state.view.proxy
+    proxy_reference = Process.monitor(proxy_pid)
+
+    Phoenix.LiveViewTest.render_click(state.view, "patch_then_die", %{})
+    assert_receive {:DOWN, ^proxy_reference, :process, ^proxy_pid, _reason}, 1_000
+
+    assert_raise Fluffy.LiveViewError, fn -> fill(session, by_label("Map note"), "north", timeout: 500) end
+    assert URI.parse(Fluffy.Session.current_page(session).url).query == "step=patched"
+  end
+
+  @tag driver: :phoenix
+  test "following a view's redirect leaves none of its messages in the test process" do
+    session = :phoenix |> live_session() |> visit("/live/chamber-map")
+    state = Fluffy.Session.page_state(session)
+    {reference, _topic, proxy_pid} = state.view.proxy
+    proxy_reference = Process.monitor(proxy_pid)
+
+    send(state.view.pid, {:navigate, "/live/keyboard"})
+    assert_receive {:DOWN, ^proxy_reference, :process, ^proxy_pid, _reason}, 1_000
+
+    expect(session, Fluffy.Expect.page_to_have_url("/live/keyboard"))
+
+    {:messages, messages} = Process.info(self(), :messages)
+    refute Enum.any?(messages, &match?({^reference, _message}, &1))
   end
 
   # Each navigation used to retry the expectation with the time left, and once
@@ -445,8 +524,8 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
 
     Process.exit(state.view.pid, {:shutdown, {:live_redirect, %{kind: :push, to: "/live/secret-chamber"}}})
 
-    assert_receive {:DOWN, ^proxy_reference, :process, ^proxy_pid, _reason}
-    assert_receive {:DOWN, ^watcher_reference, :process, _watcher, _reason}
+    assert_receive {:DOWN, ^proxy_reference, :process, ^proxy_pid, _reason}, 1_000
+    assert_receive {:DOWN, ^watcher_reference, :process, _watcher, _reason}, 1_000
 
     assert_raise Fluffy.OperationError, ~r/navigated away before the action reached it/, fn ->
       click(session, by_role(:button, name: "Lull guardian", exact: true), timeout: 0)

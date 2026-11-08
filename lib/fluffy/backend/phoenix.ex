@@ -155,7 +155,11 @@ defmodule Fluffy.Backend.Phoenix do
   end
 
   def navigate(%Session{} = session, %Redirect{} = navigation) do
-    follow_redirect(session, navigation.destination, navigation.flash, navigation.redirects)
+    document_id = Session.current_page(session).document_id
+    session = follow_redirect(session, navigation.destination, navigation.flash, navigation.redirects)
+
+    # A download keeps the document, but the view that redirected to it is gone.
+    if Session.current_page(session).document_id == document_id, do: keep_document(session, nil), else: session
   end
 
   def navigate(%Session{} = session, %Patch{} = navigation) do
@@ -375,7 +379,7 @@ defmodule Fluffy.Backend.Phoenix do
 
   # LiveView's client disconnects before every HTTP navigation it lets through,
   # so a kept LiveView document remains as inert markup. Its conn is the
-  # no-content response's, the session's latest.
+  # no-content response's, the session's latest, or none after a download.
   defp keep_document(session, conn) do
     case Session.current_page(session) do
       %Page.State{driver: :live, state: state, url: url} ->
@@ -551,6 +555,7 @@ defmodule Fluffy.Backend.Phoenix do
     Fluffy.SessionRuntime.release(session.runtime, {:live_view, proxy_pid})
 
     flush_watcher_event(page.state.watcher)
+    flush_view_messages(page.state.view)
     :ok
   end
 
@@ -559,6 +564,14 @@ defmodule Fluffy.Backend.Phoenix do
   defp flush_watcher_event(watcher) do
     receive do
       {:fluffy_live_view, ^watcher, _event} -> :ok
+    after
+      0 -> :ok
+    end
+  end
+
+  defp flush_view_messages(%{proxy: {reference, _topic, _proxy_pid}} = view) do
+    receive do
+      {^reference, _message} -> flush_view_messages(view)
     after
       0 -> :ok
     end
