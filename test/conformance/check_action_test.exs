@@ -166,6 +166,32 @@ defmodule Fluffy.Conformance.CheckActionTest do
     end)
   end
 
+  test "Playwright check succeeds when page code reverts the click on a briefly unresponsive page" do
+    revert = ~s|oninput="queueMicrotask(() => this.checked = !this.checked)"|
+
+    # Several busy stretches, so that one still blocks the page after Fluffy's
+    # document check has slipped in between them.
+    busy = """
+    () => {
+      let stretches = 3
+      const block = () => {
+        const end = performance.now() + 800
+        while (performance.now() < end);
+        if (--stretches) setTimeout(block)
+      }
+      setTimeout(block)
+    }
+    """
+
+    with_html(:playwright, ~s(<label><input type="checkbox" #{revert}>Updates</label>), fn session ->
+      Playwright.evaluate(session, busy)
+
+      session
+      |> check(by_role(:checkbox, name: "Updates"))
+      |> expect(to_be_checked(by_role(:checkbox, name: "Updates"), checked: false))
+    end)
+  end
+
   test "Playwright check fails when the click does not change the state" do
     html = ~s|<label><input type="checkbox" onclick="event.preventDefault()">Updates</label>|
 
