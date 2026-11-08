@@ -184,7 +184,7 @@ defmodule Fluffy.Driver.Playwright do
       # Listening first misses no request the submit starts.
       Listeners.listening(submission_listeners(page, frame), fn ref ->
         case BrowserLocator.evaluate(native, @submit, nil, timeout: remaining) do
-          {:ok, true} -> await_submission(ref, deadline)
+          {:ok, true} -> await_submission(ref, deadline, remaining)
           {:ok, false} -> :ok
           {:error, error} -> {:error, error}
         end
@@ -219,15 +219,14 @@ defmodule Fluffy.Driver.Playwright do
     end
   end
 
-  defp await_submission(ref, deadline) do
-    timeout = Deadline.remaining(deadline, 1)
-
+  # Like Playwright's, a timeout message names the action's timeout.
+  defp await_submission(ref, deadline, timeout) do
     receive do
-      {^ref, :request, request} -> await_response(ref, request, deadline)
+      {^ref, :request, request} -> await_response(ref, request, deadline, timeout)
       {^ref, :navigated} -> :ok
       {^ref, :unload_prompted} -> :ok
     after
-      timeout ->
+      Deadline.remaining(deadline, 1) ->
         {:error,
          %TimeoutError{
            message:
@@ -239,12 +238,10 @@ defmodule Fluffy.Driver.Playwright do
 
   # Reading the response has no timeout of its own; a failed request has none.
   # A redirect continues the navigation with another request.
-  defp await_response(ref, request, deadline) do
-    timeout = Deadline.remaining(deadline, 1)
-
-    case Bounded.within(timeout, fn -> Request.response(request) end) do
+  defp await_response(ref, request, deadline, timeout) do
+    case Bounded.within(Deadline.remaining(deadline, 1), fn -> Request.response(request) end) do
       {:ok, {:ok, response}} ->
-        if redirect?(response), do: await_submission(ref, deadline), else: :ok
+        if redirect?(response), do: await_submission(ref, deadline, timeout), else: :ok
 
       {:ok, {:error, error}} ->
         {:error, error}
