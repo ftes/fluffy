@@ -275,6 +275,8 @@ defmodule Fluffy.Driver.Playwright do
     end)
   end
 
+  @activation_cursor_timeout 500
+
   @impl true
   def set_checked(%Session{} = session, %Locator{} = locator, desired, options \\ []) when is_boolean(desired) do
     {operation, set} = if desired, do: {:check, &BrowserLocator.check/2}, else: {:uncheck, &BrowserLocator.uncheck/2}
@@ -283,9 +285,10 @@ defmodule Fluffy.Driver.Playwright do
       deadline = Deadline.new(remaining)
       # Only the activations after this point count, so the cursor is read
       # before the click even though the fallback below rarely needs it. The
-      # read shares the action's timeout; the one after the click is
+      # read is capped so a slow page leaves the click its budget; unread, the
+      # click goes ahead without the fallback. The read after the click is
       # bookkeeping for a click that has happened.
-      cursor = Document.activation_cursor(native, remaining)
+      cursor = Document.activation_cursor(native, min(remaining, @activation_cursor_timeout))
 
       case set.(native, native(options, Deadline.remaining(deadline, 1))) do
         # Playwright reads the state after its click, which a LiveView patch
