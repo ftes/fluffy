@@ -35,18 +35,26 @@ defmodule Fluffy.Backend.Playwright.Listeners do
   end
 
   @doc """
-  Runs `fun` with the listeners `listen` builds for a fresh ref, which tags the
-  messages they send the caller; afterwards they are removed and their pending
-  messages dropped.
+  Runs `fun` with the listeners `listen` builds for a fresh ref, a process alias
+  they send their messages to, tagged with it; afterwards they are removed and
+  their pending messages dropped.
+
+  Removing a listener does not wait for a call of it already running, which can
+  still send. Deactivating the alias drops those sends.
   """
   def listening(listen, fun) do
-    ref = make_ref()
-    listeners = register(listen.(ref))
+    ref = Process.alias()
 
     try do
-      fun.(ref)
+      listeners = register(listen.(ref))
+
+      try do
+        fun.(ref)
+      after
+        release(listeners)
+      end
     after
-      release(listeners)
+      Process.unalias(ref)
       flush(ref)
     end
   end

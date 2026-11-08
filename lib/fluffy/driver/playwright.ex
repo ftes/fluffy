@@ -196,19 +196,18 @@ defmodule Fluffy.Driver.Playwright do
   # a commit seen first navigated within the document. Listening for a dialog
   # would stop Playwright from handling it, so the wait listens for its close.
   defp submission_listeners(page, frame) do
-    owner = self()
     guid = frame.guid
 
     fn ref ->
       request = fn request ->
         if Request.is_navigation_request(request) and match?(%{guid: ^guid}, Events.request_frame(request)),
-          do: send(owner, {ref, :request, request})
+          do: send(ref, {ref, :request, request})
       end
 
-      navigated = fn navigated -> if navigated.guid == guid, do: send(owner, {ref, :navigated}) end
+      navigated = fn navigated -> if navigated.guid == guid, do: send(ref, {ref, :navigated}) end
 
       unload_prompted = fn dialog ->
-        if PlaywrightEx.Dialog.type(dialog) == "beforeunload", do: send(owner, {ref, :unload_prompted})
+        if PlaywrightEx.Dialog.type(dialog) == "beforeunload", do: send(ref, {ref, :unload_prompted})
       end
 
       [
@@ -509,8 +508,7 @@ defmodule Fluffy.Driver.Playwright do
   end
 
   defp page_closes?(page, deadline) do
-    owner = self()
-    listen = fn ref -> [{BrowserPage, page, :close, fn _page -> send(owner, {ref, :closed}) end}] end
+    listen = fn ref -> [{BrowserPage, page, :close, fn _page -> send(ref, {ref, :closed}) end}] end
 
     Listeners.listening(listen, fn ref ->
       BrowserPage.is_closed(page) or
