@@ -313,6 +313,15 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
   end
 
   @tag driver: :phoenix
+  test "a LiveView whose connection LiveView rejects fails with the rejection instead of redirecting to itself" do
+    session = live_session(:phoenix)
+
+    assert_raise RuntimeError, ~r/rejected the connection to .*\/unrouted-live as stale or unauthorized/, fn ->
+      visit(session, "/unrouted-live")
+    end
+  end
+
+  @tag driver: :phoenix
   test "an action that follows a navigation counts the navigation toward its timeout" do
     session =
       :phoenix

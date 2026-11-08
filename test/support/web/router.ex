@@ -114,6 +114,7 @@ defmodule Fluffy.TestWeb.Router do
     pipe_through(:browser)
 
     get("/embedded-ready", PageController, :embedded_ready)
+    get("/unrouted-live", PageController, :unrouted_live)
     get("/database", PageController, :database)
     get("/databases", PageController, :databases)
   end

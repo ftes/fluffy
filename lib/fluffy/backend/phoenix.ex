@@ -388,9 +388,18 @@ defmodule Fluffy.Backend.Phoenix do
   end
 
   defp commit_response(%{assigns: %{live_module: _module}} = conn, session, url, redirects) do
+    mounted_url = Plug.Conn.request_url(conn)
+
     case live(conn) do
       {:ok, view, html} ->
         commit_live(session, view, html, URI.to_string(url), redirects)
+
+      # LiveView rejected the connection as stale or unauthorized. LiveViewTest
+      # reports that as a redirect to the URL being mounted, where the LiveView
+      # client would reload the page, so following it would only loop.
+      {:error, {:redirect, %{to: ^mounted_url} = options} = reason} when map_size(options) == 1 ->
+        raise "LiveView navigation failed: LiveView rejected the connection to #{mounted_url} as stale or " <>
+                "unauthorized, such as for a live_session or on_mount mismatch: #{inspect(reason)}"
 
       # The view redirected in its connected mount. A browser follows it.
       {:error, {kind, %{to: _destination}} = redirect} when kind in [:live_redirect, :redirect] ->
