@@ -454,6 +454,22 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     refute Enum.any?(messages, &match?({^reference, _message}, &1))
   end
 
+  @tag driver: :phoenix
+  test "an action commits the last of the patches queued while it ran" do
+    session = :phoenix |> live_session() |> visit("/live/chamber-map")
+    view_pid = Fluffy.Session.page_state(session).view.pid
+
+    # Suspending the view queues its own patch ahead of the click's event.
+    :sys.suspend(view_pid)
+    send(view_pid, :patch)
+    resume = Task.async(fn -> Process.sleep(50) && :sys.resume(view_pid) end)
+
+    click(session, by_role(:button, name: "Patch now", exact: true))
+    Task.await(resume)
+
+    assert URI.parse(Fluffy.Session.current_page(session).url).query == "step=patched"
+  end
+
   # Each navigation used to retry the expectation with the time left, and once
   # none was left, kept retrying it without end.
   @tag driver: :phoenix

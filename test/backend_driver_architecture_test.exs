@@ -36,21 +36,16 @@ defmodule Fluffy.BackendDriverArchitectureTest do
     expect(navigated_session, "The guardian sleeps" |> by_text() |> to_be_visible())
   end
 
-  test "a Live driver reports patches and the Phoenix backend commits them" do
+  test "a Live driver commits a patch on the document it acted on" do
     session = visit(phoenix_session(), "/live/chamber-map")
     document = Session.current_page(session).document_id
 
-    assert {:navigate, pending_session, %Navigation.Patch{destination: "/live/chamber-map?step=patched"} = intent} =
-             Live.click(session, by_role(:link, name: "Reveal passage", exact: true), [])
+    assert %Session{} = patched_session = Live.click(session, by_role(:link, name: "Reveal passage", exact: true), [])
 
-    assert Session.current_page(pending_session).document_id == document
-
-    navigated_session = Backend.navigate(pending_session, intent)
-
-    assert Session.current_driver(navigated_session) == :live
-    assert Session.current_page(navigated_session).document_id == document
-    expect(navigated_session, Fluffy.Expect.page_to_have_url("/live/chamber-map?step=patched"))
-    expect(navigated_session, "Map position: patched" |> by_text() |> to_be_visible())
+    assert Session.current_driver(patched_session) == :live
+    assert Session.current_page(patched_session).document_id == document
+    expect(patched_session, Fluffy.Expect.page_to_have_url("/live/chamber-map?step=patched"))
+    expect(patched_session, "Map position: patched" |> by_text() |> to_be_visible())
   end
 
   test "a Static driver reports a returned native conn for backend reconciliation" do

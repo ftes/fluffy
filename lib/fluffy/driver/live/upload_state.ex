@@ -43,7 +43,7 @@ defmodule Fluffy.Driver.Live.UploadState do
 
   defstruct forms: %{}
 
-  @opaque t :: %__MODULE__{forms: %{optional(integer()) => Form.t()}}
+  @opaque t :: %__MODULE__{forms: %{optional(term()) => Form.t()}}
 
   def new, do: %__MODULE__{}
   def empty?(%__MODULE__{forms: forms}), do: map_size(forms) == 0
@@ -142,7 +142,10 @@ defmodule Fluffy.Driver.Live.UploadState do
   end
 
   defp update_form(%__MODULE__{} = state, form_id, fun) do
-    %{state | forms: Map.update!(state.forms, form_id, fun)}
+    case state.forms do
+      %{^form_id => form} -> %{state | forms: Map.put(state.forms, form_id, fun.(form))}
+      %{} -> state
+    end
   end
 
   defp mark_batch_uploaded(%Batch{upload: %{pid: upload_pid}} = batch, upload_pid), do: %{batch | uploaded?: true}
