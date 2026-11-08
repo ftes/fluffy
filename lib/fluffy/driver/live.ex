@@ -424,26 +424,20 @@ defmodule Fluffy.Driver.Live do
   defp reconcile_unwrapped(session, client_dom) do
     state = Session.page_state(session)
 
-    case current_redirect(state.view) do
-      {:error, {_kind, _options}} = redirect ->
-        follow_redirect_result(session, redirect)
+    case left_view_event(state, 0) do
+      {:redirect, redirect} ->
+        follow_redirect_result(session, {:error, redirect})
 
-      nil ->
-        case live_view_event(state.watcher, 0) do
-          {:redirect, redirect} ->
-            follow_redirect_result(session, {:error, redirect})
+      {:died, reason} ->
+        raise Fluffy.LiveViewError, reason: reason
 
-          {:died, reason} ->
-            raise Fluffy.LiveViewError, reason: reason
-
-          :none ->
-            try do
-              state.view
-              |> render()
-              |> then(&commit_render_result(session, client_dom, &1))
-            catch
-              :exit, reason -> follow_exit_redirect(session, reason, fn -> exit(reason) end)
-            end
+      :none ->
+        try do
+          state.view
+          |> render()
+          |> then(&commit_render_result(session, client_dom, &1))
+        catch
+          :exit, reason -> follow_exit_redirect(session, reason, fn -> exit(reason) end)
         end
     end
   end
@@ -458,7 +452,7 @@ defmodule Fluffy.Driver.Live do
   defp exit_redirect!(session, original_reason, unexplained \\ nil) do
     state = Session.page_state(session)
 
-    case live_view_exit_event(state.view, state.watcher, Session.context(session).timeout) do
+    case left_view_event(state, min(Session.context(session).timeout, @retry_interval)) do
       {:redirect, redirect} -> redirect
       {:died, reason} -> raise Fluffy.LiveViewError, reason: reason
       :none when is_function(unexplained, 0) -> unexplained.()
@@ -582,19 +576,10 @@ defmodule Fluffy.Driver.Live do
 
   # Checks the mailbox only: a view that left reports it to Fluffy right away.
   defp unread_redirect(session) do
-    state = Session.page_state(session)
-    watcher = state.watcher
-
-    case current_redirect(state.view) do
-      {:error, redirect} ->
-        redirected(session, redirect)
-
-      nil ->
-        receive do
-          {:fluffy_live_view, ^watcher, {:redirect, redirect}} -> redirected(session, redirect)
-        after
-          0 -> nil
-        end
+    case left_view_event(Session.page_state(session), 0) do
+      {:redirect, redirect} -> redirected(session, redirect)
+      {:died, reason} -> raise Fluffy.LiveViewError, reason: reason
+      :none -> nil
     end
   end
 
@@ -604,10 +589,12 @@ defmodule Fluffy.Driver.Live do
   defp navigation_found({:navigate, session, navigation, {:retry, _remaining}}), do: {session, navigation}
   defp navigation_found(_result), do: :none
 
-  defp live_view_exit_event(view, watcher, timeout) do
-    case current_redirect(view) do
+  # Reports how the view left: the redirect its client handed Fluffy, or what
+  # its watcher saw, waiting up to `wait` for the watcher.
+  defp left_view_event(state, wait) do
+    case current_redirect(state.view) do
       {:error, redirect} -> {:redirect, redirect}
-      nil -> live_view_event(watcher, min(timeout, @retry_interval))
+      nil -> live_view_event(state.watcher, wait)
     end
   end
 
