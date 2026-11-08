@@ -171,7 +171,9 @@ defmodule Fluffy.Driver.Playwright do
   # final response of its redirect chain, when the server has handled the
   # request, not the commit, which a no-content or download response never
   # makes. Page code can still turn the navigation into a same-document one (the
-  # Navigation API's `intercept()`), which ends the wait too.
+  # Navigation API's `intercept()`), which ends the wait too. So does a
+  # `beforeunload` dialog: dismissing it cancels the navigation, and its close
+  # does not say how it was handled, so submit then returns like click.
   @impl true
   def submit(%Session{} = session, %Locator{} = locator, options \\ []) do
     %{page: page, frame: frame} = Session.page_state(session)
@@ -191,7 +193,8 @@ defmodule Fluffy.Driver.Playwright do
   end
 
   # A navigation request comes before the frame commits to another document, so
-  # a commit seen first navigated within the document.
+  # a commit seen first navigated within the document. Listening for a dialog
+  # would stop Playwright from handling it, so the wait listens for its close.
   defp submission_listeners(page, frame) do
     owner = self()
     guid = frame.guid
@@ -203,7 +206,16 @@ defmodule Fluffy.Driver.Playwright do
       end
 
       navigated = fn navigated -> if navigated.guid == guid, do: send(owner, {ref, :navigated}) end
-      [{BrowserPage, page, :request, request}, {BrowserPage, page, :frame_navigated, navigated}]
+
+      unload_prompted = fn dialog ->
+        if PlaywrightEx.Dialog.type(dialog) == "beforeunload", do: send(owner, {ref, :unload_prompted})
+      end
+
+      [
+        {BrowserPage, page, :request, request},
+        {BrowserPage, page, :frame_navigated, navigated},
+        {BrowserPage, page, :dialog_closed, unload_prompted}
+      ]
     end
   end
 
@@ -213,6 +225,7 @@ defmodule Fluffy.Driver.Playwright do
     receive do
       {^ref, :request, request} -> await_response(ref, request, deadline)
       {^ref, :navigated} -> :ok
+      {^ref, :unload_prompted} -> :ok
     after
       timeout ->
         {:error,

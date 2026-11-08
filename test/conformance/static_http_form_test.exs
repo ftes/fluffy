@@ -635,6 +635,33 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
     assert [_source] = TestHTTPFixtures.requests(fixture)
   end
 
+  # Dismissing the prompt cancels the navigation; accepting it lets it go on.
+  # Filling the field gives the page the user activation the prompt requires.
+  for {outcome, handle, heading, requests} <- [
+        {"dismissed", &Fluffy.Dialog.dismiss/1, "Draft", 1},
+        {"accepted", &Fluffy.Dialog.accept/1, "Saved", 2}
+      ] do
+    @tag driver: :playwright
+    test "Playwright submit returns when a beforeunload prompt is #{outcome}" do
+      body = """
+      <h1>Draft</h1><form id="note" method="post" action="save"><label>Title <input name="title"></label></form>
+      <script>addEventListener('beforeunload', event => event.preventDefault())</script>
+      """
+
+      fixture = TestHTTPFixtures.register_sequence([%{body: html(body)}, %{body: html("<h1>Saved</h1>")}])
+
+      :playwright
+      |> start_test_session()
+      |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+      |> fill(by_label("Title"), "Draft")
+      |> once(Fluffy.Event.dialog(), unquote(handle))
+      |> submit(by_css("#note"), timeout: 2_000)
+      |> expect(unquote(heading) |> by_text() |> to_be_visible())
+
+      assert length(TestHTTPFixtures.requests(fixture)) == unquote(requests)
+    end
+  end
+
   @tag driver: :playwright
   @tag :capture_log
   test "Playwright submit names the navigation request it waited for when the browser sends none" do
