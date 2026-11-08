@@ -22,11 +22,12 @@ runs:
       with:
         path: ~/.cache/playwright_ex
         key: playwright-driver-${{ runner.os }}-${{ hashFiles('deps/playwright_ex/DRIVER_VERSION', 'deps/playwright_ex/NODE_VERSION') }}
+    # Browsers depend on the driver version only, not its bundled Node.js.
     - name: Restore Playwright browser
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
       with:
         path: ~/.cache/ms-playwright
-        key: playwright-browser-${{ runner.os }}-${{ hashFiles('deps/playwright_ex/DRIVER_VERSION', 'deps/playwright_ex/NODE_VERSION') }}-${{ inputs.browser }}
+        key: playwright-browser-${{ runner.os }}-${{ hashFiles('deps/playwright_ex/DRIVER_VERSION') }}-${{ inputs.browser }}
     # As in PlaywrightEx's CI: --with-deps runs apt-get against the runner's Azure mirror, which
     # can stall. The .debs are cached per browser and driver version, so a warm run installs
     # offline; archive.ubuntu.com is a fallback mirror, apt times out stalled fetches, and each
