@@ -627,7 +627,8 @@ defmodule Fluffy.Driver.Live do
   end
 
   # A patch also changes what the view renders, so read the view for the
-  # patched document before committing the patched URLs.
+  # patched document before committing the patched URL. The last patch
+  # decides the URL.
   defp apply_unread_patches(session) do
     case unread_patches(Session.page_state(session).view, []) do
       [] ->
@@ -635,7 +636,7 @@ defmodule Fluffy.Driver.Live do
 
       patches ->
         case refresh(session) do
-          %Session{} = session -> Enum.reduce(patches, session, &apply_patch(&2, &1))
+          %Session{} = session -> apply_patches(session, patches)
           {:navigate, session, navigation} -> {:redirected, session, navigation}
         end
     end
@@ -648,9 +649,10 @@ defmodule Fluffy.Driver.Live do
     end
   end
 
-  defp apply_patch(session, {_reference, {:patch, _topic, %{to: destination}}} = patch) do
+  defp apply_patches(session, patches) do
+    {_reference, {:patch, _topic, %{to: destination}}} = List.last(patches)
     session = commit_patch(session, destination)
-    ActionScope.record_applied(patch)
+    Enum.each(patches, &ActionScope.record_applied/1)
     session
   end
 
