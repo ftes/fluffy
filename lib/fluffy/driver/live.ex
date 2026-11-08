@@ -545,17 +545,18 @@ defmodule Fluffy.Driver.Live do
   # navigation that attempt finds before reaching the view fails it. Once an
   # event reached the view, the action took effect, so a navigation a later
   # step finds ends the action on the new page instead, like a browser whose
-  # page navigated mid-action. A redirect the view left since Fluffy last read
-  # it is followed first, so an action that never calls the view, such as a
-  # plain link, acts on the new page too. An action that fails before following
-  # a navigation leaves its session on its page with the navigation unread.
-  # `arguments` are the driver call's own, which the retry repeats.
+  # page navigated mid-action. A redirect the view left, or a patch it pushed,
+  # since Fluffy last read it is followed first, so an action that never calls
+  # the view, such as a plain link, acts on the new page too. An action that
+  # fails before following a navigation leaves its session on its page with
+  # the navigation unread. `arguments` are the driver call's own, which the
+  # retry repeats.
   defp act(session, operation, arguments, action) do
     deadline = Retry.deadline(session, Keyword.validate!(List.last(arguments), [:timeout]))
 
     result =
       ActionScope.run(fn ->
-        result = unread_redirect(session) || action.(deadline)
+        result = unread_navigation(session) || action.(deadline)
         finish_action(result, ActionScope.delivered?(), operation, arguments, deadline)
       end)
 
@@ -603,12 +604,24 @@ defmodule Fluffy.Driver.Live do
   defp action_label(:set_checked, [_locator, desired, _options]), do: if(desired, do: :check, else: :uncheck)
   defp action_label(operation, _arguments), do: operation
 
-  # Checks the mailbox only: a view that left reports it to Fluffy right away.
-  defp unread_redirect(session) do
+  # Checks the mailbox only: a view that left or patched reports it to Fluffy
+  # right away.
+  defp unread_navigation(session) do
     case left_view_event(Session.page_state(session), 0) do
       {:redirect, redirect} -> redirected(session, redirect)
       {:died, reason} -> raise Fluffy.LiveViewError, reason: reason
-      :none -> nil
+      :none -> unread_patch(session)
+    end
+  end
+
+  # A patch also changes what the view renders, so read the view for the
+  # patched page.
+  defp unread_patch(session) do
+    with destination when is_binary(destination) <- current_patch(Session.page_state(session).view) do
+      case refresh(session) do
+        %Session{} = session -> {:redirected, session, Navigation.patch(destination, Session.page_state(session))}
+        {:navigate, session, navigation} -> {:redirected, session, navigation}
+      end
     end
   end
 

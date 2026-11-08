@@ -196,6 +196,18 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     end
 
     @tag driver: driver
+    test "follows a plain link on the document a Live patch changed after the last read with #{driver}", %{
+      driver: driver
+    } do
+      driver
+      |> live_session()
+      |> visit("/live/chamber-map?async=patch")
+      |> await_unread_patches(driver, 1, "/live/chamber-map?step=late-patched")
+      |> click(by_role(:link, name: "Chamber from here", exact: true))
+      |> expect(Fluffy.Expect.page_to_have_url("/chamber?from=late-patched"))
+    end
+
+    @tag driver: driver
     test "an action whose target a Live navigation removed fails as missing with #{driver}", %{
       driver: driver
     } do
@@ -345,6 +357,23 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     |> expect("The secret chamber is open" |> by_text() |> to_be_visible())
   end
 
+  @tag driver: :phoenix
+  test "an action without timeout budget fails when its one attempt on the new page finds another navigation" do
+    session =
+      :phoenix
+      |> live_session()
+      |> visit("/live/chamber-map?async=patch-twice")
+      |> await_unread_patches(:phoenix, 2, nil)
+
+    assert_raise Fluffy.OperationError, ~r/navigated away/, fn ->
+      click(session, by_role(:link, name: "Chamber from here", exact: true), timeout: 0)
+    end
+
+    session
+    |> expect(Fluffy.Expect.page_to_have_url("/live/chamber-map?step=late-patched"))
+    |> expect("Map position: late-patched" |> by_text(exact: true) |> to_be_visible())
+  end
+
   # Waits until the view has navigated away without Fluffy reading it, so the
   # next action still targets the document Fluffy last saw.
   defp await_unread_navigation(session, :phoenix, _url) do
@@ -355,6 +384,32 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
   end
 
   defp await_unread_navigation(session, :playwright, url), do: expect(session, Fluffy.Expect.page_to_have_url(url))
+
+  # Waits until the view has pushed `count` patches without Fluffy reading
+  # them, so the next action still targets the document Fluffy last saw.
+  defp await_unread_patches(session, :phoenix, count, _url) do
+    {reference, _topic, _proxy_pid} = Fluffy.Session.page_state(session).view.proxy
+    await_patch_messages(reference, count, System.monotonic_time(:millisecond) + 1_000)
+    session
+  end
+
+  defp await_unread_patches(session, :playwright, _count, url), do: expect(session, Fluffy.Expect.page_to_have_url(url))
+
+  defp await_patch_messages(reference, count, deadline) do
+    {:messages, messages} = Process.info(self(), :messages)
+
+    cond do
+      Enum.count(messages, &match?({^reference, {:patch, _topic, _options}}, &1)) >= count ->
+        :ok
+
+      System.monotonic_time(:millisecond) < deadline ->
+        Process.sleep(5)
+        await_patch_messages(reference, count, deadline)
+
+      true ->
+        flunk("expected #{count} unread Live patches")
+    end
+  end
 
   defp live_session(driver) do
     start_session(driver,

@@ -13,6 +13,8 @@ defmodule Fluffy.TestWeb.NavigationLive do
         "mount" -> send(self(), :navigate)
         "return" -> Process.send_after(self(), {:navigate, "/live/chamber-map?step=returned"}, 30)
         "return-late" -> Process.send_after(self(), {:navigate, "/live/chamber-map?step=returned&late=true"}, 30)
+        "patch" -> Process.send_after(self(), :patch, 30)
+        "patch-twice" -> Process.send_after(self(), :patch_twice, 30)
         _sync -> :ok
       end
     end
@@ -92,6 +94,11 @@ defmodule Fluffy.TestWeb.NavigationLive do
 
   def handle_info(:patch, socket) do
     {:noreply, push_patch(socket, to: "/live/chamber-map?step=late-patched")}
+  end
+
+  def handle_info(:patch_twice, socket) do
+    send(self(), :patch)
+    {:noreply, push_patch(socket, to: "/live/chamber-map?step=wandered")}
   end
 
   @impl true
