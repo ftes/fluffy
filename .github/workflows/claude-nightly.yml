@@ -81,93 +81,83 @@ jobs:
     permissions:
       pull-requests: read
     outputs:
-      branches: ${{ steps.list.outputs.branches }}
+      numbers: ${{ steps.list.outputs.numbers }}
     steps:
-      - name: List conflicted nightly PRs
+      - name: List conflicted nightly PRs without human comments or reviews
         id: list
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         # GitHub computes mergeability on the first read after main moves, answering UNKNOWN until
-        # it's done.
+        # it's done. A human comment or review keeps a PR from being replaced under them.
         run: |
           list() {
-            gh pr list --state open --limit 1000 --json headRefName,isCrossRepository,mergeable \
-              --jq '[.[] | select((.isCrossRepository | not) and (.headRefName | startswith("claude/nightly-")) and .mergeable == "CONFLICTING") | .headRefName]'
+            gh pr list --state open --limit 1000 --json number,headRefName,isCrossRepository,mergeable,comments,reviews \
+              --jq '[.[] | select((.isCrossRepository | not) and (.headRefName | startswith("claude/nightly-")) and .mergeable == "CONFLICTING" and ([.comments[], .reviews[]] | all(.author.login == "claude"))) | .number]'
           }
           list > /dev/null
           sleep 30
-          echo "branches=$(list)" >> "$GITHUB_OUTPUT"
+          echo "numbers=$(list)" >> "$GITHUB_OUTPUT"
 
-  resolve:
+  # Replaces each conflicted PR with one on a new branch from main. The Claude app can't push
+  # workflow file changes, which a merge or rebase of the old branch would carry from main.
+  recreate:
     needs: conflicts
-    if: ${{ !cancelled() && needs.conflicts.result == 'success' && needs.conflicts.outputs.branches != '[]' }}
+    if: ${{ !cancelled() && needs.conflicts.result == 'success' && needs.conflicts.outputs.numbers != '[]' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 45
     permissions:
       contents: read
-      id-token: write # Exchanged for the Claude app token, unless NIGHTLY_WORKFLOWS_TOKEN is set.
+      id-token: write # Exchanged for the Claude app token.
     strategy:
       fail-fast: false
       matrix:
-        branch: ${{ fromJSON(needs.conflicts.outputs.branches) }}
+        pr: ${{ fromJSON(needs.conflicts.outputs.numbers) }}
+    env:
+      NIGHTLY_BRANCH: claude/nightly-${{ github.run_id }}-${{ matrix.pr }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ matrix.branch }}
           fetch-depth: 0
       - name: Set up toolchain and deps
         uses: ./.github/actions/setup
         with:
           lane: newest
-      # A merge, not a rebase: the push stays a fast-forward. The Claude app can't push changes to
-      # workflow files, which a merge from main can carry; those PRs need the token.
-      - name: Merge main, leaving the conflicts for Claude
-        id: merge
-        env:
-          BRANCH: ${{ matrix.branch }}
-          WORKFLOWS_TOKEN: ${{ secrets.NIGHTLY_WORKFLOWS_TOKEN }}
-        run: |
-          git -c user.name=claude -c user.email=noreply@anthropic.com merge --no-commit origin/main || true
-          git rev-parse --verify MERGE_HEAD
-          if [ -z "$WORKFLOWS_TOKEN" ] && ! git diff --quiet HEAD -- .github/workflows; then
-            echo "::warning::Skipping $BRANCH: merging main changes workflow files, which needs NIGHTLY_WORKFLOWS_TOKEN."
-            echo "blocked=true" >> "$GITHUB_OUTPUT"
-          fi
+      - run: git switch -c "$NIGHTLY_BRANCH"
       - name: Run Claude
-        if: steps.merge.outputs.blocked != 'true'
         uses: anthropics/claude-code-action@d535f5172dec02b204866b393d6b20b9b2aaf98d # v1.0.266
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          github_token: ${{ secrets.NIGHTLY_WORKFLOWS_TOKEN }}
           prompt: |
             REPO: ${{ github.repository }}
-            BRANCH: ${{ matrix.branch }}
+            OLD PR: ${{ matrix.pr }}
+            BRANCH: ${{ env.NIGHTLY_BRANCH }} (already checked out, from current main)
 
-            This branch is an open simplification PR with origin/main merged in but not committed.
-            The conflicts are in the working tree. Resolve them.
+            The old PR is a simplification that now conflicts with main. Redo it on this branch.
 
-            Read `gh pr view ${{ matrix.branch }}` for what the PR set out to do, and `git log` and
-            `git show` for why main changed. In each conflicted file keep both main's change and
-            the PR's intent. Run `mix deps.get` if mix.lock changed, then `mix format` and
-            `mix compile --warnings-as-errors`. CI on the PR runs the test suite.
+            Read `gh pr view ${{ matrix.pr }}` and `gh pr diff ${{ matrix.pr }}` for what it set out
+            to do, then make the same change against the code as it is now, keeping what main has
+            changed since. Run `mix format` and `mix compile --warnings-as-errors`. CI on the new PR
+            runs the test suite.
 
-            If the PR's change can't be kept without redesigning it, stop without committing and
-            say why.
+            If the change can't be redone without redesigning it, stop without pushing and say why.
 
-            To publish, `git add` the resolved files, then run exactly:
-              git commit --no-edit
-              git push origin ${{ matrix.branch }}
+            To publish, commit with the old PR's title as the subject, write tmp/nightly-pr.md (the
+            old description, updated if the change differs; tmp/ is gitignored), then run exactly,
+            in this order:
+              git push -u origin ${{ env.NIGHTLY_BRANCH }}
+              gh pr create --base main --head ${{ env.NIGHTLY_BRANCH }} --title "<subject>" --body-file tmp/nightly-pr.md
+              gh pr close ${{ matrix.pr }} --delete-branch --comment "Conflicted with main; replaced by <new PR URL>."
           claude_args: |
             --model claude-opus-5-5
             --max-turns 60
-            --allowedTools "Read,Grep,Glob,Edit,Write,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git add:*),Bash(git commit --no-edit),Bash(mix deps.get),Bash(mix format:*),Bash(mix compile:*),Bash(gh pr view ${{ matrix.branch }}:*),Bash(git push origin ${{ matrix.branch }})"
+            --allowedTools "Read,Grep,Glob,Edit,Write,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git add:*),Bash(git commit:*),Bash(mix format:*),Bash(mix compile:*),Bash(gh pr view ${{ matrix.pr }}:*),Bash(gh pr diff ${{ matrix.pr }}:*),Bash(git push -u origin ${{ env.NIGHTLY_BRANCH }}),Bash(gh pr create --base main --head ${{ env.NIGHTLY_BRANCH }} *),Bash(gh pr close ${{ matrix.pr }} *)"
 
   # Enforces the cap before any toolchain is set up. Runs even if an earlier job failed: the
   # count is still right, it just finds fewer slots.
   capacity:
-    needs: resolve
+    needs: recreate
     if: ${{ !cancelled() }}
     runs-on: ubuntu-26.04
     timeout-minutes: 5
