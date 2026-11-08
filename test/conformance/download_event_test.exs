@@ -171,7 +171,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
 
     pending = wait_for(session, Event.download())
     click(session, by_role(:link, name: "Download"))
-    assert_receive {:stream, server}
+    assert_receive {:stream, server}, Fluffy.Session.timeout(session)
 
     try do
       download = await(pending)
@@ -274,7 +274,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
 
     pending = wait_for(session, Event.download())
     click(session, by_role(:link, name: "Download"))
-    assert_receive {:stream, server}
+    assert_receive {:stream, server}, Fluffy.Session.timeout(session)
     download = await(pending)
     assert download.suggested_filename == "broken.txt"
     send(server, :abort)
