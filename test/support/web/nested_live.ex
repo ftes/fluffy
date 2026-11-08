@@ -12,7 +12,14 @@ defmodule Fluffy.TestWeb.NestedParentLive do
       _none -> :ok
     end
 
-    {:ok, assign(socket, late?: params["late"] == "true", parent_email: "", saved_parent_email: nil, parent_count: 0)}
+    {:ok,
+     assign(socket,
+       late?: params["late"] == "true",
+       parent_email: "",
+       saved_parent_email: nil,
+       parent_count: 0,
+       shifted?: false
+     )}
   end
 
   @impl true
@@ -34,6 +41,7 @@ defmodule Fluffy.TestWeb.NestedParentLive do
 
   @impl true
   def handle_info({:return, to}, socket), do: {:noreply, push_navigate(socket, to: to)}
+  def handle_info(:shift_child, socket), do: {:noreply, assign(socket, :shifted?, true)}
 
   @impl true
   def handle_params(_params, _uri, socket), do: {:noreply, socket}
@@ -49,6 +57,7 @@ defmodule Fluffy.TestWeb.NestedParentLive do
 
       <p>Parent saved: {@saved_parent_email || "none"}</p>
       <p>Parent count: {@parent_count}</p>
+      <p :if={@shifted?}>Child shifted</p>
       {live_render(@socket, Fluffy.TestWeb.NestedChildLive,
         id: "nested-child",
         session: %{"late" => @late?}
@@ -78,7 +87,8 @@ defmodule Fluffy.TestWeb.NestedChildLive do
        saved_child_email: nil,
        child_count: 0,
        delayed_button?: false,
-       uploaded_name: nil
+       uploaded_name: nil,
+       shift_changes: 0
      )}
   end
 
@@ -107,6 +117,16 @@ defmodule Fluffy.TestWeb.NestedChildLive do
   def handle_event("patch", _params, socket) do
     {:noreply, push_patch(socket, to: "/live/nested?from=child")}
   end
+
+  # Waits until the parent renders content before this view, so the click's
+  # render moves it.
+  def handle_event("shift", _params, socket) do
+    send(socket.parent_pid, :shift_child)
+    :sys.get_state(socket.parent_pid)
+    {:noreply, socket}
+  end
+
+  def handle_event("shift-changed", _params, socket), do: {:noreply, update(socket, :shift_changes, &(&1 + 1))}
 
   def handle_event("validate-upload", _params, socket), do: {:noreply, socket}
 
@@ -143,6 +163,11 @@ defmodule Fluffy.TestWeb.NestedChildLive do
       <button :if={@delayed_button?} type="button" phx-click="increment">Delayed child action</button>
       <button type="button" phx-click="navigate">Navigate from child</button>
       <button type="button" phx-click="patch">Patch from child</button>
+
+      <form id="child-shift-form" phx-change="shift-changed">
+        <label><input id="child-shift" type="checkbox" name="shift" phx-click="shift" /> Shift child</label>
+      </form>
+      <p>Child shift changes: {@shift_changes}</p>
 
       <form
         :if={!@upload_late?}

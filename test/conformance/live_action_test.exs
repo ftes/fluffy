@@ -65,6 +65,18 @@ defmodule Fluffy.Conformance.LiveActionTest do
     end
 
     @tag driver: driver
+    test "routes a check's change to the nested LiveView its click moved with #{driver}", %{driver: driver} do
+      child = by_css("#nested-child")
+
+      driver
+      |> live_session()
+      |> visit("/live/nested")
+      |> check(by_label(child, "Shift child", exact: true))
+      |> expect("Child shifted" |> by_text(exact: true) |> to_be_visible())
+      |> expect(child |> by_text("Child shift changes: 1", exact: true) |> to_be_visible())
+    end
+
+    @tag driver: driver
     test "retries an action and then routes it to the owning nested LiveView with #{driver}", %{
       driver: driver
     } do
