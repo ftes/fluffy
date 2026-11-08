@@ -23,7 +23,7 @@ defmodule Fluffy.Driver.Live.ActionScope do
       action.()
     catch
       kind, reason ->
-        @scope |> Process.get() |> Map.fetch!(:taken) |> Enum.reverse() |> Enum.each(&send(self(), &1))
+        @scope |> Process.get() |> Map.fetch!(:taken) |> put_back()
         :erlang.raise(kind, reason, __STACKTRACE__)
     after
       restore(@scope, previous)
@@ -37,6 +37,34 @@ defmodule Fluffy.Driver.Live.ActionScope do
       retry.()
     after
       restore(@final_attempt, previous)
+    end
+  end
+
+  # Puts the taken messages back ahead of those of the same kind that arrived
+  # since, so later reads see them in the order the view sent them.
+  defp put_back(taken) do
+    taken
+    |> Enum.reverse()
+    |> Enum.group_by(&message_kind/1)
+    |> Enum.each(fn {kind, messages} -> Enum.each(messages ++ take_queued(kind, []), &send(self(), &1)) end)
+  end
+
+  defp message_kind({:fluffy_live_view, watcher, _event}), do: {:watcher, watcher}
+  defp message_kind({reference, {:patch, topic, _options}}), do: {:patch, reference, topic}
+
+  defp take_queued({:watcher, watcher} = kind, queued) do
+    receive do
+      {:fluffy_live_view, ^watcher, _event} = message -> take_queued(kind, [message | queued])
+    after
+      0 -> Enum.reverse(queued)
+    end
+  end
+
+  defp take_queued({:patch, reference, topic} = kind, queued) do
+    receive do
+      {^reference, {:patch, ^topic, _options}} = message -> take_queued(kind, [message | queued])
+    after
+      0 -> Enum.reverse(queued)
     end
   end
 
