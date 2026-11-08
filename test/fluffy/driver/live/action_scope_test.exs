@@ -35,4 +35,23 @@ defmodule Fluffy.Driver.Live.ActionScopeTest do
     assert [%{to: "/first"}, %{to: "/second"}] = for({^reference, {:patch, _topic, options}} <- messages, do: options)
     assert [:first, :second] = for({:fluffy_live_view, :watcher, {:redirect, which}} <- messages, do: which)
   end
+
+  test "a failed action puts a redirect it took from the view's client back" do
+    reference = make_ref()
+    send(self(), {reference, {:redirect, "topic", %{to: "/first"}}})
+
+    assert_raise RuntimeError, "failed", fn ->
+      ActionScope.run(fn ->
+        assert_receive {^reference, {:redirect, "topic", _options}} = redirect
+        ActionScope.record_taken(redirect)
+        send(self(), {reference, {:redirect, "topic", %{to: "/second"}}})
+        raise "failed"
+      end)
+    end
+
+    {:messages, messages} = Process.info(self(), :messages)
+
+    assert [%{to: "/first"}, %{to: "/second"}] =
+             for({^reference, {:redirect, _topic, options}} <- messages, do: options)
+  end
 end

@@ -50,7 +50,7 @@ defmodule Fluffy.Driver.Live.ActionScope do
   end
 
   defp message_kind({:fluffy_live_view, watcher, _event}), do: {:watcher, watcher}
-  defp message_kind({reference, {:patch, topic, _options}}), do: {:patch, reference, topic}
+  defp message_kind({reference, {kind, topic, _options}}) when kind in [:patch, :redirect], do: {kind, reference, topic}
 
   defp take_queued({:watcher, watcher} = kind, queued) do
     receive do
@@ -60,9 +60,9 @@ defmodule Fluffy.Driver.Live.ActionScope do
     end
   end
 
-  defp take_queued({:patch, reference, topic} = kind, queued) do
+  defp take_queued({tag, reference, topic} = kind, queued) do
     receive do
-      {^reference, {:patch, ^topic, _options}} = message -> take_queued(kind, [message | queued])
+      {^reference, {^tag, ^topic, _options}} = message -> take_queued(kind, [message | queued])
     after
       0 -> Enum.reverse(queued)
     end
