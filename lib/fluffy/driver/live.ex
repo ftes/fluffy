@@ -464,13 +464,17 @@ defmodule Fluffy.Driver.Live do
   # A view call exits when the view went away. Return the redirect it left, or
   # `:none` when it left nothing, and raise when it died.
   defp exit_redirect(session) do
-    state = Session.page_state(session)
-
-    case left_view_event(state, min(Session.context(session).timeout, @retry_interval)) do
+    case left_view(session) do
       {:redirect, redirect} -> redirect
       {:died, reason} -> raise Fluffy.LiveViewError, reason: reason
       :none -> :none
     end
+  end
+
+  # Reports how the view left a call that failed on it, waiting briefly for its
+  # watcher.
+  defp left_view(session) do
+    left_view_event(Session.page_state(session), min(Session.context(session).timeout, @retry_interval))
   end
 
   # A redirect an event causes comes back as the event call's result, and each
@@ -516,15 +520,18 @@ defmodule Fluffy.Driver.Live do
 
   # When the view navigated away, a call exits, or LiveViewTest hands the
   # redirect back where the caller expected a reply and the caller raises on
-  # it. Either way, return the redirect the view left. Any other failure stands.
+  # it. Either way, return the redirect the view left. Any other failure,
+  # including a raise on a view that died, stands.
   defp call_view(session, call) do
     {:ok, call.()}
   rescue
     exception ->
       stacktrace = __STACKTRACE__
 
-      case redirect_reply_failure?(session, exception, stacktrace) && exit_redirect(session) do
-        {_kind, _options} = redirect -> {:view_left, redirect}
+      with true <- redirect_reply_failure?(session, exception, stacktrace),
+           {:redirect, redirect} <- left_view(session) do
+        {:view_left, redirect}
+      else
         _unexplained -> reraise(exception, stacktrace)
       end
   catch
