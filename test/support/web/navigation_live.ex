@@ -79,6 +79,15 @@ defmodule Fluffy.TestWeb.NavigationLive do
     {:noreply, redirect(socket, to: "/chamber")}
   end
 
+  def handle_event("patch_then_die", _params, socket) do
+    send(self(), :die)
+    {:noreply, push_patch(socket, to: "/live/chamber-map?step=patched")}
+  end
+
+  def handle_event("redirect_report", _params, socket) do
+    {:noreply, redirect(socket, to: "/redirect/report")}
+  end
+
   def handle_event("redirect_with_flash", _params, socket) do
     socket = put_flash(socket, :info, "The secret passage opened")
     {:noreply, redirect(socket, to: "/live/secret-chamber")}
@@ -105,6 +114,11 @@ defmodule Fluffy.TestWeb.NavigationLive do
 
   def handle_info({:navigate, to}, socket) do
     {:noreply, push_navigate(socket, to: to)}
+  end
+
+  def handle_info(:die, socket) do
+    Process.exit(self(), :kill)
+    {:noreply, socket}
   end
 
   def handle_info(:reveal, socket), do: {:noreply, assign(socket, :late?, false)}
@@ -138,6 +152,7 @@ defmodule Fluffy.TestWeb.NavigationLive do
       <a href="/chamber">Sleeping chamber</a>
       <a href={"/chamber?from=#{@step}"}>Chamber from here</a>
       <button type="button" phx-click="redirect_static">Lull guardian</button>
+      <button type="button" phx-click="redirect_report">Fetch report</button>
       <button type="button" phx-click="redirect_with_flash">Open secret passage</button>
       <button type="button" phx-click="navigate_after_event">Enter chamber after event</button>
       <button type="button" phx-click="patch_after_event">Reveal passage after event</button>

@@ -89,8 +89,19 @@ defmodule Fluffy.TestWeb.KeyboardLive do
     {:noreply, socket |> record("leave", params) |> assign(:leaving?, true)}
   end
 
+  # The exit is queued before the reply, so it precedes the key's next event.
+  def handle_event("leave-unfollowable", params, socket) do
+    send(self(), :leave_unfollowable)
+    {:noreply, record(socket, "leave", params)}
+  end
+
   @impl true
   def handle_info(:leave, socket), do: {:noreply, push_navigate(socket, to: "/live/keyboard?step=left")}
+
+  def handle_info(:leave_unfollowable, socket) do
+    Process.exit(self(), {:shutdown, {:live_redirect, %{kind: :push, to: "/redirect/loop"}}})
+    {:noreply, socket}
+  end
 
   defp record(socket, event, params) do
     entry =
@@ -211,6 +222,11 @@ defmodule Fluffy.TestWeb.KeyboardLive do
       </label>
       <label :if={!@leaving?}>
         Leaving key <input id="leaving-key" phx-keydown="leave" phx-keyup="element-keyup" />
+      </label>
+
+      <label>
+        Unfollowable key
+        <input id="unfollowable-key" phx-keydown="leave-unfollowable" phx-keyup="element-keyup" />
       </label>
 
       <p>Step: {@step}</p>

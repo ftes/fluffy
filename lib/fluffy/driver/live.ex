@@ -44,37 +44,27 @@ defmodule Fluffy.Driver.Live do
     deadline = Retry.deadline(session, Keyword.validate!(expectation.options, [:timeout]))
 
     result =
-      ActionScope.run(fn ->
-        session
-        |> eventually(deadline, fn session ->
-          case evaluate_expectation(session, expectation) do
-            {:ok, passed?, _actual} when passed? != expectation.negated? ->
-              {:ok, session}
+      eventually(session, deadline, fn session ->
+        case evaluate_expectation(session, expectation) do
+          {:ok, passed?, _actual} when passed? != expectation.negated? ->
+            {:ok, session}
 
-            {:ok, _passed?, actual} ->
-              {:retry, "Expected #{Expect.Internal.describe(expectation)}, got #{inspect(actual)}"}
-          end
-        end)
-        |> finish_expectation()
+          {:ok, _passed?, actual} ->
+            {:retry, "Expected #{Expect.Internal.describe(expectation)}, got #{inspect(actual)}"}
+        end
       end)
 
+    # An expectation goes on on the page a navigation landed on, like an
+    # action, so pages that keep navigating fail it at the redirect limit.
     case result do
-      {:retry_on_new_page, session, redirects} ->
+      {:navigate, session, navigation, {:retry, _remaining}} ->
+        {session, redirects} = follow_for_retry(session, navigation)
         retry_on_new_page(session, redirects, :expect, [expectation], deadline)
 
       session ->
         session
     end
   end
-
-  # An expectation goes on on the page a navigation landed on, like an
-  # action, so pages that keep navigating fail it at the redirect limit.
-  defp finish_expectation({:navigate, session, navigation, {:retry, _remaining}}) do
-    {session, redirects} = follow_for_retry(session, navigation)
-    {:retry_on_new_page, session, redirects}
-  end
-
-  defp finish_expectation(session), do: session
 
   @impl true
   def click(%Session{} = session, %Locator{} = locator, action_options \\ []) do
@@ -578,9 +568,9 @@ defmodule Fluffy.Driver.Live do
   # A navigation found once no budget remains fails the action instead, as
   # Playwright never acts past its deadline, and leaves the navigation unread
   # for the session's next call. One whose following used up the budget fails
-  # it too, on the new page. Once an event reached the view, the action took effect, so a navigation a later
-  # step finds ends the action on the new page instead, like a browser whose
-  # page navigated mid-action. A redirect the view left since Fluffy last read
+  # it too, on the new page. Once an event reached the view, the action took
+  # effect, so a navigation a later step finds ends the action on the new page
+  # instead, like a browser whose page navigated mid-action. A redirect the view left since Fluffy last read
   # it is followed first, so an action that never calls the view, such as a
   # plain link, acts on the new page too. A patch changes the document in
   # place, as in a browser, so the action applies the patches the view pushed
@@ -630,20 +620,10 @@ defmodule Fluffy.Driver.Live do
   # Follows a navigation an action or expectation found before reaching the
   # view, for a retry on the new page. The navigation counts toward the retry's
   # timeout, and its redirect toward the redirect limit of the retries and of
-  # the redirects it leads to. Following it can fail before the session left
-  # its page, such as at that limit: the session then stays there, so the failed
-  # call puts back the view messages it took there. Once it left, they are moot.
+  # the redirects it leads to.
   defp follow_for_retry(session, %Redirect{} = navigation) do
-    state = Session.page_state(session)
     redirects = HTTP.count_redirect!(ActionScope.redirects(), URI.parse(Session.current_page(session).url))
-
-    try do
-      {Fluffy.Backend.navigate(session, %{navigation | redirects: redirects}), redirects}
-    catch
-      kind, reason ->
-        if Session.page_state(session) != state, do: ActionScope.record_left_page()
-        :erlang.raise(kind, reason, __STACKTRACE__)
-    end
+    {Fluffy.Backend.navigate(session, %{navigation | redirects: redirects}), redirects}
   end
 
   # Runs outside the action's scope, as an action of its own on the page its
@@ -673,39 +653,46 @@ defmodule Fluffy.Driver.Live do
   defp unread_navigation(session) do
     case left_view_event(Session.page_state(session), 0) do
       {:redirect, redirect} -> redirected(session, redirect)
-      {:died, reason} -> raise Fluffy.LiveViewError, reason: reason
       :none -> apply_unread_patches(session)
+      {:died, reason} -> raise_after_patches(session, reason)
     end
   end
 
-  # A patch also changes what the view renders, so read the view for the
-  # patched document before committing the patched URL. The last patch
-  # decides the URL.
+  # A patch is committed as it is taken, and the last one decides the URL. It
+  # also changes what the view renders, so the action reads the view for the
+  # patched document before it goes on.
   defp apply_unread_patches(session) do
-    case unread_patches(Session.page_state(session).view, []) do
-      [] ->
+    case last_patch(Session.page_state(session).view) do
+      nil ->
         session
 
-      patches ->
-        case refresh(session) do
-          %Session{} = session -> apply_patches(session, patches)
+      destination ->
+        case session |> commit_patch(destination) |> refresh() do
+          %Session{} = session -> session
           {:navigate, session, navigation} -> {:redirected, session, navigation}
         end
     end
   end
 
-  defp unread_patches(view, patches) do
-    case take_patch(view) do
-      nil -> Enum.reverse(patches)
-      patch -> unread_patches(view, [patch | patches])
+  # An action keeps a patch the view pushed before it died, however soon the
+  # watcher reported the death.
+  defp raise_after_patches(session, reason) do
+    apply_last_patch(session)
+    raise Fluffy.LiveViewError, reason: reason
+  end
+
+  defp apply_last_patch(session) do
+    case last_patch(Session.page_state(session).view) do
+      nil -> session
+      destination -> commit_patch(session, destination)
     end
   end
 
-  defp apply_patches(session, patches) do
-    {_reference, {:patch, _topic, %{to: destination}}} = List.last(patches)
-    session = commit_patch(session, destination)
-    Enum.each(patches, &ActionScope.record_applied/1)
-    session
+  defp last_patch(view, last \\ nil) do
+    case current_patch(view) do
+      nil -> last
+      destination -> last_patch(view, destination)
+    end
   end
 
   defp commit_patch(session, destination) do
@@ -730,16 +717,21 @@ defmodule Fluffy.Driver.Live do
   defp live_view_event(watcher, wait) do
     receive do
       {:fluffy_live_view, ^watcher, event} = message ->
-        ActionScope.record_taken(message)
+        leave_unread(message)
         event
     after
       wait -> :none
     end
   end
 
+  # A view leaves once, and that stays true until the session leaves its page,
+  # so reading how it left leaves the message for the session's next call. A
+  # call that fails before following it then needs no undo.
+  defp leave_unread(message), do: send(self(), message)
+
   # A patch changes the document in place, so the wait commits it and goes on
   # there, while a redirect ends the wait on the new page. A committed patch
-  # stays applied even if the action fails, so the wait does not record it.
+  # stays applied even if the action fails.
   defp wait_for_retry(session, wait) do
     state = Session.page_state(session)
     %{proxy: {reference, topic, _proxy_pid}} = state.view
@@ -750,11 +742,11 @@ defmodule Fluffy.Driver.Live do
         commit_patch(session, destination)
 
       {:fluffy_live_view, ^watcher, {:died, reason}} = message ->
-        ActionScope.record_taken(message)
+        leave_unread(message)
         raise Fluffy.LiveViewError, reason: reason
 
       {:fluffy_live_view, ^watcher, {:redirect, redirect}} = message ->
-        ActionScope.record_taken(message)
+        leave_unread(message)
         follow_redirect_result(session, {:error, redirect})
     after
       wait -> session
@@ -857,9 +849,7 @@ defmodule Fluffy.Driver.Live do
     %{proxy: {reference, topic, _}} = view
 
     receive do
-      {^reference, {:patch, ^topic, %{to: _destination}}} = message ->
-        ActionScope.record_taken(message)
-        message
+      {^reference, {:patch, ^topic, %{to: _destination}}} = message -> message
     after
       0 -> nil
     end
@@ -870,7 +860,7 @@ defmodule Fluffy.Driver.Live do
 
     receive do
       {^reference, {:redirect, ^topic, %{to: _destination} = options}} = message ->
-        ActionScope.record_taken(message)
+        leave_unread(message)
         {:error, {:redirect, options}}
     after
       0 -> nil
