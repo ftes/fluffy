@@ -26,7 +26,6 @@ defmodule Fluffy do
   alias Fluffy.Driver.Registry, as: DriverRegistry
   alias Fluffy.Event
   alias Fluffy.Event.Pending
-  alias Fluffy.Expect
   alias Fluffy.SelectedFile
   alias Fluffy.Session
 
@@ -503,7 +502,7 @@ defmodule Fluffy do
         session | arguments
       ])
 
-    resolve_driver_result(result, operation, arguments)
+    resolve_driver_result(result)
   rescue
     error ->
       stacktrace = __STACKTRACE__
@@ -514,22 +513,9 @@ defmodule Fluffy do
       reraise(error, stacktrace)
   end
 
-  defp resolve_driver_result(%Session{} = session, _operation, _arguments), do: session
+  defp resolve_driver_result(%Session{} = session), do: session
 
-  defp resolve_driver_result({:navigate, %Session{} = session, navigation}, _operation, _arguments) do
+  defp resolve_driver_result({:navigate, %Session{} = session, navigation}) do
     Backend.navigate(session, navigation)
-  end
-
-  defp resolve_driver_result({:navigate, %Session{} = session, navigation, {:retry, remaining}}, operation, arguments) do
-    session
-    |> Backend.navigate(navigation)
-    |> dispatch_driver(operation, put_retry_timeout(arguments, remaining))
-  end
-
-  defp put_retry_timeout(arguments, remaining) do
-    List.update_at(arguments, -1, fn
-      %Expect{} = expectation -> Expect.Internal.merge_options(expectation, timeout: remaining)
-      options -> Keyword.put(options, :timeout, remaining)
-    end)
   end
 end

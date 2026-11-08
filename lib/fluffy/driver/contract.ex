@@ -9,7 +9,6 @@ defmodule Fluffy.Driver.Contract do
   @type result ::
           Session.t()
           | {:navigate, Session.t(), Navigation.t()}
-          | {:navigate, Session.t(), Navigation.t(), {:retry, non_neg_integer()}}
 
   @callback validate_operation!(Session.t(), atom(), list()) :: :ok
 
