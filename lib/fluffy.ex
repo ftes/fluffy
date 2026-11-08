@@ -32,6 +32,7 @@ defmodule Fluffy do
   @native_values [
     Fluffy.Request,
     Fluffy.Response,
+    Fluffy.Route,
     Fluffy.Dialog,
     Fluffy.Download,
     Fluffy.FileChooser,
@@ -45,6 +46,7 @@ defmodule Fluffy do
   @typedoc "A browser value that `unwrap/2` resolves to its PlaywrightEx counterpart."
   @type native_value ::
           Fluffy.Request.t()
+          | Fluffy.Route.t()
           | Fluffy.Response.t()
           | Fluffy.Dialog.t()
           | Fluffy.Download.t()
@@ -208,7 +210,7 @@ defmodule Fluffy do
   return values are ignored. `Fluffy.Playwright.unwrap/3` passes a native
   locator instead.
 
-  With a `Fluffy.Request`, `Fluffy.Response`, `Fluffy.Dialog`,
+  With a `Fluffy.Request`, `Fluffy.Response`, `Fluffy.Route`, `Fluffy.Dialog`,
   `Fluffy.Download`, `Fluffy.FileChooser`, `Fluffy.Frame`,
   `Fluffy.ConsoleMessage`, `Fluffy.PageError`, `Fluffy.Worker` or
   `Fluffy.WebSocket`, `fun` receives its PlaywrightEx counterpart and
@@ -254,6 +256,7 @@ defmodule Fluffy do
 
   # A popup's initial request may have no page to check.
   defp owner_page(%Fluffy.Response{request: request}), do: request.page
+  defp owner_page(%Fluffy.Route{request: request}), do: request.page
   defp owner_page(%{page: page}), do: page
 
   @doc group: "Events"

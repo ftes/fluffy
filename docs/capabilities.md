@@ -40,6 +40,7 @@ boundaries described below.
 | Runtime permissions, geolocation, offline mode, and HTTP credentials | - | equivalent |
 | Hover, drag-and-drop, sequential typing, keyboard, and mouse input | - | equivalent |
 | Dialogs, console, page errors, frames, workers, WebSockets, and browser network events | - | equivalent |
+| Browser request routing | - | equivalent |
 | Active-page JavaScript evaluation | - | equivalent |
 | Fake page clock and timers | - | equivalent |
 | JavaScript-owned DOM and default actions | - | equivalent |
@@ -207,13 +208,13 @@ fails when PlaywrightEx adds or removes one.
   `press_sequentially`, `focus`, `blur`, `dblclick`, `tap`, `dispatch_event`,
   `select_text`, `scroll_into_view_if_needed`, `set_viewport_size`, `emulate_media`,
   the expectations in `Fluffy.Expect`, navigation, page management, cookies,
-  storage state, permissions, geolocation, offline mode, HTTP credentials, tracing,
-  page and element screenshots, page evaluation, the clock in
+  storage state, permissions, geolocation, offline mode, HTTP credentials, request
+  routing, tracing, page and element screenshots, page evaluation, the clock in
   `Fluffy.Playwright.Clock`, keyboard and mouse input in `Fluffy.Playwright.Keyboard`
   and `Fluffy.Playwright.Mouse`, the events in `Fluffy.Event`, and the values they
   deliver, including response bodies. Their options pass through as documented.
 - **Unwrap:** everything else page-, locator-, or value-local, such as reads like
-  `text_content`, assertions like `to_have_css`, routing, and response timing.
+  `text_content`, assertions like `to_have_css`, HAR routing, and response timing.
   Navigation these cause is adopted.
 - **Unsafe natively:** closing the page or context (use `Fluffy.Playwright.close_page/2`
   and `Fluffy.close_session/1`), `remove_all_listeners`, `set_default_timeout` and

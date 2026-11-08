@@ -64,6 +64,7 @@ defmodule Fluffy.PlaywrightMembers do
   def counterparts(PlaywrightEx.Request), do: [Fluffy.Request]
   def counterparts(PlaywrightEx.Response), do: [Fluffy.Response]
   def counterparts(PlaywrightEx.ConsoleMessage), do: [Fluffy.ConsoleMessage]
+  def counterparts(PlaywrightEx.Route), do: [Fluffy.Route]
   def counterparts(:event), do: [Fluffy.Event]
   def counterparts(_module), do: []
 
@@ -124,7 +125,8 @@ defmodule Fluffy.PlaywrightMembers do
           {[:expect_request_finished], {:renamed, {Fluffy.Event, :request_finished, 1}}},
           {[:expect_websocket], {:renamed, {Fluffy.Event, :web_socket, 1}}},
           {[:expect_worker], {:renamed, {Fluffy.Event, :worker, 1}}},
-          {~w(viewport_size route unroute unroute_all route_from_har route_web_socket touchscreen aria_snapshot
+          {~w(route unroute)a, :wrapped},
+          {~w(viewport_size unroute_all route_from_har route_web_socket touchscreen aria_snapshot
               aria_snapshot_json add_locator_handler remove_locator_handler)a, @page_gap},
           {~w(wait_for_load_state wait_for_url wait_for_function content add_init_script add_script_tag
               add_style_tag expose_binding expose_function set_extra_http_headers console_messages
@@ -169,7 +171,8 @@ defmodule Fluffy.PlaywrightMembers do
         {[:expect_page], {:renamed, {Fluffy.Event, :page, 1}}},
         {[:expect_console_message], @native_event},
         {~w(grant_permissions clear_permissions set_geolocation set_offline set_http_credentials)a, :wrapped},
-        {~w(route unroute unroute_all route_from_har route_web_socket)a,
+        {~w(route unroute)a, :wrapped},
+        {~w(unroute_all route_from_har route_web_socket)a,
          {:unwrap, "gap: on PlaywrightEx.Page.context/1 inside Fluffy.unwrap/2"}},
         {~w(set_extra_http_headers set_storage_state add_init_script expose_binding expose_function clock browser
             background_pages service_workers new_cdp_session credentials debugger request is_closed
@@ -218,7 +221,8 @@ defmodule Fluffy.PlaywrightMembers do
         {~w(finished frame headers_array http_version from_service_worker)a, @native_value}
       ],
       PlaywrightEx.Route => [
-        {~w(abort continue fallback fetch fulfill request)a, {:unwrap, "gap: in a PlaywrightEx.Page.route/3 handler"}}
+        {~w(abort continue fallback fulfill request)a, :wrapped},
+        {[:fetch], {:unwrap, "gap: on the PlaywrightEx.Route of Fluffy.unwrap/2"}}
       ],
       PlaywrightEx.ConsoleMessage => [
         {~w(location page text timestamp type)a, :wrapped},

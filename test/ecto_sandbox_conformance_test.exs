@@ -22,6 +22,23 @@ defmodule Fluffy.EctoSandboxConformanceTest do
     [value: value]
   end
 
+  test "a Playwright route handler runs inside the test's sandbox", %{value: value} do
+    session = start_session(:playwright, base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+
+    Fluffy.Playwright.route(session, "**/fluffy-sandbox-route", fn route ->
+      %{rows: [[read]]} = TestRepo.query!("SELECT value FROM fluffy_records")
+      Fluffy.Route.fulfill(route, json: %{value: read})
+    end)
+
+    session = visit(session, "/database")
+
+    assert Fluffy.Playwright.evaluate(
+             session,
+             "url => fetch(url).then(response => response.json())",
+             Fluffy.TestServer.base_url() <> "/fluffy-sandbox-route"
+           ) == %{"value" => value}
+  end
+
   for backend <- [:phoenix, :playwright] do
     @tag backend: backend
     test "shares one isolated transaction across Static and Live with #{backend}", %{
