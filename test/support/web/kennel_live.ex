@@ -12,6 +12,7 @@ defmodule Fluffy.TestWeb.KennelLive do
        tune: nil,
        treats: 0,
        treat_name: nil,
+       treat_keys: [],
        bones: 0
      )}
   end
@@ -42,6 +43,10 @@ defmodule Fluffy.TestWeb.KennelLive do
     {:noreply, assign(socket, :treat_name, treat)}
   end
 
+  def handle_event("treat-" <> phase, %{"key" => key} = params, socket) when phase in ["keydown", "keyup"] do
+    {:noreply, update(socket, :treat_keys, &(&1 ++ ["#{phase}:#{key}=#{params["value"] || "none"}"]))}
+  end
+
   def handle_event("bury-bone", _params, socket) do
     {:noreply, update(socket, :bones, &(&1 + 1))}
   end
@@ -64,6 +69,8 @@ defmodule Fluffy.TestWeb.KennelLive do
             <button>Name treat</button>
           </form>
           <p>Treat name: {@treat_name}</p>
+          <label>Treat key <input value="x" phx-keydown="treat-keydown" phx-keyup="treat-keyup" /></label>
+          <p>Treat keys: {Enum.join(@treat_keys, ", ")}</p>
           <.portal id="bone-portal" target="body">
             <div id="bone-status" role="status" aria-label="Bones">
               <p>Bones: {@bones}</p>

@@ -64,6 +64,21 @@ defmodule Fluffy.Conformance.LiveKeyboardActionTest do
     end
   end
 
+  test "a keyup carries the element's value as its keydown does" do
+    session()
+    |> press(by_label("Valued key", exact: true), "Enter")
+    |> expect("element-keydown:key=Enter;value=x;scope=none" |> by_text(exact: true) |> to_be_visible())
+    |> expect("element-keyup:key=Enter;value=x;scope=none" |> by_text(exact: true) |> to_be_visible())
+  end
+
+  test "a keyup-only binding on a disabled element uses LiveViewTest's error" do
+    session = session()
+
+    assert_raise ArgumentError, ~r/because it is disabled/, fn ->
+      press(session, by_label("Disabled keyup key", exact: true), "Enter")
+    end
+  end
+
   test "window bindings are addressed on their own element" do
     session()
     |> press(by_css("#window-keydown"), "Escape")
@@ -79,6 +94,12 @@ defmodule Fluffy.Conformance.LiveKeyboardActionTest do
       |> by_text(exact: true)
       |> to_be_visible()
     )
+  end
+
+  test "a press sends its keyup to a component that survives the keydown" do
+    session()
+    |> press(by_label("Component press key", exact: true), "a")
+    |> expect("Component event: component-press-up:key=a" |> by_text(exact: true) |> to_be_visible())
   end
 
   test "a key handler patch is reconciled" do

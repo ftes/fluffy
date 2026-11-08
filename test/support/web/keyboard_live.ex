@@ -220,6 +220,15 @@ defmodule Fluffy.TestWeb.KeyboardLive do
       <label>
         Crash key <input id="crash-key" phx-keydown="crash" phx-key="Enter" />
       </label>
+      <label>
+        Valued key
+        <input id="valued-key" value="x" phx-keydown="element-keydown" phx-keyup="element-keyup" />
+      </label>
+
+      <label>
+        Disabled keyup key <input id="disabled-keyup-key" disabled phx-keyup="element-keyup" />
+      </label>
+
       <label :if={!@leaving?}>
         Leaving key <input id="leaving-key" phx-keydown="leave" phx-keyup="element-keyup" />
       </label>
@@ -258,6 +267,10 @@ defmodule Fluffy.TestWeb.KeyboardComponent do
     {:noreply, assign(socket, :event, event)}
   end
 
+  def handle_event("component-press-" <> phase, params, socket) do
+    {:noreply, assign(socket, :event, "component-press-#{phase}:key=#{params["key"]}")}
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -268,6 +281,15 @@ defmodule Fluffy.TestWeb.KeyboardComponent do
           id="component-key"
           phx-keydown={Phoenix.LiveView.JS.push("component-keydown", value: %{scope: "component"})}
           phx-key="Enter"
+          phx-target={@myself}
+        />
+      </label>
+      <label>
+        Component press key
+        <input
+          id="component-press-key"
+          phx-keydown="component-press-down"
+          phx-keyup="component-press-up"
           phx-target={@myself}
         />
       </label>

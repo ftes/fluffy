@@ -18,7 +18,8 @@ defmodule Fluffy.TestWeb.NestedParentLive do
        parent_email: "",
        saved_parent_email: nil,
        parent_count: 0,
-       shifted?: false
+       shifted?: false,
+       child_removed?: false
      )}
   end
 
@@ -42,6 +43,7 @@ defmodule Fluffy.TestWeb.NestedParentLive do
   @impl true
   def handle_info({:return, to}, socket), do: {:noreply, push_navigate(socket, to: to)}
   def handle_info(:shift_child, socket), do: {:noreply, assign(socket, :shifted?, true)}
+  def handle_info(:remove_child, socket), do: {:noreply, assign(socket, :child_removed?, true)}
 
   @impl true
   def handle_params(_params, _uri, socket), do: {:noreply, socket}
@@ -58,10 +60,13 @@ defmodule Fluffy.TestWeb.NestedParentLive do
       <p>Parent saved: {@saved_parent_email || "none"}</p>
       <p>Parent count: {@parent_count}</p>
       <p :if={@shifted?}>Child shifted</p>
-      {live_render(@socket, Fluffy.TestWeb.NestedChildLive,
-        id: "nested-child",
-        session: %{"late" => @late?}
-      )}
+      <p :if={@child_removed?}>Child removed</p>
+      {if !@child_removed? do
+        live_render(@socket, Fluffy.TestWeb.NestedChildLive,
+          id: "nested-child",
+          session: %{"late" => @late?}
+        )
+      end}
     </main>
     """
   end
@@ -126,6 +131,14 @@ defmodule Fluffy.TestWeb.NestedChildLive do
     {:noreply, socket}
   end
 
+  # Replies only once the parent's render removing this view is on its way, so
+  # LiveViewTest has dropped the view by the time this reply arrives.
+  def handle_event("remove-self", _params, socket) do
+    send(socket.parent_pid, :remove_child)
+    :sys.get_state(socket.parent_pid)
+    {:noreply, socket}
+  end
+
   def handle_event("shift-changed", _params, socket), do: {:noreply, update(socket, :shift_changes, &(&1 + 1))}
 
   def handle_event("validate-upload", _params, socket), do: {:noreply, socket}
@@ -166,6 +179,8 @@ defmodule Fluffy.TestWeb.NestedChildLive do
 
       <form id="child-shift-form" phx-change="shift-changed">
         <label><input id="child-shift" type="checkbox" name="shift" phx-click="shift" /> Shift child</label>
+        <label>Remove child key
+        <input name="remove-self" phx-keydown="remove-self" phx-keyup="remove-self" /></label>
       </form>
       <p>Child shift changes: {@shift_changes}</p>
 
