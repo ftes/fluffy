@@ -83,7 +83,8 @@ defmodule Fluffy.Backend.Playwright.Document do
   @doc "A page listener that flags the state when its main frame navigates."
   def navigation_listener(state) do
     guid = state.frame.guid
-    fn frame -> if frame.guid == guid, do: :atomics.put(state.navigated, 1, 1) end
+    navigated = state.navigated
+    fn frame -> if frame.guid == guid, do: :atomics.put(navigated, 1, 1) end
   end
 
   @doc "Whether the main frame may have navigated since Fluffy last read the document it adopted."
