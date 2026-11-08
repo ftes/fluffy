@@ -55,6 +55,7 @@ Fluffy now runs on PlaywrightEx 0.17, a port of the official Playwright client w
 - Playwright `submit` waits for the server to answer the navigation it starts, following its redirects, so it no longer returns before WebKit has sent the form. A submission the browser handles within the document (a GET to a fragment of the current URL, a Navigation API `intercept()`) ends the wait, as does a `beforeunload` prompt.
 - On Phoenix, a link, form submission or redirect answered with `204 No Content` or `205 Reset Content` keeps the current page, URL and form state instead of showing an empty document; a LiveView page stays, disconnected, as in a browser. `visit` to such a response raises, like Playwright's.
 - On Chromium, a link or form submission answered with `204 No Content` no longer leaves later actions waiting on the aborted navigation.
+- On Playwright, a LiveView navigation whose new view patches as it mounts (`phx-mounted={JS.patch(...)}`) is followed as a navigation instead of a patch, so Fluffy awaits the new view and the PhoenixTest facade drops the old page's active form.
 - A Playwright action whose navigation lands on pages that navigate again on load (a client-side redirect chain) follows them instead of raising "Execution context was destroyed".
 - LiveView follows a redirect that lands while Fluffy reads the view after mount, an event or a retry, instead of crashing in `LazyHTML.from_fragment/1` or on a `GenServer.call` exit.
 

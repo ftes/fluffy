@@ -48,6 +48,7 @@ defmodule Fluffy.TestWeb.Router do
       live("/async", AsyncLive)
       live("/chamber-map", NavigationLive)
       live("/secret-chamber", DestinationLive)
+      live("/mounted-patch", MountedPatchLive)
       live("/session", SessionLive)
       live("/database", DatabaseLive)
       live("/potions", FormLive)

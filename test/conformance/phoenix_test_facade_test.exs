@@ -513,7 +513,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
 
     @tag driver: driver
     test "navigation clears the active form with #{driver}" do
-      for link <- ["Secret chamber", "Sleeping chamber"] do
+      for link <- ["Secret chamber", "Patching chamber", "Sleeping chamber"] do
         session =
           unquote(driver)
           |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)

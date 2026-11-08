@@ -48,16 +48,18 @@ defmodule Fluffy.Backend.Playwright.Document do
   """
 
   # A document the init script did not reach (a page's initial about:blank) is
-  # stamped by its first probe.
+  # stamped by its first probe. A redirect since the cursor replaced the view
+  # even when a patch followed it (the new view patching on mount).
   @probe """
   cursor => {
     const state = #{@state}
     const recent = cursor == null ? [] : state.navigations.slice(cursor)
+    const redirected = recent.some(navigation => navigation.kind === 'redirect')
     return {
       url: location.href,
       document: state.document,
       cursor: state.navigations.length,
-      kind: recent.at(-1)?.kind ?? 'document'
+      kind: redirected ? 'redirect' : recent.at(-1)?.kind ?? 'document'
     }
   }
   """

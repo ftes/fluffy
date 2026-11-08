@@ -75,6 +75,7 @@ defmodule Fluffy.TestWeb.NavigationLive do
       <p>Saves: {@saves}</p>
       <.link patch="/live/chamber-map?step=patched">Reveal passage</.link>
       <.link navigate="/live/secret-chamber">Secret chamber</.link>
+      <.link navigate="/live/mounted-patch">Patching chamber</.link>
       <a :if={@topic} href={"/live/redirect-ready?topic=#{@topic}"} target="_blank">Open ready popup</a>
       <a href="/chamber">Sleeping chamber</a>
       <button type="button" phx-click="redirect_static">Lull guardian</button>
@@ -98,6 +99,27 @@ defmodule Fluffy.TestWeb.DestinationLive do
     <main>
       <p>The secret chamber is open</p>
       <p :if={message = Phoenix.Flash.get(@flash, :info)}>{message}</p>
+    </main>
+    """
+  end
+end
+
+defmodule Fluffy.TestWeb.MountedPatchLive do
+  @moduledoc false
+
+  use Phoenix.LiveView
+
+  alias Phoenix.LiveView.JS
+
+  @impl true
+  def handle_params(params, _uri, socket), do: {:noreply, assign(socket, :step, params["step"] || "initial")}
+
+  # The client patches as the view mounts, right after the redirect that joined it.
+  @impl true
+  def render(assigns) do
+    ~H"""
+    <main>
+      <p phx-mounted={JS.patch("/live/mounted-patch?step=mounted")}>Patching chamber: {@step}</p>
     </main>
     """
   end
