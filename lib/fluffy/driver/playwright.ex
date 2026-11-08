@@ -336,18 +336,21 @@ defmodule Fluffy.Driver.Playwright do
       else: option_indexes(native, values, timeout, deadline)
   end
 
-  # Like Playwright's own string matching, waits for the options to appear.
+  # Like Playwright's own string matching, waits in the browser for the options
+  # to appear, re-resolving the select as it does.
   defp option_indexes(native, values, timeout, deadline, waited_for \\ nil) do
     case BrowserLocator.evaluate(native, @option_indexes, values, timeout: Deadline.remaining(deadline, 1)) do
       {:ok, resolved} when is_list(resolved) ->
         {:ok, Enum.map(resolved, &Map.new(&1, fn {key, value} -> {String.to_existing_atom(key), value} end))}
 
       {:ok, missing} ->
-        Process.sleep(min(100, Deadline.remaining(deadline)))
+        expression = "(select, wanted) => Array.isArray((#{@option_indexes})(select, wanted))"
 
-        if Deadline.expired?(deadline),
-          do: missing_option(missing, timeout),
-          else: option_indexes(native, values, timeout, deadline, missing)
+        case BrowserLocator.wait_for_function(native, expression, values, timeout: Deadline.remaining(deadline, 1)) do
+          :ok -> option_indexes(native, values, timeout, deadline, missing)
+          {:error, %TimeoutError{}} -> missing_option(missing, timeout)
+          {:error, error} -> {:error, error}
+        end
 
       {:error, %TimeoutError{}} when is_binary(waited_for) ->
         missing_option(waited_for, timeout)
