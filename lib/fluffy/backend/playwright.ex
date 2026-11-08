@@ -106,8 +106,20 @@ defmodule Fluffy.Backend.Playwright do
   end
 
   @impl true
-  def page_snapshot(_context, page) do
-    %{page | url: BrowserPage.url(page.state.page), document_id: {page.state.document_identity, page.document_id}}
+  def page_snapshot(context, page) do
+    document_id = {document_identity(context, page.state), page.document_id}
+    %{page | url: BrowserPage.url(page.state.page), document_id: document_id}
+  end
+
+  # Actions adopt the document they find. One that page code navigated to
+  # since is read from the page; a closed or unresponsive page keeps the
+  # adopted identity.
+  defp document_identity(context, state) do
+    if Document.navigated?(state),
+      do: Document.probe!(state.frame, nil, context.timeout).document,
+      else: state.document_identity
+  rescue
+    _error -> state.document_identity
   end
 
   @impl true
@@ -140,11 +152,14 @@ defmodule Fluffy.Backend.Playwright do
   def subscribe_page(_context, page, runtime) do
     browser_page = page.state.page
     listener = fn closed -> send(runtime, {:fluffy_playwright, :page_close, closed}) end
+    navigated = Document.navigation_listener(page.state)
     # Listening first misses no close; a page closed before keeps no listener.
     BrowserPage.on(browser_page, :close, listener)
+    BrowserPage.on(browser_page, :frame_navigated, navigated)
 
     if BrowserPage.is_closed(browser_page) do
       BrowserPage.off(browser_page, :close, listener)
+      BrowserPage.off(browser_page, :frame_navigated, navigated)
       {:error, "page #{inspect(page.id)} is closed"}
     else
       :ok
@@ -153,7 +168,11 @@ defmodule Fluffy.Backend.Playwright do
 
   @doc false
   def page_record(browser_page) do
-    %Page.State{driver: :playwright, state: %State{page: browser_page, frame: BrowserPage.main_frame(browser_page)}}
+    # A page's document is unknown until Fluffy reads it.
+    navigated = :atomics.new(1, [])
+    :atomics.put(navigated, 1, 1)
+    state = %State{page: browser_page, frame: BrowserPage.main_frame(browser_page), navigated: navigated}
+    %Page.State{driver: :playwright, state: state}
   end
 
   @impl true
@@ -280,7 +299,7 @@ defmodule Fluffy.Backend.Playwright do
     native = Keyword.merge([wait_until: :load], Keyword.put(options, :timeout, Session.timeout(session, options)))
     response = navigate!(direction, [state.page, native])
     # Bookkeeping uses the session timeout, as after other actions.
-    probe = Document.probe!(state.frame, nil, session_timeout)
+    probe = Document.adopted_probe!(state, nil, session_timeout)
 
     if is_nil(response) and probe.url == previous_url and probe.document == state.document_identity,
       do: session,
@@ -313,7 +332,7 @@ defmodule Fluffy.Backend.Playwright do
   end
 
   defp adopt_navigated_document(session, state, timeout) do
-    adopt_probed_document(session, state, Document.probe!(state.frame, nil, timeout), timeout)
+    adopt_probed_document(session, state, Document.adopted_probe!(state, nil, timeout), timeout)
   end
 
   defp adopt_probed_document(session, state, probe, timeout) do

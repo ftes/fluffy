@@ -78,6 +78,24 @@ defmodule Fluffy.Backend.Playwright.Document do
 
   def init_script, do: @state
 
+  @doc "A page listener that flags the state when its main frame navigates."
+  def navigation_listener(state) do
+    guid = state.frame.guid
+    fn frame -> if frame.guid == guid, do: :atomics.put(state.navigated, 1, 1) end
+  end
+
+  @doc "Whether the main frame may have navigated since Fluffy last read the document it adopted."
+  def navigated?(state), do: :atomics.get(state.navigated, 1) == 1
+
+  @doc """
+  Like `probe!/3`, for a read whose document Fluffy then adopts. Clearing the
+  flag first misses no navigation that commits after the read.
+  """
+  def adopted_probe!(state, cursor, timeout) do
+    :atomics.put(state.navigated, 1, 0)
+    probe!(state.frame, cursor, timeout)
+  end
+
   @doc """
   Reads the frame's document identity, URL and LiveView navigations since `cursor`.
 

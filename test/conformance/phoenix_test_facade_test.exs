@@ -723,6 +723,32 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
     end
   end
 
+  # The page navigates after the click returns, and no Fluffy action has read
+  # its new document when submit checks the form.
+  @tag driver: :playwright
+  test "a page script navigation Fluffy has not adopted clears the active form" do
+    fixture =
+      Fluffy.TestHTTPFixtures.register(%{
+        body: """
+        <html><body><form method="post"><input name="name" aria-label="Name"></form>
+        <button onclick="setTimeout(() => location.assign('?next'), 200)">Later</button></body></html>
+        """
+      })
+
+    session =
+      :playwright
+      |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+      |> visit(Fluffy.TestHTTPFixtures.path(fixture))
+      |> unwrap(&send(self(), {:page, &1}))
+      |> fill_in("Name", with: "Ada")
+      |> click_button("Later")
+
+    assert_received {:page, page}
+    :ok = PlaywrightEx.Page.wait_for_url(page, &String.ends_with?(&1, "?next"), wait_until: :commit, timeout: 2_000)
+
+    assert_raise ArgumentError, ~r/no active form/, fn -> submit(session) end
+  end
+
   test "used connections are recycled with their session cookies before visiting" do
     Phoenix.ConnTest.build_conn()
     |> Phoenix.ConnTest.dispatch(Endpoint, :get, "/session/start?identity=Hermione")

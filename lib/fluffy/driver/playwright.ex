@@ -546,7 +546,7 @@ defmodule Fluffy.Driver.Playwright do
 
   # The runtime may not have processed a close yet; report it as it would.
   defp open_page_probe!(session, state, timeout) do
-    Document.probe!(state.frame, nil, timeout)
+    Document.adopted_probe!(state, nil, timeout)
   rescue
     TargetClosedError -> raise ArgumentError, "page #{inspect(session.active_page)} is closed"
   end
@@ -562,7 +562,7 @@ defmodule Fluffy.Driver.Playwright do
   end
 
   defp reconcile_open_page_navigation(session, state, before, deadline) do
-    probe = Document.probe!(state.frame, before.cursor, Deadline.remaining(deadline, 1))
+    probe = Document.adopted_probe!(state, before.cursor, Deadline.remaining(deadline, 1))
 
     probe =
       if probe.document == state.document_identity and probe.kind in [:redirect, :patch] do
