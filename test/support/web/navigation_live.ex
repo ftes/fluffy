@@ -98,6 +98,10 @@ defmodule Fluffy.TestWeb.NavigationLive do
     {:noreply, socket}
   end
 
+  def handle_event("patch_now", _params, socket) do
+    {:noreply, push_patch(socket, to: "/live/chamber-map?step=patched")}
+  end
+
   def handle_event("patch_after_event", _params, socket) do
     Process.send_after(self(), :patch, 30)
     {:noreply, socket}
@@ -155,6 +159,7 @@ defmodule Fluffy.TestWeb.NavigationLive do
       <button type="button" phx-click="redirect_report">Fetch report</button>
       <button type="button" phx-click="redirect_with_flash">Open secret passage</button>
       <button type="button" phx-click="navigate_after_event">Enter chamber after event</button>
+      <button type="button" phx-click="patch_now">Patch now</button>
       <button type="button" phx-click="patch_after_event">Reveal passage after event</button>
       <button :if={@topic} type="button" phx-click="navigate_ready">Navigate ready</button>
       <label>

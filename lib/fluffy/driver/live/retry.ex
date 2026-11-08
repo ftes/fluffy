@@ -22,7 +22,7 @@ defmodule Fluffy.Driver.Live.Retry do
   defp do_run(session, deadline, attempt, refresh, wait_for_retry) do
     case refresh.(session) do
       {:navigate, session, navigation} ->
-        retry_after_navigation(session, navigation, deadline)
+        {:redirected, session, navigation}
 
       %Session{} = session ->
         run_attempt(session, deadline, attempt, refresh, wait_for_retry)
@@ -49,16 +49,11 @@ defmodule Fluffy.Driver.Live.Retry do
   defp wait_and_retry(session, deadline, attempt, refresh, wait_for_retry, remaining) do
     case wait_for_retry.(session, min(remaining, 10)) do
       {:navigate, session, navigation} ->
-        retry_after_navigation(session, navigation, deadline)
+        {:redirected, session, navigation}
 
       %Session{} = session ->
         do_run(session, deadline, attempt, refresh, wait_for_retry)
     end
-  end
-
-  defp retry_after_navigation(session, navigation, deadline) do
-    remaining = Deadline.remaining(deadline)
-    {:navigate, session, navigation, {:retry, remaining}}
   end
 
   defp raise_failure({:strictness, locator, candidates}) do
