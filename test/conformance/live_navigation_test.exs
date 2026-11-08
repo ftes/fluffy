@@ -118,6 +118,30 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     end
 
     @tag driver: driver
+    test "follows a plain link on the document a Live navigation landed on after the last read with #{driver}", %{
+      driver: driver
+    } do
+      driver
+      |> live_session()
+      |> visit("/live/chamber-map?async=return")
+      |> await_unread_navigation(driver, "/live/chamber-map?step=returned")
+      |> click(by_role(:link, name: "Chamber from here", exact: true))
+      |> expect(Fluffy.Expect.page_to_have_url("/chamber?from=returned"))
+    end
+
+    @tag driver: driver
+    test "fills a field without phx-change on the document a Live navigation landed on after the last read with #{driver}",
+         %{driver: driver} do
+      driver
+      |> live_session()
+      |> visit("/live/chamber-map?async=return")
+      |> await_unread_navigation(driver, "/live/chamber-map?step=returned")
+      |> fill(by_label("Map note"), "north")
+      |> expect(Fluffy.Expect.page_to_have_url("/live/chamber-map?step=returned"))
+      |> expect("Map note" |> by_label() |> to_have_value("north"))
+    end
+
+    @tag driver: driver
     test "clicks inside a nested LiveView on the document a Live navigation landed on after the last read with #{driver}",
          %{driver: driver} do
       driver

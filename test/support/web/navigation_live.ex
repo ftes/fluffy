@@ -103,6 +103,8 @@ defmodule Fluffy.TestWeb.NavigationLive do
         <label for="map-step">Map step</label>
         <input id="map-step" name="step" value={@step} />
       </form>
+      <label for="map-note">Map note</label>
+      <input id="map-note" name="note" />
       <p :if={@saved_step}>Saved step: {@saved_step}</p>
       <p>Saves: {@saves}</p>
       <.link patch="/live/chamber-map?step=patched">Reveal passage</.link>
@@ -110,6 +112,7 @@ defmodule Fluffy.TestWeb.NavigationLive do
       <.link navigate="/live/mounted-patch">Patching chamber</.link>
       <a :if={@topic} href={"/live/redirect-ready?topic=#{@topic}"} target="_blank">Open ready popup</a>
       <a href="/chamber">Sleeping chamber</a>
+      <a href={"/chamber?from=#{@step}"}>Chamber from here</a>
       <button type="button" phx-click="redirect_static">Lull guardian</button>
       <button type="button" phx-click="redirect_with_flash">Open secret passage</button>
       <button type="button" phx-click="navigate_after_event">Enter chamber after event</button>

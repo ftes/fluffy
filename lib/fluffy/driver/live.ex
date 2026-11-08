@@ -556,10 +556,12 @@ defmodule Fluffy.Driver.Live do
   # remaining timeout, as a Playwright locator retries on the page it finds,
   # or fail when no budget remains. Once an event reached the view, the action
   # took effect, so a navigation a later step finds ends the action on the new
-  # page instead, like a browser whose page navigated mid-action.
+  # page instead, like a browser whose page navigated mid-action. A redirect
+  # the view left since Fluffy last read it is followed first, so an action that
+  # never calls the view, such as a plain link, acts on the new page too.
   defp act(session, operation, locator, options, action) do
     deadline = Retry.deadline(session, Keyword.validate!(options, [:timeout]))
-    {result, delivered?} = Delivery.track(fn -> action.(deadline) end)
+    {result, delivered?} = Delivery.track(fn -> unread_redirect(session) || action.(deadline) end)
 
     case {navigation_found(result), delivered?} do
       {{session, navigation}, true} ->
@@ -574,6 +576,24 @@ defmodule Fluffy.Driver.Live do
 
       {:none, _delivered?} ->
         result
+    end
+  end
+
+  # Checks the mailbox only: a view that left reports it to Fluffy right away.
+  defp unread_redirect(session) do
+    state = Session.page_state(session)
+    watcher = state.watcher
+
+    case current_redirect(state.view) do
+      {:error, redirect} ->
+        redirected(session, redirect)
+
+      nil ->
+        receive do
+          {:fluffy_live_view, ^watcher, {:redirect, redirect}} -> redirected(session, redirect)
+        after
+          0 -> nil
+        end
     end
   end
 
