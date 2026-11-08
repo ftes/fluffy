@@ -10,7 +10,9 @@ defmodule Fluffy.Event do
   Request and response registrations accept `scope: :page` (the default) or
   `scope: :context`. Page events observe the context; all other events observe
   the page selected when registering. A close event resolves with that page's
-  handle, which is closed.
+  handle, which is closed. As in Playwright, an event of a page that closed
+  before Fluffy saw it, such as a popup that closes at once, carries that
+  page's closed handle; a request's page is then nil.
   """
 
   alias Fluffy.Event.Pending

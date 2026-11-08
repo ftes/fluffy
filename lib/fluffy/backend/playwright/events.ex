@@ -48,19 +48,11 @@ defmodule Fluffy.Backend.Playwright.Events do
     decode = fn
       {:source_closed, _reason} when type == :close -> {:ok, Page.new(session.runtime, source)}
       {:fluffy_playwright_event, :crash, _page} -> {:error, "event source crashed"}
-      {:fluffy_playwright_event, _event, native} -> decoded(session, type, native)
+      {:fluffy_playwright_event, _event, native} -> {:ok, value(session, type, native)}
       _message -> :ignore
     end
 
     {decode, unsubscribe}
-  end
-
-  # An event whose page closed before Fluffy saw it, such as a popup closed at
-  # once, has no page handle to deliver; it is not the one a wait is for.
-  defp decoded(session, type, native) do
-    {:ok, value(session, type, native)}
-  catch
-    :unregistered_page -> :ignore
   end
 
   defp checked_page(page) do
@@ -128,9 +120,12 @@ defmodule Fluffy.Backend.Playwright.Events do
 
   # A request's page is optional, so a page that closed unseen leaves it nil.
   defp request_page(session, request) do
-    if frame = request_frame(request), do: page_handle(session, PlaywrightEx.Frame.page(frame))
-  catch
-    :unregistered_page -> nil
+    frame = request_frame(request)
+
+    case frame && live_page_handle(session, PlaywrightEx.Frame.page(frame)) do
+      {:ok, page} -> page
+      _none -> nil
+    end
   end
 
   # Service worker requests, and a navigation request issued before its frame
@@ -151,18 +146,30 @@ defmodule Fluffy.Backend.Playwright.Events do
   defp dialog_type("prompt"), do: :prompt
   defp dialog_type("beforeunload"), do: :beforeunload
 
+  # Like Playwright, an event of a page that closed before Fluffy saw it, such
+  # as a popup closed at once, delivers that page, closed.
   defp page_handle(session, browser_page) do
-    case SessionRuntime.external_page(session.runtime, browser_page.guid) do
-      {:ok, nil} -> register_page(session, browser_page)
-      {:ok, id} -> Page.new(session.runtime, id)
-      {:error, message} -> raise ArgumentError, message
+    case live_page_handle(session, browser_page) do
+      {:ok, page} -> page
+      :closed -> session.runtime |> SessionRuntime.closed_page(browser_page.guid) |> handle!(session)
+    end
+  end
+
+  defp live_page_handle(session, browser_page) do
+    case session.runtime |> SessionRuntime.external_page(browser_page.guid) |> handle!(session) do
+      nil -> register_page(session, browser_page)
+      page -> {:ok, page}
     end
   end
 
   defp register_page(session, browser_page) do
     case SessionRuntime.register_page(session.runtime, Fluffy.Backend.Playwright.page_record(browser_page)) do
-      {:ok, id} -> Page.new(session.runtime, id)
-      {:error, _closed} -> throw(:unregistered_page)
+      {:ok, id} -> {:ok, Page.new(session.runtime, id)}
+      {:error, _closed} -> :closed
     end
   end
+
+  defp handle!({:ok, nil}, _session), do: nil
+  defp handle!({:ok, id}, session), do: Page.new(session.runtime, id)
+  defp handle!({:error, message}, _session), do: raise(ArgumentError, message)
 end

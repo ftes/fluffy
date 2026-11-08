@@ -20,6 +20,7 @@ defmodule Fluffy.SessionRuntime do
   def pages(runtime), do: call(runtime, :pages)
   def page(runtime, id), do: call(runtime, {:page, id})
   def external_page(runtime, id), do: call(runtime, {:external_page, id})
+  def closed_page(runtime, id), do: call(runtime, {:closed_page, id})
   def put_page_state(runtime, id, state), do: call(runtime, {:page_state, id, state})
   def replace_page(runtime, %Page.State{} = page), do: call(runtime, {:replace_page, page})
   def close_page(runtime, id), do: call(runtime, {:close_page, id})
@@ -100,6 +101,12 @@ defmodule Fluffy.SessionRuntime do
 
   def handle_call({:page, id}, _from, state), do: {:reply, fetch_page(state, id), state}
   def handle_call({:external_page, id}, _from, state), do: {:reply, {:ok, state.external_pages[id]}, state}
+
+  # A page that closed before it was registered keeps one identity, never live.
+  def handle_call({:closed_page, external_id}, _from, state) do
+    external_pages = Map.put_new_lazy(state.external_pages, external_id, &make_ref/0)
+    {:reply, {:ok, external_pages[external_id]}, %{state | external_pages: external_pages}}
+  end
 
   def handle_call({:page_state, id, page_state}, _from, state) do
     case fetch_page(state, id) do

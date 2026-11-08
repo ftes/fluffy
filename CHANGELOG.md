@@ -47,6 +47,7 @@ Fluffy now runs on PlaywrightEx 0.17, a port of the official Playwright client w
 - Playwright actions and expectations default to the session's `timeout:`, like LiveView.
 - Playwright `reload(timeout:)` bounds the reload only; the LiveView connection wait after it uses the session's `timeout:`, as after other actions.
 - An action that closes its own page, such as a popup's `window.close()`, succeeds instead of raising `PlaywrightEx.TargetClosedError`.
+- An event of a page that closed before Fluffy saw it, such as a popup that closes at once, resolves with that page's closed handle instead of raising; a request's page is nil.
 - A browser that fails to launch raises in the session that needed it, instead of restarting every running session.
 - Playwright `check` and `uncheck` succeed once the click sets the requested state, as on Phoenix, even if page code such as a LiveView patch changes it before Playwright reads it back (common in Firefox and WebKit).
 - Playwright `submit` waits for the server to answer the navigation it starts, following its redirects, so it no longer returns before WebKit has sent the form. A submission the browser handles within the document (a GET to a fragment of the current URL, a Navigation API `intercept()`) ends the wait, as does a `beforeunload` prompt.

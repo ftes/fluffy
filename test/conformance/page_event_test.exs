@@ -55,6 +55,46 @@ defmodule Fluffy.Conformance.PageEventTest do
     assert pages(session) == [current_page(session)]
   end
 
+  # Holding the session runtime while the popup opens and closes keeps Fluffy
+  # from registering the popup, as when it closes before Fluffy sees it.
+  @tag driver: :playwright
+  test "page and popup waits resolve with a popup that closed before Fluffy saw it" do
+    {session, _fixture} = browser_session()
+    page_wait = wait_for(session, Event.page())
+    popup_wait = wait_for(session, Event.popup())
+    frame = Fluffy.Session.page_state(session).frame
+    owner = self()
+
+    holder =
+      Task.async(fn ->
+        Fluffy.SessionRuntime.run(session.runtime, fn ->
+          send(owner, :held)
+
+          receive do
+            :release -> :ok
+          end
+        end)
+      end)
+
+    assert_receive :held
+
+    assert {:ok, nil} =
+             PlaywrightEx.Frame.evaluate(frame, """
+             async () => {
+               const popup = window.open('details')
+               popup.close()
+               while (!popup.closed) await new Promise(resolve => setTimeout(resolve, 20))
+             }
+             """)
+
+    send(session.runtime, :release)
+    Task.await(holder)
+    popup = await(popup_wait)
+    assert await(page_wait) == popup
+    refute popup in pages(session)
+    assert_raise ArgumentError, ~r/is closed/, fn -> Page.url(popup) end
+  end
+
   @tag driver: :playwright
   test "a scoped page expectation ignores callback page selection and return values" do
     {session, _fixture} = browser_session()
