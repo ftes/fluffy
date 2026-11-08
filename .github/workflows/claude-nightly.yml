@@ -29,16 +29,16 @@ jobs:
       pull-requests: read
       id-token: write # Exchanged for the Claude app token, which closes the PRs.
     steps:
-      - name: List open nightly PRs without comments or reviews
+      - name: List open nightly PRs without human comments or reviews
         id: list
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        # Any comment or review keeps a PR out of triage. The allowlist names each PR, so Claude
-        # can't close any other.
+        # A human comment or review keeps a PR out of triage; Claude's own review doesn't. The
+        # allowlist names each PR, so Claude can't close any other.
         run: |
           numbers=$(gh pr list --state open --limit 1000 --json number,headRefName,isCrossRepository,comments,reviews \
-            --jq '[.[] | select((.isCrossRepository | not) and (.headRefName | startswith("claude/nightly-")) and .comments == [] and .reviews == []) | .number]')
+            --jq '[.[] | select((.isCrossRepository | not) and (.headRefName | startswith("claude/nightly-")) and ([.comments[], .reviews[]] | all(.author.login == "claude"))) | .number]')
           {
             echo "numbers=$(jq -r 'join(" ")' <<< "$numbers")"
             echo "allowed=$(jq -r 'map("Bash(gh pr close \(.) *)") | join(",")' <<< "$numbers")"
@@ -72,10 +72,102 @@ jobs:
             --max-turns 60
             --allowedTools "Read,Grep,Glob,Agent,Task,Bash(git log:*),Bash(git show:*),Bash(git diff:*),Bash(gh pr view:*),Bash(gh pr diff:*),${{ steps.list.outputs.allowed }}"
 
-  # Enforces the cap before any toolchain is set up. Runs even if triage failed: the count is
-  # still right, it just finds fewer slots.
-  capacity:
+  # After triage, so only PRs worth keeping get fixed.
+  conflicts:
     needs: triage
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      pull-requests: read
+    outputs:
+      branches: ${{ steps.list.outputs.branches }}
+    steps:
+      - name: List conflicted nightly PRs
+        id: list
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        # GitHub computes mergeability on the first read after main moves, answering UNKNOWN until
+        # it's done.
+        run: |
+          list() {
+            gh pr list --state open --limit 1000 --json headRefName,isCrossRepository,mergeable \
+              --jq '[.[] | select((.isCrossRepository | not) and (.headRefName | startswith("claude/nightly-")) and .mergeable == "CONFLICTING") | .headRefName]'
+          }
+          list > /dev/null
+          sleep 30
+          echo "branches=$(list)" >> "$GITHUB_OUTPUT"
+
+  resolve:
+    needs: conflicts
+    if: ${{ !cancelled() && needs.conflicts.result == 'success' && needs.conflicts.outputs.branches != '[]' }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write # Exchanged for the Claude app token, unless NIGHTLY_WORKFLOWS_TOKEN is set.
+    strategy:
+      fail-fast: false
+      matrix:
+        branch: ${{ fromJSON(needs.conflicts.outputs.branches) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ matrix.branch }}
+          fetch-depth: 0
+      - name: Set up toolchain and deps
+        uses: ./.github/actions/setup
+        with:
+          lane: newest
+      # A merge, not a rebase: the push stays a fast-forward. The Claude app can't push changes to
+      # workflow files, which a merge from main can carry; those PRs need the token.
+      - name: Merge main, leaving the conflicts for Claude
+        id: merge
+        env:
+          BRANCH: ${{ matrix.branch }}
+          WORKFLOWS_TOKEN: ${{ secrets.NIGHTLY_WORKFLOWS_TOKEN }}
+        run: |
+          git -c user.name=claude -c user.email=noreply@anthropic.com merge --no-commit origin/main || true
+          git rev-parse --verify MERGE_HEAD
+          if [ -z "$WORKFLOWS_TOKEN" ] && ! git diff --quiet HEAD -- .github/workflows; then
+            echo "::warning::Skipping $BRANCH: merging main changes workflow files, which needs NIGHTLY_WORKFLOWS_TOKEN."
+            echo "blocked=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Run Claude
+        if: steps.merge.outputs.blocked != 'true'
+        uses: anthropics/claude-code-action@d535f5172dec02b204866b393d6b20b9b2aaf98d # v1.0.266
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.NIGHTLY_WORKFLOWS_TOKEN }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            BRANCH: ${{ matrix.branch }}
+
+            This branch is an open simplification PR with origin/main merged in but not committed.
+            The conflicts are in the working tree. Resolve them.
+
+            Read `gh pr view ${{ matrix.branch }}` for what the PR set out to do, and `git log` and
+            `git show` for why main changed. In each conflicted file keep both main's change and
+            the PR's intent. Run `mix deps.get` if mix.lock changed, then `mix format` and
+            `mix compile --warnings-as-errors`. CI on the PR runs the test suite.
+
+            If the PR's change can't be kept without redesigning it, stop without committing and
+            say why.
+
+            To publish, `git add` the resolved files, then run exactly:
+              git commit --no-edit
+              git push origin ${{ matrix.branch }}
+          claude_args: |
+            --model claude-opus-5-5
+            --max-turns 60
+            --allowedTools "Read,Grep,Glob,Edit,Write,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git add:*),Bash(git commit --no-edit),Bash(mix deps.get),Bash(mix format:*),Bash(mix compile:*),Bash(gh pr view ${{ matrix.branch }}:*),Bash(git push origin ${{ matrix.branch }})"
+
+  # Enforces the cap before any toolchain is set up. Runs even if an earlier job failed: the
+  # count is still right, it just finds fewer slots.
+  capacity:
+    needs: resolve
     if: ${{ !cancelled() }}
     runs-on: ubuntu-26.04
     timeout-minutes: 5
@@ -105,7 +197,7 @@ jobs:
 
   improve:
     needs: capacity
-    # !cancelled(): the implicit success() would also fail on a failed triage, two jobs up.
+    # !cancelled(): the implicit success() would also fail on any failed or skipped job further up.
     if: ${{ !cancelled() && needs.capacity.outputs.has-slot == 'true' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 90
