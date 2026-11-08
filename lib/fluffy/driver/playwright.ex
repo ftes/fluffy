@@ -317,14 +317,14 @@ defmodule Fluffy.Driver.Playwright do
   end
 
   # Playwright takes either strings (matching value or label) or option maps.
-  # A mixed list resolves its strings to option indexes, the first string
-  # without an option reported as itself.
+  # A mixed list resolves its strings to option indexes (null for a map), the
+  # first string without an option reported as itself.
   @option_indexes """
   (select, wanted) => {
     const resolved = wanted.map(value => {
-      if (typeof value !== 'string') return value
+      if (typeof value !== 'string') return null
       const index = [...select.options].findIndex(option => option.value === value || option.label === value)
-      return index < 0 ? value : {index}
+      return index < 0 ? value : index
     })
     return resolved.find(value => typeof value === 'string') ?? resolved
   }
@@ -340,8 +340,8 @@ defmodule Fluffy.Driver.Playwright do
   # to appear, re-resolving the select as it does.
   defp option_indexes(native, values, timeout, deadline, waited_for \\ nil) do
     case BrowserLocator.evaluate(native, @option_indexes, values, timeout: Deadline.remaining(deadline, 1)) do
-      {:ok, resolved} when is_list(resolved) ->
-        {:ok, Enum.map(resolved, &Map.new(&1, fn {key, value} -> {String.to_existing_atom(key), value} end))}
+      {:ok, indexes} when is_list(indexes) ->
+        {:ok, Enum.zip_with(values, indexes, &if(is_binary(&1), do: %{index: &2}, else: &1))}
 
       {:ok, missing} ->
         expression = "(select, wanted) => Array.isArray((#{@option_indexes})(select, wanted))"

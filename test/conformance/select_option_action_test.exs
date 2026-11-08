@@ -203,6 +203,21 @@ defmodule Fluffy.Conformance.SelectOptionActionTest do
   end
 
   @tag driver: :playwright
+  test "select_option with a mixed list keeps its value and label maps" do
+    html = """
+    <select aria-label="Plan" multiple>
+      <option value="free">Free</option><option value="pro">Pro</option><option value="team">Team</option>
+    </select>
+    """
+
+    with_html(:playwright, html, fn session ->
+      session
+      |> select_option(by_label("Plan"), [%{value: "free"}, "Pro", %{label: "Team"}])
+      |> expect(to_have_values(by_label("Plan"), ["free", "pro", "team"]))
+    end)
+  end
+
+  @tag driver: :playwright
   test "select_option with a mixed list names the option it waited for" do
     with_html(:playwright, ~s(<select aria-label="Plan" multiple><option>Free</option></select>), fn session ->
       assert_raise Fluffy.OperationError, ~r/option with value or label "Pro"/, fn ->
