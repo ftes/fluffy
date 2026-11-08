@@ -899,13 +899,15 @@ defmodule Fluffy.Driver.Live do
         selector_for_view(state.client_dom, ClientDOM.selector_for_node_id(state.client_dom, form_id), event_context)
 
       upload_name = existing_upload_name!(target)
+      # Validate the selection before starting an upload client it would leak.
+      client_dom = ClientDOM.set_input_files(state.client_dom, locator, selected_files)
 
       # Starting the upload client reads the view's upload config.
       with {:ok, upload} <-
              read_view(session, fn ->
                file_input!(session, event_context.view, form_selector, upload_name, selected_files)
              end) do
-        start_live_upload(session, locator, selected_files, target, event_context, form_id, form_selector, upload)
+        start_live_upload(session, client_dom, selected_files, target, event_context, form_id, form_selector, upload)
       end
     end
   end
@@ -925,11 +927,9 @@ defmodule Fluffy.Driver.Live do
     UploadCompat.file_input!(view, form_selector, upload_name, entries, Session.context(session).http.endpoint)
   end
 
-  defp start_live_upload(session, locator, selected_files, target, event_context, form_id, form_selector, upload) do
-    state = Session.page_state(session)
+  defp start_live_upload(session, client_dom, selected_files, target, event_context, form_id, form_selector, upload) do
     auto_upload? = live_auto_upload?(target)
     append? = live_multiple_file_input?(target) and live_upload_present?(session, form_id)
-    client_dom = ClientDOM.set_input_files(state.client_dom, locator, selected_files)
     session = if append?, do: session, else: release_live_upload_for_form(session, form_id)
 
     :ok =
