@@ -5,7 +5,7 @@ defmodule Fluffy.TestWeb.KeyboardLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok, assign(socket, events: [], payload_keys: "none", step: "initial", submitted: nil)}
+    {:ok, assign(socket, events: [], leaving?: false, payload_keys: "none", step: "initial", submitted: nil)}
   end
 
   @impl true
@@ -81,6 +81,16 @@ defmodule Fluffy.TestWeb.KeyboardLive do
   end
 
   def handle_event("crash", _params, _socket), do: raise("keyboard handler crashed")
+
+  # Removes the key target and navigates a moment later, so the page navigates
+  # between keydown and keyup.
+  def handle_event("leave", params, socket) do
+    Process.send_after(self(), :leave, 30)
+    {:noreply, socket |> record("leave", params) |> assign(:leaving?, true)}
+  end
+
+  @impl true
+  def handle_info(:leave, socket), do: {:noreply, push_navigate(socket, to: "/live/keyboard?step=left")}
 
   defp record(socket, event, params) do
     entry =
@@ -198,6 +208,9 @@ defmodule Fluffy.TestWeb.KeyboardLive do
       </label>
       <label>
         Crash key <input id="crash-key" phx-keydown="crash" phx-key="Enter" />
+      </label>
+      <label :if={!@leaving?}>
+        Leaving key <input id="leaving-key" phx-keydown="leave" phx-keyup="element-keyup" />
       </label>
 
       <p>Step: {@step}</p>

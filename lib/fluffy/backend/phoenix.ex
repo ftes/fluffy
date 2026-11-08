@@ -155,11 +155,7 @@ defmodule Fluffy.Backend.Phoenix do
   end
 
   def navigate(%Session{} = session, %Redirect{} = navigation) do
-    url = resolve_url(Session.context(session).http.base_url, navigation.destination, session)
-
-    session
-    |> put_live_redirect_flash(navigation.destination, navigation.flash)
-    |> request(url)
+    follow_redirect(session, navigation.destination, navigation.flash, navigation.redirects)
   end
 
   def navigate(%Session{} = session, %Patch{} = navigation) do
@@ -257,7 +253,7 @@ defmodule Fluffy.Backend.Phoenix do
   defp encode_post_submission(%{fields: fields}), do: Fluffy.Form.url_encode(fields)
 
   @doc false
-  def commit_live(%Session{} = session, view, html, destination) do
+  def commit_live(%Session{} = session, view, html, destination, redirects \\ 0) do
     proxy_pid = live_view_proxy_pid(view)
     Process.unlink(proxy_pid)
 
@@ -308,12 +304,25 @@ defmodule Fluffy.Backend.Phoenix do
     session = PageLifecycle.replace_document(session, :live, state, URI.to_string(url), [], &release_page/3)
 
     case redirect do
-      nil ->
-        session
-
-      {_kind, %{to: destination} = options} ->
-        navigate(session, %Redirect{destination: destination, flash: options[:flash]})
+      nil -> session
+      redirect -> follow_mount_redirect(session, redirect, url, redirects)
     end
+  end
+
+  # A browser follows a redirect from a view's mount like an HTTP redirect, so
+  # it counts toward the same redirect limit.
+  defp follow_mount_redirect(session, {_kind, %{to: destination} = options}, url, redirects) do
+    follow_redirect(session, destination, options[:flash], HTTP.count_redirect!(redirects, url))
+  end
+
+  # Requests a view's redirect destination, after `redirects` redirects so far,
+  # with the flash it carries.
+  defp follow_redirect(session, destination, flash, redirects) do
+    url = resolve_url(Session.context(session).http.base_url, destination, session)
+
+    session
+    |> put_live_redirect_flash(url, flash)
+    |> request(url, :get, nil, nil, redirects)
   end
 
   defp mounted_client_dom(html), do: html |> LazyHTML.from_document() |> ClientDOM.from_document()
@@ -331,20 +340,18 @@ defmodule Fluffy.Backend.Phoenix do
     session |> put_http(http) |> finish_response(response, nil)
   end
 
-  defp request(session, url, method \\ :get, body \\ nil, download_name \\ nil) do
-    {http, response} = HTTP.request(Session.context(session).http, url, method, body)
+  defp request(session, url, method, body, download_name \\ nil, redirects \\ 0) do
+    {http, response} = HTTP.request(Session.context(session).http, url, method, body, redirects)
     session |> put_http(http) |> finish_response(response, download_name)
   end
 
-  defp put_live_redirect_flash(session, _destination, nil), do: session
+  defp put_live_redirect_flash(session, _url, nil), do: session
 
-  defp put_live_redirect_flash(session, destination, flash) do
+  defp put_live_redirect_flash(session, url, flash) do
     token =
       if is_map(flash),
         do: Phoenix.LiveView.Utils.sign_flash(Session.context(session).http.endpoint, flash),
         else: flash
-
-    url = resolve_url(Session.context(session).http.base_url, destination, session)
 
     http =
       HTTP.store_cookie_header(
@@ -359,10 +366,10 @@ defmodule Fluffy.Backend.Phoenix do
   defp finish_response(session, %HTTPResponse{conn: %{status: status} = conn}, _download_name)
        when status in @no_content_statuses, do: keep_document(session, conn)
 
-  defp finish_response(session, %HTTPResponse{conn: conn, request: %{url: url}}, download_name) do
+  defp finish_response(session, %HTTPResponse{conn: conn, request: %{url: url}} = response, download_name) do
     case capture_download(conn, session, url, download_name) do
       {:ok, session} -> session
-      :not_a_download -> commit_response(conn, session, url)
+      :not_a_download -> commit_response(conn, session, url, response.redirects)
     end
   end
 
@@ -380,21 +387,34 @@ defmodule Fluffy.Backend.Phoenix do
     end
   end
 
-  defp commit_response(%{assigns: %{live_module: _module}} = conn, session, url) do
+  defp commit_response(%{assigns: %{live_module: _module}} = conn, session, url, redirects) do
+    mounted_url = Plug.Conn.request_url(conn)
+
     case live(conn) do
       {:ok, view, html} ->
-        commit_live(session, view, html, URI.to_string(url))
+        commit_live(session, view, html, URI.to_string(url), redirects)
+
+      # LiveView rejected the connection as stale or unauthorized. LiveViewTest
+      # reports that as a redirect to the URL being mounted, where the LiveView
+      # client would reload the page, so following it would only loop.
+      {:error, {:redirect, %{to: ^mounted_url} = options} = reason} when map_size(options) == 1 ->
+        raise "LiveView navigation failed: LiveView rejected the connection to #{mounted_url} as stale or " <>
+                "unauthorized, such as for a live_session or on_mount mismatch: #{inspect(reason)}"
+
+      # The view redirected in its connected mount. A browser follows it.
+      {:error, {kind, %{to: _destination}} = redirect} when kind in [:live_redirect, :redirect] ->
+        follow_mount_redirect(session, redirect, url, redirects)
 
       {:error, reason} ->
         raise "LiveView navigation failed: #{inspect(reason)}"
     end
   end
 
-  defp commit_response(%{status: status} = conn, session, url) when status in 200..599 do
+  defp commit_response(%{status: status} = conn, session, url, _redirects) when status in 200..599 do
     commit_static(conn, session, url)
   end
 
-  defp commit_response(conn, _session, url) do
+  defp commit_response(conn, _session, url, _redirects) do
     raise "Phoenix navigation failed with HTTP #{conn.status} for #{URI.to_string(url)}"
   end
 

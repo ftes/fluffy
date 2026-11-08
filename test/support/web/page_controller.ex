@@ -33,6 +33,12 @@ defmodule Fluffy.TestWeb.PageController do
     """)
   end
 
+  # Renders a LiveView at a URL that does not route to it, so LiveView rejects
+  # its connection as unauthorized, as after a live_session change.
+  def unrouted_live(conn, _params) do
+    Phoenix.LiveView.Controller.live_render(conn, Fluffy.TestWeb.DestinationLive, router: Fluffy.TestWeb.Router)
+  end
+
   def embedded_ready(conn, %{"topic" => topic} = params) do
     delay = String.to_integer(params["delay"] || "100")
 
@@ -61,6 +67,8 @@ defmodule Fluffy.TestWeb.PageController do
   def redirect_live_ready(conn, %{"topic" => topic}) do
     redirect(conn, to: "/live/redirect-ready?topic=#{URI.encode_www_form(topic)}")
   end
+
+  def redirect_loop(conn, _params), do: redirect(conn, to: "/redirect/loop")
 
   def click_source(conn, _params) do
     send_html(conn, """

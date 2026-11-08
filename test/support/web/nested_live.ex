@@ -4,8 +4,22 @@ defmodule Fluffy.TestWeb.NestedParentLive do
   use Phoenix.LiveView
 
   @impl true
-  def mount(_params, _session, socket) do
-    {:ok, assign(socket, parent_email: "", saved_parent_email: nil, parent_count: 0)}
+  def mount(params, _session, socket) do
+    # Navigates back here a moment after connecting, without any action.
+    case connected?(socket) && params["async"] do
+      "return" -> Process.send_after(self(), {:return, "/live/nested?step=returned"}, 30)
+      "return-late" -> Process.send_after(self(), {:return, "/live/nested?step=returned&late=true"}, 30)
+      _none -> :ok
+    end
+
+    {:ok,
+     assign(socket,
+       late?: params["late"] == "true",
+       parent_email: "",
+       saved_parent_email: nil,
+       parent_count: 0,
+       shifted?: false
+     )}
   end
 
   @impl true
@@ -26,6 +40,10 @@ defmodule Fluffy.TestWeb.NestedParentLive do
   end
 
   @impl true
+  def handle_info({:return, to}, socket), do: {:noreply, push_navigate(socket, to: to)}
+  def handle_info(:shift_child, socket), do: {:noreply, assign(socket, :shifted?, true)}
+
+  @impl true
   def handle_params(_params, _uri, socket), do: {:noreply, socket}
 
   @impl true
@@ -39,7 +57,11 @@ defmodule Fluffy.TestWeb.NestedParentLive do
 
       <p>Parent saved: {@saved_parent_email || "none"}</p>
       <p>Parent count: {@parent_count}</p>
-      {live_render(@socket, Fluffy.TestWeb.NestedChildLive, id: "nested-child")}
+      <p :if={@shifted?}>Child shifted</p>
+      {live_render(@socket, Fluffy.TestWeb.NestedChildLive,
+        id: "nested-child",
+        session: %{"late" => @late?}
+      )}
     </main>
     """
   end
@@ -51,16 +73,22 @@ defmodule Fluffy.TestWeb.NestedChildLive do
   use Phoenix.LiveView
 
   @impl true
-  def mount(_params, _session, socket) do
+  def mount(_params, session, socket) do
+    # Renders the upload form a moment after connecting.
+    late? = session["late"] == true
+    if connected?(socket) and late?, do: Process.send_after(self(), :reveal_upload, 40)
+
     {:ok,
      socket
      |> allow_upload(:attachment, accept: ~w(.txt), max_entries: 1)
      |> assign(
+       upload_late?: late?,
        child_email: "",
        saved_child_email: nil,
        child_count: 0,
        delayed_button?: false,
-       uploaded_name: nil
+       uploaded_name: nil,
+       shift_changes: 0
      )}
   end
 
@@ -90,6 +118,16 @@ defmodule Fluffy.TestWeb.NestedChildLive do
     {:noreply, push_patch(socket, to: "/live/nested?from=child")}
   end
 
+  # Waits until the parent renders content before this view, so the click's
+  # render moves it.
+  def handle_event("shift", _params, socket) do
+    send(socket.parent_pid, :shift_child)
+    :sys.get_state(socket.parent_pid)
+    {:noreply, socket}
+  end
+
+  def handle_event("shift-changed", _params, socket), do: {:noreply, update(socket, :shift_changes, &(&1 + 1))}
+
   def handle_event("validate-upload", _params, socket), do: {:noreply, socket}
 
   def handle_event("save-upload", _params, socket) do
@@ -105,6 +143,8 @@ defmodule Fluffy.TestWeb.NestedChildLive do
   def handle_info(:show_delayed_button, socket) do
     {:noreply, assign(socket, :delayed_button?, true)}
   end
+
+  def handle_info(:reveal_upload, socket), do: {:noreply, assign(socket, :upload_late?, false)}
 
   @impl true
   def render(assigns) do
@@ -124,7 +164,17 @@ defmodule Fluffy.TestWeb.NestedChildLive do
       <button type="button" phx-click="navigate">Navigate from child</button>
       <button type="button" phx-click="patch">Patch from child</button>
 
-      <form id="child-upload-form" phx-change="validate-upload" phx-submit="save-upload">
+      <form id="child-shift-form" phx-change="shift-changed">
+        <label><input id="child-shift" type="checkbox" name="shift" phx-click="shift" /> Shift child</label>
+      </form>
+      <p>Child shift changes: {@shift_changes}</p>
+
+      <form
+        :if={!@upload_late?}
+        id="child-upload-form"
+        phx-change="validate-upload"
+        phx-submit="save-upload"
+      >
         <label>Child attachment <.live_file_input upload={@uploads.attachment} /></label>
         <button type="submit">Upload child attachment</button>
       </form>

@@ -8,6 +8,8 @@ defmodule Fluffy.Driver.Live.Event do
 
   import Phoenix.LiveViewTest
 
+  alias Fluffy.Driver.Live.ActionScope
+
   @bindings %{
     click: ["phx-click"],
     change: ["phx-change"],
@@ -23,6 +25,8 @@ defmodule Fluffy.Driver.Live.Event do
     end
   end
 
+  # Each command that reaches the view records its delivery, so a later
+  # command that finds the view gone does not undo the earlier ones.
   def exec(view, declaration, attributes, kind, payload) do
     declaration
     |> commands()
@@ -48,16 +52,20 @@ defmodule Fluffy.Driver.Live.Event do
     view = with_target(view, options["target"] || attribute(attributes, "phx-target"))
     value = Map.merge(payload, options["value"] || %{})
 
-    case kind do
-      :click -> render_click(view, event, value)
-      :change -> render_change(view, event, value)
-      :submit -> render_submit(view, event, value)
-      :keydown -> render_keydown(view, event, value)
-      :keyup -> render_keyup(view, event, value)
-    end
+    result =
+      case kind do
+        :click -> render_click(view, event, value)
+        :change -> render_change(view, event, value)
+        :submit -> render_submit(view, event, value)
+        :keydown -> render_keydown(view, event, value)
+        :keyup -> render_keyup(view, event, value)
+      end
+
+    ActionScope.delivered(result)
   end
 
-  defp dispatch(["patch", %{"href" => href}], view, _attributes, _kind, _payload), do: render_patch(view, href)
+  defp dispatch(["patch", %{"href" => href}], view, _attributes, _kind, _payload),
+    do: view |> render_patch(href) |> ActionScope.delivered()
 
   defp dispatch(["navigate", %{"href" => href} = options], _view, _attributes, _kind, _payload) do
     {:error, {:live_redirect, %{to: href, kind: if(options["replace"], do: :replace, else: :push)}}}

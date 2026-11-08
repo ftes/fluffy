@@ -415,6 +415,26 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
     refute Process.alive?(rejected_client)
   end
 
+  test "starts no Live upload client for a selection the input rejects" do
+    session =
+      :phoenix
+      |> start_test_session()
+      |> visit("/live/scrolls")
+
+    error =
+      assert_raise Fluffy.OperationError, fn ->
+        set_input_files(session, by_label("Attachment"), [fixture_path(), second_fixture_path()])
+      end
+
+    assert error.cause.reason == :multiple_files_not_allowed
+
+    {:ok, supervisor} = ExUnit.fetch_test_supervisor()
+
+    assert supervisor
+           |> Supervisor.which_children()
+           |> Enum.filter(&match?({_id, _pid, _type, [Phoenix.LiveViewTest.UploadClient]}, &1)) == []
+  end
+
   test "releases a managed upload client after a successful Phoenix submit" do
     session =
       :phoenix

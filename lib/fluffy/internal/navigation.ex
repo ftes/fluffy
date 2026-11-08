@@ -18,9 +18,16 @@ end
 
 defmodule Fluffy.Internal.Navigation.Redirect do
   @moduledoc false
+  # `redirects` counts the redirects that led to this one, which the redirects
+  # following it count on from.
   @enforce_keys [:destination]
-  defstruct [:destination, :flash]
-  @type t :: %__MODULE__{destination: String.t(), flash: map() | String.t() | nil}
+  defstruct [:destination, :flash, redirects: 0]
+
+  @type t :: %__MODULE__{
+          destination: String.t(),
+          flash: map() | String.t() | nil,
+          redirects: non_neg_integer()
+        }
 end
 
 defmodule Fluffy.Internal.Navigation.Patch do

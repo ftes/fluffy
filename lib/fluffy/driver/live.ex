@@ -5,8 +5,11 @@ defmodule Fluffy.Driver.Live do
 
   import Phoenix.LiveViewTest, except: [open_browser: 1, open_browser: 2]
 
+  alias Fluffy.Backend.Phoenix.HTTP
   alias Fluffy.ClientDOM
+  alias Fluffy.Deadline
   alias Fluffy.Driver.Live.ActionResolver
+  alias Fluffy.Driver.Live.ActionScope
   alias Fluffy.Driver.Live.Click
   alias Fluffy.Driver.Live.Document
   alias Fluffy.Driver.Live.Event
@@ -16,6 +19,7 @@ defmodule Fluffy.Driver.Live do
   alias Fluffy.Form
   alias Fluffy.HTML.DocumentIndex
   alias Fluffy.Internal.Navigation
+  alias Fluffy.Internal.Navigation.Redirect
   alias Fluffy.LiveViewTest.UploadCompat
   alias Fluffy.Locator
   alias Fluffy.Page
@@ -37,48 +41,71 @@ defmodule Fluffy.Driver.Live do
 
   @impl true
   def expect(%Session{} = session, %Expect{} = expectation) do
-    options = Keyword.validate!(expectation.options, [:timeout])
+    deadline = Retry.deadline(session, Keyword.validate!(expectation.options, [:timeout]))
 
-    eventually(session, options, fn session ->
-      case evaluate_expectation(session, expectation) do
-        {:ok, passed?, _actual} when passed? != expectation.negated? ->
-          {:ok, session}
+    result =
+      ActionScope.run(fn ->
+        session
+        |> eventually(deadline, fn session ->
+          case evaluate_expectation(session, expectation) do
+            {:ok, passed?, _actual} when passed? != expectation.negated? ->
+              {:ok, session}
 
-        {:ok, _passed?, actual} ->
-          {:retry, "Expected #{Expect.Internal.describe(expectation)}, got #{inspect(actual)}"}
+            {:ok, _passed?, actual} ->
+              {:retry, "Expected #{Expect.Internal.describe(expectation)}, got #{inspect(actual)}"}
+          end
+        end)
+        |> finish_expectation()
+      end)
+
+    case result do
+      {:retry_on_new_page, session, redirects} ->
+        retry_on_new_page(session, redirects, :expect, [expectation], deadline)
+
+      session ->
+        session
+    end
+  end
+
+  # An expectation goes on on the page a navigation landed on, like an
+  # action, so pages that keep navigating fail it at the redirect limit.
+  defp finish_expectation({:navigate, session, navigation, {:retry, _remaining}}) do
+    {session, redirects} = follow_for_retry(session, navigation)
+    {:retry_on_new_page, session, redirects}
+  end
+
+  defp finish_expectation(session), do: session
+
+  @impl true
+  def click(%Session{} = session, %Locator{} = locator, action_options \\ []) do
+    act(session, :click, [locator, action_options], fn session, deadline ->
+      case resolve_live_action(session, locator, deadline, &ClientDOM.click(&1, locator)) do
+        {%Session{} = session, {client_dom, target}} -> commit_click(session, client_dom, target)
+        navigation -> navigation
       end
     end)
   end
 
-  @impl true
-  def click(%Session{} = session, %Locator{} = locator, action_options \\ []) do
-    case resolve_live_action(session, locator, action_options, fn client_dom ->
-           ClientDOM.click(client_dom, locator)
-         end) do
-      {%Session{} = session, {client_dom, target}} -> commit_click(session, client_dom, target)
-      navigation -> navigation
-    end
-  end
-
   defp commit_click(session, client_dom, target) do
     state = Session.page_state(session)
-    event_context = owning_view_context(state.view, target)
 
-    case ClientDOM.phoenix_html_submission(client_dom, target) do
-      submission when is_map(submission) ->
-        if competing_live_click_binding?(target) do
-          raise Fluffy.CapabilityError,
-            capability: :phoenix_html_live_action_conflict,
-            driver: :live,
-            detail:
-              "a data-method/data-to link with a competing phx-click or LiveView navigation action requires Playwright"
-        else
-          {:navigate, Session.put_page_state(session, %{state | client_dom: client_dom}),
-           Navigation.submission(submission)}
-        end
+    with {:ok, event_context} <- owning_view_context(session, target) do
+      case ClientDOM.phoenix_html_submission(client_dom, target) do
+        submission when is_map(submission) ->
+          if competing_live_click_binding?(target) do
+            raise Fluffy.CapabilityError,
+              capability: :phoenix_html_live_action_conflict,
+              driver: :live,
+              detail:
+                "a data-method/data-to link with a competing phx-click or LiveView navigation action requires Playwright"
+          else
+            {:navigate, Session.put_page_state(session, %{state | client_dom: client_dom}),
+             Navigation.submission(submission)}
+          end
 
-      nil ->
-        commit_plain_click(session, client_dom, target, event_context)
+        nil ->
+          commit_plain_click(session, client_dom, target, event_context)
+      end
     end
   end
 
@@ -99,11 +126,9 @@ defmodule Fluffy.Driver.Live do
 
       :render_click ->
         result =
-          try do
+          dispatch_view_event(session, fn ->
             Click.render(event_view, client_dom, target, view_selector(client_dom, target.selector, event_context))
-          catch
-            :exit, reason -> raise Fluffy.LiveViewError, reason: reason
-          end
+          end)
 
         case commit_render_result(session, client_dom, result, event_view) do
           %Session{} = session -> release_cancelled_live_upload(session, target)
@@ -165,11 +190,9 @@ defmodule Fluffy.Driver.Live do
           |> decode_merge_target()
 
         result =
-          try do
+          dispatch_view_event(session, fn ->
             render_view_event(client_dom, event_context, event.dispatcher_selector, :change, payload)
-          catch
-            :exit, reason -> raise Fluffy.LiveViewError, reason: reason
-          end
+          end)
 
         commit_render_result(session, client_dom, result, event_view)
     end
@@ -177,48 +200,65 @@ defmodule Fluffy.Driver.Live do
 
   @impl true
   def submit(%Session{} = session, %Locator{} = locator, options \\ []) do
-    Keyword.validate!(options, [:timeout])
-    state = Session.page_state(session)
-    client_dom = Map.fetch!(state, :client_dom)
-    target = ClientDOM.target!(client_dom, locator)
-    event_context = owning_view_context(state.view, target)
+    act(session, :submit, [locator, options], fn session, deadline ->
+      case resolve_live_action(session, locator, deadline, &ClientDOM.target!(&1, locator)) do
+        {%Session{} = session, target} -> commit_submit(session, target)
+        navigation -> navigation
+      end
+    end)
+  end
 
-    case ClientDOM.submit_form(client_dom, target, :live) do
-      nil ->
-        raise ArgumentError, "submit/2 requires a form locator, got #{inspect(target.tag)}"
+  defp commit_submit(session, target) do
+    client_dom = Session.page_state(session).client_dom
 
-      %{phx_submit?: true} = submission ->
-        dispatch_live_submit(session, client_dom, submission, event_context)
+    with {:ok, event_context} <- owning_view_context(session, target) do
+      case ClientDOM.submit_form(client_dom, target, :live) do
+        nil ->
+          raise ArgumentError, "submit/2 requires a form locator, got #{inspect(target.tag)}"
 
-      %{phx_submit?: false} = submission ->
-        {:navigate, session, Navigation.submission(submission)}
+        %{phx_submit?: true} = submission ->
+          dispatch_live_submit(session, client_dom, submission, event_context)
+
+        %{phx_submit?: false} = submission ->
+          {:navigate, session, Navigation.submission(submission)}
+      end
     end
   end
 
   @impl true
   def fill(%Session{} = session, %Locator{} = locator, value, options \\ []) do
-    case resolve_live_action(session, locator, options, &ClientDOM.fill(&1, locator, value, :live)) do
-      {%Session{} = session, {client_dom, target}} -> dispatch_live_change(session, client_dom, target)
-      navigation -> navigation
-    end
+    act(session, :fill, [locator, value, options], fn session, deadline ->
+      case resolve_live_action(session, locator, deadline, &ClientDOM.fill(&1, locator, value, :live)) do
+        {%Session{} = session, {client_dom, target}} -> dispatch_live_change(session, client_dom, target)
+        navigation -> navigation
+      end
+    end)
   end
 
   @impl true
-  def set_input_files(%Session{} = session, %Locator{} = locator, _source_paths, selected_files, _options \\ []) do
-    state = Session.page_state(session)
-
-    if ClientDOM.live_managed_form?(state.client_dom, locator) do
-      case selected_files do
-        [_selected_file | _remaining_files] ->
+  def set_input_files(%Session{} = session, %Locator{} = locator, source_paths, selected_files, options \\ []) do
+    act(session, :set_input_files, [locator, source_paths, selected_files, options], fn session, deadline ->
+      case resolve_live_action(session, locator, deadline, &select_files(&1, locator, selected_files)) do
+        {%Session{} = session, :live_upload} ->
           set_live_upload(session, locator, selected_files)
 
-        [] ->
-          client_dom = ClientDOM.set_input_files(state.client_dom, locator, [])
+        {%Session{} = session, %ClientDOM{} = client_dom} ->
+          state = Session.page_state(session)
           Session.put_page_state(session, %{state | client_dom: client_dom})
+
+        navigation ->
+          navigation
       end
+    end)
+  end
+
+  # Files selected in a LiveView-managed form upload through the view, while
+  # any other input, or clearing one, only keeps the selection.
+  defp select_files(client_dom, locator, selected_files) do
+    if selected_files != [] and ClientDOM.live_managed_form?(client_dom, locator) do
+      :live_upload
     else
-      client_dom = ClientDOM.set_input_files(state.client_dom, locator, selected_files)
-      Session.put_page_state(session, %{state | client_dom: client_dom})
+      ClientDOM.set_input_files(client_dom, locator, selected_files)
     end
   end
 
@@ -236,24 +276,21 @@ defmodule Fluffy.Driver.Live do
 
   @impl true
   def set_checked(%Session{} = session, %Locator{} = locator, desired, options \\ []) do
-    case resolve_live_action(
-           session,
-           locator,
-           options,
-           &ClientDOM.set_checked(&1, locator, desired)
-         ) do
-      {%Session{} = session, {candidate_client_dom, target}} ->
-        state = Session.page_state(session)
+    act(session, :set_checked, [locator, desired, options], fn session, deadline ->
+      case resolve_live_action(session, locator, deadline, &ClientDOM.set_checked(&1, locator, desired)) do
+        {%Session{} = session, {candidate_client_dom, target}} ->
+          state = Session.page_state(session)
 
-        if candidate_client_dom == state.client_dom do
-          session
-        else
-          commit_checked(session, candidate_client_dom, target)
-        end
+          if candidate_client_dom == state.client_dom do
+            session
+          else
+            commit_checked(session, candidate_client_dom, target)
+          end
 
-      navigation ->
-        navigation
-    end
+        navigation ->
+          navigation
+      end
+    end)
   end
 
   defp commit_checked(session, client_dom, target) do
@@ -264,7 +301,8 @@ defmodule Fluffy.Driver.Live do
         client_dom = Session.page_state(session).client_dom
 
         # A selector such as :checked stops matching after uncheck. Follow the
-        # original control across any click patch instead of resolving it again.
+        # original control across any click patch instead of resolving it again,
+        # and find the view that owns it there, since the click may have moved it.
         case Enum.find(ClientDOM.index(client_dom).entries, &(&1.identity == identity)) do
           nil ->
             session
@@ -280,36 +318,34 @@ defmodule Fluffy.Driver.Live do
 
   @impl true
   def select_option(%Session{} = session, %Locator{} = locator, requested, options \\ []) do
-    case resolve_live_action(
-           session,
-           locator,
-           options,
-           &ClientDOM.select_option(&1, locator, requested)
-         ) do
-      {%Session{} = session, {client_dom, target}} -> dispatch_live_change(session, client_dom, target)
-      navigation -> navigation
-    end
+    act(session, :select_option, [locator, requested, options], fn session, deadline ->
+      case resolve_live_action(session, locator, deadline, &ClientDOM.select_option(&1, locator, requested)) do
+        {%Session{} = session, {client_dom, target}} -> dispatch_live_change(session, client_dom, target)
+        navigation -> navigation
+      end
+    end)
   end
 
   @impl true
   def press(%Session{} = session, %Locator{} = locator, key, options \\ []) do
-    options = Keyword.validate!(options, [:timeout])
+    act(session, :press, [locator, key, options], fn session, deadline ->
+      case resolve_live_action(session, locator, deadline, &ClientDOM.target!(&1, locator)) do
+        {%Session{} = session, target} -> dispatch_keys(session, locator, target, key, deadline)
+        navigation -> navigation
+      end
+    end)
+  end
 
-    case resolve_live_action(session, locator, options, &ClientDOM.target!(&1, locator)) do
-      {%Session{} = session, target} ->
-        phases = Enum.filter([:keydown, :keyup], &key_binding?(target, &1))
-        phases = if phases == [], do: [:keydown], else: phases
+  defp dispatch_keys(session, locator, target, key, deadline) do
+    phases = Enum.filter([:keydown, :keyup], &key_binding?(target, &1))
+    phases = if phases == [], do: [:keydown], else: phases
 
-        Enum.reduce_while(phases, session, fn phase, session ->
-          case dispatch_key(session, locator, key, phase, options) do
-            %Session{} = session -> {:cont, session}
-            navigation -> {:halt, navigation}
-          end
-        end)
-
-      navigation ->
-        navigation
-    end
+    Enum.reduce_while(phases, session, fn phase, session ->
+      case dispatch_key(session, locator, key, phase, deadline) do
+        %Session{} = session -> {:cont, session}
+        navigation -> {:halt, navigation}
+      end
+    end)
   end
 
   defp key_binding?(target, phase) do
@@ -317,20 +353,19 @@ defmodule Fluffy.Driver.Live do
       attribute(target.attributes, "phx-window-#{phase}") != nil
   end
 
-  defp dispatch_key(session, locator, key, phase, options) do
-    case resolve_live_action(session, locator, options, &ClientDOM.target!(&1, locator)) do
+  defp dispatch_key(session, locator, key, phase, deadline) do
+    case resolve_live_action(session, locator, deadline, &ClientDOM.target!(&1, locator)) do
       {%Session{} = session, target} ->
         state = Session.page_state(session)
-        context = owning_view_context(state.view, target)
 
-        result =
-          try do
-            render_view_event(state.client_dom, context, target.selector, phase, %{"key" => key})
-          catch
-            :exit, reason -> raise Fluffy.LiveViewError, reason: reason
-          end
+        with {:ok, context} <- owning_view_context(session, target) do
+          result =
+            dispatch_view_event(session, fn ->
+              render_view_event(state.client_dom, context, target.selector, phase, %{"key" => key})
+            end)
 
-        commit_render_result(session, state.client_dom, result, context.view)
+          commit_render_result(session, state.client_dom, result, context.view)
+        end
 
       navigation ->
         navigation
@@ -371,12 +406,10 @@ defmodule Fluffy.Driver.Live do
   defp client_dom(session), do: session |> Session.page_state() |> Map.fetch!(:client_dom)
   defp document(session), do: session |> client_dom() |> Map.fetch!(:document)
 
-  defp resolve_live_action(session, locator, options, action) do
-    options = Keyword.validate!(options, [:timeout])
-
+  defp resolve_live_action(session, locator, deadline, action) do
     case Retry.run_current(
            session,
-           options,
+           deadline,
            &ActionResolver.attempt(&1, locator, action),
            &refresh/1,
            &wait_for_retry/2
@@ -386,8 +419,8 @@ defmodule Fluffy.Driver.Live do
     end
   end
 
-  defp eventually(session, options, attempt) do
-    Retry.run(session, options, attempt, &refresh/1, &wait_for_retry/2)
+  defp eventually(session, deadline, attempt) do
+    Retry.run(session, deadline, attempt, &refresh/1, &wait_for_retry/2)
   end
 
   defp refresh(session) do
@@ -402,66 +435,311 @@ defmodule Fluffy.Driver.Live do
           follow_redirect_result(session, {:error, redirect})
       end
     catch
-      :exit, original_reason ->
-        case live_view_exit_event(state.view, state.watcher, Session.context(session).timeout) do
-          {:redirect, redirect} -> follow_redirect_result(session, {:error, redirect})
-          {:died, reason} -> raise Fluffy.LiveViewError, reason: reason
-          :none -> raise Fluffy.LiveViewError, reason: original_reason
-        end
+      :exit, reason -> follow_exit_redirect(session, reason)
     end
   end
 
   defp reconcile_unwrapped(session, client_dom) do
     state = Session.page_state(session)
 
-    case current_redirect(state.view) do
-      {:error, {_kind, _options}} = redirect ->
-        follow_redirect_result(session, redirect)
+    case left_view_event(state, 0) do
+      {:redirect, redirect} ->
+        follow_redirect_result(session, {:error, redirect})
 
-      nil ->
-        case live_view_event(state.watcher, 0) do
-          {:redirect, redirect} ->
-            follow_redirect_result(session, {:error, redirect})
+      {:died, reason} ->
+        raise Fluffy.LiveViewError, reason: reason
 
-          {:died, reason} ->
-            raise Fluffy.LiveViewError, reason: reason
-
-          :none ->
-            try do
-              state.view
-              |> render()
-              |> then(&commit_render_result(session, client_dom, &1))
-            catch
-              :exit, reason ->
-                reconcile_unwrapped_exit(session, state.view, state.watcher, reason)
-            end
+      :none ->
+        try do
+          state.view
+          |> render()
+          |> then(&commit_render_result(session, client_dom, &1))
+        catch
+          :exit, reason -> follow_exit_redirect(session, reason, :exit)
         end
     end
   end
 
-  defp reconcile_unwrapped_exit(session, view, watcher, original_reason) do
-    case live_view_exit_event(view, watcher, Session.context(session).timeout) do
-      {:redirect, redirect} -> follow_redirect_result(session, {:error, redirect})
-      {:died, reason} -> raise Fluffy.LiveViewError, reason: reason
-      :none -> exit(original_reason)
+  # Follows the redirect a view left when a call to it exited. An exit the
+  # view left no redirect for raises a LiveViewError, or exits again when
+  # `unexplained` is `:exit`.
+  defp follow_exit_redirect(session, reason, unexplained \\ :raise) do
+    case {exit_redirect(session), unexplained} do
+      {:none, :raise} -> raise Fluffy.LiveViewError, reason: reason
+      {:none, :exit} -> exit(reason)
+      {redirect, _unexplained} -> follow_redirect_result(session, {:error, redirect})
     end
   end
 
-  defp live_view_exit_event(view, watcher, timeout) do
-    case current_redirect(view) do
+  # A view call exits when the view went away. Return the redirect it left, or
+  # `:none` when it left nothing, and raise when it died.
+  defp exit_redirect(session) do
+    case left_view(session) do
+      {:redirect, redirect} -> redirect
+      {:died, reason} -> raise Fluffy.LiveViewError, reason: reason
+      :none -> :none
+    end
+  end
+
+  # Reports how the view left a call that failed on it, waiting briefly for its
+  # watcher.
+  defp left_view(session) do
+    left_view_event(Session.page_state(session), min(Session.context(session).timeout, @retry_interval))
+  end
+
+  # A redirect an event causes comes back as the event call's result, and each
+  # call that sends the view an event records that it reached the view for the
+  # running action. The call fails only when it finds the view already gone, so
+  # the event never reached it: follow the redirect the view left instead.
+  defp dispatch_view_event(session, dispatch) do
+    case call_view(session, dispatch) do
+      {:ok, result} -> result
+      redirected -> redirected
+    end
+  end
+
+  # render_upload can deliver a chunk and then exit on the view's redirect, so
+  # once it starts, the view may have seen the action. Read the view before the
+  # action first reaches it, so a view that already navigated away counts as
+  # never having seen it. Later uploads follow a delivery and need no read.
+  defp dispatch_view_upload(session, upload, entry_name) do
+    with :ok <- read_view_before_delivery(session, upload.view) do
+      ActionScope.record_delivery()
+      dispatch_view_event(session, fn -> render_upload(upload, entry_name) end)
+    end
+  end
+
+  defp read_view_before_delivery(session, view) do
+    if ActionScope.delivered?() do
+      :ok
+    else
+      with {:ok, _html} <- read_view(session, fn -> render(view) end), do: :ok
+    end
+  end
+
+  # Reads the view without acting on it, such as its children or its upload
+  # config, and reports a redirect the view left for the action to follow,
+  # whether the read exits on it or its client hands it back as the value.
+  defp read_view(session, read) do
+    case call_view(session, read) do
+      {:ok, {:error, {_kind, _options} = redirect}} -> redirected(session, redirect)
+      result -> result
+    end
+  end
+
+  # When the view navigated away, a call exits, or LiveViewTest hands the
+  # redirect back where the caller expected a reply and the caller raises on
+  # it. Either way, follow the redirect the view left. Any other failure,
+  # including a raise on a view that died, stands.
+  defp call_view(session, call) do
+    {:ok, call.()}
+  rescue
+    exception ->
+      stacktrace = __STACKTRACE__
+
+      with true <- redirect_reply_failure?(session, exception, stacktrace),
+           {:redirect, redirect} <- left_view(session) do
+        redirected(session, redirect)
+      else
+        _unexplained -> reraise(exception, stacktrace)
+      end
+  catch
+    :exit, reason ->
+      {:navigate, session, navigation} = follow_exit_redirect(session, reason)
+      {:redirected, session, navigation}
+  end
+
+  # LiveViewTest hands back a redirect in place of a reply only once the view's
+  # client stopped on it, and its own code then fails on that reply. Its own
+  # failures raise ArgumentError, and an error raised outside its code, such as
+  # Fluffy's, is not explained by a redirect.
+  defp redirect_reply_failure?(session, exception, stacktrace) do
+    {_reference, _topic, proxy_pid} = Session.page_state(session).view.proxy
+
+    not is_struct(exception, ArgumentError) and Enum.any?(stacktrace, &live_view_test_frame?/1) and
+      not Process.alive?(proxy_pid)
+  end
+
+  defp live_view_test_frame?({module, _function, _arity, _location}) do
+    module == Phoenix.LiveViewTest or String.starts_with?(Atom.to_string(module), "Elixir.Phoenix.LiveViewTest.")
+  end
+
+  defp live_view_test_frame?(_frame), do: false
+
+  defp redirected(session, redirect) do
+    {:navigate, session, navigation} = follow_redirect_result(session, {:error, redirect})
+    {:redirected, session, navigation}
+  end
+
+  # Runs a Live action within one deadline, recording whether any of its
+  # events reached the view. A navigation found before that landed before the
+  # action: follow it and retry the whole action on the new page within the
+  # remaining timeout, as a Playwright locator retries on the page it finds.
+  # A navigation found once no budget remains fails the action instead, as
+  # Playwright never acts past its deadline, and leaves the navigation unread
+  # for the session's next call. One whose following used up the budget fails
+  # it too, on the new page. Once an event reached the view, the action took effect, so a navigation a later
+  # step finds ends the action on the new page instead, like a browser whose
+  # page navigated mid-action. A redirect the view left since Fluffy last read
+  # it is followed first, so an action that never calls the view, such as a
+  # plain link, acts on the new page too. A patch changes the document in
+  # place, as in a browser, so the action applies the patches the view pushed
+  # since and goes on in the same attempt. An action that fails before
+  # following a navigation leaves its session on its page with the navigation
+  # unread. `arguments` are the driver call's own, which the retry repeats.
+  defp act(session, operation, arguments, action) do
+    deadline = Retry.deadline(session, Keyword.validate!(List.last(arguments), [:timeout]))
+
+    result =
+      ActionScope.run(fn ->
+        result =
+          case unread_navigation(session) do
+            %Session{} = session -> action.(session, deadline)
+            redirected -> redirected
+          end
+
+        finish_action(result, ActionScope.delivered?(), operation, arguments, deadline)
+      end)
+
+    case result do
+      {:retry_on_new_page, session, redirects} ->
+        if Deadline.expired?(deadline), do: raise_navigated_away(operation, arguments)
+        retry_on_new_page(session, redirects, operation, arguments, deadline)
+
+      result ->
+        result
+    end
+  end
+
+  defp finish_action(result, delivered?, operation, arguments, deadline) do
+    case {navigation_found(result), delivered?} do
+      {{session, navigation}, true} ->
+        {:navigate, session, navigation}
+
+      {{session, navigation}, false} ->
+        if Deadline.expired?(deadline), do: raise_navigated_away(operation, arguments)
+
+        {session, redirects} = follow_for_retry(session, navigation)
+        {:retry_on_new_page, session, redirects}
+
+      {:none, _delivered?} ->
+        result
+    end
+  end
+
+  # Follows a navigation an action or expectation found before reaching the
+  # view, for a retry on the new page. The navigation counts toward the retry's
+  # timeout, and its redirect toward the redirect limit of the retries and of
+  # the redirects it leads to. Following it can fail before the session left
+  # its page, such as at that limit: the session then stays there, so the failed
+  # call puts back the view messages it took there. Once it left, they are moot.
+  defp follow_for_retry(session, %Redirect{} = navigation) do
+    state = Session.page_state(session)
+    redirects = HTTP.count_redirect!(ActionScope.redirects(), URI.parse(Session.current_page(session).url))
+
+    try do
+      {Fluffy.Backend.navigate(session, %{navigation | redirects: redirects}), redirects}
+    catch
+      kind, reason ->
+        if Session.page_state(session) != state, do: ActionScope.record_left_page()
+        :erlang.raise(kind, reason, __STACKTRACE__)
+    end
+  end
+
+  # Runs outside the action's scope, as an action of its own on the page its
+  # `redirects`-th redirect landed on. Expectations retry the same way.
+  defp retry_on_new_page(session, redirects, operation, arguments, deadline) do
+    remaining = Deadline.remaining(deadline)
+    arguments = List.update_at(arguments, -1, &put_timeout(&1, remaining))
+    ActionScope.after_redirects(redirects, fn -> Fluffy.__dispatch_driver__(session, operation, arguments) end)
+  end
+
+  defp put_timeout(%Expect{} = expectation, timeout), do: Expect.Internal.merge_options(expectation, timeout: timeout)
+  defp put_timeout(options, timeout), do: Keyword.put(options, :timeout, timeout)
+
+  defp raise_navigated_away(operation, arguments) do
+    raise Fluffy.ActionabilityError,
+      action: action_label(operation, arguments),
+      reason: :navigated_away,
+      locator: hd(arguments)
+  end
+
+  defp action_label(:set_checked, [_locator, desired, _options]), do: if(desired, do: :check, else: :uncheck)
+  defp action_label(operation, _arguments), do: operation
+
+  # Checks the mailbox only: a view that left or patched reports it to Fluffy
+  # right away. Returns the session on the patched document, if any, or the
+  # redirect the view left.
+  defp unread_navigation(session) do
+    case left_view_event(Session.page_state(session), 0) do
+      {:redirect, redirect} -> redirected(session, redirect)
+      {:died, reason} -> raise Fluffy.LiveViewError, reason: reason
+      :none -> apply_unread_patches(session)
+    end
+  end
+
+  # A patch also changes what the view renders, so read the view for the
+  # patched document before committing the patched URL. The last patch
+  # decides the URL.
+  defp apply_unread_patches(session) do
+    case unread_patches(Session.page_state(session).view, []) do
+      [] ->
+        session
+
+      patches ->
+        case refresh(session) do
+          %Session{} = session -> apply_patches(session, patches)
+          {:navigate, session, navigation} -> {:redirected, session, navigation}
+        end
+    end
+  end
+
+  defp unread_patches(view, patches) do
+    case take_patch(view) do
+      nil -> Enum.reverse(patches)
+      patch -> unread_patches(view, [patch | patches])
+    end
+  end
+
+  defp apply_patches(session, patches) do
+    {_reference, {:patch, _topic, %{to: destination}}} = List.last(patches)
+    session = commit_patch(session, destination)
+    Enum.each(patches, &ActionScope.record_applied/1)
+    session
+  end
+
+  defp commit_patch(session, destination) do
+    Fluffy.Backend.navigate(session, Navigation.patch(destination, Session.page_state(session)))
+  end
+
+  # A navigation the action found before it finished, whether a view call or
+  # the wait for its target saw it.
+  defp navigation_found({:redirected, session, navigation}), do: {session, navigation}
+  defp navigation_found({:navigate, session, navigation, {:retry, _remaining}}), do: {session, navigation}
+  defp navigation_found(_result), do: :none
+
+  # Reports how the view left: the redirect its client handed Fluffy, or what
+  # its watcher saw, waiting up to `wait` for the watcher.
+  defp left_view_event(state, wait) do
+    case current_redirect(state.view) do
       {:error, redirect} -> {:redirect, redirect}
-      nil -> live_view_event(watcher, min(timeout, @retry_interval))
+      nil -> live_view_event(state.watcher, wait)
     end
   end
 
   defp live_view_event(watcher, wait) do
     receive do
-      {:fluffy_live_view, ^watcher, event} -> event
+      {:fluffy_live_view, ^watcher, event} = message ->
+        ActionScope.record_taken(message)
+        event
     after
       wait -> :none
     end
   end
 
+  # A patch changes the document in place, so the wait commits it and goes on
+  # there, while a redirect ends the wait on the new page. A committed patch
+  # stays applied even if the action fails, so the wait does not record it.
   defp wait_for_retry(session, wait) do
     state = Session.page_state(session)
     %{proxy: {reference, topic, _proxy_pid}} = state.view
@@ -469,12 +747,14 @@ defmodule Fluffy.Driver.Live do
 
     receive do
       {^reference, {:patch, ^topic, %{to: destination}}} ->
-        {:navigate, session, Navigation.patch(destination, state)}
+        commit_patch(session, destination)
 
-      {:fluffy_live_view, ^watcher, {:died, reason}} ->
+      {:fluffy_live_view, ^watcher, {:died, reason}} = message ->
+        ActionScope.record_taken(message)
         raise Fluffy.LiveViewError, reason: reason
 
-      {:fluffy_live_view, ^watcher, {:redirect, redirect}} ->
+      {:fluffy_live_view, ^watcher, {:redirect, redirect}} = message ->
+        ActionScope.record_taken(message)
         follow_redirect_result(session, {:error, redirect})
     after
       wait -> session
@@ -524,6 +804,10 @@ defmodule Fluffy.Driver.Live do
     follow_redirect_result(session, redirect)
   end
 
+  defp commit_render_result(_session, _client_dom, {:redirected, %Session{}, _navigation} = redirected, _event_view) do
+    redirected
+  end
+
   defp commit_render_result(session, client_dom, result, _event_view) when is_binary(result) do
     state = Session.page_state(session)
 
@@ -553,12 +837,8 @@ defmodule Fluffy.Driver.Live do
       {:error, redirect} ->
         follow_redirect_result(session, {:error, redirect})
 
-      {:exit, original_reason} ->
-        case live_view_exit_event(state.view, state.watcher, Session.context(session).timeout) do
-          {:redirect, redirect} -> follow_redirect_result(session, {:error, redirect})
-          {:died, reason} -> raise Fluffy.LiveViewError, reason: reason
-          :none -> raise Fluffy.LiveViewError, reason: original_reason
-        end
+      {:exit, reason} ->
+        follow_exit_redirect(session, reason)
     end
   end
 
@@ -567,10 +847,19 @@ defmodule Fluffy.Driver.Live do
   end
 
   defp current_patch(view) do
+    case take_patch(view) do
+      {_reference, {:patch, _topic, %{to: destination}}} -> destination
+      nil -> nil
+    end
+  end
+
+  defp take_patch(view) do
     %{proxy: {reference, topic, _}} = view
 
     receive do
-      {^reference, {:patch, ^topic, %{to: destination}}} -> destination
+      {^reference, {:patch, ^topic, %{to: _destination}}} = message ->
+        ActionScope.record_taken(message)
+        message
     after
       0 -> nil
     end
@@ -580,7 +869,8 @@ defmodule Fluffy.Driver.Live do
     %{proxy: {reference, topic, _}} = view
 
     receive do
-      {^reference, {:redirect, ^topic, %{to: _destination} = options}} ->
+      {^reference, {:redirect, ^topic, %{to: _destination} = options}} = message ->
+        ActionScope.record_taken(message)
         {:error, {:redirect, options}}
     after
       0 -> nil
@@ -588,30 +878,28 @@ defmodule Fluffy.Driver.Live do
   end
 
   defp dispatch_live_change(session, client_dom, %Fluffy.HTML.Target{} = target) do
-    state = Session.page_state(session)
-    event_context = owning_view_context(state.view, target)
-    event_view = event_context.view
-    session = Session.put_page_state(session, %{state | client_dom: client_dom})
+    with {:ok, event_context} <- owning_view_context(session, target) do
+      state = Session.page_state(session)
+      session = Session.put_page_state(session, %{state | client_dom: client_dom})
 
-    case ClientDOM.change_event(client_dom, target) do
-      nil ->
-        session
+      case ClientDOM.change_event(client_dom, target) do
+        nil ->
+          session
 
-      event ->
-        payload =
-          event.fields
-          |> Form.to_params()
-          |> Map.put("_target", event.target_name || "undefined")
-          |> decode_merge_target()
+        event ->
+          payload =
+            event.fields
+            |> Form.to_params()
+            |> Map.put("_target", event.target_name || "undefined")
+            |> decode_merge_target()
 
-        result =
-          try do
-            render_view_event(client_dom, event_context, event.dispatcher_selector, :change, payload)
-          catch
-            :exit, reason -> raise Fluffy.LiveViewError, reason: reason
-          end
+          result =
+            dispatch_view_event(session, fn ->
+              render_view_event(client_dom, event_context, event.dispatcher_selector, :change, payload)
+            end)
 
-        commit_render_result(session, client_dom, result, event_view)
+          commit_render_result(session, client_dom, result, event_context.view)
+      end
     end
   end
 
@@ -623,11 +911,9 @@ defmodule Fluffy.Driver.Live do
     payload = Form.to_params(submission.fields)
 
     result =
-      try do
+      dispatch_view_event(session, fn ->
         render_view_event(client_dom, event_context, form_selector, :submit, payload)
-      catch
-        :exit, reason -> raise Fluffy.LiveViewError, reason: reason
-      end
+      end)
 
     commit_render_result(session, client_dom, result, event_view)
   end
@@ -636,47 +922,88 @@ defmodule Fluffy.Driver.Live do
   # owner lookup. Teleported portal content belongs to the view that owns the
   # portal, and elements outside every LiveView fall back to the main view.
   # `root_id` is the container that LiveViewTest selectors are relative to; it
-  # is nil when element/2 cannot reach the target.
-  defp owning_view_context(root_view, target) do
-    target.ancestors
-    |> Kernel.++([target])
-    |> Enum.reduce(%{view: root_view, root_id: nil, layout?: true}, fn candidate, context ->
-      teleported = attribute(candidate.attributes, "data-phx-teleported")
+  # is nil when element/2 cannot reach the target. Finding a nested view reads
+  # the view's children, so a view that navigated away reports its redirect.
+  defp owning_view_context(session, target) do
+    read_view(session, fn -> find_owning_view_context(Session.page_state(session).view, target) end)
+  end
 
-      case {attribute(candidate.attributes, "data-phx-session"), attribute(candidate.attributes, "id")} do
-        _teleported when is_binary(teleported) ->
-          view =
-            find_view(root_view, teleported) ||
-              raise Fluffy.LiveViewError, reason: {:nested_live_view_not_found, teleported, root_view.id}
-
-          %{view: view, root_id: nil, layout?: false}
-
-        {session, id} when is_binary(session) and session != "" and id == root_view.id ->
-          %{view: root_view, root_id: candidate.id, layout?: false}
-
-        {session, id} when is_binary(session) and session != "" and is_binary(id) and id != "" ->
-          if context.layout? do
-            raise Fluffy.CapabilityError,
-              capability: :root_layout_live_views,
-              driver: :live,
-              detail: "LiveViewTest does not connect LiveView #{inspect(id)} rendered outside the main LiveView"
+  defp find_owning_view_context(root_view, target) do
+    result =
+      Enum.reduce_while(
+        target.ancestors ++ [target],
+        {:ok, %{view: root_view, root_id: nil, layout?: true}},
+        fn candidate, {:ok, context} ->
+          case candidate_view_context(root_view, context, candidate) do
+            {:ok, context} -> {:cont, {:ok, context}}
+            redirect -> {:halt, redirect}
           end
+        end
+      )
 
+    case result do
+      {:ok, context} -> context
+      redirect -> redirect
+    end
+  end
+
+  defp candidate_view_context(root_view, context, candidate) do
+    teleported = attribute(candidate.attributes, "data-phx-teleported")
+
+    case {attribute(candidate.attributes, "data-phx-session"), attribute(candidate.attributes, "id")} do
+      _teleported when is_binary(teleported) ->
+        case find_view(root_view, teleported) do
+          {:ok, nil} -> raise Fluffy.LiveViewError, reason: {:nested_live_view_not_found, teleported, root_view.id}
+          {:ok, view} -> {:ok, %{view: view, root_id: nil, layout?: false}}
+          redirect -> redirect
+        end
+
+      {session, id} when is_binary(session) and session != "" and id == root_view.id ->
+        {:ok, %{view: root_view, root_id: candidate.id, layout?: false}}
+
+      {session, id} when is_binary(session) and session != "" and is_binary(id) and id != "" ->
+        if context.layout? do
+          raise Fluffy.CapabilityError,
+            capability: :root_layout_live_views,
+            driver: :live,
+            detail: "LiveViewTest does not connect LiveView #{inspect(id)} rendered outside the main LiveView"
+        end
+
+        with {:ok, children} <- view_children(context.view) do
           view =
-            find_live_child(context.view, id) ||
+            Enum.find(children, &(&1.id == id)) ||
               raise Fluffy.LiveViewError,
                 reason: {:nested_live_view_not_found, id, context.view.id}
 
-          %{context | view: view, root_id: candidate.id}
+          {:ok, %{context | view: view, root_id: candidate.id}}
+        end
 
-        _not_a_live_root ->
-          context
-      end
-    end)
+      _not_a_live_root ->
+        {:ok, context}
+    end
   end
 
+  # Returns `{:ok, view}`, or `{:ok, nil}` when no view has the id.
+  defp find_view(%{id: id} = view, id), do: {:ok, view}
+
   defp find_view(view, id) do
-    if view.id == id, do: view, else: Enum.find_value(live_children(view), &find_view(&1, id))
+    with {:ok, children} <- view_children(view) do
+      Enum.reduce_while(children, {:ok, nil}, fn child, not_found ->
+        case find_view(child, id) do
+          {:ok, nil} -> {:cont, not_found}
+          found -> {:halt, found}
+        end
+      end)
+    end
+  end
+
+  # A view whose client stopped on a redirect hands the redirect back in place
+  # of its children.
+  defp view_children(view) do
+    case live_children(view) do
+      {:error, {_kind, _options}} = redirect -> redirect
+      children -> {:ok, children}
+    end
   end
 
   defp view_selector(_client_dom, _selector, %{root_id: nil}), do: nil
@@ -694,12 +1021,15 @@ defmodule Fluffy.Driver.Live do
   defp render_view_event(client_dom, context, selector, kind, payload) do
     element = element(context.view, selector_for_view(client_dom, selector, context))
 
-    case kind do
-      :change -> render_change(element, payload)
-      :submit -> render_submit(element, payload)
-      :keydown -> render_keydown(element, payload)
-      :keyup -> render_keyup(element, payload)
-    end
+    result =
+      case kind do
+        :change -> render_change(element, payload)
+        :submit -> render_submit(element, payload)
+        :keydown -> render_keydown(element, payload)
+        :keyup -> render_keyup(element, payload)
+      end
+
+    ActionScope.delivered(result)
   end
 
   defp selector_for_view(client_dom, selector, %{root_id: root_id}) do
@@ -726,45 +1056,52 @@ defmodule Fluffy.Driver.Live do
     end
 
     target = ClientDOM.target!(state.client_dom, locator)
-    event_context = owning_view_context(state.view, target)
-    form_id = Form.owner_id(ClientDOM.index(state.client_dom), target)
 
-    if is_nil(event_context.root_id) do
-      raise Fluffy.CapabilityError,
-        capability: :file_uploads,
-        driver: :live,
-        detail: "LiveView-managed file uploads outside the LiveView container, such as in a portal, require Playwright"
+    with {:ok, event_context} <- owning_view_context(session, target) do
+      if is_nil(event_context.root_id) do
+        raise Fluffy.CapabilityError,
+          capability: :file_uploads,
+          driver: :live,
+          detail: "LiveView-managed file uploads outside the LiveView container, such as in a portal, require Playwright"
+      end
+
+      form_id = Form.owner_id(ClientDOM.index(state.client_dom), target)
+
+      form_selector =
+        selector_for_view(state.client_dom, ClientDOM.selector_for_node_id(state.client_dom, form_id), event_context)
+
+      upload_name = existing_upload_name!(target)
+      # Validate the selection before starting an upload client it would leak.
+      client_dom = ClientDOM.set_input_files(state.client_dom, locator, selected_files)
+
+      # Starting the upload client reads the view's upload config.
+      with {:ok, upload} <-
+             read_view(session, fn ->
+               file_input!(session, event_context.view, form_selector, upload_name, selected_files)
+             end) do
+        start_live_upload(session, client_dom, selected_files, target, event_context, form_id, form_selector, upload)
+      end
     end
+  end
 
-    form_selector =
-      selector_for_view(
-        state.client_dom,
-        ClientDOM.selector_for_node_id(state.client_dom, form_id),
-        event_context
-      )
+  defp file_input!(session, view, form_selector, upload_name, selected_files) do
+    entries =
+      Enum.map(selected_files, fn selected_file ->
+        %{
+          content: selected_file.bytes,
+          last_modified: nil,
+          name: selected_file.name,
+          size: selected_file.size,
+          type: selected_file.content_type
+        }
+      end)
 
-    upload_name = existing_upload_name!(target)
+    UploadCompat.file_input!(view, form_selector, upload_name, entries, Session.context(session).http.endpoint)
+  end
+
+  defp start_live_upload(session, client_dom, selected_files, target, event_context, form_id, form_selector, upload) do
     auto_upload? = live_auto_upload?(target)
     append? = live_multiple_file_input?(target) and live_upload_present?(session, form_id)
-    client_dom = ClientDOM.set_input_files(state.client_dom, locator, selected_files)
-
-    upload =
-      UploadCompat.file_input!(
-        event_context.view,
-        form_selector,
-        upload_name,
-        Enum.map(selected_files, fn selected_file ->
-          %{
-            content: selected_file.bytes,
-            last_modified: nil,
-            name: selected_file.name,
-            size: selected_file.size,
-            type: selected_file.content_type
-          }
-        end),
-        Session.context(session).http.endpoint
-      )
-
     session = if append?, do: session, else: release_live_upload_for_form(session, form_id)
 
     :ok =
@@ -791,13 +1128,12 @@ defmodule Fluffy.Driver.Live do
       )
 
     result =
-      try do
+      dispatch_view_event(session, fn ->
         event_context.view
         |> element(form_selector)
         |> render_change(upload)
-      catch
-        :exit, reason -> raise Fluffy.LiveViewError, reason: reason
-      end
+        |> ActionScope.delivered()
+      end)
 
     case commit_render_result(session, client_dom, result, event_context.view) do
       %Session{} = session when auto_upload? ->
@@ -1035,18 +1371,16 @@ defmodule Fluffy.Driver.Live do
     payload = Form.to_params(submission.fields)
 
     submit_result =
-      try do
+      dispatch_view_event(session, fn ->
         render_view_event(state.client_dom, event_context, form_selector, :submit, payload)
-      catch
-        :exit, reason -> raise Fluffy.LiveViewError, reason: reason
-      end
+      end)
 
     case commit_render_result(session, state.client_dom, submit_result, event_context.view) do
       %Session{} = session ->
         release_live_upload_for_form(session, form_id)
 
-      {:navigate, %Session{} = session, navigation} ->
-        {:navigate, release_live_upload_for_form(session, form_id), navigation}
+      {kind, %Session{} = session, navigation} when kind in [:navigate, :redirected] ->
+        {kind, release_live_upload_for_form(session, form_id), navigation}
     end
   end
 
@@ -1073,26 +1407,18 @@ defmodule Fluffy.Driver.Live do
 
   defp dispatch_live_upload(session, upload, entry_names, event_context) do
     Enum.reduce_while(entry_names, {:ok, session}, fn entry_name, {:ok, session} ->
-      upload_result =
-        try do
-          render_upload(upload, entry_name)
-        catch
-          :exit, reason -> raise Fluffy.LiveViewError, reason: reason
-        end
+      upload_result = dispatch_view_upload(session, upload, entry_name)
 
       case upload_result do
-        {:error, _entry_errors} ->
+        # A progress callback that navigates returns its redirect, which
+        # commits like any other render result.
+        {:error, entry_errors} when not is_tuple(entry_errors) ->
           {:halt, {:entry_error, session}}
 
         _result ->
           state = Session.page_state(session)
 
-          case commit_render_result(
-                 session,
-                 state.client_dom,
-                 upload_result,
-                 event_context.view
-               ) do
+          case commit_render_result(session, state.client_dom, upload_result, event_context.view) do
             %Session{} = session -> {:cont, {:ok, session}}
             navigation -> {:halt, {:navigation, navigation}}
           end
