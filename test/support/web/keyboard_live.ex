@@ -220,6 +220,15 @@ defmodule Fluffy.TestWeb.KeyboardLive do
       <label>
         Crash key <input id="crash-key" phx-keydown="crash" phx-key="Enter" />
       </label>
+      <label>
+        Valued key
+        <input id="valued-key" value="x" phx-keydown="element-keydown" phx-keyup="element-keyup" />
+      </label>
+
+      <label>
+        Disabled keyup key <input id="disabled-keyup-key" disabled phx-keyup="element-keyup" />
+      </label>
+
       <label :if={!@leaving?}>
         Leaving key <input id="leaving-key" phx-keydown="leave" phx-keyup="element-keyup" />
       </label>

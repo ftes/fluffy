@@ -46,6 +46,7 @@ Fluffy now runs on PlaywrightEx 0.17, a port of the official Playwright client w
 
 ### Fixed
 
+- A LiveView `press` sends its keyup to the binding its target had when the press started, as a browser does: a keydown that removes, moves, or rebinds its target no longer drops the keyup or sends it to another element, even with `first()`, `last()`, or an input without an id. A keydown that removes the LiveComponent handling the key still loses the keyup, since LiveViewTest has destroyed the component by then.
 - No unused-function warning when Fluffy is compiled without Ecto.
 - A Playwright session starts when `config :fluffy, :playwright` leaves out `timeout:`, using its 15 seconds default instead of raising `KeyError`.
 - Playwright actions and expectations default to the session's `timeout:`, like LiveView.

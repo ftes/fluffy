@@ -18,18 +18,19 @@ defmodule Fluffy.Driver.Live.Event do
     keyup: ["phx-keyup", "phx-window-keyup"]
   }
 
-  def push(view, %{attributes: attributes}, kind, payload) do
+  def push(view, %{attributes: attributes}, kind, payload, target_gone? \\ fn _target -> false end) do
     case Enum.find_value(Map.fetch!(@bindings, kind), &attribute(attributes, &1)) do
       nil -> render(view)
-      declaration -> exec(view, declaration, attributes, kind, payload)
+      declaration -> exec(view, declaration, attributes, kind, payload, target_gone?)
     end
   end
 
   # Each command that reaches the view records its delivery, so a later
   # command that finds the view gone does not undo the earlier ones.
-  def exec(view, declaration, attributes, kind, payload) do
+  def exec(view, declaration, attributes, kind, payload, target_gone? \\ fn _target -> false end) do
     declaration
     |> commands()
+    |> Enum.reject(&target_gone?(&1, attributes, target_gone?))
     |> Enum.reduce_while(render(view), fn command, result ->
       case dispatch(command, view, attributes, kind, payload) do
         nil -> {:cont, result}
@@ -43,6 +44,15 @@ defmodule Fluffy.Driver.Live.Event do
   # form events carry the serialized form.
   def values(attributes) do
     for {"phx-value-" <> key, value} <- attributes, into: %{}, do: {key, value}
+  end
+
+  # A key event also carries the element's value attribute, as LiveViewTest's
+  # element events do.
+  def key_values(attributes) do
+    case attribute(attributes, "value") do
+      nil -> values(attributes)
+      value -> attributes |> values() |> Map.put("value", value)
+    end
   end
 
   defp commands("[" <> _ = encoded), do: Phoenix.json_library().decode!(encoded)
@@ -72,6 +82,12 @@ defmodule Fluffy.Driver.Live.Event do
   end
 
   defp dispatch(_command, _view, _attributes, _kind, _payload), do: nil
+
+  defp target_gone?(["push", options], attributes, target_gone?) do
+    target_gone?.(options["target"] || attribute(attributes, "phx-target"))
+  end
+
+  defp target_gone?(_command, _attributes, _target_gone?), do: false
 
   defp attribute(attributes, name) do
     case List.keyfind(attributes, name, 0) do

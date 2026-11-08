@@ -83,6 +83,17 @@ defmodule Fluffy.Conformance.LivePatchActionTest do
     end
 
     @tag driver: driver
+    test "a last() key press keeps its keyup on its id-less input when the keydown adds a row with #{driver}", %{
+      driver: driver
+    } do
+      driver
+      |> live_session()
+      |> visit("/live/patching/rows-append")
+      |> press("Twin" |> by_label(exact: true) |> last(), "Enter")
+      |> visible("Row keyups: b.")
+    end
+
+    @tag driver: driver
     test "a key press goes on after its keydown changes what its locator matches with #{driver}", %{driver: driver} do
       driver
       |> live_session()
@@ -175,6 +186,79 @@ defmodule Fluffy.Conformance.LivePatchActionTest do
     visible(session, "Uploaded: 1")
     visible(session, "Saves: 0")
     assert url_query(session) == "step=uploaded"
+  end
+
+  # Browsers race the keyup against the keydown's patch. Chromium and WebKit send
+  # it first by default, which these pin; Firefox or a press delay may not.
+  @tag driver: :phoenix
+  test "a key press sends its keyup after its keydown removes the target" do
+    :phoenix
+    |> live_session()
+    |> visit("/live/patching/keydown-remove-unpatched")
+    |> press(by_label("Keys", exact: true), "Enter")
+    |> visible("Keyups: 1")
+  end
+
+  @tag driver: :phoenix
+  test "a key press sends its keyup after its keydown removes its keyup binding" do
+    :phoenix
+    |> live_session()
+    |> visit("/live/patching/keydown-unbind")
+    |> press(by_label("Keys", exact: true), "Enter")
+    |> visible("Keyups: 1")
+  end
+
+  for {pick, row} <- [first: "a", last: "b"] do
+    @tag driver: :phoenix
+    test "a key press keeps its keyup on its id-less input when the keydown removes the #{pick} row" do
+      input = by_label("Twin", exact: true)
+
+      :phoenix
+      |> live_session()
+      |> visit("/live/patching/rows-remove")
+      |> press(apply(Fluffy.Locator, unquote(pick), [input]), "Enter")
+      |> visible("Row keyups: #{unquote(row)}.")
+    end
+  end
+
+  @tag driver: :phoenix
+  test "a first() key press keeps its keyup on its id-less input when the keydown prepends a twin" do
+    :phoenix
+    |> live_session()
+    |> visit("/live/patching/rows-prepend")
+    |> press("Twin" |> by_label(exact: true) |> first(), "Enter")
+    |> visible("Row keyups: a.")
+  end
+
+  @tag driver: :phoenix
+  test "a key press sends its keyup to the view when its keydown removes a plain phx-target element" do
+    :phoenix
+    |> live_session()
+    |> visit("/live/patching/plain-target")
+    |> press(by_label("Plain keys", exact: true), "Enter")
+    |> visible("Keyups: 1")
+  end
+
+  @tag driver: :phoenix
+  test "a key press ends cleanly when its keydown makes the parent remove its nested view" do
+    :phoenix
+    |> live_session()
+    |> visit("/live/nested")
+    |> press(by_label("Remove child key", exact: true), "Enter")
+    |> visible("Child removed")
+  end
+
+  # LiveViewTest destroys the component before a keyup can reach it. A browser
+  # that sends the keyup before the patch still reaches it.
+  for mode <- ~w(component-selector component-replaced component-myself) do
+    @tag driver: :phoenix
+    test "a key press ends cleanly when its keydown removes the #{mode} that handles its keyup" do
+      :phoenix
+      |> live_session()
+      |> visit("/live/patching/#{unquote(mode)}")
+      |> press(by_label("Component keys", exact: true), "Enter")
+      |> visible("Component keyups: 0")
+    end
   end
 
   @tag driver: :phoenix

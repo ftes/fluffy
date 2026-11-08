@@ -74,11 +74,14 @@ suppression.
 - **Static:** unsupported; raises `Fluffy.CapabilityError` for every key.
 - **LiveView:** passes the supplied key unchanged to LiveViewTest keydown/keyup
   handlers bound to the selected element. This includes window bindings on that
-  element, without discovering handlers elsewhere in the document. LiveViewTest
-  supplies event values and targeting. Fluffy does not apply `phx-key` filters,
-  translate keys or modifier combinations, synthesize field values, or simulate
-  focus movement, editing, activation, or implicit submission. An element with
-  no keyboard binding raises. Callers supply the intended key value.
+  element, without discovering handlers elsewhere in the document. Event values
+  and targeting follow LiveViewTest. Keyup uses the binding the element had when
+  the press started, even if the keydown's patch changes or removes it, except
+  that a keydown removing the LiveComponent handling the key loses the keyup.
+  Fluffy does not apply `phx-key` filters, translate keys or modifier
+  combinations, synthesize field values, or simulate focus movement, editing,
+  activation, or implicit submission. An element with no keyboard binding
+  raises. Callers supply the intended key value.
 - **Playwright:** native browser key presses, including default actions and
   Playwright modifier syntax.
 
