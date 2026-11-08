@@ -112,18 +112,21 @@ defmodule Fluffy.Backend.Playwright.Document do
   `evaluate` has no timeout and waits while a script blocks the page's main
   thread, so the read gives up after `timeout`.
   """
-  def probe!(frame, cursor, timeout), do: probe!(frame, cursor, timeout, Deadline.new(timeout))
+  def probe!(frame, cursor, timeout), do: probe!(frame, cursor, timeout, Deadline.new(timeout), 5)
 
-  defp probe!(frame, cursor, timeout, deadline) do
+  defp probe!(frame, cursor, timeout, deadline, backoff) do
     case Bounded.within(Deadline.remaining(deadline, 1), fn -> Frame.evaluate(frame, @probe, cursor) end) do
       {:ok, {:ok, %{"url" => url, "document" => document, "cursor" => next, "kind" => kind}}} ->
         %{url: url, document: document, cursor: next, kind: kind(kind)}
 
       # A navigation replaced the execution context mid-call; read the new one.
-      # A redirect chain (a page that navigates on load) replaces several.
+      # A redirect chain (a page that navigates on load) replaces several, so
+      # back off rather than call the driver in a busy loop.
       {:ok, {:error, error}} ->
+        if context_destroyed?(error), do: Process.sleep(min(backoff, Deadline.remaining(deadline)))
+
         if context_destroyed?(error) and not Deadline.expired?(deadline),
-          do: probe!(frame, cursor, timeout, deadline),
+          do: probe!(frame, cursor, timeout, deadline, min(backoff * 2, 50)),
           else: raise(error)
 
       :timeout ->
