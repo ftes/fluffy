@@ -377,20 +377,13 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
   end
 
   @tag driver: :phoenix
-  test "an action without timeout budget fails when its one attempt on the new page finds another navigation" do
-    session =
-      :phoenix
-      |> live_session()
-      |> visit("/live/chamber-map?async=patch-twice")
-      |> await_unread_patches(:phoenix, 2, nil)
-
-    assert_raise Fluffy.OperationError, ~r/navigated away/, fn ->
-      click(session, by_role(:link, name: "Chamber from here", exact: true), timeout: 0)
-    end
-
-    session
-    |> expect(Fluffy.Expect.page_to_have_url("/live/chamber-map?step=late-patched"))
-    |> expect("Map position: late-patched" |> by_text(exact: true) |> to_be_visible())
+  test "an action without timeout budget acts on the document Live patches changed after the last read" do
+    :phoenix
+    |> live_session()
+    |> visit("/live/chamber-map?async=patch-twice")
+    |> await_unread_patches(:phoenix, 2, nil)
+    |> click(by_role(:link, name: "Chamber from here", exact: true), timeout: 0)
+    |> expect(Fluffy.Expect.page_to_have_url("/chamber?from=late-patched"))
   end
 
   # Waits until the view has navigated away without Fluffy reading it, so the

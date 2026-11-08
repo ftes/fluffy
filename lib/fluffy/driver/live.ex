@@ -54,7 +54,7 @@ defmodule Fluffy.Driver.Live do
 
   @impl true
   def click(%Session{} = session, %Locator{} = locator, action_options \\ []) do
-    act(session, :click, [locator, action_options], fn deadline ->
+    act(session, :click, [locator, action_options], fn session, deadline ->
       case resolve_live_action(session, locator, deadline, &ClientDOM.click(&1, locator)) do
         {%Session{} = session, {client_dom, target}} -> commit_click(session, client_dom, target)
         navigation -> navigation
@@ -176,7 +176,7 @@ defmodule Fluffy.Driver.Live do
 
   @impl true
   def submit(%Session{} = session, %Locator{} = locator, options \\ []) do
-    act(session, :submit, [locator, options], fn deadline ->
+    act(session, :submit, [locator, options], fn session, deadline ->
       case resolve_live_action(session, locator, deadline, &ClientDOM.target!(&1, locator)) do
         {%Session{} = session, target} -> commit_submit(session, target)
         navigation -> navigation
@@ -203,7 +203,7 @@ defmodule Fluffy.Driver.Live do
 
   @impl true
   def fill(%Session{} = session, %Locator{} = locator, value, options \\ []) do
-    act(session, :fill, [locator, value, options], fn deadline ->
+    act(session, :fill, [locator, value, options], fn session, deadline ->
       case resolve_live_action(session, locator, deadline, &ClientDOM.fill(&1, locator, value, :live)) do
         {%Session{} = session, {client_dom, target}} -> dispatch_live_change(session, client_dom, target)
         navigation -> navigation
@@ -213,7 +213,7 @@ defmodule Fluffy.Driver.Live do
 
   @impl true
   def set_input_files(%Session{} = session, %Locator{} = locator, source_paths, selected_files, options \\ []) do
-    act(session, :set_input_files, [locator, source_paths, selected_files, options], fn deadline ->
+    act(session, :set_input_files, [locator, source_paths, selected_files, options], fn session, deadline ->
       case resolve_live_action(session, locator, deadline, &select_files(&1, locator, selected_files)) do
         {%Session{} = session, :live_upload} ->
           set_live_upload(session, locator, selected_files)
@@ -252,7 +252,7 @@ defmodule Fluffy.Driver.Live do
 
   @impl true
   def set_checked(%Session{} = session, %Locator{} = locator, desired, options \\ []) do
-    act(session, :set_checked, [locator, desired, options], fn deadline ->
+    act(session, :set_checked, [locator, desired, options], fn session, deadline ->
       case resolve_live_action(session, locator, deadline, &ClientDOM.set_checked(&1, locator, desired)) do
         {%Session{} = session, {candidate_client_dom, target}} ->
           state = Session.page_state(session)
@@ -294,7 +294,7 @@ defmodule Fluffy.Driver.Live do
 
   @impl true
   def select_option(%Session{} = session, %Locator{} = locator, requested, options \\ []) do
-    act(session, :select_option, [locator, requested, options], fn deadline ->
+    act(session, :select_option, [locator, requested, options], fn session, deadline ->
       case resolve_live_action(session, locator, deadline, &ClientDOM.select_option(&1, locator, requested)) do
         {%Session{} = session, {client_dom, target}} -> dispatch_live_change(session, client_dom, target)
         navigation -> navigation
@@ -304,7 +304,7 @@ defmodule Fluffy.Driver.Live do
 
   @impl true
   def press(%Session{} = session, %Locator{} = locator, key, options \\ []) do
-    act(session, :press, [locator, key, options], fn deadline ->
+    act(session, :press, [locator, key, options], fn session, deadline ->
       case resolve_live_action(session, locator, deadline, &ClientDOM.target!(&1, locator)) do
         {%Session{} = session, target} -> dispatch_keys(session, locator, target, key, deadline)
         navigation -> navigation
@@ -553,18 +553,24 @@ defmodule Fluffy.Driver.Live do
   # navigation that attempt finds before reaching the view fails it. Once an
   # event reached the view, the action took effect, so a navigation a later
   # step finds ends the action on the new page instead, like a browser whose
-  # page navigated mid-action. A redirect the view left, or a patch it pushed,
-  # since Fluffy last read it is followed first, so an action that never calls
-  # the view, such as a plain link, acts on the new page too. An action that
-  # fails before following a navigation leaves its session on its page with
-  # the navigation unread. `arguments` are the driver call's own, which the
-  # retry repeats.
+  # page navigated mid-action. A redirect the view left since Fluffy last read
+  # it is followed first, so an action that never calls the view, such as a
+  # plain link, acts on the new page too. A patch changes the document in
+  # place, as in a browser, so the action applies the patches the view pushed
+  # since and goes on in the same attempt. An action that fails before
+  # following a navigation leaves its session on its page with the navigation
+  # unread. `arguments` are the driver call's own, which the retry repeats.
   defp act(session, operation, arguments, action) do
     deadline = Retry.deadline(session, Keyword.validate!(List.last(arguments), [:timeout]))
 
     result =
       ActionScope.run(fn ->
-        result = unread_navigation(session) || action.(deadline)
+        result =
+          case unread_navigation(session) do
+            %Session{} = session -> action.(session, deadline)
+            redirected -> redirected
+          end
+
         finish_action(result, ActionScope.delivered?(), operation, arguments, deadline)
       end)
 
@@ -610,24 +616,40 @@ defmodule Fluffy.Driver.Live do
   defp action_label(operation, _arguments), do: operation
 
   # Checks the mailbox only: a view that left or patched reports it to Fluffy
-  # right away.
+  # right away. Returns the session on the patched document, if any, or the
+  # redirect the view left.
   defp unread_navigation(session) do
     case left_view_event(Session.page_state(session), 0) do
       {:redirect, redirect} -> redirected(session, redirect)
       {:died, reason} -> raise Fluffy.LiveViewError, reason: reason
-      :none -> unread_patch(session)
+      :none -> apply_unread_patches(session)
     end
   end
 
   # A patch also changes what the view renders, so read the view for the
-  # patched page.
-  defp unread_patch(session) do
-    with destination when is_binary(destination) <- current_patch(Session.page_state(session).view) do
-      case refresh(session) do
-        %Session{} = session -> {:redirected, session, Navigation.patch(destination, Session.page_state(session))}
-        {:navigate, session, navigation} -> {:redirected, session, navigation}
-      end
+  # patched document before committing the patched URLs.
+  defp apply_unread_patches(session) do
+    case unread_patches(Session.page_state(session).view, []) do
+      [] ->
+        session
+
+      destinations ->
+        case refresh(session) do
+          %Session{} = session -> Enum.reduce(destinations, session, &commit_patch(&2, &1))
+          {:navigate, session, navigation} -> {:redirected, session, navigation}
+        end
     end
+  end
+
+  defp unread_patches(view, destinations) do
+    case current_patch(view) do
+      nil -> Enum.reverse(destinations)
+      destination -> unread_patches(view, [destination | destinations])
+    end
+  end
+
+  defp commit_patch(session, destination) do
+    Fluffy.Backend.navigate(session, Navigation.patch(destination, Session.page_state(session)))
   end
 
   # A navigation the action found before it finished, whether a view call or
@@ -655,6 +677,8 @@ defmodule Fluffy.Driver.Live do
     end
   end
 
+  # A patch changes the document in place, so the wait commits it and goes on
+  # there, while a redirect ends the wait on the new page.
   defp wait_for_retry(session, wait) do
     state = Session.page_state(session)
     %{proxy: {reference, topic, _proxy_pid}} = state.view
@@ -663,7 +687,7 @@ defmodule Fluffy.Driver.Live do
     receive do
       {^reference, {:patch, ^topic, %{to: destination}}} = message ->
         ActionScope.record_taken(message)
-        {:navigate, session, Navigation.patch(destination, state)}
+        commit_patch(session, destination)
 
       {:fluffy_live_view, ^watcher, {:died, reason}} = message ->
         ActionScope.record_taken(message)
