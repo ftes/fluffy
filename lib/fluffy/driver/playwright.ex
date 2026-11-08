@@ -30,7 +30,7 @@ defmodule Fluffy.Driver.Playwright do
   @impl true
   def open_browser(%Session{} = session, open_fun) do
     frame = Session.page_state(session).frame
-    html = Bounded.within!(session_timeout(session), :content, fn -> Frame.content(frame) end)
+    html = Bounded.within!(Session.timeout(session), :content, fn -> Frame.content(frame) end)
     url = Session.current_page(session).url
     resolver = fn path -> URI.to_string(URI.merge(url, path)) end
     Fluffy.OpenBrowser.write(LazyHTML.from_document(html), resolver, open_fun)
@@ -111,7 +111,7 @@ defmodule Fluffy.Driver.Playwright do
   def set_html(%Session{} = session, html) when is_binary(html) do
     frame = Session.page_state(session).frame
     expression = "html => { document.querySelector('#fluffy-test-root').innerHTML = html }"
-    Bounded.within!(session_timeout(session), :set_html, fn -> Frame.evaluate(frame, expression, html) end)
+    Bounded.within!(Session.timeout(session), :set_html, fn -> Frame.evaluate(frame, expression, html) end)
     session
   end
 
@@ -295,7 +295,7 @@ defmodule Fluffy.Driver.Playwright do
         # check_action_test pins it.
         {:error, %PlaywrightError{message: message}} = error ->
           if message =~ "Clicking the checkbox did not change its state" and
-               Document.activated?(native, cursor, desired, session_timeout(session)),
+               Document.activated?(native, cursor, desired, Session.timeout(session)),
              do: :ok,
              else: error
 
@@ -446,8 +446,6 @@ defmodule Fluffy.Driver.Playwright do
           "Playwright unwrap invalidated the tracked #{kind}; use Fluffy page and session lifecycle APIs"
   end
 
-  defp session_timeout(session), do: Session.timeout(session)
-
   defp locator(session, locator), do: PlaywrightLocator.locator(Session.page_state(session).frame, locator)
 
   # Fluffy's own options stay here; the rest pass through to the PlaywrightEx call.
@@ -476,7 +474,7 @@ defmodule Fluffy.Driver.Playwright do
     {session, before} = prepare_document(session)
     state = Session.page_state(session)
     browser_context = Session.context(session).browser_context
-    bookkeeping_timeout = session_timeout(session)
+    bookkeeping_timeout = Session.timeout(session)
 
     case action.(operation_timeout) do
       {:ok, value} ->
@@ -532,7 +530,7 @@ defmodule Fluffy.Driver.Playwright do
   # navigation that happened outside Fluffy (a late one, or through unwrap/2).
   defp prepare_document(session) do
     state = Session.page_state(session)
-    timeout = session_timeout(session)
+    timeout = Session.timeout(session)
     probe = open_page_probe!(session, state, timeout)
 
     if probe.document == state.document_identity do
