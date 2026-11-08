@@ -40,11 +40,10 @@ defmodule Fluffy.Driver.Live do
 
   @impl true
   def expect(%Session{} = session, %Expect{} = expectation) do
-    options = Keyword.validate!(expectation.options, [:timeout])
-    deadline = Retry.deadline(session, options)
+    deadline = Retry.deadline(session, Keyword.validate!(expectation.options, [:timeout]))
 
     result =
-      eventually(session, options, fn session ->
+      eventually(session, deadline, fn session ->
         case evaluate_expectation(session, expectation) do
           {:ok, passed?, _actual} when passed? != expectation.negated? ->
             {:ok, session}
@@ -408,8 +407,8 @@ defmodule Fluffy.Driver.Live do
     end
   end
 
-  defp eventually(session, options, attempt) do
-    Retry.run(session, options, attempt, &refresh/1, &wait_for_retry/2)
+  defp eventually(session, deadline, attempt) do
+    Retry.run(session, deadline, attempt, &refresh/1, &wait_for_retry/2)
   end
 
   defp refresh(session) do
