@@ -262,7 +262,7 @@ defmodule Fluffy.Backend.Playwright do
   @impl true
   def reload(%Session{} = session, options \\ []) do
     state = Session.page_state(session)
-    native = Keyword.merge([wait_until: :load], Keyword.put(options, :timeout, Session.timeout(session, options)))
+    native = navigation_options(session, options)
     _response = navigate!(:reload, [state.page, native])
     # Bookkeeping uses the session timeout, as after other actions.
     adopt_navigated_document(session, state, Session.timeout(session))
@@ -296,7 +296,7 @@ defmodule Fluffy.Backend.Playwright do
     state = Session.page_state(session)
     session_timeout = Session.timeout(session)
     previous_url = Session.current_page(session).url
-    native = Keyword.merge([wait_until: :load], Keyword.put(options, :timeout, Session.timeout(session, options)))
+    native = navigation_options(session, options)
     response = navigate!(direction, [state.page, native])
     # Bookkeeping uses the session timeout, as after other actions.
     probe = Document.adopted_probe!(state, nil, session_timeout)
@@ -323,6 +323,10 @@ defmodule Fluffy.Backend.Playwright do
     Bounded.within!(timeout, :close_page, fn -> with :ok <- BrowserPage.close(page.state.page), do: {:ok, :ok} end)
     :ok
   end
+
+  # Like visit/2, reload and history wait for the load event by default.
+  defp navigation_options(session, options),
+    do: Keyword.merge([wait_until: :load], Keyword.put(options, :timeout, Session.timeout(session, options)))
 
   defp navigate!(operation, arguments) do
     case apply(BrowserPage, operation, arguments) do
