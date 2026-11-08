@@ -155,11 +155,7 @@ defmodule Fluffy.Backend.Phoenix do
   end
 
   def navigate(%Session{} = session, %Redirect{} = navigation) do
-    url = resolve_url(Session.context(session).http.base_url, navigation.destination, session)
-
-    session
-    |> put_live_redirect_flash(navigation.destination, navigation.flash)
-    |> request(url)
+    follow_redirect(session, navigation.destination, navigation.flash, 0)
   end
 
   def navigate(%Session{} = session, %Patch{} = navigation) do
@@ -316,12 +312,17 @@ defmodule Fluffy.Backend.Phoenix do
   # A browser follows a redirect from a view's mount like an HTTP redirect, so
   # it counts toward the same redirect limit.
   defp follow_mount_redirect(session, {_kind, %{to: destination} = options}, url, redirects) do
-    redirects = HTTP.count_redirect!(redirects, url)
-    destination_url = resolve_url(Session.context(session).http.base_url, destination, session)
+    follow_redirect(session, destination, options[:flash], HTTP.count_redirect!(redirects, url))
+  end
+
+  # Requests a view's redirect destination, after `redirects` redirects so far,
+  # with the flash it carries.
+  defp follow_redirect(session, destination, flash, redirects) do
+    url = resolve_url(Session.context(session).http.base_url, destination, session)
 
     session
-    |> put_live_redirect_flash(destination, options[:flash])
-    |> request(destination_url, :get, nil, nil, redirects)
+    |> put_live_redirect_flash(url, flash)
+    |> request(url, :get, nil, nil, redirects)
   end
 
   defp mounted_client_dom(html), do: html |> LazyHTML.from_document() |> ClientDOM.from_document()
@@ -339,20 +340,18 @@ defmodule Fluffy.Backend.Phoenix do
     session |> put_http(http) |> finish_response(response, nil)
   end
 
-  defp request(session, url, method \\ :get, body \\ nil, download_name \\ nil, redirects \\ 0) do
+  defp request(session, url, method, body, download_name \\ nil, redirects \\ 0) do
     {http, response} = HTTP.request(Session.context(session).http, url, method, body, redirects)
     session |> put_http(http) |> finish_response(response, download_name)
   end
 
-  defp put_live_redirect_flash(session, _destination, nil), do: session
+  defp put_live_redirect_flash(session, _url, nil), do: session
 
-  defp put_live_redirect_flash(session, destination, flash) do
+  defp put_live_redirect_flash(session, url, flash) do
     token =
       if is_map(flash),
         do: Phoenix.LiveView.Utils.sign_flash(Session.context(session).http.endpoint, flash),
         else: flash
-
-    url = resolve_url(Session.context(session).http.base_url, destination, session)
 
     http =
       HTTP.store_cookie_header(
