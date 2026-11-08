@@ -63,6 +63,19 @@ defmodule Fluffy.Conformance.BlockedPageTest do
     assert System.monotonic_time(:millisecond) - started < 10_000
   end
 
+  test "a blocked page that page code navigated reports its URL without waiting for the page" do
+    session = :playwright |> session_for_html(@html, base_url: Fluffy.TestServer.base_url()) |> short_timeout()
+    Fluffy.Playwright.evaluate(session, "history.pushState(null, '', 'pushed')")
+
+    assert_raise RuntimeError, ~r/evaluate did not finish within 1000ms/, fn ->
+      Fluffy.Playwright.evaluate(session, "() => { while (true) {} }")
+    end
+
+    # Waiting for the page under this timeout would outlast the test's own.
+    session = Fluffy.Session.put_context(session, %{Fluffy.Session.context(session) | timeout: 600_000})
+    assert session |> Fluffy.Playwright.current_page() |> Fluffy.Page.url() |> String.ends_with?("/pushed")
+  end
+
   test "failure artifacts of a blocked page are captured without waiting for it", %{tmp_dir: tmp_dir} do
     session = frozen_session()
     started = System.monotonic_time(:millisecond)

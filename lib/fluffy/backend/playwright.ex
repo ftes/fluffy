@@ -112,12 +112,16 @@ defmodule Fluffy.Backend.Playwright do
     %{page | url: BrowserPage.url(page.state.page), document_id: document_id}
   end
 
+  # Reading metadata such as a page's URL must not wait out a page blocked by
+  # a dialog or a long script.
+  @snapshot_probe_timeout 300
+
   # Actions adopt the document they find. One that page code navigated to
   # since is read from the page; a closed or unresponsive page keeps the
   # adopted identity.
   defp document_identity(context, state) do
     if Document.navigated?(state),
-      do: Document.probe!(state.frame, nil, context.timeout).document,
+      do: Document.probe!(state.frame, nil, min(context.timeout, @snapshot_probe_timeout)).document,
       else: state.document_identity
   rescue
     _error -> state.document_identity
