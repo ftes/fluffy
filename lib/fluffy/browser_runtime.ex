@@ -1,61 +1,55 @@
 defmodule Fluffy.BrowserRuntime do
   @moduledoc false
 
+  # Assigns each session to the least-loaded browser slot, ties to the lowest,
+  # so that sequential sessions reuse one browser and only real concurrency
+  # launches more. Assignment never waits: slots launch in their own processes.
+
   use GenServer
 
-  alias Fluffy.Backend.Playwright.Bounded
-  alias PlaywrightEx.Browser
-  alias PlaywrightEx.BrowserType
-  alias PlaywrightEx.Playwright
+  alias __MODULE__.Slot
 
-  @driver Fluffy.PlaywrightDriver
-
-  defstruct [
-    :browser,
-    :browser_closer,
-    :browser_launcher,
-    :engine,
-    :launch_options,
-    :playwright_options,
-    :playwright_name,
-    :runtime_supervisor,
-    :transport_starter,
-    :timeout,
-    launch_count: 0
-  ]
+  defstruct [:timeout, slots: [], assignments: %{}]
 
   @opaque t :: %__MODULE__{
-            browser: Browser.t() | nil,
-            browser_closer: function(),
-            browser_launcher: function(),
-            engine: :chromium | :firefox | :webkit,
-            launch_options: keyword(),
-            playwright_options: keyword(),
-            playwright_name: atom(),
-            runtime_supervisor: GenServer.name(),
-            transport_starter: function(),
             timeout: timeout(),
-            launch_count: non_neg_integer()
+            slots: [pid()],
+            assignments: %{pid() => {pid(), reference()}}
           }
 
-  @doc "Returns the shared browser, launching it if needed. Raises if it cannot launch."
+  @doc "Returns the calling process's browser, launching it if needed. Raises if it cannot launch."
   def browser(server \\ __MODULE__) do
-    server |> GenServer.call(:browser, :infinity) |> browser!()
+    server |> assign() |> Slot.browser()
   end
 
-  @doc "Returns a browser other than `lost`, launching one if `lost` is current."
+  @doc "Returns a browser other than `lost` from the calling process's slot, launching one if `lost` is current."
   def replace(server \\ __MODULE__, lost) do
-    server |> GenServer.call({:replace, lost.guid}, :infinity) |> browser!()
+    server |> assign() |> Slot.replace(lost)
   end
 
-  # A failed launch raises in the session that asked for the browser. Crashing the
-  # runtime instead would restart every running session.
-  defp browser!({:ok, browser}), do: browser
-  defp browser!({:error, error}), do: raise(error)
+  # A process that exits releases its slot without this. Releasing as a session
+  # closes frees the slot for the very next session.
+  @doc "Frees the calling process's slot."
+  def release(server \\ __MODULE__) do
+    GenServer.call(server, {:release, self()}, :infinity)
+  end
 
+  # Asks the slots from the caller, so a launching slot holds up only this call.
   def status(server \\ __MODULE__) do
-    GenServer.call(server, :status)
+    slots =
+      for {slot, load} <- GenServer.call(server, :loads, :infinity),
+          do: Map.merge(Slot.status(slot), %{pid: slot, load: load})
+
+    %{
+      browser: Enum.find_value(slots, & &1.browser),
+      initialized?: Enum.any?(slots, & &1.browser),
+      launch_count: slots |> Enum.map(& &1.launch_count) |> Enum.sum(),
+      playwright_name: hd(slots).playwright_name,
+      slots: slots
+    }
   end
+
+  defp assign(server), do: GenServer.call(server, {:assign, self()}, :infinity)
 
   def start_link(options) do
     name = Keyword.get(options, :name, __MODULE__)
@@ -65,125 +59,83 @@ defmodule Fluffy.BrowserRuntime do
   @impl true
   def init(options) do
     Process.flag(:trap_exit, true)
+    slot_options = Keyword.drop(options, [:name, :pool_size])
 
-    state = %__MODULE__{
-      timeout: Keyword.fetch!(options, :timeout),
-      engine: Keyword.get(options, :engine, :chromium),
-      launch_options: Keyword.fetch!(options, :launch_options),
-      playwright_options: Keyword.fetch!(options, :playwright_options),
-      playwright_name: Keyword.get(options, :playwright_name, @driver),
-      runtime_supervisor: Keyword.get(options, :runtime_supervisor, Fluffy.BrowserRuntime.Supervisor),
-      transport_starter: Keyword.get(options, :transport_starter, &start_transport/3),
-      browser_launcher: Keyword.get(options, :browser_launcher, &launch_browser/3),
-      browser_closer: Keyword.get(options, :browser_closer, &Browser.close/1)
-    }
+    slots =
+      for _slot <- 1..Keyword.get(options, :pool_size, 1) do
+        {:ok, slot} = Slot.start_link(slot_options)
+        slot
+      end
 
-    {:ok, state}
+    {:ok, %__MODULE__{timeout: Keyword.fetch!(options, :timeout), slots: slots}}
   end
 
   @impl true
-  def handle_call(:browser, _from, %__MODULE__{browser: nil} = state) do
-    case launch(state) do
-      {:ok, browser} ->
-        state = %{state | browser: browser, launch_count: state.launch_count + 1}
-        {:reply, {:ok, browser}, state}
+  def handle_call({:assign, owner}, _from, state) do
+    case state.assignments do
+      %{^owner => {slot, _monitor}} ->
+        {:reply, slot, state}
 
-      {:error, reason} ->
-        {:reply, {:error, launch_error(state.engine, reason)}, state}
+      assignments ->
+        slot = least_loaded(state)
+        assignment = {slot, Process.monitor(owner)}
+        {:reply, slot, %{state | assignments: Map.put(assignments, owner, assignment)}}
     end
   end
 
-  def handle_call(:browser, _from, state) do
-    {:reply, {:ok, state.browser}, state}
+  def handle_call({:release, owner}, _from, state) do
+    {:reply, :ok, unassign(state, owner)}
   end
 
-  # The lost browser may still run, refusing contexts; close it without
-  # holding up the callers waiting for its replacement.
-  def handle_call({:replace, guid}, from, %{browser: %{guid: guid} = lost} = state) do
-    {:ok, _pid} =
-      Task.Supervisor.start_child(Fluffy.TaskSupervisor, fn ->
-        Bounded.within(state.timeout, fn -> close_browser(state, lost) end)
-      end)
-
-    handle_call(:browser, from, %{state | browser: nil})
-  end
-
-  def handle_call({:replace, _guid}, from, state), do: handle_call(:browser, from, state)
-
-  def handle_call(:status, _from, state) do
-    {:reply,
-     %{
-       browser: state.browser,
-       initialized?: not is_nil(state.browser),
-       launch_count: state.launch_count,
-       playwright_name: state.playwright_name
-     }, state}
+  def handle_call(:loads, _from, state) do
+    loads = loads(state)
+    {:reply, Enum.map(state.slots, &{&1, Map.get(loads, &1, 0)}), state}
   end
 
   @impl true
-  # A lost driver disconnects every browser. The next session relaunches
-  # against the restarted driver's root.
-  def handle_info({:browser_disconnected, guid}, %{browser: %{guid: guid}} = state),
-    do: {:noreply, %{state | browser: nil}}
+  def handle_info({:DOWN, _monitor, :process, owner, _reason}, state) do
+    {:noreply, unassign(state, owner)}
+  end
+
+  def handle_info({:EXIT, slot, reason}, state) do
+    if slot in state.slots, do: {:stop, reason, state}, else: {:noreply, state}
+  end
 
   def handle_info(_message, state), do: {:noreply, state}
 
+  # Each slot closes its browser within the runtime's timeout, all at once.
   @impl true
-  def terminate(_reason, %{browser: nil}), do: :ok
-
   def terminate(_reason, state) do
-    Bounded.within(state.timeout, fn -> close_browser(state, state.browser) end)
+    state.slots
+    |> Enum.map(fn slot -> Task.async(fn -> stop_slot(slot) end) end)
+    |> Task.yield_many(state.timeout)
+
     :ok
+  end
+
+  defp stop_slot(slot) do
+    GenServer.stop(slot, :shutdown, :infinity)
   catch
-    _kind, _reason -> :ok
+    :exit, _reason -> :ok
   end
 
-  # Shutdown is best effort, and a crash in the unlinked call would only log.
-  defp close_browser(state, browser) do
-    state.browser_closer.(browser)
-  catch
-    _kind, _reason -> :ok
+  defp least_loaded(state) do
+    loads = loads(state)
+    Enum.min_by(state.slots, &Map.get(loads, &1, 0))
   end
 
-  # Invalid launch options raise in PlaywrightEx. That raise belongs to the
-  # caller too, not to the runtime.
-  defp launch(state) do
-    launch_options = Keyword.put_new(state.launch_options, :timeout, state.timeout)
-
-    with :ok <- state.transport_starter.(state.runtime_supervisor, state.playwright_name, state.playwright_options) do
-      state.browser_launcher.(state.engine, state.playwright_name, launch_options)
-    end
-  rescue
-    exception -> {:error, exception}
-  catch
-    :exit, reason -> {:error, {:exit, reason}}
+  defp loads(state) do
+    Enum.frequencies_by(state.assignments, fn {_owner, {slot, _monitor}} -> slot end)
   end
 
-  defp start_transport(runtime_supervisor, name, playwright_options) do
-    child = {PlaywrightEx.Supervisor, Keyword.put(playwright_options, :name, name)}
+  defp unassign(state, owner) do
+    case Map.pop(state.assignments, owner) do
+      {nil, _assignments} ->
+        state
 
-    case DynamicSupervisor.start_child(runtime_supervisor, child) do
-      {:ok, _pid} -> :ok
-      {:error, {:already_started, _pid}} -> :ok
-      {:error, reason} -> {:error, {:transport, reason}}
-    end
-  end
-
-  defp launch_error(engine, {:transport, reason}),
-    do: RuntimeError.exception("could not start the Playwright driver for #{engine}: #{inspect(reason)}")
-
-  defp launch_error(engine, reason) do
-    detail = if is_exception(reason), do: Exception.message(reason), else: inspect(reason)
-    RuntimeError.exception("could not launch the Playwright #{engine} browser: #{detail}")
-  end
-
-  defp launch_browser(engine, name, launch_options) do
-    runtime = self()
-    browser_type = apply(Playwright, engine, [PlaywrightEx.playwright(name)])
-
-    with {:ok, browser} <- BrowserType.launch(browser_type, launch_options) do
-      Browser.on(browser, :disconnected, fn browser -> send(runtime, {:browser_disconnected, browser.guid}) end)
-      {:ok, browser}
+      {{_slot, monitor}, assignments} ->
+        Process.demonitor(monitor, [:flush])
+        %{state | assignments: assignments}
     end
   end
 end

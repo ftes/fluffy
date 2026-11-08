@@ -56,6 +56,7 @@ config :fluffy,
     engine: :chromium,
     timeout: 15_000,
     launch_options: [headless: true],
+    pool_size: 1,
     artifact_dir: System.get_env("FLUFFY_ARTIFACT_DIR"),
     trace_dir: System.get_env("FLUFFY_TRACE_DIR", "traces"),
     log_browser_console: true
@@ -69,6 +70,7 @@ pinned driver is used.
 `launch_options: [timeout: 10_000]` to give browser launch a separate timeout;
 otherwise it uses the global Playwright `timeout`. To use a system browser, set
 `launch_options: [executable_path: System.find_executable("google-chrome-stable")]`.
+`mix playwright_ex.install --no-browsers` installs only the driver for an existing browser.
 If the browser disconnects, Fluffy launches a new one for the next session.
 
 Setting `artifact_dir` is recommended for every project that runs Playwright
@@ -84,10 +86,15 @@ calls `Fluffy.Playwright.trace/1` or `Fluffy.Playwright.trace/2`.
 Set `engine: :firefox` or `engine: :webkit` after installing the corresponding
 browser (`mix playwright_ex.install -- firefox`).
 See [Browser baseline](capabilities.md#browser-baseline) for conformance coverage.
-Fluffy launches one browser lazily per configured runtime lane and creates a
-fresh isolated `BrowserContext` for each session. ExUnit `max_cases` is the
-default concurrency bound; Fluffy does not add a second pool limiter.
-Lower it when browser startup or the host becomes resource-constrained.
+Fluffy creates a fresh isolated `BrowserContext` for each session, in a pool of
+`pool_size` browsers (default `1`). No driver or browser starts until a session
+needs one. Sessions go to the least-loaded browser, ties to the lowest slot, so
+sequential sessions reuse one browser and only concurrent sessions launch more.
+A lost browser is launched again for the next session that needs it, and the
+others keep running. ExUnit `max_cases` remains the concurrency bound; lower it
+when browser startup or the host becomes resource-constrained. Firefox dispatches
+input for all of a browser's pages in one queue and times out under load, so set
+`pool_size` to about half the logical cores for Firefox suites.
 
 ## Ecto sandbox
 
