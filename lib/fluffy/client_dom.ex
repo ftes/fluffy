@@ -201,10 +201,10 @@ defmodule Fluffy.ClientDOM do
     end
   end
 
-  def fill(%__MODULE__{} = client_dom, %Locator{} = locator, value, driver) when is_binary(value) do
+  def fill(%__MODULE__{} = client_dom, %Locator{} = locator, value, driver, action \\ :fill) when is_binary(value) do
     target = target!(client_dom, locator)
-    ensure_target_enabled!(target, :fill, locator)
-    Actionability.ensure_editable!(target.element, :fill, locator)
+    ensure_target_enabled!(target, action, locator)
+    Actionability.ensure_editable!(target.element, action, locator)
 
     if target.tag not in ["input", "textarea"] do
       raise Fluffy.CapabilityError,

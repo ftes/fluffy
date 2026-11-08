@@ -1,5 +1,4 @@
 defmodule Fluffy.PlaywrightMembers do
-  @moduledoc false
   # How Fluffy covers each member of the PlaywrightEx facade it builds on, checked
   # against the installed PlaywrightEx by `Fluffy.PlaywrightMembersTest`. Review it on a
   # PlaywrightEx upgrade: new members are unclassified, removed ones stale.
@@ -11,6 +10,10 @@ defmodule Fluffy.PlaywrightMembers do
   #     value through `Fluffy.unwrap/2`. "gap:" marks candidates for a Fluffy API.
   #   * `{:denied, reason}` - breaks Fluffy's tracking or ownership when called natively.
   #   * `{:na, reason}` - not applicable: legacy, deprecated, or tooling.
+  @moduledoc false
+
+  alias Fluffy.Playwright.Keyboard
+  alias Fluffy.Playwright.Mouse
 
   @legacy {:na, "selector-string duplicate of a Locator member"}
   @discouraged {:na, "deprecated or discouraged upstream"}
@@ -52,6 +55,8 @@ defmodule Fluffy.PlaywrightMembers do
   def counterparts(PlaywrightEx.FrameLocator), do: [Fluffy.FrameLocator]
   def counterparts(PlaywrightEx.BrowserContext), do: [Fluffy.Playwright]
   def counterparts(PlaywrightEx.Clock), do: [Fluffy.Playwright.Clock]
+  def counterparts(PlaywrightEx.Keyboard), do: [Keyboard]
+  def counterparts(PlaywrightEx.Mouse), do: [Mouse]
   def counterparts(PlaywrightEx.Dialog), do: [Fluffy.Dialog]
   def counterparts(PlaywrightEx.Download), do: [Fluffy.Download]
   def counterparts(PlaywrightEx.FileChooser), do: [Fluffy.FileChooser]
@@ -68,10 +73,11 @@ defmodule Fluffy.PlaywrightMembers do
           {~w(and_ or_ filter first last nth content_frame frame_locator)a, :wrapped},
           {~w(click fill check uncheck select_option press set_input_files)a, :wrapped},
           {~w(hover drag_to press_sequentially focus blur)a, :wrapped},
+          {~w(clear set_checked dblclick tap dispatch_event select_text scroll_into_view_if_needed screenshot)a,
+           :wrapped},
           {[:locator], {:renamed, {Fluffy.Locator, :by_css, 2}}},
           {[:visible], {:renamed, {Fluffy.Locator, :filter, 2}}},
-          {~w(clear set_checked dblclick tap dispatch_event select_text scroll_into_view_if_needed screenshot
-              evaluate evaluate_all evaluate_handle bounding_box aria_snapshot aria_snapshot_json wait_for
+          {~w(evaluate evaluate_all evaluate_handle bounding_box aria_snapshot aria_snapshot_json wait_for
               wait_for_function drop all within)a, @native_locator},
           {~w(count text_content inner_text inner_html all_text_contents all_inner_texts get_attribute input_value
               is_checked is_disabled is_editable is_enabled is_hidden is_visible)a, @native_read},
@@ -95,6 +101,9 @@ defmodule Fluffy.PlaywrightMembers do
       PlaywrightEx.Page =>
         [
           {~w(reload go_back go_forward url opener evaluate screenshot on once off)a, :wrapped},
+          {~w(set_viewport_size emulate_media)a, :wrapped},
+          {[:keyboard], {:renamed, {Keyboard, :press, 3}}},
+          {[:mouse], {:renamed, {Mouse, :click, 4}}},
           {[:goto], {:renamed, {Fluffy, :visit, 2}}},
           {[:close], {:renamed, {Fluffy.Playwright, :close_page, 2}}},
           {[:add_listener], {:renamed, {Fluffy, :on, 4}}},
@@ -110,9 +119,8 @@ defmodule Fluffy.PlaywrightMembers do
           {[:frame_locator], {:renamed, {Fluffy.Locator, :frame_locator, 1}}},
           {[:title], {:unwrap, "gap: read; page_to_have_title asserts it"}},
           {~w(expect_console_message expect_request_finished expect_websocket expect_worker)a, @native_event},
-          {~w(set_viewport_size viewport_size emulate_media route unroute unroute_all route_from_har
-              route_web_socket keyboard mouse touchscreen aria_snapshot aria_snapshot_json add_locator_handler
-              remove_locator_handler)a, @page_gap},
+          {~w(viewport_size route unroute unroute_all route_from_har route_web_socket touchscreen aria_snapshot
+              aria_snapshot_json add_locator_handler remove_locator_handler)a, @page_gap},
           {~w(wait_for_load_state wait_for_url wait_for_function content add_init_script add_script_tag
               add_style_tag expose_binding expose_function set_extra_http_headers console_messages
               clear_console_messages page_errors clear_page_errors requests workers context main_frame frame
@@ -165,12 +173,8 @@ defmodule Fluffy.PlaywrightMembers do
         {[:remove_all_listeners], @own_listeners},
         {~w(set_default_timeout set_default_navigation_timeout)a, @own_timeouts}
       ],
-      PlaywrightEx.Keyboard => [
-        {~w(down insert_text press type up)a, {:unwrap, "gap: page-global input on PlaywrightEx.Page.keyboard/1"}}
-      ],
-      PlaywrightEx.Mouse => [
-        {~w(click dblclick down move up wheel)a, {:unwrap, "gap: page-global input on PlaywrightEx.Page.mouse/1"}}
-      ],
+      PlaywrightEx.Keyboard => [{~w(down insert_text press type up)a, :wrapped}],
+      PlaywrightEx.Mouse => [{~w(click dblclick down move up wheel)a, :wrapped}],
       PlaywrightEx.Touchscreen => [{[:tap], {:unwrap, "page-global input on PlaywrightEx.Page.touchscreen/1"}}],
       PlaywrightEx.Dialog => [{~w(accept dismiss page type message default_value)a, :wrapped}],
       PlaywrightEx.Download => [

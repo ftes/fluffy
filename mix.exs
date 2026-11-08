@@ -107,6 +107,8 @@ defmodule Fluffy.MixProject do
           Fluffy.Event,
           Fluffy.Playwright,
           Fluffy.Playwright.Clock,
+          Fluffy.Playwright.Keyboard,
+          Fluffy.Playwright.Mouse,
           Fluffy.Sandbox
         ],
         "Sessions and results": [

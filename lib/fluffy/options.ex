@@ -22,6 +22,8 @@ defmodule Fluffy.Options do
       {PlaywrightEx.Locator, :click, 2,
        [:button, :click_count, :delay, :force, :modifiers, :position, :scroll, :steps, :trial]},
     fill: {PlaywrightEx.Locator, :fill, 3, [:force]},
+    clear: {PlaywrightEx.Locator, :clear, 2, [:force]},
+    set_checked: {PlaywrightEx.Locator, :set_checked, 3, [:force, :position, :scroll, :trial]},
     check: {PlaywrightEx.Locator, :check, 2, [:force, :position, :scroll, :trial]},
     uncheck: {PlaywrightEx.Locator, :uncheck, 2, [:force, :position, :scroll, :trial]},
     select_option: {PlaywrightEx.Locator, :select_option, 3, [:force]},
@@ -37,26 +39,52 @@ defmodule Fluffy.Options do
     press_sequentially: {PlaywrightEx.Locator, :press_sequentially, 3, [:delay]},
     focus: {PlaywrightEx.Locator, :focus, 2, []},
     blur: {PlaywrightEx.Locator, :blur, 2, []},
+    dblclick:
+      {PlaywrightEx.Locator, :dblclick, 2, [:button, :delay, :force, :modifiers, :position, :scroll, :steps, :trial]},
+    tap: {PlaywrightEx.Locator, :tap, 2, [:force, :modifiers, :position, :scroll, :trial]},
+    dispatch_event: {PlaywrightEx.Locator, :dispatch_event, 4, []},
+    select_text: {PlaywrightEx.Locator, :select_text, 2, [:force]},
+    scroll_into_view_if_needed: {PlaywrightEx.Locator, :scroll_into_view_if_needed, 2, []},
+    locator_screenshot:
+      {PlaywrightEx.Locator, :screenshot, 2,
+       [:animations, :caret, :mask, :mask_color, :omit_background, :quality, :scale, :style, :type]},
+    emulate_media:
+      {PlaywrightEx.Page, :emulate_media, 2, [:color_scheme, :contrast, :forced_colors, :media, :reduced_motion]},
+    keyboard_press: {PlaywrightEx.Keyboard, :press, 3, [:delay]},
+    keyboard_type: {PlaywrightEx.Keyboard, :type, 3, [:delay]},
+    mouse_click: {PlaywrightEx.Mouse, :click, 4, [:button, :click_count, :delay]},
+    mouse_dblclick: {PlaywrightEx.Mouse, :dblclick, 4, [:button, :delay]},
+    mouse_down: {PlaywrightEx.Mouse, :down, 2, [:button, :click_count]},
+    mouse_up: {PlaywrightEx.Mouse, :up, 2, [:button, :click_count]},
+    mouse_move: {PlaywrightEx.Mouse, :move, 4, [:steps]},
     go_back: {PlaywrightEx.Page, :go_back, 2, [:wait_until]},
     go_forward: {PlaywrightEx.Page, :go_forward, 2, [:wait_until]},
     install_clock: {PlaywrightEx.Clock, :install, 2, [:time]}
   ]
 
   @fluffy_native_keys [:timeout]
-  @denied_native_keys [:no_wait_after, :signal]
+  # `path` is the positional argument of an element screenshot.
+  @denied_native_keys [:no_wait_after, :signal, :path]
 
-  # Upstream docs of a passed-through option that Fluffy's behavior completes.
-  @native_option_docs [
-    wait_until:
-      "*Playwright only.* When Playwright considers the navigation done: `:commit`, `:domcontentloaded`, " <>
-        "`:load` (the default) or `:networkidle`. Fluffy then still waits until the document is parsed " <>
-        "and its LiveViews are connected, as after every navigation."
+  # Upstream docs and types of a passed-through option that Fluffy's behavior completes.
+  @native_option_overrides [
+    wait_until: [
+      doc:
+        "*Playwright only.* When Playwright considers the navigation done: `:commit`, `:domcontentloaded`, " <>
+          "`:load` (the default) or `:networkidle`. Fluffy then still waits until the document is parsed " <>
+          "and its LiveViews are connected, as after every navigation."
+    ],
+    mask: [
+      type_spec: quote(do: [Fluffy.Locator.t()]),
+      type_doc: "list of `t:Fluffy.Locator.t/0`",
+      doc: "*Playwright only.* Locators of the elements to cover with a box of `:mask_color` in the screenshot."
+    ]
   ]
 
   @action_schemas Map.new(@native_actions ++ @playwright_actions, fn {action, {module, fun, arity, keys}} ->
                     native =
                       for {key, entry} <- Native.schema(module, fun, arity, keys) do
-                        if doc = @native_option_docs[key], do: {key, Keyword.put(entry, :doc, doc)}, else: {key, entry}
+                        {key, Keyword.merge(entry, Keyword.get(@native_option_overrides, key, []))}
                       end
 
                     {action, NimbleOptions.new!(@timeout_options ++ native)}

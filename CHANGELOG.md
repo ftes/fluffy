@@ -45,6 +45,8 @@ Fluffy now runs on PlaywrightEx 0.17, a port of the official Playwright client w
 - `Fluffy.Event.close()` resolves with the selected page's handle when it closes.
 - Playwright clock control in `Fluffy.Playwright.Clock`: `install`, `pause_at`, `run_for`, `fast_forward`, `resume`, `set_fixed_time` and `set_system_time`. Fluffy's waits work with a paused clock.
 - `Fluffy.Expect` gains `to_have_text`, `to_contain_text`, `to_have_attribute`, `to_have_class`, `to_contain_class`, `to_have_id`, `to_be_attached`, `to_be_hidden` and `to_be_empty` on every driver, following Playwright's whitespace normalization, regular expressions, per-element lists and strictness. `use_inner_text:` is Playwright only; Phoenix raises `Fluffy.CapabilityError` for it.
+- `Fluffy.clear/3` and `Fluffy.set_checked/4` work on every driver.
+- `Fluffy.Playwright` gains `dblclick`, `tap`, `dispatch_event`, `select_text`, `scroll_into_view_if_needed`, element `screenshot`, `set_viewport_size` and `emulate_media`; `Fluffy.Playwright.Keyboard` and `Fluffy.Playwright.Mouse` send page-wide input. As in Playwright, page-wide input and `dispatch_event` do not wait for a navigation they start; `expect` on the new page before the next action. They accept their PlaywrightEx options except `no_wait_after:` and `signal:`, and raise `Fluffy.CapabilityError` on Phoenix.
 
 ### Fixed
 

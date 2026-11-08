@@ -35,8 +35,8 @@ end
 
 For tests using browser-only helpers, also `import Fluffy.Playwright`. This
 lets you call `new_page`, `current_page`, `pages`, `switch_page`, `close_page`,
-`go_back`, `go_forward`, `hover`, `drag_to`, and `press_sequentially` without
-module qualifiers:
+`go_back`, `go_forward`, `hover`, `drag_to`, `press_sequentially`, `dblclick`,
+and the other browser actions without module qualifiers:
 
 ```elixir
 import Fluffy
@@ -300,6 +300,10 @@ session
 |> assert(visible(by_text("Creature saved")))
 ```
 
+`clear` empties a text input or textarea, like `fill` with `""`. `set_checked`
+takes the desired state as a boolean, for a test that computes it. Both work on
+every driver.
+
 `fill` accepts any value implementing `String.Chars`, such as numbers, dates,
 and custom structs. `select_option` also converts option values and labels,
 including those in `%{value: value}` and `%{label: label}` requests. Conversion
@@ -409,6 +413,29 @@ session
 
 For character-by-character browser typing, use `Fluffy.Playwright.press_sequentially/4`.
 See [LiveView timing and keyboard events](capabilities.md#liveview-timing-and-keyboard-events).
+
+### Browser-only actions
+
+`Fluffy.Playwright` wraps more of Playwright's actions, such as `dblclick`, `tap`,
+`dispatch_event`, `select_text`, `scroll_into_view_if_needed`, element `screenshot`,
+`set_viewport_size`, and `emulate_media`. `Fluffy.Playwright.Keyboard` and
+`Fluffy.Playwright.Mouse` send page-wide input. Each returns the session, adopts
+a navigation it causes, and raises `Fluffy.CapabilityError` on Phoenix:
+
+```elixir
+alias Fluffy.Playwright
+alias Fluffy.Playwright.Keyboard
+
+session
+|> Playwright.set_viewport_size(%{width: 390, height: 844})
+|> Playwright.emulate_media(color_scheme: :dark)
+|> Playwright.dblclick(by_role(:cell, name: "Fluffy"))
+|> Keyboard.press("Enter")
+|> Playwright.screenshot(by_css("table"), "tmp/creatures.png")
+```
+
+`Fluffy.Playwright.tap/3` needs `browser_context: [has_touch: true]` and takes a
+required option list, so `import Fluffy.Playwright` leaves `Kernel.tap/2` usable.
 
 ## Assertions
 

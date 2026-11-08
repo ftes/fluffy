@@ -43,6 +43,30 @@ defmodule Fluffy.Options.NativeGenerated do
          "Whether to bypass the [actionability](https://playwright.dev/docs/actionability) checks. Defaults to `false`.",
          quote(do: boolean())}
     ],
+    {PlaywrightEx.Locator, :clear, 2} => [
+      force:
+        {"`t:boolean/0`",
+         "Whether to bypass the [actionability](https://playwright.dev/docs/actionability) checks. Defaults to `false`.",
+         quote(do: boolean())}
+    ],
+    {PlaywrightEx.Locator, :set_checked, 3} => [
+      force:
+        {"`t:boolean/0`",
+         "Whether to bypass the [actionability](https://playwright.dev/docs/actionability) checks. Defaults to `false`.",
+         quote(do: boolean())},
+      position:
+        {"`t:map/0`",
+         "A point to use relative to the top-left corner of element padding box. If not specified, uses some visible point of the element.",
+         quote(do: %{x: number(), y: number()})},
+      scroll:
+        {"`:auto` | `:none`",
+         "Controls whether Playwright scrolls the element into view before performing the action. Defaults to `:auto`, which scrolls the element into view when necessary, including scrolling nested scrollable containers. When set to `:none`, Playwright does not scroll the element and the action fails if the element is not already in the viewport. This is useful to assert that an element is reachable by the user without additional scrolling.",
+         quote(do: :auto | :none)},
+      trial:
+        {"`t:boolean/0`",
+         "When set, this method only performs the [actionability](https://playwright.dev/docs/actionability) checks and skips the action. Defaults to `false`. Useful to wait until the element is ready for the action without performing it.",
+         quote(do: boolean())}
+    ],
     {PlaywrightEx.Locator, :check, 2} => [
       force:
         {"`t:boolean/0`",
@@ -146,6 +170,166 @@ defmodule Fluffy.Options.NativeGenerated do
     ],
     {PlaywrightEx.Locator, :press_sequentially, 3} => [
       delay: {"`t:number/0`", "Time to wait between key presses in milliseconds. Defaults to 0.", quote(do: number())}
+    ],
+    {PlaywrightEx.Locator, :dblclick, 2} => [
+      button: {"`:left` | `:right` | `:middle`", "Defaults to `:left`.", quote(do: :left | :right | :middle)},
+      delay:
+        {"`t:number/0`", "Time to wait between `mousedown` and `mouseup` in milliseconds. Defaults to 0.",
+         quote(do: number())},
+      force:
+        {"`t:boolean/0`",
+         "Whether to bypass the [actionability](https://playwright.dev/docs/actionability) checks. Defaults to `false`.",
+         quote(do: boolean())},
+      modifiers:
+        {"list of `:alt` | `:control` | `:control_or_meta` | `:meta` | `:shift`",
+         ~s(Modifier keys to press. Ensures that only these modifiers are pressed during the operation, and then restores current modifiers back. If not specified, currently pressed modifiers are used. "ControlOrMeta" resolves to "Control" on Windows and Linux and to "Meta" on macOS.),
+         quote(do: [:alt | :control | :control_or_meta | :meta | :shift])},
+      position:
+        {"`t:map/0`",
+         "A point to use relative to the top-left corner of element padding box. If not specified, uses some visible point of the element.",
+         quote(do: %{x: number(), y: number()})},
+      scroll:
+        {"`:auto` | `:none`",
+         "Controls whether Playwright scrolls the element into view before performing the action. Defaults to `:auto`, which scrolls the element into view when necessary, including scrolling nested scrollable containers. When set to `:none`, Playwright does not scroll the element and the action fails if the element is not already in the viewport. This is useful to assert that an element is reachable by the user without additional scrolling.",
+         quote(do: :auto | :none)},
+      steps:
+        {"`t:integer/0`",
+         "Defaults to 1. Sends `n` interpolated `mousemove` events to represent travel between Playwright's current cursor position and the provided destination. When set to 1, emits a single `mousemove` event at the destination location.",
+         quote(do: integer())},
+      trial:
+        {"`t:boolean/0`",
+         "When set, this method only performs the [actionability](https://playwright.dev/docs/actionability) checks and skips the action. Defaults to `false`. Useful to wait until the element is ready for the action without performing it. Note that keyboard `:modifiers` will be pressed regardless of `:trial` to allow testing elements which are only visible when those keys are pressed.",
+         quote(do: boolean())}
+    ],
+    {PlaywrightEx.Locator, :tap, 2} => [
+      force:
+        {"`t:boolean/0`",
+         "Whether to bypass the [actionability](https://playwright.dev/docs/actionability) checks. Defaults to `false`.",
+         quote(do: boolean())},
+      modifiers:
+        {"list of `:alt` | `:control` | `:control_or_meta` | `:meta` | `:shift`",
+         ~s(Modifier keys to press. Ensures that only these modifiers are pressed during the operation, and then restores current modifiers back. If not specified, currently pressed modifiers are used. "ControlOrMeta" resolves to "Control" on Windows and Linux and to "Meta" on macOS.),
+         quote(do: [:alt | :control | :control_or_meta | :meta | :shift])},
+      position:
+        {"`t:map/0`",
+         "A point to use relative to the top-left corner of element padding box. If not specified, uses some visible point of the element.",
+         quote(do: %{x: number(), y: number()})},
+      scroll:
+        {"`:auto` | `:none`",
+         "Controls whether Playwright scrolls the element into view before performing the action. Defaults to `:auto`, which scrolls the element into view when necessary, including scrolling nested scrollable containers. When set to `:none`, Playwright does not scroll the element and the action fails if the element is not already in the viewport. This is useful to assert that an element is reachable by the user without additional scrolling.",
+         quote(do: :auto | :none)},
+      trial:
+        {"`t:boolean/0`",
+         "When set, this method only performs the [actionability](https://playwright.dev/docs/actionability) checks and skips the action. Defaults to `false`. Useful to wait until the element is ready for the action without performing it. Note that keyboard `:modifiers` will be pressed regardless of `:trial` to allow testing elements which are only visible when those keys are pressed.",
+         quote(do: boolean())}
+    ],
+    {PlaywrightEx.Locator, :select_text, 2} => [
+      force:
+        {"`t:boolean/0`",
+         "Whether to bypass the [actionability](https://playwright.dev/docs/actionability) checks. Defaults to `false`.",
+         quote(do: boolean())}
+    ],
+    {PlaywrightEx.Locator, :screenshot, 2} => [
+      animations:
+        {"`:disabled` | `:allow`",
+         "When set to `:disabled`, stops CSS animations, CSS transitions and Web Animations. Animations get different treatment depending on their duration:",
+         quote(do: :disabled | :allow)},
+      caret:
+        {"`:hide` | `:initial`",
+         "When set to `:hide`, screenshot will hide text caret. When set to `:initial`, text caret behavior will not be changed.  Defaults to `:hide`.",
+         quote(do: :hide | :initial)},
+      mask:
+        {"list of `t:PlaywrightEx.Locator.t/0`",
+         "Specify locators that should be masked when the screenshot is taken. Masked elements will be overlaid with a pink box `#FF00FF` (customized by `:mask_color`) that completely covers its bounding box. The mask is also applied to invisible elements, see [Matching only visible elements](https://playwright.dev/docs/locators#matching-only-visible-elements) to disable that.",
+         quote(do: [PlaywrightEx.Locator.t()])},
+      mask_color:
+        {"`t:String.t/0`",
+         "Specify the color of the overlay box for masked elements, in [CSS color format](https://developer.mozilla.org/en-US/docs/Web/CSS/color_value). Default color is pink `#FF00FF`.",
+         quote(do: String.t())},
+      omit_background:
+        {"`t:boolean/0`",
+         "Hides default white background and allows capturing screenshots with transparency. Not applicable to `jpeg` images. Defaults to `false`.",
+         quote(do: boolean())},
+      quality:
+        {"`t:integer/0`",
+         "The quality of the image, between 0-100. Not applicable to `png` images. For `jpeg` the default is `80`. For `webp`, a quality of `100` (the default) produces a lossless image, while lower values use lossy compression.",
+         quote(do: integer())},
+      scale:
+        {"`:css` | `:device`",
+         "When set to `:css`, screenshot will have a single pixel per each css pixel on the page. For high-dpi devices, this will keep screenshots small. Using `:device` option will produce a single pixel per each device pixel, so screenshots of high-dpi devices will be twice as large or even larger.",
+         quote(do: :css | :device)},
+      style:
+        {"`t:String.t/0`",
+         "Text of the stylesheet to apply while making the screenshot. This is where you can hide dynamic elements, make elements invisible or change their properties to help you creating repeatable screenshots. This stylesheet pierces the Shadow DOM and applies to the inner frames.",
+         quote(do: String.t())},
+      type:
+        {"`:png` | `:jpeg` | `:webp`", "Specify screenshot type, defaults to `:png`.", quote(do: :png | :jpeg | :webp)}
+    ],
+    {PlaywrightEx.Page, :emulate_media, 2} => [
+      color_scheme:
+        {"`:null` | `:light` | `:dark` | `:no_preference`",
+         "Emulates [prefers-colors-scheme](https://developer.mozilla.org/en-US/docs/Web/CSS/@media/prefers-color-scheme) media feature, supported values are `:light` and `:dark`. Passing `:null` disables color scheme emulation. `:no_preference` is deprecated.",
+         quote(do: :null | :light | :dark | :no_preference)},
+      contrast:
+        {"`:null` | `:no_preference` | `:more`",
+         "Emulates `'prefers-contrast'` media feature, supported values are `:no_preference`, `:more`. Passing `:null` disables contrast emulation.",
+         quote(do: :null | :no_preference | :more)},
+      forced_colors:
+        {"`:null` | `:active` | `:none`",
+         "Emulates `'forced-colors'` media feature, supported values are `:active` and `:none`. Passing `:null` disables forced colors emulation.",
+         quote(do: :null | :active | :none)},
+      media:
+        {"`:null` | `:screen` | `:print`",
+         "Changes the CSS media type of the page. The only allowed values are `:screen`, `:print` and `:null`. Passing `:null` disables CSS media emulation.",
+         quote(do: :null | :screen | :print)},
+      reduced_motion:
+        {"`:null` | `:reduce` | `:no_preference`",
+         "Emulates `'prefers-reduced-motion'` media feature, supported values are `:reduce`, `:no_preference`. Passing `:null` disables reduced motion emulation.",
+         quote(do: :null | :reduce | :no_preference)}
+    ],
+    {PlaywrightEx.Keyboard, :press, 3} => [
+      delay:
+        {"`t:number/0`", "Time to wait between `keydown` and `keyup` in milliseconds. Defaults to 0.",
+         quote(do: number())}
+    ],
+    {PlaywrightEx.Keyboard, :type, 3} => [
+      delay: {"`t:number/0`", "Time to wait between key presses in milliseconds. Defaults to 0.", quote(do: number())}
+    ],
+    {PlaywrightEx.Mouse, :click, 4} => [
+      button: {"`:left` | `:right` | `:middle`", "Defaults to `:left`.", quote(do: :left | :right | :middle)},
+      click_count:
+        {"`t:integer/0`",
+         "defaults to 1. See [`UIEvent.detail`](https://developer.mozilla.org/en-US/docs/Web/API/UIEvent/detail).",
+         quote(do: integer())},
+      delay:
+        {"`t:number/0`", "Time to wait between `mousedown` and `mouseup` in milliseconds. Defaults to 0.",
+         quote(do: number())}
+    ],
+    {PlaywrightEx.Mouse, :dblclick, 4} => [
+      button: {"`:left` | `:right` | `:middle`", "Defaults to `:left`.", quote(do: :left | :right | :middle)},
+      delay:
+        {"`t:number/0`", "Time to wait between `mousedown` and `mouseup` in milliseconds. Defaults to 0.",
+         quote(do: number())}
+    ],
+    {PlaywrightEx.Mouse, :down, 2} => [
+      button: {"`:left` | `:right` | `:middle`", "Defaults to `:left`.", quote(do: :left | :right | :middle)},
+      click_count:
+        {"`t:integer/0`",
+         "defaults to 1. See [`UIEvent.detail`](https://developer.mozilla.org/en-US/docs/Web/API/UIEvent/detail).",
+         quote(do: integer())}
+    ],
+    {PlaywrightEx.Mouse, :up, 2} => [
+      button: {"`:left` | `:right` | `:middle`", "Defaults to `:left`.", quote(do: :left | :right | :middle)},
+      click_count:
+        {"`t:integer/0`",
+         "defaults to 1. See [`UIEvent.detail`](https://developer.mozilla.org/en-US/docs/Web/API/UIEvent/detail).",
+         quote(do: integer())}
+    ],
+    {PlaywrightEx.Mouse, :move, 4} => [
+      steps:
+        {"`t:integer/0`",
+         "Defaults to 1. Sends `n` interpolated `mousemove` events to represent travel between Playwright's current cursor position and the provided destination. When set to 1, emits a single `mousemove` event at the destination location.",
+         quote(do: integer())}
     ],
     {PlaywrightEx.Page, :go_back, 2} => [
       wait_until:

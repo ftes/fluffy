@@ -5,7 +5,8 @@ defmodule Fluffy.Playwright do
   These functions intentionally live under `Fluffy.Playwright` because they
   depend on a real browser. Use them when behavior requires one; they are not
   implemented by the Static or LiveView drivers. The page clock lives in
-  `Fluffy.Playwright.Clock`.
+  `Fluffy.Playwright.Clock`, page-wide input in `Fluffy.Playwright.Keyboard` and
+  `Fluffy.Playwright.Mouse`.
   """
 
   alias Fluffy.Backend
@@ -49,6 +50,12 @@ defmodule Fluffy.Playwright do
   @type drag_to_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:drag_to)))
   @type press_sequentially_option ::
           unquote(NimbleOptions.option_typespec(Options.action_schema(:press_sequentially)))
+  @type dblclick_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:dblclick)))
+  @type tap_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:tap)))
+  @type select_text_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:select_text)))
+  @type locator_screenshot_option ::
+          unquote(NimbleOptions.option_typespec(Options.action_schema(:locator_screenshot)))
+  @type emulate_media_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:emulate_media)))
 
   @doc group: "Lifecycle and navigation"
   @doc playwright_only: true
@@ -224,6 +231,122 @@ defmodule Fluffy.Playwright do
     Fluffy.__dispatch_driver__(session, :press_sequentially, [locator, text, options])
   end
 
+  @doc group: "Actions"
+  @doc playwright_only: true
+  @doc """
+  Double-clicks a locator.
+
+  ## Options
+
+  Playwright-only options pass through to #{Options.native_reference(:dblclick)}.
+
+  #{NimbleOptions.docs(Options.action_schema(:dblclick))}
+  """
+  @spec dblclick(Session.t(), Fluffy.Locator.t(), [dblclick_option()]) :: Session.t()
+  def dblclick(%Session{} = session, locator, options \\ []) do
+    ensure_playwright_backend!(session, :dblclick)
+    Fluffy.__dispatch_driver__(session, :dblclick, [locator, Options.validate_action!(:dblclick, options)])
+  end
+
+  @doc group: "Actions"
+  @doc playwright_only: true
+  @doc """
+  Taps a locator. The session's browser context needs `has_touch: true`.
+
+  `options` is required: a `tap/2` would make `Kernel.tap/2` ambiguous wherever this
+  module is imported.
+
+  ## Options
+
+  Playwright-only options pass through to #{Options.native_reference(:tap)}.
+
+  #{NimbleOptions.docs(Options.action_schema(:tap))}
+  """
+  @spec tap(Session.t(), Fluffy.Locator.t(), [tap_option()]) :: Session.t()
+  def tap(%Session{} = session, locator, options) do
+    ensure_playwright_backend!(session, :tap)
+    Fluffy.__dispatch_driver__(session, :tap, [locator, Options.validate_action!(:tap, options)])
+  end
+
+  @doc group: "Actions"
+  @doc playwright_only: true
+  @doc """
+  Dispatches a DOM event of `type` on a locator, skipping actionability checks.
+
+  `event_init` is an optional map of event properties, such as `%{bubbles: false}`.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.action_schema(:dispatch_event))}
+  """
+  @spec dispatch_event(Session.t(), Fluffy.Locator.t(), String.t(), map() | nil, [Fluffy.action_option()]) :: Session.t()
+  def dispatch_event(%Session{} = session, locator, type, event_init \\ nil, options \\ [])
+      when is_binary(type) and (is_map(event_init) or is_nil(event_init)) do
+    ensure_playwright_backend!(session, :dispatch_event)
+    options = Options.validate_action!(:dispatch_event, options)
+    Fluffy.__dispatch_driver__(session, :dispatch_event, [locator, type, event_init, options])
+  end
+
+  @doc group: "Actions"
+  @doc playwright_only: true
+  @doc """
+  Selects the text of a locator.
+
+  ## Options
+
+  Playwright-only options pass through to #{Options.native_reference(:select_text)}.
+
+  #{NimbleOptions.docs(Options.action_schema(:select_text))}
+  """
+  @spec select_text(Session.t(), Fluffy.Locator.t(), [select_text_option()]) :: Session.t()
+  def select_text(%Session{} = session, locator, options \\ []) do
+    ensure_playwright_backend!(session, :select_text)
+    Fluffy.__dispatch_driver__(session, :select_text, [locator, Options.validate_action!(:select_text, options)])
+  end
+
+  @doc group: "Actions"
+  @doc playwright_only: true
+  @doc "Scrolls a locator into view unless it is already visible. Accepts `timeout:`."
+  @spec scroll_into_view_if_needed(Session.t(), Fluffy.Locator.t(), [Fluffy.action_option()]) :: Session.t()
+  def scroll_into_view_if_needed(%Session{} = session, locator, options \\ []) do
+    ensure_playwright_backend!(session, :scroll_into_view_if_needed)
+    options = Options.validate_action!(:scroll_into_view_if_needed, options)
+    Fluffy.__dispatch_driver__(session, :scroll_into_view_if_needed, [locator, options])
+  end
+
+  @doc group: "Actions"
+  @doc playwright_only: true
+  @doc """
+  Resizes the active page's viewport to `%{width: width, height: height}`. Accepts `timeout:`.
+  """
+  @spec set_viewport_size(Session.t(), %{width: integer(), height: integer()}, [Fluffy.action_option()]) :: Session.t()
+  def set_viewport_size(%Session{} = session, %{width: _, height: _} = size, options \\ []) do
+    ensure_playwright_backend!(session, :set_viewport_size)
+    options = Options.validate_action!(options)
+    page_action(session, :set_viewport_size, &PlaywrightEx.Page.set_viewport_size(&1, size), options)
+  end
+
+  @doc group: "Actions"
+  @doc playwright_only: true
+  @doc """
+  Emulates media features on the active page, such as `color_scheme: :dark`.
+
+  ## Options
+
+  Playwright-only options pass through to #{Options.native_reference(:emulate_media)}.
+
+  #{NimbleOptions.docs(Options.action_schema(:emulate_media))}
+  """
+  @spec emulate_media(Session.t(), [emulate_media_option()]) :: Session.t()
+  def emulate_media(%Session{} = session, options \\ []) do
+    ensure_playwright_backend!(session, :emulate_media)
+    {timeout, native} = Keyword.split(Options.validate_action!(:emulate_media, options), [:timeout])
+    page_action(session, :emulate_media, &PlaywrightEx.Page.emulate_media(&1, native), timeout)
+  end
+
+  defp page_action(session, operation, fun, options),
+    do: Fluffy.__dispatch_driver__(session, :page_action, [operation, fun, options])
+
   @doc playwright_only: true
   @doc """
   Runs `fun` with the `PlaywrightEx.Locator` for `locator` and returns the reconciled session.
@@ -285,13 +408,38 @@ defmodule Fluffy.Playwright do
   Saves a screenshot of the active page and returns the session.
 
   Accepts the options of `PlaywrightEx.Page.screenshot/2`, such as `full_page:`.
+  Pass a locator and a path to capture one element, see `screenshot/4`.
   """
   @spec screenshot(Session.t(), Path.t(), PlaywrightEx.Page.screenshot_options()) :: Session.t()
-  def screenshot(session, path, options \\ []) when is_binary(path) and is_list(options) do
+  @spec screenshot(Session.t(), Fluffy.Locator.t(), Path.t()) :: Session.t()
+  def screenshot(session, target, path_or_options \\ [])
+
+  def screenshot(session, path, options) when is_binary(path) and is_list(options) do
     ensure_playwright_backend!(session, :screenshot)
     File.mkdir_p!(Path.dirname(path))
     PlaywrightEx.Page.screenshot!(Session.page_state(session).page, Keyword.put(options, :path, path))
     session
+  end
+
+  def screenshot(session, %Fluffy.Locator{} = locator, path) when is_binary(path),
+    do: screenshot(session, locator, path, [])
+
+  @doc playwright_only: true
+  @doc """
+  Saves a screenshot of one element and returns the session.
+
+  ## Options
+
+  Playwright-only options pass through to #{Options.native_reference(:locator_screenshot)}.
+
+  #{NimbleOptions.docs(Options.action_schema(:locator_screenshot))}
+  """
+  @spec screenshot(Session.t(), Fluffy.Locator.t(), Path.t(), [locator_screenshot_option()]) :: Session.t()
+  def screenshot(%Session{} = session, %Fluffy.Locator{} = locator, path, options) when is_binary(path) do
+    ensure_playwright_backend!(session, :screenshot)
+    options = Options.validate_action!(:locator_screenshot, options)
+    File.mkdir_p!(Path.dirname(path))
+    Fluffy.__dispatch_driver__(session, :screenshot, [locator, path, options])
   end
 
   @doc playwright_only: true

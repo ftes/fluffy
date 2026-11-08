@@ -58,8 +58,10 @@ defmodule Fluffy do
   @type action_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema()))
   @type click_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema(:click)))
   @type fill_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema(:fill)))
+  @type clear_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema(:clear)))
   @type check_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema(:check)))
   @type uncheck_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema(:uncheck)))
+  @type set_checked_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema(:set_checked)))
   @type select_option_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema(:select_option)))
   @type press_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema(:press)))
   @type reload_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema(:reload)))
@@ -328,6 +330,22 @@ defmodule Fluffy do
 
   @doc group: "Actions"
   @doc """
+  Clears a text input or textarea, like `fill/4` with an empty string.
+
+  ## Options
+
+  Playwright-only options pass through to #{Fluffy.Options.native_reference(:clear)}.
+
+  #{NimbleOptions.docs(Fluffy.Options.action_schema(:clear))}
+  """
+  @spec clear(Session.t(), Fluffy.Locator.t(), [clear_option()]) :: Session.t()
+  def clear(%Session{} = session, locator, options \\ []) do
+    options = Fluffy.Options.validate_action!(:clear, options)
+    dispatch_driver(session, :clear, [locator, options])
+  end
+
+  @doc group: "Actions"
+  @doc """
   Selects local paths or in-memory `Fluffy.FilePayload` values for a file
   input, or clears its FileList with `[]`.
 
@@ -426,6 +444,22 @@ defmodule Fluffy do
   def uncheck(%Session{} = session, locator, options \\ []) do
     options = Fluffy.Options.validate_action!(:uncheck, options)
     dispatch_driver(session, :set_checked, [locator, false, options])
+  end
+
+  @doc group: "Actions"
+  @doc """
+  Sets a checkbox or radio to `checked`, like `check/3` or `uncheck/3` chosen at runtime.
+
+  ## Options
+
+  Playwright-only options pass through to #{Fluffy.Options.native_reference(:set_checked)}.
+
+  #{NimbleOptions.docs(Fluffy.Options.action_schema(:set_checked))}
+  """
+  @spec set_checked(Session.t(), Fluffy.Locator.t(), boolean(), [set_checked_option()]) :: Session.t()
+  def set_checked(%Session{} = session, locator, checked, options \\ []) when is_boolean(checked) do
+    options = Fluffy.Options.validate_action!(:set_checked, options)
+    dispatch_driver(session, :set_checked, [locator, checked, options])
   end
 
   @doc group: "Actions"

@@ -7,6 +7,8 @@ defmodule Fluffy.Conformance.NativeOptionsTest do
 
   alias Fluffy.Options
   alias Fluffy.Options.NativeGenerated
+  alias Fluffy.Playwright.Keyboard
+  alias Fluffy.Playwright.Mouse
   alias Fluffy.TestWeb.Endpoint
   alias Mix.Tasks.Fluffy.Gen.NativeOptions
 
@@ -149,7 +151,23 @@ defmodule Fluffy.Conformance.NativeOptionsTest do
             &Fluffy.Playwright.blur(session, button, &1),
             &Fluffy.Playwright.go_back(session, &1),
             &Fluffy.Playwright.go_forward(session, &1),
-            &Fluffy.Playwright.Clock.install(session, &1)
+            &Fluffy.Playwright.Clock.install(session, &1),
+            &clear(session, button, &1),
+            &set_checked(session, button, true, &1),
+            &Fluffy.Playwright.dblclick(session, button, &1),
+            &Fluffy.Playwright.tap(session, button, &1),
+            &Fluffy.Playwright.dispatch_event(session, button, "click", nil, &1),
+            &Fluffy.Playwright.select_text(session, button, &1),
+            &Fluffy.Playwright.scroll_into_view_if_needed(session, button, &1),
+            &Fluffy.Playwright.screenshot(session, button, "/tmp/x.png", &1),
+            &Fluffy.Playwright.set_viewport_size(session, %{width: 1, height: 1}, &1),
+            &Fluffy.Playwright.emulate_media(session, &1),
+            &Keyboard.press(session, "a", &1),
+            &Keyboard.type(session, "a", &1),
+            &Keyboard.down(session, "a", &1),
+            &Mouse.click(session, 0, 0, &1),
+            &Mouse.move(session, 0, 0, &1),
+            &Mouse.wheel(session, 0, 0, &1)
           ],
           option <- [no_wait_after: true, signal: nil, timeout: :infinity] do
         assert_raise NimbleOptions.ValidationError, fn -> call.([option]) end

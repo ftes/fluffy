@@ -27,12 +27,12 @@ defmodule Fluffy.Driver.Live.ActionResolver do
   end
 
   defp retryable?(%Fluffy.ActionabilityError{action: action, reason: :disabled})
-       when action in [:click, :fill, :check, :uncheck, :select_option] do
+       when action in [:click, :fill, :clear, :check, :uncheck, :select_option] do
     true
   end
 
   defp retryable?(%Fluffy.ActionabilityError{action: :click, reason: :hidden}), do: true
-  defp retryable?(%Fluffy.ActionabilityError{action: :fill, reason: :readonly}), do: true
+  defp retryable?(%Fluffy.ActionabilityError{action: action, reason: :readonly}) when action in [:fill, :clear], do: true
 
   defp retryable?(%Fluffy.ActionabilityError{action: :select_option, reason: :option_not_found}), do: true
 
