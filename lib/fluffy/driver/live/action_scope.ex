@@ -107,6 +107,10 @@ defmodule Fluffy.Driver.Live.ActionScope do
   # failed action leaves it out instead of applying it again.
   def record_applied(message), do: update(&%{&1 | taken: List.delete(&1.taken, message)})
 
+  # Records that the action's session left the page it took the messages on,
+  # so a failed action has none to put back.
+  def record_left_page, do: update(&%{&1 | taken: []})
+
   defp update(fun) do
     case Process.get(@scope) do
       nil -> :ok

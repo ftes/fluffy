@@ -68,6 +68,8 @@ defmodule Fluffy.TestWeb.PageController do
     redirect(conn, to: "/live/redirect-ready?topic=#{URI.encode_www_form(topic)}")
   end
 
+  def redirect_loop(conn, _params), do: redirect(conn, to: "/redirect/loop")
+
   def click_source(conn, _params) do
     send_html(conn, """
     <!doctype html>

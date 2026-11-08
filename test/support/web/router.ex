@@ -37,6 +37,7 @@ defmodule Fluffy.TestWeb.Router do
     get("/actions/history-push-state", PageController, :history_push_state)
     get("/actions/disconnected-live-root", PageController, :disconnected_live_root)
     get("/redirect/live-ready", PageController, :redirect_live_ready)
+    get("/redirect/loop", PageController, :redirect_loop)
   end
 
   scope "/live", Fluffy.TestWeb do

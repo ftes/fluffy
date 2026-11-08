@@ -58,7 +58,8 @@ defmodule Fluffy.Driver.Live do
     # action, so pages that keep navigating fail it at the redirect limit.
     case result do
       {:navigate, session, navigation, {:retry, _remaining}} ->
-        retry_on_new_page(session, navigation, :expect, [expectation], deadline)
+        {session, redirects} = follow_for_retry(session, navigation)
+        retry_on_new_page(session, redirects, :expect, [expectation], deadline)
 
       session ->
         session
@@ -587,7 +588,7 @@ defmodule Fluffy.Driver.Live do
       end)
 
     case result do
-      {:retry_on_new_page, session, navigation} -> retry_on_new_page(session, navigation, operation, arguments, deadline)
+      {:retry_on_new_page, session, redirects} -> retry_on_new_page(session, redirects, operation, arguments, deadline)
       result -> result
     end
   end
@@ -605,21 +606,36 @@ defmodule Fluffy.Driver.Live do
             locator: hd(arguments)
         end
 
-        {:retry_on_new_page, session, navigation}
+        {session, redirects} = follow_for_retry(session, navigation)
+        {:retry_on_new_page, session, redirects}
 
       {:none, _delivered?} ->
         result
     end
   end
 
-  # Runs outside the action's scope: following the navigation moves the
-  # session to the new page, so the action leaves nothing unread behind. The
-  # navigation counts toward the action's timeout, and its redirect toward the
-  # redirect limit of the action's retries and of the redirects it leads to.
-  # Expectations retry the same way.
-  defp retry_on_new_page(session, %Redirect{} = navigation, operation, arguments, deadline) do
+  # Follows a navigation an action or expectation found before reaching the
+  # view, for a retry on the new page. The navigation counts toward the retry's
+  # timeout, and its redirect toward the redirect limit of the retries and of
+  # the redirects it leads to. Following it can fail before the session left
+  # its page, such as at that limit: the session then stays there, so a failed
+  # action puts back the view messages it took there. Once it left, they are moot.
+  defp follow_for_retry(session, %Redirect{} = navigation) do
+    state = Session.page_state(session)
     redirects = HTTP.count_redirect!(ActionScope.redirects(), URI.parse(Session.current_page(session).url))
-    session = Fluffy.Backend.navigate(session, %{navigation | redirects: redirects})
+
+    try do
+      {Fluffy.Backend.navigate(session, %{navigation | redirects: redirects}), redirects}
+    catch
+      kind, reason ->
+        if Session.page_state(session) != state, do: ActionScope.record_left_page()
+        :erlang.raise(kind, reason, __STACKTRACE__)
+    end
+  end
+
+  # Runs outside the action's scope, as an action of its own on the page its
+  # `redirects`-th redirect landed on. Expectations retry the same way.
+  defp retry_on_new_page(session, redirects, operation, arguments, deadline) do
     remaining = Deadline.remaining(deadline)
     arguments = List.update_at(arguments, -1, &put_timeout(&1, remaining))
     retry = fn -> Fluffy.__dispatch_driver__(session, operation, arguments) end
