@@ -8,12 +8,11 @@ defmodule Fluffy.Driver.Live do
   alias Fluffy.ClientDOM
   alias Fluffy.Deadline
   alias Fluffy.Driver.Live.ActionResolver
+  alias Fluffy.Driver.Live.ActionScope
   alias Fluffy.Driver.Live.Click
-  alias Fluffy.Driver.Live.Delivery
   alias Fluffy.Driver.Live.Document
   alias Fluffy.Driver.Live.Event
   alias Fluffy.Driver.Live.Retry
-  alias Fluffy.Driver.Live.TakenMessages
   alias Fluffy.Driver.Live.UploadState
   alias Fluffy.Expect
   alias Fluffy.Form
@@ -472,27 +471,25 @@ defmodule Fluffy.Driver.Live do
   # never having seen it. Later uploads follow a delivery and need no read.
   defp dispatch_view_upload(session, upload, entry_name) do
     with :ok <- read_view_before_delivery(session, upload.view) do
-      Delivery.record()
+      ActionScope.record_delivery()
       dispatch_view_event(session, fn -> render_upload(upload, entry_name) end)
     end
   end
 
   defp read_view_before_delivery(session, view) do
-    if Delivery.delivered?() do
+    if ActionScope.delivered?() do
       :ok
     else
-      case read_view(session, fn -> render(view) end) do
-        {:ok, {:error, redirect}} -> redirected(session, redirect)
-        {:ok, _html} -> :ok
-        redirected -> redirected
-      end
+      with {:ok, _html} <- read_view(session, fn -> render(view) end), do: :ok
     end
   end
 
   # Reads the view without acting on it, such as its children or its upload
-  # config, and reports a redirect the view left for the action to follow.
+  # config, and reports a redirect the view left for the action to follow,
+  # whether the read exits on it or its client hands it back as the value.
   defp read_view(session, read) do
     case call_view(session, read) do
+      {:ok, {:error, {_kind, _options} = redirect}} -> redirected(session, redirect)
       {:ok, value} -> {:ok, value}
       {:view_left, redirect} -> redirected(session, redirect)
     end
@@ -552,9 +549,9 @@ defmodule Fluffy.Driver.Live do
   defp act(session, operation, locator, options, action) do
     deadline = Retry.deadline(session, Keyword.validate!(options, [:timeout]))
 
-    TakenMessages.track(fn ->
-      {result, delivered?} = Delivery.track(fn -> unread_redirect(session) || action.(deadline) end)
-      finish_action(result, delivered?, operation, locator, deadline)
+    ActionScope.run(fn ->
+      result = unread_redirect(session) || action.(deadline)
+      finish_action(result, ActionScope.delivered?(), operation, locator, deadline)
     end)
   end
 
@@ -603,7 +600,7 @@ defmodule Fluffy.Driver.Live do
   defp live_view_event(watcher, wait) do
     receive do
       {:fluffy_live_view, ^watcher, event} = message ->
-        TakenMessages.record(message)
+        ActionScope.record_taken(message)
         event
     after
       wait -> :none
@@ -617,15 +614,15 @@ defmodule Fluffy.Driver.Live do
 
     receive do
       {^reference, {:patch, ^topic, %{to: destination}}} = message ->
-        TakenMessages.record(message)
+        ActionScope.record_taken(message)
         {:navigate, session, Navigation.patch(destination, state)}
 
       {:fluffy_live_view, ^watcher, {:died, reason}} = message ->
-        TakenMessages.record(message)
+        ActionScope.record_taken(message)
         raise Fluffy.LiveViewError, reason: reason
 
       {:fluffy_live_view, ^watcher, {:redirect, redirect}} = message ->
-        TakenMessages.record(message)
+        ActionScope.record_taken(message)
         follow_redirect_result(session, {:error, redirect})
     after
       wait -> session
@@ -722,7 +719,7 @@ defmodule Fluffy.Driver.Live do
 
     receive do
       {^reference, {:patch, ^topic, %{to: destination}}} = message ->
-        TakenMessages.record(message)
+        ActionScope.record_taken(message)
         destination
     after
       0 -> nil
@@ -734,7 +731,7 @@ defmodule Fluffy.Driver.Live do
 
     receive do
       {^reference, {:redirect, ^topic, %{to: _destination} = options}} = message ->
-        TakenMessages.record(message)
+        ActionScope.record_taken(message)
         {:error, {:redirect, options}}
     after
       0 -> nil
@@ -789,10 +786,7 @@ defmodule Fluffy.Driver.Live do
   # is nil when element/2 cannot reach the target. Finding a nested view reads
   # the view's children, so a view that navigated away reports its redirect.
   defp owning_view_context(session, target) do
-    case read_view(session, fn -> find_owning_view_context(Session.page_state(session).view, target) end) do
-      {:ok, {:error, redirect}} -> redirected(session, redirect)
-      found -> found
-    end
+    read_view(session, fn -> find_owning_view_context(Session.page_state(session).view, target) end)
   end
 
   defp find_owning_view_context(root_view, target) do
@@ -871,7 +865,7 @@ defmodule Fluffy.Driver.Live do
         :keyup -> render_keyup(element, payload)
       end
 
-    Delivery.delivered(result)
+    ActionScope.delivered(result)
   end
 
   defp selector_for_view(client_dom, selector, %{root_id: root_id}) do
@@ -974,7 +968,7 @@ defmodule Fluffy.Driver.Live do
         event_context.view
         |> element(form_selector)
         |> render_change(upload)
-        |> Delivery.delivered()
+        |> ActionScope.delivered()
       end)
 
     case commit_render_result(session, client_dom, result, event_context.view) do

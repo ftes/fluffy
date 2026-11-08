@@ -8,7 +8,7 @@ defmodule Fluffy.Driver.Live.Event do
 
   import Phoenix.LiveViewTest
 
-  alias Fluffy.Driver.Live.Delivery
+  alias Fluffy.Driver.Live.ActionScope
 
   @bindings %{
     click: ["phx-click"],
@@ -61,11 +61,11 @@ defmodule Fluffy.Driver.Live.Event do
         :keyup -> render_keyup(view, event, value)
       end
 
-    Delivery.delivered(result)
+    ActionScope.delivered(result)
   end
 
   defp dispatch(["patch", %{"href" => href}], view, _attributes, _kind, _payload),
-    do: view |> render_patch(href) |> Delivery.delivered()
+    do: view |> render_patch(href) |> ActionScope.delivered()
 
   defp dispatch(["navigate", %{"href" => href} = options], _view, _attributes, _kind, _payload) do
     {:error, {:live_redirect, %{to: href, kind: if(options["replace"], do: :replace, else: :push)}}}
