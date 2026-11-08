@@ -20,6 +20,8 @@ defmodule Fluffy.Driver.Live.Delivery do
     end
   end
 
+  def delivered?, do: Process.get(@delivered) == true
+
   def record do
     if Process.get(@delivered) == false, do: Process.put(@delivered, true)
     :ok
