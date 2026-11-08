@@ -466,18 +466,14 @@ defmodule Fluffy.Driver.Live do
     end
   end
 
-  # A redirect an event causes comes back as the event call's result, and the
-  # event reached the view: record that for the running action. The call fails
-  # only when it finds the view already gone, so the event never reached it:
-  # follow the redirect the view left instead.
+  # A redirect an event causes comes back as the event call's result, and each
+  # call that sends the view an event records that it reached the view for the
+  # running action. The call fails only when it finds the view already gone, so
+  # the event never reached it: follow the redirect the view left instead.
   defp dispatch_view_event(session, dispatch) do
     case call_view(session, dispatch) do
-      {:ok, result} ->
-        Delivery.record()
-        result
-
-      {:view_left, redirect} ->
-        redirected(session, redirect)
+      {:ok, result} -> result
+      {:view_left, redirect} -> redirected(session, redirect)
     end
   end
 
@@ -827,12 +823,15 @@ defmodule Fluffy.Driver.Live do
   defp render_view_event(client_dom, context, selector, kind, payload) do
     element = element(context.view, selector_for_view(client_dom, selector, context))
 
-    case kind do
-      :change -> render_change(element, payload)
-      :submit -> render_submit(element, payload)
-      :keydown -> render_keydown(element, payload)
-      :keyup -> render_keyup(element, payload)
-    end
+    result =
+      case kind do
+        :change -> render_change(element, payload)
+        :submit -> render_submit(element, payload)
+        :keydown -> render_keydown(element, payload)
+        :keyup -> render_keyup(element, payload)
+      end
+
+    Delivery.delivered(result)
   end
 
   defp selector_for_view(client_dom, selector, %{root_id: root_id}) do
@@ -935,6 +934,7 @@ defmodule Fluffy.Driver.Live do
         event_context.view
         |> element(form_selector)
         |> render_change(upload)
+        |> Delivery.delivered()
       end)
 
     case commit_render_result(session, client_dom, result, event_context.view) do

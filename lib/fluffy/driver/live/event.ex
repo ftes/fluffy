@@ -61,22 +61,17 @@ defmodule Fluffy.Driver.Live.Event do
         :keyup -> render_keyup(view, event, value)
       end
 
-    delivered(result)
+    Delivery.delivered(result)
   end
 
   defp dispatch(["patch", %{"href" => href}], view, _attributes, _kind, _payload),
-    do: view |> render_patch(href) |> delivered()
+    do: view |> render_patch(href) |> Delivery.delivered()
 
   defp dispatch(["navigate", %{"href" => href} = options], _view, _attributes, _kind, _payload) do
     {:error, {:live_redirect, %{to: href, kind: if(options["replace"], do: :replace, else: :push)}}}
   end
 
   defp dispatch(_command, _view, _attributes, _kind, _payload), do: nil
-
-  defp delivered(result) do
-    Delivery.record()
-    result
-  end
 
   defp attribute(attributes, name) do
     case List.keyfind(attributes, name, 0) do

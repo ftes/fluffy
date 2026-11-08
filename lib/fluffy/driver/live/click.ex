@@ -4,6 +4,7 @@ defmodule Fluffy.Driver.Live.Click do
   import Phoenix.LiveViewTest
 
   alias Fluffy.ClientDOM
+  alias Fluffy.Driver.Live.Delivery
   alias Fluffy.Driver.Live.Event
   alias Fluffy.HTML.Semantics
   alias Fluffy.Locator
@@ -21,7 +22,7 @@ defmodule Fluffy.Driver.Live.Click do
         render_detached(view, target, declaration)
 
       true ->
-        view |> element(selector) |> render_click()
+        view |> element(selector) |> render_click() |> Delivery.delivered()
     end
   end
 
@@ -30,7 +31,7 @@ defmodule Fluffy.Driver.Live.Click do
   defp render_detached(view, target, declaration) do
     case {attribute(target, "data-phx-link"), attribute(target, "href")} do
       {"patch", href} when is_binary(href) ->
-        render_patch(view, href)
+        view |> render_patch(href) |> Delivery.delivered()
 
       {"redirect", href} when is_binary(href) ->
         kind = if attribute(target, "data-phx-link-state") == "replace", do: :replace, else: :push

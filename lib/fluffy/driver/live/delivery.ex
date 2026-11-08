@@ -24,4 +24,11 @@ defmodule Fluffy.Driver.Live.Delivery do
     if Process.get(@delivered) == false, do: Process.put(@delivered, true)
     :ok
   end
+
+  # Records a view call that sent the view an event, patch or upload, and
+  # passes its result on.
+  def delivered(result) do
+    record()
+    result
+  end
 end
