@@ -80,14 +80,13 @@ defmodule Fluffy.BrowserRuntime do
 
   @impl true
   def handle_call(:browser, _from, %__MODULE__{browser: nil} = state) do
-    launch_options = Keyword.put_new(state.launch_options, :timeout, state.timeout)
+    case launch(state) do
+      {:ok, browser} ->
+        state = %{state | browser: browser, launch_count: state.launch_count + 1}
+        {:reply, {:ok, browser}, state}
 
-    with :ok <- state.transport_starter.(state.runtime_supervisor, state.playwright_name, state.playwright_options),
-         {:ok, browser} <- state.browser_launcher.(state.engine, state.playwright_name, launch_options) do
-      state = %{state | browser: browser, launch_count: state.launch_count + 1}
-      {:reply, {:ok, browser}, state}
-    else
-      {:error, reason} -> {:reply, {:error, launch_error(state.engine, reason)}, state}
+      {:error, reason} ->
+        {:reply, {:error, launch_error(state.engine, reason)}, state}
     end
   end
 
@@ -133,6 +132,20 @@ defmodule Fluffy.BrowserRuntime do
     Browser.close(browser)
   catch
     _kind, _reason -> :ok
+  end
+
+  # Invalid launch options raise in PlaywrightEx. That raise belongs to the
+  # caller too, not to the runtime.
+  defp launch(state) do
+    launch_options = Keyword.put_new(state.launch_options, :timeout, state.timeout)
+
+    with :ok <- state.transport_starter.(state.runtime_supervisor, state.playwright_name, state.playwright_options) do
+      state.browser_launcher.(state.engine, state.playwright_name, launch_options)
+    end
+  rescue
+    exception -> {:error, exception}
+  catch
+    :exit, reason -> {:error, {:exit, reason}}
   end
 
   defp start_transport(runtime_supervisor, name, playwright_options) do

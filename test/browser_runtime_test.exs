@@ -67,6 +67,42 @@ defmodule Fluffy.BrowserRuntimeTest do
     assert %{guid: "browser-1"} = BrowserRuntime.browser(runtime_name)
   end
 
+  test "a launch that raises raises in the caller without crashing the runtime" do
+    runtime_name = start_runtime(self(), fn -> raise ArgumentError, "unknown options [:headles]" end)
+    runtime = Process.whereis(runtime_name)
+
+    assert_raise RuntimeError, "could not launch the Playwright chromium browser: unknown options [:headles]", fn ->
+      BrowserRuntime.browser(runtime_name)
+    end
+
+    assert Process.whereis(runtime_name) == runtime
+    assert BrowserRuntime.status(runtime_name).launch_count == 0
+  end
+
+  @tag driver: :playwright
+  test "invalid launch options raise in the caller without crashing the runtime" do
+    runtime_supervisor = start_supervised!(DynamicSupervisor)
+    playwright_name = Module.concat(__MODULE__, "Driver#{System.unique_integer([:positive])}")
+
+    runtime =
+      start_supervised!(
+        {BrowserRuntime,
+         name: Module.concat(playwright_name, Runtime),
+         engine: Application.fetch_env!(:fluffy, :playwright)[:engine],
+         timeout: 15_000,
+         launch_options: [headles: true],
+         playwright_options: [],
+         playwright_name: playwright_name,
+         runtime_supervisor: runtime_supervisor}
+      )
+
+    assert_raise RuntimeError, ~r/could not launch the Playwright \w+ browser: .*headles/, fn ->
+      BrowserRuntime.browser(runtime)
+    end
+
+    assert Process.alive?(runtime)
+  end
+
   @tag driver: :playwright, capture_log: true
   test "relaunches against a restarted driver after the driver process dies" do
     runtime_supervisor = start_supervised!(DynamicSupervisor)
