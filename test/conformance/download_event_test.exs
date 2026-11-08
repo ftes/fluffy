@@ -212,7 +212,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
 
     session =
       :playwright
-      |> start_session(base_url: Fluffy.TestServer.base_url(), timeout: 500)
+      |> start_session(base_url: Fluffy.TestServer.base_url(), timeout: 2_000)
       |> visit(TestHTTPFixtures.path(fixture, "/start"))
 
     # Only saving is bound by the short session timeout; starting the download is not.
@@ -224,7 +224,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
       download = await(pending)
       destination = Path.join(tmp_dir, "copy.txt")
 
-      assert_raise RuntimeError, ~r/did not complete within the session's timeout of 500ms and was canceled/, fn ->
+      assert_raise RuntimeError, ~r/did not complete within the session's timeout of 2000ms and was canceled/, fn ->
         Download.save_as!(download, destination)
       end
 

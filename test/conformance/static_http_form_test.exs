@@ -674,18 +674,23 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
     session = :playwright |> start_test_session() |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
 
     assert_raise Fluffy.OperationError,
-                 ~r/Timeout 500ms exceeded while waiting for the submitted form's navigation request/,
+                 ~r/Timeout 2000ms exceeded while waiting for the submitted form's navigation request/,
                  fn ->
-                   submit(session, by_css("#note"), timeout: 500)
+                   submit(session, by_css("#note"), timeout: 2_000)
                  end
   end
 
   @tag driver: :playwright
   @tag :capture_log
   test "Playwright submit names its timeout when the server does not answer in time" do
+    test_pid = self()
+
     slow = fn _request ->
-      Process.sleep(1_000)
-      %{body: html("<h1>Saved</h1>")}
+      send(test_pid, {:answering, self()})
+
+      receive do
+        :finish -> %{body: html("<h1>Saved</h1>")}
+      end
     end
 
     fixture =
@@ -693,9 +698,12 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
 
     session = :playwright |> start_test_session() |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
 
-    assert_raise Fluffy.OperationError, ~r/Timeout 300ms exceeded while waiting for the form submission response/, fn ->
-      submit(session, by_css("#note"), timeout: 300)
+    assert_raise Fluffy.OperationError, ~r/Timeout 2000ms exceeded while waiting for the form submission response/, fn ->
+      submit(session, by_css("#note"), timeout: 2_000)
     end
+
+    assert_receive {:answering, server}
+    send(server, :finish)
   end
 
   defp start_test_session(driver) do

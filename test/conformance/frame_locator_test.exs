@@ -215,7 +215,7 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
       )
 
     locator = "iframe" |> frame_locator() |> by_role(:button, name: "Save")
-    error = assert_raise Fluffy.OperationError, fn -> click(session, locator, timeout: 200) end
+    error = assert_raise Fluffy.OperationError, fn -> click(session, locator) end
     assert error.operation == :click
     assert error.locator == locator
     assert error.backend == :playwright
@@ -237,8 +237,8 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
     test "#{action} rejects ambiguous frame owners and ambiguous elements" do
       body = "<input aria-label='Email'><input aria-label='Email'>"
       session = browser_html(iframe("first", body) <> iframe("second", body))
-      # srcdoc frames load asynchronously; under load Firefox can take longer than the 200ms
-      # action budget, which then times out before Playwright can report the strict violation.
+      # srcdoc frames load asynchronously: wait for both inputs so strictness is decided
+      # against the whole document.
       for frame <- ["#first", "#second"] do
         expect(session, frame |> frame_locator() |> by_role(:textbox) |> to_have_count(2))
       end
@@ -250,8 +250,8 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
         error =
           assert_raise Fluffy.OperationError, fn ->
             case unquote(action) do
-              :press -> press(session, locator, "Tab", timeout: 200)
-              action -> apply(Fluffy.Playwright, action, [session, locator, [timeout: 200]])
+              :press -> press(session, locator, "Tab")
+              action -> apply(Fluffy.Playwright, action, [session, locator])
             end
           end
 

@@ -36,11 +36,11 @@ defmodule Fluffy.Backend.Playwright.Document do
     // What the last trusted click did to a checkbox or radio, before page code
     // (such as a LiveView patch) can change it again. The event's target is
     // retargeted to the host of a shadow root the input is in.
-    state.activations = {count: 0, checked: null}
+    state.activations = {count: 0, checked: null, target: null}
     window.addEventListener('input', event => {
       const target = event.composedPath()[0]
       if (event.isTrusted && target instanceof HTMLInputElement && ['checkbox', 'radio'].includes(target.type))
-        state.activations = {count: state.activations.count + 1, checked: target.checked}
+        state.activations = {count: state.activations.count + 1, checked: target.checked, target}
     }, true)
 
     return state
@@ -147,7 +147,8 @@ defmodule Fluffy.Backend.Playwright.Document do
 
   # The activation state lives in the document of the frame `locator` resolves
   # in, possibly a child frame. `evaluate_all` runs there without waiting for a
-  # match, and has no timeout of its own.
+  # match, in the top page while there is no match yet, and has no timeout of
+  # its own.
 
   @doc "Marks the checkbox and radio activations `activated?/4` reads; `nil` if the frame cannot be read."
   def activation_cursor(locator, timeout) do
@@ -159,13 +160,21 @@ defmodule Fluffy.Backend.Playwright.Document do
     end
   end
 
-  @doc "Whether a checkbox or radio activation in the same document since `cursor` left it `checked`."
+  @doc """
+  Whether a checkbox or radio activation since `cursor` left it `checked`.
+
+  A cursor read in another document, before the frame or element was there,
+  cannot date an activation, so only one on this element counts.
+  """
   def activated?(_locator, nil, _checked, _timeout), do: false
 
   def activated?(locator, [document, count], checked, timeout) do
     expression = """
-    (_elements, [document, count, checked]) => window.__fluffy?.document === document &&
-      window.__fluffy.activations.count > count && window.__fluffy.activations.checked === checked
+    (elements, [document, count, checked]) => {
+      const state = window.__fluffy
+      if (state?.activations.checked !== checked) return false
+      return state.document === document ? state.activations.count > count : state.activations.target === elements[0]
+    }
     """
 
     read = Bounded.within(timeout, fn -> Locator.evaluate_all(locator, expression, [document, count, checked]) end)
