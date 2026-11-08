@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.9.0 — Unreleased
+## 0.9.0-rc.0 — 2026-11-08
 
 Fluffy now runs on PlaywrightEx 0.17, a port of the official Playwright client with a pinned Playwright 1.65 driver.
 
