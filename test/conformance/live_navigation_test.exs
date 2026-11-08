@@ -314,6 +314,25 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     end
   end
 
+  @tag driver: :phoenix
+  test "an action's retry counts its redirect toward those of the page it follows" do
+    # A visit follows the page's 20 connected-mount redirects within the limit.
+    :phoenix
+    |> live_session()
+    |> visit("/live/chamber-map?redirect=chain-20")
+    |> expect(Fluffy.Expect.page_to_have_url("/live/chamber-map?redirect=chain-0"))
+
+    session =
+      :phoenix
+      |> live_session()
+      |> visit("/live/chamber-map?async=chain")
+      |> await_unread_navigation(:phoenix, nil)
+
+    assert_raise RuntimeError, ~r/exceeded 20 redirects/, fn ->
+      fill(session, by_label("Map note"), "north")
+    end
+  end
+
   # Each navigation used to retry the expectation with the time left, and once
   # none was left, kept retrying it without end.
   @tag driver: :phoenix

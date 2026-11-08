@@ -42,6 +42,7 @@ defmodule Fluffy.TestWeb.NavigationLive do
 
   defp schedule_async("loop"), do: send(self(), {:navigate, "/live/chamber-map?async=loop-back"})
   defp schedule_async("loop-back"), do: send(self(), {:navigate, "/live/chamber-map?async=loop"})
+  defp schedule_async("chain"), do: Process.send_after(self(), {:navigate, "/live/chamber-map?redirect=chain-20"}, 30)
   defp schedule_async("patch"), do: Process.send_after(self(), :patch, 30)
   defp schedule_async("patch-twice"), do: Process.send_after(self(), :patch_twice, 30)
   defp schedule_async(_sync), do: :ok
@@ -53,6 +54,11 @@ defmodule Fluffy.TestWeb.NavigationLive do
   defp mount_redirect(socket, "static"), do: redirect(socket, to: "/chamber")
   defp mount_redirect(socket, "ping"), do: push_navigate(socket, to: "/live/chamber-map?redirect=pong")
   defp mount_redirect(socket, "pong"), do: redirect(socket, to: "/live/chamber-map?redirect=ping")
+
+  # Redirects `hops` more times before it settles.
+  defp mount_redirect(socket, "chain-" <> hops) when hops != "0",
+    do: push_navigate(socket, to: "/live/chamber-map?redirect=chain-#{String.to_integer(hops) - 1}")
+
   defp mount_redirect(socket, _none), do: socket
 
   @impl true

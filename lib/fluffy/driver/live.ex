@@ -19,6 +19,7 @@ defmodule Fluffy.Driver.Live do
   alias Fluffy.Form
   alias Fluffy.HTML.DocumentIndex
   alias Fluffy.Internal.Navigation
+  alias Fluffy.Internal.Navigation.Redirect
   alias Fluffy.LiveViewTest.UploadCompat
   alias Fluffy.Locator
   alias Fluffy.Page
@@ -614,10 +615,11 @@ defmodule Fluffy.Driver.Live do
   # Runs outside the action's scope: following the navigation moves the
   # session to the new page, so the action leaves nothing unread behind. The
   # navigation counts toward the action's timeout, and its redirect toward the
-  # redirect limit of the action's retries. Expectations retry the same way.
-  defp retry_on_new_page(session, navigation, operation, arguments, deadline) do
+  # redirect limit of the action's retries and of the redirects it leads to.
+  # Expectations retry the same way.
+  defp retry_on_new_page(session, %Redirect{} = navigation, operation, arguments, deadline) do
     redirects = HTTP.count_redirect!(ActionScope.redirects(), URI.parse(Session.current_page(session).url))
-    session = Fluffy.Backend.navigate(session, navigation)
+    session = Fluffy.Backend.navigate(session, %{navigation | redirects: redirects})
     remaining = Deadline.remaining(deadline)
     arguments = List.update_at(arguments, -1, &put_timeout(&1, remaining))
     retry = fn -> Fluffy.__dispatch_driver__(session, operation, arguments) end

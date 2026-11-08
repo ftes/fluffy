@@ -155,7 +155,7 @@ defmodule Fluffy.Backend.Phoenix do
   end
 
   def navigate(%Session{} = session, %Redirect{} = navigation) do
-    follow_redirect(session, navigation.destination, navigation.flash, 0)
+    follow_redirect(session, navigation.destination, navigation.flash, navigation.redirects)
   end
 
   def navigate(%Session{} = session, %Patch{} = navigation) do
