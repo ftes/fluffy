@@ -1252,11 +1252,9 @@ defmodule Fluffy.Driver.Live do
       upload_result = dispatch_view_upload(session, upload, entry_name)
 
       case upload_result do
-        # A progress callback that navigates returns the redirect.
-        {:error, {kind, %{to: _destination}}} when kind in [:live_redirect, :redirect] ->
-          {:halt, {:navigation, follow_redirect_result(session, upload_result)}}
-
-        {:error, _entry_errors} ->
+        # A progress callback that navigates returns its redirect, which
+        # commits like any other render result.
+        {:error, entry_errors} when not is_tuple(entry_errors) ->
           {:halt, {:entry_error, session}}
 
         _result ->
