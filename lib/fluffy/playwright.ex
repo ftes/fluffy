@@ -331,11 +331,27 @@ defmodule Fluffy.Playwright do
   """
   @spec evaluate(Session.t(), String.t(), term()) :: term()
   def evaluate(session, expression, arg \\ nil) when is_binary(expression) do
+    reject_evaluate_options!(arg)
     ensure_playwright!(session)
     frame = Session.page_state(session).frame
     timeout = Session.timeout(session)
     Bounded.within!(timeout, :evaluate, fn -> PlaywrightEx.Frame.evaluate(frame, expression, arg) end)
   end
+
+  # Fluffy 0.8 took `evaluate(session, expression, timeout: ..., is_function: ..., arg: ...)`;
+  # such a list would now reach the page as the argument.
+  @evaluate_options [:timeout, :is_function, :arg]
+
+  defp reject_evaluate_options!([_ | _] = arg) do
+    if Keyword.keyword?(arg) and Enum.all?(Keyword.keys(arg), &(&1 in @evaluate_options)) do
+      raise ArgumentError,
+            "evaluate/3 takes the JavaScript argument, not the options #{inspect(Keyword.keys(arg))}; " <>
+              "call evaluate(session, expression, arg): a function expression receives arg, " <>
+              "and the call is bounded by the session's timeout:"
+    end
+  end
+
+  defp reject_evaluate_options!(_arg), do: :ok
 
   @doc playwright_only: true
   @doc """
