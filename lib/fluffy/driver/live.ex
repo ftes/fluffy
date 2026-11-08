@@ -484,7 +484,7 @@ defmodule Fluffy.Driver.Live do
   defp dispatch_view_event(session, dispatch) do
     case call_view(session, dispatch) do
       {:ok, result} -> result
-      {:view_left, redirect} -> redirected(session, redirect)
+      redirected -> redirected
     end
   end
 
@@ -513,14 +513,13 @@ defmodule Fluffy.Driver.Live do
   defp read_view(session, read) do
     case call_view(session, read) do
       {:ok, {:error, {_kind, _options} = redirect}} -> redirected(session, redirect)
-      {:ok, value} -> {:ok, value}
-      {:view_left, redirect} -> redirected(session, redirect)
+      result -> result
     end
   end
 
   # When the view navigated away, a call exits, or LiveViewTest hands the
   # redirect back where the caller expected a reply and the caller raises on
-  # it. Either way, return the redirect the view left. Any other failure,
+  # it. Either way, follow the redirect the view left. Any other failure,
   # including a raise on a view that died, stands.
   defp call_view(session, call) do
     {:ok, call.()}
@@ -530,16 +529,14 @@ defmodule Fluffy.Driver.Live do
 
       with true <- redirect_reply_failure?(session, exception, stacktrace),
            {:redirect, redirect} <- left_view(session) do
-        {:view_left, redirect}
+        redirected(session, redirect)
       else
         _unexplained -> reraise(exception, stacktrace)
       end
   catch
     :exit, reason ->
-      case exit_redirect(session) do
-        :none -> raise Fluffy.LiveViewError, reason: reason
-        redirect -> {:view_left, redirect}
-      end
+      {:navigate, session, navigation} = follow_exit_redirect(session, reason)
+      {:redirected, session, navigation}
   end
 
   # LiveViewTest hands back a redirect in place of a reply only once the view's
