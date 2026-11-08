@@ -34,6 +34,19 @@ defmodule Fluffy.Conformance.PageCloseTest do
   end
 
   @tag driver: :playwright
+  test "the next action on a page that closed itself after an action reports the closed page" do
+    {_session, popup} = popup_session()
+    popup = Fluffy.Playwright.hover(popup, by_role(:button, name: "Authorize"))
+    pending = wait_for(popup, Event.close())
+    Fluffy.Playwright.evaluate(popup, "() => { setTimeout(() => window.close(), 30) }")
+    await(pending)
+
+    assert_raise ArgumentError, ~r/page #Reference<.*> is closed/, fn ->
+      click(popup, by_role(:button, name: "Authorize"))
+    end
+  end
+
+  @tag driver: :playwright
   test "a close expectation resolves with the closed page" do
     {session, popup} = popup_session()
     closed = current_page(popup)

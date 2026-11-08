@@ -27,6 +27,55 @@ defmodule Fluffy.Conformance.BlockedPageTest do
     assert Playwright.evaluate(session_for_html(:playwright, "<p>ok</p>"), "1 + 1") == 2
   end
 
+  describe "a page blocked after the previous action" do
+    @diagnostic ~r/did not respond to Fluffy's document check within \d+ms; .* a dialog/
+    @controls """
+    <button onclick="setTimeout(() => { while (true) {} }, 50)">Freeze</button>
+    <button>Other</button>
+    <form><input aria-label="Field"><input aria-label="Tick" type="checkbox"><input aria-label="File" type="file">
+    <select aria-label="Pick"><option>One</option></select><button type="submit">Save</button></form>
+    """
+
+    setup do
+      session = :playwright |> session_for_html(@controls, base_url: Fluffy.TestServer.base_url()) |> short_timeout()
+      session = click(session, by_role(:button, name: "Freeze"))
+      Process.sleep(200)
+      {:ok, session: session}
+    end
+
+    for operation <-
+          ~w(click fill submit press check select_option set_input_files focus blur hover drag_to press_sequentially)a do
+      @tag timeout: 20_000
+      test "fails #{operation} naming the blocked page", %{session: session} do
+        started = System.monotonic_time(:millisecond)
+        assert_raise RuntimeError, @diagnostic, fn -> act(session, unquote(operation)) end
+        assert System.monotonic_time(:millisecond) - started < 10_000
+      end
+    end
+
+    @tag timeout: 20_000
+    test "fails an expectation naming the blocked page", %{session: session} do
+      assert_raise RuntimeError, @diagnostic, fn ->
+        Fluffy.Expect.expect(session, "Absent" |> by_text() |> Fluffy.Expect.to_be_visible())
+      end
+    end
+
+    defp act(session, :click), do: click(session, by_role(:button, name: "Other"))
+    defp act(session, :fill), do: fill(session, by_label("Field"), "x")
+    defp act(session, :submit), do: submit(session, by_css("form"))
+    defp act(session, :press), do: press(session, by_label("Field"), "a")
+    defp act(session, :check), do: check(session, by_label("Tick"))
+    defp act(session, :select_option), do: select_option(session, by_label("Pick"), "One")
+    defp act(session, :set_input_files), do: set_input_files(session, by_label("File"), [])
+    defp act(session, :focus), do: Fluffy.Playwright.focus(session, by_label("Field"))
+    defp act(session, :blur), do: Fluffy.Playwright.blur(session, by_label("Field"))
+    defp act(session, :hover), do: Fluffy.Playwright.hover(session, by_label("Field"))
+    defp act(session, :press_sequentially), do: Fluffy.Playwright.press_sequentially(session, by_label("Field"), "a")
+
+    defp act(session, :drag_to),
+      do: Fluffy.Playwright.drag_to(session, by_label("Field"), by_role(:button, name: "Other"))
+  end
+
   test "evaluate of a never-settling expression fails within the session timeout" do
     session = :playwright |> session_for_html("<p>ok</p>", base_url: Fluffy.TestServer.base_url()) |> short_timeout()
     started = System.monotonic_time(:millisecond)

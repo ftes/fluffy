@@ -78,17 +78,28 @@ defmodule Fluffy.Backend.Playwright.Document do
     })
   """
 
+  # The slots of `state.navigated`.
+  @navigated 1
+  @reusable 2
+
   def init_script, do: @state
+
+  @doc "The state's flags: the page starts navigated, its document unknown until Fluffy reads it."
+  def new_flags do
+    flags = :atomics.new(2, [])
+    :atomics.put(flags, @navigated, 1)
+    flags
+  end
 
   @doc "A page listener that flags the state when its main frame navigates."
   def navigation_listener(state) do
     guid = state.frame.guid
     navigated = state.navigated
-    fn frame -> if frame.guid == guid, do: :atomics.put(navigated, 1, 1) end
+    fn frame -> if frame.guid == guid, do: :atomics.put(navigated, @navigated, 1) end
   end
 
   @doc "Whether the main frame may have navigated since Fluffy last read the document it adopted."
-  def navigated?(state), do: :atomics.get(state.navigated, 1) == 1
+  def navigated?(state), do: :atomics.get(state.navigated, @navigated) == 1
 
   @doc """
   Like `probe!/3`, for a read whose document Fluffy then adopts. Clearing the
@@ -96,15 +107,28 @@ defmodule Fluffy.Backend.Playwright.Document do
   adopts nothing, so the flag stays set.
   """
   def adopted_probe!(state, cursor, timeout) do
-    navigated = :atomics.exchange(state.navigated, 1, 0)
+    :atomics.put(state.navigated, @reusable, 0)
+    navigated = :atomics.exchange(state.navigated, @navigated, 0)
 
     try do
       probe!(state.frame, cursor, timeout)
     catch
       kind, reason ->
-        if navigated == 1, do: :atomics.put(state.navigated, 1, 1)
+        if navigated == 1, do: :atomics.put(state.navigated, @navigated, 1)
         :erlang.raise(kind, reason, __STACKTRACE__)
     end
+  end
+
+  @doc "Marks `state.kept_probe` as the next action's read before it runs."
+  def keep_probe(state), do: :atomics.put(state.navigated, @reusable, 1)
+
+  @doc """
+  The kept read, once, if the main frame has not navigated since. Any later
+  read or failed action leaves the next action to read the page itself.
+  """
+  def take_kept_probe(state) do
+    if :atomics.exchange(state.navigated, @reusable, 0) == 1 and not navigated?(state),
+      do: Map.put(state.kept_probe, :reused?, true)
   end
 
   @doc """

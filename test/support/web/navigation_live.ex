@@ -107,6 +107,12 @@ defmodule Fluffy.TestWeb.NavigationLive do
     {:noreply, socket}
   end
 
+  # A live redirect to the current URL: LiveView leaves browser history alone.
+  def handle_event("renavigate_after_event", %{"to" => to}, socket) do
+    Process.send_after(self(), {:navigate, to}, 30)
+    {:noreply, socket}
+  end
+
   def handle_event("navigate_ready", _params, socket) do
     {:noreply, push_navigate(socket, to: "/live/redirect-ready?topic=#{socket.assigns.topic}")}
   end
@@ -161,6 +167,9 @@ defmodule Fluffy.TestWeb.NavigationLive do
       <button type="button" phx-click="navigate_after_event">Enter chamber after event</button>
       <button type="button" phx-click="patch_now">Patch now</button>
       <button type="button" phx-click="patch_after_event">Reveal passage after event</button>
+      <button type="button" phx-click="renavigate_after_event" phx-value-to="/live/chamber-map">
+        Re-enter map after event
+      </button>
       <button :if={@topic} type="button" phx-click="navigate_ready">Navigate ready</button>
       <label>
         <input

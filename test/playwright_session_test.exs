@@ -64,6 +64,21 @@ defmodule Fluffy.PlaywrightSessionTest do
     assert Document.navigated?(state)
   end
 
+  test "an action's closing read serves the next action, once, until the page navigates" do
+    session = Fluffy.session_for_html(:playwright, "<button>Go</button>", base_url: Fluffy.TestServer.base_url())
+    button = Fluffy.Locator.by_role(:button, name: "Go")
+
+    state = session |> Fluffy.click(button) |> Session.page_state()
+    assert %{reused?: true, document: document} = Document.take_kept_probe(state)
+    assert document == state.document_identity
+    assert Document.take_kept_probe(state) == nil
+
+    state = session |> Fluffy.click(button) |> Session.page_state()
+    assert {:ok, _} = Frame.evaluate(state.frame, "history.pushState(null, '', 'pushed')")
+    assert Document.navigated?(state)
+    assert Document.take_kept_probe(state) == nil
+  end
+
   # Document probes retry on this message; guard it against driver rewording.
   test "a navigation during an evaluate reports the destroyed context Fluffy retries on" do
     session = :playwright |> Fluffy.start_session() |> Fluffy.visit("/stage")

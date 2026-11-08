@@ -178,10 +178,7 @@ defmodule Fluffy.Backend.Playwright do
 
   @doc false
   def page_record(browser_page) do
-    # A page's document is unknown until Fluffy reads it.
-    navigated = :atomics.new(1, [])
-    :atomics.put(navigated, 1, 1)
-    state = %State{page: browser_page, frame: BrowserPage.main_frame(browser_page), navigated: navigated}
+    state = %State{page: browser_page, frame: BrowserPage.main_frame(browser_page), navigated: Document.new_flags()}
     %Page.State{driver: :playwright, state: state}
   end
 

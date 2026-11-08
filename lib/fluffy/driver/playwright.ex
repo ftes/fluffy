@@ -492,7 +492,7 @@ defmodule Fluffy.Driver.Playwright do
   defp action(session, operation, target, options, fun) do
     timeout = Session.timeout(session, options)
 
-    case navigation_aware_action(session, timeout, &result(fun.(&1))) do
+    case navigation_aware_action(session, timeout, &result(fun.(&1)), reuse_read?: true) do
       {:ok, _value, outcome} -> outcome
       {:error, error} -> OperationFailure.raise_playwright!(operation, target, error)
     end
@@ -501,10 +501,12 @@ defmodule Fluffy.Driver.Playwright do
   defp result(:ok), do: {:ok, :ok}
   defp result(result), do: result
 
-  defp navigation_aware_action(session, operation_timeout, action) do
+  # Only an action may reuse the previous read: its call gives up on a blocked
+  # page after its own timeout. An expectation does not, so its read comes first.
+  defp navigation_aware_action(session, operation_timeout, action, options \\ []) do
     # Browser bookkeeping has its own budget; it must not consume a short
     # action/assertion timeout or silently leave navigation state stale.
-    {session, before} = prepare_document(session)
+    {session, before} = prepare_document(session, options[:reuse_read?] == true)
     state = Session.page_state(session)
     browser_context = Session.context(session).browser_context
     bookkeeping_timeout = Session.timeout(session)
@@ -522,9 +524,23 @@ defmodule Fluffy.Driver.Playwright do
           else: {:error, error}
 
       {:error, error} ->
+        report_reused_read(state, before, bookkeeping_timeout)
         {:error, error}
     end
   end
+
+  # An action that reused the previous read has not asked the page anything
+  # itself. If it fails, a page that has since blocked is reported as its own
+  # read would have reported it; a responsive page leaves the action's error.
+  @reused_read_timeout 300
+  defp report_reused_read(state, %{reused?: true}, timeout) do
+    Document.probe!(state.frame, nil, min(timeout, @reused_read_timeout))
+    :ok
+  rescue
+    TargetClosedError -> :ok
+  end
+
+  defp report_reused_read(_state, _before, _timeout), do: :ok
 
   # A lost driver or a closed context closes the page too. The context's
   # closed flag may still lag a lost driver, unlike a call on it. The page's
@@ -558,11 +574,23 @@ defmodule Fluffy.Driver.Playwright do
     match?({:ok, {:error, %TargetClosedError{}}}, read)
   end
 
-  # Adopts a document Fluffy has not seen: a new page's first document, or a
-  # navigation that happened outside Fluffy (a late one, or through unwrap/2).
-  defp prepare_document(session) do
+  # When the previous action read this document and the main frame has not
+  # navigated since, its read is this action's. Otherwise adopts a document
+  # Fluffy has not seen: a new page's first document, or a navigation that
+  # happened outside Fluffy (a late one, or through unwrap/2).
+  defp prepare_document(session, reuse_read?) do
     state = Session.page_state(session)
-    timeout = Session.timeout(session)
+
+    with true <- reuse_read?,
+         false <- BrowserPage.is_closed(state.page),
+         %{} = before <- Document.take_kept_probe(state) do
+      {session, before}
+    else
+      _unavailable -> read_document(session, state, Session.timeout(session))
+    end
+  end
+
+  defp read_document(session, state, timeout) do
     probe = open_page_probe!(session, state, timeout)
 
     if probe.document == state.document_identity do
@@ -614,6 +642,8 @@ defmodule Fluffy.Driver.Playwright do
         {:navigate, session, Navigation.browser_patch(probe.url, state)}
 
       true ->
+        session = Session.put_page_state(session, %{state | kept_probe: probe})
+        Document.keep_probe(state)
         session
     end
   end
