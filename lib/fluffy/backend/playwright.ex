@@ -50,16 +50,20 @@ defmodule Fluffy.Backend.Playwright do
       |> Keyword.put(:extra_http_headers, headers)
 
     # The runtime creates and closes the context: PlaywrightEx keeps a closed
-    # context's data until those processes exit. Its cleanup is registered
-    # before any further setup can fail.
-    browser_context = SessionRuntime.run(runtime, fn -> new_context!(context_options) end)
+    # context's data until those processes exit. Its cleanup is registered in
+    # the same runtime call, before any further setup can fail.
+    browser_context =
+      SessionRuntime.run_registered(runtime, fn ->
+        browser_context = new_context!(context_options)
 
-    # The runtime waits at most `timeout` for the close, which has no timeout of
-    # its own; a slower close continues unlinked rather than leaving the context
-    # open in the shared browser.
-    :ok =
-      SessionRuntime.register(runtime, {:browser_context, browser_context.guid}, fn ->
-        Bounded.within(timeout, fn -> BrowserContext.close(browser_context) end, on_timeout: :leave)
+        # The runtime waits at most `timeout` for the close, which has no timeout
+        # of its own; a slower close continues unlinked rather than leaving the
+        # context open in the shared browser.
+        close = fn ->
+          Bounded.within(timeout, fn -> BrowserContext.close(browser_context) end, on_timeout: :leave)
+        end
+
+        {browser_context, {:browser_context, browser_context.guid}, close}
       end)
 
     SessionRuntime.run(runtime, fn ->

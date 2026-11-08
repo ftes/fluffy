@@ -40,6 +40,16 @@ defmodule Fluffy.SessionRuntime do
     end
   end
 
+  # Like `run/2` for a `fun` returning `{value, resource, cleanup}`: the cleanup
+  # is registered in the same call, so the resource never goes unregistered.
+  def run_registered(runtime, fun) when is_function(fun, 0) do
+    case call(runtime, {:run_registered, fun}) do
+      {:ok, value} -> value
+      {:raise, kind, reason, stacktrace} -> :erlang.raise(kind, reason, stacktrace)
+      {:error, message} -> raise ArgumentError, message
+    end
+  end
+
   def subscribe(runtime, pid, source, type, handler), do: call(runtime, {:subscribe, pid, source, type, handler})
   def unsubscribe(runtime, pid), do: call(runtime, {:unsubscribe, pid})
   def remove_listener(runtime, source, type, handler), do: call(runtime, {:remove_listener, source, type, handler})
@@ -152,6 +162,13 @@ defmodule Fluffy.SessionRuntime do
 
   def handle_call({:run, fun}, _from, state) do
     {:reply, {:ok, fun.()}, state}
+  catch
+    kind, reason -> {:reply, {:raise, kind, reason, __STACKTRACE__}, state}
+  end
+
+  def handle_call({:run_registered, fun}, _from, state) do
+    {value, resource, cleanup} = fun.()
+    {:reply, {:ok, value}, %{state | resources: [{resource, cleanup} | state.resources]}}
   catch
     kind, reason -> {:reply, {:raise, kind, reason, __STACKTRACE__}, state}
   end

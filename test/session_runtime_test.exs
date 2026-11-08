@@ -52,6 +52,21 @@ defmodule Fluffy.SessionRuntimeTest do
     refute_received :released_closed
   end
 
+  test "a run registers the cleanup of the resource it creates in the same call" do
+    {:ok, runtime} = SessionRuntime.start(self())
+    caller = self()
+
+    assert SessionRuntime.run_registered(runtime, fn ->
+             {self(), :created, fn -> send(caller, :created_closed) end}
+           end) == runtime
+
+    assert SessionRuntime.resources(runtime) == {:ok, [:created]}
+    assert_raise RuntimeError, "failed", fn -> SessionRuntime.run_registered(runtime, fn -> raise "failed" end) end
+    assert SessionRuntime.resources(runtime) == {:ok, [:created]}
+    assert :ok = SessionRuntime.close(runtime)
+    assert_received :created_closed
+  end
+
   test "state survives discarded handles and session shutdown is idempotent" do
     session = Fluffy.session_for_html(:static, "<input aria-label='Name'>")
     Fluffy.fill(session, Fluffy.Locator.by_label("Name"), "Ada")
