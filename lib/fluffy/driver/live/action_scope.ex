@@ -10,13 +10,27 @@ defmodule Fluffy.Driver.Live.ActionScope do
   # session's next call to find, except a patch the action already applied
   # there. Outside an action, recording does nothing.
   #
-  # An action whose timeout ran out before it reached the view retries once on
-  # the page a navigation landed on, as a final attempt that may not retry
-  # again. Its retries count the redirects they follow, so pages that keep
+  # An action's retries count the redirects they follow, so pages that keep
   # navigating before the action reaches them fail it at the redirect limit.
+  #
+  # Nothing checks that the driver records what this scope relies on, so Live
+  # driver code that talks to a view must keep to these rules:
+  #
+  #   * A view call that sends the view something (an event, a patch, an
+  #     upload) goes through `delivered/1` or `record_delivery/0`, so a
+  #     retry never repeats an action the view already saw. Reads, such as
+  #     `render`, record nothing.
+  #   * A view message taken from the mailbox (a patch, a redirect, a watcher
+  #     event) is passed to `record_taken/1` as it is taken, so a failed action
+  #     puts it back. One the action then applies to its session goes to
+  #     `record_applied/1`, and once the session left the page,
+  #     `record_left_page/0` drops them all.
+  #   * A retry on another page runs after the action's scope ended, as an
+  #     action of its own, so it neither counts the first page's deliveries
+  #     nor puts back its messages. It passes the redirects followed so far
+  #     through `after_redirects/2`, so the redirect limit holds across retries.
 
   @scope {__MODULE__, :scope}
-  @final_attempt {__MODULE__, :final_attempt}
   @redirects {__MODULE__, :redirects}
 
   def run(action) when is_function(action, 0) do
@@ -30,16 +44,6 @@ defmodule Fluffy.Driver.Live.ActionScope do
         :erlang.raise(kind, reason, __STACKTRACE__)
     after
       restore(@scope, previous)
-    end
-  end
-
-  def final_attempt(retry) when is_function(retry, 0) do
-    previous = Process.put(@final_attempt, true)
-
-    try do
-      retry.()
-    after
-      restore(@final_attempt, previous)
     end
   end
 
@@ -87,8 +91,6 @@ defmodule Fluffy.Driver.Live.ActionScope do
 
   defp restore(key, nil), do: Process.delete(key)
   defp restore(key, previous), do: Process.put(key, previous)
-
-  def final_attempt?, do: Process.get(@final_attempt) == true
 
   def delivered?, do: match?(%{delivered?: true}, Process.get(@scope))
 

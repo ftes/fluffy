@@ -565,10 +565,9 @@ defmodule Fluffy.Driver.Live do
   # events reached the view. A navigation found before that landed before the
   # action: follow it and retry the whole action on the new page within the
   # remaining timeout, as a Playwright locator retries on the page it finds.
-  # Once no budget remains, the retry is one final attempt without waiting, so
-  # the action reports what it finds there, such as a missing target, and a
-  # navigation that attempt finds before reaching the view fails it. Once an
-  # event reached the view, the action took effect, so a navigation a later
+  # A navigation found once no budget remains fails the action instead, as
+  # Playwright never acts past its deadline, and leaves the navigation unread
+  # for the session's next call. Once an event reached the view, the action took effect, so a navigation a later
   # step finds ends the action on the new page instead, like a browser whose
   # page navigated mid-action. A redirect the view left since Fluffy last read
   # it is followed first, so an action that never calls the view, such as a
@@ -603,7 +602,7 @@ defmodule Fluffy.Driver.Live do
         {:navigate, session, navigation}
 
       {{session, navigation}, false} ->
-        if Deadline.expired?(deadline) and ActionScope.final_attempt?() do
+        if Deadline.expired?(deadline) do
           raise Fluffy.ActionabilityError,
             action: action_label(operation, arguments),
             reason: :navigated_away,
@@ -642,11 +641,7 @@ defmodule Fluffy.Driver.Live do
   defp retry_on_new_page(session, redirects, operation, arguments, deadline) do
     remaining = Deadline.remaining(deadline)
     arguments = List.update_at(arguments, -1, &put_timeout(&1, remaining))
-    retry = fn -> Fluffy.__dispatch_driver__(session, operation, arguments) end
-
-    ActionScope.after_redirects(redirects, fn ->
-      if remaining == 0, do: ActionScope.final_attempt(retry), else: retry.()
-    end)
+    ActionScope.after_redirects(redirects, fn -> Fluffy.__dispatch_driver__(session, operation, arguments) end)
   end
 
   defp put_timeout(%Expect{} = expectation, timeout), do: Expect.Internal.merge_options(expectation, timeout: timeout)
