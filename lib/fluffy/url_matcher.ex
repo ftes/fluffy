@@ -65,10 +65,11 @@ defmodule Fluffy.URLMatcher do
   """
   def ignore_case(expected, nil), do: expected
 
-  # A leading inline flag overrides the regex's own `i` option.
+  # Prefixing an inline flag would break a source that must start with a PCRE verb such as `(*UCP)`.
   def ignore_case(%Regex{} = expected, ignore_case) do
-    flag = if ignore_case, do: "(?i)", else: "(?-i)"
-    Regex.compile!(flag <> Regex.source(expected), Regex.opts(expected))
+    options = List.delete(Regex.opts(expected), :caseless)
+    options = if ignore_case, do: [:caseless | options], else: options
+    Regex.compile!(Regex.source(expected), options)
   end
 
   def ignore_case(expected, false), do: expected

@@ -77,6 +77,8 @@ defmodule Fluffy.Conformance.NativeOptionsTest do
       |> expect(page_to_have_url("/STAGE", ignore_case: true))
       |> expect(page_to_have_url(~r/STAGE$/, ignore_case: true))
       |> expect(not_(page_to_have_url(~r/STAGE$/i, ignore_case: false)))
+      |> expect(page_to_have_url(~r/(*UCP)\bSTAGE$/, ignore_case: true))
+      |> expect(not_(page_to_have_url(~r/(*UCP)\bSTAGE$/i, ignore_case: false)))
     end
   end
 
