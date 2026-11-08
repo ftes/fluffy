@@ -64,6 +64,34 @@ defmodule Fluffy.Conformance.BrowserAPITest do
   end
 
   @tag driver: :playwright
+  test "cookie and storage maps use Playwright's camelCase keys" do
+    session = :playwright |> start_session() |> visit("/harness")
+    url = Fluffy.TestServer.base_url()
+
+    session = Playwright.add_cookies(session, [%{name: "token", value: "abc", url: url, httpOnly: true, sameSite: "Lax"}])
+    assert [%{name: "token", httpOnly: true, sameSite: "Lax"}] = Playwright.cookies(session)
+    assert [%{name: "token"}] = Playwright.cookies(session, [url])
+
+    # Fluffy 0.8 options would reach Playwright as URLs.
+    for options <- [[urls: [url]], [timeout: 1_000]] do
+      assert_raise ArgumentError, ~r/cookies\/2 takes the URL list, not the options/, fn ->
+        Playwright.cookies(session, options)
+      end
+    end
+
+    assert %{cookies: [%{httpOnly: true}], origins: _origins} = Playwright.storage_state(session)
+
+    # Playwright would drop these silently.
+    for {key, camel_case} <- [http_only: :httpOnly, same_site: :sameSite], cookie_key <- [key, Atom.to_string(key)] do
+      assert_raise ArgumentError,
+                   ~r/#{inspect(cookie_key)} is not a Playwright cookie field; use #{inspect(camel_case)}/,
+                   fn ->
+                     Playwright.add_cookies(session, [%{:name => "old", :value => "x", :url => url, cookie_key => true}])
+                   end
+    end
+  end
+
+  @tag driver: :playwright
   test "hover, drag, and typing emit native browser events" do
     session =
       Fluffy.session_for_html(:playwright, """
@@ -106,6 +134,23 @@ defmodule Fluffy.Conformance.BrowserAPITest do
     session |> go_forward() |> expect(page_to_have_url(Fluffy.TestServer.base_url() <> "/harness#other"))
   end
 
+  @tag driver: :playwright
+  test "history without an entry keeps a URL a script changed" do
+    session = :playwright |> start_session() |> visit("/harness")
+    Playwright.evaluate(session, "history.replaceState(null, '', '/harness?replaced')")
+    session = go_forward(session)
+
+    assert Fluffy.Page.url(current_page(session)) == Fluffy.TestServer.base_url() <> "/harness?replaced"
+    expect(session, page_to_have_url(Fluffy.TestServer.base_url() <> "/harness?replaced"))
+  end
+
+  @tag driver: :playwright
+  test "history validates its timeout like other actions" do
+    session = start_session(:playwright)
+    assert_raise NimbleOptions.ValidationError, ~r/:timeout/, fn -> go_back(session, timeout: :infinity) end
+    assert_raise NimbleOptions.ValidationError, ~r/:timeout/, fn -> go_forward(session, timeout: -1) end
+  end
+
   test "browser operations reject Phoenix sessions" do
     session = start_session(:phoenix)
 
@@ -122,6 +167,11 @@ defmodule Fluffy.Conformance.BrowserAPITest do
           fn -> Playwright.storage_state(session) end
         ] do
       assert_raise Fluffy.CapabilityError, operation
+    end
+
+    for history <- [&go_back/1, &go_forward/1] do
+      error = assert_raise Fluffy.CapabilityError, fn -> history.(session) end
+      assert error.capability == :browser_history
     end
 
     assert :ok = close_session(session)

@@ -94,11 +94,57 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
 
       session = start_test_session(driver)
 
-      assert_raise RuntimeError, fn ->
+      assert_raise navigation_error(driver), fn ->
         visit(session, TestHTTPFixtures.path(fixture, "/loop"))
       end
 
       assert length(TestHTTPFixtures.requests(fixture)) >= 20
+    end
+
+    # The browser aborts the navigation and stays where it was; Playwright's goto fails.
+    for status <- [204, 205] do
+      @tag driver: driver
+      test "visit fails on a #{status} response with #{driver}", %{driver: driver} do
+        fixture =
+          TestHTTPFixtures.register_sequence([
+            %{status: unquote(status)},
+            %{body: html("Orders")},
+            %{status: unquote(status)}
+          ])
+
+        assert_raise navigation_error(driver), ~r/abort|interrupt/i, fn ->
+          driver |> start_test_session() |> visit(TestHTTPFixtures.path(fixture, "/empty"))
+        end
+
+        session = driver |> start_test_session() |> visit(TestHTTPFixtures.path(fixture, "/orders"))
+
+        assert_raise navigation_error(driver), ~r/abort|interrupt/i, fn ->
+          visit(session, TestHTTPFixtures.path(fixture, "/empty"))
+        end
+
+        assert Enum.map(TestHTTPFixtures.requests(fixture), & &1.path) == ["/empty", "/orders", "/empty"]
+      end
+
+      @tag driver: driver
+      test "a failed visit keeps the cookies of its #{status} response with #{driver}", %{driver: driver} do
+        fixture =
+          TestHTTPFixtures.register_sequence([
+            %{body: html("Orders")},
+            %{status: unquote(status), headers: [{"set-cookie", "seen=1; Path=/"}]},
+            %{body: html("Orders")}
+          ])
+
+        session = driver |> start_test_session() |> visit(TestHTTPFixtures.path(fixture, "/orders"))
+
+        assert_raise navigation_error(driver), ~r/abort|interrupt/i, fn ->
+          visit(session, TestHTTPFixtures.path(fixture, "/beacon"))
+        end
+
+        visit(session, TestHTTPFixtures.path(fixture, "/orders"))
+
+        assert [_orders, _beacon, %{headers: headers}] = TestHTTPFixtures.requests(fixture)
+        assert {"cookie", "seen=1"} in headers
+      end
     end
 
     @tag driver: driver
@@ -135,4 +181,8 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
   defp html(text) do
     "<!doctype html><html><body><main><h1>#{text}</h1></main></body></html>"
   end
+
+  # Playwright raises its own exception for a failed navigation.
+  defp navigation_error(:playwright), do: PlaywrightEx.PlaywrightError
+  defp navigation_error(:phoenix), do: RuntimeError
 end

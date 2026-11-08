@@ -216,7 +216,7 @@ defmodule Fluffy.Conformance.ComposedLocatorTest do
   test "intersections remain serializable and describe both operands" do
     locator = "#email" |> by_css() |> and_(by_label("Email", exact: true))
     assert locator |> :erlang.term_to_binary() |> :erlang.binary_to_term() == locator
-    assert Fluffy.Locator.describe(locator) == ~s{by_css("#email") |> and_(by_label("Email", exact: true))}
+    assert inspect(locator) == ~s{#Fluffy.Locator<by_css("#email") |> and_(by_label("Email", exact: true))>}
   end
 
   defp with_html(driver, html, fun) do

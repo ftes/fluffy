@@ -20,6 +20,7 @@ defmodule Fluffy.SessionRuntime do
   def pages(runtime), do: call(runtime, :pages)
   def page(runtime, id), do: call(runtime, {:page, id})
   def external_page(runtime, id), do: call(runtime, {:external_page, id})
+  def closed_page(runtime, id), do: call(runtime, {:closed_page, id})
   def put_page_state(runtime, id, state), do: call(runtime, {:page_state, id, state})
   def replace_page(runtime, %Page.State{} = page), do: call(runtime, {:replace_page, page})
   def close_page(runtime, id), do: call(runtime, {:close_page, id})
@@ -29,7 +30,25 @@ defmodule Fluffy.SessionRuntime do
     do: call(runtime, {:register_resource, resource, cleanup})
 
   def release(runtime, resource), do: call(runtime, {:release_resource, resource})
-  def monitor(runtime, pid), do: call(runtime, {:monitor, pid})
+
+  # Runs `fun` in the runtime process, so the runtime owns what it creates.
+  def run(runtime, fun) when is_function(fun, 0) do
+    case call(runtime, {:run, fun}) do
+      {:ok, value} -> value
+      {:raise, kind, reason, stacktrace} -> :erlang.raise(kind, reason, stacktrace)
+      {:error, message} -> raise ArgumentError, message
+    end
+  end
+
+  # Like `run/2` for a `fun` returning `{value, resource, cleanup}`: the cleanup
+  # is registered in the same call, so the resource never goes unregistered.
+  def run_registered(runtime, fun) when is_function(fun, 0) do
+    case call(runtime, {:run_registered, fun}) do
+      {:ok, value} -> value
+      {:raise, kind, reason, stacktrace} -> :erlang.raise(kind, reason, stacktrace)
+      {:error, message} -> raise ArgumentError, message
+    end
+  end
 
   def subscribe(runtime, pid, source, type, handler), do: call(runtime, {:subscribe, pid, source, type, handler})
   def unsubscribe(runtime, pid), do: call(runtime, {:unsubscribe, pid})
@@ -93,6 +112,12 @@ defmodule Fluffy.SessionRuntime do
   def handle_call({:page, id}, _from, state), do: {:reply, fetch_page(state, id), state}
   def handle_call({:external_page, id}, _from, state), do: {:reply, {:ok, state.external_pages[id]}, state}
 
+  # A page that closed before it was registered keeps one identity, never live.
+  def handle_call({:closed_page, external_id}, _from, state) do
+    external_pages = Map.put_new_lazy(state.external_pages, external_id, &make_ref/0)
+    {:reply, {:ok, external_pages[external_id]}, %{state | external_pages: external_pages}}
+  end
+
   def handle_call({:page_state, id, page_state}, _from, state) do
     case fetch_page(state, id) do
       {:ok, page} -> {:reply, :ok, %{state | pages: Map.put(state.pages, id, %{page | state: page_state})}}
@@ -135,8 +160,18 @@ defmodule Fluffy.SessionRuntime do
   def handle_call({:release_resource, resource}, _from, state),
     do: {:reply, :ok, %{state | resources: List.keydelete(state.resources, resource, 0)}}
 
-  def handle_call({:monitor, pid}, _from, state),
-    do: {:reply, :ok, %{state | monitors: [Process.monitor(pid) | state.monitors]}}
+  def handle_call({:run, fun}, _from, state) do
+    {:reply, {:ok, fun.()}, state}
+  catch
+    kind, reason -> {:reply, {:raise, kind, reason, __STACKTRACE__}, state}
+  end
+
+  def handle_call({:run_registered, fun}, _from, state) do
+    {value, resource, cleanup} = fun.()
+    {:reply, {:ok, value}, %{state | resources: [{resource, cleanup} | state.resources]}}
+  catch
+    kind, reason -> {:reply, {:raise, kind, reason, __STACKTRACE__}, state}
+  end
 
   def handle_call({:subscribe, pid, source, type, handler}, _from, state) do
     if source == :context or Map.has_key?(state.pages, source) do

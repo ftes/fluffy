@@ -54,7 +54,7 @@ defmodule Fluffy.Driver.Live.Click do
   defp checkable_payload(client_dom, target) do
     payload = Event.values(target.attributes)
 
-    if ClientDOM.checked?(client_dom, Locator.new({:css, target.selector})) do
+    if ClientDOM.checked?(client_dom, Locator.by_css(target.selector)) do
       Map.put(payload, "value", attribute(target, "value") || "on")
     else
       Map.delete(payload, "value")

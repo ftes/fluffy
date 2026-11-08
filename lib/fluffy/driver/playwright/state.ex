@@ -1,12 +1,16 @@
 defmodule Fluffy.Driver.Playwright.State do
   @moduledoc false
 
-  @enforce_keys [:frame_id, :page_id]
-  defstruct [:document_identity, :frame_id, :page_id]
+  # `navigated` is set when the main frame navigates and cleared before Fluffy
+  # reads the document it adopts, so a set flag means `document_identity` may
+  # be stale.
+  @enforce_keys [:page, :frame, :navigated]
+  defstruct [:page, :frame, :document_identity, :navigated]
 
   @type t :: %__MODULE__{
-          document_identity: reference() | nil,
-          frame_id: String.t(),
-          page_id: String.t()
+          page: PlaywrightEx.Page.t(),
+          frame: PlaywrightEx.Frame.t(),
+          document_identity: String.t() | nil,
+          navigated: :atomics.atomics_ref()
         }
 end

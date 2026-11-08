@@ -6,6 +6,8 @@ defmodule Fluffy.Conformance.LiveFormTest do
   import Fluffy.Locator
   import Fluffy.Playwright
 
+  alias Fluffy.TestHTTPFixtures
+
   test "Live reset buttons do not reset fields and still dispatch server events" do
     session = :phoenix |> start_test_session() |> visit("/live/potions")
 
@@ -121,6 +123,42 @@ defmodule Fluffy.Conformance.LiveFormTest do
       |> fill(by_label("Name"), "Ada Lovelace")
       |> expect(to_have_value(by_label("Name"), "Ada Lovelace"))
       |> expect("Email is required" |> by_text() |> to_be_visible())
+    end
+
+    # The form also has an HTTP action, which a cancelled submit never reaches.
+    @tag driver: driver
+    test "submit sends a phx-submit form to LiveView only with #{driver}", %{driver: driver} do
+      driver
+      |> start_test_session()
+      |> visit("/live/potions")
+      |> fill(by_label("Row 0"), "aconite")
+      |> submit(by_css("#profile-form"), timeout: 2_000)
+      |> expect("Saved rows: aconite, belladonna, cinder" |> by_text() |> to_be_visible())
+      |> expect(page_to_have_url(&(&1.path == "/live/potions")))
+    end
+
+    for status <- [204, 205] do
+      @tag driver: driver
+      # LiveView's client disconnects as the form submits, so the kept page stays inert.
+      test "a #{status} response to an HTTP form keeps the disconnected LiveView page with #{driver}", %{
+        driver: driver
+      } do
+        fixture = TestHTTPFixtures.register(%{status: unquote(status)})
+
+        driver
+        |> start_test_session()
+        |> visit("/live/no-content?" <> URI.encode_query(to: TestHTTPFixtures.path(fixture, "/save")))
+        |> click(by_role(:button, name: "Increment"))
+        |> expect("Count: 1" |> by_text() |> to_be_visible())
+        |> fill(by_label("Note"), "edited")
+        |> submit(by_css("#http-form"), timeout: 2_000)
+        |> expect("Note" |> by_label() |> to_have_value("edited"))
+        |> expect(page_to_have_url(&(&1.path == "/live/no-content")))
+        |> click(by_role(:button, name: "Increment"))
+        |> expect("Count: 1" |> by_text() |> to_be_visible())
+
+        assert [%{method: "POST", body: "note=edited"}] = TestHTTPFixtures.requests(fixture)
+      end
     end
 
     @tag driver: driver

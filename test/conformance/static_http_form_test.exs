@@ -90,6 +90,113 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
     end
 
     @tag driver: driver
+    test "submit returns once the server has received the submission using #{driver}", %{driver: driver} do
+      fixture =
+        TestHTTPFixtures.register_sequence([
+          %{body: html(~s(<form id="note" method="post" action="save"><input name="note" value="kept"></form>))},
+          %{body: html("<h1>Saved</h1>")}
+        ])
+
+      driver
+      |> start_test_session()
+      |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+      |> submit(by_css("#note"))
+
+      [_source, submission] = TestHTTPFixtures.requests(fixture)
+      assert submission.body == "note=kept"
+    end
+
+    @tag driver: driver
+    test "submit returns once the server has answered the redirected request using #{driver}", %{driver: driver} do
+      test = self()
+
+      fixture =
+        TestHTTPFixtures.register_sequence([
+          %{body: html(~s(<form id="note" method="post" action="save"><input name="note" value="kept"></form>))},
+          %{status: 303, headers: [{"location", "saved"}]},
+          fn _request ->
+            Process.sleep(300)
+            send(test, :saved_page_served)
+            %{body: html("<h1>Saved</h1>")}
+          end
+        ])
+
+      driver
+      |> start_test_session()
+      |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+      |> submit(by_css("#note"), timeout: 5_000)
+
+      assert_received :saved_page_served
+    end
+
+    # Nothing reads the page after the submit, so submit itself must return. Before
+    # Playwright 1.65, Chromium waited on the aborted navigation (microsoft/playwright#43279).
+    @tag driver: driver
+    test "submit returns after a no-content response using #{driver}", %{driver: driver} do
+      fixture =
+        TestHTTPFixtures.register_sequence([
+          %{body: html(~s(<form id="note" method="post" action="save"><input name="note" value="kept"></form>))},
+          %{status: 204}
+        ])
+
+      driver
+      |> start_test_session()
+      |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+      |> submit(by_css("#note"), timeout: 2_000)
+
+      assert [_source, %{method: "POST", body: "note=kept"}] = TestHTTPFixtures.requests(fixture)
+    end
+
+    # Browsers abort the navigation and keep the document; none resets the form on 205.
+    for status <- [204, 205] do
+      @tag driver: driver
+      test "a #{status} response to submit keeps the current page and form state using #{driver}", %{driver: driver} do
+        fixture =
+          TestHTTPFixtures.register_sequence([
+            %{
+              body:
+                html(
+                  ~s(<h1>Draft</h1><form id="note" method="post" action="save"><label>Note <input name="note" value="draft"></label></form>)
+                )
+            },
+            %{status: unquote(status)}
+          ])
+
+        driver
+        |> start_test_session()
+        |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+        |> fill(by_label("Note"), "edited")
+        |> submit(by_css("#note"), timeout: 2_000)
+        |> expect("Draft" |> by_text() |> to_be_visible())
+        |> expect("Note" |> by_label() |> to_have_value("edited"))
+        |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/forms/start")))
+
+        assert [_source, %{method: "POST", body: "note=edited"}] = TestHTTPFixtures.requests(fixture)
+      end
+    end
+
+    @tag driver: driver
+    test "a download response to submit keeps the current page using #{driver}", %{driver: driver} do
+      fixture =
+        TestHTTPFixtures.register_sequence([
+          %{body: html(~s(<h1>Exports</h1><form id="export" method="post" action="export"></form>))},
+          %{
+            headers: [{"content-type", "text/csv"}, {"content-disposition", ~s(attachment; filename="report.csv")}],
+            body: "id\n1\n"
+          }
+        ])
+
+      driver
+      |> start_test_session()
+      |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+      |> submit(by_css("#export"), timeout: 2_000)
+      |> expect("Exports" |> by_text() |> to_be_visible())
+      |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/forms/start")))
+
+      assert [_source, %{method: "POST"}] = TestHTTPFixtures.requests(fixture)
+    end
+
+    @tag driver: driver
     test "submits ordered successful controls with URL-encoded POST using #{driver}", %{
       driver: driver
     } do
@@ -465,6 +572,130 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
 
     assert submission.body ==
              "email=not+an+email&number=many&url=not+a+url&colour=not-a-colour&date=not-a-date&datetime=soon&month=later&range=wide&time=noon&week=someday"
+  end
+
+  # These submissions start no navigation in the page; submit must not wait for one.
+  for {name, form} <- [
+        {"a new-window target", ~s(<form id="note" method="post" action="save" target="_blank"></form>)},
+        {"a named window target", ~s(<form id="note" method="post" action="save" target="elsewhere"></form>)},
+        {"dialog method", ~s(<dialog open><form id="note" method="dialog"></form></dialog>)},
+        {"a cancelled submit event", ~s[<form id="note" action="save" onsubmit="event.preventDefault()"></form>]}
+      ] do
+    @tag driver: :playwright
+    test "Playwright submit with #{name} does not wait for a page navigation" do
+      fixture = TestHTTPFixtures.register(%{body: html("<h1>Draft</h1>" <> unquote(form))})
+
+      :playwright
+      |> start_test_session()
+      |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+      |> submit(by_css("#note"), timeout: 2_000)
+      |> expect("Draft" |> by_text() |> to_be_visible())
+    end
+  end
+
+  # The GET's URL differs from the current one only by its fragment.
+  @tag driver: :playwright
+  test "Playwright submit of a GET to a fragment of the current URL navigates within the document" do
+    fixture =
+      TestHTTPFixtures.register(%{
+        body: html(~s(<h1>Draft</h1><form id="note" action="#results"><input name="q" value="fluffy"></form>))
+      })
+
+    :playwright
+    |> start_test_session()
+    |> visit(TestHTTPFixtures.path(fixture, "/forms/start?q=fluffy"))
+    |> submit(by_css("#note"), timeout: 2_000)
+    |> expect("Draft" |> by_text() |> to_be_visible())
+    |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/forms/start?q=fluffy#results")))
+
+    assert [_source] = TestHTTPFixtures.requests(fixture)
+  end
+
+  @tag driver: :playwright
+  test "Playwright submit intercepted by the Navigation API navigates within the document" do
+    intercept = """
+    <script>
+      navigation.addEventListener('navigate', event => {
+        if (event.formData) event.intercept({handler: () => { document.querySelector('h1').textContent = 'Intercepted' }})
+      })
+    </script>
+    """
+
+    fixture =
+      TestHTTPFixtures.register(%{
+        body: html(~s(<h1>Draft</h1><form id="note" method="post" action="save"></form>) <> intercept)
+      })
+
+    :playwright
+    |> start_test_session()
+    |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+    |> submit(by_css("#note"), timeout: 2_000)
+    |> expect("Intercepted" |> by_text() |> to_be_visible())
+
+    assert [_source] = TestHTTPFixtures.requests(fixture)
+  end
+
+  # Dismissing the prompt cancels the navigation; accepting it lets it go on.
+  # Filling the field gives the page the user activation the prompt requires.
+  for {outcome, handle, heading, requests} <- [
+        {"dismissed", &Fluffy.Dialog.dismiss/1, "Draft", 1},
+        {"accepted", &Fluffy.Dialog.accept/1, "Saved", 2}
+      ] do
+    @tag driver: :playwright
+    test "Playwright submit returns when a beforeunload prompt is #{outcome}" do
+      body = """
+      <h1>Draft</h1><form id="note" method="post" action="save"><label>Title <input name="title"></label></form>
+      <script>addEventListener('beforeunload', event => event.preventDefault())</script>
+      """
+
+      fixture = TestHTTPFixtures.register_sequence([%{body: html(body)}, %{body: html("<h1>Saved</h1>")}])
+
+      :playwright
+      |> start_test_session()
+      |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+      |> fill(by_label("Title"), "Draft")
+      |> once(Fluffy.Event.dialog(), unquote(handle))
+      |> submit(by_css("#note"), timeout: 2_000)
+      |> expect(unquote(heading) |> by_text() |> to_be_visible())
+
+      assert length(TestHTTPFixtures.requests(fixture)) == unquote(requests)
+    end
+  end
+
+  @tag driver: :playwright
+  @tag :capture_log
+  test "Playwright submit names the navigation request it waited for when the browser sends none" do
+    body = """
+    <!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="form-action 'none'"></head>
+    <body><form id="note" method="post" action="save"></form></body></html>
+    """
+
+    fixture = TestHTTPFixtures.register(%{body: body})
+    session = :playwright |> start_test_session() |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+
+    assert_raise Fluffy.OperationError,
+                 ~r/Timeout 500ms exceeded while waiting for the submitted form's navigation request/,
+                 fn ->
+                   submit(session, by_css("#note"), timeout: 500)
+                 end
+  end
+
+  @tag driver: :playwright
+  @tag :capture_log
+  test "Playwright submit names its timeout when the server does not answer in time" do
+    slow = fn _request ->
+      Process.sleep(1_000)
+      %{body: html("<h1>Saved</h1>")}
+    end
+
+    fixture =
+      TestHTTPFixtures.register_sequence([%{body: html(~s(<form id="note" method="post" action="save"></form>))}, slow])
+
+    session = :playwright |> start_test_session() |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+
+    assert_raise Fluffy.OperationError, ~r/Timeout 300ms exceeded while waiting for the form submission response/, fn ->
+      submit(session, by_css("#note"), timeout: 300)
+    end
   end
 
   defp start_test_session(driver) do

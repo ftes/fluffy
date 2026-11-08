@@ -105,9 +105,6 @@ defmodule Fluffy.Assert do
   @doc "Equivalent to `Fluffy.Expect.page_to_have_url/2`."
   defdelegate page_url(expected, options \\ []), to: Fluffy.Expect, as: :page_to_have_url
 
-  @doc "Equivalent to `Fluffy.Expect.page_to_have_status/2`."
-  defdelegate page_status(expected, options \\ []), to: Fluffy.Expect, as: :page_to_have_status
-
   @doc "Equivalent to `Fluffy.Expect.page_to_have_opener/2`."
   defdelegate page_opener(expected, options \\ []), to: Fluffy.Expect, as: :page_to_have_opener
 

@@ -23,7 +23,6 @@ defmodule Fluffy.Backend.Contract do
 
   # Metadata and document identity belong to the backend that owns the page.
   @callback page_snapshot(term(), Page.State.t()) :: Page.State.t()
-  @callback page_status(term(), Page.State.t()) :: non_neg_integer() | nil
   @callback commit_page(Page.State.t(), atom(), term(), String.t() | nil, keyword()) :: Page.State.t()
 
   # Normalize backend page identities and events before they enter the runtime.
@@ -32,5 +31,8 @@ defmodule Fluffy.Backend.Contract do
   # Called only for the first registration of an open page.
   @callback subscribe_page(term(), Page.State.t(), pid()) :: :ok | {:error, String.t()}
   @callback runtime_event(term(), term()) ::
-              {:page_opened, page_registration()} | {:page_closed, term()} | :closed | :ignore
+              {:page_opened, page_registration()}
+              | {:page_closed, term()}
+              | :closed
+              | :ignore
 end

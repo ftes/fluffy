@@ -40,7 +40,7 @@ defmodule Fluffy.MixProject do
       package: package(),
       deps: deps(),
       aliases: aliases(),
-      dialyzer: [plt_add_apps: [:ex_unit]]
+      dialyzer: [plt_add_apps: [:ex_unit, :mix]]
     ]
   end
 
@@ -55,7 +55,9 @@ defmodule Fluffy.MixProject do
     [preferred_envs: [lint: :test, check: :test, quality: :test]]
   end
 
-  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  # `dev/` holds maintainer tasks, kept out of the package and consumers' builds.
+  defp elixirc_paths(:test), do: ["lib", "dev", "test/support"]
+  defp elixirc_paths(:dev), do: ["lib", "dev"]
   defp elixirc_paths(_env), do: ["lib"]
 
   defp deps do
@@ -64,7 +66,7 @@ defmodule Fluffy.MixProject do
       {:lazy_html, ">= 0.1.0 and < 1.0.0"},
       {:phoenix, "~> 1.7"},
       {:phoenix_live_view, "~> 1.0"},
-      {:playwright_ex, "~> 0.15"},
+      {:playwright_ex, "~> 0.17.0-rc.3"},
       {:phoenix_ecto, "~> 4.7", optional: true},
       {:ecto_sql, "~> 3.10", optional: true},
       {:ex_doc, "~> 0.40.3", only: :dev, runtime: false},
@@ -79,11 +81,12 @@ defmodule Fluffy.MixProject do
   defp docs do
     [
       main: "readme",
+      # Maintainer tasks in `dev/` are not part of the package.
+      filter_modules: fn module, _metadata -> module != Mix.Tasks.Fluffy.Gen.NativeOptions end,
       annotations_for_docs: fn metadata ->
         if metadata[:playwright_only], do: ["Playwright only"], else: []
       end,
       source_ref: "v#{@version}",
-      assets: %{"docs/images" => "docs/images"},
       extras: ["README.md"] ++ @doc_files,
       groups_for_extras: [
         Guides: @guides,
@@ -102,6 +105,7 @@ defmodule Fluffy.MixProject do
           Fluffy.Page,
           Fluffy.Event,
           Fluffy.Playwright,
+          Fluffy.Playwright.Clock,
           Fluffy.Sandbox
         ],
         "Sessions and results": [
@@ -110,10 +114,10 @@ defmodule Fluffy.MixProject do
           Fluffy.Dialog,
           Fluffy.FileChooser,
           Fluffy.FilePayload,
-          Fluffy.HTTPEvent,
+          Fluffy.Request,
+          Fluffy.Response,
           Fluffy.Frame,
-          Fluffy.Event.Pending,
-          Fluffy.Playwright.Handle
+          Fluffy.Event.Pending
         ],
         "Capabilities and errors": [
           Fluffy.Capability,
@@ -132,7 +136,7 @@ defmodule Fluffy.MixProject do
       name: "fluffy",
       licenses: ["MIT"],
       links: %{"GitHub" => @source_url, "Hex.pm" => @hex_url},
-      files: ["lib", "docs/images", ".formatter.exs", "mix.exs", "README.md" | @doc_files]
+      files: ["lib", ".formatter.exs", "mix.exs", "README.md" | @doc_files]
     ]
   end
 
@@ -142,13 +146,15 @@ defmodule Fluffy.MixProject do
         "deps.get",
         "cmd pnpm install --frozen-lockfile",
         "assets.build",
-        "cmd pnpm exec playwright install chromium"
+        "playwright_ex.install -- chromium"
       ],
       "consumer.regenerate": "run --no-start integration/regenerate_consumer.exs",
       "assets.build": ["cmd pnpm run build:test"],
       lint: [
         "format --check-formatted",
+        # Compiles strictly first: the generator's own compile would satisfy it.
         "compile --warnings-as-errors",
+        "fluffy.gen.native_options --check",
         "credo --format oneline"
       ],
       check: ["lint", "test --warnings-as-errors"],

@@ -30,6 +30,17 @@ defmodule Fluffy do
   alias Fluffy.SelectedFile
   alias Fluffy.Session
 
+  @native_values [Fluffy.Request, Fluffy.Response, Fluffy.Dialog, Fluffy.Download, Fluffy.FileChooser, Fluffy.Frame]
+
+  @typedoc "A browser value that `unwrap/2` resolves to its PlaywrightEx counterpart."
+  @type native_value ::
+          Fluffy.Request.t()
+          | Fluffy.Response.t()
+          | Fluffy.Dialog.t()
+          | Fluffy.Download.t()
+          | Fluffy.FileChooser.t()
+          | Fluffy.Frame.t()
+
   @doc group: "Lifecycle and navigation"
   @doc """
   Starts an isolated `:phoenix` or `:playwright` session.
@@ -46,6 +57,13 @@ defmodule Fluffy do
   """
   @type backend :: :phoenix | :playwright
   @type action_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema()))
+  @type click_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema(:click)))
+  @type fill_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema(:fill)))
+  @type check_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema(:check)))
+  @type uncheck_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema(:uncheck)))
+  @type select_option_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema(:select_option)))
+  @type press_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema(:press)))
+  @type reload_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema(:reload)))
   @type file_input_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.file_input_schema()))
   @type session_option ::
           unquote(NimbleOptions.option_typespec(Fluffy.Options.session_schema()))
@@ -149,26 +167,43 @@ defmodule Fluffy do
   The Phoenix backend re-dispatches the current URL and selects the Static or
   LiveView driver for the returned page. The Playwright backend asks the active
   browser page to reload.
+
+  ## Options
+
+  Playwright-only options pass through to #{Fluffy.Options.native_reference(:reload)}.
+
+  #{NimbleOptions.docs(Fluffy.Options.action_schema(:reload))}
   """
-  @spec reload(Session.t(), [action_option()]) :: Session.t()
+  @spec reload(Session.t(), [reload_option()]) :: Session.t()
   def reload(%Session{} = session, options \\ []) do
-    options = Fluffy.Options.validate_action!(options)
+    options = Fluffy.Options.validate_action!(:reload, options)
     Backend.reload(session, options)
   end
 
   @doc group: "Diagnostics and native access"
   @doc """
-  Runs a driver-specific native operation and returns the reconciled session.
+  Runs `fun` with the native counterpart of a session or a browser value.
 
-  Static callbacks receive the current `Plug.Conn` and must return an updated
-  `Plug.Conn`. LiveView callbacks receive the current
-  `Phoenix.LiveViewTest.View`, and Playwright callbacks receive a
-  `Fluffy.Playwright.Handle`. Successful LiveView and Playwright callback return
-  values are ignored.
+  With a session, `fun` runs a driver-specific native operation and `unwrap/2`
+  returns the reconciled session. Static callbacks receive the current
+  `Plug.Conn` and must return an updated `Plug.Conn`. LiveView callbacks
+  receive the current `Phoenix.LiveViewTest.View`, and Playwright callbacks
+  receive the `PlaywrightEx.Page`. Successful LiveView and Playwright callback
+  return values are ignored. `Fluffy.Playwright.unwrap/3` passes a native
+  locator instead.
+
+  With a `Fluffy.Request`, `Fluffy.Response`, `Fluffy.Dialog`,
+  `Fluffy.Download`, `Fluffy.FileChooser` or `Fluffy.Frame`, `fun` receives
+  its PlaywrightEx counterpart and `unwrap/2` returns the callback's result.
+  A Phoenix download has none and raises `Fluffy.CapabilityError`.
+
+      body = unwrap(response, &PlaywrightEx.Response.text!/1)
 
   Native operations are not cross-driver compatible. Prefer the shared
   Fluffy API whenever it covers the behavior under test.
   """
+  @spec unwrap(Session.t(), (term() -> term())) :: Session.t()
+  @spec unwrap(native_value(), (term() -> result)) :: result when result: term()
   def unwrap(%Session{} = session, fun) when is_function(fun, 1) do
     case Session.current_driver(session) do
       :unvisited ->
@@ -179,6 +214,29 @@ defmodule Fluffy do
         dispatch_driver(session, :unwrap, [fun])
     end
   end
+
+  def unwrap(%module{} = value, fun) when module in @native_values and is_function(fun, 1), do: fun.(native!(value))
+
+  defp native!(%Fluffy.Download{native: nil}) do
+    raise Fluffy.CapabilityError,
+      capability: :native_download,
+      driver: :phoenix,
+      detail: "a Phoenix download has no native counterpart"
+  end
+
+  defp native!(%Fluffy.Frame{} = frame), do: Fluffy.Frame.native!(frame)
+
+  # A value such as a download outlives its page but not its session.
+  defp native!(%{native: native} = value) when is_struct(native) do
+    if page = owner_page(value), do: Fluffy.Page.ensure_session!(page)
+    native
+  end
+
+  defp native!(value), do: raise(ArgumentError, "#{inspect(value.__struct__)} has no native counterpart")
+
+  # A popup's initial request may have no page to check.
+  defp owner_page(%Fluffy.Response{request: request}), do: request.page
+  defp owner_page(%{page: page}), do: page
 
   @doc group: "Events"
   @doc "Registers an event wait immediately. Await the pending handle once with `await/1`."
@@ -213,9 +271,18 @@ defmodule Fluffy do
   end
 
   @doc group: "Actions"
-  @spec click(Session.t(), Fluffy.Locator.t(), [action_option()]) :: Session.t()
+  @doc """
+  Clicks one strict target.
+
+  ## Options
+
+  Playwright-only options pass through to #{Fluffy.Options.native_reference(:click)}.
+
+  #{NimbleOptions.docs(Fluffy.Options.action_schema(:click))}
+  """
+  @spec click(Session.t(), Fluffy.Locator.t(), [click_option()]) :: Session.t()
   def click(%Session{} = session, locator, options \\ []) do
-    options = Fluffy.Options.validate_action!(options)
+    options = Fluffy.Options.validate_action!(:click, options)
     dispatch_driver(session, :click, [locator, options])
   end
 
@@ -247,10 +314,16 @@ defmodule Fluffy do
 
   Filling contenteditable elements requires Playwright. Static and LiveView
   support input and textarea controls.
+
+  ## Options
+
+  Playwright-only options pass through to #{Fluffy.Options.native_reference(:fill)}.
+
+  #{NimbleOptions.docs(Fluffy.Options.action_schema(:fill))}
   """
-  @spec fill(Session.t(), Fluffy.Locator.t(), String.Chars.t(), [action_option()]) :: Session.t()
+  @spec fill(Session.t(), Fluffy.Locator.t(), String.Chars.t(), [fill_option()]) :: Session.t()
   def fill(%Session{} = session, locator, value, options \\ []) do
-    options = Fluffy.Options.validate_action!(options)
+    options = Fluffy.Options.validate_action!(:fill, options)
     dispatch_driver(session, :fill, [locator, to_string(value), options])
   end
 
@@ -325,15 +398,35 @@ defmodule Fluffy do
   end
 
   @doc group: "Actions"
-  @spec check(Session.t(), Fluffy.Locator.t(), [action_option()]) :: Session.t()
+  @doc """
+  Checks a checkbox or radio.
+
+  ## Options
+
+  Playwright-only options pass through to #{Fluffy.Options.native_reference(:check)}.
+
+  #{NimbleOptions.docs(Fluffy.Options.action_schema(:check))}
+  """
+  @spec check(Session.t(), Fluffy.Locator.t(), [check_option()]) :: Session.t()
   def check(%Session{} = session, locator, options \\ []) do
-    set_checked(session, locator, true, options)
+    options = Fluffy.Options.validate_action!(:check, options)
+    dispatch_driver(session, :set_checked, [locator, true, options])
   end
 
   @doc group: "Actions"
-  @spec uncheck(Session.t(), Fluffy.Locator.t(), [action_option()]) :: Session.t()
+  @doc """
+  Unchecks a checkbox.
+
+  ## Options
+
+  Playwright-only options pass through to #{Fluffy.Options.native_reference(:uncheck)}.
+
+  #{NimbleOptions.docs(Fluffy.Options.action_schema(:uncheck))}
+  """
+  @spec uncheck(Session.t(), Fluffy.Locator.t(), [uncheck_option()]) :: Session.t()
   def uncheck(%Session{} = session, locator, options \\ []) do
-    set_checked(session, locator, false, options)
+    options = Fluffy.Options.validate_action!(:uncheck, options)
+    dispatch_driver(session, :set_checked, [locator, false, options])
   end
 
   @doc group: "Actions"
@@ -345,10 +438,16 @@ defmodule Fluffy do
   escaping. Indexes remain zero-based integers. A list requests multiple
   options; wrap a charlist in `%{value: charlist}` or `%{label: charlist}`
   to use it as one option.
+
+  ## Options
+
+  Playwright-only options pass through to #{Fluffy.Options.native_reference(:select_option)}.
+
+  #{NimbleOptions.docs(Fluffy.Options.action_schema(:select_option))}
   """
-  @spec select_option(Session.t(), Fluffy.Locator.t(), term(), [action_option()]) :: Session.t()
+  @spec select_option(Session.t(), Fluffy.Locator.t(), term(), [select_option_option()]) :: Session.t()
   def select_option(%Session{} = session, locator, requested, options \\ []) do
-    options = Fluffy.Options.validate_action!(options)
+    options = Fluffy.Options.validate_action!(:select_option, options)
     requested = if is_list(requested), do: requested, else: [requested]
     requested = Enum.map(requested, &stringify_option/1)
     dispatch_driver(session, :select_option, [locator, requested, options])
@@ -378,17 +477,18 @@ defmodule Fluffy do
 
   Static pages do not support `press` and raise `Fluffy.CapabilityError`.
   Use `submit/2` to submit a form explicitly on any driver.
+
+  ## Options
+
+  Playwright-only options pass through to #{Fluffy.Options.native_reference(:press)}.
+
+  #{NimbleOptions.docs(Fluffy.Options.action_schema(:press))}
   """
-  @spec press(Session.t(), Fluffy.Locator.t(), String.t(), [action_option()]) :: Session.t()
+  @spec press(Session.t(), Fluffy.Locator.t(), String.t(), [press_option()]) :: Session.t()
   def press(%Session{} = session, locator, key, options \\ []) when is_binary(key) do
-    options = Fluffy.Options.validate_action!(options)
+    options = Fluffy.Options.validate_action!(:press, options)
 
     dispatch_driver(session, :press, [locator, key, options])
-  end
-
-  defp set_checked(%Session{} = session, locator, desired, options) do
-    options = Fluffy.Options.validate_action!(options)
-    dispatch_driver(session, :set_checked, [locator, desired, options])
   end
 
   @doc false
@@ -428,7 +528,7 @@ defmodule Fluffy do
 
   defp put_retry_timeout(arguments, remaining) do
     List.update_at(arguments, -1, fn
-      %Expect{} = expectation -> Expect.merge_options(expectation, timeout: remaining)
+      %Expect{} = expectation -> Expect.Internal.merge_options(expectation, timeout: remaining)
       options -> Keyword.put(options, :timeout, remaining)
     end)
   end

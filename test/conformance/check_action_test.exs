@@ -128,6 +128,101 @@ defmodule Fluffy.Conformance.CheckActionTest do
     end)
   end
 
+  # Page code here reverts the click at once; a LiveView patch does the same a
+  # round trip later, often before Playwright reads the state back.
+  test "Playwright check and uncheck succeed when page code reverts the click" do
+    revert = ~s|oninput="queueMicrotask(() => this.checked = !this.checked)"|
+
+    html = """
+    <label><input type="checkbox" #{revert}>Updates</label>
+    <label><input type="checkbox" checked #{revert}>Digest</label>
+    """
+
+    with_html(:playwright, html, fn session ->
+      session
+      |> check(by_role(:checkbox, name: "Updates"))
+      |> expect(to_be_checked(by_role(:checkbox, name: "Updates"), checked: false))
+      |> uncheck(by_role(:checkbox, name: "Digest"))
+      |> expect(to_be_checked(by_role(:checkbox, name: "Digest")))
+    end)
+  end
+
+  test "Playwright check and uncheck succeed when page code in an iframe reverts the click" do
+    revert = ~s|oninput="queueMicrotask(() => this.checked = !this.checked)"|
+
+    inner = """
+    <label><input type="checkbox" #{revert}>Updates</label>
+    <label><input type="checkbox" checked #{revert}>Digest</label>
+    """
+
+    frame = frame_locator("iframe")
+
+    with_html(:playwright, ~s(<iframe srcdoc="#{String.replace(inner, "\"", "&quot;")}"></iframe>), fn session ->
+      session
+      |> check(by_role(frame, :checkbox, name: "Updates"))
+      |> expect(to_be_checked(by_role(frame, :checkbox, name: "Updates"), checked: false))
+      |> uncheck(by_role(frame, :checkbox, name: "Digest"))
+      |> expect(to_be_checked(by_role(frame, :checkbox, name: "Digest")))
+    end)
+  end
+
+  test "Playwright check succeeds when page code reverts the click on a briefly unresponsive page" do
+    revert = ~s|oninput="queueMicrotask(() => this.checked = !this.checked)"|
+
+    # Several busy stretches, so that one still blocks the page after Fluffy's
+    # document check has slipped in between them.
+    busy = """
+    () => {
+      let stretches = 3
+      const block = () => {
+        const end = performance.now() + 800
+        while (performance.now() < end);
+        if (--stretches) setTimeout(block)
+      }
+      setTimeout(block)
+    }
+    """
+
+    with_html(:playwright, ~s(<label><input type="checkbox" #{revert}>Updates</label>), fn session ->
+      Playwright.evaluate(session, busy)
+
+      session
+      |> check(by_role(:checkbox, name: "Updates"))
+      |> expect(to_be_checked(by_role(:checkbox, name: "Updates"), checked: false))
+    end)
+  end
+
+  test "Playwright check fails when the click does not change the state" do
+    html = ~s|<label><input type="checkbox" onclick="event.preventDefault()">Updates</label>|
+
+    with_html(:playwright, html, fn session ->
+      assert_raise Fluffy.OperationError, ~r/Clicking the checkbox did not change its state/, fn ->
+        check(session, by_role(:checkbox, name: "Updates"))
+      end
+    end)
+  end
+
+  test "Playwright check and uncheck succeed when page code in a shadow root reverts the click" do
+    shadow = """
+    () => {
+      const root = document.querySelector('#host').attachShadow({mode: 'open'})
+      root.innerHTML = '<label><input type="checkbox">Updates</label><label><input type="checkbox" checked>Digest</label>'
+      for (const input of root.querySelectorAll('input'))
+        input.addEventListener('input', () => queueMicrotask(() => input.checked = !input.checked))
+    }
+    """
+
+    with_html(:playwright, ~s(<div id="host"></div>), fn session ->
+      Playwright.evaluate(session, shadow)
+
+      session
+      |> check(by_role(:checkbox, name: "Updates"))
+      |> expect(to_be_checked(by_role(:checkbox, name: "Updates"), checked: false))
+      |> uncheck(by_role(:checkbox, name: "Digest"))
+      |> expect(to_be_checked(by_role(:checkbox, name: "Digest")))
+    end)
+  end
+
   test "the Static driver rejects browser-owned indeterminate checkbox state" do
     checkbox = by_role(:checkbox, name: "Construction")
     html = ~s(<label><input type="checkbox">Construction</label>)

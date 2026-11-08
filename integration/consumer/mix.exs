@@ -41,7 +41,7 @@ defmodule FluffyConsumer.MixProject do
   defp deps do
     [
       {:fluffy, [path: "../..", only: :test]},
-      {:phoenix, "~> 1.8.13"},
+      {:phoenix, "~> 1.8.16"},
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
       {:phoenix_live_view, "~> 1.2.0"},

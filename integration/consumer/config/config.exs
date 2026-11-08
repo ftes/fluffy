@@ -19,7 +19,7 @@ config :fluffy_consumer, FluffyConsumerWeb.Endpoint,
     layout: false
   ],
   pubsub_server: FluffyConsumer.PubSub,
-  live_view: [signing_salt: "oAYrJSP/"]
+  live_view: [signing_salt: "jp0sor1I"]
 
 # Configure Elixir's Logger
 config :logger, :default_formatter,

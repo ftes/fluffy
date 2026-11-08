@@ -7,8 +7,8 @@ defmodule Fluffy.Conformance.NetworkEventTest do
   import Fluffy.Playwright
 
   alias Fluffy.Event
-  alias Fluffy.HTTPEvent
   alias Fluffy.Playwright
+  alias Fluffy.SessionRuntime
   alias Fluffy.TestHTTPFixtures
 
   @tag driver: :playwright
@@ -18,21 +18,46 @@ defmodule Fluffy.Conformance.NetworkEventTest do
     response_wait = wait_for(session, Event.response(&String.ends_with?(&1.url, "/api?source=button")))
     click(session, by_role(:button, name: "Save"))
 
-    assert %HTTPEvent{kind: :request, method: "POST", status: nil, resource_type: "fetch", post_data: "payload"} =
+    assert %Fluffy.Request{method: "POST", resource_type: "fetch", post_data: "payload"} =
              request = await(request_wait)
 
     assert request.url == TestHTTPFixtures.url(fixture, "/api?source=button")
     assert request.headers["x-fluffy"] == "network-test"
     assert request.page == current_page(session)
 
-    assert %HTTPEvent{kind: :response, method: "POST", status: 207, status_text: "Multi-Status"} =
-             response = await(response_wait)
-
+    assert %Fluffy.Response{status: 207, status_text: "Multi-Status"} = response = await(response_wait)
     assert response.url == request.url
     assert response.headers["content-type"] == "application/json"
-    assert response.resource_type == "fetch"
-    assert response.post_data == "payload"
-    assert response.page == request.page
+    assert response.request == request
+  end
+
+  @tag driver: :playwright
+  test "a request's post_data keeps a binary body's bytes" do
+    {session, fixture} = session()
+    request_wait = wait_for(session, Event.request(&String.ends_with?(&1.url, "/api?source=bytes")))
+
+    Playwright.evaluate(
+      session,
+      "url => { fetch(url, {method: 'POST', body: new Uint8Array([0xff, 0x00, 0x89, 0x50])}); return true }",
+      TestHTTPFixtures.url(fixture, "/api?source=bytes")
+    )
+
+    assert await(request_wait).post_data == <<0xFF, 0x00, 0x89, 0x50>>
+  end
+
+  @tag driver: :playwright
+  test "unwrap reaches the native request and response" do
+    {session, _fixture} = session()
+    response_wait = wait_for(session, Event.response(&String.ends_with?(&1.url, "/api?source=button")))
+    click(session, by_role(:button, name: "Save"))
+    response = await(response_wait)
+
+    assert unwrap(response, &PlaywrightEx.Response.text!/1) == ~s({"saved":true})
+    assert unwrap(response.request, &PlaywrightEx.Request.is_navigation_request/1) == false
+
+    close_session(session)
+    assert_raise ArgumentError, ~r/session is closed/, fn -> unwrap(response, & &1) end
+    assert_raise ArgumentError, ~r/session is closed/, fn -> unwrap(response.request, & &1) end
   end
 
   @tag driver: :playwright
@@ -44,8 +69,7 @@ defmodule Fluffy.Conformance.NetworkEventTest do
     Playwright.evaluate(
       session,
       "url => { const f = document.createElement('iframe'); f.src = url; document.body.appendChild(f) }",
-      arg: frame_url,
-      is_function: true
+      frame_url
     )
 
     await(frame_wait)
@@ -53,9 +77,10 @@ defmodule Fluffy.Conformance.NetworkEventTest do
     page_wait = wait_for(session, event)
     context_wait = wait_for(session, event, scope: :context)
 
-    Playwright.evaluate(session, "url => { document.querySelector('iframe').contentWindow.fetch(url); return true }",
-      arg: TestHTTPFixtures.url(fixture, "/api"),
-      is_function: true
+    Playwright.evaluate(
+      session,
+      "url => { document.querySelector('iframe').contentWindow.fetch(url); return true }",
+      TestHTTPFixtures.url(fixture, "/api")
     )
 
     request = await(page_wait)
@@ -88,6 +113,42 @@ defmodule Fluffy.Conformance.NetworkEventTest do
     # The context observes issuance before Playwright associates the new page.
     assert request.page == nil
     assert Fluffy.Page.opener(await(popup)) == current_page(session)
+  end
+
+  # Holding the session runtime while the popup opens and closes keeps Fluffy
+  # from registering the popup, as when it closes before Fluffy sees it.
+  @tag driver: :playwright
+  test "a context wait ignores an event from a page that closed before Fluffy saw it" do
+    {session, _fixture} = session()
+    pending = wait_for(session, Event.response(&String.ends_with?(&1.url, "/api?source=last")), scope: :context)
+    frame = Fluffy.Session.page_state(session).frame
+    owner = self()
+
+    holder =
+      Task.async(fn ->
+        SessionRuntime.run(session.runtime, fn ->
+          send(owner, :held)
+
+          receive do
+            :release -> :ok
+          end
+        end)
+      end)
+
+    assert_receive :held
+
+    assert {:ok, nil} =
+             PlaywrightEx.Frame.evaluate(frame, """
+             async () => {
+               const popup = window.open('closing')
+               while (!popup.closed) await new Promise(resolve => setTimeout(resolve, 20))
+               await fetch('api?source=last')
+             }
+             """)
+
+    send(session.runtime, :release)
+    Task.await(holder)
+    assert await(pending).request.page == current_page(session)
   end
 
   @tag driver: :playwright
@@ -187,6 +248,9 @@ defmodule Fluffy.Conformance.NetworkEventTest do
 
           "/child" ->
             %{body: "<h1>Child</h1>"}
+
+          "/closing" ->
+            %{body: "<script>fetch('api?source=popup').then(() => window.close())</script>"}
 
           "/api" ->
             %{status: 207, headers: [{"content-type", "application/json"}], body: ~s({"saved":true})}

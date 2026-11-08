@@ -1,22 +1,22 @@
 defmodule Fluffy.Playwright.Trace do
   @moduledoc false
 
+  alias Fluffy.Backend.Playwright.Bounded
   alias Fluffy.TestScope
+  alias PlaywrightEx.BrowserContext
   alias PlaywrightEx.Tracing
 
-  @enforce_keys [:connection, :executable, :open?, :path, :timeout, :tracing_id]
-  defstruct [:connection, :executable, :open?, :path, :timeout, :tracing_id]
+  @enforce_keys [:open?, :path, :timeout, :tracing]
+  defstruct [:open?, :path, :timeout, :tracing]
 
   @opaque t :: %__MODULE__{
-            connection: GenServer.name(),
-            executable: String.t(),
             open?: boolean(),
             path: String.t(),
             timeout: timeout(),
-            tracing_id: String.t()
+            tracing: Tracing.t()
           }
 
-  def start(context, options) when is_map(context) do
+  def start(context, options, capture_options) when is_map(context) do
     scope = context.resource_scope
 
     if !is_pid(scope) do
@@ -26,58 +26,27 @@ defmodule Fluffy.Playwright.Trace do
     metadata = TestScope.metadata(scope)
     title = Keyword.get(options, :name) || default_title(metadata)
     directory = Keyword.get(options, :directory, configured_directory())
-    path = trace_path(directory, title)
     File.mkdir_p!(directory)
+    tracing = BrowserContext.tracing(context.browser_context)
 
-    tracing_options = [
-      connection: context.connection,
+    # Starting also opens the first chunk, which `stop/1` saves.
+    _disposable = Tracing.start!(tracing, Keyword.put(capture_options, :title, title))
+
+    %__MODULE__{
+      open?: Keyword.fetch!(options, :open),
+      path: trace_path(directory, title),
       timeout: context.timeout,
-      title: title,
-      screenshots: Keyword.fetch!(options, :screenshots),
-      snapshots: Keyword.fetch!(options, :snapshots),
-      sources: Keyword.fetch!(options, :sources),
-      coverage: Keyword.fetch!(options, :coverage)
-    ]
-
-    case Tracing.tracing_start(context.tracing_id, tracing_options) do
-      {:ok, _result} -> :ok
-      {:error, error} -> raise "Could not start Playwright tracing: #{inspect(error)}"
-    end
-
-    case Tracing.tracing_start_chunk(context.tracing_id,
-           connection: context.connection,
-           timeout: context.timeout,
-           title: title
-         ) do
-      {:ok, _result} ->
-        %__MODULE__{
-          connection: context.connection,
-          executable: configured_executable(),
-          open?: Keyword.fetch!(options, :open),
-          path: path,
-          timeout: context.timeout,
-          tracing_id: context.tracing_id
-        }
-
-      {:error, error} ->
-        Tracing.tracing_stop(context.tracing_id,
-          connection: context.connection,
-          timeout: context.timeout
-        )
-
-        raise "Could not start Playwright trace chunk: #{inspect(error)}"
-    end
+      tracing: tracing
+    }
   end
 
+  # Stopping has no timeout of its own and runs while the session shuts down.
   def stop(%__MODULE__{} = trace) do
     saved? =
       try do
-        save_chunk(trace)
+        Bounded.within(trace.timeout, fn -> Tracing.stop_chunk(trace.tracing, path: trace.path) end) == {:ok, :ok}
       after
-        Tracing.tracing_stop(trace.tracing_id,
-          connection: trace.connection,
-          timeout: trace.timeout
-        )
+        Bounded.within(trace.timeout, fn -> Tracing.stop(trace.tracing) end)
       end
 
     if saved? and trace.open?, do: open(trace)
@@ -86,25 +55,14 @@ defmodule Fluffy.Playwright.Trace do
 
   def public_state(%__MODULE__{path: path}), do: %{path: path}
 
-  defp save_chunk(trace) do
-    case Tracing.tracing_stop_chunk(trace.tracing_id,
-           connection: trace.connection,
-           timeout: trace.timeout
-         ) do
-      {:ok, artifact} ->
-        case File.cp(artifact.absolute_path, trace.path) do
-          :ok -> true
-          {:error, _reason} -> false
-        end
-
-      {:error, _reason} ->
-        false
-    end
-  end
-
   defp open(trace) do
     path = Path.absname(trace.path)
-    spawn(fn -> System.cmd(trace.executable, ["show-trace", path], stderr_to_stdout: true) end)
+    {program, prefix} = PlaywrightEx.Driver.executable(Keyword.take(config(), [:executable]))
+
+    spawn(fn ->
+      System.cmd(program, prefix ++ ["show-trace", path], env: PlaywrightEx.Driver.driver_env(), stderr_to_stdout: true)
+    end)
+
     :ok
   end
 
@@ -131,16 +89,7 @@ defmodule Fluffy.Playwright.Trace do
     end
   end
 
-  defp configured_directory do
-    :fluffy
-    |> Application.fetch_env!(:playwright)
-    |> Keyword.get(:trace_dir, "traces")
-  end
+  defp configured_directory, do: Keyword.fetch!(config(), :trace_dir)
 
-  defp configured_executable do
-    :fluffy
-    |> Application.fetch_env!(:playwright)
-    |> Fluffy.Options.validate_playwright!()
-    |> Keyword.get(:executable, "playwright")
-  end
+  defp config, do: Fluffy.Options.playwright_config()
 end

@@ -9,7 +9,7 @@ defmodule Fluffy.EctoSandboxLifecycleTest do
   alias Fluffy.TestRepoTwo
   alias Fluffy.TestScope
   alias Fluffy.TestWeb.Endpoint
-  alias PlaywrightEx.BrowserContext
+  alias PlaywrightEx.Browser
 
   setup_all do
     :ok = Fluffy.TestDatabase.ensure_started()
@@ -49,11 +49,11 @@ defmodule Fluffy.EctoSandboxLifecycleTest do
       )
       |> visit("/live/database?delay=250")
 
-    context_id = Fluffy.Session.context(session).context_id
+    browser_context = Fluffy.Session.context(session).browser_context
     GenServer.stop(scope)
 
     refute Process.alive?(owner)
-    assert {:error, _reason} = BrowserContext.cookies(context_id, timeout: 100)
+    refute browser_context.guid in Enum.map(Browser.contexts(Fluffy.BrowserRuntime.browser()), & &1.guid)
   end
 
   @tag :capture_log
@@ -68,14 +68,14 @@ defmodule Fluffy.EctoSandboxLifecycleTest do
         endpoint: Endpoint
       )
 
-    context_id = Fluffy.Session.context(session).context_id
+    browser_context = Fluffy.Session.context(session).browser_context
     scope_reference = Process.monitor(scope)
     Process.exit(owner, :kill)
 
     assert_receive {:DOWN, ^scope_reference, :process, ^scope, {:shutdown, {:sandbox_owner_down, :killed}}},
                    1_000
 
-    assert {:error, _reason} = BrowserContext.cookies(context_id, timeout: 100)
+    refute browser_context.guid in Enum.map(Browser.contexts(Fluffy.BrowserRuntime.browser()), & &1.guid)
   end
 
   test "supervisor shutdown drains Live resources before stopping sandbox ownership" do

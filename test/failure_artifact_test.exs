@@ -3,6 +3,7 @@ defmodule Fluffy.FailureArtifactTest do
 
   import Fluffy
 
+  alias Fluffy.Backend.Playwright.Bounded
   alias Fluffy.FailureArtifact
 
   @tag :tmp_dir
@@ -24,5 +25,22 @@ defmodule Fluffy.FailureArtifactTest do
     assert File.read!(html) =~ "Artifact page"
     assert png |> File.read!() |> byte_size() > 0
     assert File.read!(failure) =~ "original failure"
+  end
+
+  # A linked call would kill the caller, skipping capture's own error handling.
+  @tag :capture_log
+  test "a crash in a bounded Playwright call raises in the caller instead of killing it" do
+    assert_raise RuntimeError, "boom", fn -> Bounded.within(1_000, fn -> raise "boom" end) end
+    assert catch_exit(Bounded.within(1_000, fn -> exit(:boom) end)) == :boom
+  end
+
+  test "a bounded Playwright call past its timeout is killed, or left to finish" do
+    owner = self()
+    slow = fn -> fn -> send(owner, {:finished, Process.sleep(200)}) end end
+
+    assert Bounded.within(10, slow.()) == :timeout
+    refute_receive {:finished, :ok}, 400
+    assert Bounded.within(10, slow.(), on_timeout: :leave) == :timeout
+    assert_receive {:finished, :ok}, 400
   end
 end

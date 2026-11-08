@@ -48,12 +48,51 @@ defmodule Fluffy.Conformance.PageEventTest do
     |> switch_page(page)
     |> expect(:heading |> by_role(name: "Details") |> to_be_visible())
     |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/details")))
-    |> expect(page_to_have_status(202))
     |> close_page()
     |> switch_page(current_page(session))
     |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/start")))
 
     assert pages(session) == [current_page(session)]
+  end
+
+  # Holding the session runtime while the popup opens and closes keeps Fluffy
+  # from registering the popup, as when it closes before Fluffy sees it.
+  @tag driver: :playwright
+  test "page and popup waits resolve with a popup that closed before Fluffy saw it" do
+    {session, _fixture} = browser_session()
+    page_wait = wait_for(session, Event.page())
+    popup_wait = wait_for(session, Event.popup())
+    frame = Fluffy.Session.page_state(session).frame
+    owner = self()
+
+    holder =
+      Task.async(fn ->
+        Fluffy.SessionRuntime.run(session.runtime, fn ->
+          send(owner, :held)
+
+          receive do
+            :release -> :ok
+          end
+        end)
+      end)
+
+    assert_receive :held
+
+    assert {:ok, nil} =
+             PlaywrightEx.Frame.evaluate(frame, """
+             async () => {
+               const popup = window.open('details')
+               popup.close()
+               while (!popup.closed) await new Promise(resolve => setTimeout(resolve, 20))
+             }
+             """)
+
+    send(session.runtime, :release)
+    Task.await(holder)
+    popup = await(popup_wait)
+    assert await(page_wait) == popup
+    refute popup in pages(session)
+    assert_raise ArgumentError, ~r/is closed/, fn -> Page.url(popup) end
   end
 
   @tag driver: :playwright
@@ -82,17 +121,20 @@ defmodule Fluffy.Conformance.PageEventTest do
   test "a settled popup stays available when the action outlives the wait deadline" do
     {session, fixture} = browser_session()
 
+    # The deadline leaves room for a browser click under parallel cases
+    # (Firefox dispatches input for one page at a time); the action still
+    # outlives it.
     expect_event(
       session,
       Event.popup(),
       fn input ->
         click(input, by_role(:link, name: "Redirect", exact: true))
-        Process.sleep(1_000)
+        Process.sleep(3_000)
       end,
       fn page ->
         session |> switch_page(page) |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/details")))
       end,
-      timeout: 1_000
+      timeout: 3_000
     )
   end
 
@@ -109,7 +151,7 @@ defmodule Fluffy.Conformance.PageEventTest do
   end
 
   @tag driver: :playwright
-  test "the first popup retains its own final response when another page also loads" do
+  test "the first popup keeps its own final document when another page also loads" do
     {session, fixture} = browser_session()
     pending = wait_for(session, Event.popup())
     click(session, by_role(:link, name: "Redirect", exact: true))
@@ -118,7 +160,7 @@ defmodule Fluffy.Conformance.PageEventTest do
     session
     |> switch_page(await(pending))
     |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/details")))
-    |> expect(page_to_have_status(202))
+    |> expect(:heading |> by_role(name: "Details") |> to_be_visible())
   end
 
   for driver <- [:static, :live] do
@@ -226,7 +268,7 @@ defmodule Fluffy.Conformance.PageEventTest do
             %{body: "<h1>Unrelated</h1>"}
 
           "/details" ->
-            %{status: 202, body: "<h1>Details</h1>"}
+            %{body: "<h1>Details</h1>"}
 
           "/redirect" ->
             %{status: 302, headers: [{"location", "details"}], body: ""}

@@ -186,6 +186,46 @@ defmodule Fluffy.Conformance.SelectOptionActionTest do
     end)
   end
 
+  # As for a list of strings alone, Playwright waits for the options to appear.
+  @tag driver: :playwright
+  test "select_option with a mixed list waits for its options" do
+    html = """
+    <select aria-label="Plan" multiple><option>Free</option></select>
+    <button onclick="setTimeout(() => this.previousElementSibling.add(new Option('Pro', 'pro')), 300)">Add</button>
+    """
+
+    with_html(:playwright, html, fn session ->
+      session
+      |> click(by_role(:button, name: "Add"))
+      |> select_option(by_label("Plan"), [%{index: 0}, "Pro"])
+      |> expect(to_have_values(by_label("Plan"), ["Free", "pro"]))
+    end)
+  end
+
+  @tag driver: :playwright
+  test "select_option with a mixed list keeps its value and label maps" do
+    html = """
+    <select aria-label="Plan" multiple>
+      <option value="free">Free</option><option value="pro">Pro</option><option value="team">Team</option>
+    </select>
+    """
+
+    with_html(:playwright, html, fn session ->
+      session
+      |> select_option(by_label("Plan"), [%{value: "free"}, "Pro", %{label: "Team"}])
+      |> expect(to_have_values(by_label("Plan"), ["free", "pro", "team"]))
+    end)
+  end
+
+  @tag driver: :playwright
+  test "select_option with a mixed list fails when an option never appears" do
+    with_html(:playwright, ~s(<select aria-label="Plan" multiple><option>Free</option></select>), fn session ->
+      assert_raise Fluffy.OperationError, ~r/did not find some options/, fn ->
+        select_option(session, by_label("Plan"), [%{index: 0}, "Pro"], timeout: 2_000)
+      end
+    end)
+  end
+
   defp with_html(driver, html, fun) do
     session = session_for_html(driver, html, base_url: Fluffy.TestServer.base_url())
     fun.(session)

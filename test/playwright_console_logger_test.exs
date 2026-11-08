@@ -8,21 +8,15 @@ defmodule Fluffy.PlaywrightConsoleLoggerTest do
 
   alias Fluffy.Event
   alias Fluffy.Playwright
-  alias Fluffy.Playwright.ConsoleLogger
   alias Fluffy.TestHTTPFixtures
 
-  test "formats browser messages with source locations and metadata" do
-    message = %{
-      method: :console,
-      params: %{
-        page: %{guid: "page-1"},
-        location: %{url: "http://example.test/app.js", line_number: 12, column_number: 7}
-      }
-    }
+  test "log_browser_console: false disables browser logging" do
+    config = Application.fetch_env!(:fluffy, :playwright)
+    Application.put_env(:fluffy, :playwright, Keyword.put(config, :log_browser_console, false))
+    on_exit(fn -> Application.put_env(:fluffy, :playwright, config) end)
+    session = start_session(:playwright, base_url: Fluffy.TestServer.base_url())
 
-    log = capture_log(fn -> ConsoleLogger.log(:warning, "browser warning", message) end)
-
-    assert log =~ "browser warning (http://example.test/app.js:12:7)"
+    refute capture_log(fn -> Playwright.evaluate(session, "console.error('silenced error')") end) =~ "silenced error"
   end
 
   test "logs console and uncaught errors from main pages and popups" do
@@ -64,6 +58,21 @@ defmodule Fluffy.PlaywrightConsoleLoggerTest do
     assert log =~ "first context error"
     assert log =~ "popup context error"
     assert log =~ "uncaught page failure"
+  end
+
+  test "logs uncaught non-Error values thrown by page code" do
+    session = start_session(:playwright, base_url: Fluffy.TestServer.base_url())
+
+    log =
+      capture_log(fn ->
+        Playwright.evaluate(session, "setTimeout(() => { throw 'thrown string' }, 0); Promise.reject(4242); 1")
+        Process.sleep(100)
+        # The session still answers.
+        assert Playwright.evaluate(session, "1 + 1") == 2
+      end)
+
+    assert log =~ "thrown string"
+    assert log =~ "4242"
   end
 
   defp html(body), do: "<!doctype html><html><body>#{body}</body></html>"

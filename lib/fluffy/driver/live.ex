@@ -45,7 +45,7 @@ defmodule Fluffy.Driver.Live do
           {:ok, session}
 
         {:ok, _passed?, actual} ->
-          {:retry, "Expected #{Expect.describe(expectation)}, got #{inspect(actual)}"}
+          {:retry, "Expected #{Expect.Internal.describe(expectation)}, got #{inspect(actual)}"}
       end
     end)
   end
@@ -365,7 +365,7 @@ defmodule Fluffy.Driver.Live do
         title -> LazyHTML.text(title)
       end
 
-    {:ok, Expect.title_matches?(expected, actual), actual}
+    {:ok, Expect.Internal.title_matches?(expected, actual), actual}
   end
 
   defp client_dom(session), do: session |> Session.page_state() |> Map.fetch!(:client_dom)
@@ -394,12 +394,9 @@ defmodule Fluffy.Driver.Live do
     state = Session.page_state(session)
 
     try do
-      case render(state.view) do
-        html when is_binary(html) ->
-          Session.put_page_state(session, %{
-            state
-            | client_dom: ClientDOM.reconcile(state.client_dom, compose(state, html))
-          })
+      case Document.render(state.document, state.view) do
+        {:ok, document} ->
+          Session.put_page_state(session, %{state | client_dom: ClientDOM.reconcile(state.client_dom, document)})
 
         {:error, redirect} ->
           follow_redirect_result(session, {:error, redirect})
@@ -532,14 +529,14 @@ defmodule Fluffy.Driver.Live do
 
     rendered =
       try do
-        {:ok, render(state.view)}
+        Document.render(state.document, state.view)
       catch
         :exit, reason -> {:exit, reason}
       end
 
     case rendered do
-      {:ok, html} when is_binary(html) ->
-        state = %{state | client_dom: ClientDOM.reconcile(client_dom, compose(state, html))}
+      {:ok, document} ->
+        state = %{state | client_dom: ClientDOM.reconcile(client_dom, document)}
         session = session |> Session.put_page_state(state) |> prune_stale_live_uploads()
 
         case ClientDOM.triggered_submission(state.client_dom) do
@@ -553,7 +550,7 @@ defmodule Fluffy.Driver.Live do
             {:navigate, session, Navigation.submission(submission)}
         end
 
-      {:ok, {:error, redirect}} ->
+      {:error, redirect} ->
         follow_redirect_result(session, {:error, redirect})
 
       {:exit, original_reason} ->
@@ -564,8 +561,6 @@ defmodule Fluffy.Driver.Live do
         end
     end
   end
-
-  defp compose(state, html), do: Document.compose(state.document, html, page_title(state.view))
 
   defp follow_redirect_result(session, {:error, {_kind, %{to: destination} = options}}) do
     {:navigate, session, Navigation.redirect(destination, flash: options[:flash])}
@@ -688,7 +683,7 @@ defmodule Fluffy.Driver.Live do
   defp view_selector(client_dom, selector, context), do: selector_for_view(client_dom, selector, context)
 
   defp render_view_event(client_dom, %{root_id: nil} = context, selector, kind, payload) do
-    target = ClientDOM.target!(client_dom, Locator.new({:css, selector}))
+    target = ClientDOM.target!(client_dom, Locator.by_css(selector))
 
     payload =
       if kind in [:click, :keydown, :keyup], do: Map.merge(Event.values(target.attributes), payload), else: payload
@@ -984,12 +979,12 @@ defmodule Fluffy.Driver.Live do
 
   defp live_upload_entry_rendered?(client_dom, entry_ref) do
     selector = ~s([phx-value-ref="#{entry_ref}"])
-    ClientDOM.resolve(client_dom, Locator.new({:css, selector})) != []
+    ClientDOM.resolve(client_dom, Locator.by_css(selector)) != []
   end
 
   defp put_live_upload_files(session, %{input_selector: selector}, selected_files) do
     state = Session.page_state(session)
-    locator = Locator.new({:css, selector})
+    locator = Locator.by_css(selector)
     client_dom = ClientDOM.set_input_files(state.client_dom, locator, selected_files)
     Session.put_page_state(session, %{state | client_dom: client_dom})
   end

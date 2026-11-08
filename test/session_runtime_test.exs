@@ -52,6 +52,21 @@ defmodule Fluffy.SessionRuntimeTest do
     refute_received :released_closed
   end
 
+  test "a run registers the cleanup of the resource it creates in the same call" do
+    {:ok, runtime} = SessionRuntime.start(self())
+    caller = self()
+
+    assert SessionRuntime.run_registered(runtime, fn ->
+             {self(), :created, fn -> send(caller, :created_closed) end}
+           end) == runtime
+
+    assert SessionRuntime.resources(runtime) == {:ok, [:created]}
+    assert_raise RuntimeError, "failed", fn -> SessionRuntime.run_registered(runtime, fn -> raise "failed" end) end
+    assert SessionRuntime.resources(runtime) == {:ok, [:created]}
+    assert :ok = SessionRuntime.close(runtime)
+    assert_received :created_closed
+  end
+
   test "state survives discarded handles and session shutdown is idempotent" do
     session = Fluffy.session_for_html(:static, "<input aria-label='Name'>")
     Fluffy.fill(session, Fluffy.Locator.by_label("Name"), "Ada")
@@ -61,23 +76,36 @@ defmodule Fluffy.SessionRuntimeTest do
     assert_raise ArgumentError, ~r/session is closed/, fn -> Fluffy.Session.context(session) end
   end
 
+  # Watched in CI: once in ~12 full Chromium runs (seed 575633, --max-cases 16,
+  # three suites sharing one checkout) the runtime was already gone (:noproc)
+  # when monitored, before its owner finished. The cause is unknown: 30+ full
+  # runs, with CPU load and with this race repeated 500 times under exit
+  # tracing, did not reproduce it. The checks below tell a runtime lost before
+  # registration or to a restarted supervisor from one that stopped by itself.
   test "normal owner exit releases its runtime and resources" do
     parent = self()
+    supervisor = Process.whereis(Fluffy.SessionRuntime.Supervisor)
 
     owner =
       spawn(fn ->
         {:ok, runtime} = SessionRuntime.start(self())
         {:ok, resource} = Agent.start(fn -> nil end)
-        SessionRuntime.register(runtime, resource, fn -> Agent.stop(resource) end)
-        send(parent, {:started, runtime, resource})
+        registered = SessionRuntime.register(runtime, resource, fn -> Agent.stop(resource) end)
+        send(parent, {:started, runtime, resource, registered})
 
         receive do
           :finish -> :ok
         end
       end)
 
-    assert_receive {:started, runtime, resource}
+    assert_receive {:started, runtime, resource, registered}
+    assert registered == :ok
     monitor = Process.monitor(runtime)
+
+    refute_received {:DOWN, ^monitor, :process, ^runtime, :noproc},
+                    "runtime stopped before its owner finished; supervisor restarted: " <>
+                      inspect(Process.whereis(Fluffy.SessionRuntime.Supervisor) != supervisor)
+
     send(owner, :finish)
     assert_receive {:DOWN, ^monitor, :process, ^runtime, :normal}
     refute Process.alive?(resource)

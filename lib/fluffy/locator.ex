@@ -2,6 +2,10 @@ defmodule Fluffy.Locator do
   @moduledoc """
   A lazy, driver-independent element query.
 
+  Options marked *Playwright only.* compile into the browser selector. Static and
+  LiveView sessions raise `Fluffy.CapabilityError` when they resolve a locator that
+  uses one.
+
   Role locators accept these options:
 
   #{NimbleOptions.docs(Fluffy.Options.role_locator_schema())}
@@ -20,6 +24,7 @@ defmodule Fluffy.Locator do
   """
 
   alias Fluffy.FrameLocator
+  alias Fluffy.Locator.Internal
   alias Fluffy.Options
 
   @enforce_keys [:operations]
@@ -32,19 +37,13 @@ defmodule Fluffy.Locator do
   @type test_id_option :: unquote(NimbleOptions.option_typespec(Options.test_id_locator_schema()))
   @type filter_option :: unquote(NimbleOptions.option_typespec(Options.filter_locator_schema()))
 
-  def new(operation), do: %__MODULE__{operations: [operation]}
-
-  def append(%__MODULE__{} = locator, operation) do
-    update_in(locator.operations, &(&1 ++ [operation]))
-  end
-
   @spec by_role(atom(), [role_option()]) :: t()
   @spec by_role(scope(), atom()) :: t()
   @spec by_role(scope(), atom(), [role_option()]) :: t()
   def by_role(role, options \\ [])
 
   def by_role(role, options) when is_atom(role) and is_list(options) do
-    new({:role, role, Options.validate_role_locator!(options)})
+    Internal.new({:role, role, Options.validate_role_locator!(options)})
   end
 
   def by_role(parent, role) when is_struct(parent, __MODULE__) or is_struct(parent, FrameLocator) do
@@ -62,7 +61,7 @@ defmodule Fluffy.Locator do
   def by_text(text, options \\ [])
 
   def by_text(text, options) when is_binary(text) and is_list(options) do
-    new({:text, text, Options.validate_exact_locator!(options)})
+    Internal.new({:text, text, Options.validate_exact_locator!(options)})
   end
 
   def by_text(parent, text) when is_struct(parent, __MODULE__) or is_struct(parent, FrameLocator) do
@@ -148,7 +147,7 @@ defmodule Fluffy.Locator do
 
   def by_test_id(test_id, options) when is_binary(test_id) and is_list(options) do
     options = Options.validate_test_id_locator!(options)
-    new({:test_id, validate_attribute!(options[:attribute]), test_id})
+    Internal.new({:test_id, validate_attribute!(options[:attribute]), test_id})
   end
 
   def by_test_id(parent, test_id) when is_struct(parent, __MODULE__) or is_struct(parent, FrameLocator) do
@@ -161,7 +160,7 @@ defmodule Fluffy.Locator do
   end
 
   @spec by_css(String.t()) :: t()
-  def by_css(css) when is_binary(css), do: new({:css, css})
+  def by_css(css) when is_binary(css), do: Internal.new({:css, css})
 
   @spec by_css(scope(), String.t()) :: t()
   def by_css(parent, css) when is_binary(css) do
@@ -183,30 +182,10 @@ defmodule Fluffy.Locator do
   @spec content_frame(t()) :: FrameLocator.t()
   def content_frame(%__MODULE__{} = owner), do: %FrameLocator{owner: owner}
 
-  @doc false
-  def crosses_frame?(%__MODULE__{operations: operations}) do
-    Enum.any?(operations, fn
-      :enter_frame ->
-        true
-
-      {operator, inner} when operator in [:and, :or] ->
-        crosses_frame?(inner)
-
-      {:filter, options} ->
-        Enum.any?(options, fn
-          {key, %__MODULE__{} = inner} when key in [:has, :has_not] -> crosses_frame?(inner)
-          _ -> false
-        end)
-
-      _ ->
-        false
-    end)
-  end
-
-  defp child_query(%__MODULE__{} = parent, operation), do: append(parent, operation)
+  defp child_query(%__MODULE__{} = parent, operation), do: Internal.append(parent, operation)
 
   defp child_query(%FrameLocator{owner: owner}, operation) do
-    owner |> append(:enter_frame) |> append(operation)
+    owner |> Internal.append(:enter_frame) |> Internal.append(operation)
   end
 
   @doc """
@@ -228,92 +207,34 @@ defmodule Fluffy.Locator do
   """
   @spec and_(t(), t()) :: t()
   def and_(%__MODULE__{} = left, %__MODULE__{} = right) do
-    append(left, {:and, right})
+    Internal.append(left, {:and, right})
   end
 
   @doc "Matches elements in either locator, once each in document order, retaining action strictness."
   @spec or_(t(), t()) :: t()
-  def or_(%__MODULE__{} = left, %__MODULE__{} = right), do: append(left, {:or, right})
+  def or_(%__MODULE__{} = left, %__MODULE__{} = right), do: Internal.append(left, {:or, right})
 
   @spec filter(t(), [filter_option()]) :: t()
   def filter(%__MODULE__{} = locator, options) when is_list(options) do
-    append(
+    Internal.append(
       locator,
       {:filter, Options.validate_filter_locator!(options)}
     )
   end
 
-  def first(%__MODULE__{} = locator), do: append(locator, {:nth, 0})
-  def last(%__MODULE__{} = locator), do: append(locator, {:nth, -1})
+  def first(%__MODULE__{} = locator), do: Internal.append(locator, {:nth, 0})
+  def last(%__MODULE__{} = locator), do: Internal.append(locator, {:nth, -1})
 
   def nth(%__MODULE__{} = locator, index) when is_integer(index) do
-    append(locator, {:nth, index})
-  end
-
-  def describe(%__MODULE__{} = locator) do
-    Enum.map_join(locator.operations, " |> ", &describe_operation/1)
-  end
-
-  defp describe_operation(:enter_frame), do: "content_frame()"
-
-  defp describe_operation({:css, css}), do: "by_css(#{inspect(css)})"
-
-  defp describe_operation({:role, role, options}) do
-    "by_role(#{inspect(role)}#{describe_options(options)})"
-  end
-
-  defp describe_operation({:text, text, options}) do
-    "by_text(#{inspect(text)}#{describe_options(options)})"
-  end
-
-  defp describe_operation({:label, text, options}) do
-    "by_label(#{inspect(text)}#{describe_options(options)})"
-  end
-
-  defp describe_operation({:attribute, attribute, text, options}) do
-    function =
-      case attribute do
-        "placeholder" -> "by_placeholder"
-        "alt" -> "by_alt_text"
-        "title" -> "by_title"
-      end
-
-    "#{function}(#{inspect(text)}#{describe_options(options)})"
-  end
-
-  defp describe_operation({:test_id, "data-testid", test_id}) do
-    "by_test_id(#{inspect(test_id)})"
-  end
-
-  defp describe_operation({:test_id, attribute, test_id}) do
-    "by_test_id(#{inspect(test_id)}, attribute: #{inspect(attribute)})"
-  end
-
-  defp describe_operation({:or, right}), do: "or_(#{describe(right)})"
-
-  defp describe_operation({:and, right}), do: "and_(#{describe(right)})"
-
-  defp describe_operation({:filter, options}), do: "filter(#{describe_keywords(options)})"
-  defp describe_operation({:nth, 0}), do: "nth(0)"
-  defp describe_operation({:nth, -1}), do: "last()"
-  defp describe_operation({:nth, index}), do: "nth(#{index})"
-
-  defp describe_options([]), do: ""
-  defp describe_options(options), do: ", " <> describe_keywords(options)
-
-  defp describe_keywords(options) do
-    Enum.map_join(options, ", ", fn
-      {:has, %__MODULE__{} = locator} -> "has: " <> describe(locator)
-      {key, value} -> "#{key}: #{inspect(value)}"
-    end)
+    Internal.append(locator, {:nth, index})
   end
 
   defp attribute_or_label_locator(:label, text, options) do
-    new({:label, text, Options.validate_exact_locator!(options)})
+    Internal.new({:label, text, Options.validate_exact_locator!(options)})
   end
 
   defp attribute_locator(attribute, text, options) do
-    new({:attribute, attribute, text, Options.validate_exact_locator!(options)})
+    Internal.new({:attribute, attribute, text, Options.validate_exact_locator!(options)})
   end
 
   defp append_attribute_locator(parent, attribute, text, options) do
@@ -336,6 +257,6 @@ defimpl Inspect, for: Fluffy.Locator do
   import Inspect.Algebra
 
   def inspect(locator, _options) do
-    concat(["#Fluffy.Locator<", Fluffy.Locator.describe(locator), ">"])
+    concat(["#Fluffy.Locator<", Fluffy.Locator.Internal.describe(locator), ">"])
   end
 end

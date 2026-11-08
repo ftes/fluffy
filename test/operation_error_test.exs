@@ -41,7 +41,7 @@ defmodule Fluffy.OperationErrorTest do
       error = assert_raise OperationError, fn -> submit(session, locator) end
       assert error.operation == :submit
       assert error.locator == locator
-      assert %{error: %{name: "Error"}} = error.cause
+      assert %PlaywrightEx.PlaywrightError{} = error.cause
       assert error.message =~ message
     end
   end
@@ -59,8 +59,7 @@ defmodule Fluffy.OperationErrorTest do
           constructor() { super(); window.constructions++; }
         });
       }
-      """,
-      is_function: true
+      """
     )
 
     before = Playwright.evaluate(session, "window.constructions")
@@ -71,8 +70,8 @@ defmodule Fluffy.OperationErrorTest do
       end
 
     assert error.message =~ "to have count 2"
-    assert error.message =~ "value: 1"
-    assert error.message =~ "timed_out: true"
+    assert error.message =~ "Received: 1"
+    assert error.message =~ "Timeout:"
     assert error.message =~ "Call log:"
     assert Playwright.evaluate(session, "window.constructions") == before
   end
@@ -87,15 +86,14 @@ defmodule Fluffy.OperationErrorTest do
       () => {
         Element.prototype.cloneNode = () => { throw new Error('unexpected diagnostic clone') };
       }
-      """,
-      is_function: true
+      """
     )
 
     locator = by_role(:button, name: "Save")
     error = assert_raise OperationError, fn -> click(session, locator, timeout: 200) end
     assert error.operation == :click
     assert error.locator == locator
-    assert %{error: %{name: "TimeoutError"}} = error.cause
+    assert %PlaywrightEx.TimeoutError{} = error.cause
     assert error.message =~ "Call log:"
     refute error.message =~ "unexpected diagnostic clone"
   end
@@ -124,7 +122,7 @@ defmodule Fluffy.OperationErrorTest do
 
         if unquote(driver) == :playwright do
           assert error.backend == :playwright
-          assert %{error: %{name: "TimeoutError"}, log: [_ | _]} = error.cause
+          assert %PlaywrightEx.TimeoutError{log: [_ | _]} = error.cause
         else
           assert error.backend == :phoenix
           assert %Fluffy.ActionabilityError{reason: :disabled, locator: ^locator} = error.cause

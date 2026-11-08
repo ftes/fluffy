@@ -49,7 +49,6 @@ config :fluffy,
   playwright: [
     enabled: true,
     engine: browser_engine,
-    executable: Path.expand("../node_modules/playwright/cli.js", __DIR__),
     timeout: 15_000,
     launch_options: [headless: true],
     artifact_dir: System.get_env("FLUFFY_ARTIFACT_DIR")

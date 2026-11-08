@@ -21,6 +21,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
       download = await(pending)
       assert download.suggested_filename == "report.csv"
       assert String.ends_with?(download.url, "/report")
+      assert download |> Download.page() |> Fluffy.Page.url() |> String.ends_with?("/start")
       assert Download.read!(download) == "id,total\n1,42\n"
       assert Download.read!(download) == "id,total\n1,42\n"
       destination = Path.join(tmp_dir, "copy.csv")
@@ -29,6 +30,13 @@ defmodule Fluffy.Conformance.DownloadEventTest do
       session
       |> expect(page_to_have_url(&String.ends_with?(&1.path, "/start")))
       |> expect("Source" |> by_text() |> to_be_visible())
+
+      if driver == :playwright do
+        assert Download.page(download) == Fluffy.Playwright.current_page(session)
+        assert unwrap(download, &PlaywrightEx.Download.suggested_filename/1) == "report.csv"
+      else
+        assert_raise Fluffy.CapabilityError, ~r/no native counterpart/, fn -> unwrap(download, & &1) end
+      end
 
       close_session(session)
       assert File.read!(destination) == "id,total\n1,42\n"
@@ -119,6 +127,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
     :playwright
     |> session()
     |> expect_event(Event.download(), &click(&1, by_role(:link, name: "New tab", exact: true)), fn download ->
+      assert %Fluffy.Page{} = Download.page(download)
       assert Download.read!(download) == "id,total\n1,42\n"
     end)
     |> expect("Source" |> by_text() |> to_be_visible())
@@ -175,7 +184,62 @@ defmodule Fluffy.Conformance.DownloadEventTest do
     end
   end
 
+  @tag driver: :playwright, tmp_dir: true
+  test "saving a download that never completes cancels it and raises after the session timeout", %{tmp_dir: tmp_dir} do
+    owner = self()
+
+    fixture =
+      TestHTTPFixtures.register(fn request ->
+        case request.path do
+          "/start" ->
+            %{body: ~s(<a href="endless">Download</a>)}
+
+          "/endless" ->
+            %{
+              headers: [{"content-disposition", "attachment; filename=endless.txt"}],
+              stream: fn conn ->
+                {:ok, conn} = Plug.Conn.chunk(conn, "first")
+                send(owner, {:stream, self()})
+
+                receive do
+                  :finish -> conn
+                end
+              end
+            }
+        end
+      end)
+
+    session =
+      :playwright
+      |> start_session(base_url: Fluffy.TestServer.base_url(), timeout: 500)
+      |> visit(TestHTTPFixtures.path(fixture, "/start"))
+
+    pending = wait_for(session, Event.download())
+    click(session, by_role(:link, name: "Download"))
+    assert_receive {:stream, server}
+
+    try do
+      download = await(pending)
+      destination = Path.join(tmp_dir, "copy.txt")
+
+      assert_raise RuntimeError, ~r/did not complete within the session's timeout of 500ms and was canceled/, fn ->
+        Download.save_as!(download, destination)
+      end
+
+      send(server, :finish)
+      assert unwrap(download, &PlaywrightEx.Download.failure/1) == {:ok, "canceled"}
+      refute File.exists?(destination)
+      assert_raise PlaywrightEx.PlaywrightError, ~r/canceled/, fn -> Download.read!(download) end
+    after
+      send(server, :finish)
+    end
+  end
+
   @tag driver: :playwright, tmp_dir: true, capture_log: true
+  @tag skip:
+         if(Application.compile_env!(:fluffy, :playwright)[:engine] == :firefox,
+           do: "Firefox never completes or fails an interrupted download"
+         )
   test "failed downloads expose metadata but raise when reading or saving", %{tmp_dir: tmp_dir} do
     owner = self()
 
@@ -214,9 +278,9 @@ defmodule Fluffy.Conformance.DownloadEventTest do
     assert download.suggested_filename == "broken.txt"
     send(server, :abort)
 
-    assert_raise RuntimeError, ~r/Could not save download/, fn -> Download.read!(download) end
+    assert_raise PlaywrightEx.PlaywrightError, ~r/download.saveAs/, fn -> Download.read!(download) end
 
-    assert_raise RuntimeError, ~r/Could not save download/, fn ->
+    assert_raise PlaywrightEx.PlaywrightError, ~r/download.saveAs/, fn ->
       Download.save_as!(download, Path.join(tmp_dir, "copy.txt"))
     end
   end

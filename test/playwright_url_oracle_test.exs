@@ -43,8 +43,7 @@ defmodule Fluffy.PlaywrightURLOracleTest do
                    values: Object.fromEntries(names.map(name => [name, url.searchParams.getAll(name)]))
                  }
                }
-               """,
-               is_function: true
+               """
              )
   end
 end

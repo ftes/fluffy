@@ -3,15 +3,21 @@ defmodule Fluffy.BrowserRuntime do
 
   use GenServer
 
+  alias Fluffy.Backend.Playwright.Bounded
   alias PlaywrightEx.Browser
+  alias PlaywrightEx.BrowserType
+  alias PlaywrightEx.Playwright
+
+  @driver Fluffy.PlaywrightDriver
 
   defstruct [
-    :browser_id,
+    :browser,
+    :browser_closer,
     :browser_launcher,
     :engine,
     :launch_options,
     :playwright_options,
-    :playwright_supervisor,
+    :playwright_name,
     :runtime_supervisor,
     :transport_starter,
     :timeout,
@@ -19,21 +25,33 @@ defmodule Fluffy.BrowserRuntime do
   ]
 
   @opaque t :: %__MODULE__{
-            browser_id: String.t() | nil,
+            browser: Browser.t() | nil,
+            browser_closer: function(),
             browser_launcher: function(),
             engine: :chromium | :firefox | :webkit,
             launch_options: keyword(),
             playwright_options: keyword(),
-            playwright_supervisor: GenServer.name(),
+            playwright_name: atom(),
             runtime_supervisor: GenServer.name(),
             transport_starter: function(),
             timeout: timeout(),
             launch_count: non_neg_integer()
           }
 
-  def browser_id(server \\ __MODULE__) do
-    GenServer.call(server, :browser_id, :infinity)
+  @doc "Returns the shared browser, launching it if needed. Raises if it cannot launch."
+  def browser(server \\ __MODULE__) do
+    server |> GenServer.call(:browser, :infinity) |> browser!()
   end
+
+  @doc "Returns a browser other than `lost`, launching one if `lost` is current."
+  def replace(server \\ __MODULE__, lost) do
+    server |> GenServer.call({:replace, lost.guid}, :infinity) |> browser!()
+  end
+
+  # A failed launch raises in the session that asked for the browser. Crashing the
+  # runtime instead would restart every running session.
+  defp browser!({:ok, browser}), do: browser
+  defp browser!({:error, error}), do: raise(error)
 
   def status(server \\ __MODULE__) do
     GenServer.call(server, :status)
@@ -53,82 +71,119 @@ defmodule Fluffy.BrowserRuntime do
       engine: Keyword.get(options, :engine, :chromium),
       launch_options: Keyword.fetch!(options, :launch_options),
       playwright_options: Keyword.fetch!(options, :playwright_options),
-      playwright_supervisor: Keyword.get(options, :playwright_supervisor, PlaywrightEx.Supervisor),
+      playwright_name: Keyword.get(options, :playwright_name, @driver),
       runtime_supervisor: Keyword.get(options, :runtime_supervisor, Fluffy.BrowserRuntime.Supervisor),
       transport_starter: Keyword.get(options, :transport_starter, &start_transport/3),
-      browser_launcher: Keyword.get(options, :browser_launcher, &launch_browser/4)
+      browser_launcher: Keyword.get(options, :browser_launcher, &launch_browser/3),
+      browser_closer: Keyword.get(options, :browser_closer, &Browser.close/1)
     }
 
     {:ok, state}
   end
 
   @impl true
-  def handle_call(:browser_id, _from, %__MODULE__{browser_id: nil} = state) do
-    :ok =
-      state.transport_starter.(
-        state.runtime_supervisor,
-        state.playwright_supervisor,
-        state.playwright_options
-      )
+  def handle_call(:browser, _from, %__MODULE__{browser: nil} = state) do
+    case launch(state) do
+      {:ok, browser} ->
+        state = %{state | browser: browser, launch_count: state.launch_count + 1}
+        {:reply, {:ok, browser}, state}
 
-    {:ok, browser} =
-      state.browser_launcher.(
-        state.engine,
-        state.playwright_supervisor,
-        state.launch_options,
-        state.timeout
-      )
-
-    state = %{state | browser_id: browser.guid, launch_count: state.launch_count + 1}
-    {:reply, browser.guid, state}
+      {:error, reason} ->
+        {:reply, {:error, launch_error(state.engine, reason)}, state}
+    end
   end
 
-  def handle_call(:browser_id, _from, state) do
-    {:reply, state.browser_id, state}
+  def handle_call(:browser, _from, state) do
+    {:reply, {:ok, state.browser}, state}
   end
+
+  # The lost browser may still run, refusing contexts; close it without
+  # holding up the callers waiting for its replacement.
+  def handle_call({:replace, guid}, from, %{browser: %{guid: guid} = lost} = state) do
+    {:ok, _pid} =
+      Task.Supervisor.start_child(Fluffy.TaskSupervisor, fn ->
+        Bounded.within(state.timeout, fn -> close_browser(state, lost) end)
+      end)
+
+    handle_call(:browser, from, %{state | browser: nil})
+  end
+
+  def handle_call({:replace, _guid}, from, state), do: handle_call(:browser, from, state)
 
   def handle_call(:status, _from, state) do
     {:reply,
      %{
-       browser_id: state.browser_id,
-       initialized?: not is_nil(state.browser_id),
+       browser: state.browser,
+       initialized?: not is_nil(state.browser),
        launch_count: state.launch_count,
-       playwright_supervisor: state.playwright_supervisor
+       playwright_name: state.playwright_name
      }, state}
   end
 
   @impl true
-  def terminate(_reason, %{browser_id: nil}), do: :ok
+  # A lost driver disconnects every browser. The next session relaunches
+  # against the restarted driver's root.
+  def handle_info({:browser_disconnected, guid}, %{browser: %{guid: guid}} = state),
+    do: {:noreply, %{state | browser: nil}}
+
+  def handle_info(_message, state), do: {:noreply, state}
+
+  @impl true
+  def terminate(_reason, %{browser: nil}), do: :ok
 
   def terminate(_reason, state) do
-    connection = PlaywrightEx.Supervisor.connection_name(state.playwright_supervisor)
-
-    if Process.whereis(connection) do
-      Browser.close(state.browser_id, connection: connection, timeout: state.timeout)
-    end
-
+    Bounded.within(state.timeout, fn -> close_browser(state, state.browser) end)
     :ok
+  catch
+    _kind, _reason -> :ok
   end
 
-  defp start_transport(runtime_supervisor, playwright_supervisor, playwright_options) do
-    child =
-      {PlaywrightEx.Supervisor, Keyword.put(playwright_options, :name, playwright_supervisor)}
+  # Shutdown is best effort, and a crash in the unlinked call would only log.
+  defp close_browser(state, browser) do
+    state.browser_closer.(browser)
+  catch
+    _kind, _reason -> :ok
+  end
+
+  # Invalid launch options raise in PlaywrightEx. That raise belongs to the
+  # caller too, not to the runtime.
+  defp launch(state) do
+    launch_options = Keyword.put_new(state.launch_options, :timeout, state.timeout)
+
+    with :ok <- state.transport_starter.(state.runtime_supervisor, state.playwright_name, state.playwright_options) do
+      state.browser_launcher.(state.engine, state.playwright_name, launch_options)
+    end
+  rescue
+    exception -> {:error, exception}
+  catch
+    :exit, reason -> {:error, {:exit, reason}}
+  end
+
+  defp start_transport(runtime_supervisor, name, playwright_options) do
+    child = {PlaywrightEx.Supervisor, Keyword.put(playwright_options, :name, name)}
 
     case DynamicSupervisor.start_child(runtime_supervisor, child) do
       {:ok, _pid} -> :ok
       {:error, {:already_started, _pid}} -> :ok
-      {:error, reason} -> raise "could not start Playwright transport: #{inspect(reason)}"
+      {:error, reason} -> {:error, {:transport, reason}}
     end
   end
 
-  defp launch_browser(engine, playwright_supervisor, launch_options, timeout) do
-    connection = PlaywrightEx.Supervisor.connection_name(playwright_supervisor)
+  defp launch_error(engine, {:transport, reason}),
+    do: RuntimeError.exception("could not start the Playwright driver for #{engine}: #{inspect(reason)}")
 
-    PlaywrightEx.launch_browser(
-      engine,
-      launch_options
-      |> Keyword.put_new(:timeout, timeout)
-      |> Keyword.put(:connection, connection)
-    )
+  defp launch_error(engine, reason) do
+    detail = if is_exception(reason), do: Exception.message(reason), else: inspect(reason)
+    RuntimeError.exception("could not launch the Playwright #{engine} browser: #{detail}")
+  end
+
+  defp launch_browser(engine, name, launch_options) do
+    runtime = self()
+    browser_type = apply(Playwright, engine, [PlaywrightEx.playwright(name)])
+
+    with {:ok, browser} <- BrowserType.launch(browser_type, launch_options) do
+      Browser.on(browser, :disconnected, fn browser -> send(runtime, {:browser_disconnected, browser.guid}) end)
+      {:ok, browser}
+    end
   end
 end

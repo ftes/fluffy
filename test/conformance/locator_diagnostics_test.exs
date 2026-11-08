@@ -23,7 +23,7 @@ defmodule Fluffy.Conformance.LocatorDiagnosticsTest do
       assert error.message =~ "by_role(:button, name: \"Save\")"
 
       if unquote(driver) == :playwright do
-        assert error.message =~ "value: 2"
+        assert error.message =~ "Received: 2"
         assert error.message =~ "Call log:"
       else
         assert error.message =~ "it matched 2"

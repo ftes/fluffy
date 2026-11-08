@@ -24,7 +24,7 @@ defmodule Fluffy.Conformance.PlaywrightEvaluateTest do
              """)
   end
 
-  test "supports function-style evaluation with an argument and a custom timeout" do
+  test "supports function-style evaluation with an argument" do
     session =
       session_for_html(:playwright, "<main><p id=status>Ready</p></main>", base_url: Fluffy.TestServer.base_url())
 
@@ -32,10 +32,20 @@ defmodule Fluffy.Conformance.PlaywrightEvaluateTest do
              Playwright.evaluate(
                session,
                "suffix => document.querySelector('#status').textContent + suffix",
-               is_function: true,
-               arg: "!",
-               timeout: 1_000
+               "!"
              )
+  end
+
+  test "rejects Fluffy 0.8 evaluate options passed as the argument" do
+    session = session_for_html(:playwright, "<main>Options</main>", base_url: Fluffy.TestServer.base_url())
+
+    for options <- [[timeout: 1_000], [is_function: true, arg: "!"]] do
+      assert_raise ArgumentError,
+                   ~r/evaluate\/3 takes the JavaScript argument.*evaluate\(session, expression, arg\)/,
+                   fn ->
+                     Playwright.evaluate(session, "suffix => suffix", options)
+                   end
+    end
   end
 
   test "raises a capability error outside the Playwright driver" do
@@ -56,7 +66,7 @@ defmodule Fluffy.Conformance.PlaywrightEvaluateTest do
     session =
       session_for_html(:playwright, "<main>Failure</main>", base_url: Fluffy.TestServer.base_url())
 
-    assert_raise RuntimeError, ~r/Playwright evaluate failed/, fn ->
+    assert_raise PlaywrightEx.PlaywrightError, ~r/boom/, fn ->
       Playwright.evaluate(session, "(() => { throw new Error('boom') })()")
     end
   end

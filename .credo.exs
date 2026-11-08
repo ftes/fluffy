@@ -3,7 +3,7 @@
     %{
       name: "default",
       files: %{
-        included: [".credo.exs", "mix.exs", "config/", "lib/", "test/"],
+        included: [".credo.exs", "mix.exs", "config/", "dev/", "lib/", "test/"],
         excluded: []
       },
       strict: true,

@@ -68,6 +68,26 @@ defmodule Fluffy.Conformance.StaticHTTPLinkTest do
 
       assert [_request] = TestHTTPFixtures.requests(fixture)
     end
+
+    for status <- [204, 205] do
+      @tag driver: driver
+      test "a link to a #{status} response keeps the current page with #{driver}", %{driver: driver} do
+        fixture =
+          TestHTTPFixtures.register_sequence([
+            %{body: html(~s(<h1>Current order</h1><a href="acknowledge">Acknowledge</a>))},
+            %{status: unquote(status)}
+          ])
+
+        driver
+        |> start_test_session()
+        |> visit(TestHTTPFixtures.path(fixture, "/orders/current"))
+        |> click(by_role(:link, name: "Acknowledge"))
+        |> expect("Current order" |> by_text() |> to_be_visible())
+        |> expect(Fluffy.Expect.page_to_have_url(TestHTTPFixtures.url(fixture, "/orders/current")))
+
+        assert Enum.map(TestHTTPFixtures.requests(fixture), & &1.path) == ["/orders/current", "/orders/acknowledge"]
+      end
+    end
   end
 
   test "Phoenix rejects external link navigation explicitly" do

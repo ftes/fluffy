@@ -67,20 +67,23 @@ defmodule Fluffy.Conformance.EventTimeoutTest do
       driver: driver,
       fixture: fixture
     } do
+      # The deadline leaves room for a browser click under parallel cases
+      # (Firefox dispatches input for one page at a time); the callback still
+      # outlives it.
       driver
       |> start_test_session(fixture)
       |> expect_event(
         Event.download(&(&1.suggested_filename == "report.csv")),
         fn session ->
           click(session, by_role(:link, name: "Download"))
-          Process.sleep(1_000)
+          Process.sleep(3_000)
         end,
         fn download ->
           assert download.suggested_filename == "report.csv"
           assert Fluffy.Download.read!(download) == "download bytes"
           assert download.url == TestHTTPFixtures.url(fixture, "/report")
         end,
-        timeout: 1_000
+        timeout: 3_000
       )
       |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/start")))
     end
