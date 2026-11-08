@@ -431,26 +431,32 @@ defmodule Fluffy.Driver.Live do
           |> render()
           |> then(&commit_render_result(session, client_dom, &1))
         catch
-          :exit, reason -> follow_exit_redirect(session, reason, fn -> exit(reason) end)
+          :exit, reason ->
+            case exit_redirect(session) do
+              :none -> exit(reason)
+              redirect -> follow_redirect_result(session, {:error, redirect})
+            end
         end
     end
   end
 
   # Follows the redirect a view left when a call to it exited.
-  defp follow_exit_redirect(session, reason, unexplained \\ nil) do
-    follow_redirect_result(session, {:error, exit_redirect!(session, reason, unexplained)})
+  defp follow_exit_redirect(session, reason) do
+    case exit_redirect(session) do
+      :none -> raise Fluffy.LiveViewError, reason: reason
+      redirect -> follow_redirect_result(session, {:error, redirect})
+    end
   end
 
   # A view call exits when the view went away. Return the redirect it left, or
-  # raise when it died or left nothing.
-  defp exit_redirect!(session, original_reason, unexplained \\ nil) do
+  # `:none` when it left nothing, and raise when it died.
+  defp exit_redirect(session) do
     state = Session.page_state(session)
 
     case left_view_event(state, min(Session.context(session).timeout, @retry_interval)) do
       {:redirect, redirect} -> redirect
       {:died, reason} -> raise Fluffy.LiveViewError, reason: reason
-      :none when is_function(unexplained, 0) -> unexplained.()
-      :none -> raise Fluffy.LiveViewError, reason: original_reason
+      :none -> :none
     end
   end
 
@@ -504,14 +510,16 @@ defmodule Fluffy.Driver.Live do
     exception ->
       stacktrace = __STACKTRACE__
 
-      if redirect_reply_failure?(session, exception, stacktrace) do
-        {:view_left, exit_redirect!(session, exception, fn -> reraise(exception, stacktrace) end)}
-      else
-        reraise(exception, stacktrace)
+      case redirect_reply_failure?(session, exception, stacktrace) && exit_redirect(session) do
+        {_kind, _options} = redirect -> {:view_left, redirect}
+        _unexplained -> reraise(exception, stacktrace)
       end
   catch
     :exit, reason ->
-      {:view_left, exit_redirect!(session, reason)}
+      case exit_redirect(session) do
+        :none -> raise Fluffy.LiveViewError, reason: reason
+        redirect -> {:view_left, redirect}
+      end
   end
 
   # LiveViewTest hands back a redirect in place of a reply only once the view's
