@@ -41,16 +41,28 @@ defmodule Fluffy.Driver.Live do
   @impl true
   def expect(%Session{} = session, %Expect{} = expectation) do
     options = Keyword.validate!(expectation.options, [:timeout])
+    deadline = Retry.deadline(session, options)
 
-    eventually(session, options, fn session ->
-      case evaluate_expectation(session, expectation) do
-        {:ok, passed?, _actual} when passed? != expectation.negated? ->
-          {:ok, session}
+    result =
+      eventually(session, options, fn session ->
+        case evaluate_expectation(session, expectation) do
+          {:ok, passed?, _actual} when passed? != expectation.negated? ->
+            {:ok, session}
 
-        {:ok, _passed?, actual} ->
-          {:retry, "Expected #{Expect.Internal.describe(expectation)}, got #{inspect(actual)}"}
-      end
-    end)
+          {:ok, _passed?, actual} ->
+            {:retry, "Expected #{Expect.Internal.describe(expectation)}, got #{inspect(actual)}"}
+        end
+      end)
+
+    # An expectation goes on on the page a navigation landed on, like an
+    # action, so pages that keep navigating fail it at the redirect limit.
+    case result do
+      {:navigate, session, navigation, {:retry, _remaining}} ->
+        retry_on_new_page(session, navigation, :expect, [expectation], deadline)
+
+      session ->
+        session
+    end
   end
 
   @impl true
@@ -603,18 +615,21 @@ defmodule Fluffy.Driver.Live do
   # Runs outside the action's scope: following the navigation moves the
   # session to the new page, so the action leaves nothing unread behind. The
   # navigation counts toward the action's timeout, and its redirect toward the
-  # redirect limit of the action's retries.
+  # redirect limit of the action's retries. Expectations retry the same way.
   defp retry_on_new_page(session, navigation, operation, arguments, deadline) do
     redirects = HTTP.count_redirect!(ActionScope.redirects(), URI.parse(Session.current_page(session).url))
     session = Fluffy.Backend.navigate(session, navigation)
     remaining = Deadline.remaining(deadline)
-    arguments = List.update_at(arguments, -1, &Keyword.put(&1, :timeout, remaining))
+    arguments = List.update_at(arguments, -1, &put_timeout(&1, remaining))
     retry = fn -> Fluffy.__dispatch_driver__(session, operation, arguments) end
 
     ActionScope.after_redirects(redirects, fn ->
       if remaining == 0, do: ActionScope.final_attempt(retry), else: retry.()
     end)
   end
+
+  defp put_timeout(%Expect{} = expectation, timeout), do: Expect.Internal.merge_options(expectation, timeout: timeout)
+  defp put_timeout(options, timeout), do: Keyword.put(options, :timeout, timeout)
 
   defp action_label(:set_checked, [_locator, desired, _options]), do: if(desired, do: :check, else: :uncheck)
   defp action_label(operation, _arguments), do: operation

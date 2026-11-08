@@ -314,6 +314,18 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     end
   end
 
+  # Each navigation used to retry the expectation with the time left, and once
+  # none was left, kept retrying it without end.
+  @tag driver: :phoenix
+  @tag timeout: 20_000
+  test "an expectation on views that keep navigating to each other fails at the redirect limit" do
+    session = :phoenix |> live_session() |> visit("/live/chamber-map?async=loop")
+
+    assert_raise RuntimeError, ~r/exceeded 20 redirects/, fn ->
+      expect(session, Fluffy.Expect.page_to_have_url("/nowhere"), timeout: 5_000)
+    end
+  end
+
   @tag driver: :phoenix
   test "an action without timeout budget acts once on the page a navigation landed on" do
     :phoenix
