@@ -12,10 +12,12 @@ defmodule Fluffy.Driver.Live.ActionScope do
   #
   # An action whose timeout ran out before it reached the view retries once on
   # the page a navigation landed on, as a final attempt that may not retry
-  # again.
+  # again. Its retries count the redirects they follow, so pages that keep
+  # navigating before the action reaches them fail it at the redirect limit.
 
   @scope {__MODULE__, :scope}
   @final_attempt {__MODULE__, :final_attempt}
+  @redirects {__MODULE__, :redirects}
 
   def run(action) when is_function(action, 0) do
     previous = Process.put(@scope, %{delivered?: false, taken: []})
@@ -40,6 +42,20 @@ defmodule Fluffy.Driver.Live.ActionScope do
       restore(@final_attempt, previous)
     end
   end
+
+  # Runs a retry on the page the action's `redirects`-th redirect landed on.
+  def after_redirects(redirects, retry) when is_integer(redirects) and is_function(retry, 0) do
+    previous = Process.put(@redirects, redirects)
+
+    try do
+      retry.()
+    after
+      restore(@redirects, previous)
+    end
+  end
+
+  # The redirects the running action followed to the page it acts on.
+  def redirects, do: Process.get(@redirects, 0)
 
   # Puts the taken messages back ahead of those of the same kind that arrived
   # since, so later reads see them in the order the view sent them.

@@ -7,18 +7,7 @@ defmodule Fluffy.TestWeb.NavigationLive do
 
   @impl true
   def mount(params, _session, socket) do
-    if connected?(socket) do
-      case params["async"] do
-        "true" -> Process.send_after(self(), :navigate, 30)
-        "mount" -> send(self(), :navigate)
-        "return" -> Process.send_after(self(), {:navigate, "/live/chamber-map?step=returned"}, 30)
-        "return-late" -> Process.send_after(self(), {:navigate, "/live/chamber-map?step=returned&late=true"}, 30)
-        "return-slow" -> Process.send_after(self(), {:navigate, "/live/chamber-map?late=true&reveal=150&delay=600"}, 30)
-        "patch" -> Process.send_after(self(), :patch, 30)
-        "patch-twice" -> Process.send_after(self(), :patch_twice, 30)
-        _sync -> :ok
-      end
-    end
+    if connected?(socket), do: schedule_async(params["async"])
 
     # Connects slowly.
     if connected?(socket) and params["delay"], do: Process.sleep(String.to_integer(params["delay"]))
@@ -40,6 +29,22 @@ defmodule Fluffy.TestWeb.NavigationLive do
 
     {:ok, mount_redirect(socket, connected?(socket) && params["redirect"])}
   end
+
+  defp schedule_async("true"), do: Process.send_after(self(), :navigate, 30)
+  defp schedule_async("mount"), do: send(self(), :navigate)
+  defp schedule_async("return"), do: Process.send_after(self(), {:navigate, "/live/chamber-map?step=returned"}, 30)
+
+  defp schedule_async("return-late"),
+    do: Process.send_after(self(), {:navigate, "/live/chamber-map?step=returned&late=true"}, 30)
+
+  defp schedule_async("return-slow"),
+    do: Process.send_after(self(), {:navigate, "/live/chamber-map?late=true&reveal=150&delay=600"}, 30)
+
+  defp schedule_async("loop"), do: send(self(), {:navigate, "/live/chamber-map?async=loop-back"})
+  defp schedule_async("loop-back"), do: send(self(), {:navigate, "/live/chamber-map?async=loop"})
+  defp schedule_async("patch"), do: Process.send_after(self(), :patch, 30)
+  defp schedule_async("patch-twice"), do: Process.send_after(self(), :patch_twice, 30)
+  defp schedule_async(_sync), do: :ok
 
   defp mount_redirect(socket, "live") do
     socket |> put_flash(:info, "The secret passage opened") |> push_navigate(to: "/live/secret-chamber")

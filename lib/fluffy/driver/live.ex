@@ -5,6 +5,7 @@ defmodule Fluffy.Driver.Live do
 
   import Phoenix.LiveViewTest, except: [open_browser: 1, open_browser: 2]
 
+  alias Fluffy.Backend.Phoenix.HTTP
   alias Fluffy.ClientDOM
   alias Fluffy.Deadline
   alias Fluffy.Driver.Live.ActionResolver
@@ -602,14 +603,18 @@ defmodule Fluffy.Driver.Live do
 
   # Runs outside the action's scope: following the navigation moves the
   # session to the new page, so the action leaves nothing unread behind. The
-  # navigation counts toward the action's timeout.
+  # navigation counts toward the action's timeout, and its redirect toward the
+  # redirect limit of the action's retries.
   defp retry_on_new_page(session, navigation, operation, arguments, deadline) do
+    redirects = HTTP.count_redirect!(ActionScope.redirects(), URI.parse(Session.current_page(session).url))
     session = Fluffy.Backend.navigate(session, navigation)
     remaining = Deadline.remaining(deadline)
     arguments = List.update_at(arguments, -1, &Keyword.put(&1, :timeout, remaining))
     retry = fn -> Fluffy.__dispatch_driver__(session, operation, arguments) end
 
-    if remaining == 0, do: ActionScope.final_attempt(retry), else: retry.()
+    ActionScope.after_redirects(redirects, fn ->
+      if remaining == 0, do: ActionScope.final_attempt(retry), else: retry.()
+    end)
   end
 
   defp action_label(:set_checked, [_locator, desired, _options]), do: if(desired, do: :check, else: :uncheck)

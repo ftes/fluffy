@@ -303,6 +303,18 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
   end
 
   @tag driver: :phoenix
+  test "an action on views that keep navigating to each other fails at the redirect limit" do
+    # Each view navigates as it connects, so the action never finds its target
+    # and follows each navigation instead.
+    assert_raise RuntimeError, ~r/exceeded 20 redirects/, fn ->
+      :phoenix
+      |> live_session()
+      |> visit("/live/chamber-map?async=loop")
+      |> click(by_role(:button, name: "Missing", exact: true), timeout: 10_000)
+    end
+  end
+
+  @tag driver: :phoenix
   test "an action without timeout budget acts once on the page a navigation landed on" do
     :phoenix
     |> live_session()
