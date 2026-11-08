@@ -8,8 +8,13 @@ defmodule Fluffy.Driver.Live.ActionScope do
   # it took from the mailbox. An action that fails leaves its session on the
   # page it started on, so the scope puts those messages back for that
   # session's next call to find. Outside an action, recording does nothing.
+  #
+  # An action whose timeout ran out before it reached the view retries once on
+  # the page a navigation landed on, as a final attempt that may not retry
+  # again.
 
   @scope {__MODULE__, :scope}
+  @final_attempt {__MODULE__, :final_attempt}
 
   def run(action) when is_function(action, 0) do
     Process.put(@scope, %{delivered?: false, taken: []})
@@ -24,6 +29,18 @@ defmodule Fluffy.Driver.Live.ActionScope do
       Process.delete(@scope)
     end
   end
+
+  def final_attempt(retry) when is_function(retry, 0) do
+    previous = Process.put(@final_attempt, true)
+
+    try do
+      retry.()
+    after
+      if previous, do: Process.put(@final_attempt, previous), else: Process.delete(@final_attempt)
+    end
+  end
+
+  def final_attempt?, do: Process.get(@final_attempt) == true
 
   def delivered?, do: match?(%{delivered?: true}, Process.get(@scope))
 

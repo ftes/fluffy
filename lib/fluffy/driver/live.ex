@@ -54,7 +54,7 @@ defmodule Fluffy.Driver.Live do
 
   @impl true
   def click(%Session{} = session, %Locator{} = locator, action_options \\ []) do
-    act(session, :click, locator, action_options, fn deadline ->
+    act(session, :click, [locator, action_options], fn deadline ->
       case resolve_live_action(session, locator, deadline, &ClientDOM.click(&1, locator)) do
         {%Session{} = session, {client_dom, target}} -> commit_click(session, client_dom, target)
         navigation -> navigation
@@ -176,7 +176,7 @@ defmodule Fluffy.Driver.Live do
 
   @impl true
   def submit(%Session{} = session, %Locator{} = locator, options \\ []) do
-    act(session, :submit, locator, options, fn deadline ->
+    act(session, :submit, [locator, options], fn deadline ->
       case resolve_live_action(session, locator, deadline, &ClientDOM.target!(&1, locator)) do
         {%Session{} = session, target} -> commit_submit(session, target)
         navigation -> navigation
@@ -203,7 +203,7 @@ defmodule Fluffy.Driver.Live do
 
   @impl true
   def fill(%Session{} = session, %Locator{} = locator, value, options \\ []) do
-    act(session, :fill, locator, options, fn deadline ->
+    act(session, :fill, [locator, value, options], fn deadline ->
       case resolve_live_action(session, locator, deadline, &ClientDOM.fill(&1, locator, value, :live)) do
         {%Session{} = session, {client_dom, target}} -> dispatch_live_change(session, client_dom, target)
         navigation -> navigation
@@ -212,8 +212,8 @@ defmodule Fluffy.Driver.Live do
   end
 
   @impl true
-  def set_input_files(%Session{} = session, %Locator{} = locator, _source_paths, selected_files, options \\ []) do
-    act(session, :set_input_files, locator, options, fn deadline ->
+  def set_input_files(%Session{} = session, %Locator{} = locator, source_paths, selected_files, options \\ []) do
+    act(session, :set_input_files, [locator, source_paths, selected_files, options], fn deadline ->
       case resolve_live_action(session, locator, deadline, &select_files(&1, locator, selected_files)) do
         {%Session{} = session, :live_upload} ->
           set_live_upload(session, locator, selected_files)
@@ -252,7 +252,7 @@ defmodule Fluffy.Driver.Live do
 
   @impl true
   def set_checked(%Session{} = session, %Locator{} = locator, desired, options \\ []) do
-    act(session, if(desired, do: :check, else: :uncheck), locator, options, fn deadline ->
+    act(session, :set_checked, [locator, desired, options], fn deadline ->
       case resolve_live_action(session, locator, deadline, &ClientDOM.set_checked(&1, locator, desired)) do
         {%Session{} = session, {candidate_client_dom, target}} ->
           state = Session.page_state(session)
@@ -294,7 +294,7 @@ defmodule Fluffy.Driver.Live do
 
   @impl true
   def select_option(%Session{} = session, %Locator{} = locator, requested, options \\ []) do
-    act(session, :select_option, locator, options, fn deadline ->
+    act(session, :select_option, [locator, requested, options], fn deadline ->
       case resolve_live_action(session, locator, deadline, &ClientDOM.select_option(&1, locator, requested)) do
         {%Session{} = session, {client_dom, target}} -> dispatch_live_change(session, client_dom, target)
         navigation -> navigation
@@ -304,7 +304,7 @@ defmodule Fluffy.Driver.Live do
 
   @impl true
   def press(%Session{} = session, %Locator{} = locator, key, options \\ []) do
-    act(session, :press, locator, options, fn deadline ->
+    act(session, :press, [locator, key, options], fn deadline ->
       case resolve_live_action(session, locator, deadline, &ClientDOM.target!(&1, locator)) do
         {%Session{} = session, target} -> dispatch_keys(session, locator, target, key, deadline)
         navigation -> navigation
@@ -537,41 +537,71 @@ defmodule Fluffy.Driver.Live do
   end
 
   # Runs a Live action within one deadline, recording whether any of its
-  # events reached the view. A redirect found before that landed before the
+  # events reached the view. A navigation found before that landed before the
   # action: follow it and retry the whole action on the new page within the
-  # remaining timeout, as a Playwright locator retries on the page it finds,
-  # or fail when no budget remains. Once an event reached the view, the action
-  # took effect, so a navigation a later step finds ends the action on the new
-  # page instead, like a browser whose page navigated mid-action. A redirect
-  # the view left since Fluffy last read it is followed first, so an action that
-  # never calls the view, such as a plain link, acts on the new page too. A
-  # failed action leaves its session on that page with the navigation unread.
-  defp act(session, operation, locator, options, action) do
-    deadline = Retry.deadline(session, Keyword.validate!(options, [:timeout]))
+  # remaining timeout, as a Playwright locator retries on the page it finds.
+  # Once no budget remains, the retry is one final attempt without waiting, so
+  # the action reports what it finds there, such as a missing target, and a
+  # navigation that attempt finds before reaching the view fails it. Once an
+  # event reached the view, the action took effect, so a navigation a later
+  # step finds ends the action on the new page instead, like a browser whose
+  # page navigated mid-action. A redirect the view left since Fluffy last read
+  # it is followed first, so an action that never calls the view, such as a
+  # plain link, acts on the new page too. An action that fails before following
+  # a navigation leaves its session on its page with the navigation unread.
+  # `arguments` are the driver call's own, which the retry repeats.
+  defp act(session, operation, arguments, action) do
+    deadline = Retry.deadline(session, Keyword.validate!(List.last(arguments), [:timeout]))
 
-    ActionScope.run(fn ->
-      result = unread_redirect(session) || action.(deadline)
-      finish_action(result, ActionScope.delivered?(), operation, locator, deadline)
-    end)
+    result =
+      ActionScope.run(fn ->
+        result = unread_redirect(session) || action.(deadline)
+        finish_action(result, ActionScope.delivered?(), operation, arguments, deadline)
+      end)
+
+    case result do
+      {:retry_on_new_page, session, navigation} -> retry_on_new_page(session, navigation, operation, arguments, deadline)
+      result -> result
+    end
   end
 
-  defp finish_action(result, delivered?, operation, locator, deadline) do
+  defp finish_action(result, delivered?, operation, arguments, deadline) do
     case {navigation_found(result), delivered?} do
       {{session, navigation}, true} ->
         {:navigate, session, navigation}
 
       {{session, navigation}, false} ->
-        if Deadline.expired?(deadline) do
-          reason = if match?(%Navigation.Patch{}, navigation), do: :patched_away, else: :navigated_away
-          raise Fluffy.ActionabilityError, action: operation, reason: reason, locator: locator
+        if Deadline.expired?(deadline) and ActionScope.final_attempt?() do
+          raise Fluffy.ActionabilityError,
+            action: action_label(operation, arguments),
+            reason: :navigated_away,
+            locator: hd(arguments)
         end
 
-        Retry.retry_after_navigation(session, navigation, deadline)
+        {:retry_on_new_page, session, navigation}
 
       {:none, _delivered?} ->
         result
     end
   end
+
+  # Runs outside the action's scope: following the navigation moves the
+  # session to the new page, so the action leaves nothing unread behind.
+  defp retry_on_new_page(session, navigation, operation, arguments, deadline) do
+    remaining = Deadline.remaining(deadline)
+    arguments = List.update_at(arguments, -1, &Keyword.put(&1, :timeout, remaining))
+
+    retry = fn ->
+      session
+      |> Fluffy.Backend.navigate(navigation)
+      |> Fluffy.__dispatch_driver__(operation, arguments)
+    end
+
+    if remaining == 0, do: ActionScope.final_attempt(retry), else: retry.()
+  end
+
+  defp action_label(:set_checked, [_locator, desired, _options]), do: if(desired, do: :check, else: :uncheck)
+  defp action_label(operation, _arguments), do: operation
 
   # Checks the mailbox only: a view that left reports it to Fluffy right away.
   defp unread_redirect(session) do

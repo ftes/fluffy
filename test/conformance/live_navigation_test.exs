@@ -291,37 +291,37 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
   end
 
   @tag driver: :phoenix
-  test "an action without timeout budget fails instead of retrying on the page a navigation landed on" do
-    session =
-      :phoenix
-      |> live_session()
-      |> visit("/live/chamber-map?async=return")
-      |> await_unread_navigation(:phoenix, nil)
-
-    assert_raise Fluffy.OperationError, ~r/navigated away/, fn ->
-      click(session, by_role(:button, name: "Lull guardian", exact: true), timeout: 0)
-    end
+  test "an action without timeout budget acts once on the page a navigation landed on" do
+    :phoenix
+    |> live_session()
+    |> visit("/live/chamber-map?async=return")
+    |> await_unread_navigation(:phoenix, nil)
+    |> click(by_role(:button, name: "Lull guardian", exact: true), timeout: 0)
+    |> expect(Fluffy.Expect.page_to_have_url("/chamber"))
   end
 
   @tag driver: :phoenix
-  test "the next action follows the navigation an action without budget failed on" do
+  test "an action without timeout budget whose target a navigation removed fails as missing and leaves the new page" do
     session =
       :phoenix
       |> live_session()
-      |> visit("/live/chamber-map?async=return")
+      |> visit("/live/chamber-map?async=true")
       |> await_unread_navigation(:phoenix, nil)
 
-    assert_raise Fluffy.OperationError, ~r/navigated away/, fn ->
-      click(session, by_role(:button, name: "Lull guardian", exact: true), timeout: 0)
-    end
+    error =
+      assert_raise Fluffy.OperationError, ~r/Lull guardian/, fn ->
+        click(session, by_role(:button, name: "Lull guardian", exact: true), timeout: 0)
+      end
+
+    refute Exception.message(error) =~ "navigated away"
 
     session
-    |> expect(Fluffy.Expect.page_to_have_url("/live/chamber-map?step=returned"))
-    |> expect("Map position: returned" |> by_text(exact: true) |> to_be_visible())
+    |> expect(Fluffy.Expect.page_to_have_url("/live/secret-chamber"))
+    |> expect("The secret chamber is open" |> by_text() |> to_be_visible())
   end
 
   @tag driver: :phoenix
-  test "the next action follows a navigation only the view watcher reported after an action without budget failed on it" do
+  test "an action without timeout budget acts once on the page a navigation only the view watcher reported landed on" do
     session = :phoenix |> live_session() |> visit("/live/chamber-map")
     state = Fluffy.Session.page_state(session)
     {_reference, _topic, proxy_pid} = state.view.proxy
@@ -333,9 +333,12 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     assert_receive {:DOWN, ^proxy_reference, :process, ^proxy_pid, _reason}
     assert_receive {:DOWN, ^watcher_reference, :process, _watcher, _reason}
 
-    assert_raise Fluffy.OperationError, ~r/navigated away/, fn ->
-      click(session, by_role(:button, name: "Lull guardian", exact: true), timeout: 0)
-    end
+    error =
+      assert_raise Fluffy.OperationError, ~r/Lull guardian/, fn ->
+        click(session, by_role(:button, name: "Lull guardian", exact: true), timeout: 0)
+      end
+
+    refute Exception.message(error) =~ "navigated away"
 
     session
     |> expect(Fluffy.Expect.page_to_have_url("/live/secret-chamber"))
