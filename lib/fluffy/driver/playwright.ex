@@ -412,7 +412,9 @@ defmodule Fluffy.Driver.Playwright do
   end
 
   # Page-wide input and emulation have no timeout of their own and wait while a
-  # script blocks the page. Like an action, the input can navigate.
+  # script blocks the page. Unlike a locator action, Playwright does not wait for
+  # a navigation the input starts, which may commit after this returns; the
+  # next call adopts it then.
   def page_action(%Session{} = session, operation, fun, options) do
     page = Session.page_state(session).page
 

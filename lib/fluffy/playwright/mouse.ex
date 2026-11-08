@@ -3,10 +3,14 @@ defmodule Fluffy.Playwright.Mouse do
   Page-wide mouse input for Playwright sessions, after Playwright's `Mouse`.
 
   Coordinates are CSS pixels from the top-left corner of the viewport. To target
-  an element, use `Fluffy.click/3` or `Fluffy.Playwright.hover/3`. A navigation the
-  input causes is adopted, as after an action. Use it through
+  an element, use `Fluffy.click/3` or `Fluffy.Playwright.hover/3`. Use it through
   `alias Fluffy.Playwright.Mouse`; the names are too generic to import. Phoenix
   sessions raise `Fluffy.CapabilityError`.
+
+  Unlike `Fluffy.click/3`, these functions do not wait for a navigation the input
+  starts, as in Playwright: they can return before it commits, and the next action
+  can race it. If the input navigates, `expect` something on the new page before
+  the next action; the session adopts the new document then.
   """
 
   alias Fluffy.Options
@@ -31,7 +35,7 @@ defmodule Fluffy.Playwright.Mouse do
   """
   @spec click(Session.t(), number(), number(), [click_option()]) :: Session.t()
   def click(%Session{} = session, x, y, options \\ []) when is_number(x) and is_number(y) do
-    {timeout, native} = split_options(:mouse_click, options)
+    {timeout, native} = Options.split_action!(:mouse_click, options)
     input(session, :"Mouse.click", timeout, &BrowserMouse.click(&1, x, y, native))
   end
 
@@ -47,7 +51,7 @@ defmodule Fluffy.Playwright.Mouse do
   """
   @spec dblclick(Session.t(), number(), number(), [dblclick_option()]) :: Session.t()
   def dblclick(%Session{} = session, x, y, options \\ []) when is_number(x) and is_number(y) do
-    {timeout, native} = split_options(:mouse_dblclick, options)
+    {timeout, native} = Options.split_action!(:mouse_dblclick, options)
     input(session, :"Mouse.dblclick", timeout, &BrowserMouse.dblclick(&1, x, y, native))
   end
 
@@ -63,7 +67,7 @@ defmodule Fluffy.Playwright.Mouse do
   """
   @spec down(Session.t(), [down_option()]) :: Session.t()
   def down(%Session{} = session, options \\ []) do
-    {timeout, native} = split_options(:mouse_down, options)
+    {timeout, native} = Options.split_action!(:mouse_down, options)
     input(session, :"Mouse.down", timeout, &BrowserMouse.down(&1, native))
   end
 
@@ -79,7 +83,7 @@ defmodule Fluffy.Playwright.Mouse do
   """
   @spec up(Session.t(), [up_option()]) :: Session.t()
   def up(%Session{} = session, options \\ []) do
-    {timeout, native} = split_options(:mouse_up, options)
+    {timeout, native} = Options.split_action!(:mouse_up, options)
     input(session, :"Mouse.up", timeout, &BrowserMouse.up(&1, native))
   end
 
@@ -95,7 +99,7 @@ defmodule Fluffy.Playwright.Mouse do
   """
   @spec move(Session.t(), number(), number(), [move_option()]) :: Session.t()
   def move(%Session{} = session, x, y, options \\ []) when is_number(x) and is_number(y) do
-    {timeout, native} = split_options(:mouse_move, options)
+    {timeout, native} = Options.split_action!(:mouse_move, options)
     input(session, :"Mouse.move", timeout, &BrowserMouse.move(&1, x, y, native))
   end
 
@@ -106,11 +110,6 @@ defmodule Fluffy.Playwright.Mouse do
     input(session, :"Mouse.wheel", Options.validate_action!(options), &BrowserMouse.wheel(&1, delta_x, delta_y))
   end
 
-  defp split_options(action, options), do: Keyword.split(Options.validate_action!(action, options), [:timeout])
-
-  defp input(session, operation, options, fun) do
-    Fluffy.Playwright.__ensure_playwright_backend__!(session, :mouse)
-    mouse_fun = fn page -> fun.(PlaywrightEx.Page.mouse(page)) end
-    Fluffy.__dispatch_driver__(session, :page_action, [operation, mouse_fun, options])
-  end
+  defp input(session, operation, options, fun),
+    do: Fluffy.Playwright.__page_input__(session, &PlaywrightEx.Page.mouse/1, operation, options, fun)
 end

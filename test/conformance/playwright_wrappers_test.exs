@@ -292,6 +292,11 @@ defmodule Fluffy.Conformance.PlaywrightWrappersTest do
       assert_raise Fluffy.CapabilityError, operation
     end
 
+    for input <- [fn -> Keyboard.press(session, "a") end, fn -> Mouse.down(session) end] do
+      error = assert_raise Fluffy.CapabilityError, input
+      assert Fluffy.Capability.status(error.capability, :static) == :browser_only
+    end
+
     assert :ok = close_session(session)
   end
 end

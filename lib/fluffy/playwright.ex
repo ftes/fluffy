@@ -275,6 +275,10 @@ defmodule Fluffy.Playwright do
 
   `event_init` is an optional map of event properties, such as `%{bubbles: false}`.
 
+  As in Playwright, this does not wait for a navigation the event starts and can
+  return before it commits, so the next action can race it. If the event navigates,
+  `expect` something on the new page before the next action.
+
   ## Options
 
   #{NimbleOptions.docs(Options.action_schema(:dispatch_event))}
@@ -340,12 +344,18 @@ defmodule Fluffy.Playwright do
   @spec emulate_media(Session.t(), [emulate_media_option()]) :: Session.t()
   def emulate_media(%Session{} = session, options \\ []) do
     ensure_playwright_backend!(session, :emulate_media)
-    {timeout, native} = Keyword.split(Options.validate_action!(:emulate_media, options), [:timeout])
+    {timeout, native} = Options.split_action!(:emulate_media, options)
     page_action(session, :emulate_media, &PlaywrightEx.Page.emulate_media(&1, native), timeout)
   end
 
   defp page_action(session, operation, fun, options),
     do: Fluffy.__dispatch_driver__(session, :page_action, [operation, fun, options])
+
+  @doc false
+  def __page_input__(session, device, operation, options, fun) do
+    ensure_playwright_backend!(session, :browser_pointer_typing)
+    page_action(session, operation, &fun.(device.(&1)), options)
+  end
 
   @doc playwright_only: true
   @doc """

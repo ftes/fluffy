@@ -419,8 +419,8 @@ See [LiveView timing and keyboard events](capabilities.md#liveview-timing-and-ke
 `Fluffy.Playwright` wraps more of Playwright's actions, such as `dblclick`, `tap`,
 `dispatch_event`, `select_text`, `scroll_into_view_if_needed`, element `screenshot`,
 `set_viewport_size`, and `emulate_media`. `Fluffy.Playwright.Keyboard` and
-`Fluffy.Playwright.Mouse` send page-wide input. Each returns the session, adopts
-a navigation it causes, and raises `Fluffy.CapabilityError` on Phoenix:
+`Fluffy.Playwright.Mouse` send page-wide input. Each returns the session and
+raises `Fluffy.CapabilityError` on Phoenix:
 
 ```elixir
 alias Fluffy.Playwright
@@ -431,8 +431,15 @@ session
 |> Playwright.emulate_media(color_scheme: :dark)
 |> Playwright.dblclick(by_role(:cell, name: "Fluffy"))
 |> Keyboard.press("Enter")
+|> assert(visible(by_text("Fluffy's chamber")))
 |> Playwright.screenshot(by_css("table"), "tmp/creatures.png")
 ```
+
+As in Playwright, page-wide input and `dispatch_event` do not wait for a navigation
+they start: they can return before it commits, and an action right after them can
+act on the old page or before a LiveView connects. If the input navigates, assert
+something on the new page first, as above; the session adopts the new document
+then.
 
 `Fluffy.Playwright.tap/3` needs `browser_context: [has_touch: true]` and takes a
 required option list, so `import Fluffy.Playwright` leaves `Kernel.tap/2` usable.

@@ -396,6 +396,9 @@ defmodule Fluffy.Options do
   @spec validate_action!(atom(), keyword()) :: keyword()
   def validate_action!(action, options), do: NimbleOptions.validate!(options, action_schema(action))
 
+  @spec split_action!(atom(), keyword()) :: {keyword(), keyword()}
+  def split_action!(action, options), do: Keyword.split(validate_action!(action, options), [:timeout])
+
   @spec validate_expectation!(keyword()) :: keyword()
   def validate_expectation!(options), do: NimbleOptions.validate!(options, @expectation_schema)
 

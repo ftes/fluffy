@@ -3,10 +3,14 @@ defmodule Fluffy.Playwright.Keyboard do
   Page-wide keyboard input for Playwright sessions, after Playwright's `Keyboard`.
 
   Keys go to whatever has focus. To target an element, use `Fluffy.press/4` or
-  `Fluffy.Playwright.press_sequentially/4`. A navigation the input causes is
-  adopted, as after an action. Use it through `alias Fluffy.Playwright.Keyboard`;
-  the names are too generic to import. Phoenix sessions raise
-  `Fluffy.CapabilityError`.
+  `Fluffy.Playwright.press_sequentially/4`. Use it through
+  `alias Fluffy.Playwright.Keyboard`; the names are too generic to import. Phoenix
+  sessions raise `Fluffy.CapabilityError`.
+
+  Unlike `Fluffy.press/4`, these functions do not wait for a navigation the input
+  starts, as in Playwright: they can return before it commits, and the next action
+  can race it. If the input navigates, `expect` something on the new page before
+  the next action; the session adopts the new document then.
   """
 
   alias Fluffy.Options
@@ -28,7 +32,7 @@ defmodule Fluffy.Playwright.Keyboard do
   """
   @spec press(Session.t(), String.t(), [press_option()]) :: Session.t()
   def press(%Session{} = session, key, options \\ []) when is_binary(key) do
-    {timeout, native} = split_options(:keyboard_press, options)
+    {timeout, native} = Options.split_action!(:keyboard_press, options)
     input(session, :"Keyboard.press", timeout, &BrowserKeyboard.press(&1, key, native))
   end
 
@@ -44,7 +48,7 @@ defmodule Fluffy.Playwright.Keyboard do
   """
   @spec type(Session.t(), String.t(), [type_option()]) :: Session.t()
   def type(%Session{} = session, text, options \\ []) when is_binary(text) do
-    {timeout, native} = split_options(:keyboard_type, options)
+    {timeout, native} = Options.split_action!(:keyboard_type, options)
     input(session, :"Keyboard.type", timeout, &BrowserKeyboard.type(&1, text, native))
   end
 
@@ -72,11 +76,6 @@ defmodule Fluffy.Playwright.Keyboard do
     input(session, :"Keyboard.insert_text", Options.validate_action!(options), &BrowserKeyboard.insert_text(&1, text))
   end
 
-  defp split_options(action, options), do: Keyword.split(Options.validate_action!(action, options), [:timeout])
-
-  defp input(session, operation, options, fun) do
-    Fluffy.Playwright.__ensure_playwright_backend__!(session, :keyboard)
-    keyboard_fun = fn page -> fun.(PlaywrightEx.Page.keyboard(page)) end
-    Fluffy.__dispatch_driver__(session, :page_action, [operation, keyboard_fun, options])
-  end
+  defp input(session, operation, options, fun),
+    do: Fluffy.Playwright.__page_input__(session, &PlaywrightEx.Page.keyboard/1, operation, options, fun)
 end
