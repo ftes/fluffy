@@ -54,6 +54,16 @@ defmodule Fluffy.PlaywrightSessionTest do
     assert listeners.() == before
   end
 
+  test "a failed adopted document read keeps the page flagged as navigated" do
+    session = Fluffy.start_session(:playwright)
+    browser_page = PlaywrightEx.BrowserContext.new_page!(Session.context(session).browser_context)
+    state = PlaywrightBackend.page_record(browser_page).state
+    :ok = PlaywrightEx.Page.close!(browser_page)
+
+    assert_raise PlaywrightEx.TargetClosedError, fn -> Document.adopted_probe!(state, nil, 1_000) end
+    assert Document.navigated?(state)
+  end
+
   # Document probes retry on this message; guard it against driver rewording.
   test "a navigation during an evaluate reports the destroyed context Fluffy retries on" do
     session = :playwright |> Fluffy.start_session() |> Fluffy.visit("/stage")

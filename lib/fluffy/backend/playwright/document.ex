@@ -89,11 +89,19 @@ defmodule Fluffy.Backend.Playwright.Document do
 
   @doc """
   Like `probe!/3`, for a read whose document Fluffy then adopts. Clearing the
-  flag first misses no navigation that commits after the read.
+  flag first misses no navigation that commits after the read; a failed read
+  adopts nothing, so the flag stays set.
   """
   def adopted_probe!(state, cursor, timeout) do
-    :atomics.put(state.navigated, 1, 0)
-    probe!(state.frame, cursor, timeout)
+    navigated = :atomics.exchange(state.navigated, 1, 0)
+
+    try do
+      probe!(state.frame, cursor, timeout)
+    catch
+      kind, reason ->
+        if navigated == 1, do: :atomics.put(state.navigated, 1, 1)
+        :erlang.raise(kind, reason, __STACKTRACE__)
+    end
   end
 
   @doc """
