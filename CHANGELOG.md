@@ -9,6 +9,7 @@ Fluffy now runs on PlaywrightEx 0.17, a port of the official Playwright client w
 - Install the driver and browsers with `mix playwright_ex.install -- chromium`; drop the npm `playwright` package and the `assets_dir` config.
 - Playwright 1.65 is required. Its breaking changes apply: actions wait for an element to be not inert, and text the browser does not render is no longer part of accessible names.
 - Replace `js_logger:` with `log_browser_console: true | false`; `Fluffy.Playwright.ConsoleLogger` is removed and custom `PlaywrightEx.JsLogger` modules are not supported.
+- Browser `console.warn` messages log at `:warning` instead of `:info`.
 - `executable:` now names a Playwright driver executable instead of the npm `cli.js`; drop it if it pointed at npm `playwright`.
 - `unwrap/2` passes a `%PlaywrightEx.Page{}`; `Fluffy.Playwright.Handle` is removed.
 - `Fluffy.HTTPEvent` is replaced by `Fluffy.Request` and `Fluffy.Response` (`response.request` is the request).
