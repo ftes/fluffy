@@ -567,7 +567,8 @@ defmodule Fluffy.Driver.Live do
   # remaining timeout, as a Playwright locator retries on the page it finds.
   # A navigation found once no budget remains fails the action instead, as
   # Playwright never acts past its deadline, and leaves the navigation unread
-  # for the session's next call. Once an event reached the view, the action took effect, so a navigation a later
+  # for the session's next call. One whose following used up the budget fails
+  # it too, on the new page. Once an event reached the view, the action took effect, so a navigation a later
   # step finds ends the action on the new page instead, like a browser whose
   # page navigated mid-action. A redirect the view left since Fluffy last read
   # it is followed first, so an action that never calls the view, such as a
@@ -591,8 +592,12 @@ defmodule Fluffy.Driver.Live do
       end)
 
     case result do
-      {:retry_on_new_page, session, redirects} -> retry_on_new_page(session, redirects, operation, arguments, deadline)
-      result -> result
+      {:retry_on_new_page, session, redirects} ->
+        if Deadline.expired?(deadline), do: raise_navigated_away(operation, arguments)
+        retry_on_new_page(session, redirects, operation, arguments, deadline)
+
+      result ->
+        result
     end
   end
 
@@ -602,12 +607,7 @@ defmodule Fluffy.Driver.Live do
         {:navigate, session, navigation}
 
       {{session, navigation}, false} ->
-        if Deadline.expired?(deadline) do
-          raise Fluffy.ActionabilityError,
-            action: action_label(operation, arguments),
-            reason: :navigated_away,
-            locator: hd(arguments)
-        end
+        if Deadline.expired?(deadline), do: raise_navigated_away(operation, arguments)
 
         {session, redirects} = follow_for_retry(session, navigation)
         {:retry_on_new_page, session, redirects}
@@ -646,6 +646,13 @@ defmodule Fluffy.Driver.Live do
 
   defp put_timeout(%Expect{} = expectation, timeout), do: Expect.Internal.merge_options(expectation, timeout: timeout)
   defp put_timeout(options, timeout), do: Keyword.put(options, :timeout, timeout)
+
+  defp raise_navigated_away(operation, arguments) do
+    raise Fluffy.ActionabilityError,
+      action: action_label(operation, arguments),
+      reason: :navigated_away,
+      locator: hd(arguments)
+  end
 
   defp action_label(:set_checked, [_locator, desired, _options]), do: if(desired, do: :check, else: :uncheck)
   defp action_label(operation, _arguments), do: operation

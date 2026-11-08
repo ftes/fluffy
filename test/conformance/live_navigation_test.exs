@@ -399,22 +399,20 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
   end
 
   @tag driver: :phoenix
-  test "an action that follows a navigation counts the navigation toward its timeout" do
+  test "an action whose timeout following a navigation used up fails without acting on the new page" do
     session =
       :phoenix
       |> live_session()
       |> visit("/live/chamber-map?async=return-slow")
       |> await_unread_navigation(:phoenix, nil)
 
-    # Connecting the new view takes 600ms, longer than the action's timeout, so
-    # the action makes one attempt there without waiting for the form it
-    # renders 150ms after connecting.
-    error =
-      assert_raise Fluffy.OperationError, ~r/Map step/, fn ->
-        fill(session, by_label("Map step", exact: true), "lost", timeout: 300)
-      end
+    # Connecting the new view takes 600ms, longer than the action's timeout.
+    assert_raise Fluffy.OperationError, ~r/navigated away before the action reached it/, fn ->
+      click(session, by_role(:button, name: "Lull guardian", exact: true), timeout: 300)
+    end
 
-    refute Exception.message(error) =~ "navigated away"
+    # Clicking the button would have redirected to /chamber.
+    expect(session, Fluffy.Expect.page_to_have_url(&(&1.path == "/live/chamber-map" and &1.query =~ "delay=600")))
   end
 
   @tag driver: :phoenix
