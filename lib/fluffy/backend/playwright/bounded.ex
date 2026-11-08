@@ -28,8 +28,15 @@ defmodule Fluffy.Backend.Playwright.Bounded do
   defp stop(task, :kill), do: Task.shutdown(task, :brutal_kill)
   defp stop(task, :leave), do: Task.ignore(task)
 
-  @doc "Like `within/2` for a call returning `{:ok, value}` or `{:error, error}`; returns the value or raises."
-  def within!(timeout, operation, fun) do
+  @doc """
+  Like `within/2` for a call returning `{:ok, value}` or `{:error, error}`; returns the value or raises.
+
+  On timeout it runs the `after_timeout:` function, if any, then raises with
+  `message:` or a default naming `operation`.
+  """
+  def within!(timeout, operation, fun, options \\ []) do
+    options = Keyword.validate!(options, [:message, after_timeout: fn -> :ok end])
+
     case within(timeout, fun) do
       {:ok, {:ok, value}} ->
         value
@@ -38,8 +45,11 @@ defmodule Fluffy.Backend.Playwright.Bounded do
         raise error
 
       :timeout ->
-        raise "Playwright #{operation} did not finish within #{timeout}ms; " <>
-                "it may never settle, or a script may be blocking the page's main thread"
+        options[:after_timeout].()
+
+        raise options[:message] ||
+                "Playwright #{operation} did not finish within #{timeout}ms; " <>
+                  "it may never settle, or a script may be blocking the page's main thread"
     end
   end
 end

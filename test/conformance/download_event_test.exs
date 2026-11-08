@@ -185,7 +185,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
   end
 
   @tag driver: :playwright, tmp_dir: true
-  test "reading or saving a download that never completes raises after the session timeout", %{tmp_dir: tmp_dir} do
+  test "saving a download that never completes cancels it and raises after the session timeout", %{tmp_dir: tmp_dir} do
     owner = self()
 
     fixture =
@@ -220,14 +220,16 @@ defmodule Fluffy.Conformance.DownloadEventTest do
 
     try do
       download = await(pending)
+      destination = Path.join(tmp_dir, "copy.txt")
 
-      assert_raise RuntimeError, ~r/did not complete within the session's timeout of 500ms/, fn ->
-        Download.read!(download)
+      assert_raise RuntimeError, ~r/did not complete within the session's timeout of 500ms and was canceled/, fn ->
+        Download.save_as!(download, destination)
       end
 
-      assert_raise RuntimeError, ~r/did not complete within the session's timeout of 500ms/, fn ->
-        Download.save_as!(download, Path.join(tmp_dir, "copy.txt"))
-      end
+      send(server, :finish)
+      assert unwrap(download, &PlaywrightEx.Download.failure/1) == {:ok, "canceled"}
+      refute File.exists?(destination)
+      assert_raise PlaywrightEx.PlaywrightError, ~r/canceled/, fn -> Download.read!(download) end
     after
       send(server, :finish)
     end

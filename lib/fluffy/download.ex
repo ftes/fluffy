@@ -4,9 +4,9 @@ defmodule Fluffy.Download do
 
   `suggested_filename`, `url` and `page` are available to event predicates. Read
   or save the contents separately; those operations wait for completion and raise
-  on download failure. On Playwright, they raise once the session's `timeout:`
-  passes without completion, as for an interrupted download on Firefox, which
-  never completes. Handles belong to their session; saved files outlive it. On Playwright, reach the `PlaywrightEx.Download` with
+  on download failure. On Playwright, they cancel the download and raise once the
+  session's `timeout:` passes without completion, as for an interrupted download
+  on Firefox, which never completes. Handles belong to their session; saved files outlive it. On Playwright, reach the `PlaywrightEx.Download` with
   `Fluffy.unwrap/2`.
   """
 
@@ -56,20 +56,20 @@ defmodule Fluffy.Download do
 
   defp save_source!(%{body: bytes}, destination, _context) when is_binary(bytes), do: File.write!(destination, bytes)
 
-  # Playwright waits for completion without a timeout of its own.
+  # Playwright waits for completion without a timeout of its own. A save left
+  # pending would still write the file once the download completes, so a timeout
+  # cancels the download.
   defp save_source!(%{native: %PlaywrightEx.Download{} = native}, destination, %{timeout: timeout}) do
-    case Bounded.within(timeout, fn -> PlaywrightEx.Download.save_as(native, destination) end) do
-      {:ok, :ok} ->
-        :ok
-
-      {:ok, {:error, error}} ->
-        raise error
-
-      :timeout ->
-        raise "the download did not complete within the session's timeout of #{timeout}ms; " <>
-                "its response may never end, or the browser may have stopped it (Firefox never " <>
-                "completes an interrupted download)"
-    end
+    Bounded.within!(
+      timeout,
+      :save_as,
+      fn -> with :ok <- PlaywrightEx.Download.save_as(native, destination), do: {:ok, :ok} end,
+      after_timeout: fn -> Bounded.within(timeout, fn -> PlaywrightEx.Download.cancel(native) end) end,
+      message:
+        "the download did not complete within the session's timeout of #{timeout}ms and was canceled; " <>
+          "its response may never end, or the browser may have stopped it (Firefox never " <>
+          "completes an interrupted download)"
+    )
   end
 
   defp check_size!(size, limit) when size > limit do
