@@ -70,6 +70,15 @@ defmodule Fluffy.Conformance.BrowserAPITest do
 
     session = Playwright.add_cookies(session, [%{name: "token", value: "abc", url: url, httpOnly: true, sameSite: "Lax"}])
     assert [%{name: "token", httpOnly: true, sameSite: "Lax"}] = Playwright.cookies(session)
+    assert [%{name: "token"}] = Playwright.cookies(session, [url])
+
+    # Fluffy 0.8 options would reach Playwright as URLs.
+    for options <- [[urls: [url]], [timeout: 1_000]] do
+      assert_raise ArgumentError, ~r/cookies\/2 takes the URL list, not the options/, fn ->
+        Playwright.cookies(session, options)
+      end
+    end
+
     assert %{cookies: [%{httpOnly: true}], origins: _origins} = Playwright.storage_state(session)
 
     # Playwright would drop these silently.

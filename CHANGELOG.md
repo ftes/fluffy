@@ -14,7 +14,7 @@ Fluffy now runs on PlaywrightEx 0.17, a port of the official Playwright client w
 - `unwrap/2` passes a `%PlaywrightEx.Page{}`; `Fluffy.Playwright.Handle` is removed.
 - `Fluffy.HTTPEvent` is replaced by `Fluffy.Request` and `Fluffy.Response` (`response.request` is the request).
 - `Fluffy.Playwright.evaluate(session, expression, arg \\ nil)` replaces the `is_function:`, `arg:` and `timeout:` options, which now raise `ArgumentError`, and raises after the session's `timeout:`; JavaScript `null` returns `:null`.
-- `Fluffy.Playwright.cookies(session, urls)` takes the URL list directly.
+- `Fluffy.Playwright.cookies(session, urls)` takes the URL list directly; the `urls:` and `timeout:` options now raise `ArgumentError`.
 - Cookie maps of `add_cookies/2` and `cookies/2` use Playwright's camelCase atom keys: `%{name: "a", value: "b", url: url, http_only: true}` becomes `%{name: "a", value: "b", url: url, httpOnly: true}`, likewise `sameSite:` and `partitionKey:`; `add_cookies/2` raises on the old keys. `storage_state/2` returns atom keys instead of strings: `state["cookies"]` becomes `state.cookies`, likewise `:origins`, `:localStorage` and `:httpOnly`. Saved state files and string-keyed maps still load.
 - `browser_context:`, `launch_options:`, and the options of `screenshot`, `storage_state`, cookies and `trace` pass through to PlaywrightEx, which validates them.
 - `go_back`/`go_forward`, `hover`, `drag_to` and `press_sequentially` accept the options of their PlaywrightEx call except `no_wait_after:` and `signal:`, which would bypass navigation tracking.

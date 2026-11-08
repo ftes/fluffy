@@ -384,8 +384,19 @@ defmodule Fluffy.Playwright do
   @doc "Returns browser cookies, optionally only those for `urls`. See `PlaywrightEx.BrowserContext.cookies/2`."
   @spec cookies(Session.t(), String.t() | [String.t()] | nil) :: [map()]
   def cookies(session, urls \\ nil) do
+    reject_cookies_options!(urls)
     session |> browser_context!(:cookies) |> BrowserContext.cookies!(urls)
   end
+
+  # Fluffy 0.8 took `cookies(session, urls: [...], timeout: ...)`; such a list
+  # would now reach Playwright as the URLs.
+  defp reject_cookies_options!([{key, _value} | _] = options) when is_atom(key) do
+    raise ArgumentError,
+          "cookies/2 takes the URL list, not the options #{inspect(Keyword.keys(options))}; " <>
+            "call cookies(session, urls): the call is bounded by the session's timeout:"
+  end
+
+  defp reject_cookies_options!(_urls), do: :ok
 
   @doc playwright_only: true
   @doc """
