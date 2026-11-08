@@ -120,6 +120,10 @@ defmodule Fluffy.MixProject do
           Fluffy.Request,
           Fluffy.Response,
           Fluffy.Frame,
+          Fluffy.ConsoleMessage,
+          Fluffy.PageError,
+          Fluffy.Worker,
+          Fluffy.WebSocket,
           Fluffy.Event.Pending
         ],
         "Capabilities and errors": [

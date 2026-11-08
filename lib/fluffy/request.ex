@@ -1,7 +1,8 @@
 defmodule Fluffy.Request do
   @moduledoc """
-  A browser request delivered by `Fluffy.Event.request/1`, and as the request of
-  a `Fluffy.Response`.
+  A browser request delivered by `Fluffy.Event.request/1`,
+  `Fluffy.Event.request_failed/1` and `Fluffy.Event.request_finished/1`, and as
+  the request of a `Fluffy.Response`.
 
   Fields follow Playwright's `Request` accessors. `headers` has lowercase names.
   `post_data` is the buffered request body, as raw bytes (`postDataBuffer`), or

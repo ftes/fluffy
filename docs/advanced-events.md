@@ -205,8 +205,8 @@ handlers and waits can observe the same dialog; ensure only one handler resolves
 Request and response events require Playwright. Page scope, the default, includes
 child frames; `scope: :context` observes all pages, including a popup's first request.
 Sources remain bound when switching pages. Use the same source and scope for `off`.
-Other events reject `scope:`: page events always observe the context, while popup, close,
-download, dialog, chooser, and frame-navigation events bind to the selected page.
+`request_failed` and `request_finished` take the same scope. Other events reject `scope:`:
+page events always observe the context, while all others bind to the selected page.
 
 ```elixir
 session
@@ -235,6 +235,43 @@ assert Response.json(response) == %{"saved" => true}
 `post_data_json/1`, `failure/1`, `redirected_from/1` and `redirected_to/1`. These
 readers raise once the session is closed or after its `timeout:`. Timing, sizes,
 security details and the server address stay on the native value.
+
+`Event.request_failed()` and `Event.request_finished()` resolve with the
+`Fluffy.Request` once it fails or its response body has downloaded. An HTTP error
+status is a finished request, not a failed one. Read the reason with
+`Request.failure/1`:
+
+```elixir
+%{errorText: reason} = Request.failure(request)
+```
+
+## Console, page errors, and page lifecycle
+
+These events require Playwright and observe the page selected at registration,
+including its child frames.
+
+```elixir
+session
+|> assert_event(
+  Event.console(&(&1.type == "error")),
+  &click(&1, by_role(:button, name: "Refresh")),
+  fn message -> assert message.text =~ "stale report" end
+)
+```
+
+`Event.console()` resolves with a `Fluffy.ConsoleMessage` (`type`, `text`, `location`,
+`timestamp`, `page`) and `Event.page_error()` with a `Fluffy.PageError` for an uncaught
+exception (`name`, `message`, `stack`, `page`). Waits and listeners do not affect
+`log_browser_console`: messages are logged as well.
+
+`Event.worker()` resolves with a `Fluffy.Worker` and `Event.web_socket()` with a
+`Fluffy.WebSocket`, each with its `url` and `page`; `unwrap/2` reaches the native value
+for evaluating in a worker or listening to a socket's frames.
+
+`Event.dom_content_loaded()` and `Event.load()` resolve with the `Fluffy.Page` when that
+page's document reaches those states, and `Event.crash()` when it crashes. A crash fails
+the page's other waits, except `Event.close()`. `Event.frame_attached()` and `Event.frame_detached()` resolve
+with a `Fluffy.Frame`, like `Event.frame_navigated()`.
 
 ## File choosers
 
@@ -278,5 +315,7 @@ These actions require Playwright and reconcile navigation caused by the action.
 Event values keep their PlaywrightEx counterpart private. `Fluffy.unwrap/2` passes
 it to a callback and returns the callback's result, for members Fluffy does not
 wrap: `PlaywrightEx.Request`, `PlaywrightEx.Response`, `PlaywrightEx.Dialog`,
-`PlaywrightEx.Download`, `PlaywrightEx.FileChooser`, and `PlaywrightEx.Frame`.
-Phoenix downloads have none and raise `Fluffy.CapabilityError`.
+`PlaywrightEx.Download`, `PlaywrightEx.FileChooser`, `PlaywrightEx.Frame`,
+`PlaywrightEx.ConsoleMessage`, `PlaywrightEx.Worker`, and `PlaywrightEx.WebSocket`,
+and the PlaywrightEx exception of a page error. Phoenix downloads have none and raise
+`Fluffy.CapabilityError`.

@@ -29,7 +29,18 @@ defmodule Fluffy do
   alias Fluffy.SelectedFile
   alias Fluffy.Session
 
-  @native_values [Fluffy.Request, Fluffy.Response, Fluffy.Dialog, Fluffy.Download, Fluffy.FileChooser, Fluffy.Frame]
+  @native_values [
+    Fluffy.Request,
+    Fluffy.Response,
+    Fluffy.Dialog,
+    Fluffy.Download,
+    Fluffy.FileChooser,
+    Fluffy.Frame,
+    Fluffy.ConsoleMessage,
+    Fluffy.PageError,
+    Fluffy.Worker,
+    Fluffy.WebSocket
+  ]
 
   @typedoc "A browser value that `unwrap/2` resolves to its PlaywrightEx counterpart."
   @type native_value ::
@@ -39,6 +50,10 @@ defmodule Fluffy do
           | Fluffy.Download.t()
           | Fluffy.FileChooser.t()
           | Fluffy.Frame.t()
+          | Fluffy.ConsoleMessage.t()
+          | Fluffy.PageError.t()
+          | Fluffy.Worker.t()
+          | Fluffy.WebSocket.t()
 
   @doc group: "Lifecycle and navigation"
   @doc """
@@ -194,8 +209,10 @@ defmodule Fluffy do
   locator instead.
 
   With a `Fluffy.Request`, `Fluffy.Response`, `Fluffy.Dialog`,
-  `Fluffy.Download`, `Fluffy.FileChooser` or `Fluffy.Frame`, `fun` receives
-  its PlaywrightEx counterpart and `unwrap/2` returns the callback's result.
+  `Fluffy.Download`, `Fluffy.FileChooser`, `Fluffy.Frame`,
+  `Fluffy.ConsoleMessage`, `Fluffy.PageError`, `Fluffy.Worker` or
+  `Fluffy.WebSocket`, `fun` receives its PlaywrightEx counterpart and
+  `unwrap/2` returns the callback's result.
   A Phoenix download has none and raises `Fluffy.CapabilityError`.
 
       address = unwrap(response, &PlaywrightEx.Response.server_addr!/1)

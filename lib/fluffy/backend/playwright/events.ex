@@ -1,18 +1,24 @@
 defmodule Fluffy.Backend.Playwright.Events do
   @moduledoc false
 
+  import Fluffy.Event, only: [is_network_type: 1]
+
   alias Fluffy.Backend.Playwright.Listeners
+  alias Fluffy.ConsoleMessage
   alias Fluffy.Dialog
   alias Fluffy.Download
   alias Fluffy.FileChooser
   alias Fluffy.Page
+  alias Fluffy.PageError
   alias Fluffy.Session
   alias Fluffy.SessionRuntime
+  alias Fluffy.WebSocket
+  alias Fluffy.Worker
   alias PlaywrightEx.BrowserContext
   alias PlaywrightEx.Page, as: BrowserPage
 
   def event_source(session, type, scope) do
-    if type == :page or (type in [:request, :response] and scope == :context) do
+    if type == :page or (is_network_type(type) and scope == :context) do
       Session.context(session)
       :context
     else
@@ -34,7 +40,7 @@ defmodule Fluffy.Backend.Playwright.Events do
 
         page_id ->
           page = Page.record(Page.new(session.runtime, page_id)).state.page
-          [{BrowserPage, page, type}, {BrowserPage, page, :crash}]
+          Enum.uniq([{BrowserPage, page, type}, {BrowserPage, page, :crash}])
       end
 
     listeners =
@@ -46,10 +52,20 @@ defmodule Fluffy.Backend.Playwright.Events do
     unsubscribe = fn -> Listeners.release(listeners) end
 
     decode = fn
-      {:source_closed, _reason} when type == :close -> {:ok, Page.new(session.runtime, source)}
-      {:fluffy_playwright_event, :crash, _page} -> {:error, "event source crashed"}
-      {:fluffy_playwright_event, _event, native} -> {:ok, value(session, type, native)}
-      _message -> :ignore
+      {:source_closed, _reason} when type == :close ->
+        {:ok, Page.new(session.runtime, source)}
+
+      {:fluffy_playwright_event, :crash, _page} when type != :crash ->
+        {:error, "event source crashed"}
+
+      {:fluffy_playwright_event, _event, native} when type in [:page_error, :worker, :web_socket] ->
+        {:ok, source_value(session, type, source, native)}
+
+      {:fluffy_playwright_event, _event, native} ->
+        {:ok, value(session, type, native)}
+
+      _message ->
+        :ignore
     end
 
     {decode, unsubscribe}
@@ -69,7 +85,8 @@ defmodule Fluffy.Backend.Playwright.Events do
     }
   end
 
-  defp value(session, type, browser_page) when type in [:page, :popup], do: page_handle(session, browser_page)
+  defp value(session, type, browser_page) when type in [:page, :popup, :load, :dom_content_loaded, :crash],
+    do: page_handle(session, browser_page)
 
   defp value(session, :dialog, dialog) do
     %Dialog{
@@ -89,11 +106,12 @@ defmodule Fluffy.Backend.Playwright.Events do
     }
   end
 
-  defp value(session, :frame_navigated, frame) do
+  defp value(session, type, frame) when type in [:frame_navigated, :frame_attached, :frame_detached] do
     Fluffy.Frame.new(page_handle(session, PlaywrightEx.Frame.page(frame)), frame)
   end
 
-  defp value(session, :request, request), do: request(session, request)
+  defp value(session, type, request) when type in [:request, :request_failed, :request_finished],
+    do: request(session, request)
 
   defp value(session, :response, response) do
     %Fluffy.Response{
@@ -104,6 +122,36 @@ defmodule Fluffy.Backend.Playwright.Events do
       request: request(session, PlaywrightEx.Response.request(response)),
       native: response
     }
+  end
+
+  defp value(session, :console, message) do
+    %ConsoleMessage{
+      type: PlaywrightEx.ConsoleMessage.type(message),
+      text: PlaywrightEx.ConsoleMessage.text(message),
+      location: PlaywrightEx.ConsoleMessage.location(message),
+      timestamp: PlaywrightEx.ConsoleMessage.timestamp(message),
+      page: message |> PlaywrightEx.ConsoleMessage.page() |> optional_page_handle(session),
+      native: message
+    }
+  end
+
+  # These upstream values do not name their page, which is the event's source.
+  defp source_value(session, :page_error, source, error) when is_exception(error) do
+    %PageError{
+      name: error.name,
+      message: Exception.message(error),
+      stack: error.stack,
+      page: Page.new(session.runtime, source),
+      native: error
+    }
+  end
+
+  defp source_value(session, :worker, source, worker) do
+    %Worker{url: PlaywrightEx.Worker.url(worker), page: Page.new(session.runtime, source), native: worker}
+  end
+
+  defp source_value(session, :web_socket, source, web_socket) do
+    %WebSocket{url: PlaywrightEx.WebSocket.url(web_socket), page: Page.new(session.runtime, source), native: web_socket}
   end
 
   # Also builds the redirects of a `Fluffy.Request`, which has only the runtime.

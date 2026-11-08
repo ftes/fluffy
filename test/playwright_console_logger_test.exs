@@ -75,5 +75,30 @@ defmodule Fluffy.PlaywrightConsoleLoggerTest do
     assert log =~ "4242"
   end
 
+  test "logs what a listener or wait on the same page also observes" do
+    session = start_session(:playwright, base_url: Fluffy.TestServer.base_url())
+    owner = self()
+    on(session, Event.console(), fn message -> send(owner, {:console, message.text}) end)
+    console = wait_for(session, Event.console(&(&1.text == "heard message")))
+    page_error = wait_for(session, Event.page_error())
+
+    log =
+      capture_log(fn ->
+        Playwright.evaluate(
+          session,
+          "console.error('heard message'); setTimeout(() => { throw new Error('heard failure') }, 0); 1"
+        )
+
+        assert await(console).text == "heard message"
+        assert await(page_error).message =~ "heard failure"
+        assert_receive {:console, "heard message"}
+        # The runtime logs after the listeners it shares the event with.
+        Process.sleep(100)
+      end)
+
+    assert log =~ "heard message"
+    assert log =~ "heard failure"
+  end
+
   defp html(body), do: "<!doctype html><html><body>#{body}</body></html>"
 end
