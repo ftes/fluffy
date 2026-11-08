@@ -211,7 +211,7 @@ defmodule Fluffy.Conformance.NetworkEventTest do
 
     pending = wait_for(session, Event.response(&String.ends_with?(&1.url, "/stream")))
     click(session, by_role(:button, name: "Fetch"))
-    assert_receive {:stream, server}
+    assert_receive {:stream, server}, Fluffy.Session.timeout(session)
 
     try do
       assert await(pending).status == 200

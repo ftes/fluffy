@@ -9,8 +9,6 @@ defmodule Fluffy.Conformance.FileInputActionTest do
   alias Fluffy.Playwright
   alias Fluffy.TestHTTPFixtures
 
-  @chromium? Application.compile_env!(:fluffy, :playwright)[:engine] == :chromium
-
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
     test "selects one local file and submits its multipart part with #{driver}" do
@@ -504,7 +502,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
   for driver <- [:static, :playwright] do
     @tag driver: driver
     @tag skip:
-           if(driver == :playwright and not @chromium?,
+           if(driver == :playwright and not playwright_engine?(:chromium),
              do:
                "Playwright checks only for an <input>; the file type is enforced by Chromium's " <>
                  "DOM.setFileInputFiles, while Firefox and WebKit accept a text input without error"

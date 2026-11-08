@@ -5,9 +5,23 @@
   ],
   "enabledManagers": [
     "mix",
-    "npm",
     "github-actions",
-    "asdf"
+    "asdf",
+    "custom.regex"
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "The esbuild binary that bundles the test assets",
+      "managerFilePatterns": [
+        "/^config/config\\.exs$/"
+      ],
+      "matchStrings": [
+        "config :esbuild,\\s+version: \"(?<currentValue>[^\"]+)\""
+      ],
+      "depNameTemplate": "esbuild",
+      "datasourceTemplate": "npm"
+    }
   ],
   "timezone": "Europe/Berlin",
   "schedule": [
@@ -21,30 +35,11 @@
   ],
   "packageRules": [
     {
-      "description": "Keep runtime updates together, including pnpm's packageManager pin",
+      "description": "Keep runtime updates together",
       "matchManagers": [
         "asdf"
       ],
       "groupName": "toolchain"
-    },
-    {
-      "matchManagers": [
-        "npm"
-      ],
-      "matchDepTypes": [
-        "packageManager"
-      ],
-      "groupName": "toolchain"
-    },
-    {
-      "description": "The minimum supported Node version is a compatibility decision",
-      "matchManagers": [
-        "npm"
-      ],
-      "matchDepTypes": [
-        "engines"
-      ],
-      "enabled": false
     },
     {
       "description": "Preserve Elixir's OTP build compatibility suffix",

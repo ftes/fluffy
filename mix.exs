@@ -73,6 +73,7 @@ defmodule Fluffy.MixProject do
       {:styler, "~> 1.12", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+      {:esbuild, "~> 0.10.1", only: [:dev, :test], runtime: false},
       {:bandit, "~> 1.0", only: :test},
       {:postgrex, ">= 0.22.0 and < 1.0.0", only: :test}
     ]
@@ -144,12 +145,11 @@ defmodule Fluffy.MixProject do
     [
       setup: [
         "deps.get",
-        "cmd pnpm install --frozen-lockfile",
         "assets.build",
         "playwright_ex.install -- chromium"
       ],
       "consumer.regenerate": "run --no-start integration/regenerate_consumer.exs",
-      "assets.build": ["cmd pnpm run build:test"],
+      "assets.build": ["esbuild.install --if-missing", "esbuild test_browser"],
       lint: [
         "format --check-formatted",
         # Compiles strictly first: the generator's own compile would satisfy it.

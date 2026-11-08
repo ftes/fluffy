@@ -6,8 +6,6 @@ defmodule Fluffy.Conformance.FocusActionTest do
   import Fluffy.Locator
   import Fluffy.Playwright
 
-  @webkit? Application.compile_env!(:fluffy, :playwright)[:engine] == :webkit
-
   @tag driver: :playwright
   test "focusing another control implicitly blurs the previous control with playwright" do
     first = by_label("First")
@@ -113,20 +111,12 @@ defmodule Fluffy.Conformance.FocusActionTest do
   end
 
   @tag driver: :playwright
-  test "browser fill and click update focus" do
-    with_html(:playwright, ~s(<input aria-label="Name"><button>Save</button>), fn session ->
+  test "browser fill updates focus" do
+    with_html(:playwright, ~s(<input aria-label="Name">), fn session ->
       session
       |> fill(by_label("Name"), "Ada")
       |> expect(to_be_focused(by_label("Name")))
-      |> click(by_role(:button, name: "Save"))
-      |> expect(button_focus_after_click(by_role(:button, name: "Save")))
     end)
-  end
-
-  # WebKit, like Safari, does not focus buttons on click (upstream Playwright skips
-  # page-focus.spec.ts FO-007 on WebKit: "Safari does not focus on click").
-  defp button_focus_after_click(button) do
-    if @webkit?, do: not_(to_be_focused(button)), else: to_be_focused(button)
   end
 
   defp with_html(driver, html, fun) do

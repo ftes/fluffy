@@ -19,6 +19,7 @@ defmodule Fluffy.Conformance.PageEventTest do
       other = await(other_wait)
       pending = wait_for(session, apply(Event, unquote(event_type), []))
       session |> switch_page(other) |> click(by_role(:link, name: "Unrelated", exact: true))
+      await_pages(session, &(length(&1) >= 3))
       click(session, by_role(:link, name: "Details", exact: true))
       captured = await(pending)
 
@@ -91,7 +92,8 @@ defmodule Fluffy.Conformance.PageEventTest do
     Task.await(holder)
     popup = await(popup_wait)
     assert await(page_wait) == popup
-    refute popup in pages(session)
+    # The opener can see a popup closed before the driver reports it.
+    await_pages(session, &(popup not in &1))
     assert_raise ArgumentError, ~r/is closed/, fn -> Page.url(popup) end
   end
 
@@ -155,6 +157,7 @@ defmodule Fluffy.Conformance.PageEventTest do
     {session, fixture} = browser_session()
     pending = wait_for(session, Event.popup())
     click(session, by_role(:link, name: "Redirect", exact: true))
+    await_pages(session, &(length(&1) >= 2))
     click(session, by_role(:link, name: "Other", exact: true))
 
     session
@@ -209,13 +212,15 @@ defmodule Fluffy.Conformance.PageEventTest do
           "/slow" ->
             %{
               stream: fn conn ->
-                {:ok, conn} = Plug.Conn.chunk(conn, "<!doctype html><html><body><h1>Loading</h1>")
+                {:ok, conn} =
+                  Plug.Conn.chunk(conn, "<!doctype html><html><body><h1>Loading</h1>" <> TestHTTPFixtures.sniff_padding())
+
                 send(owner, {:stream, self()})
 
                 receive do
                   :finish -> :ok
                 after
-                  5_000 -> :ok
+                  30_000 -> :ok
                 end
 
                 {:ok, conn} = Plug.Conn.chunk(conn, "<p>Loaded</p></body></html>")
@@ -232,7 +237,9 @@ defmodule Fluffy.Conformance.PageEventTest do
 
     pending = wait_for(session, Event.popup())
     click(session, by_role(:link, name: "Open"))
-    assert_receive {:stream, server}
+    # WebKit requests the popup's document only after Playwright initialized the new page, so
+    # wait as long as the popup wait itself may.
+    assert_receive {:stream, server}, Fluffy.Session.timeout(session)
 
     try do
       page = await(pending)
@@ -241,6 +248,25 @@ defmodule Fluffy.Conformance.PageEventTest do
       session |> switch_page(page) |> expect("Loaded" |> by_text() |> to_be_visible())
     after
       send(server, :finish)
+    end
+  end
+
+  # A click returns before its popup exists and the popups of separate clicks
+  # can appear in either order, so a test that relies on their order waits for
+  # the first before the next click.
+  defp await_pages(session, condition, attempts \\ 1_500) do
+    pages = pages(session)
+
+    cond do
+      condition.(pages) ->
+        :ok
+
+      attempts == 0 ->
+        flunk("the session's pages never met the condition: #{inspect(pages)}")
+
+      true ->
+        Process.sleep(10)
+        await_pages(session, condition, attempts - 1)
     end
   end
 

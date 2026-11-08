@@ -136,6 +136,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
   @tag driver: :playwright
   test "download metadata is available before completion, while read waits for the bytes" do
     owner = self()
+    first = "first" <> TestHTTPFixtures.sniff_padding()
 
     fixture =
       TestHTTPFixtures.register(fn request ->
@@ -147,13 +148,13 @@ defmodule Fluffy.Conformance.DownloadEventTest do
             %{
               headers: [{"content-disposition", "attachment; filename=slow.txt"}],
               stream: fn conn ->
-                {:ok, conn} = Plug.Conn.chunk(conn, "first")
+                {:ok, conn} = Plug.Conn.chunk(conn, first)
                 send(owner, {:stream, self()})
 
                 receive do
                   :finish -> :ok
                 after
-                  5_000 -> :ok
+                  30_000 -> :ok
                 end
 
                 {:ok, conn} = Plug.Conn.chunk(conn, "last")
@@ -170,7 +171,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
 
     pending = wait_for(session, Event.download())
     click(session, by_role(:link, name: "Download"))
-    assert_receive {:stream, server}
+    assert_receive {:stream, server}, Fluffy.Session.timeout(session)
 
     try do
       download = await(pending)
@@ -178,7 +179,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
       reader = Task.async(fn -> Download.read!(download) end)
       assert Task.yield(reader, 20) == nil
       send(server, :finish)
-      assert Task.await(reader) == "firstlast"
+      assert Task.await(reader) == first <> "last"
     after
       send(server, :finish)
     end
@@ -198,7 +199,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
             %{
               headers: [{"content-disposition", "attachment; filename=endless.txt"}],
               stream: fn conn ->
-                {:ok, conn} = Plug.Conn.chunk(conn, "first")
+                {:ok, conn} = Plug.Conn.chunk(conn, "first" <> TestHTTPFixtures.sniff_padding())
                 send(owner, {:stream, self()})
 
                 receive do
@@ -214,9 +215,10 @@ defmodule Fluffy.Conformance.DownloadEventTest do
       |> start_session(base_url: Fluffy.TestServer.base_url(), timeout: 500)
       |> visit(TestHTTPFixtures.path(fixture, "/start"))
 
-    pending = wait_for(session, Event.download())
-    click(session, by_role(:link, name: "Download"))
-    assert_receive {:stream, server}
+    # Only saving is bound by the short session timeout; starting the download is not.
+    pending = wait_for(session, Event.download(), timeout: 15_000)
+    click(session, by_role(:link, name: "Download"), timeout: 15_000)
+    assert_receive {:stream, server}, 15_000
 
     try do
       download = await(pending)
@@ -237,7 +239,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
 
   @tag driver: :playwright, tmp_dir: true, capture_log: true
   @tag skip:
-         if(Application.compile_env!(:fluffy, :playwright)[:engine] == :firefox,
+         if(playwright_engine?(:firefox),
            do: "Firefox never completes or fails an interrupted download"
          )
   test "failed downloads expose metadata but raise when reading or saving", %{tmp_dir: tmp_dir} do
@@ -253,13 +255,13 @@ defmodule Fluffy.Conformance.DownloadEventTest do
             %{
               headers: [{"content-disposition", "attachment; filename=broken.txt"}],
               stream: fn conn ->
-                {:ok, _conn} = Plug.Conn.chunk(conn, "partial")
+                {:ok, _conn} = Plug.Conn.chunk(conn, "partial" <> TestHTTPFixtures.sniff_padding())
                 send(owner, {:stream, self()})
 
                 receive do
                   :abort -> exit(:shutdown)
                 after
-                  5_000 -> exit(:shutdown)
+                  30_000 -> exit(:shutdown)
                 end
               end
             }
@@ -273,7 +275,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
 
     pending = wait_for(session, Event.download())
     click(session, by_role(:link, name: "Download"))
-    assert_receive {:stream, server}
+    assert_receive {:stream, server}, Fluffy.Session.timeout(session)
     download = await(pending)
     assert download.suggested_filename == "broken.txt"
     send(server, :abort)
