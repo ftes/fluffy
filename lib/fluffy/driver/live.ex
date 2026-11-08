@@ -13,6 +13,7 @@ defmodule Fluffy.Driver.Live do
   alias Fluffy.Driver.Live.Document
   alias Fluffy.Driver.Live.Event
   alias Fluffy.Driver.Live.Retry
+  alias Fluffy.Driver.Live.TakenMessages
   alias Fluffy.Driver.Live.UploadState
   alias Fluffy.Expect
   alias Fluffy.Form
@@ -552,11 +553,18 @@ defmodule Fluffy.Driver.Live do
   # took effect, so a navigation a later step finds ends the action on the new
   # page instead, like a browser whose page navigated mid-action. A redirect
   # the view left since Fluffy last read it is followed first, so an action that
-  # never calls the view, such as a plain link, acts on the new page too.
+  # never calls the view, such as a plain link, acts on the new page too. A
+  # failed action leaves its session on that page with the navigation unread.
   defp act(session, operation, locator, options, action) do
     deadline = Retry.deadline(session, Keyword.validate!(options, [:timeout]))
-    {result, delivered?} = Delivery.track(fn -> unread_redirect(session) || action.(deadline) end)
 
+    TakenMessages.track(fn ->
+      {result, delivered?} = Delivery.track(fn -> unread_redirect(session) || action.(deadline) end)
+      finish_action(result, delivered?, operation, locator, deadline)
+    end)
+  end
+
+  defp finish_action(result, delivered?, operation, locator, deadline) do
     case {navigation_found(result), delivered?} do
       {{session, navigation}, true} ->
         {:navigate, session, navigation}
@@ -600,7 +608,9 @@ defmodule Fluffy.Driver.Live do
 
   defp live_view_event(watcher, wait) do
     receive do
-      {:fluffy_live_view, ^watcher, event} -> event
+      {:fluffy_live_view, ^watcher, event} = message ->
+        TakenMessages.record(message)
+        event
     after
       wait -> :none
     end
@@ -612,13 +622,16 @@ defmodule Fluffy.Driver.Live do
     watcher = state.watcher
 
     receive do
-      {^reference, {:patch, ^topic, %{to: destination}}} ->
+      {^reference, {:patch, ^topic, %{to: destination}}} = message ->
+        TakenMessages.record(message)
         {:navigate, session, Navigation.patch(destination, state)}
 
-      {:fluffy_live_view, ^watcher, {:died, reason}} ->
+      {:fluffy_live_view, ^watcher, {:died, reason}} = message ->
+        TakenMessages.record(message)
         raise Fluffy.LiveViewError, reason: reason
 
-      {:fluffy_live_view, ^watcher, {:redirect, redirect}} ->
+      {:fluffy_live_view, ^watcher, {:redirect, redirect}} = message ->
+        TakenMessages.record(message)
         follow_redirect_result(session, {:error, redirect})
     after
       wait -> session
@@ -714,7 +727,9 @@ defmodule Fluffy.Driver.Live do
     %{proxy: {reference, topic, _}} = view
 
     receive do
-      {^reference, {:patch, ^topic, %{to: destination}}} -> destination
+      {^reference, {:patch, ^topic, %{to: destination}}} = message ->
+        TakenMessages.record(message)
+        destination
     after
       0 -> nil
     end
@@ -724,7 +739,8 @@ defmodule Fluffy.Driver.Live do
     %{proxy: {reference, topic, _}} = view
 
     receive do
-      {^reference, {:redirect, ^topic, %{to: _destination} = options}} ->
+      {^reference, {:redirect, ^topic, %{to: _destination} = options}} = message ->
+        TakenMessages.record(message)
         {:error, {:redirect, options}}
     after
       0 -> nil

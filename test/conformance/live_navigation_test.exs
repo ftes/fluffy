@@ -303,6 +303,45 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     end
   end
 
+  @tag driver: :phoenix
+  test "the next action follows the navigation an action without budget failed on" do
+    session =
+      :phoenix
+      |> live_session()
+      |> visit("/live/chamber-map?async=return")
+      |> await_unread_navigation(:phoenix, nil)
+
+    assert_raise Fluffy.OperationError, ~r/navigated away/, fn ->
+      click(session, by_role(:button, name: "Lull guardian", exact: true), timeout: 0)
+    end
+
+    session
+    |> expect(Fluffy.Expect.page_to_have_url("/live/chamber-map?step=returned"))
+    |> expect("Map position: returned" |> by_text(exact: true) |> to_be_visible())
+  end
+
+  @tag driver: :phoenix
+  test "the next action follows a navigation only the view watcher reported after an action without budget failed on it" do
+    session = :phoenix |> live_session() |> visit("/live/chamber-map")
+    state = Fluffy.Session.page_state(session)
+    {_reference, _topic, proxy_pid} = state.view.proxy
+    proxy_reference = Process.monitor(proxy_pid)
+    watcher_reference = Process.monitor(state.watcher)
+
+    Process.exit(state.view.pid, {:shutdown, {:live_redirect, %{kind: :push, to: "/live/secret-chamber"}}})
+
+    assert_receive {:DOWN, ^proxy_reference, :process, ^proxy_pid, _reason}
+    assert_receive {:DOWN, ^watcher_reference, :process, _watcher, _reason}
+
+    assert_raise Fluffy.OperationError, ~r/navigated away/, fn ->
+      click(session, by_role(:button, name: "Lull guardian", exact: true), timeout: 0)
+    end
+
+    session
+    |> expect(Fluffy.Expect.page_to_have_url("/live/secret-chamber"))
+    |> expect("The secret chamber is open" |> by_text() |> to_be_visible())
+  end
+
   # Waits until the view has navigated away without Fluffy reading it, so the
   # next action still targets the document Fluffy last saw.
   defp await_unread_navigation(session, :phoenix, _url) do
