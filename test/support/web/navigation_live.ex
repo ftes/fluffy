@@ -13,15 +13,21 @@ defmodule Fluffy.TestWeb.NavigationLive do
         "mount" -> send(self(), :navigate)
         "return" -> Process.send_after(self(), {:navigate, "/live/chamber-map?step=returned"}, 30)
         "return-late" -> Process.send_after(self(), {:navigate, "/live/chamber-map?step=returned&late=true"}, 30)
+        "return-slow" -> Process.send_after(self(), {:navigate, "/live/chamber-map?late=true&reveal=150&delay=600"}, 30)
         "patch" -> Process.send_after(self(), :patch, 30)
         "patch-twice" -> Process.send_after(self(), :patch_twice, 30)
         _sync -> :ok
       end
     end
 
+    # Connects slowly.
+    if connected?(socket) and params["delay"], do: Process.sleep(String.to_integer(params["delay"]))
+
     # Renders the form a moment after connecting.
     late? = params["late"] == "true"
-    if connected?(socket) and late?, do: Process.send_after(self(), :reveal, 40)
+
+    if connected?(socket) and late?,
+      do: Process.send_after(self(), :reveal, params |> Map.get("reveal", "40") |> String.to_integer())
 
     socket =
       assign(socket,

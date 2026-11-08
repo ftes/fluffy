@@ -595,16 +595,13 @@ defmodule Fluffy.Driver.Live do
   end
 
   # Runs outside the action's scope: following the navigation moves the
-  # session to the new page, so the action leaves nothing unread behind.
+  # session to the new page, so the action leaves nothing unread behind. The
+  # navigation counts toward the action's timeout.
   defp retry_on_new_page(session, navigation, operation, arguments, deadline) do
+    session = Fluffy.Backend.navigate(session, navigation)
     remaining = Deadline.remaining(deadline)
     arguments = List.update_at(arguments, -1, &Keyword.put(&1, :timeout, remaining))
-
-    retry = fn ->
-      session
-      |> Fluffy.Backend.navigate(navigation)
-      |> Fluffy.__dispatch_driver__(operation, arguments)
-    end
+    retry = fn -> Fluffy.__dispatch_driver__(session, operation, arguments) end
 
     if remaining == 0, do: ActionScope.final_attempt(retry), else: retry.()
   end
