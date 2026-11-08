@@ -305,62 +305,21 @@ defmodule Fluffy.Driver.Playwright do
 
   @impl true
   def select_option(%Session{} = session, %Locator{} = locator, requested, options \\ []) do
-    locator_action(session, :select_option, locator, options, fn native, remaining ->
-      deadline = Deadline.new(remaining)
-
-      with {:ok, values} <- uniform_option_values(native, requested, remaining, deadline) do
-        BrowserLocator.select_option(native, values, native(options, Deadline.remaining(deadline, 1)))
-      end
-    end)
+    locator_action(
+      session,
+      :select_option,
+      locator,
+      options,
+      &BrowserLocator.select_option(&1, uniform_option_values(requested), native(options, &2))
+    )
   end
 
-  # Playwright takes either strings (matching value or label) or option maps.
-  # A mixed list resolves its strings to option indexes (null for a map), the
-  # first string without an option reported as itself.
-  @option_indexes """
-  (select, wanted) => {
-    const resolved = wanted.map(value => {
-      if (typeof value !== 'string') return null
-      const index = [...select.options].findIndex(option => option.value === value || option.label === value)
-      return index < 0 ? value : index
-    })
-    return resolved.find(value => typeof value === 'string') ?? resolved
-  }
-  """
-
-  defp uniform_option_values(native, values, timeout, deadline) do
-    if Enum.all?(values, &is_binary/1) or not Enum.any?(values, &is_binary/1),
-      do: {:ok, values},
-      else: option_indexes(native, values, timeout, deadline)
-  end
-
-  # Like Playwright's own string matching, waits in the browser for the options
-  # to appear, re-resolving the select as it does.
-  defp option_indexes(native, values, timeout, deadline, waited_for \\ nil) do
-    case BrowserLocator.evaluate(native, @option_indexes, values, timeout: Deadline.remaining(deadline, 1)) do
-      {:ok, indexes} when is_list(indexes) ->
-        {:ok, Enum.zip_with(values, indexes, &if(is_binary(&1), do: %{index: &2}, else: &1))}
-
-      {:ok, missing} ->
-        expression = "(select, wanted) => Array.isArray((#{@option_indexes})(select, wanted))"
-
-        case BrowserLocator.wait_for_function(native, expression, values, timeout: Deadline.remaining(deadline, 1)) do
-          :ok -> option_indexes(native, values, timeout, deadline, missing)
-          {:error, %TimeoutError{}} -> missing_option(missing, timeout)
-          {:error, error} -> {:error, error}
-        end
-
-      {:error, %TimeoutError{}} when is_binary(waited_for) ->
-        missing_option(waited_for, timeout)
-
-      {:error, error} ->
-        {:error, error}
-    end
-  end
-
-  defp missing_option(value, timeout) do
-    message = "Timeout #{timeout}ms exceeded while waiting for an option with value or label #{inspect(value)}"
-    {:error, %TimeoutError{message: message}}
+  # Playwright takes either strings (matching value or label) or option maps,
+  # so a mixed list spells its strings as maps.
+  defp uniform_option_values(values) do
+    if Enum.all?(values, &is_binary/1),
+      do: values,
+      else: Enum.map(values, &if(is_binary(&1), do: %{valueOrLabel: &1}, else: &1))
   end
 
   def focus(%Session{} = session, %Locator{} = locator, options \\ []) do
