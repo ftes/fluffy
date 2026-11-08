@@ -106,7 +106,9 @@ defmodule Fluffy.Backend.Playwright.Events do
     }
   end
 
-  defp request(session, request) do
+  # Also builds the redirects of a `Fluffy.Request`, which has only the runtime.
+  @doc false
+  def request(session, request) do
     %Fluffy.Request{
       url: PlaywrightEx.Request.url(request),
       method: PlaywrightEx.Request.method(request),
@@ -114,7 +116,8 @@ defmodule Fluffy.Backend.Playwright.Events do
       resource_type: PlaywrightEx.Request.resource_type(request),
       post_data: PlaywrightEx.Request.post_data_buffer(request),
       page: request_page(session, request),
-      native: request
+      native: request,
+      runtime: session.runtime
     }
   end
 

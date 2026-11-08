@@ -12,7 +12,7 @@ pending = wait_for(session, Event.download())
 click(session, by_role(:button, name: "Download report"))
 download = await(pending)
 assert download.suggested_filename == "report.csv"
-assert Download.read!(download) =~ "customer_id,total"
+assert Download.read(download) =~ "customer_id,total"
 ```
 
 Each wait has an independent source, predicate, and deadline. The deadline starts
@@ -38,7 +38,7 @@ session
   &click(&1, by_role(:button, name: "Download report")),
   fn download ->
     assert download.suggested_filename == "report.csv"
-    assert Download.read!(download) =~ "customer_id,total"
+    assert Download.read(download) =~ "customer_id,total"
   end
 )
 |> click(by_role(:button, name: "Continue"))
@@ -53,12 +53,15 @@ on every exit and preserves callback errors.
 ## Downloads
 
 A download handle exposes `suggested_filename` and `url` when downloading starts.
-`Download.read!(download, max_bytes: 10_000_000)` waits for completion and returns
+`Download.read(download, max_bytes: 10_000_000)` waits for completion and returns
 bytes, enforcing the indicated in-memory limit (10 MB by default).
-`Download.save_as!(download, destination)` waits and saves using bounded memory.
-Failures raise when reading or saving. Handles belong to their session; saved
-files outlive it. In-process HTTP downloads use the same API. JavaScript-generated
-downloads require Playwright.
+`Download.save_as(download, destination)` waits and saves using bounded memory.
+Failures raise when reading or saving; on Playwright, `Fluffy.unwrap/2` reaches
+`failure` and `cancel` on the `PlaywrightEx.Download`. Handles belong to their
+session; saved files outlive it. In-process HTTP downloads use the same API and
+complete before delivery. `Download.path/1` returns the browser's copy of the file:
+Phoenix holds the bytes in memory and raises `Fluffy.CapabilityError`.
+JavaScript-generated downloads require Playwright.
 
 ## Pages, popups, and frames
 
@@ -220,11 +223,18 @@ the response body. Values are `Fluffy.Request` (URL, method, headers, resource t
 post data, page) and `Fluffy.Response` (URL, status, status text, headers, and its
 `request`). The page can be nil when it
 is not yet known, such as for a popup's initial request. Bodies are not retained;
-read one from the native response:
+read one from the browser, which waits for the response to end:
 
 ```elixir
-body = unwrap(response, &PlaywrightEx.Response.text!/1)
+assert Response.ok?(response)
+assert Response.json(response) == %{"saved" => true}
 ```
+
+`Response` also has `body/1`, `text/1`, `all_headers/1`, `header_value/2` and
+`header_values/2`. `Request` has `all_headers/1`, `header_value/2`,
+`post_data_json/1`, `failure/1`, `redirected_from/1` and `redirected_to/1`. These
+readers raise once the session is closed or after its `timeout:`. Timing, sizes,
+security details and the server address stay on the native value.
 
 ## File choosers
 

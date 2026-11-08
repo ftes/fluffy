@@ -24,6 +24,7 @@ defmodule Fluffy.PlaywrightMembers do
   @native_page {:unwrap, "on the page of Fluffy.unwrap/2"}
   @page_gap {:unwrap, "gap: on the page of Fluffy.unwrap/2"}
   @native_value {:unwrap, "gap: on the PlaywrightEx value of Fluffy.unwrap/2"}
+  @native_only {:unwrap, "browser network detail on the PlaywrightEx value of Fluffy.unwrap/2"}
   @native_event {:unwrap, "gap: listen natively inside Fluffy.unwrap/2"}
   @own_timeouts {:denied, "Fluffy owns timeouts: the session's timeout: is the context default"}
   @own_listeners {:denied, "removes the listeners Fluffy relies on for pages and events"}
@@ -163,8 +164,8 @@ defmodule Fluffy.PlaywrightMembers do
         {[:expect_event], {:renamed, {Fluffy.Expect, :expect_event, 3}}},
         {[:expect_page], {:renamed, {Fluffy.Event, :page, 1}}},
         {[:expect_console_message], @native_event},
-        {~w(route unroute unroute_all route_from_har route_web_socket grant_permissions clear_permissions
-            set_geolocation set_offline set_http_credentials)a,
+        {~w(grant_permissions clear_permissions set_geolocation set_offline set_http_credentials)a, :wrapped},
+        {~w(route unroute unroute_all route_from_har route_web_socket)a,
          {:unwrap, "gap: on PlaywrightEx.Page.context/1 inside Fluffy.unwrap/2"}},
         {~w(set_extra_http_headers set_storage_state add_init_script expose_binding expose_function clock browser
             background_pages service_workers new_cdp_session credentials debugger request is_closed
@@ -179,9 +180,10 @@ defmodule Fluffy.PlaywrightMembers do
       PlaywrightEx.Dialog => [{~w(accept dismiss page type message default_value)a, :wrapped}],
       PlaywrightEx.Download => [
         {~w(suggested_filename url page)a, :wrapped},
-        {[:save_as], {:renamed, {Fluffy.Download, :save_as!, 2}}},
-        {[:create_read_stream], {:renamed, {Fluffy.Download, :read!, 2}}},
-        {~w(path failure cancel delete)a, @native_value}
+        {[:save_as], {:renamed, {Fluffy.Download, :save_as, 2}}},
+        {[:create_read_stream], {:renamed, {Fluffy.Download, :read, 2}}},
+        {[:path], :wrapped},
+        {~w(failure delete cancel)a, {:unwrap, "on PlaywrightEx.Download inside Fluffy.unwrap/2"}}
       ],
       PlaywrightEx.FileChooser => [
         {[:page], :wrapped},
@@ -190,15 +192,26 @@ defmodule Fluffy.PlaywrightMembers do
         {[:element], @native_value}
       ],
       PlaywrightEx.Request => [
-        {~w(url method headers resource_type post_data)a, :wrapped},
+        {~w(url method headers resource_type post_data failure redirected_from redirected_to)a, :wrapped},
+        {[:all_headers], {:renamed, {Fluffy.Request, :all_headers, 1}}},
+        {[:header_value], {:renamed, {Fluffy.Request, :header_value, 2}}},
+        {[:post_data_json], {:renamed, {Fluffy.Request, :post_data_json, 1}}},
         {[:frame], {:unwrap, "on the PlaywrightEx value of Fluffy.unwrap/2; Fluffy.Request has its page"}},
-        {~w(response redirected_from redirected_to failure timing sizes all_headers header_value headers_array
-            post_data_json post_data_buffer is_navigation_request existing_response service_worker)a, @native_value}
+        {~w(timing sizes)a, @native_only},
+        {~w(response headers_array post_data_buffer is_navigation_request existing_response service_worker)a,
+         @native_value}
       ],
       PlaywrightEx.Response => [
         {~w(url status status_text headers request)a, :wrapped},
-        {~w(ok body text json finished frame all_headers header_value header_values headers_array http_version
-            security_details server_addr from_service_worker)a, @native_value}
+        {[:ok], {:renamed, {Fluffy.Response, :ok?, 1}}},
+        {[:body], {:renamed, {Fluffy.Response, :body, 1}}},
+        {[:text], {:renamed, {Fluffy.Response, :text, 1}}},
+        {[:json], {:renamed, {Fluffy.Response, :json, 1}}},
+        {[:all_headers], {:renamed, {Fluffy.Response, :all_headers, 1}}},
+        {[:header_value], {:renamed, {Fluffy.Response, :header_value, 2}}},
+        {[:header_values], {:renamed, {Fluffy.Response, :header_values, 2}}},
+        {~w(security_details server_addr)a, @native_only},
+        {~w(finished frame headers_array http_version from_service_worker)a, @native_value}
       ],
       PlaywrightEx.Route => [
         {~w(abort continue fallback fetch fulfill request)a, {:unwrap, "gap: in a PlaywrightEx.Page.route/3 handler"}}

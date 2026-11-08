@@ -32,7 +32,7 @@ defmodule FluffyConsumer.AdoptionTest do
         &click(&1, by_role(:link, name: "Download report")),
         fn download ->
           assert download.suggested_filename == "report.csv"
-          assert Fluffy.Download.read!(download) == "id,total\n1,42\n"
+          assert Fluffy.Download.read(download) == "id,total\n1,42\n"
         end
       )
       |> assert(page_url("/"))

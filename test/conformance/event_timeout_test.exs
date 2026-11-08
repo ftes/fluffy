@@ -80,7 +80,7 @@ defmodule Fluffy.Conformance.EventTimeoutTest do
         end,
         fn download ->
           assert download.suggested_filename == "report.csv"
-          assert Fluffy.Download.read!(download) == "download bytes"
+          assert Fluffy.Download.read(download) == "download bytes"
           assert download.url == TestHTTPFixtures.url(fixture, "/report")
         end,
         timeout: 3_000

@@ -214,6 +214,12 @@ defmodule Fluffy.Capability do
         "Cookie queries and mutation, and storage export and restoration, operate on the Playwright browser context."
     },
     %{
+      id: :browser_context_setters,
+      feature: "Runtime permissions, geolocation, offline mode, and HTTP credentials",
+      drivers: %{static: :browser_only, live: :browser_only, playwright: :equivalent},
+      detail: "These change a real browser context; a Phoenix session has none."
+    },
+    %{
       id: :browser_pointer_typing,
       feature: "Hover, drag-and-drop, sequential typing, keyboard, and mouse input",
       drivers: %{static: :browser_only, live: :browser_only, playwright: :equivalent},
