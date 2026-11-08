@@ -74,6 +74,15 @@ defmodule Fluffy.Options do
     to_be_checked: {PlaywrightEx.Expect, :to_be_checked, 2, [:checked, :indeterminate]},
     to_have_value: {PlaywrightEx.Expect, :to_have_value, 3, []},
     to_have_values: {PlaywrightEx.Expect, :to_have_values, 3, []},
+    to_have_text: {PlaywrightEx.Expect, :to_have_text, 3, [:ignore_case, :use_inner_text]},
+    to_contain_text: {PlaywrightEx.Expect, :to_contain_text, 3, [:ignore_case, :use_inner_text]},
+    to_have_attribute: {PlaywrightEx.Expect, :to_have_attribute, 4, [:ignore_case]},
+    to_have_class: {PlaywrightEx.Expect, :to_have_class, 3, []},
+    to_contain_class: {PlaywrightEx.Expect, :to_contain_class, 3, []},
+    to_have_id: {PlaywrightEx.Expect, :to_have_id, 3, []},
+    to_be_attached: {PlaywrightEx.Expect, :to_be_attached, 2, [:attached]},
+    to_be_hidden: {PlaywrightEx.Expect, :to_be_hidden, 2, []},
+    to_be_empty: {PlaywrightEx.Expect, :to_be_empty, 2, []},
     page_to_have_title: {PlaywrightEx.Expect, :to_have_title, 3, []},
     page_to_have_url: {PlaywrightEx.Expect, :to_have_url, 3, [:ignore_case]}
   ]
@@ -86,7 +95,12 @@ defmodule Fluffy.Options do
     enabled: [type: :boolean, doc: "Set to false to expect a disabled target, like `not_/1`."],
     checked: [type: :boolean, doc: "Set to false to expect an unchecked control."],
     indeterminate: [type: :boolean, doc: "Expect the browser-owned indeterminate state."],
-    ignore_case: [type: :boolean, doc: "Match a string or regular expression case-insensitively."]
+    ignore_case: [type: :boolean, doc: "Match a string or regular expression case-insensitively."],
+    attached: [type: :boolean, doc: "Set to false to expect a detached target, like `not_/1`."],
+    use_inner_text: [
+      type: :boolean,
+      doc: "*Playwright only.* Read the browser's rendered `innerText` instead of the text content."
+    ]
   ]
 
   @expectation_schemas Map.new(@native_expectations, fn {matcher, {_module, _fun, _arity, mirrored}} ->

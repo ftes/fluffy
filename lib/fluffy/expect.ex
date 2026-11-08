@@ -31,18 +31,29 @@ defmodule Fluffy.Expect do
   @type target :: {:locator, Locator.t()} | :page
 
   @type kind ::
-          :checked
+          :attached
+          | :attribute
+          | :checked
+          | :class
+          | :contain_class
+          | :contain_text
           | :count
           | :disabled
           | :editable
+          | :empty
           | :enabled
           | :focused
+          | :hidden
+          | :id
           | :opener
+          | :text
           | :title
           | :url
           | :value
           | :values
           | :visible
+
+  @type text_expectation :: String.t() | Regex.t()
 
   @type t :: %__MODULE__{
           target: target(),
@@ -62,6 +73,16 @@ defmodule Fluffy.Expect do
   @type to_be_checked_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_be_checked)))
   @type to_have_value_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_have_value)))
   @type to_have_values_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_have_values)))
+  @type to_have_text_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_have_text)))
+  @type to_contain_text_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_contain_text)))
+  @type to_have_attribute_option ::
+          unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_have_attribute)))
+  @type to_have_class_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_have_class)))
+  @type to_contain_class_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_contain_class)))
+  @type to_have_id_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_have_id)))
+  @type to_be_attached_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_be_attached)))
+  @type to_be_hidden_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_be_hidden)))
+  @type to_be_empty_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_be_empty)))
   @type page_to_have_title_option ::
           unquote(NimbleOptions.option_typespec(Options.expectation_schema(:page_to_have_title)))
   @type page_to_have_url_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:page_to_have_url)))
@@ -243,6 +264,179 @@ defmodule Fluffy.Expect do
     native_expectation(:to_have_values, {:locator, locator}, :values, expected, options)
   end
 
+  @doc group: "Locator assertions"
+  @doc """
+  Expects the target's text to equal a string or match a regular expression.
+
+  Text is the element's `textContent` without `<script>`, `<style>`, and
+  `<noscript>` content, with a submit, button, or reset input contributing its
+  value. A string compares normalized whitespace in both the text and the
+  expected value, while a regular expression sees the text as is.
+
+  A list asserts every element the locator matches, in order: there must be as
+  many elements as expected values, and each must match its value. Any other
+  form requires exactly one element.
+
+  Negation still requires the element, except in the list form, where no
+  elements are simply a list that does not match.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.expectation_schema(:to_have_text))}
+  """
+  @spec to_have_text(Locator.t(), text_expectation() | [text_expectation()], [to_have_text_option()]) :: t()
+  def to_have_text(%Locator{} = locator, expected, options \\ [])
+      when is_binary(expected) or is_struct(expected, Regex) or is_list(expected) do
+    text_expectation(:to_have_text, locator, :text, expected, options)
+  end
+
+  @doc group: "Locator assertions"
+  @doc """
+  Expects the target's text to contain a string or match a regular expression.
+
+  Reads and normalizes text like `to_have_text/3`. A list expects the values to
+  match a subset of the elements the locator matches, in order; unlike
+  `to_have_text/3`, the counts need not agree.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.expectation_schema(:to_contain_text))}
+  """
+  @spec to_contain_text(Locator.t(), text_expectation() | [text_expectation()], [to_contain_text_option()]) :: t()
+  def to_contain_text(%Locator{} = locator, expected, options \\ [])
+      when is_binary(expected) or is_struct(expected, Regex) or is_list(expected) do
+    text_expectation(:to_contain_text, locator, :contain_text, expected, options)
+  end
+
+  @doc group: "Locator assertions"
+  @doc """
+  Expects the target to have the attribute, optionally with the given value.
+
+  A `nil` value asserts that the attribute is present; options may take its
+  place. A string compares the exact attribute value, without whitespace
+  normalization.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.expectation_schema(:to_have_attribute))}
+  """
+  @spec to_have_attribute(Locator.t(), String.t()) :: t()
+  @spec to_have_attribute(Locator.t(), String.t(), text_expectation() | nil | [to_have_attribute_option()]) :: t()
+  @spec to_have_attribute(Locator.t(), String.t(), text_expectation() | nil, [to_have_attribute_option()]) :: t()
+  def to_have_attribute(locator, name, value \\ nil, options \\ [])
+
+  def to_have_attribute(%Locator{} = locator, name, options, []) when is_binary(name) and is_list(options),
+    do: to_have_attribute(locator, name, nil, options)
+
+  def to_have_attribute(%Locator{} = locator, name, value, options)
+      when is_binary(name) and (is_nil(value) or is_binary(value) or is_struct(value, Regex)) and is_list(options) do
+    options = Options.validate_expectation!(:to_have_attribute, options)
+    {matching, options} = Keyword.split(options, [:ignore_case])
+    Internal.new({:locator, locator}, :attribute, {name, value, matching}, options)
+  end
+
+  @doc group: "Locator assertions"
+  @doc """
+  Expects the target's `class` attribute to equal a string or match a regular
+  expression. An element without one has an empty class.
+
+  A list asserts every element the locator matches, in order, as in
+  `to_have_text/3`. To match individual classes, use `to_contain_class/3`.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.expectation_schema(:to_have_class))}
+  """
+  @spec to_have_class(Locator.t(), text_expectation() | [text_expectation()], [to_have_class_option()]) :: t()
+  def to_have_class(%Locator{} = locator, expected, options \\ [])
+      when is_binary(expected) or is_struct(expected, Regex) or is_list(expected) do
+    native_expectation(:to_have_class, {:locator, locator}, :class, text_values!(expected), options)
+  end
+
+  @doc group: "Locator assertions"
+  @doc """
+  Expects the target to have all the classes of a space-separated string, in any
+  order.
+
+  A list asserts every element the locator matches, in order, with one string
+  for each element. Unlike `to_have_class/3`, this constructor takes no regular
+  expression.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.expectation_schema(:to_contain_class))}
+  """
+  @spec to_contain_class(Locator.t(), String.t() | [String.t()], [to_contain_class_option()]) :: t()
+  def to_contain_class(%Locator{} = locator, expected, options \\ []) when is_binary(expected) or is_list(expected) do
+    if is_list(expected) and not Enum.all?(expected, &is_binary/1) do
+      raise ArgumentError, "expected a string of class names for each element, got: #{inspect(expected)}"
+    end
+
+    native_expectation(:to_contain_class, {:locator, locator}, :contain_class, expected, options)
+  end
+
+  @doc group: "Locator assertions"
+  @doc """
+  Expects the target's id to equal a string or match a regular expression. An
+  element without one has an empty id.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.expectation_schema(:to_have_id))}
+  """
+  @spec to_have_id(Locator.t(), text_expectation(), [to_have_id_option()]) :: t()
+  def to_have_id(%Locator{} = locator, expected, options \\ []) when is_binary(expected) or is_struct(expected, Regex) do
+    native_expectation(:to_have_id, {:locator, locator}, :id, expected, options)
+  end
+
+  @doc group: "Locator assertions"
+  @doc """
+  Expects the target to be attached to the document, visible or not.
+
+  Pass `attached: false` to expect that nothing matches, like `not_/1`.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.expectation_schema(:to_be_attached))}
+  """
+  @spec to_be_attached(Locator.t(), [to_be_attached_option()]) :: t()
+  def to_be_attached(%Locator{} = locator, options \\ []) do
+    state_expectation(:to_be_attached, locator, :attached, options)
+  end
+
+  @doc group: "Locator assertions"
+  @doc """
+  Expects the target to be hidden, which includes matching nothing.
+
+  Negating it requires a visible element. Static and LiveView use the
+  structural visibility of `to_be_visible/2`; see
+  [Visibility and DOM presence](usage.md#visibility-and-dom-presence).
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.expectation_schema(:to_be_hidden))}
+  """
+  @spec to_be_hidden(Locator.t(), [to_be_hidden_option()]) :: t()
+  def to_be_hidden(%Locator{} = locator, options \\ []) do
+    native_expectation(:to_be_hidden, {:locator, locator}, :hidden, true, options)
+  end
+
+  @doc group: "Locator assertions"
+  @doc """
+  Expects an input or textarea to have no value, or any other element to have no
+  text besides whitespace.
+
+  Negation still requires the element.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.expectation_schema(:to_be_empty))}
+  """
+  @spec to_be_empty(Locator.t(), [to_be_empty_option()]) :: t()
+  def to_be_empty(%Locator{} = locator, options \\ []) do
+    native_expectation(:to_be_empty, {:locator, locator}, :empty, true, options)
+  end
+
   # `visible: false` and the like assert the opposite state, as in PlaywrightEx.
   defp state_expectation(matcher, locator, kind, options) do
     options = Options.validate_expectation!(matcher, options)
@@ -253,6 +447,23 @@ defmodule Fluffy.Expect do
 
   defp native_expectation(matcher, target, kind, expected, options),
     do: Internal.new(target, kind, expected, Options.validate_expectation!(matcher, options))
+
+  # The options that select how text is read and compared travel with the expected value.
+  defp text_expectation(matcher, locator, kind, expected, options) do
+    options = Options.validate_expectation!(matcher, options)
+    {matching, options} = Keyword.split(options, [:ignore_case, :use_inner_text])
+    Internal.new({:locator, locator}, kind, {text_values!(expected), matching}, options)
+  end
+
+  defp text_values!(expected) when is_list(expected) do
+    if Enum.all?(expected, &(is_binary(&1) or is_struct(&1, Regex))) do
+      expected
+    else
+      raise ArgumentError, "expected a list of strings or regular expressions, got: #{inspect(expected)}"
+    end
+  end
+
+  defp text_values!(expected), do: expected
 
   @doc group: "Assertions"
   @doc """

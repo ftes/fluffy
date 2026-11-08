@@ -44,6 +44,7 @@ Fluffy now runs on PlaywrightEx 0.17, a port of the official Playwright client w
 - `Fluffy.Download.page/1` with a `page` field; on Phoenix, the page that started the download.
 - `Fluffy.Event.close()` resolves with the selected page's handle when it closes.
 - Playwright clock control in `Fluffy.Playwright.Clock`: `install`, `pause_at`, `run_for`, `fast_forward`, `resume`, `set_fixed_time` and `set_system_time`. Fluffy's waits work with a paused clock.
+- `Fluffy.Expect` gains `to_have_text`, `to_contain_text`, `to_have_attribute`, `to_have_class`, `to_contain_class`, `to_have_id`, `to_be_attached`, `to_be_hidden` and `to_be_empty` on every driver, following Playwright's whitespace normalization, regular expressions, per-element lists and strictness. `use_inner_text:` is Playwright only; Phoenix raises `Fluffy.CapabilityError` for it.
 
 ### Fixed
 
@@ -70,6 +71,7 @@ Fluffy now runs on PlaywrightEx 0.17, a port of the official Playwright client w
 - A LiveView upload survives a render that inserts content before its form, instead of failing at submit with "cannot consume uploaded files when entries are still in progress".
 - LiveView `set_input_files` and upload submits follow a navigation from an upload progress callback right away instead of treating it as an entry error.
 - LiveView `submit` and `set_input_files` wait for their target within the action's timeout, like `click`.
+- On Phoenix, `to_be_visible`, `filter(visible:)` and `assert_has` treat a descendant of a `hidden` element and an `<input type="hidden">` as invisible, as Playwright does.
 
 ## 0.8.0 — 2026-11-04
 

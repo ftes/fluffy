@@ -208,7 +208,7 @@ fails when PlaywrightEx adds or removes one.
   `Fluffy.Playwright.Clock`, and the events in `Fluffy.Event`. Their options pass
   through as documented.
 - **Unwrap:** everything page-, locator-, or value-local, such as `dblclick`, reads
-  like `text_content`, assertions like `to_have_text`, keyboard and mouse input,
+  like `text_content`, assertions like `to_have_css`, keyboard and mouse input,
   routing, viewport, media emulation, permissions, and response bodies. Navigation
   these cause is adopted.
 - **Unsafe natively:** closing the page or context (use `Fluffy.Playwright.close_page/2`

@@ -20,10 +20,27 @@ defmodule Fluffy.Locator.Static do
     end)
   end
 
+  # What Phoenix can know from markup: the element's own `hidden` or `aria-hidden`,
+  # an ancestor's `hidden`, and hidden inputs, which a browser never renders.
   def structurally_visible?(element) do
     case LazyHTML.attributes(element) do
-      [attributes] -> not hidden?(attributes)
-      _ -> true
+      [attributes] ->
+        not hidden?(attributes) and not hidden_input?(element, attributes) and
+          not hidden_ancestor?(LazyHTML.parent_node(element))
+
+      _ ->
+        true
+    end
+  end
+
+  defp hidden_input?(element, attributes) do
+    LazyHTML.tag(element) == ["input"] and String.downcase(attribute(attributes, "type") || "") == "hidden"
+  end
+
+  defp hidden_ancestor?(element) do
+    case LazyHTML.attributes(element) do
+      [attributes] -> has_attribute?(attributes, "hidden") or hidden_ancestor?(LazyHTML.parent_node(element))
+      _ -> false
     end
   end
 

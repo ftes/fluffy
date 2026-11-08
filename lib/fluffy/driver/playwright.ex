@@ -89,23 +89,43 @@ defmodule Fluffy.Driver.Playwright do
   defp native_expectation(session, %Expect{target: :page, kind: :title, expected: expected}),
     do: {Session.page_state(session).page, :to_have_title, [expected], []}
 
-  defp native_expectation(session, %Expect{target: {:locator, locator}, kind: kind, expected: expected}) do
-    locator = locator(session, locator)
+  @state_assertions %{
+    attached: :to_be_attached,
+    disabled: :to_be_disabled,
+    editable: :to_be_editable,
+    empty: :to_be_empty,
+    enabled: :to_be_enabled,
+    focused: :to_be_focused,
+    hidden: :to_be_hidden,
+    visible: :to_be_visible
+  }
 
-    case kind do
-      :count -> {locator, :to_have_count, [expected], []}
-      :visible -> {locator, :to_be_visible, [], []}
-      :disabled -> {locator, :to_be_disabled, [], []}
-      :editable -> {locator, :to_be_editable, [], []}
-      :enabled -> {locator, :to_be_enabled, [], []}
-      :focused -> {locator, :to_be_focused, [], []}
-      :value -> {locator, :to_have_value, [expected], []}
-      :values -> {locator, :to_have_values, [expected], []}
-      :checked when expected == :checked -> {locator, :to_be_checked, [], []}
-      :checked when expected == :unchecked -> {locator, :to_be_checked, [], [checked: false]}
-      :checked when expected == :indeterminate -> {locator, :to_be_checked, [], [indeterminate: true]}
-    end
+  @value_assertions %{
+    class: :to_have_class,
+    contain_class: :to_contain_class,
+    count: :to_have_count,
+    id: :to_have_id,
+    value: :to_have_value,
+    values: :to_have_values
+  }
+
+  defp native_expectation(session, %Expect{target: {:locator, locator}, kind: kind, expected: expected}) do
+    {assertion, arguments, options} = locator_assertion(kind, expected)
+    {locator(session, locator), assertion, arguments, options}
   end
+
+  defp locator_assertion(:checked, :checked), do: {:to_be_checked, [], []}
+  defp locator_assertion(:checked, :unchecked), do: {:to_be_checked, [], [checked: false]}
+  defp locator_assertion(:checked, :indeterminate), do: {:to_be_checked, [], [indeterminate: true]}
+  defp locator_assertion(:text, {expected, options}), do: {:to_have_text, [expected], options}
+  defp locator_assertion(:contain_text, {expected, options}), do: {:to_contain_text, [expected], options}
+  defp locator_assertion(:attribute, {name, value, options}), do: {:to_have_attribute, [name, value], options}
+
+  defp locator_assertion(kind, _expected) when is_map_key(@state_assertions, kind),
+    do: {Map.fetch!(@state_assertions, kind), [], []}
+
+  defp locator_assertion(kind, expected) when is_map_key(@value_assertions, kind),
+    do: {Map.fetch!(@value_assertions, kind), [expected], []}
 
   @impl true
   def set_html(%Session{} = session, html) when is_binary(html) do

@@ -84,12 +84,11 @@ defmodule Fluffy.PlaywrightMembers do
       PlaywrightEx.Expect =>
         expect([
           {~w(to_have_count to_be_visible to_be_disabled to_be_editable to_be_enabled to_be_focused to_be_checked
-              to_have_value to_have_values)a, :wrapped},
+              to_have_value to_have_values to_have_text to_contain_text to_have_attribute to_have_class
+              to_contain_class to_have_id to_be_attached to_be_hidden to_be_empty)a, :wrapped},
           {[:to_have_title], {:renamed, {Fluffy.Expect, :page_to_have_title, 2}}},
           {[:to_have_url], {:renamed, {Fluffy.Expect, :page_to_have_url, 2}}},
-          {~w(to_have_text to_contain_text to_have_attribute to_have_class to_contain_class to_have_id
-              to_be_attached to_be_hidden to_be_empty to_have_role to_have_accessible_name
-              to_have_accessible_description to_have_accessible_error_message to_have_css to_be_in_viewport
+          {~w(to_have_role to_have_accessible_name to_have_accessible_description to_have_accessible_error_message to_have_css to_be_in_viewport
               to_have_js_property to_match_aria_snapshot to_have_screenshot)a, @native_expect},
           {[:to_be_ok], {:na, "APIResponse assertion"}}
         ]),

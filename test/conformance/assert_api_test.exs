@@ -5,6 +5,27 @@ defmodule Fluffy.Conformance.AssertAPITest do
   import Fluffy
   import Fluffy.Locator
 
+  test "element assertions delegate to their expectations, without clashing with Fluffy or Fluffy.Locator" do
+    session =
+      session_for_html(:static, ~s(<p id="note" class="row wide" title="Hint">Saved</p><p id="gone" hidden></p>))
+
+    note = by_css("#note")
+
+    session
+    |> assert(text(note, "Saved"))
+    |> assert(contain_text(note, "Sav"))
+    |> assert(attribute(note, "title"))
+    |> assert(attribute(note, "title", "Hint"))
+    |> assert(class(note, "row wide"))
+    |> assert(contain_class(note, "wide"))
+    |> assert(id(note, "note"))
+    |> assert(attached(note))
+    |> assert(hidden(by_css("#gone")))
+    |> assert(empty(by_css("#gone")))
+    |> refute(text(note, "Lost"))
+    |> refute(empty(note))
+  end
+
   for driver <- [:static, :playwright] do
     @tag driver: driver
     test "assert and refute preserve locator and page semantics with #{driver}" do

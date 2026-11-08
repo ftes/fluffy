@@ -29,6 +29,13 @@ defmodule Fluffy.Driver.PhoenixValidation do
         driver: driver,
         detail: "indeterminate is a browser-owned DOM property"
     end
+
+    if expectation.kind in [:text, :contain_text] and Keyword.has_key?(elem(expectation.expected, 1), :use_inner_text) do
+      raise CapabilityError,
+        capability: :computed_browser_semantics,
+        driver: driver,
+        detail: "use_inner_text: reads text as the browser renders it"
+    end
   end
 
   defp validate_argument!(driver, %Locator{} = locator) do

@@ -415,11 +415,50 @@ See [LiveView timing and keyboard events](capabilities.md#liveview-timing-and-ke
 See [Assertion styles](assertion-styles.md) for native assertion imports,
 constructor names, options, and negation semantics.
 
+`Fluffy.Expect` asserts text, attributes, classes, ids, and states the same way
+on every driver:
+
+```elixir
+session
+|> expect(to_have_text(by_role(:heading), "Creature saved"))
+|> expect(to_contain_text(by_role(:alert), ~r/\d+ spells/))
+|> expect(to_have_text(by_css("li"), ["Fluffy", "Norbert"]))
+|> expect(to_have_attribute(by_role(:link, name: "Docs"), "href", "/docs"))
+|> expect(to_have_class(by_css("#card"), "card selected"))
+|> expect(to_contain_class(by_css("#card"), "selected"))
+|> expect(to_have_id(by_label("Name"), "name"))
+|> expect(to_be_attached(by_css("#card")))
+|> expect(to_be_hidden(by_text("Saving")))
+|> expect(to_be_empty(by_label("Notes")))
+```
+
+A string compares normalized whitespace in the text; a regular expression sees
+it as is. LiveView text can differ in whitespace-only nodes between elements:
+`<b>a</b> <i>b</i>` reads "ab" there. On Static and
+LiveView a regular expression runs as PCRE, and in the browser as JavaScript, so `$` also matches before a final newline on Phoenix, and
+without the `u` flag `.` matches one byte there rather than one character.
+`ignore_case:` takes precedence over a regular expression's own flag.
+A list checks each matched element in order, while any other form requires
+exactly one match. `use_inner_text: true` reads rendered text and requires
+Playwright, so `to_have_text` and `to_contain_text` raise
+`Fluffy.CapabilityError` on Static and LiveView when given it.
+
+`to_be_hidden` passes when nothing matches, as does `not_(to_be_visible(locator))`.
+Negating `to_have_text`, `to_contain_text`, `to_have_attribute`, `to_have_class`,
+`to_contain_class`, `to_have_id`, or `to_be_empty` still fails when nothing matches.
+
+Known limits: on Static and LiveView, `to_be_empty` can differ from a browser for
+a checkbox, radio, range or color input and a script-only element, and attribute
+names match exactly; on Playwright, `submit` can return early when a submit handler
+that does not cancel changes the URL in the document (`pushState`, `replaceState`,
+`location.hash`), so assert with a retrying `expect` afterwards.
+
 ## Visibility and DOM presence
 
 Even the `:phoenix` backend checks **structural visibility**, rather than just
 DOM presence. Its Static and LiveView drivers treat a matched element with a
-`hidden` attribute or `aria-hidden="true"` as invisible.
+`hidden` attribute or `aria-hidden="true"`, a descendant of a `hidden` element,
+and an `<input type="hidden">` as invisible.
 
 Without `count:` or a field predicate, the PhoenixTest-style facade's
 `assert_has` requires any visible match and `refute_has` requires no visible
