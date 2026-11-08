@@ -1,0 +1,133 @@
+name: Claude Nightly Improvement
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+# One run at a time, so two runs can't both take the last slot.
+concurrency:
+  group: claude-nightly
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # As in ci.yml.
+  MISE_VERSION: "2026.8.14"
+  MIX_ENV: test
+
+jobs:
+  # Enforces the cap before any toolchain or token is set up.
+  capacity:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      pull-requests: read
+    outputs:
+      has-slot: ${{ steps.count.outputs.has-slot }}
+      prs: ${{ steps.count.outputs.prs }}
+    steps:
+      - name: Count open nightly PRs
+        id: count
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          MAX_OPEN_PRS: 3
+        # Same-repo branches only: a fork can pick any branch name, and this repo is public.
+        run: |
+          prs=$(gh pr list --state all --limit 1000 --json title,state,headRefName,isCrossRepository \
+            --jq '[.[] | select((.isCrossRepository | not) and (.headRefName | startswith("claude/nightly-"))) | {title, state}]')
+          open=$(jq '[.[] | select(.state == "OPEN")] | length' <<< "$prs")
+          echo "::notice::$open of $MAX_OPEN_PRS nightly PRs open"
+          if [ "$open" -lt "$MAX_OPEN_PRS" ]; then has_slot=true; else has_slot=false; fi
+          {
+            echo "has-slot=$has_slot"
+            echo "prs=$(jq -c '.[:30]' <<< "$prs")"
+          } >> "$GITHUB_OUTPUT"
+
+  improve:
+    needs: capacity
+    if: needs.capacity.outputs.has-slot == 'true'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      id-token: write # Exchanged for the Claude app token. PRs from GITHUB_TOKEN wouldn't trigger CI.
+    services:
+      postgres:
+        image: postgres:18.6@sha256:edb0c08dc33befd0262ab3b5cf1c4f3f8cfd8b09e88c05b45adee29d6761ddb6
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 1s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      # The run's only branch: the exact push and PR commands below allow no other, and GitHub
+      # refuses a second PR for one head, so a run opens at most one.
+      NIGHTLY_BRANCH: claude/nightly-${{ github.run_id }}
+      # `mix check` outlasts Claude Code's default Bash timeout.
+      BASH_DEFAULT_TIMEOUT_MS: "900000"
+      BASH_MAX_TIMEOUT_MS: "900000"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - name: Set up toolchain and deps
+        uses: ./.github/actions/setup
+        with:
+          lane: newest
+      - name: Install Playwright browser
+        uses: ./.github/actions/browser
+      - run: pnpm run build:test
+      - run: git switch -c "$NIGHTLY_BRANCH"
+
+      - name: Run Claude
+        uses: anthropics/claude-code-action@d535f5172dec02b204866b393d6b20b9b2aaf98d # v1.0.266
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            BRANCH: ${{ env.NIGHTLY_BRANCH }} (already checked out)
+            PREVIOUS NIGHTLY PRS, newest first: ${{ needs.capacity.outputs.prs }}
+
+            Find the single most valuable improvement to this codebase's simplicity or consistency
+            and open one pull request for it, the kind a senior maintainer would be glad to merge.
+
+            1. Read AGENTS.md and enough of lib/ and test/ to know the prevailing patterns. Use
+               subagents to survey separate areas in parallel.
+            2. Look for duplicated logic that belongs in one place, dead code, needless indirection
+               or options, and one concept handled or named differently across modules or drivers.
+            3. Rank the candidates by how much simpler or more uniform the code becomes for how
+               little it changes. Read the callers and tests of the best one before committing to
+               it. Skip anything overlapping an OPEN PR above or repeating a CLOSED one: those were
+               declined.
+            4. Implement that one idea, matching the surrounding code. Prefer a diff that removes
+               more than it adds.
+
+            Limits: observable public behaviour stays the same, and driver-specific boundaries stay
+            explicit. No new features, bug fixes, dependency, CI or changelog changes, and no
+            changes that are only formatting, comments or renames to taste.
+
+            Verify with `mix check --max-cases 4`. It must pass. Re-run once if a browser test looks
+            flaky; otherwise fix the cause or drop the change.
+
+            If nothing is clearly worth a maintainer's time, or the check can't be made to pass,
+            stop without pushing and say why. No PR is a good result; a marginal PR is not.
+
+            To publish, commit with one imperative sentence as the subject (match `git log`), then
+            run exactly:
+              git push -u origin ${{ env.NIGHTLY_BRANCH }}
+              gh pr create --base main --head ${{ env.NIGHTLY_BRANCH }} --title "<subject>" --body-file tmp/nightly-pr.md
+            Write tmp/nightly-pr.md first (tmp/ is gitignored): a few sentences on what was
+            inconsistent or complex and why this is simpler. No attribution lines.
+          claude_args: |
+            --model claude-opus-5-5
+            --max-turns 150
+            --allowedTools "Read,Grep,Glob,Edit,Write,Agent,Task,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git add:*),Bash(git commit:*),Bash(mix check:*),Bash(mix test:*),Bash(mix format:*),Bash(mix compile:*),Bash(mix credo:*),Bash(git push -u origin ${{ env.NIGHTLY_BRANCH }}),Bash(gh pr create --base main --head ${{ env.NIGHTLY_BRANCH }} *)"
