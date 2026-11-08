@@ -54,4 +54,25 @@ defmodule Fluffy.Driver.Live.ActionScopeTest do
     assert [%{to: "/first"}, %{to: "/second"}] =
              for({^reference, {:redirect, _topic, options}} <- messages, do: options)
   end
+
+  test "a failed action leaves out a patch it applied" do
+    reference = make_ref()
+    send(self(), {reference, {:patch, "topic", %{to: "/applied"}}})
+    send(self(), {reference, {:patch, "topic", %{to: "/unapplied"}}})
+
+    assert_raise RuntimeError, "failed", fn ->
+      ActionScope.run(fn ->
+        assert_receive {^reference, {:patch, "topic", %{to: "/applied"}}} = applied
+        ActionScope.record_taken(applied)
+        ActionScope.record_applied(applied)
+        assert_receive {^reference, {:patch, "topic", %{to: "/unapplied"}}} = unapplied
+        ActionScope.record_taken(unapplied)
+        raise "failed"
+      end)
+    end
+
+    {:messages, messages} = Process.info(self(), :messages)
+
+    assert [%{to: "/unapplied"}] = for({^reference, {:patch, _topic, options}} <- messages, do: options)
+  end
 end

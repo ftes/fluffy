@@ -7,7 +7,8 @@ defmodule Fluffy.Driver.Live.ActionScope do
   # events that reached it before, and the view messages, such as a redirect,
   # it took from the mailbox. An action that fails leaves its session on the
   # page it started on, so the scope puts those messages back for that
-  # session's next call to find. Outside an action, recording does nothing.
+  # session's next call to find, except a patch the action already applied
+  # there. Outside an action, recording does nothing.
   #
   # An action whose timeout ran out before it reached the view retries once on
   # the page a navigation landed on, as a final attempt that may not retry
@@ -85,6 +86,10 @@ defmodule Fluffy.Driver.Live.ActionScope do
   end
 
   def record_taken(message), do: update(&%{&1 | taken: [message | &1.taken]})
+
+  # Records that the action applied a taken message to its session, so a
+  # failed action leaves it out instead of applying it again.
+  def record_applied(message), do: update(&%{&1 | taken: List.delete(&1.taken, message)})
 
   defp update(fun) do
     case Process.get(@scope) do

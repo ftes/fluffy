@@ -633,19 +633,25 @@ defmodule Fluffy.Driver.Live do
       [] ->
         session
 
-      destinations ->
+      patches ->
         case refresh(session) do
-          %Session{} = session -> Enum.reduce(destinations, session, &commit_patch(&2, &1))
+          %Session{} = session -> Enum.reduce(patches, session, &apply_patch(&2, &1))
           {:navigate, session, navigation} -> {:redirected, session, navigation}
         end
     end
   end
 
-  defp unread_patches(view, destinations) do
-    case current_patch(view) do
-      nil -> Enum.reverse(destinations)
-      destination -> unread_patches(view, [destination | destinations])
+  defp unread_patches(view, patches) do
+    case take_patch(view) do
+      nil -> Enum.reverse(patches)
+      patch -> unread_patches(view, [patch | patches])
     end
+  end
+
+  defp apply_patch(session, {_reference, {:patch, _topic, %{to: destination}}} = patch) do
+    session = commit_patch(session, destination)
+    ActionScope.record_applied(patch)
+    session
   end
 
   defp commit_patch(session, destination) do
@@ -678,15 +684,15 @@ defmodule Fluffy.Driver.Live do
   end
 
   # A patch changes the document in place, so the wait commits it and goes on
-  # there, while a redirect ends the wait on the new page.
+  # there, while a redirect ends the wait on the new page. A committed patch
+  # stays applied even if the action fails, so the wait does not record it.
   defp wait_for_retry(session, wait) do
     state = Session.page_state(session)
     %{proxy: {reference, topic, _proxy_pid}} = state.view
     watcher = state.watcher
 
     receive do
-      {^reference, {:patch, ^topic, %{to: destination}}} = message ->
-        ActionScope.record_taken(message)
+      {^reference, {:patch, ^topic, %{to: destination}}} ->
         commit_patch(session, destination)
 
       {:fluffy_live_view, ^watcher, {:died, reason}} = message ->
@@ -787,12 +793,19 @@ defmodule Fluffy.Driver.Live do
   end
 
   defp current_patch(view) do
+    case take_patch(view) do
+      {_reference, {:patch, _topic, %{to: destination}}} -> destination
+      nil -> nil
+    end
+  end
+
+  defp take_patch(view) do
     %{proxy: {reference, topic, _}} = view
 
     receive do
-      {^reference, {:patch, ^topic, %{to: destination}}} = message ->
+      {^reference, {:patch, ^topic, %{to: _destination}}} = message ->
         ActionScope.record_taken(message)
-        destination
+        message
     after
       0 -> nil
     end
