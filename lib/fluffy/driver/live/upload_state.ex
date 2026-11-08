@@ -24,12 +24,11 @@ end
 
 defmodule Fluffy.Driver.Live.UploadState.Form do
   @moduledoc false
-  @enforce_keys [:input_identity, :input_selector]
-  defstruct [:input_identity, :input_selector, batches: []]
+  @enforce_keys [:input_identity]
+  defstruct [:input_identity, batches: []]
 
   @type t :: %__MODULE__{
           input_identity: term(),
-          input_selector: String.t(),
           batches: [Fluffy.Driver.Live.UploadState.Batch.t()]
         }
 end
@@ -52,7 +51,11 @@ defmodule Fluffy.Driver.Live.UploadState do
   def get(%__MODULE__{forms: forms}, form_id), do: Map.get(forms, form_id)
   def forms(%__MODULE__{forms: forms}), do: Map.values(forms)
 
-  def put(%__MODULE__{} = state, form_id, identity, selector, upload, selected_files, options) do
+  def find_key(%__MODULE__{forms: forms}, fun) when is_function(fun, 1) do
+    Enum.find_value(forms, fn {form_id, form} -> if fun.(form), do: form_id end)
+  end
+
+  def put(%__MODULE__{} = state, form_id, identity, upload, selected_files, options) do
     options = Keyword.validate!(options, append: false, uploaded: false)
 
     entries =
@@ -69,7 +72,7 @@ defmodule Fluffy.Driver.Live.UploadState do
     batch = %Batch{entries: entries, upload: upload, uploaded?: options[:uploaded]}
     previous = get(state, form_id)
     batches = if options[:append] and previous, do: previous.batches ++ [batch], else: [batch]
-    form = %Form{input_identity: identity, input_selector: selector, batches: batches}
+    form = %Form{input_identity: identity, batches: batches}
     %{state | forms: Map.put(state.forms, form_id, form)}
   end
 
@@ -78,6 +81,9 @@ defmodule Fluffy.Driver.Live.UploadState do
       %{form | batches: Enum.map(form.batches, &mark_batch_uploaded(&1, upload_pid))}
     end)
   end
+
+  # A finished upload stays consumable even after its input is gone.
+  def uploaded?(%Form{batches: batches}), do: Enum.all?(batches, & &1.uploaded?)
 
   def delete_form(%__MODULE__{} = state, form_id) do
     {Map.get(state.forms, form_id), %{state | forms: Map.delete(state.forms, form_id)}}
@@ -142,10 +148,7 @@ defmodule Fluffy.Driver.Live.UploadState do
   end
 
   defp update_form(%__MODULE__{} = state, form_id, fun) do
-    case state.forms do
-      %{^form_id => form} -> %{state | forms: Map.put(state.forms, form_id, fun.(form))}
-      %{} -> state
-    end
+    %{state | forms: Map.update!(state.forms, form_id, fun)}
   end
 
   defp mark_batch_uploaded(%Batch{upload: %{pid: upload_pid}} = batch, upload_pid), do: %{batch | uploaded?: true}

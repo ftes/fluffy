@@ -110,6 +110,7 @@ defmodule Fluffy.Conformance.LivePatchActionTest do
       |> set_input_files(by_label("Attachment", exact: true), @upload)
       |> click(by_role(:button, name: "Save", exact: true))
       |> visible("Saves: 1")
+      |> visible("Consumed: 1")
     end
 
     @tag driver: driver
@@ -159,6 +160,143 @@ defmodule Fluffy.Conformance.LivePatchActionTest do
       |> set_input_files(by_label("Attachment", exact: true), [@upload, @second_upload])
       |> click(by_role(:button, name: "Save", exact: true))
       |> visible("Consumed: 2")
+    end
+
+    @tag driver: driver
+    test "an upload to a form without an id survives a render that shifts the form with #{driver}", %{driver: driver} do
+      driver
+      |> live_session()
+      |> visit("/live/patching/idless-validate")
+      |> set_input_files(by_label("Attachment", exact: true), @upload)
+      |> visible("Wrapper before the form")
+      |> click(by_role(:button, name: "Save", exact: true))
+      |> visible("Consumed: 1")
+    end
+
+    @tag driver: driver
+    test "a form without an id that hides its file input and shifts still submits with #{driver}", %{driver: driver} do
+      driver
+      |> live_session()
+      |> visit("/live/patching/idless-hide")
+      |> set_input_files(by_label("Attachment", exact: true), @upload)
+      |> click(by_role(:button, name: "Save", exact: true))
+      |> visible("Saves: 1")
+      |> visible("Consumed: 1")
+    end
+
+    @tag driver: driver
+    test "a form without an id that loses its file input does not submit the form now at its path with #{driver}", %{
+      driver: driver
+    } do
+      driver
+      |> live_session()
+      |> visit("/live/patching/idless-hide-twin")
+      |> set_input_files(by_label("Attachment", exact: true), @upload)
+      |> click(by_role(:button, name: "Save", exact: true))
+      |> visible("Saves: 1")
+      |> visible("Consumed: 1")
+      |> visible("Other saves: 0")
+    end
+
+    @tag driver: driver
+    test "an upload's form still submits when its last upload removes it with #{driver}", %{driver: driver} do
+      driver
+      |> live_session()
+      |> visit("/live/patching/progress-remove")
+      |> set_input_files(by_label("Attachment", exact: true), @upload)
+      |> click(by_role(:button, name: "Save", exact: true))
+      |> visible("Saves: 1")
+      |> visible("Consumed: 1")
+    end
+
+    @tag driver: driver
+    test "a form without an id still submits when its last upload removes it with #{driver}", %{driver: driver} do
+      driver
+      |> live_session()
+      |> visit("/live/patching/idless-remove")
+      |> set_input_files(by_label("Attachment", exact: true), @upload)
+      |> click(by_role(:button, name: "Save", exact: true))
+      |> visible("Saves: 1")
+      |> visible("Consumed: 1")
+    end
+
+    @tag driver: driver
+    test "a form without an id still submits when a render replaces it and keeps its input with #{driver}", %{
+      driver: driver
+    } do
+      driver
+      |> live_session()
+      |> visit("/live/patching/idless-detach")
+      |> set_input_files(by_label("Attachment", exact: true), @upload)
+      |> click(by_role(:button, name: "Save", exact: true))
+      |> visible("Saves: 1")
+      |> visible("Consumed: 1")
+    end
+
+    for {mode, form} <- [{"validate-insert", "with"}, {"idless-validate", "without"}] do
+      @tag driver: driver
+      @tag mode: mode
+      test "an upload cancels after a render shifts a form #{form} an id with #{driver}", %{driver: driver, mode: mode} do
+        driver
+        |> live_session()
+        |> visit("/live/patching/#{mode}")
+        |> set_input_files(by_label("Attachment", exact: true), @upload)
+        |> visible("Upload received")
+        |> click(by_role(:button, name: "Cancel upload", exact: true))
+        |> expect(:button |> by_role(name: "Cancel upload", exact: true) |> to_be_visible() |> not_())
+        |> click(by_role(:button, name: "Save", exact: true))
+        |> visible("Saves: 1")
+        |> visible("Consumed: 0")
+      end
+    end
+
+    @tag driver: driver
+    test "a file selection keeps a server-bound field filled before it with #{driver}", %{driver: driver} do
+      driver
+      |> live_session()
+      |> visit("/live/patching/fill-upload")
+      |> fill(by_label("Title", exact: true), "north")
+      |> visible("Validated title: north")
+      |> set_input_files(by_label("Attachment", exact: true), @upload)
+      |> expect(:button |> by_role(name: "Cancel upload", exact: true) |> to_be_visible())
+      |> visible("Validated title: north")
+      |> expect("Title" |> by_label(exact: true) |> to_have_value("north"))
+      |> click(by_role(:button, name: "Save", exact: true))
+      |> visible("Saved title: north")
+      |> visible("Consumed: 1")
+    end
+
+    @tag driver: driver
+    test "an auto upload stays consumable after its input is removed with #{driver}", %{driver: driver} do
+      driver
+      |> live_session()
+      |> visit("/live/patching/auto-hide")
+      |> set_input_files(by_label("Attachment", exact: true), @upload)
+      |> visible("Uploaded: 1")
+      |> click(by_role(:button, name: "Save", exact: true))
+      |> visible("Consumed: 1")
+    end
+
+    @tag driver: driver
+    test "an auto upload can be cancelled after its input is removed with #{driver}", %{driver: driver} do
+      driver
+      |> live_session()
+      |> visit("/live/patching/auto-hide")
+      |> set_input_files(by_label("Attachment", exact: true), @upload)
+      |> visible("Uploaded: 1")
+      |> click(by_role(:button, name: "Cancel upload", exact: true))
+      |> click(by_role(:button, name: "Save", exact: true))
+      |> visible("Consumed: 0")
+    end
+
+    @tag driver: driver
+    test "a file input outside its form uploads with #{driver}", %{driver: driver} do
+      driver
+      |> live_session()
+      |> visit("/live/patching/outside-input")
+      |> set_input_files(by_label("Attachment", exact: true), @upload)
+      |> click(by_role(:button, name: "Save", exact: true))
+      |> visible("Consumed: 1")
     end
 
     @tag driver: driver

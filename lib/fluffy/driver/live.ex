@@ -131,8 +131,8 @@ defmodule Fluffy.Driver.Live do
         case ClientDOM.form_submission(client_dom, target, :live) do
           %{phx_submit?: true} = submission ->
             case live_upload_for_submit(session, target) do
-              {:ok, form_id, upload} ->
-                dispatch_live_upload_submit(session, form_id, upload, submission)
+              {:ok, form_key, upload, form} ->
+                dispatch_live_upload_submit(session, form_key, upload, form, submission)
 
               :none ->
                 dispatch_live_submit(session, client_dom, submission, event_context)
@@ -813,18 +813,20 @@ defmodule Fluffy.Driver.Live do
     end
   end
 
-  defp commit_render_result(session, _client_dom, {:error, {_kind, _options}} = redirect) do
+  defp commit_render_result(session, client_dom, result, after_render \\ &prune_stale_live_uploads/1)
+
+  defp commit_render_result(session, _client_dom, {:error, {_kind, _options}} = redirect, _after_render) do
     follow_redirect_result(session, redirect)
   end
 
-  defp commit_render_result(_session, _client_dom, {:redirected, %Session{}, _navigation} = redirected) do
+  defp commit_render_result(_session, _client_dom, {:redirected, %Session{}, _navigation} = redirected, _after_render) do
     redirected
   end
 
   # Patches are committed before the render, so it shows the last of them.
   # LiveViewTest answers nil when the event's nested view was removed before its
   # reply; the page is still whatever the root view renders now.
-  defp commit_render_result(session, client_dom, result) when is_binary(result) or is_nil(result) do
+  defp commit_render_result(session, client_dom, result, after_render) when is_binary(result) or is_nil(result) do
     session = apply_last_patch(session)
     state = Session.page_state(session)
 
@@ -838,7 +840,7 @@ defmodule Fluffy.Driver.Live do
     case rendered do
       {:ok, document} ->
         state = %{state | client_dom: ClientDOM.reconcile(client_dom, document)}
-        session = session |> Session.put_page_state(state) |> prune_stale_live_uploads()
+        session = session |> Session.put_page_state(state) |> after_render.()
 
         case ClientDOM.triggered_submission(state.client_dom) do
           nil ->
@@ -1068,6 +1070,7 @@ defmodule Fluffy.Driver.Live do
       form_selector =
         selector_for_view(state.client_dom, ClientDOM.selector_for_node_id(state.client_dom, form_id), event_context)
 
+      input_selector = selector_for_view(state.client_dom, target.selector, event_context)
       upload_name = existing_upload_name!(target)
       # Validate the selection before starting an upload client it would leak.
       client_dom = ClientDOM.set_input_files(state.client_dom, locator, selected_files)
@@ -1077,7 +1080,8 @@ defmodule Fluffy.Driver.Live do
              read_view(session, fn ->
                file_input!(session, event_context.view, form_selector, upload_name, selected_files)
              end) do
-        form_key = node_identity(state.client_dom, %{id: form_id})
+        upload = UploadCompat.at_input(upload, input_selector)
+        form_key = live_upload_key(state, form_id) || node_identity(state.client_dom, target)
         start_live_upload(session, client_dom, selected_files, target, event_context, form_key, form_selector, upload)
       end
     end
@@ -1138,9 +1142,8 @@ defmodule Fluffy.Driver.Live do
       %Session{} = session when auto_upload? ->
         if live_upload_present?(session, form_key) do
           case dispatch_live_upload(session, form_key, upload, upload_entry_names(upload)) do
-            {:ok, session} -> mark_live_upload_uploaded(session, form_key, upload.pid)
-            {:input_gone, session} -> session
-            {:entry_error, session} -> session
+            {:ok, session} -> session |> mark_live_upload_uploaded(form_key, upload.pid) |> prune_stale_live_uploads()
+            {reason, session} when reason in [:entry_error, :input_gone] -> prune_stale_live_uploads(session)
             {:navigation, navigation} -> navigation
           end
         else
@@ -1162,8 +1165,7 @@ defmodule Fluffy.Driver.Live do
       UploadState.put(
         state.live_uploads,
         form_id,
-        ClientDOM.target_identity(target),
-        target.selector,
+        node_identity(client_dom, target),
         upload,
         selected_files,
         uploaded: uploaded?,
@@ -1229,18 +1231,36 @@ defmodule Fluffy.Driver.Live do
 
   defp live_upload_for_submit(session, target) do
     state = Session.page_state(session)
+    index = ClientDOM.index(state.client_dom)
 
-    case Form.owner_id(ClientDOM.index(state.client_dom), target) do
+    case Form.owner_id(index, target) do
       nil ->
         :none
 
       form_id ->
-        form_key = node_identity(state.client_dom, %{id: form_id})
+        form_key = live_upload_key(state, form_id)
 
         case UploadState.get(state.live_uploads, form_key) do
           nil -> :none
-          upload_state -> {:ok, form_key, upload_state}
+          upload_state -> {:ok, form_key, upload_state, DocumentIndex.target_by_id(index, form_id)}
         end
+    end
+  end
+
+  # A form with an id is the key of its upload. A form without one has only a
+  # position, which a patch can shift or hand to another form, so its upload
+  # goes by its file input, which always has an id.
+  defp live_upload_key(state, form_id) do
+    case node_identity(state.client_dom, %{id: form_id}) do
+      {:path, _selector_path} -> UploadState.find_key(state.live_uploads, &upload_input_in_form?(state, &1, form_id))
+      identity -> identity
+    end
+  end
+
+  defp upload_input_in_form?(state, upload_form, form_id) do
+    case find_by_identity(state.client_dom, upload_form.input_identity) do
+      nil -> false
+      input -> Form.owner_id(ClientDOM.index(state.client_dom), input) == form_id
     end
   end
 
@@ -1315,11 +1335,18 @@ defmodule Fluffy.Driver.Live do
     ClientDOM.resolve(client_dom, Locator.by_css(selector)) != []
   end
 
-  defp put_live_upload_files(session, %{input_selector: selector}, selected_files) do
+  defp put_live_upload_files(session, %{input_identity: identity}, selected_files) do
     state = Session.page_state(session)
-    locator = Locator.by_css(selector)
-    client_dom = ClientDOM.set_input_files(state.client_dom, locator, selected_files)
-    Session.put_page_state(session, %{state | client_dom: client_dom})
+
+    # A finished upload outlives its input, so the input may be gone.
+    case find_by_identity(state.client_dom, identity) do
+      nil ->
+        session
+
+      input ->
+        client_dom = ClientDOM.set_input_files(state.client_dom, Locator.by_css(input.selector), selected_files)
+        Session.put_page_state(session, %{state | client_dom: client_dom})
+    end
   end
 
   defp put_live_upload_entries(session, form_id, upload_pid, entries) do
@@ -1328,12 +1355,12 @@ defmodule Fluffy.Driver.Live do
     Session.put_page_state(session, %{state | live_uploads: live_uploads})
   end
 
-  defp dispatch_live_upload_submit(session, form_key, upload_state, submission) do
+  defp dispatch_live_upload_submit(session, form_key, upload_state, clicked_form, submission) do
     # LiveView marks the form before any upload runs, so the marks survive a
     # submit that an upload entry error blocks.
     state = Session.page_state(session)
-    form = find_by_identity(state.client_dom, form_key)
-    session = Session.put_page_state(session, %{state | client_dom: ClientDOM.mark_form_used(state.client_dom, form.id)})
+    client_dom = ClientDOM.mark_form_used(state.client_dom, clicked_form.id)
+    session = Session.put_page_state(session, %{state | client_dom: client_dom})
 
     upload_result =
       Enum.reduce_while(upload_state.batches, {:ok, session}, fn entry_upload, {:ok, session} ->
@@ -1353,53 +1380,64 @@ defmodule Fluffy.Driver.Live do
 
     case upload_result do
       {:ok, session} ->
-        submit_after_uploads(session, form_key, submission)
+        submit_after_uploads(session, form_key, clicked_form, submission)
 
       {reason, session} when reason in [:entry_error, :input_gone] ->
-        session
+        prune_stale_live_uploads(session)
 
       {:navigation, navigation} ->
         navigation
     end
   end
 
-  # A patch during the uploads can move or remove the form.
-  defp submit_after_uploads(session, form_key, submission) do
-    case current_upload_form(session, form_key) do
-      nil ->
-        session
+  # A patch during the uploads can move or remove the form. A form the patch
+  # took away still reaches its view with the binding it had when clicked, as
+  # the browser submits the element it started with. A kept file input that a
+  # patch moved into another form submits that form instead, unlike the browser.
+  defp submit_after_uploads(session, form_key, clicked_form, submission) do
+    form = current_upload_form(session, form_key)
 
-      form ->
-        with {:ok, event_context} <- owning_view_context(session, form) do
-          dispatch_live_upload_submit_event(session, form_key, form, submission, event_context)
-        end
+    with {:ok, event_context} <- owning_view_context(session, form || clicked_form) do
+      dispatch_live_upload_submit_event(session, form_key, form, clicked_form, submission, event_context)
     end
   end
 
-  # A file input always has an id, so its form is the one to trust. A form
-  # without an id has a positional identity, which a patch can shift or hand to
-  # another form. Only when the input is gone does the form's identity decide.
+  # A file input always has an id, so its form is the one to trust. Only when
+  # the input is gone or left its form does the identity of a form with an id
+  # decide. The upload of a form without an id is keyed by its input instead.
   defp current_upload_form(session, form_key) do
     state = Session.page_state(session)
-    form_of_upload_input(state, form_key) || find_by_identity(state.client_dom, form_key)
+    form_of_upload_input(state, form_key) || form_by_key(state, form_key)
   end
 
+  defp form_by_key(state, {_kind, "form", _id} = form_key), do: find_by_identity(state.client_dom, form_key)
+  defp form_by_key(_state, _input_key), do: nil
+
   defp form_of_upload_input(state, form_key) do
-    with %{input_identity: identity} <- UploadState.get(state.live_uploads, form_key),
-         %{} = input <- find_by_identity(state.client_dom, identity) do
+    with %{} = input <- live_upload_input(state, form_key) do
       index = ClientDOM.index(state.client_dom)
       DocumentIndex.target_by_id(index, Form.owner_id(index, input))
     end
   end
 
-  defp dispatch_live_upload_submit_event(session, form_key, form, submission, event_context) do
+  defp live_upload_input(state, form_key) do
+    with %{input_identity: identity} <- UploadState.get(state.live_uploads, form_key) do
+      find_by_identity(state.client_dom, identity)
+    end
+  end
+
+  defp dispatch_live_upload_submit_event(session, form_key, form, clicked_form, submission, event_context) do
     state = Session.page_state(session)
 
     payload = Form.to_params(submission.fields)
 
     submit_result =
       dispatch_view_event(session, fn ->
-        render_view_event(state.client_dom, event_context, form.selector, :submit, payload)
+        if form do
+          render_view_event(state.client_dom, event_context, form.selector, :submit, payload)
+        else
+          Event.push(event_context.view, clicked_form, :submit, payload)
+        end
       end)
 
     case commit_render_result(session, state.client_dom, submit_result) do
@@ -1435,25 +1473,22 @@ defmodule Fluffy.Driver.Live do
   defp dispatch_live_upload(session, form_key, upload, entry_names) do
     Enum.reduce_while(entry_names, {:ok, session}, fn entry_name, {:ok, session} ->
       # A patch during the uploads can remove the input, releasing its client,
-      # or move the form its client's selector names.
-      with true <- live_upload_present?(session, form_key),
-           {:ok, upload} <- upload_at_current_form(session, form_key, upload) do
+      # or move it away from its client's selector.
+      with %{} = input <- live_upload_input(Session.page_state(session), form_key),
+           {:ok, upload} <- upload_at_current_input(session, input, upload) do
         dispatch_live_upload_entry(session, upload, entry_name)
       else
-        false -> {:halt, {:input_gone, session}}
+        nil -> {:halt, {:input_gone, session}}
         navigation -> {:halt, {:navigation, navigation}}
       end
     end)
   end
 
-  defp upload_at_current_form(session, form_key, upload) do
+  defp upload_at_current_input(session, input, upload) do
     client_dom = Session.page_state(session).client_dom
-    form = current_upload_form(session, form_key)
 
-    with {:ok, context} <- owning_view_context(session, form) do
-      selector = selector_for_view(client_dom, form.selector, context)
-      [_form, input] = String.split(upload.element.selector, ~s( input[type="file"]), parts: 2)
-      {:ok, %{upload | element: %{upload.element | selector: ~s(#{selector} input[type="file"]#{input})}}}
+    with {:ok, context} <- owning_view_context(session, input) do
+      {:ok, UploadCompat.at_input(upload, selector_for_view(client_dom, input.selector, context))}
     end
   end
 
@@ -1469,7 +1504,9 @@ defmodule Fluffy.Driver.Live do
       _result ->
         state = Session.page_state(session)
 
-        case commit_render_result(session, state.client_dom, upload_result) do
+        # The caller prunes once the uploads end: the view still has to consume
+        # an upload whose own progress removed its input.
+        case commit_render_result(session, state.client_dom, upload_result, & &1) do
           %Session{} = session -> {:cont, {:ok, session}}
           navigation -> {:halt, {:navigation, navigation}}
         end
@@ -1484,7 +1521,8 @@ defmodule Fluffy.Driver.Live do
 
     {live_uploads, stale_uploads} =
       UploadState.prune(state.live_uploads, fn upload_state ->
-        ClientDOM.target_identity_present?(state.client_dom, upload_state.input_identity)
+        DocumentIndex.identity_present?(ClientDOM.index(state.client_dom), upload_state.input_identity) or
+          UploadState.uploaded?(upload_state)
       end)
 
     Enum.each(stale_uploads, &release_live_upload_clients(session, &1))
