@@ -33,4 +33,14 @@ defmodule Fluffy.FailureArtifactTest do
     assert_raise RuntimeError, "boom", fn -> Bounded.within(1_000, fn -> raise "boom" end) end
     assert catch_exit(Bounded.within(1_000, fn -> exit(:boom) end)) == :boom
   end
+
+  test "a bounded Playwright call past its timeout is killed, or left to finish" do
+    owner = self()
+    slow = fn -> fn -> send(owner, {:finished, Process.sleep(200)}) end end
+
+    assert Bounded.within(10, slow.()) == :timeout
+    refute_receive {:finished, :ok}, 400
+    assert Bounded.within(10, slow.(), on_timeout: :leave) == :timeout
+    assert_receive {:finished, :ok}, 400
+  end
 end

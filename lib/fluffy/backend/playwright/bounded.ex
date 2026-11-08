@@ -9,17 +9,24 @@ defmodule Fluffy.Backend.Playwright.Bounded do
 
   The call runs unlinked, so a crash does not kill the caller: an exception is
   raised again in the caller, any other crash exits it with its reason.
+
+  A call still running after `timeout` is killed, or with `on_timeout: :leave`
+  left to finish on its own.
   """
-  def within(timeout, fun) do
+  def within(timeout, fun, options \\ []) do
+    on_timeout = Keyword.validate!(options, on_timeout: :kill)[:on_timeout]
     task = Task.Supervisor.async_nolink(Fluffy.TaskSupervisor, fun)
 
-    case Task.yield(task, timeout) || Task.shutdown(task, :brutal_kill) do
+    case Task.yield(task, timeout) || stop(task, on_timeout) do
       {:ok, result} -> {:ok, result}
       {:exit, {exception, stacktrace}} when is_exception(exception) -> reraise exception, stacktrace
       {:exit, reason} -> exit(reason)
       nil -> :timeout
     end
   end
+
+  defp stop(task, :kill), do: Task.shutdown(task, :brutal_kill)
+  defp stop(task, :leave), do: Task.ignore(task)
 
   @doc "Like `within/2` for a call returning `{:ok, value}` or `{:error, error}`; returns the value or raises."
   def within!(timeout, operation, fun) do

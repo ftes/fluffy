@@ -59,8 +59,7 @@ defmodule Fluffy.Backend.Playwright do
     # open in the shared browser.
     :ok =
       SessionRuntime.register(runtime, {:browser_context, browser_context.guid}, fn ->
-        task = Task.Supervisor.async_nolink(Fluffy.TaskSupervisor, fn -> BrowserContext.close(browser_context) end)
-        Task.yield(task, timeout)
+        Bounded.within(timeout, fn -> BrowserContext.close(browser_context) end, on_timeout: :leave)
       end)
 
     SessionRuntime.run(runtime, fn ->
