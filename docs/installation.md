@@ -9,7 +9,7 @@ database. Then follow [Usage](usage.md) for your first test and shared test case
 ```elixir
 defp deps do
   [
-    {:fluffy, "~> 0.9.0-rc.0", only: :test}
+    {:fluffy, "~> 0.9.0-rc.1", only: :test}
   ]
 end
 ```
