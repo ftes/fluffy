@@ -229,6 +229,21 @@ defmodule Fluffy.Locator do
     Internal.append(locator, {:nth, index})
   end
 
+  @doc """
+  Returns a locator matching `locator`'s elements inside each element matched by `other`.
+
+  Relative operations such as `nth/2` and `first/1` on `locator` are resolved
+  separately inside each match of `other`, so this picks the third cell of every row,
+  not the third cell of the table:
+
+      by_css("td") |> nth(2) |> within(by_css("tr"))
+
+  Static and LiveView resolve it the same way. Compare scoping by the parent locator,
+  as in `by_css(row, "td")`, where `nth/2` picks from all the matches together.
+  """
+  @spec within(t(), t()) :: t()
+  def within(%__MODULE__{} = locator, %__MODULE__{} = other), do: Internal.new({:within, other, locator})
+
   defp attribute_or_label_locator(:label, text, options) do
     Internal.new({:label, text, Options.validate_exact_locator!(options)})
   end

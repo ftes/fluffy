@@ -89,6 +89,22 @@ defmodule Fluffy.Driver.Playwright do
   defp native_expectation(session, %Expect{target: :page, kind: :title, expected: expected}),
     do: {Session.page_state(session).page, :to_have_title, [expected], []}
 
+  defp native_expectation(session, %Expect{target: :page, kind: :aria_snapshot, expected: expected}) do
+    {assertion, arguments, options} = locator_assertion(:aria_snapshot, expected)
+    {Session.page_state(session).page, assertion, arguments, options}
+  end
+
+  defp native_expectation(session, %Expect{target: target, kind: :screenshot, expected: options}) do
+    native =
+      case target do
+        :page -> Session.page_state(session).page
+        {:locator, locator} -> locator(session, locator)
+      end
+
+    options = resolve_mask(options, session)
+    {native, :to_have_screenshot, [], options}
+  end
+
   @state_assertions %{
     attached: :to_be_attached,
     disabled: :to_be_disabled,
@@ -105,6 +121,7 @@ defmodule Fluffy.Driver.Playwright do
     contain_class: :to_contain_class,
     count: :to_have_count,
     id: :to_have_id,
+    role: :to_have_role,
     value: :to_have_value,
     values: :to_have_values
   }
@@ -121,6 +138,16 @@ defmodule Fluffy.Driver.Playwright do
   defp locator_assertion(:contain_text, {expected, options}), do: {:to_contain_text, [expected], options}
   defp locator_assertion(:attribute, {name, value, options}), do: {:to_have_attribute, [name, value], options}
   defp locator_assertion(:in_viewport, options), do: {:to_be_in_viewport, [], options}
+  defp locator_assertion(:aria_snapshot, {expected, options}), do: {:to_match_aria_snapshot, [expected], options}
+  defp locator_assertion(:css, {name, value, options}), do: {:to_have_css, [name, value], options}
+  defp locator_assertion(:js_property, {name, value}), do: {:to_have_js_property, [name, value], []}
+  defp locator_assertion(:accessible_name, {expected, options}), do: {:to_have_accessible_name, [expected], options}
+
+  defp locator_assertion(:accessible_description, {expected, options}),
+    do: {:to_have_accessible_description, [expected], options}
+
+  defp locator_assertion(:accessible_error_message, {expected, options}),
+    do: {:to_have_accessible_error_message, [expected], options}
 
   defp locator_assertion(kind, _expected) when is_map_key(@state_assertions, kind),
     do: {Map.fetch!(@state_assertions, kind), [], []}
@@ -409,11 +436,67 @@ defmodule Fluffy.Driver.Playwright do
     end)
   end
 
+  def wait_for(session, locator, options) do
+    locator_action(session, :wait_for, locator, options, &BrowserLocator.wait_for(&1, native(options, &2)), :wait)
+  end
+
+  def drop(session, locator, payload, options) do
+    locator_action(session, :drop, locator, options, &BrowserLocator.drop(&1, payload, native(options, &2)))
+  end
+
+  def locator_wait_for_function(session, locator, expression, arg, options) do
+    locator_action(
+      session,
+      :wait_for_function,
+      locator,
+      options,
+      &BrowserLocator.wait_for_function(&1, expression, arg, native(options, &2)),
+      :wait
+    )
+  end
+
+  def bounding_box(session, locator, options) do
+    bounded_read(session, :bounding_box, locator, options, &BrowserLocator.bounding_box(&1, native(options, &2)))
+  end
+
+  def aria_snapshot(session, locator, options) do
+    native_locator = locator(session, locator)
+    read(session, :aria_snapshot, locator, options, &BrowserLocator.aria_snapshot(native_locator, native(options, &1)))
+  end
+
+  def page_aria_snapshot(session, options) do
+    page = Session.page_state(session).page
+    read(session, :aria_snapshot, nil, options, &BrowserPage.aria_snapshot(page, native(options, &1)))
+  end
+
+  def page_read(session, operation, fun, options) do
+    page = Session.page_state(session).page
+
+    read(session, operation, nil, options, &bounded(operation, &1, fn -> fun.(page) end))
+  end
+
+  def locator_evaluate(session, locator, expression, arg, options) do
+    bounded_read(session, :evaluate, locator, options, &BrowserLocator.evaluate(&1, expression, arg, native(options, &2)))
+  end
+
+  def evaluate_all(session, locator, expression, arg, options) do
+    bounded_read(session, :evaluate_all, locator, options, fn native_locator, _remaining ->
+      BrowserLocator.evaluate_all(native_locator, expression, arg)
+    end)
+  end
+
+  defp read(session, operation, target, options, fun) do
+    case navigation_aware_action(session, Session.timeout(session, options), fun, :wait) do
+      {:ok, value, outcome} -> {:return, value, outcome}
+      {:error, error} -> OperationFailure.raise_playwright!(operation, target, error)
+    end
+  end
+
   def screenshot(session, locator, path, options) do
     options =
       options
       |> Keyword.put(:path, path)
-      |> Keyword.replace_lazy(:mask, fn mask -> Enum.map(mask, &locator(session, &1)) end)
+      |> resolve_mask(session)
 
     locator_action(session, :screenshot, locator, options, &BrowserLocator.screenshot(&1, native(options, &2)))
   end
@@ -441,17 +524,28 @@ defmodule Fluffy.Driver.Playwright do
       operation,
       nil,
       options,
-      fn remaining ->
-        case Bounded.within(remaining, fn -> fun.(page) end) do
-          {:ok, result} ->
-            result
-
-          :timeout ->
-            {:error, %TimeoutError{message: "Timeout #{remaining}ms exceeded during #{operation}"}}
-        end
-      end,
+      &bounded(operation, &1, fn -> fun.(page) end),
       kind
     )
+  end
+
+  defp resolve_mask(options, session),
+    do: Keyword.replace_lazy(options, :mask, fn mask -> Enum.map(mask, &locator(session, &1)) end)
+
+  # A read whose Playwright call a script blocking the page could otherwise hold up.
+  defp bounded_read(session, operation, locator, options, call) do
+    native_locator = locator(session, locator)
+
+    read(session, operation, locator, options, fn remaining ->
+      bounded(operation, remaining, fn -> call.(native_locator, remaining) end)
+    end)
+  end
+
+  defp bounded(operation, remaining, fun) do
+    case Bounded.within(remaining, fun) do
+      {:ok, result} -> result
+      :timeout -> {:error, %TimeoutError{message: "Timeout #{remaining}ms exceeded during #{operation}"}}
+    end
   end
 
   @impl true
@@ -518,9 +612,9 @@ defmodule Fluffy.Driver.Playwright do
   # Fluffy's own options stay here; the rest pass through to the PlaywrightEx call.
   defp native(options, remaining), do: Keyword.put(options, :timeout, remaining)
 
-  defp locator_action(session, operation, locator, options, fun) do
+  defp locator_action(session, operation, locator, options, fun, kind \\ :action) do
     native = locator(session, locator)
-    action(session, operation, locator, options, &fun.(native, &1))
+    action(session, operation, locator, options, &fun.(native, &1), kind)
   end
 
   defp action(session, operation, target, options, fun, kind \\ :action) do

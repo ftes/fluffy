@@ -94,6 +94,20 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
     |> assert_has("#saved", text: "Saved typed")
   end
 
+  for driver <- [:static, :playwright] do
+    @tag driver: driver
+    test "an or_ operand of a within parent stays inside the facade's scope with #{driver}" do
+      parents = Locator.or_(Locator.by_css(".a"), Locator.by_css(".b"))
+
+      unquote(driver)
+      |> Fluffy.session_for_html("""
+      <section id="one"><div class="a"><p>In</p></div></section>
+      <div class="b"><p>Out</p></div>
+      """)
+      |> within("#one", &assert_has(&1, Locator.within(Locator.by_css("p"), parents), count: 1))
+    end
+  end
+
   @tag driver: :playwright
   test "within/3 rejects a frame locator combined with a composed operand" do
     frame = Locator.frame_locator("iframe")

@@ -215,16 +215,27 @@ fails when PlaywrightEx adds or removes one.
 - **Wrapped:** locator builders (`get_by_role` as `by_role`, and so on), the
   cross-driver actions, including `clear` and `set_checked`, `hover`, `drag_to`,
   `press_sequentially`, `focus`, `blur`, `dblclick`, `tap`, `dispatch_event`,
-  `select_text`, `scroll_into_view_if_needed`, `set_viewport_size`, `emulate_media`,
-  the expectations in `Fluffy.Expect`, navigation, page management, cookies,
-  storage state, permissions, geolocation, offline mode, HTTP credentials, request
-  routing, tracing, page and element screenshots, page evaluation, init scripts,
-  `wait_for_function` on the page, the clock in
+  `select_text`, `scroll_into_view_if_needed`, `wait_for` on a locator,
+  `bounding_box`, `aria_snapshot`, `drop`, `all`, `Fluffy.Locator.within/2`, locator
+  `evaluate`, `evaluate_all` and `wait_for_function`, `set_viewport_size`,
+  `viewport_size`, `emulate_media`, `pdf`, `bring_to_front`, `content`, `title`,
+  the expectations in `Fluffy.Expect`, including `to_have_css`,
+  `to_have_js_property`, `to_have_role`, the accessible name, description and error
+  message assertions, `to_match_aria_snapshot` and `to_have_screenshot`, navigation,
+  page management, cookies, storage state, including `set_storage_state`,
+  `local_storage` and `session_storage`, permissions, geolocation, offline mode,
+  HTTP credentials, extra HTTP headers, request routing, including `unroute_all`
+  and `Fluffy.Route.fetch/2`,
+  tracing, page and element screenshots, page evaluation, init scripts, script and
+  style tags, `wait_for_function` and `wait_for_load_state` on the page, the clock in
   `Fluffy.Playwright.Clock`, keyboard and mouse input in `Fluffy.Playwright.Keyboard`
   and `Fluffy.Playwright.Mouse`, the events in `Fluffy.Event`, and the values they
   deliver, including response bodies. Their options pass through as documented.
-- **Unwrap:** everything else page-, locator-, or value-local, such as assertions
-  like `to_have_css`, HAR routing, and response timing. For reads like
+  `to_have_screenshot` needs an explicit `path:` for its baseline, which Fluffy does
+  not derive from the test name; `to_match_aria_snapshot` compares an inline snapshot
+  or, with `path:`, a file written when missing.
+- **Unwrap:** everything else page-, locator-, or value-local, such as
+  `aria_snapshot_json`, HAR routing, and response timing. For reads like
   `text_content`, `Fluffy.unwrap_and_return/2` and
   `Fluffy.Playwright.unwrap_and_return/3` return the callback's result instead of
   the session. Navigation these cause is adopted.

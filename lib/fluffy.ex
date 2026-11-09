@@ -73,6 +73,7 @@ defmodule Fluffy do
   """
   @type backend :: :phoenix | :playwright
   @type action_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema()))
+  @type wait_for_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema(:wait_for)))
   @type click_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema(:click)))
   @type fill_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema(:fill)))
   @type clear_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema(:clear)))
@@ -280,9 +281,35 @@ defmodule Fluffy do
   defp owner_page(%{page: page}), do: page
 
   @doc group: "Events"
-  @doc "Registers an event wait immediately. Await the pending handle once with `await/1`."
+  @doc """
+  Waits for an event or a locator.
+
+  With a `Fluffy.Event`, registers the wait immediately and returns a pending
+  handle: await it once with `await/1`.
+
+  With a `Fluffy.Locator`, blocks until the locator reaches `state:`, by default
+  `:visible`, and returns the session. This form is Playwright only, and raises
+  `Fluffy.CapabilityError` on Phoenix. It raises after the session's `timeout:` unless
+  `timeout:` is given. Prefer an `expect` when asserting what the page shows.
+
+      session |> wait_for(by_role(:dialog), state: :hidden) |> click(by_role(:button))
+
+  ## Locator options
+
+  Playwright-only options pass through to #{Fluffy.Options.native_reference(:wait_for)}.
+
+  #{NimbleOptions.docs(Fluffy.Options.action_schema(:wait_for))}
+  """
   @spec wait_for(Session.t(), Event.t(), [Event.option()]) :: Pending.t()
-  def wait_for(%Session{} = session, %Event{} = event, options \\ []), do: Event.wait(session, event, options)
+  @spec wait_for(Session.t(), Fluffy.Locator.t(), [wait_for_option()]) :: Session.t()
+  def wait_for(session, target, options \\ [])
+
+  def wait_for(%Session{} = session, %Event{} = event, options), do: Event.wait(session, event, options)
+
+  def wait_for(%Session{} = session, %Fluffy.Locator{} = locator, options) do
+    Fluffy.Playwright.__ensure_playwright_backend__!(session, :wait_for)
+    dispatch_driver(session, :wait_for, [locator, Fluffy.Options.validate_action!(:wait_for, options)])
+  end
 
   @doc group: "Events"
   @doc "Consumes a pending event and returns its value. Its deadline starts at registration."

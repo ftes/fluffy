@@ -37,6 +37,13 @@ defmodule Fluffy.Locator.Static do
       {:filter, options}, candidates ->
         filter_candidates(candidates, aria, options)
 
+      # `child` resolves separately inside each match of `parent`, `nth` included.
+      {:within, parent, child}, candidates ->
+        candidates
+        |> Enum.flat_map(&resolve(aria, &1, parent))
+        |> Enum.flat_map(&resolve(aria, &1, child))
+        |> Enum.uniq_by(&LazyHTML.css_path/1)
+
       operation, candidates when elem(operation, 0) in @descendant_queries ->
         candidates
         |> Enum.flat_map(&(operation |> apply_operation([&1]) |> without_scope(&1, aria.index.document)))

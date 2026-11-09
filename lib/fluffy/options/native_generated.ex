@@ -229,6 +229,45 @@ defmodule Fluffy.Options.NativeGenerated do
          "Whether to bypass the [actionability](https://playwright.dev/docs/actionability) checks. Defaults to `false`.",
          quote(do: boolean())}
     ],
+    {PlaywrightEx.Locator, :wait_for, 2} => [
+      state:
+        {"`:attached` | `:detached` | `:visible` | `:hidden`", "Defaults to `:visible`. Can be either:",
+         quote(do: :attached | :detached | :visible | :hidden)}
+    ],
+    {PlaywrightEx.Locator, :aria_snapshot, 2} => [
+      boxes:
+        {"`t:boolean/0`",
+         "When `true`, appends each element's bounding box as `[box=x,y,width,height]` to the snapshot. Coordinates are relative to the viewport, in CSS pixels, as returned by [`Element.getBoundingClientRect()`](https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect). Defaults to `false`.",
+         quote(do: boolean())},
+      depth: {"`t:integer/0`", "When specified, limits the depth of the snapshot.", quote(do: integer())},
+      mode:
+        {"`:ai` | `:default`",
+         "When set to `:ai`, returns a snapshot optimized for AI consumption. Defaults to `:default`. See details for more information.",
+         quote(do: :ai | :default)}
+    ],
+    {PlaywrightEx.Locator, :drop, 3} => [
+      position:
+        {"`t:map/0`",
+         "A point to use relative to the top-left corner of element padding box. If not specified, uses some visible point of the element.",
+         quote(do: %{x: number(), y: number()})}
+    ],
+    {PlaywrightEx.Locator, :evaluate, 4} => [
+      expose_functions:
+        {"`t:boolean/0`",
+         "When set to `true`, functions passed inside `arg` are exposed in the page and can be called from the page function. Calling one returns a `Promise` of its result. Under the hood, each function is exposed via `PlaywrightEx.Page.expose_function/3`, so it is technically accessible from all frames of the page. Exposed functions are cleared upon the top-level navigation. Defaults to `false`, in which case functions are not serializable and passing one fails.",
+         quote(do: boolean())}
+    ],
+    {PlaywrightEx.Page, :aria_snapshot, 2} => [
+      boxes:
+        {"`t:boolean/0`",
+         "When `true`, appends each element's bounding box as `[box=x,y,width,height]` to the snapshot. Coordinates are relative to the viewport, in CSS pixels, as returned by [`Element.getBoundingClientRect()`](https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect). Defaults to `false`.",
+         quote(do: boolean())},
+      depth: {"`t:integer/0`", "When specified, limits the depth of the snapshot.", quote(do: integer())},
+      mode:
+        {"`:ai` | `:default`",
+         "When set to `:ai`, returns a snapshot optimized for AI consumption: including element references like `[ref=e2]` and snapshots of `<iframe>`s. Defaults to `:default`.",
+         quote(do: :ai | :default)}
+    ],
     {PlaywrightEx.Page, :wait_for_function, 4} => [
       polling:
         {"`t:number/0` | `:raf`",
@@ -270,6 +309,110 @@ defmodule Fluffy.Options.NativeGenerated do
          quote(do: String.t())},
       type:
         {"`:png` | `:jpeg` | `:webp`", "Specify screenshot type, defaults to `:png`.", quote(do: :png | :jpeg | :webp)}
+    ],
+    {PlaywrightEx.Expect, :to_have_screenshot, 2} => [
+      animations:
+        {"`:disabled` | `:allow`",
+         "When set to `:disabled`, stops CSS animations, CSS transitions and Web Animations. Animations get different treatment depending on their duration:",
+         quote(do: :disabled | :allow)},
+      caret:
+        {"`:hide` | `:initial`",
+         "When set to `:hide`, screenshot will hide text caret. When set to `:initial`, text caret behavior will not be changed.  Defaults to `:hide`.",
+         quote(do: :hide | :initial)},
+      mask:
+        {"list of `t:PlaywrightEx.Locator.t/0`",
+         "Specify locators that should be masked when the screenshot is taken. Masked elements will be overlaid with a pink box `#FF00FF` (customized by `:mask_color`) that completely covers its bounding box. The mask is also applied to invisible elements, see [Matching only visible elements](https://playwright.dev/docs/locators#matching-only-visible-elements) to disable that.",
+         quote(do: [PlaywrightEx.Locator.t()])},
+      mask_color:
+        {"`t:String.t/0`",
+         "Specify the color of the overlay box for masked elements, in [CSS color format](https://developer.mozilla.org/en-US/docs/Web/CSS/color_value). Default color is pink `#FF00FF`.",
+         quote(do: String.t())},
+      max_diff_pixel_ratio:
+        {"`t:number/0`",
+         "An acceptable ratio of pixels that are different to the total amount of pixels, between `0` and `1`. Default is configurable with `config :playwright_ex, :expect` (see the configuration in `PlaywrightEx.Expect`). Note that `:threshold` defines which pixels are considered different.",
+         quote(do: number())},
+      max_diff_pixels:
+        {"`t:integer/0`",
+         "An acceptable amount of pixels that could be different. Default is configurable with `config :playwright_ex, :expect` (see the configuration in `PlaywrightEx.Expect`). Note that `:threshold` defines which pixels are considered different.",
+         quote(do: integer())},
+      omit_background:
+        {"`t:boolean/0`",
+         "Hides default white background and allows capturing screenshots with transparency. Not applicable to `jpeg` images. Defaults to `false`.",
+         quote(do: boolean())},
+      scale:
+        {"`:css` | `:device`",
+         "When set to `:css`, screenshot will have a single pixel per each css pixel on the page. For high-dpi devices, this will keep screenshots small. Using `:device` option will produce a single pixel per each device pixel, so screenshots of high-dpi devices will be twice as large or even larger.",
+         quote(do: :css | :device)},
+      style_path:
+        {"`t:String.t/0` | list of `t:String.t/0`",
+         "File name containing the stylesheet to apply while making the screenshot. This is where you can hide dynamic elements, make elements invisible or change their properties to help you creating repeatable screenshots. This stylesheet pierces the Shadow DOM and applies to the inner frames.",
+         quote(do: String.t() | [String.t()])},
+      threshold:
+        {"`t:number/0`",
+         "An acceptable perceived color difference in the [YIQ color space](https://en.wikipedia.org/wiki/YIQ) between the same pixel in compared images, between zero (strict) and one (lax), default is configurable with `config :playwright_ex, :expect` (see the configuration in `PlaywrightEx.Expect`). Defaults to `0.2`.",
+         quote(do: number())},
+      clip:
+        {"`t:map/0`", "An object which specifies clipping of the resulting image.",
+         quote(do: %{x: number(), y: number(), width: number(), height: number()})},
+      full_page:
+        {"`t:boolean/0`",
+         "When true, takes a screenshot of the full scrollable page, instead of the currently visible viewport. Defaults to `false`.",
+         quote(do: boolean())}
+    ],
+    {PlaywrightEx.Page, :content, 2} => [
+      include_shadow:
+        {"`t:boolean/0`",
+         "When true, contents of open shadow roots are included as [declarative shadow DOM](https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_shadow_DOM#declaratively_with_html), i.e. `<template shadowrootmode=\"open\">` elements nested inside their host elements. Closed shadow roots are never included. Defaults to `false`.",
+         quote(do: boolean())}
+    ],
+    {PlaywrightEx.Page, :pdf, 2} => [
+      display_header_footer: {"`t:boolean/0`", "Display header and footer. Defaults to `false`.", quote(do: boolean())},
+      footer_template:
+        {"`t:String.t/0`", "HTML template for the print footer. Should use the same format as the `:header_template`.",
+         quote(do: String.t())},
+      format:
+        {"`t:String.t/0`",
+         "Paper format. If set, takes priority over `:width` or `:height` options. Defaults to 'Letter'.",
+         quote(do: String.t())},
+      header_template:
+        {"`t:String.t/0`",
+         "HTML template for the print header. Should be valid HTML markup with following classes used to inject printing values into them:",
+         quote(do: String.t())},
+      height:
+        {"`t:String.t/0` | `t:number/0`", "Paper height, accepts values labeled with units.",
+         quote(do: String.t() | number())},
+      landscape: {"`t:boolean/0`", "Paper orientation. Defaults to `false`.", quote(do: boolean())},
+      margin:
+        {"`t:map/0`", "Paper margins, defaults to none.",
+         quote(
+           do: %{
+             optional(:top) => String.t() | number(),
+             optional(:right) => String.t() | number(),
+             optional(:bottom) => String.t() | number(),
+             optional(:left) => String.t() | number()
+           }
+         )},
+      outline:
+        {"`t:boolean/0`", "Whether or not to embed the document outline into the PDF. Defaults to `false`.",
+         quote(do: boolean())},
+      page_ranges:
+        {"`t:String.t/0`",
+         "Paper ranges to print, e.g., '1-5, 8, 11-13'. Defaults to the empty string, which means print all pages.",
+         quote(do: String.t())},
+      prefer_css_page_size:
+        {"`t:boolean/0`",
+         "Give any CSS `@page` size declared in the page priority over what is declared in `:width` and `:height` or `:format` options. Defaults to `false`, which will scale the content to fit the paper size.",
+         quote(do: boolean())},
+      print_background: {"`t:boolean/0`", "Print background graphics. Defaults to `false`.", quote(do: boolean())},
+      scale:
+        {"`t:number/0`", "Scale of the webpage rendering. Defaults to `1`. Scale amount must be between 0.1 and 2.",
+         quote(do: number())},
+      tagged:
+        {"`t:boolean/0`", "Whether or not to generate tagged (accessible) PDF. Defaults to `false`.",
+         quote(do: boolean())},
+      width:
+        {"`t:String.t/0` | `t:number/0`", "Paper width, accepts values labeled with units.",
+         quote(do: String.t() | number())}
     ],
     {PlaywrightEx.Page, :emulate_media, 2} => [
       color_scheme:

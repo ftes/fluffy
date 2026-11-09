@@ -7,7 +7,17 @@
 - `by_role` on Phoenix knows Playwright's implicit roles for everything markup can decide, landmarks included: `article`, `banner`, `complementary`, `contentinfo`, `form`, `main`, `navigation`, `region` and `search`, plus the likes of `paragraph`, `group`, `dialog`, `searchbox` and `status`. The usage guide has the full list.
 - `Fluffy.Expect.to_be_in_viewport/2` and `Fluffy.Assert.in_viewport/2`, with `ratio:` from 0 to 1, for Playwright; Phoenix raises `Fluffy.CapabilityError`.
 - `Fluffy.Playwright.add_init_script/3` runs a script in every later document of the session's browser context.
-- `Fluffy.Playwright.wait_for_function/4` waits on the active page and returns the session, within the session's `timeout:` unless `timeout:` is given.
+- `Fluffy.Playwright.wait_for_function/4` waits on the active page and returns the session, within the session's `timeout:` unless `timeout:` is given. A non-empty keyword list in the argument position is options, so `wait_for_function(session, expression, timeout: 100)` works; `[]` stays a JavaScript array.
+- `Fluffy.Playwright.evaluate/4` accepts `timeout:`, overriding the session's, as `evaluate(session, expression, timeout: 100)` or `evaluate(session, expression, arg, timeout: 100)`.
+- `Fluffy.Expect.to_have_css/4`, `to_have_js_property/4`, `to_have_role/3`, `to_have_accessible_name/3`, `to_have_accessible_description/3` and `to_have_accessible_error_message/3` for Playwright; Phoenix raises `Fluffy.CapabilityError`.
+- `Fluffy.Expect.to_have_screenshot/2` and `page_to_have_screenshot/1` compare against the baseline at a required `path:`; Fluffy does not derive one from the test name. `to_match_aria_snapshot/3` and `page_to_match_aria_snapshot/2` compare an inline snapshot. Playwright only.
+- `to_match_aria_snapshot/2` and `page_to_match_aria_snapshot/1` also take `path:` in place of the expected snapshot, a file resolved against the current working directory and written when missing unless `update_snapshots:` is `:none`. Needs PlaywrightEx 0.17.0-rc.4.
+- `Fluffy.Playwright` gains `set_extra_http_headers/2`, which keeps the session's starting headers and Ecto sandbox header, `add_script_tag/2`, `add_style_tag/2`, `wait_for_load_state/3` and `unroute_all/2`, all returning the session, and `bounding_box/3`, `aria_snapshot/3` and `viewport_size/1`, returning the value. Phoenix raises `Fluffy.CapabilityError`.
+- `Fluffy.wait_for/3` also takes a locator on Playwright, with `state:`: it blocks and returns the session, while an event still returns a pending handle. Phoenix raises `Fluffy.CapabilityError` for a locator.
+- `Fluffy.Playwright.evaluate` and `wait_for_function` take a locator, and `evaluate_all/5` runs on all its elements, with the same options-or-argument matching.
+- `Fluffy.Playwright` gains `drop/4`, `pdf/3`, `bring_to_front/2` and `set_storage_state/2`, returning the session, and `all/2`, `content/2`, `title/2`, `local_storage/2` and `session_storage/2`, returning the value.
+- `Fluffy.Locator.within/2` scopes a locator to each match of another, with `nth/2` and `first/1` resolved per parent, on every driver.
+- `Fluffy.Route.fetch/2` performs a routed request and returns the response for `Fluffy.Route.fulfill/2`.
 - The facade's `assert_has` and `refute_has` accept a `%Fluffy.Locator{}` with the same options as a selector, inside the current `within/3` scope.
 - `Fluffy.unwrap_and_return/2`, `Fluffy.Playwright.unwrap_and_return/3` and `Fluffy.PhoenixTest.unwrap_and_return/2` run a native callback and return its result. They reconcile like `unwrap`; a Static callback may return anything and leaves the page alone.
 
@@ -45,7 +55,7 @@ Fluffy now runs on PlaywrightEx 0.17, a port of the official Playwright client w
 - `executable:` now names a Playwright driver executable instead of the npm `cli.js`; drop it if it pointed at npm `playwright`.
 - `unwrap/2` passes a `%PlaywrightEx.Page{}`; `Fluffy.Playwright.Handle` is removed.
 - `Fluffy.HTTPEvent` is replaced by `Fluffy.Request` and `Fluffy.Response` (`response.request` is the request).
-- `Fluffy.Playwright.evaluate(session, expression, arg \\ nil)` replaces the `is_function:`, `arg:` and `timeout:` options, which now raise `ArgumentError`, and raises after the session's `timeout:`; JavaScript `null` returns `:null`.
+- `Fluffy.Playwright.evaluate(session, expression, arg \\ nil, options \\ [])` replaces the `is_function:` and `arg:` options, which now raise `NimbleOptions.ValidationError`, and raises after `timeout:` or the session's `timeout:`; JavaScript `null` returns `:null`.
 - `Fluffy.Playwright.cookies(session, urls)` takes the URL list directly; the `urls:` and `timeout:` options now raise `ArgumentError`.
 - Cookie maps of `add_cookies/2` and `cookies/2` use Playwright's camelCase atom keys: `%{name: "a", value: "b", url: url, http_only: true}` becomes `%{name: "a", value: "b", url: url, httpOnly: true}`, likewise `sameSite:` and `partitionKey:`; `add_cookies/2` raises on the old keys. `storage_state/2` returns atom keys instead of strings: `state["cookies"]` becomes `state.cookies`, likewise `:origins`, `:localStorage` and `:httpOnly`. Saved state files and string-keyed maps still load.
 - `browser_context:`, `launch_options:`, and the options of `screenshot`, `storage_state`, cookies and `trace` pass through to PlaywrightEx, which validates them.

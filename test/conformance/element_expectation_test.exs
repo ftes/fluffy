@@ -271,6 +271,16 @@ defmodule Fluffy.Conformance.ElementExpectationTest do
   end
 
   @tag driver: :live
+  test "within resolves nth per parent on a LiveView" do
+    item = by_css("li")
+
+    :live
+    |> session()
+    |> expect(item |> nth(1) |> within(by_css("ul")) |> to_have_text("Two"))
+    |> expect(to_have_count(within(item, by_css("ul")), 3))
+  end
+
+  @tag driver: :live
   test "a Live expectation fails once its timeout runs out" do
     session = session(:live)
     started_at = System.monotonic_time(:millisecond)

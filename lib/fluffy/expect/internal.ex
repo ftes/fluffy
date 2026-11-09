@@ -78,6 +78,14 @@ defmodule Fluffy.Expect.Internal do
     "active page to have opener #{inspect(expected)}"
   end
 
+  defp positive_description(%Expect{target: :page, kind: :screenshot, expected: options}) do
+    "active page to match the screenshot at #{inspect(options[:path])}"
+  end
+
+  defp positive_description(%Expect{target: :page, kind: :aria_snapshot, expected: expected}) do
+    "active page #{locator_matcher_description(:aria_snapshot, expected)}"
+  end
+
   defp locator_matcher_description(:checked, :checked), do: "to be checked"
   defp locator_matcher_description(:checked, :unchecked), do: "to be unchecked"
   defp locator_matcher_description(:checked, :indeterminate), do: "to be indeterminate"
@@ -88,6 +96,27 @@ defmodule Fluffy.Expect.Internal do
   defp locator_matcher_description(:focused, _expected), do: "to be focused"
   defp locator_matcher_description(:in_viewport, []), do: "to be in viewport"
   defp locator_matcher_description(:in_viewport, ratio: ratio), do: "to be in viewport with ratio #{ratio}"
+  defp locator_matcher_description(:css, {name, value, _options}), do: "to have CSS #{name} #{inspect(value)}"
+  defp locator_matcher_description(:js_property, {name, value}), do: "to have JS property #{name} #{inspect(value)}"
+  defp locator_matcher_description(:screenshot, options), do: "to match the screenshot at #{inspect(options[:path])}"
+
+  defp locator_matcher_description(:aria_snapshot, {nil, path: path}),
+    do: "to match the ARIA snapshot at #{inspect(path)}"
+
+  defp locator_matcher_description(:aria_snapshot, {expected, _options}),
+    do: "to match the ARIA snapshot #{inspect(expected)}"
+
+  defp locator_matcher_description(:role, expected), do: "to have role #{inspect(expected)}"
+
+  defp locator_matcher_description(:accessible_name, {expected, options}),
+    do: "to have accessible name #{inspect(expected)}#{ignoring_case(options)}"
+
+  defp locator_matcher_description(:accessible_description, {expected, options}),
+    do: "to have accessible description #{inspect(expected)}#{ignoring_case(options)}"
+
+  defp locator_matcher_description(:accessible_error_message, {expected, options}),
+    do: "to have accessible error message #{inspect(expected)}#{ignoring_case(options)}"
+
   defp locator_matcher_description(:value, expected), do: "to have value #{inspect(expected)}"
   defp locator_matcher_description(:values, expected), do: "to have values #{inspect(expected)}"
   defp locator_matcher_description(:visible, _expected), do: "to be visible"

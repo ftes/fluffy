@@ -5,6 +5,16 @@ defmodule Fluffy.Conformance.ComposedLocatorTest do
   import Fluffy.Expect
   import Fluffy.Locator
 
+  @tag driver: :playwright
+  test "within/2 rejects a frame inside a chained locator" do
+    session = session_for_html(:playwright, ~s(<section><iframe srcdoc="<p>In</p>"></iframe></section>))
+    locator = within(by_css(frame_locator("iframe"), "p"), by_css("section"))
+
+    assert_raise ArgumentError, ~r/within\/2 cannot enter a frame/, fn ->
+      expect(session, to_have_count(locator, 1))
+    end
+  end
+
   for driver <- [:static, :playwright] do
     @tag driver: driver
     test "by_label reads labels outside its parent with #{driver}" do
@@ -42,6 +52,42 @@ defmodule Fluffy.Conformance.ComposedLocatorTest do
       |> expect(to_have_count(by_css(boxes, "p"), 1))
       |> expect(to_have_count(filter(boxes, has: by_css(".box")), 1))
       |> expect(to_have_attribute(filter(boxes, has: by_css(".box")), "id", "outer"))
+    end
+  end
+
+  for driver <- [:static, :playwright] do
+    @tag driver: driver
+    test "within resolves nth and first separately inside each parent with #{driver}", %{driver: driver} do
+      cell = by_css("td")
+      row = by_css("tbody tr")
+
+      driver
+      |> session_for_html("""
+      <table>
+        <tbody>
+          <tr><td>a1</td><td>a2</td></tr>
+          <tr><td>b1</td><td>b2</td></tr>
+        </tbody>
+      </table>
+      """)
+      |> expect(cell |> nth(1) |> within(row) |> to_have_text(["a2", "b2"]))
+      |> expect(cell |> first() |> within(row) |> to_have_text(["a1", "b1"]))
+      |> expect(to_have_count(within(cell, row), 4))
+      |> expect(row |> by_css("td") |> nth(1) |> to_have_count(1))
+      |> expect(row |> first() |> then(&within(cell, &1)) |> last() |> to_have_text("a2"))
+      |> expect(to_have_count(within(cell, by_css("#missing")), 0))
+    end
+
+    @tag driver: driver
+    test "within searches descendants only and counts a shared child once with #{driver}" do
+      unquote(driver)
+      |> session_for_html("""
+      <div id="outer" class="box"><div id="inner" class="box"><p>Shared</p></div></div>
+      """)
+      |> expect(to_have_count(within(by_css(".box"), by_css(".box")), 1))
+      |> expect(to_have_attribute(within(by_css(".box"), by_css(".box")), "id", "inner"))
+      |> expect(to_have_count(within(by_css("p"), by_css(".box")), 1))
+      |> expect(".box" |> by_css() |> first() |> within(by_css("#outer")) |> to_have_attribute("id", "inner"))
     end
   end
 

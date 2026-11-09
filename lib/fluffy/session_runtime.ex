@@ -60,6 +60,8 @@ defmodule Fluffy.SessionRuntime do
   catch
     :exit, {:noproc, _} -> :ok
     :exit, {:normal, _} -> :ok
+    # OTP 27's shape when the runtime stops by itself during the call.
+    :exit, {{:normal, {:sys, :terminate, _}}, _} -> :ok
   end
 
   def resolve(runtime, %Page{runtime: runtime, id: id}) do

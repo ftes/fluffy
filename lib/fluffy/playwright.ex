@@ -12,12 +12,14 @@ defmodule Fluffy.Playwright do
   alias Fluffy.Backend
   alias Fluffy.Backend.Playwright, as: PlaywrightBackend
   alias Fluffy.Backend.Playwright.Bounded
+  alias Fluffy.Backend.Playwright.Document
   alias Fluffy.CapabilityError
   alias Fluffy.Options
   alias Fluffy.Playwright.Trace
   alias Fluffy.Route
   alias Fluffy.Session
   alias PlaywrightEx.BrowserContext
+  alias PlaywrightEx.WebStorage
 
   @trace_schema NimbleOptions.new!(
                   directory: [
@@ -67,6 +69,20 @@ defmodule Fluffy.Playwright do
           unquote(NimbleOptions.option_typespec(Options.action_schema(:locator_screenshot)))
   @type emulate_media_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:emulate_media)))
   @type wait_for_function_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:wait_for_function)))
+  @type wait_for_load_state_option ::
+          unquote(NimbleOptions.option_typespec(Options.action_schema(:wait_for_load_state)))
+  @type bounding_box_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:bounding_box)))
+  @type aria_snapshot_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:aria_snapshot)))
+  @type add_script_tag_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:add_script_tag)))
+  @type add_style_tag_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:add_style_tag)))
+  @type unroute_all_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:unroute_all)))
+  @type evaluate_option :: unquote(NimbleOptions.option_typespec(Options.action_schema()))
+  @type locator_evaluate_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:locator_evaluate)))
+  @type locator_wait_for_function_option ::
+          unquote(NimbleOptions.option_typespec(Options.action_schema(:locator_wait_for_function)))
+  @type drop_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:drop)))
+  @type pdf_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:pdf)))
+  @type content_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:content)))
 
   @doc group: "Lifecycle and navigation"
   @doc playwright_only: true
@@ -168,6 +184,36 @@ defmodule Fluffy.Playwright do
   def go_forward(%Session{} = session, options \\ []) do
     ensure_playwright_backend!(session, :browser_history)
     Backend.history(session, :go_forward, Options.validate_action!(:go_forward, options))
+  end
+
+  @doc group: "Lifecycle and navigation"
+  @doc playwright_only: true
+  @doc """
+  Waits for the active page to reach a load state and returns the session.
+
+  `state` is `:load` (the default), `:domcontentloaded` or `:networkidle`, and the
+  options may take its place. The call raises after the session's `timeout:` unless
+  `timeout:` is given. Phoenix sessions raise `Fluffy.CapabilityError`.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.action_schema(:wait_for_load_state))}
+  """
+  @spec wait_for_load_state(Session.t()) :: Session.t()
+  @spec wait_for_load_state(Session.t(), :load | :domcontentloaded | :networkidle | nil | [wait_for_load_state_option()]) ::
+          Session.t()
+  @spec wait_for_load_state(Session.t(), :load | :domcontentloaded | :networkidle | nil, [wait_for_load_state_option()]) ::
+          Session.t()
+  def wait_for_load_state(session, state \\ nil, options \\ [])
+
+  def wait_for_load_state(%Session{} = session, options, []) when is_list(options),
+    do: wait_for_load_state(session, nil, options)
+
+  def wait_for_load_state(%Session{} = session, state, options) do
+    ensure_playwright_backend!(session, :wait_for_load_state)
+    options = Options.validate_action!(:wait_for_load_state, options)
+    wait = &PlaywrightEx.Page.wait_for_load_state(&1, state, &2)
+    Fluffy.__dispatch_driver__(session, :page_wait, [:wait_for_load_state, wait, options])
   end
 
   @doc group: "Actions"
@@ -329,6 +375,177 @@ defmodule Fluffy.Playwright do
     Fluffy.__dispatch_driver__(session, :scroll_into_view_if_needed, [locator, options])
   end
 
+  @doc playwright_only: true
+  @doc """
+  Returns the bounding box of a locator as `%{x: x, y: y, width: width, height: height}`,
+  or `nil` if the element is not visible.
+
+  Coordinates are in CSS pixels relative to the main frame's viewport. The call raises
+  after the session's `timeout:` unless `timeout:` is given. Phoenix sessions raise
+  `Fluffy.CapabilityError`.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.action_schema(:bounding_box))}
+  """
+  @spec bounding_box(Session.t(), Fluffy.Locator.t(), [bounding_box_option()]) ::
+          %{x: number(), y: number(), width: number(), height: number()} | nil
+  def bounding_box(%Session{} = session, %Fluffy.Locator{} = locator, options \\ []) do
+    ensure_playwright_backend!(session, :bounding_box)
+    Fluffy.__dispatch_driver__(session, :bounding_box, [locator, Options.validate_action!(:bounding_box, options)])
+  end
+
+  @doc playwright_only: true
+  @doc """
+  Returns the ARIA snapshot of the active page, or of a locator, as YAML text.
+
+  The call raises after the session's `timeout:` unless `timeout:` is given. Phoenix
+  sessions raise `Fluffy.CapabilityError`.
+
+  ## Options
+
+  Playwright-only options pass through to #{Options.native_reference(:aria_snapshot)}.
+
+  #{NimbleOptions.docs(Options.action_schema(:aria_snapshot))}
+  """
+  @spec aria_snapshot(Session.t(), Fluffy.Locator.t() | [aria_snapshot_option()], [aria_snapshot_option()]) :: String.t()
+  def aria_snapshot(session, locator_or_options \\ [], options \\ [])
+
+  def aria_snapshot(%Session{} = session, options, []) when is_list(options) do
+    ensure_playwright_backend!(session, :aria_snapshot)
+    Fluffy.__dispatch_driver__(session, :page_aria_snapshot, [Options.validate_action!(:page_aria_snapshot, options)])
+  end
+
+  def aria_snapshot(%Session{} = session, %Fluffy.Locator{} = locator, options) do
+    ensure_playwright_backend!(session, :aria_snapshot)
+    Fluffy.__dispatch_driver__(session, :aria_snapshot, [locator, Options.validate_action!(:aria_snapshot, options)])
+  end
+
+  @doc playwright_only: true
+  @doc """
+  Returns one `Fluffy.Locator` per element the locator matches right now, built with `Fluffy.Locator.nth/2`.
+
+  As in Playwright, this does not wait for elements to match and returns `[]` if none
+  do, and it is flaky on a list that is still changing: the elements can change
+  between this call and the use of a locator. Wait first, such as with
+  `Fluffy.Expect.to_have_count/3`. Phoenix sessions raise `Fluffy.CapabilityError`.
+  """
+  @spec all(Session.t(), Fluffy.Locator.t()) :: [Fluffy.Locator.t()]
+  def all(%Session{} = session, %Fluffy.Locator{} = locator) do
+    ensure_playwright_backend!(session, :all)
+    count = unwrap_and_return(session, locator, &PlaywrightEx.Locator.count!/1)
+    for index <- 0..(count - 1)//1, do: Fluffy.Locator.nth(locator, index)
+  end
+
+  @doc group: "Actions"
+  @doc playwright_only: true
+  @doc """
+  Drops files or data onto a locator and returns the session.
+
+  `payload` has `files:`, as paths or `%{name: name, mimeType: type, buffer: content}`
+  maps, `data:`, a map of MIME type to string, or both. As in Playwright, the call
+  fails if the target's `dragover` listener does not call `preventDefault()`. Phoenix
+  sessions raise `Fluffy.CapabilityError`.
+
+  ## Options
+
+  Playwright-only options pass through to #{Options.native_reference(:drop)}.
+
+  #{NimbleOptions.docs(Options.action_schema(:drop))}
+  """
+  @spec drop(Session.t(), Fluffy.Locator.t(), map(), [drop_option()]) :: Session.t()
+  def drop(%Session{} = session, %Fluffy.Locator{} = locator, payload, options \\ []) when is_map(payload) do
+    ensure_playwright_backend!(session, :drop)
+    Fluffy.__dispatch_driver__(session, :drop, [locator, payload, Options.validate_action!(:drop, options)])
+  end
+
+  @doc playwright_only: true
+  @doc """
+  Saves the active page as a PDF and returns the session.
+
+  Browsers other than Chromium cannot generate one and raise. Phoenix sessions raise
+  `Fluffy.CapabilityError`.
+
+  ## Options
+
+  Playwright-only options pass through to #{Options.native_reference(:pdf)}.
+
+  #{NimbleOptions.docs(Options.action_schema(:pdf))}
+  """
+  @spec pdf(Session.t(), Path.t(), [pdf_option()]) :: Session.t()
+  def pdf(%Session{} = session, path, options \\ []) when is_binary(path) do
+    ensure_playwright_backend!(session, :pdf)
+    {timeout, native} = Options.split_action!(:pdf, options)
+    File.mkdir_p!(Path.dirname(path))
+    native = Keyword.put(native, :path, path)
+    page_action(session, :pdf, &PlaywrightEx.Page.pdf(&1, native), timeout)
+  end
+
+  @doc playwright_only: true
+  @doc "Brings the active page to the front and returns the session. Accepts `timeout:`."
+  @spec bring_to_front(Session.t(), [Fluffy.action_option()]) :: Session.t()
+  def bring_to_front(%Session{} = session, options \\ []) do
+    ensure_playwright_backend!(session, :bring_to_front)
+    page_action(session, :bring_to_front, &PlaywrightEx.Page.bring_to_front/1, Options.validate_action!(options))
+  end
+
+  @doc playwright_only: true
+  @doc "Returns the full HTML of the active page, including the doctype. Accepts `timeout:`."
+  @spec content(Session.t(), [content_option()]) :: String.t()
+  def content(%Session{} = session, options \\ []) do
+    ensure_playwright_backend!(session, :content)
+    {timeout, native} = Options.split_action!(:content, options)
+    page_read(session, :content, &PlaywrightEx.Page.content(&1, native), timeout)
+  end
+
+  @doc playwright_only: true
+  @doc "Returns the active page's title. To assert it, use `Fluffy.Expect.page_to_have_title/2`. Accepts `timeout:`."
+  @spec title(Session.t(), [Fluffy.action_option()]) :: String.t()
+  def title(%Session{} = session, options \\ []) do
+    ensure_playwright_backend!(session, :title)
+
+    page_read(session, :title, &PlaywrightEx.Page.title/1, Options.validate_action!(options))
+  end
+
+  @doc playwright_only: true
+  @doc """
+  Returns the active page's `localStorage` for its current origin, as
+  `[%{name: name, value: value}]`, like `storage_state/2` a read of the state as a
+  value. Accepts `timeout:`. Phoenix sessions raise `Fluffy.CapabilityError`.
+  """
+  @spec local_storage(Session.t(), [Fluffy.action_option()]) :: [%{name: String.t(), value: String.t()}]
+  def local_storage(%Session{} = session, options \\ []) do
+    ensure_playwright_backend!(session, :local_storage)
+    read = fn page -> WebStorage.items(PlaywrightEx.Page.local_storage(page)) end
+    page_read(session, :local_storage, read, Options.validate_action!(options))
+  end
+
+  @doc playwright_only: true
+  @doc """
+  Returns the active page's `sessionStorage` for its current origin, as
+  `local_storage/2` does. Accepts `timeout:`. Phoenix sessions raise `Fluffy.CapabilityError`.
+  """
+  @spec session_storage(Session.t(), [Fluffy.action_option()]) :: [%{name: String.t(), value: String.t()}]
+  def session_storage(%Session{} = session, options \\ []) do
+    ensure_playwright_backend!(session, :session_storage)
+    read = fn page -> WebStorage.items(PlaywrightEx.Page.session_storage(page)) end
+    page_read(session, :session_storage, read, Options.validate_action!(options))
+  end
+
+  defp page_read(session, operation, fun, options),
+    do: Fluffy.__dispatch_driver__(session, :page_read, [operation, fun, options])
+
+  @doc playwright_only: true
+  @doc """
+  Returns the active page's viewport as `%{width: width, height: height}`, or `nil`
+  without a fixed viewport. Phoenix sessions raise `Fluffy.CapabilityError`.
+  """
+  @spec viewport_size(Session.t()) :: %{width: integer(), height: integer()} | nil
+  def viewport_size(%Session{} = session) do
+    ensure_playwright_backend!(session, :viewport_size)
+    PlaywrightEx.Page.viewport_size(Session.page_state(session).page)
+  end
+
   @doc group: "Actions"
   @doc playwright_only: true
   @doc """
@@ -434,6 +651,27 @@ defmodule Fluffy.Playwright do
   def unroute(%Session{} = session, url, handler \\ nil) when is_nil(handler) or is_function(handler, 1) do
     ensure_playwright_backend!(session, :routing)
     Route.Registration.remove(session, url, handler)
+    session
+  end
+
+  @doc group: "Network"
+  @doc playwright_only: true
+  @doc """
+  Removes every route on the browser context and returns the session.
+
+  As in Playwright, this includes routes set up natively and HAR routers, not only
+  those registered by `route/4`. As with `unroute/3`, a request already at a handler
+  goes on without it. Raises after the session's `timeout:` unless `timeout:` is
+  given. Phoenix sessions raise `Fluffy.CapabilityError`.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.action_schema(:unroute_all))}
+  """
+  @spec unroute_all(Session.t(), [unroute_all_option()]) :: Session.t()
+  def unroute_all(%Session{} = session, options \\ []) do
+    ensure_playwright_backend!(session, :routing)
+    Route.Registration.remove_all(session, Options.validate_action!(:unroute_all, options))
     session
   end
 
@@ -557,9 +795,13 @@ defmodule Fluffy.Playwright do
   either an expression or a function that receives `arg`. Promises are awaited,
   serializable values return as Elixir terms (objects as maps with string
   keys, JavaScript `null` as `:null`), and JavaScript failures raise. The
-  call raises if it does not settle within the session's `timeout:`.
+  call raises if it does not settle within the session's `timeout:`, or `timeout:`
+  if given.
 
-  `evaluate/3` is a browser-only value query, so it returns the evaluated value
+  A non-empty keyword list in the place of `arg` is options, since no JavaScript value
+  serializes to one; any other list, including `[]`, is an array.
+
+  `evaluate/4` is a browser-only value query, so it returns the evaluated value
   rather than the Fluffy session. Use Elixir's `then/2` when a pipeline needs
   the value and then should continue with the session:
 
@@ -578,35 +820,105 @@ defmodule Fluffy.Playwright do
 
       Playwright.evaluate(session, "selector => document.querySelector(selector).textContent", "#status")
 
+      Playwright.evaluate(session, "document.title", timeout: 1_000)
+
   Do not use this for JavaScript that owns a navigation, opens a page, starts a
   download, or installs a durable listener. Use the corresponding
   listener-before-action `Fluffy.wait_for/3` event API so lifecycle and
   cleanup remain owned by Fluffy. Reserve `Fluffy.unwrap/2` for uncommon
   page-local operations that have no first-class API.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.action_schema())}
   """
-  @spec evaluate(Session.t(), String.t(), term()) :: term()
-  def evaluate(session, expression, arg \\ nil) when is_binary(expression) do
-    reject_evaluate_options!(arg)
+  @spec evaluate(Session.t(), String.t()) :: term()
+  def evaluate(session, expression) when is_binary(expression), do: run_evaluate(session, nil, expression, nil, [])
+
+  @doc playwright_only: true
+  @doc """
+  With a string, like `evaluate/2` with `arg` or options. With a `Fluffy.Locator`,
+  evaluates `expression` on its one element and returns the value: a function
+  expression receives the element and then `arg`.
+
+      Playwright.evaluate(session, by_css("#status"), "element => element.textContent")
+
+  ## Locator options
+
+  Playwright-only options pass through to #{Options.native_reference(:locator_evaluate)}.
+
+  #{NimbleOptions.docs(Options.action_schema(:locator_evaluate))}
+  """
+  @spec evaluate(Session.t(), String.t(), term() | [evaluate_option()]) :: term()
+  @spec evaluate(Session.t(), Fluffy.Locator.t(), String.t()) :: term()
+  def evaluate(session, %Fluffy.Locator{} = locator, expression) when is_binary(expression),
+    do: run_evaluate(session, locator, expression, nil, [])
+
+  def evaluate(session, expression, arg) when is_binary(expression), do: run_evaluate(session, nil, expression, arg, [])
+
+  @doc playwright_only: true
+  @doc "Like `evaluate/3`, with `arg` and options on the page, or `arg` or options on a locator."
+  @spec evaluate(Session.t(), String.t(), term(), [evaluate_option()]) :: term()
+  @spec evaluate(Session.t(), Fluffy.Locator.t(), String.t(), term() | [locator_evaluate_option()]) :: term()
+  def evaluate(session, %Fluffy.Locator{} = locator, expression, arg) when is_binary(expression),
+    do: run_evaluate(session, locator, expression, arg, [])
+
+  def evaluate(session, expression, arg, options) when is_binary(expression),
+    do: run_evaluate(session, nil, expression, arg, options)
+
+  @doc playwright_only: true
+  @doc "Like `evaluate/4` on a locator, with both `arg` and options."
+  @spec evaluate(Session.t(), Fluffy.Locator.t(), String.t(), term(), [locator_evaluate_option()]) :: term()
+  def evaluate(session, %Fluffy.Locator{} = locator, expression, arg, options) when is_binary(expression),
+    do: run_evaluate(session, locator, expression, arg, options)
+
+  defp run_evaluate(session, target, expression, arg, options) do
+    {arg, options} = arg_and_options(arg, options)
+    evaluate_target(session, target, expression, arg, options)
+  end
+
+  # A non-empty keyword list in the place of `arg` is options; `[]` stays a JavaScript array.
+  defp arg_and_options([_ | _] = arg, []), do: if(Keyword.keyword?(arg), do: {nil, arg}, else: {arg, []})
+  defp arg_and_options(arg, options), do: {arg, options}
+
+  defp evaluate_target(session, nil, expression, arg, options) do
     ensure_playwright!(session)
+    options = Options.validate_action!(options)
     frame = Session.page_state(session).frame
-    timeout = Session.timeout(session)
+    timeout = Session.timeout(session, options)
     Bounded.within!(timeout, :evaluate, fn -> PlaywrightEx.Frame.evaluate(frame, expression, arg) end)
   end
 
-  # Fluffy 0.8 took `evaluate(session, expression, timeout: ..., is_function: ..., arg: ...)`;
-  # such a list would now reach the page as the argument.
-  @evaluate_options [:timeout, :is_function, :arg]
-
-  defp reject_evaluate_options!([_ | _] = arg) do
-    if Keyword.keyword?(arg) and Enum.all?(Keyword.keys(arg), &(&1 in @evaluate_options)) do
-      raise ArgumentError,
-            "evaluate/3 takes the JavaScript argument, not the options #{inspect(Keyword.keys(arg))}; " <>
-              "call evaluate(session, expression, arg): a function expression receives arg, " <>
-              "and the call is bounded by the session's timeout:"
-    end
+  defp evaluate_target(session, %Fluffy.Locator{} = locator, expression, arg, options) do
+    ensure_playwright!(session)
+    options = Options.validate_action!(:locator_evaluate, options)
+    Fluffy.__dispatch_driver__(session, :locator_evaluate, [locator, expression, arg, options])
   end
 
-  defp reject_evaluate_options!(_arg), do: :ok
+  @doc playwright_only: true
+  @doc """
+  Evaluates `expression` on all elements of a locator and returns the value: a function
+  expression receives the array of elements and then `arg`.
+
+      count = Playwright.evaluate_all(session, by_css("li"), "items => items.length")
+
+  Unlike `evaluate/3` on a locator, any number of elements may match, including none.
+  It raises after the session's `timeout:` unless `timeout:` is given. A non-empty
+  keyword list in the place of `arg` is options. Phoenix sessions raise
+  `Fluffy.CapabilityError`.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.action_schema())}
+  """
+  @spec evaluate_all(Session.t(), Fluffy.Locator.t(), String.t(), term() | [Fluffy.action_option()]) :: term()
+  @spec evaluate_all(Session.t(), Fluffy.Locator.t(), String.t(), term(), [Fluffy.action_option()]) :: term()
+  def evaluate_all(%Session{} = session, %Fluffy.Locator{} = locator, expression, arg \\ nil, options \\ [])
+      when is_binary(expression) do
+    ensure_playwright!(session)
+    {arg, options} = arg_and_options(arg, options)
+    Fluffy.__dispatch_driver__(session, :evaluate_all, [locator, expression, arg, Options.validate_action!(options)])
+  end
 
   @doc playwright_only: true
   @doc """
@@ -620,7 +932,9 @@ defmodule Fluffy.Playwright do
       session
       |> Fluffy.Playwright.wait_for_function("window.editor?.ready === true")
       |> Fluffy.Playwright.wait_for_function("min => window.innerWidth > min", 800, timeout: 2_000)
+      |> Fluffy.Playwright.wait_for_function("window.editor?.saved", timeout: 2_000)
 
+  A non-empty keyword list in the place of `arg` is options, as in `evaluate/4`.
   Phoenix sessions raise `Fluffy.CapabilityError`.
 
   ## Options
@@ -629,12 +943,66 @@ defmodule Fluffy.Playwright do
 
   #{NimbleOptions.docs(Options.action_schema(:wait_for_function))}
   """
+  @spec wait_for_function(Session.t(), String.t()) :: Session.t()
+  def wait_for_function(%Session{} = session, expression) when is_binary(expression),
+    do: run_wait_for_function(session, nil, expression, nil, [])
+
+  @doc playwright_only: true
+  @doc """
+  With a string, like `wait_for_function/2` with `arg` or options. With a
+  `Fluffy.Locator`, waits until a function of the locator's element returns a truthy
+  value and returns the session; the function receives the element and then `arg`.
+
+      Playwright.wait_for_function(session, by_css("#status"), "element => element.dataset.ready === 'true'")
+
+  ## Locator options
+
+  Playwright-only options pass through to #{Options.native_reference(:locator_wait_for_function)}.
+
+  #{NimbleOptions.docs(Options.action_schema(:locator_wait_for_function))}
+  """
+  @spec wait_for_function(Session.t(), String.t(), term() | [wait_for_function_option()]) :: Session.t()
+  @spec wait_for_function(Session.t(), Fluffy.Locator.t(), String.t()) :: Session.t()
+  def wait_for_function(%Session{} = session, %Fluffy.Locator{} = locator, expression) when is_binary(expression),
+    do: run_wait_for_function(session, locator, expression, nil, [])
+
+  def wait_for_function(%Session{} = session, expression, arg) when is_binary(expression),
+    do: run_wait_for_function(session, nil, expression, arg, [])
+
+  @doc playwright_only: true
+  @doc "Like `wait_for_function/3`, with `arg` and options on the page, or `arg` or options on a locator."
   @spec wait_for_function(Session.t(), String.t(), term(), [wait_for_function_option()]) :: Session.t()
-  def wait_for_function(%Session{} = session, expression, arg \\ nil, options \\ []) when is_binary(expression) do
+  @spec wait_for_function(Session.t(), Fluffy.Locator.t(), String.t(), term() | [locator_wait_for_function_option()]) ::
+          Session.t()
+  def wait_for_function(%Session{} = session, %Fluffy.Locator{} = locator, expression, arg) when is_binary(expression),
+    do: run_wait_for_function(session, locator, expression, arg, [])
+
+  def wait_for_function(%Session{} = session, expression, arg, options) when is_binary(expression),
+    do: run_wait_for_function(session, nil, expression, arg, options)
+
+  @doc playwright_only: true
+  @doc "Like `wait_for_function/4` on a locator, with both `arg` and options."
+  @spec wait_for_function(Session.t(), Fluffy.Locator.t(), String.t(), term(), [locator_wait_for_function_option()]) ::
+          Session.t()
+  def wait_for_function(%Session{} = session, %Fluffy.Locator{} = locator, expression, arg, options)
+      when is_binary(expression), do: run_wait_for_function(session, locator, expression, arg, options)
+
+  defp run_wait_for_function(session, target, expression, arg, options) do
+    {arg, options} = arg_and_options(arg, options)
+    wait_for_target(session, target, expression, arg, options)
+  end
+
+  defp wait_for_target(session, nil, expression, arg, options) do
     ensure_playwright!(session)
     options = Options.validate_action!(:wait_for_function, options)
     wait = &PlaywrightEx.Page.wait_for_function(&1, expression, arg, &2)
     Fluffy.__dispatch_driver__(session, :page_wait, [:wait_for_function, wait, options])
+  end
+
+  defp wait_for_target(session, %Fluffy.Locator{} = locator, expression, arg, options) do
+    ensure_playwright!(session)
+    options = Options.validate_action!(:locator_wait_for_function, options)
+    Fluffy.__dispatch_driver__(session, :locator_wait_for_function, [locator, expression, arg, options])
   end
 
   @doc playwright_only: true
@@ -681,6 +1049,46 @@ defmodule Fluffy.Playwright do
 
   def add_init_script(session, script, arg),
     do: set_context!(session, :add_init_script, &BrowserContext.add_init_script(&1, script, arg))
+
+  @doc playwright_only: true
+  @doc """
+  Adds a `<script>` tag to the active page's current document and returns the session.
+
+  Give one of `url:`, `path:` or `content:`. The tag does not outlive the document; for
+  every document, use `add_init_script/3`. Phoenix sessions raise `Fluffy.CapabilityError`.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.action_schema(:add_script_tag))}
+  """
+  @spec add_script_tag(Session.t(), [add_script_tag_option()]) :: Session.t()
+  def add_script_tag(%Session{} = session, options) do
+    ensure_playwright_backend!(session, :add_script_tag)
+    add_tag(session, :add_script_tag, &PlaywrightEx.Page.add_script_tag/2, options)
+  end
+
+  @doc playwright_only: true
+  @doc """
+  Adds a `<style>` or `<link rel="stylesheet">` tag to the active page's current
+  document and returns the session.
+
+  Give one of `url:`, `path:` or `content:`. The tag does not outlive the document.
+  Phoenix sessions raise `Fluffy.CapabilityError`.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.action_schema(:add_style_tag))}
+  """
+  @spec add_style_tag(Session.t(), [add_style_tag_option()]) :: Session.t()
+  def add_style_tag(%Session{} = session, options) do
+    ensure_playwright_backend!(session, :add_style_tag)
+    add_tag(session, :add_style_tag, &PlaywrightEx.Page.add_style_tag/2, options)
+  end
+
+  defp add_tag(session, operation, add, options) do
+    {timeout, native} = Options.split_action!(operation, options)
+    page_action(session, operation, &with({:ok, tag} <- add.(&1, native), do: Document.release(tag)), timeout)
+  end
 
   # Playwright ignores unknown cookie keys, such as the snake_case ones Fluffy 0.8 took.
   @snake_case_cookie_keys %{http_only: :httpOnly, same_site: :sameSite, partition_key: :partitionKey}
@@ -738,6 +1146,20 @@ defmodule Fluffy.Playwright do
 
   @doc playwright_only: true
   @doc """
+  Replaces the context's storage with `state`, a saved state from `storage_state/2`
+  as a map or file path, and returns the session.
+
+  As in Playwright, it clears the existing cookies, local storage, IndexedDB and other
+  entries first. Raises after the session's `timeout:`. Phoenix sessions raise
+  `Fluffy.CapabilityError`.
+  """
+  @spec set_storage_state(Session.t(), String.t() | map()) :: Session.t()
+  def set_storage_state(session, state) when is_binary(state) or is_map(state) do
+    set_context!(session, :set_storage_state, &BrowserContext.set_storage_state(&1, state))
+  end
+
+  @doc playwright_only: true
+  @doc """
   Grants browser permissions, such as `"geolocation"`, and returns the session.
 
   Accepts `origin:` to limit them to one origin. See `PlaywrightEx.BrowserContext.grant_permissions/3`.
@@ -784,6 +1206,27 @@ defmodule Fluffy.Playwright do
   @spec set_http_credentials(Session.t(), :null | map() | [map()]) :: Session.t()
   def set_http_credentials(session, credentials) do
     set_context!(session, :set_http_credentials, &BrowserContext.set_http_credentials(&1, credentials))
+  end
+
+  @doc playwright_only: true
+  @doc """
+  Sets extra HTTP headers for every request of the session's browser context and
+  returns the session.
+
+  Each call replaces the headers of an earlier one, as in Playwright, but keeps those
+  the session started with: `headers:`, `browser_context: [extra_http_headers: ...]`
+  and the Ecto sandbox header. A header of the same name overrides them. Raises after
+  the session's `timeout:`. Phoenix sessions raise `Fluffy.CapabilityError`.
+  """
+  @spec set_extra_http_headers(Session.t(), %{optional(String.t()) => String.t()}) :: Session.t()
+  def set_extra_http_headers(session, headers) when is_map(headers) do
+    headers = Map.new(headers, fn {name, value} -> {String.downcase(to_string(name)), value} end)
+
+    # Playwright replaces all of the context's headers, the sandbox's among them.
+    set_context!(session, :set_extra_http_headers, fn browser_context ->
+      merged = Map.merge(Session.context(session).extra_http_headers, headers)
+      BrowserContext.set_extra_http_headers(browser_context, merged)
+    end)
   end
 
   # These take no timeout of their own, and a blocked page can hold them up.
