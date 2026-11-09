@@ -182,14 +182,25 @@ defmodule Fluffy.HTML.Aria do
     if scope == aria.index.document do
       Enum.zip(all_nodes(aria), elements)
     else
-      scope_node = fetch(aria, DocumentIndex.id!(aria.index, scope))
-      aria |> descendants(scope_node) |> Enum.zip(Enum.drop(elements, 1))
+      aria |> descendants(node_for(aria, scope)) |> Enum.zip(Enum.drop(elements, 1))
     end
   end
 
-  def hidden?(%__MODULE__{} = aria, node) do
-    ignored?(aria, node) or dropdown_optgroup?(aria, node) or closest(aria, node, &not_rendered?(aria, &1)) != nil
+  # What markup alone says about rendering, shared by role matching and visibility
+  # checks. `details`, `dialog` and `popover` open state is not modeled: a Phoenix
+  # test cannot change it, so their content stays visible, unlike in a browser.
+  def rendered?(%__MODULE__{} = aria, node) do
+    not ignored?(aria, node) and not dropdown_optgroup?(aria, node) and
+      closest(aria, node, &not_rendered?(aria, &1)) == nil
   end
+
+  # Role matching also honors `aria-hidden`, which visibility checks ignore.
+  def hidden?(%__MODULE__{} = aria, node) do
+    not rendered?(aria, node) or
+      closest(aria, node, &(String.downcase(text_attribute(&1, "aria-hidden")) == "true")) != nil
+  end
+
+  def node_for(%__MODULE__{} = aria, %LazyHTML{} = element), do: fetch(aria, DocumentIndex.id!(aria.index, element))
 
   def role(%__MODULE__{} = aria, node) do
     explicit = explicit_role(node)
@@ -303,9 +314,8 @@ defmodule Fluffy.HTML.Aria do
   defp blank?(text), do: String.trim(text) == ""
 
   defp not_rendered?(aria, node) do
-    hidden_attribute?(aria, node) or String.downcase(text_attribute(node, "aria-hidden")) == "true" or
-      node.tag in @not_rendered_tags or node.tag in @svg_metadata_tags or closed_by_state?(node) or
-      closed_by_parent?(aria, node)
+    hidden_attribute?(aria, node) or node.tag in @not_rendered_tags or node.tag in @svg_metadata_tags or
+      closed_by_state?(node) or closed_by_parent?(aria, node)
   end
 
   # The user-agent's [hidden] rule covers HTML only, and marquee's display overrides it.
@@ -323,8 +333,6 @@ defmodule Fluffy.HTML.Aria do
     boundary != nil and boundary.tag in @foreign_roots
   end
 
-  # `details`, `dialog` and `popover` open state is not modeled: a Phoenix test
-  # cannot change it, so their content stays visible, unlike in a browser.
   defp closed_by_state?(%{tag: "audio"} = node), do: not attribute?(node, "controls")
   defp closed_by_state?(%{tag: "input"} = node), do: Semantics.input_type(node) == "hidden"
   defp closed_by_state?(_node), do: false

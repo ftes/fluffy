@@ -7,7 +7,7 @@ defmodule Fluffy.Locator.Static do
   @labelled_control_selector "button, input, meter, output, progress, select, textarea"
 
   def resolve(document, %Locator{} = locator) do
-    aria = if role_locator?(locator), do: Aria.for_document(document)
+    aria = if needs_aria?(locator), do: Aria.for_document(document)
     resolve(aria, document, locator)
   end
 
@@ -34,43 +34,22 @@ defmodule Fluffy.Locator.Static do
     end)
   end
 
-  defp role_locator?(%Locator{operations: operations}), do: Enum.any?(operations, &role_operation?/1)
+  defp needs_aria?(%Locator{operations: operations}), do: Enum.any?(operations, &aria_operation?/1)
 
-  defp role_operation?({:role, _role, _options}), do: true
-  defp role_operation?({operator, %Locator{} = right}) when operator in [:and, :or], do: role_locator?(right)
+  defp aria_operation?({:role, _role, _options}), do: true
+  defp aria_operation?({operator, %Locator{} = right}) when operator in [:and, :or], do: needs_aria?(right)
 
-  defp role_operation?({:filter, options}) do
+  defp aria_operation?({:filter, options}) do
     Enum.any?(options, fn
-      {_option, %Locator{} = child} -> role_locator?(child)
+      {:visible, _visible?} -> true
+      {_option, %Locator{} = child} -> needs_aria?(child)
       _option -> false
     end)
   end
 
-  defp role_operation?(_operation), do: false
+  defp aria_operation?(_operation), do: false
 
-  # What Phoenix can know from markup: the element's own `hidden` or `aria-hidden`,
-  # an ancestor's `hidden`, and hidden inputs, which a browser never renders.
-  def structurally_visible?(element) do
-    case LazyHTML.attributes(element) do
-      [attributes] ->
-        not hidden?(attributes) and not hidden_input?(element, attributes) and
-          not hidden_ancestor?(LazyHTML.parent_node(element))
-
-      _ ->
-        true
-    end
-  end
-
-  defp hidden_input?(element, attributes) do
-    LazyHTML.tag(element) == ["input"] and String.downcase(attribute(attributes, "type") || "") == "hidden"
-  end
-
-  defp hidden_ancestor?(element) do
-    case LazyHTML.attributes(element) do
-      [attributes] -> has_attribute?(attributes, "hidden") or hidden_ancestor?(LazyHTML.parent_node(element))
-      _ -> false
-    end
-  end
+  def structurally_visible?(%Aria{} = aria, element), do: Aria.rendered?(aria, Aria.node_for(aria, element))
 
   defp apply_operation({:css, selector}, scopes) do
     query_scopes(scopes, selector)
@@ -130,7 +109,7 @@ defmodule Fluffy.Locator.Static do
       Enum.all?(options, fn
         {:has_text, text} -> text_matches?(LazyHTML.text(candidate), text, Keyword.get(options, :exact, false))
         {:has_not_text, text} -> not text_matches?(LazyHTML.text(candidate), text, Keyword.get(options, :exact, false))
-        {:visible, visible?} -> structurally_visible?(candidate) == visible?
+        {:visible, visible?} -> structurally_visible?(aria, candidate) == visible?
         {:exact, _exact?} -> true
         {:has, %Locator{} = child} -> resolve(aria, candidate, child) != []
         {:has_not, %Locator{} = child} -> resolve(aria, candidate, child) == []
@@ -242,11 +221,6 @@ defmodule Fluffy.Locator.Static do
     end
   end
 
-  defp hidden?(attributes) do
-    has_attribute?(attributes, "hidden") or
-      String.downcase(attribute(attributes, "aria-hidden") || "false") == "true"
-  end
-
   defp element_text_matches?(element, expected, exact?) do
     case element_tag_and_attributes(element) do
       {tag, _attributes} when tag in ["script", "style", "noscript"] ->
@@ -284,8 +258,6 @@ defmodule Fluffy.Locator.Static do
       nil -> nil
     end
   end
-
-  defp has_attribute?(attributes, name), do: List.keymember?(attributes, name, 0)
 
   defp text_matches?(nil, _expected, _exact?), do: false
 

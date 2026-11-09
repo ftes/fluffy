@@ -502,9 +502,12 @@ that does not cancel changes the URL in the document (`pushState`, `replaceState
 ## Visibility and DOM presence
 
 Even the `:phoenix` backend checks **structural visibility**, rather than just
-DOM presence. Its Static and LiveView drivers treat a matched element with a
-`hidden` attribute or `aria-hidden="true"`, a descendant of a `hidden` element,
-and an `<input type="hidden">` as invisible.
+DOM presence. Its Static and LiveView drivers treat what markup alone keeps from
+rendering as invisible: a `hidden` attribute on the element or an ancestor, an
+`<input type="hidden">`, elements a browser never displays such as `<script>`,
+`<style>`, `<template>` or `<datalist>`, and fallback content such as a
+`<video>`'s children. `aria-hidden="true"` does not count, as in Playwright: it
+only keeps an element out of `by_role`.
 
 Without `count:` or a field predicate, the PhoenixTest-style facade's
 `assert_has` requires any visible match and `refute_has` requires no visible
@@ -516,9 +519,9 @@ selected option.
 
 Phoenix does not compute CSS or browser layout: a CSS class or inline
 `display: none` alone does not make an element structurally invisible. Use
-`:playwright` to test rendered visibility. Its browser visibility rules also
-differ from structural checks: `aria-hidden="true"` alone does not visually
-hide an element.
+`:playwright` to test rendered visibility. Open state is not modeled either:
+see [Boundaries](capabilities.md#boundaries) for `<details>`, `<dialog>` and
+`popover`.
 
 Choose the assertion that expresses the intended behavior:
 

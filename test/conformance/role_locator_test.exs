@@ -380,7 +380,77 @@ defmodule Fluffy.Conformance.RoleLocatorTest do
     end
   end
 
+  # Both checks share the rendered rule; `aria-hidden` only affects role matching.
+  visibility_cases = [
+    {"plain text", "<p id=t>Hi</p>", true},
+    {"aria-hidden element", ~s(<p id="t" aria-hidden="true">Hi</p>), true},
+    {"aria-hidden ancestor", ~s(<div aria-hidden="true"><p id="t">Hi</p></div>), true},
+    {"hidden attribute", ~s(<p id="t" hidden>Hi</p>), false},
+    {"hidden ancestor", ~s(<div hidden><p id="t">Hi</p></div>), false},
+    {"hidden input", ~s(<input id="t" type="hidden">), false},
+    {"uppercase hidden input", ~s(<input id="t" type="HIDDEN">), false},
+    {"script", ~s(<script id="t">1</script>), false},
+    {"style", ~s(<style id="t">p {}</style>), false},
+    {"template", ~s(<template id="t"><p>Hi</p></template>), false},
+    {"noscript", ~s(<noscript id="t">Hi</noscript>), false},
+    {"datalist", ~s(<datalist id="t"><option>A</option></datalist>), false},
+    {"audio without controls", ~s(<audio id="t"></audio>), false},
+    {"video fallback", ~s(<video><p id="t">Hi</p></video>), false},
+    {"progress fallback", ~s(<progress><b id="t">Hi</b></progress>), false},
+    {"svg desc", ~s(<svg><desc id="t">Hi</desc></svg>), false},
+    {"until-found child of a block", ~s(<div hidden="until-found"><p id="t">Hi</p></div>), false},
+    {"until-found child of a span", ~s(<span hidden="until-found"><b id="t">Hi</b></span>), true},
+    {"hidden attribute on an svg link", ~s(<svg><text><a id="t" hidden>Hi</a></text></svg>), true},
+    {"optgroup of a dropdown", ~s(<select><optgroup id="t" label="A"></optgroup></select>), false},
+    {"optgroup of a list box", ~s(<select size="3"><optgroup id="t" label="A"><option>A</option></optgroup></select>),
+     true}
+  ]
+
+  # Phoenix locators do not model these open states.
+  visibility_cases =
+    visibility_cases ++
+      [
+        {"content of closed details", ~s(<details><summary>S</summary><p id="t">Hi</p></details>),
+         %{static: true, playwright: false}},
+        {"closed dialog", ~s(<dialog id="t">Hi</dialog>), %{static: true, playwright: false}},
+        {"closed popover", ~s(<div id="t" popover>Hi</div>), %{static: true, playwright: false}}
+      ]
+
+  for {case_name, html, expected} <- visibility_cases, driver <- [:static, :playwright] do
+    visible? = if is_map(expected), do: Map.fetch!(expected, driver), else: expected
+
+    @tag driver: driver
+    test "#{case_name} is #{if visible?, do: "visible", else: "not visible"} with #{driver}" do
+      session = session_for_html(unquote(driver), unquote(html), base_url: Fluffy.TestServer.base_url())
+      target = by_css("#t")
+
+      if unquote(visible?) do
+        session
+        |> expect(to_be_visible(target))
+        |> expect(target |> filter(visible: true) |> to_have_count(1))
+        |> expect(target |> filter(visible: false) |> to_have_count(0))
+      else
+        session
+        |> expect(to_be_hidden(target))
+        |> expect(target |> filter(visible: true) |> to_have_count(0))
+        |> expect(target |> filter(visible: false) |> to_have_count(1))
+      end
+    end
+  end
+
   for driver <- [:static, :playwright] do
+    @tag driver: driver
+    test "aria-hidden hides an element from by_role but not from visibility with #{driver}" do
+      session =
+        session_for_html(unquote(driver), ~s(<button aria-hidden="true">Go</button>),
+          base_url: Fluffy.TestServer.base_url()
+        )
+
+      session
+      |> expect(:button |> by_role() |> to_have_count(0))
+      |> expect("button" |> by_css() |> to_be_visible())
+    end
+
     @tag driver: driver
     test "a role filter sees names outside the candidate with #{driver}" do
       html = ~s(<span id="t">Pay</span><div class="c"><button aria-labelledby="t"></button></div><div class="c"></div>)
