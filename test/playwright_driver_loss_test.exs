@@ -11,7 +11,7 @@ defmodule Fluffy.PlaywrightDriverLossTest do
   test "a lost driver stops running sessions and a new session relaunches the browser" do
     session = session_for_html(:playwright, "<button>Save</button>")
     runtime = session.runtime
-    monitor = Process.monitor(runtime)
+    monitor = monitor_running(runtime)
 
     kill_driver()
 

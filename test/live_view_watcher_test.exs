@@ -11,7 +11,7 @@ defmodule Fluffy.LiveViewWatcherTest do
         id: make_ref()
       )
 
-    watcher_reference = Process.monitor(watcher)
+    watcher_reference = monitor_running(watcher)
     Process.exit(view_pid, :kill)
 
     assert_receive {:fluffy_live_view, ^watcher, {:died, :killed}}, 100
