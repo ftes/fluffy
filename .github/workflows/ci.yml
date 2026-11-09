@@ -88,6 +88,9 @@ jobs:
       - name: Check generated PlaywrightEx options
         if: matrix.lane == 'newest'
         run: mix fluffy.gen.native_options --check
+      - name: Check generated usage rules
+        if: matrix.lane == 'newest'
+        run: mix usage_rules.sync --check
       - name: Run Dialyzer
         if: matrix.lane == 'newest'
         run: mix dialyzer --format short --list-unused-filters

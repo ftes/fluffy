@@ -177,6 +177,7 @@ defmodule Fluffy.MixProject do
         # Compiles strictly first: the generator's own compile would satisfy it.
         "compile --warnings-as-errors",
         "fluffy.gen.native_options --check",
+        "usage_rules.sync --check",
         "credo --format oneline"
       ],
       check: ["lint", "test --warnings-as-errors"],
