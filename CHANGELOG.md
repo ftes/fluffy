@@ -10,7 +10,7 @@
 
 - Stricter name matching can stop Phoenix locators that only matched by content: `by_role(name:)` now takes a name from content only for the roles Playwright does. `<div role="navigation">Menu</div>` no longer matches `by_role(:navigation, name: "Menu")`, nor do other landmarks, `list`, `listitem` or `dialog`; a button or link no longer picks up text from a landmark inside it. Name those elements with `aria-labelledby`, `aria-label`, `title` or a native `legend`, `caption` or `figcaption`.
 - `by_role` on Phoenix follows Playwright's other role and name rules too: it uses the first valid `role` token in any case and keeps the implicit role for an invalid one; `none` and `presentation` give way on focusable elements or with global ARIA attributes, and pass to list items and table parts; a blank `aria-label` or dangling `aria-labelledby` falls through to the next name source; and the implicit roles of `th`, `img` and `input` changed to match.
-- A scoped `by_role` on Phoenix no longer matches its scope element, and sees hidden ancestors, labels and `aria-labelledby` targets outside its scope. Closed `dialog`, `datalist` and the content of a closed `details` count as hidden, as on Playwright, so `by_role` no longer finds a link in a `details` menu that only JavaScript opens; reach its target another way on Phoenix, or render it `open`.
+- A scoped `by_role` on Phoenix no longer matches its scope element, and sees hidden ancestors, labels and `aria-labelledby` targets outside its scope. A `datalist` counts as hidden. Phoenix locators do not model `details` and `dialog` open state: content inside them stays visible on Phoenix, as on 0.9.0-rc.0, while Playwright needs them opened first.
 
 ## 0.9.0-rc.0 — 2026-11-09
 

@@ -306,7 +306,8 @@ defmodule Fluffy.HTML.Aria do
       node.tag not in ["marquee", "math", "svg"]
   end
 
-  defp closed_by_state?(%{tag: "dialog"} = node), do: not attribute?(node, "open")
+  # `details` and `dialog` open state is not modeled: a Phoenix test cannot change
+  # it, so their content stays visible, unlike in a browser.
   defp closed_by_state?(%{tag: "audio"} = node), do: not attribute?(node, "controls")
   defp closed_by_state?(%{tag: "input"} = node), do: Semantics.input_type(node) == "hidden"
   defp closed_by_state?(_node), do: false
@@ -315,9 +316,6 @@ defmodule Fluffy.HTML.Aria do
     case parent(aria, node) do
       %{tag: tag} when tag in @fallback_content_tags ->
         true
-
-      %{tag: "details"} = details ->
-        not attribute?(details, "open") and first_child(aria, details, "summary") != node
 
       %{} = parent ->
         text_attribute(parent, "hidden") == "until-found"
