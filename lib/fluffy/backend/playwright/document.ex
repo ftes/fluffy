@@ -14,6 +14,19 @@ defmodule Fluffy.Backend.Playwright.Document do
   alias PlaywrightEx.JSHandle
   alias PlaywrightEx.Locator
 
+  @cursor_grace 250
+
+  # The element Playwright's check reads the state of: its injected script's
+  # `follow-label` retarget.
+  @follow_label """
+  element => {
+    const plain = !element.matches('input, textarea, select') && !element.isContentEditable
+    const target = (plain && element.closest('button, [role=button], [role=checkbox], [role=radio]')) || element
+    const interactive = 'a, input, textarea, button, select, option, optgroup, [role=link], [role=button], [role=checkbox], [role=radio]'
+    return target.matches(interactive) || target.isContentEditable ? target : target.closest('label')?.control ?? target
+  }
+  """
+
   @state """
   (() => {
     if (window.__fluffy) return window.__fluffy
@@ -33,14 +46,15 @@ defmodule Fluffy.Backend.Playwright.Document do
       if (pending) pending.complete = true
     })
 
-    // What the last trusted click did to a checkbox or radio, before page code
-    // (such as a LiveView patch) can change it again. The event's target is
-    // retargeted to the host of a shadow root the input is in.
-    state.activations = {count: 0, checked: null, target: null}
+    // What the last trusted click on each checkbox or radio did to it, before
+    // page code (such as a LiveView patch) can change it again. The event's
+    // target is retargeted to the host of a shadow root the input is in.
+    state.activations = new WeakMap()
+    state.activationCount = 0
     window.addEventListener('input', event => {
       const target = event.composedPath()[0]
       if (event.isTrusted && target instanceof HTMLInputElement && ['checkbox', 'radio'].includes(target.type))
-        state.activations = {count: state.activations.count + 1, checked: target.checked, target}
+        state.activations.set(target, {count: ++state.activationCount, checked: target.checked})
     }, true)
 
     return state
@@ -146,34 +160,38 @@ defmodule Fluffy.Backend.Playwright.Document do
     do: Exception.message(error) =~ "Execution context was destroyed, most likely because of a navigation"
 
   # The activation state lives in the document of the frame `locator` resolves
-  # in, possibly a child frame. `evaluate_all` runs there without waiting for a
-  # match, in the top page while there is no match yet, and has no timeout of
-  # its own.
+  # in, possibly a child frame.
 
-  @doc "Marks the checkbox and radio activations `activated?/4` reads; `nil` if the frame cannot be read."
+  @doc """
+  Waits for `locator` to match, remembers the checkbox or radio it resolves to, and
+  marks which of its activations `activated?/4` reads; `nil` if it cannot be read. As
+  Playwright does not limit the evaluation, a blocked page gets its own bound.
+  """
   def activation_cursor(locator, timeout) do
-    expression = "() => { const state = #{@state}; return [state.document, state.activations.count] }"
+    expression =
+      "element => { const state = #{@state}; state.activationTarget = (#{@follow_label})(element); " <>
+        "return [state.document, state.activationCount] }"
 
-    case Bounded.within(timeout, fn -> Locator.evaluate_all(locator, expression) end) do
+    case Bounded.within(timeout + @cursor_grace, fn -> Locator.evaluate(locator, expression, nil, timeout: timeout) end) do
       {:ok, {:ok, cursor}} -> cursor
       _unreadable -> nil
     end
   end
 
   @doc """
-  Whether a checkbox or radio activation since `cursor` left it `checked`.
-
-  A cursor read in another document, before the frame or element was there,
-  cannot date an activation, so only one on this element counts.
+  Whether an activation of the element `cursor` remembered, since the cursor, left
+  it `checked`. It reads the element remembered rather than what the locator matches
+  now, which a LiveView patch may have changed, also the element a row shifted onto.
   """
   def activated?(_locator, nil, _checked, _timeout), do: false
 
   def activated?(locator, [document, count], checked, timeout) do
     expression = """
-    (elements, [document, count, checked]) => {
+    (_elements, [document, count, checked]) => {
       const state = window.__fluffy
-      if (state?.activations.checked !== checked) return false
-      return state.document === document ? state.activations.count > count : state.activations.target === elements[0]
+      if (state?.document !== document) return false
+      const activation = state.activations.get(state.activationTarget)
+      return activation !== undefined && activation.count > count && activation.checked === checked
     }
     """
 
