@@ -93,7 +93,7 @@ jobs:
         run: mix usage_rules.sync --check
       - name: Run Dialyzer
         if: matrix.lane == 'newest'
-        run: mix dialyzer --format short --list-unused-filters
+        run: mix dialyzer --format github --format short --list-unused-filters
       - name: Build documentation without warnings
         env:
           MIX_ENV: dev
@@ -181,18 +181,47 @@ jobs:
           save-apt-cache: ${{ matrix.lane == 'newest' && matrix.partition == 1 }}
       - name: Build test assets
         run: mix assets.build
-      # The retry reruns this partition's files with the same seed.
+      # Test failures (exit 2) are retried once, only the failed tests (`mix test --failed`);
+      # compile errors are not. The retry takes no --partitions: the failures manifest holds this
+      # partition's failures only, and --partitions would split those files again. The first run's
+      # failures (Fluffy.FailuresFormatter) go to the job summary and annotations, so a green retry
+      # does not hide them. The 10 slowest modules (Fluffy.ModuleTimesFormatter) are the floor of a
+      # partition's time.
       - name: Run tests with one retry
         id: tests
+        env:
+          FLUFFY_FAILURES_FILE: ${{ runner.temp }}/first-run-failures.txt
+          FLUFFY_MODULE_TIMES_FILE: ${{ runner.temp }}/module-times.txt
+          LANE: ${{ matrix.lane }}
         run: |
           fluffy_test_seed=$RANDOM
-          if FLUFFY_ARTIFACT_DIR="$FLUFFY_ARTIFACT_DIR/first" mix test --warnings-as-errors --seed "$fluffy_test_seed" --partitions "$TEST_PARTITIONS"; then
-            exit 0
+          label="$LANE, $FLUFFY_BROWSER, $MIX_TEST_PARTITION/$TEST_PARTITIONS"
+          status=0
+          FLUFFY_ARTIFACT_DIR="$FLUFFY_ARTIFACT_DIR/first" mix test --warnings-as-errors --seed "$fluffy_test_seed" --partitions "$TEST_PARTITIONS" || status=$?
+
+          if [[ -s "$FLUFFY_MODULE_TIMES_FILE" ]]; then
+            echo "Slowest modules ($label), wall ms, setup_all included:"
+            sort -rn "$FLUFFY_MODULE_TIMES_FILE" | head -n 10
+          fi
+          if [[ -s "$FLUFFY_FAILURES_FILE" ]]; then
+            {
+              echo "### First-run failures ($label)"
+              echo
+              while IFS=$'\t' read -r location name; do echo "- \`$location\` $name"; done < "$FLUFFY_FAILURES_FILE"
+            } >> "$GITHUB_STEP_SUMMARY"
+            while IFS=$'\t' read -r location name; do
+              message="First run failed ($label): $name"
+              message=${message//'%'/'%25'}
+              echo "::warning file=${location%:*},line=${location##*:}::$message"
+            done < "$FLUFFY_FAILURES_FILE"
+          fi
+          if [[ $status != 2 ]]; then
+            exit "$status"
           fi
 
           echo "retried=true" >> "$GITHUB_OUTPUT"
           echo "::warning::Tests failed; retrying once with seed $fluffy_test_seed. Both attempts' failure artifacts will be uploaded."
-          FLUFFY_ARTIFACT_DIR="$FLUFFY_ARTIFACT_DIR/retry" mix test --warnings-as-errors --seed "$fluffy_test_seed" --partitions "$TEST_PARTITIONS"
+          FLUFFY_ARTIFACT_DIR="$FLUFFY_ARTIFACT_DIR/retry" mix test --warnings-as-errors --seed "$fluffy_test_seed" --failed
       - name: Upload browser failure artifacts
         if: failure() || steps.tests.outputs.retried == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7

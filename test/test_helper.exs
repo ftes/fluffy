@@ -14,6 +14,11 @@ max_cases =
 
 # A passing assert_receive returns as soon as its message arrives, so a slow CI machine is
 # the only thing this longer limit is for.
-ExUnit.start(max_cases: max_cases, assert_receive_timeout: 2_000)
+ExUnit.start(
+  max_cases: max_cases,
+  assert_receive_timeout: 2_000,
+  # Added to, so `mix test --formatter` still applies.
+  formatters: ExUnit.configuration()[:formatters] ++ [Fluffy.FailuresFormatter, Fluffy.ModuleTimesFormatter]
+)
 
 {:ok, _test_server} = Fluffy.TestServer.start_link()
