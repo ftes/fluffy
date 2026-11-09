@@ -28,6 +28,7 @@ Fluffy now runs on PlaywrightEx 0.17, a port of the official Playwright client w
 - `Fluffy.Expect.checked_option` is now `to_be_checked_option`.
 - `Fluffy.Download` loses its `source` and `runtime` fields; its other fields besides `suggested_filename`, `url` and `page` are private. On Playwright, `unwrap(download, fun)` passes the `PlaywrightEx.Download`.
 - `Fluffy.Locator.describe`, `new` and `append` are internal; `inspect/1` renders a locator.
+- LiveView `set_input_files` on an upload input whose form has no id raises, saying to give the form an id, which LiveView's form recovery needs anyway.
 
 ### Added
 
@@ -48,6 +49,7 @@ Fluffy now runs on PlaywrightEx 0.17, a port of the official Playwright client w
 
 - `check` and `uncheck` on Playwright succeed when page code reverts the click in a frame that loaded after the action started.
 - A LiveView `press` sends its keyup to the binding its target had when the press started, as a browser does: a keydown that removes, moves, or rebinds its target no longer drops the keyup or sends it to another element, even with `first()`, `last()`, or an input without an id. A keydown that removes the LiveComponent handling the key loses the keyup with `phx-target={@myself}`, and sends it to the view with a CSS selector, since LiveViewTest has destroyed the component by then.
+- LiveView cancels an upload whose form a render shifted, still submits a form whose last upload moved it, keeps an upload whose input a render removed for that submit to consume, and uploads through a `live_file_input` linked to its form with `form=`.
 - No unused-function warning when Fluffy is compiled without Ecto.
 - A Playwright session starts when `config :fluffy, :playwright` leaves out `timeout:`, using its 15 seconds default instead of raising `KeyError`.
 - Playwright actions and expectations default to the session's `timeout:`, like LiveView.

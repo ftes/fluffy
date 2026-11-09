@@ -37,7 +37,7 @@ defmodule Fluffy.TestWeb.PatchingLive do
   @moduledoc false
   use Phoenix.LiveView
 
-  @upload_modes ~w(submit progress auto-change progress-insert progress-insert-form progress-remove auto-remove input-hide validate-insert idless-insert)
+  @upload_modes ~w(submit progress auto-change progress-insert progress-insert-form progress-remove auto-remove input-hide validate-insert outside-input fill-upload auto-hide idless-form)
 
   @impl true
   def mount(%{"mode" => mode}, _session, socket) do
@@ -50,6 +50,9 @@ defmodule Fluffy.TestWeb.PatchingLive do
         row_label: "Row keys",
         changes: 0,
         saves: 0,
+        title: "",
+        validated_title: nil,
+        saved_title: nil,
         consumed: 0,
         uploaded: 0,
         banner?: false,
@@ -69,7 +72,7 @@ defmodule Fluffy.TestWeb.PatchingLive do
         allow_upload(socket, :attachment,
           accept: ~w(.txt),
           max_entries: 2,
-          auto_upload: mode in ~w(auto-change auto-remove),
+          auto_upload: mode in ~w(auto-change auto-remove auto-hide),
           progress: &handle_progress/3
         )
       else
@@ -93,13 +96,13 @@ defmodule Fluffy.TestWeb.PatchingLive do
       "progress" ->
         {:noreply, patch(socket, "uploaded")}
 
-      mode when mode in ~w(progress-insert idless-insert) ->
+      "progress-insert" ->
         {:noreply, socket |> assign(:banner?, true) |> patch("uploaded")}
 
       "progress-insert-form" ->
         {:noreply, socket |> assign(:other_form?, true) |> patch("uploaded")}
 
-      "input-hide" ->
+      mode when mode in ~w(input-hide auto-hide) ->
         {:noreply, assign(socket, :input_hidden?, true)}
 
       mode when mode in ~w(progress-remove auto-remove) ->
@@ -166,12 +169,26 @@ defmodule Fluffy.TestWeb.PatchingLive do
     {:noreply, assign(socket, :banner?, true)}
   end
 
+  def handle_event("validate", %{"title" => title}, %{assigns: %{mode: "fill-upload"}} = socket) do
+    {:noreply, assign(socket, title: title, validated_title: title)}
+  end
+
   def handle_event("validate", _params, socket), do: {:noreply, socket}
 
-  def handle_event("save", _params, socket) do
+  def handle_event("save", params, socket) do
     consumed = consume_uploaded_entries(socket, :attachment, fn _meta, entry -> {:ok, entry.client_name} end)
-    socket = socket |> update(:saves, &(&1 + 1)) |> update(:consumed, &(&1 + length(consumed)))
+
+    socket =
+      socket
+      |> update(:saves, &(&1 + 1))
+      |> update(:consumed, &(&1 + length(consumed)))
+      |> assign(:saved_title, params["title"])
+
     if socket.assigns.mode == "submit", do: {:noreply, patch(socket, "saved")}, else: {:noreply, socket}
+  end
+
+  def handle_event("cancel-upload", %{"ref" => ref}, socket) do
+    {:noreply, cancel_upload(socket, :attachment, ref)}
   end
 
   @impl true
@@ -183,6 +200,8 @@ defmodule Fluffy.TestWeb.PatchingLive do
       <p>Inserted keyups: {@inserted_keyups}</p>
       <p>Changes: {@changes}</p>
       <p>Saves: {@saves}</p>
+      <p>Validated title: {@validated_title}</p>
+      <p>Saved title: {@saved_title}</p>
       <p>Consumed: {@consumed}</p>
       <p>Uploaded: {@uploaded}</p>
       <p>Row keyups: {Enum.join(@row_keyups, ",")}.</p>
@@ -221,17 +240,33 @@ defmodule Fluffy.TestWeb.PatchingLive do
         <label>Toggle <input type="checkbox" name="agree" phx-click="toggle" /></label>
       </form>
       <form :if={@other_form?} id="other-form"></form>
-      <div :if={@mode == "idless-insert" && @banner?}>Wrapper before the form</div>
+      <div :if={@mode == "validate-insert" && @banner?}>Wrapper before the form</div>
       <div>
         <form
           :if={assigns[:uploads] && !@removed?}
-          id={if @mode != "idless-insert", do: "upload-form"}
+          id={if @mode != "idless-form", do: "upload-form"}
           phx-change="validate"
           phx-submit="save"
         >
-          <label :if={!@input_hidden?}>Attachment <.live_file_input upload={@uploads.attachment} /></label>
+          <label :if={@mode == "fill-upload"}>
+            Title <input name="title" value={@title} />
+          </label>
+          <label :if={!@input_hidden? && @mode != "outside-input"}>
+            Attachment <.live_file_input upload={@uploads.attachment} />
+          </label>
           <button type="submit">Save</button>
+          <button
+            :for={entry <- @uploads.attachment.entries}
+            type="button"
+            phx-click="cancel-upload"
+            phx-value-ref={entry.ref}
+          >
+            Cancel upload
+          </button>
         </form>
+        <label :if={@mode == "outside-input"}>
+          Attachment <.live_file_input upload={@uploads.attachment} form="upload-form" />
+        </label>
       </div>
     </main>
     """

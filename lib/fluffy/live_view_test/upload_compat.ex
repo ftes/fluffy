@@ -17,6 +17,10 @@ defmodule Fluffy.LiveViewTest.UploadCompat do
     )
   end
 
+  # LiveViewTest finds the input as a descendant of the form, which misses an
+  # input outside its form and goes stale when a patch moves either of them.
+  def at_input(upload, selector), do: put_in(upload.element.selector, selector)
+
   def stop(upload) do
     if Process.alive?(upload.pid) do
       GenServer.stop(upload.pid, :normal)
