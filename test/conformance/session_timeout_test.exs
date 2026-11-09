@@ -7,14 +7,14 @@ defmodule Fluffy.Conformance.SessionTimeoutTest do
 
   alias Fluffy.Session
 
-  # Well under the global Playwright timeout (15 s); long enough for a LiveView visit.
+  # Well under the global Playwright timeout (15 s).
   @session_timeout 1_000
   @missing by_role(:button, name: "Missing")
 
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
     test "actions and expectations default to the session timeout with #{driver}", %{driver: driver} do
-      session = live_session(driver)
+      session = short_session(driver)
 
       for operation <- [
             fn -> click(session, @missing) end,
@@ -28,7 +28,7 @@ defmodule Fluffy.Conformance.SessionTimeoutTest do
 
     @tag driver: driver
     test "a per-call timeout overrides the session timeout with #{driver}", %{driver: driver} do
-      session = live_session(driver)
+      session = short_session(driver)
 
       for operation <- [
             fn -> click(session, @missing, timeout: 2_000) end,
@@ -39,9 +39,12 @@ defmodule Fluffy.Conformance.SessionTimeoutTest do
     end
   end
 
-  defp live_session(driver) do
+  # No visit on Playwright: a navigation would share the budget under test on a loaded machine.
+  defp short_session(:playwright), do: start_session(:playwright, timeout: @session_timeout)
+
+  defp short_session(:phoenix) do
     session =
-      driver
+      :phoenix
       |> start_session(
         base_url: Fluffy.TestServer.base_url(),
         endpoint: Fluffy.TestWeb.Endpoint,
@@ -49,7 +52,7 @@ defmodule Fluffy.Conformance.SessionTimeoutTest do
       )
       |> visit("/live/chamber-map")
 
-    assert Session.current_driver(session) in [:live, :playwright]
+    assert Session.current_driver(session) == :live
     session
   end
 
