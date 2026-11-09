@@ -3,6 +3,7 @@ defmodule Fluffy.ClientDOM.Expectation do
 
   alias Fluffy.ClientDOM
   alias Fluffy.Expect
+  alias Fluffy.HTML.Aria
   alias Fluffy.HTML.Semantics
   alias Fluffy.Locator.Static
   alias Fluffy.URLMatcher
@@ -17,14 +18,13 @@ defmodule Fluffy.ClientDOM.Expectation do
   end
 
   def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :visible}) do
-    actual = client_dom |> strict_candidates!(locator) |> Enum.count(&Static.structurally_visible?/1)
+    actual = count_visible(client_dom, strict_candidates!(client_dom, locator))
     {actual > 0, actual}
   end
 
   # An empty locator passes `to_be_hidden` and, negated, still fails, as in Playwright.
   def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :hidden}) do
-    candidates = strict_candidates!(client_dom, locator)
-    actual = Enum.count(candidates, &Static.structurally_visible?/1)
+    actual = count_visible(client_dom, strict_candidates!(client_dom, locator))
     {actual == 0, actual}
   end
 
@@ -149,6 +149,13 @@ defmodule Fluffy.ClientDOM.Expectation do
       [target] -> fun.(target)
       targets -> strictness_error!(locator, Enum.map(targets, & &1.element))
     end
+  end
+
+  defp count_visible(_client_dom, []), do: 0
+
+  defp count_visible(client_dom, candidates) do
+    aria = Aria.for_document(client_dom.document)
+    Enum.count(candidates, &Static.structurally_visible?(aria, &1))
   end
 
   defp strict_candidates!(client_dom, locator) do

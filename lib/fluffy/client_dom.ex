@@ -3,6 +3,7 @@ defmodule Fluffy.ClientDOM do
 
   alias Fluffy.Actionability
   alias Fluffy.ClientDOM.Query
+  alias Fluffy.HTML.Aria
   alias Fluffy.HTML.DocumentIndex
   alias Fluffy.HTML.Semantics
   alias Fluffy.HTML.Target
@@ -35,22 +36,9 @@ defmodule Fluffy.ClientDOM do
     }
   end
 
-  # The immutable LazyHTML document is a shared NIF resource. Keep its derived
-  # index in the caller instead of copying its large tree through SessionRuntime.
-  # One entry bounds retention; changing documents simply rebuilds the index.
   @doc false
   @spec index(%__MODULE__{}) :: DocumentIndex.t()
-  def index(%__MODULE__{document: document}) do
-    case Process.get({__MODULE__, :index}) do
-      {^document, index} ->
-        index
-
-      _missing ->
-        index = DocumentIndex.new(document)
-        Process.put({__MODULE__, :index}, {document, index})
-        index
-    end
-  end
+  def index(%__MODULE__{document: document}), do: Aria.for_document(document).index
 
   def reconcile(%__MODULE__{} = client_dom, html) when is_binary(html) do
     reconcile(client_dom, LazyHTML.from_fragment(html))
@@ -537,9 +525,7 @@ defmodule Fluffy.ClientDOM do
       value: attribute(target.attributes, "value") || text,
       label: attribute(target.attributes, "label") || text,
       attributes: target.attributes,
-      disabled?:
-        target.disabled? or has_attribute?(target.attributes, "disabled") or
-          DocumentIndex.ancestor_has_attribute?(index, target.id, "optgroup", "disabled")
+      disabled?: DocumentIndex.option_disabled?(index, target)
     }
   end
 
@@ -568,35 +554,11 @@ defmodule Fluffy.ClientDOM do
 
     selected_ids =
       case get_in(client_dom.properties, [target.id, :selected_ids]) do
-        nil -> default_selected_ids(options, target.attributes)
+        nil -> Semantics.default_selected_ids(options, target.attributes)
         ids -> ids
       end
 
     Enum.filter(options, &(&1.id in selected_ids))
-  end
-
-  defp default_selected_ids(options, attributes) do
-    multiple? = has_attribute?(attributes, "multiple")
-
-    selected =
-      options
-      |> Enum.filter(&has_attribute?(&1.attributes, "selected"))
-      |> Enum.map(& &1.id)
-
-    cond do
-      selected != [] -> if(multiple?, do: selected, else: Enum.take(selected, -1))
-      multiple? -> []
-      select_size(attributes) > 1 -> []
-      options == [] -> []
-      true -> options |> Enum.reject(& &1.disabled?) |> Enum.take(1) |> Enum.map(& &1.id)
-    end
-  end
-
-  defp select_size(attributes) do
-    case Integer.parse(attribute(attributes, "size") || "") do
-      {size, ""} when size > 0 -> size
-      _missing_or_invalid -> 1
-    end
   end
 
   defp tree_text(nodes) when is_list(nodes), do: Enum.map_join(nodes, &tree_text/1)

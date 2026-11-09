@@ -32,6 +32,7 @@ defmodule Fluffy.HTML.DocumentIndex do
           identity: term(),
           implicit_form_id: non_neg_integer() | nil,
           inert?: boolean(),
+          last_id: non_neg_integer(),
           parent_id: non_neg_integer() | nil,
           path: path(),
           selector_path: path(),
@@ -155,6 +156,13 @@ defmodule Fluffy.HTML.DocumentIndex do
     |> has_ancestor_attribute?(index, tag, attribute)
   end
 
+  # Default selection honors this alone: a disabled fieldset does not count.
+  @spec option_disabled?(t(), %{:id => non_neg_integer(), :attributes => list(), optional(atom()) => term()}) :: boolean()
+  def option_disabled?(%__MODULE__{} = index, option) do
+    Semantics.has_attribute?(option.attributes, "disabled") or
+      ancestor_has_attribute?(index, option.id, "optgroup", "disabled")
+  end
+
   @spec target!(t(), LazyHTML.t()) :: Target.t()
   def target!(%__MODULE__{} = index, %LazyHTML{} = element) do
     entry = Map.fetch!(index.nodes_by_path, path(element))
@@ -182,6 +190,12 @@ defmodule Fluffy.HTML.DocumentIndex do
           element_position = element_position + 1
           path = parent_path ++ [{tag, element_position}]
           selector_path = parent_selector_path ++ [{tag, tag_position}]
+          child_form_id = if tag == "form", do: id, else: implicit_form_id
+          # A browser parses noscript's content as text.
+          child_inert? = inert? or tag in ["template", "noscript"]
+
+          {descendants, following_id} =
+            index_nodes(children, id, child_form_id, child_inert?, path, selector_path, id + 1)
 
           entry = %{
             attributes: attributes,
@@ -190,17 +204,12 @@ defmodule Fluffy.HTML.DocumentIndex do
             identity: identity(tag, attributes, selector_path),
             implicit_form_id: implicit_form_id,
             inert?: inert?,
+            last_id: following_id - 1,
             parent_id: parent_id,
             path: path,
             selector_path: selector_path,
             tag: tag
           }
-
-          child_form_id = if tag == "form", do: id, else: implicit_form_id
-          child_inert? = inert? or tag == "template"
-
-          {descendants, following_id} =
-            index_nodes(children, id, child_form_id, child_inert?, path, selector_path, id + 1)
 
           {
             descendants ++ [entry | entries],

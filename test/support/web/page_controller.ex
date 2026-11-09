@@ -9,6 +9,8 @@ defmodule Fluffy.TestWeb.PageController do
     send_resp(conn, 200, "ok")
   end
 
+  # The body is the root: a wrapper would match selectors in a test, and a main
+  # one would also stop any header or footer there being a landmark.
   def harness(conn, _params) do
     send_html(conn, """
     <!doctype html>
@@ -18,7 +20,7 @@ defmodule Fluffy.TestWeb.PageController do
         <title>Fluffy test stage</title>
         <script type="module" src="/assets/test_browser.js"></script>
       </head>
-      <body><main id="fluffy-test-root"></main></body>
+      <body id="fluffy-test-root"></body>
     </html>
     """)
   end

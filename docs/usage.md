@@ -184,9 +184,21 @@ Available constructors are `by_role`, `by_text`, `by_label`,
 `by_placeholder`, `by_alt_text`, `by_title`, `by_test_id`, and `by_css`.
 Text, role-name, and label matching default to normalized substring matching;
 use `exact: true` for a complete match. Role names follow accessible-name
-precedence: `aria-labelledby`, then `aria-label`, then native labels. Explicit
-ARIA roles override implicit roles. CSS must be valid browser CSS; escape
-special characters in IDs or use a semantic/test-id locator.
+precedence: `aria-labelledby`, then `aria-label`, then native labels and
+captions, then content for the roles Playwright names from content, then
+`title`. Landmarks, lists, list items and dialogs are not named by their content.
+Explicit ARIA roles override implicit roles. The Phoenix backend knows the
+implicit roles `article`, `banner`, `blockquote`, `button`, `caption`, `cell`,
+`checkbox`, `code`, `columnheader`, `combobox`, `complementary`, `contentinfo`,
+`definition`, `deletion`, `dialog`, `document`, `emphasis`, `figure`, `form`,
+`gridcell`, `group`, `heading`, `img`, `insertion`, `link`, `list`, `listbox`,
+`listitem`, `main`, `mark`, `math`, `meter`, `navigation`, `option`, `paragraph`,
+`presentation`, `progressbar`, `radio`, `region`, `row`, `rowgroup`, `rowheader`,
+`search`, `searchbox`, `separator`, `slider`, `spinbutton`, `status`, `strong`,
+`subscript`, `superscript`, `table`, `term`, `textbox` and `time`; any other role
+needs an explicit `role` attribute there. Phoenix computes these from markup, so
+computed CSS and live input state stay browser-only. CSS must be valid browser
+CSS; escape special characters in IDs or use a semantic/test-id locator.
 
 Options marked *Playwright only.* in `Fluffy.Locator`, such as
 `by_role(:button, pressed: true)`, `by_role(:heading, level: 2)` or a regex
@@ -490,9 +502,12 @@ that does not cancel changes the URL in the document (`pushState`, `replaceState
 ## Visibility and DOM presence
 
 Even the `:phoenix` backend checks **structural visibility**, rather than just
-DOM presence. Its Static and LiveView drivers treat a matched element with a
-`hidden` attribute or `aria-hidden="true"`, a descendant of a `hidden` element,
-and an `<input type="hidden">` as invisible.
+DOM presence. Its Static and LiveView drivers treat what markup alone keeps from
+rendering as invisible: a `hidden` attribute on the element or an ancestor, an
+`<input type="hidden">`, elements a browser never displays such as `<script>`,
+`<style>`, `<template>` or `<datalist>`, and fallback content such as a
+`<video>`'s children. `aria-hidden="true"` does not count, as in Playwright: it
+only keeps an element out of `by_role`.
 
 Without `count:` or a field predicate, the PhoenixTest-style facade's
 `assert_has` requires any visible match and `refute_has` requires no visible
@@ -504,9 +519,9 @@ selected option.
 
 Phoenix does not compute CSS or browser layout: a CSS class or inline
 `display: none` alone does not make an element structurally invisible. Use
-`:playwright` to test rendered visibility. Its browser visibility rules also
-differ from structural checks: `aria-hidden="true"` alone does not visually
-hide an element.
+`:playwright` to test rendered visibility. Open state is not modeled either:
+see [Boundaries](capabilities.md#boundaries) for `<details>`, `<dialog>`,
+`popover` and the options of a closed `<select>`.
 
 Choose the assertion that expresses the intended behavior:
 

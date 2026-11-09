@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.9.0 — Unreleased
+
+### Added
+
+- `by_role` on Phoenix knows Playwright's implicit roles for everything markup can decide, landmarks included: `article`, `banner`, `complementary`, `contentinfo`, `form`, `main`, `navigation`, `region` and `search`, plus the likes of `paragraph`, `group`, `dialog`, `searchbox` and `status`. The usage guide has the full list.
+
+### Changed
+
+- Stricter name matching can stop Phoenix locators that only matched by content: `by_role(name:)` now takes a name from content only for the roles Playwright does. `<div role="navigation">Menu</div>` no longer matches `by_role(:navigation, name: "Menu")`, nor do other landmarks, `list`, `listitem` or `dialog`; a button or link no longer picks up text from a landmark inside it. Name those elements with `aria-labelledby`, `aria-label`, `title` or a native `legend`, `caption` or `figcaption`.
+- `by_role` on Phoenix follows Playwright's other role and name rules too: it uses the first valid `role` token in any case and keeps the implicit role for an invalid one; `none` and `presentation` give way on focusable elements or with global ARIA attributes, and pass to list items and table parts; a blank `aria-label` or dangling `aria-labelledby` falls through to the next name source; and the implicit roles of `th`, `img` and `input` changed to match.
+- A scoped `by_role` on Phoenix no longer matches its scope element, and sees hidden ancestors, labels and `aria-labelledby` targets outside its scope. A `datalist` counts as hidden. Phoenix locators do not model `details`, `dialog`, `popover` and dropdown `select` open state: content inside them stays visible on Phoenix, as on 0.9.0-rc.0, while Playwright needs them opened first.
+- Controls inside `<noscript>` are no longer submitted on Phoenix, as in a browser with scripting on, and a form inside `<noscript>` no longer owns its controls.
+- A `select` in a disabled `fieldset` keeps its default option on Phoenix, as in a browser, so `to_have_value` reports it. The control is still left out of form submissions.
+- Phoenix visibility checks (`to_be_visible`, `to_be_hidden`, `filter(visible:)` and the facade's `assert_has` and `refute_has`) now share one rendered rule with `by_role`. `aria-hidden` no longer counts, as in Playwright: a `to_be_visible` on an `aria-hidden` element passes and a `refute` on it fails, while `by_role` still excludes it. Elements a browser never displays, such as `<title>`, `<script>`, `<style>`, `<template>` or `<datalist>`, or fallback content inside `<video>` and the like, now count as invisible.
+- The PhoenixTest-style `click_button(session, text)` no longer matches `<input type="file">`, so a file input labelled like a button is no longer ambiguous. `by_role(:button)` still matches file inputs, as in Playwright.
+
 ## 0.9.0-rc.0 — 2026-11-09
 
 Fluffy now runs on PlaywrightEx 0.17, a port of the official Playwright client with a pinned Playwright 1.65 driver.

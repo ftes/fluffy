@@ -6,6 +6,8 @@ defmodule Fluffy.HTML.Semantics do
     number range color checkbox radio file submit image reset button
   )
 
+  @labelable_tags ~w(button input meter output progress select textarea)
+
   def attributes(%{attributes: attributes}), do: attributes
 
   def input_type(%{tag: "input", attributes: attributes}) do
@@ -39,4 +41,29 @@ defmodule Fluffy.HTML.Semantics do
   end
 
   def has_attribute?(attributes, name), do: List.keymember?(attributes, name, 0)
+
+  def labelable_tags, do: @labelable_tags
+
+  def labelable?(%{tag: "input"} = target), do: input_type(target) != "hidden"
+  def labelable?(%{tag: tag}), do: tag in @labelable_tags
+
+  def list_box?(attributes) do
+    has_attribute?(attributes, "multiple") or
+      case attributes |> attribute("size") |> Kernel.||("") |> String.trim_leading() |> Integer.parse() do
+        {size, _rest} -> size > 1
+        :error -> false
+      end
+  end
+
+  # What a `select` shows before input. Each option needs :id, :attributes and
+  # :disabled?, from `DocumentIndex.option_disabled?/2`.
+  def default_selected_ids(options, attributes) do
+    selected = options |> Enum.filter(&has_attribute?(&1.attributes, "selected")) |> Enum.map(& &1.id)
+
+    cond do
+      selected != [] -> if(has_attribute?(attributes, "multiple"), do: selected, else: Enum.take(selected, -1))
+      list_box?(attributes) -> []
+      true -> options |> Enum.reject(& &1.disabled?) |> Enum.take(1) |> Enum.map(& &1.id)
+    end
+  end
 end

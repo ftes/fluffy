@@ -18,6 +18,8 @@ defmodule Fluffy.PhoenixTest do
   alias Fluffy.Session, as: NativeSession
   alias Fluffy.URLMatcher
 
+  @non_file_buttons "button, input:not([type=file i]), [role]:not(input)"
+
   defmodule Session do
     @moduledoc """
     The facade session, containing the native session, locator scope, and active form.
@@ -74,7 +76,7 @@ defmodule Fluffy.PhoenixTest do
   """
   @spec click_link(session(), String.t()) :: session()
   @spec click_link(session(), String.t(), String.t()) :: session()
-  def click_link(session, text), do: click_role(session, :link, text)
+  def click_link(session, text), do: click_locator(session, role_locator(session, :link, text))
   def click_link(session, selector, text), do: click_link(session, selector, text, [])
 
   @spec click_link(session(), String.t(), String.t(), keyword()) :: session()
@@ -94,7 +96,12 @@ defmodule Fluffy.PhoenixTest do
   @doc "Clicks a button by accessible name, or by CSS and text or label (optional `exact:`)."
   @spec click_button(session(), String.t()) :: session()
   @spec click_button(session(), String.t(), String.t()) :: session()
-  def click_button(session, text), do: click_role(session, :button, text)
+  def click_button(session, text) do
+    # `by_role(:button)` matches a file input, as in Playwright; `click_button` never means one.
+    buttons = css_locator(session, @non_file_buttons)
+    click_locator(session, session |> role_locator(:button, text) |> Locator.and_(buttons))
+  end
+
   def click_button(session, selector, text), do: click_button(session, selector, text, [])
 
   @spec click_button(session(), String.t(), String.t(), keyword()) :: session()
@@ -293,11 +300,12 @@ defmodule Fluffy.PhoenixTest do
   @spec refute_path(session(), String.t(), keyword()) :: session()
   def refute_path(session, path, options \\ []), do: execute(session, path_expectation(path, options), true)
 
-  defp click_role(session, role, text) do
+  defp role_locator(session, role, text) do
     string!(text, :text)
-    locator = scoped(session, &Locator.by_role(&1, role, name: text), fn -> Locator.by_role(role, name: text) end)
-    map_session(session, &Fluffy.click(&1, locator))
+    scoped(session, &Locator.by_role(&1, role, name: text), fn -> Locator.by_role(role, name: text) end)
   end
+
+  defp click_locator(session, locator), do: map_session(session, &Fluffy.click(&1, locator))
 
   defp click_text(session, selector, text, options) do
     string!(text, :text)
