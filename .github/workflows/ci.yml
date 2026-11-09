@@ -23,11 +23,10 @@ on:
         type: string
         default: ""
       partitions:
-        description: "Partitions per lane and browser"
+        description: "Partitions per lane and browser (1-8), default: chromium 2, others 3"
         required: false
-        type: choice
-        options: ["1", "2", "3", "4", "5", "6", "7", "8"]
-        default: "6"
+        type: string
+        default: ""
 
 # A new push to a PR cancels its running CI. Other events (main pushes, the nightly, dispatched
 # experiments) get a group of their own: in a shared group GitHub keeps one run pending and cancels
@@ -116,7 +115,7 @@ jobs:
   # round-robin by sorted path), as PlaywrightEx's CI. Each job has its own Postgres, browser and
   # FLUFFY_ARTIFACT_DIR.
   test:
-    name: test (${{ matrix.lane }}, ${{ matrix.browser }}, ${{ matrix.partition }}/${{ matrix.partitions }})
+    name: test (${{ matrix.lane }}, ${{ matrix.browser }}, ${{ matrix.partition }})
     if: *stack_top
     runs-on: ubuntu-26.04
     # The slowest job took ~3.5 min at 6 partitions (webkit, a retry included), but a cold apt
@@ -127,13 +126,14 @@ jobs:
       matrix:
         lane: [oldest, newest]
         browser: [chromium, firefox, webkit]
-        # Any event but a dispatch has no inputs: 6 partitions, the dispatch default. `partition`
-        # lists 1..partitions.
-        partitions: ${{ fromJSON(format('[{0}]', inputs.partitions || '6')) }}
-        partition: ${{ fromJSON('{"1":[1],"2":[1,2],"3":[1,2,3],"4":[1,2,3,4],"5":[1,2,3,4,5],"6":[1,2,3,4,5,6],"7":[1,2,3,4,5,6,7],"8":[1,2,3,4,5,6,7,8]}')[inputs.partitions || '6'] }}
+        # Without a dispatch's `partitions`: 3 per browser, 2 for chromium (exclude below), as setup
+        # is about 45 s of each job. TEST_PARTITIONS has the same counts.
+        partition: ${{ fromJSON('{"1":[1],"2":[1,2],"3":[1,2,3],"4":[1,2,3,4],"5":[1,2,3,4,5],"6":[1,2,3,4,5,6],"7":[1,2,3,4,5,6,7],"8":[1,2,3,4,5,6,7,8]}')[inputs.partitions || '3'] }}
         # The oldest lane checks the Elixir/OTP floor, which the browser doesn't depend on. A
         # dispatch's `browsers` drops the newest lane's others ('none' excludes nothing).
         exclude:
+          - browser: chromium
+            partition: ${{ !inputs.partitions && 3 || 'none' }}
           - lane: oldest
             browser: firefox
           - lane: oldest
@@ -163,7 +163,7 @@ jobs:
       # Empty (the default, and on other events) leaves test_helper.exs's half the cores.
       FLUFFY_MAX_CASES: ${{ inputs.max_cases }}
       MIX_TEST_PARTITION: ${{ matrix.partition }}
-      TEST_PARTITIONS: ${{ matrix.partitions }}
+      TEST_PARTITIONS: ${{ inputs.partitions || (matrix.browser == 'chromium' && 2 || 3) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Set up toolchain and deps
@@ -194,7 +194,7 @@ jobs:
         if: failure() || steps.tests.outputs.retried == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: browser-failures-${{ matrix.lane }}-${{ matrix.browser }}-${{ matrix.partition }}of${{ matrix.partitions }}-elixir-${{ steps.setup.outputs.elixir }}-erlang-${{ steps.setup.outputs.erlang }}
+          name: browser-failures-${{ matrix.lane }}-${{ matrix.browser }}-${{ matrix.partition }}of${{ env.TEST_PARTITIONS }}-elixir-${{ steps.setup.outputs.elixir }}-erlang-${{ steps.setup.outputs.erlang }}
           path: tmp/fluffy-artifacts
           if-no-files-found: ignore
 
