@@ -83,7 +83,7 @@ defmodule Fluffy.Expect.Internal do
   end
 
   defp positive_description(%Expect{target: :page, kind: :aria_snapshot, expected: expected}) do
-    "active page to match the ARIA snapshot #{inspect(expected)}"
+    "active page #{locator_matcher_description(:aria_snapshot, expected)}"
   end
 
   defp locator_matcher_description(:checked, :checked), do: "to be checked"
@@ -99,7 +99,13 @@ defmodule Fluffy.Expect.Internal do
   defp locator_matcher_description(:css, {name, value, _options}), do: "to have CSS #{name} #{inspect(value)}"
   defp locator_matcher_description(:js_property, {name, value}), do: "to have JS property #{name} #{inspect(value)}"
   defp locator_matcher_description(:screenshot, options), do: "to match the screenshot at #{inspect(options[:path])}"
-  defp locator_matcher_description(:aria_snapshot, expected), do: "to match the ARIA snapshot #{inspect(expected)}"
+
+  defp locator_matcher_description(:aria_snapshot, {nil, path: path}),
+    do: "to match the ARIA snapshot at #{inspect(path)}"
+
+  defp locator_matcher_description(:aria_snapshot, {expected, _options}),
+    do: "to match the ARIA snapshot #{inspect(expected)}"
+
   defp locator_matcher_description(:role, expected), do: "to have role #{inspect(expected)}"
 
   defp locator_matcher_description(:accessible_name, {expected, options}),

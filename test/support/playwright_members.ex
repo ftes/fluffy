@@ -75,12 +75,12 @@ defmodule Fluffy.PlaywrightMembers do
           {~w(and_ or_ filter first last nth content_frame frame_locator)a, :wrapped},
           {~w(click fill check uncheck select_option press set_input_files)a, :wrapped},
           {~w(hover drag_to press_sequentially focus blur wait_for bounding_box aria_snapshot)a, :wrapped},
+          {~w(evaluate evaluate_all wait_for_function drop all within)a, :wrapped},
           {~w(clear set_checked dblclick tap dispatch_event select_text scroll_into_view_if_needed screenshot)a,
            :wrapped},
           {[:locator], {:renamed, {Fluffy.Locator, :by_css, 2}}},
           {[:visible], {:renamed, {Fluffy.Locator, :filter, 2}}},
-          {~w(evaluate evaluate_all evaluate_handle aria_snapshot_json wait_for_function drop all within)a,
-           @native_locator},
+          {~w(evaluate_handle aria_snapshot_json)a, @native_locator},
           {~w(count text_content inner_text inner_html all_text_contents all_inner_texts get_attribute input_value
               is_checked is_disabled is_editable is_enabled is_hidden is_visible)a, @native_read},
           {~w(describe description to_string normalize)a, {:na, "names a native locator; Fluffy locators inspect"}},
@@ -104,7 +104,7 @@ defmodule Fluffy.PlaywrightMembers do
         [
           {~w(reload go_back go_forward url opener evaluate screenshot on once off)a, :wrapped},
           {~w(set_viewport_size viewport_size emulate_media wait_for_function wait_for_load_state add_script_tag
-              add_style_tag aria_snapshot)a, :wrapped},
+              add_style_tag aria_snapshot pdf bring_to_front content title local_storage session_storage)a, :wrapped},
           {[:keyboard], {:renamed, {Keyboard, :press, 3}}},
           {[:mouse], {:renamed, {Mouse, :click, 4}}},
           {[:goto], {:renamed, {Fluffy, :visit, 2}}},
@@ -120,7 +120,6 @@ defmodule Fluffy.PlaywrightMembers do
           {~w(expect_response wait_for_response)a, {:renamed, {Fluffy.Event, :response, 1}}},
           {[:locator], {:renamed, {Fluffy.Locator, :by_css, 1}}},
           {[:frame_locator], {:renamed, {Fluffy.Locator, :frame_locator, 1}}},
-          {[:title], {:unwrap, "read through Fluffy.unwrap_and_return/2; page_to_have_title asserts it"}},
           {[:expect_console_message], {:renamed, {Fluffy.Event, :console, 1}}},
           {[:expect_request_finished], {:renamed, {Fluffy.Event, :request_finished, 1}}},
           {[:expect_websocket], {:renamed, {Fluffy.Event, :web_socket, 1}}},
@@ -128,9 +127,9 @@ defmodule Fluffy.PlaywrightMembers do
           {~w(route unroute unroute_all)a, :wrapped},
           {~w(route_from_har route_web_socket touchscreen aria_snapshot_json add_locator_handler remove_locator_handler)a,
            @page_gap},
-          {~w(wait_for_url content add_init_script expose_binding expose_function set_extra_http_headers console_messages
+          {~w(wait_for_url add_init_script expose_binding expose_function set_extra_http_headers console_messages
               clear_console_messages page_errors clear_page_errors requests workers context main_frame frame
-              frames local_storage session_storage request bring_to_front pdf coverage video screencast
+              frames request coverage video screencast
               is_closed evaluate_handle prepend_listener clock pause)a, @native_page},
           {[:remove_all_listeners], @own_listeners},
           {~w(set_default_timeout set_default_navigation_timeout)a, @own_timeouts},
@@ -173,7 +172,8 @@ defmodule Fluffy.PlaywrightMembers do
         {[:set_extra_http_headers], :wrapped},
         {~w(route unroute unroute_all)a, :wrapped},
         {~w(route_from_har route_web_socket)a, {:unwrap, "gap: on PlaywrightEx.Page.context/1 inside Fluffy.unwrap/2"}},
-        {~w(set_storage_state expose_binding expose_function clock browser
+        {[:set_storage_state], :wrapped},
+        {~w(expose_binding expose_function clock browser
             background_pages service_workers new_cdp_session credentials debugger request is_closed
             prepend_listener)a, {:unwrap, "on PlaywrightEx.Page.context/1 inside Fluffy.unwrap/2"}},
         {[:close], {:denied, "the session owns its context; use Fluffy.close_session/1"}},
@@ -220,8 +220,7 @@ defmodule Fluffy.PlaywrightMembers do
         {~w(finished frame headers_array http_version from_service_worker)a, @native_value}
       ],
       PlaywrightEx.Route => [
-        {~w(abort continue fallback fulfill request)a, :wrapped},
-        {[:fetch], {:unwrap, "gap: on the PlaywrightEx.Route of Fluffy.unwrap_and_return/2"}}
+        {~w(abort continue fallback fulfill request fetch)a, :wrapped}
       ],
       PlaywrightEx.ConsoleMessage => [
         {~w(location page text timestamp type)a, :wrapped},
@@ -268,6 +267,7 @@ defmodule Fluffy.PlaywrightMembers do
     %{
       {PlaywrightEx.Page, :goto} => "Fluffy.visit/2 navigates by path and takes no options",
       {PlaywrightEx.Page, :screenshot} => "options pass through to PlaywrightEx, which validates them",
+      {PlaywrightEx.Route, :fetch} => "options pass through to PlaywrightEx, which validates them",
       {PlaywrightEx.Page, :wait_for_event} => "Fluffy.Event waits take timeout: and scope:",
       {PlaywrightEx.Page, :expect_event} => "Fluffy.Event waits take timeout: and scope:",
       {PlaywrightEx.Page, :expect_download} => "Fluffy.Event waits take timeout: and scope:",

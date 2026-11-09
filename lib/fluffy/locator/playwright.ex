@@ -2,6 +2,7 @@ defmodule Fluffy.Locator.Playwright do
   @moduledoc false
 
   alias Fluffy.Locator
+  alias Fluffy.Locator.Internal
   alias PlaywrightEx.Isomorphic.LocatorUtils
   alias PlaywrightEx.Isomorphic.StringUtils
 
@@ -69,6 +70,18 @@ defmodule Fluffy.Locator.Playwright do
     concat(selector, "internal:or=#{JSON.encode!(selector(right))}")
   end
 
+  # A chained selector cannot enter a frame; only a parent starting the selector is not chained.
+  defp apply_operation({:within, parent, child}, selector) do
+    if Internal.crosses_frame?(child) or (selector != :none and Internal.crosses_frame?(parent)) do
+      raise ArgumentError,
+            "within/2 cannot enter a frame inside a chained locator, got: " <>
+              "within(#{Internal.describe(child)}, #{Internal.describe(parent)}); " <>
+              "start the locator from the frame instead"
+    end
+
+    selector |> chain(selector(parent)) |> chain(selector(child))
+  end
+
   defp apply_operation({:filter, options}, selector) do
     Enum.reduce(options, selector, fn
       {:has_text, text}, current ->
@@ -98,6 +111,11 @@ defmodule Fluffy.Locator.Playwright do
   defp apply_operation({:nth, index}, selector) do
     concat(selector, "nth=#{index}")
   end
+
+  # Nesting makes the operands of `and_/2` and `or_/2` in `nested` resolve from each match
+  # of `selector`. Playwright rejects a chain with nothing before it.
+  defp chain(:none, nested), do: nested
+  defp chain(selector, nested), do: concat(selector, "internal:chain=#{JSON.encode!(nested)}")
 
   defp concat(:none, right), do: right
   defp concat(left, right), do: "#{left} >> #{right}"

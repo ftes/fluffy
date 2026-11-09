@@ -11,8 +11,13 @@
 - `Fluffy.Playwright.evaluate/4` accepts `timeout:`, overriding the session's, as `evaluate(session, expression, timeout: 100)` or `evaluate(session, expression, arg, timeout: 100)`.
 - `Fluffy.Expect.to_have_css/4`, `to_have_js_property/4`, `to_have_role/3`, `to_have_accessible_name/3`, `to_have_accessible_description/3` and `to_have_accessible_error_message/3` for Playwright; Phoenix raises `Fluffy.CapabilityError`.
 - `Fluffy.Expect.to_have_screenshot/2` and `page_to_have_screenshot/1` compare against the baseline at a required `path:`; Fluffy does not derive one from the test name. `to_match_aria_snapshot/3` and `page_to_match_aria_snapshot/2` compare an inline snapshot. Playwright only.
-- `Fluffy.Playwright` gains `set_extra_http_headers/2`, which keeps the session's starting headers and Ecto sandbox header, `add_script_tag/2`, `add_style_tag/2`, `wait_for_load_state/3`, `unroute_all/2` and the locator wait `wait_for/3`, all returning the session, and `bounding_box/3`, `aria_snapshot/3` and `viewport_size/1`, returning the value. Phoenix raises `Fluffy.CapabilityError`.
-- With `import Fluffy` and `import Fluffy.Playwright`, three-argument `wait_for` calls are now ambiguous: write `Fluffy.wait_for/3` or `import Fluffy.Playwright, except: [wait_for: 3]`.
+- `to_match_aria_snapshot/2` and `page_to_match_aria_snapshot/1` also take `path:` in place of the expected snapshot, a file resolved against the current working directory and written when missing unless `update_snapshots:` is `:none`. Needs PlaywrightEx 0.17.0-rc.4.
+- `Fluffy.Playwright` gains `set_extra_http_headers/2`, which keeps the session's starting headers and Ecto sandbox header, `add_script_tag/2`, `add_style_tag/2`, `wait_for_load_state/3` and `unroute_all/2`, all returning the session, and `bounding_box/3`, `aria_snapshot/3` and `viewport_size/1`, returning the value. Phoenix raises `Fluffy.CapabilityError`.
+- `Fluffy.wait_for/3` also takes a locator on Playwright, with `state:`: it blocks and returns the session, while an event still returns a pending handle. Phoenix raises `Fluffy.CapabilityError` for a locator.
+- `Fluffy.Playwright.evaluate` and `wait_for_function` take a locator, and `evaluate_all/5` runs on all its elements, with the same options-or-argument matching.
+- `Fluffy.Playwright` gains `drop/4`, `pdf/3`, `bring_to_front/2` and `set_storage_state/2`, returning the session, and `all/2`, `content/2`, `title/2`, `local_storage/2` and `session_storage/2`, returning the value.
+- `Fluffy.Locator.within/2` scopes a locator to each match of another, with `nth/2` and `first/1` resolved per parent, on every driver.
+- `Fluffy.Route.fetch/2` performs a routed request and returns the response for `Fluffy.Route.fulfill/2`.
 - The facade's `assert_has` and `refute_has` accept a `%Fluffy.Locator{}` with the same options as a selector, inside the current `within/3` scope.
 - `Fluffy.unwrap_and_return/2`, `Fluffy.Playwright.unwrap_and_return/3` and `Fluffy.PhoenixTest.unwrap_and_return/2` run a native callback and return its result. They reconcile like `unwrap`; a Static callback may return anything and leaves the page alone.
 

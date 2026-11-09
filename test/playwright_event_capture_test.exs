@@ -2,7 +2,7 @@ defmodule Fluffy.PlaywrightEventCaptureTest do
   use Fluffy.TestCase, async: true
 
   import Fluffy
-  import Fluffy.Playwright, except: [wait_for: 3]
+  import Fluffy.Playwright
 
   alias Fluffy.Event
   alias Fluffy.Event.Subscription

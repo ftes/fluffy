@@ -48,10 +48,13 @@ defmodule Fluffy.Options do
     wait_for: {PlaywrightEx.Locator, :wait_for, 2, [:state]},
     bounding_box: {PlaywrightEx.Locator, :bounding_box, 2, []},
     aria_snapshot: {PlaywrightEx.Locator, :aria_snapshot, 2, [:boxes, :depth, :mode]},
+    drop: {PlaywrightEx.Locator, :drop, 3, [:position]},
+    locator_evaluate: {PlaywrightEx.Locator, :evaluate, 4, [:expose_functions]},
+    locator_wait_for_function: {PlaywrightEx.Locator, :wait_for_function, 4, []},
     page_aria_snapshot: {PlaywrightEx.Page, :aria_snapshot, 2, [:boxes, :depth, :mode]},
     wait_for_function: {PlaywrightEx.Page, :wait_for_function, 4, [:polling]},
     wait_for_load_state: {PlaywrightEx.Page, :wait_for_load_state, 3, []},
-    unroute_all: {PlaywrightEx.BrowserContext, :unroute_all, 2, [:behavior]},
+    unroute_all: {PlaywrightEx.BrowserContext, :unroute_all, 2, []},
     locator_screenshot:
       {PlaywrightEx.Locator, :screenshot, 2,
        [:animations, :caret, :mask, :mask_color, :omit_background, :quality, :scale, :style, :type]},
@@ -71,6 +74,25 @@ defmodule Fluffy.Options do
          :style_path,
          :threshold
        ]},
+    content: {PlaywrightEx.Page, :content, 2, [:include_shadow]},
+    pdf:
+      {PlaywrightEx.Page, :pdf, 2,
+       [
+         :display_header_footer,
+         :footer_template,
+         :format,
+         :header_template,
+         :height,
+         :landscape,
+         :margin,
+         :outline,
+         :page_ranges,
+         :prefer_css_page_size,
+         :print_background,
+         :scale,
+         :tagged,
+         :width
+       ]},
     emulate_media:
       {PlaywrightEx.Page, :emulate_media, 2, [:color_scheme, :contrast, :forced_colors, :media, :reduced_motion]},
     keyboard_press: {PlaywrightEx.Keyboard, :press, 3, [:delay]},
@@ -87,7 +109,7 @@ defmodule Fluffy.Options do
 
   @fluffy_native_keys [:timeout]
   # `path` is the positional argument of an element screenshot.
-  @denied_native_keys [:no_wait_after, :signal, :path]
+  @denied_native_keys [:no_wait_after, :signal, :path, :behavior]
 
   # Upstream docs and types of a passed-through option that Fluffy's behavior completes.
   @native_option_overrides [
@@ -162,7 +184,7 @@ defmodule Fluffy.Options do
     to_have_accessible_name: {PlaywrightEx.Expect, :to_have_accessible_name, 3, [:ignore_case]},
     to_have_accessible_description: {PlaywrightEx.Expect, :to_have_accessible_description, 3, [:ignore_case]},
     to_have_accessible_error_message: {PlaywrightEx.Expect, :to_have_accessible_error_message, 3, [:ignore_case]},
-    to_match_aria_snapshot: {PlaywrightEx.Expect, :to_match_aria_snapshot, 3, []},
+    to_match_aria_snapshot: {PlaywrightEx.Expect, :to_match_aria_snapshot, 3, [:path]},
     to_be_checked: {PlaywrightEx.Expect, :to_be_checked, 2, [:checked, :indeterminate]},
     to_have_value: {PlaywrightEx.Expect, :to_have_value, 3, []},
     to_have_values: {PlaywrightEx.Expect, :to_have_values, 3, []},
@@ -182,6 +204,12 @@ defmodule Fluffy.Options do
   @denied_expectation_keys [:signal]
 
   @mirrored_expectation_options [
+    path: [
+      type: :string,
+      doc:
+        "The snapshot file, in place of `expected`, resolved against the current working directory. " <>
+          "Fluffy does not derive a path from the test name."
+    ],
     visible: [type: :boolean, doc: "Set to false to expect a hidden target, like `not_/1`."],
     editable: [type: :boolean, doc: "Set to false to expect a read-only target, like `not_/1`."],
     enabled: [type: :boolean, doc: "Set to false to expect a disabled target, like `not_/1`."],

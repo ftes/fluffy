@@ -48,6 +48,9 @@ defmodule Fluffy.Locator.Internal do
       {operator, inner} when operator in [:and, :or] ->
         crosses_frame?(inner)
 
+      {:within, parent, child} ->
+        crosses_frame?(parent) or crosses_frame?(child)
+
       {:filter, options} ->
         Enum.any?(options, fn
           {key, %Locator{} = inner} when key in [:has, :has_not] -> crosses_frame?(inner)
@@ -68,6 +71,7 @@ defmodule Fluffy.Locator.Internal do
       {:role, _role, options} -> playwright_option(options)
       {:filter, options} -> playwright_option(options)
       {operator, %Locator{} = inner} when operator in [:and, :or] -> playwright_option(inner)
+      {:within, parent, child} -> playwright_option(parent) || playwright_option(child)
       _operation -> nil
     end)
   end
@@ -127,6 +131,7 @@ defmodule Fluffy.Locator.Internal do
   defp describe_operation({:or, right}), do: "or_(#{describe(right)})"
 
   defp describe_operation({:and, right}), do: "and_(#{describe(right)})"
+  defp describe_operation({:within, parent, child}), do: "within(#{describe(child)}, #{describe(parent)})"
 
   defp describe_operation({:filter, options}), do: "filter(#{describe_keywords(options)})"
   defp describe_operation({:nth, 0}), do: "nth(0)"

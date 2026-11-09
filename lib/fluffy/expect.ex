@@ -378,20 +378,38 @@ defmodule Fluffy.Expect do
   @doc group: "Locator assertions"
   @doc playwright_only: true
   @doc """
-  Asserts the target's ARIA snapshot against `expected`, the snapshot as YAML text.
-  Requires Playwright, including when negated.
+  Asserts the target's ARIA snapshot against `expected`, the snapshot as YAML text, or
+  against the file at `path:` in its place. Requires Playwright, including when negated.
 
-  PlaywrightEx only compares inline snapshots, so `expected` is required and there is
-  no `path:` or baseline file. An empty `expected` fails with the current snapshot in
-  its message, to paste in.
+      expect(session, to_match_aria_snapshot(by_css("body"), path: "test/snapshots/body.aria.yml"))
+
+  An empty `expected` fails with the current snapshot in its message, to paste in.
+
+  A relative `path:` resolves against the current working directory, as screenshot
+  baselines do, and Fluffy does not derive one from the test name. A missing file is
+  written and the assertion passes; negated, it fails. `config :playwright_ex, :expect`
+  sets `update_snapshots:`. Under `:none` a missing file fails, comparing against an
+  empty snapshot. Negated, a missing file passes under `:none`, `:all` or `:changed`.
 
   ## Options
 
   #{NimbleOptions.docs(Options.expectation_schema(:to_match_aria_snapshot))}
   """
-  @spec to_match_aria_snapshot(Locator.t(), String.t(), [to_match_aria_snapshot_option()]) :: t()
-  def to_match_aria_snapshot(%Locator{} = locator, expected, options \\ []) when is_binary(expected) do
-    native_expectation(:to_match_aria_snapshot, {:locator, locator}, :aria_snapshot, expected, options)
+  @spec to_match_aria_snapshot(Locator.t(), String.t() | [to_match_aria_snapshot_option()], [
+          to_match_aria_snapshot_option()
+        ]) :: t()
+  def to_match_aria_snapshot(%Locator{} = locator, expected_or_options, options \\ [])
+      when is_binary(expected_or_options) or is_list(expected_or_options) do
+    aria_snapshot_expectation({:locator, locator}, expected_or_options, options)
+  end
+
+  # The file travels with the expected value, for PlaywrightEx to raise if both are given.
+  defp aria_snapshot_expectation(target, options, []) when is_list(options),
+    do: aria_snapshot_expectation(target, nil, options)
+
+  defp aria_snapshot_expectation(target, expected, options) when is_binary(expected) or is_nil(expected) do
+    {file, options} = :to_match_aria_snapshot |> Options.validate_expectation!(options) |> Keyword.split([:path])
+    Internal.new(target, :aria_snapshot, {expected, file}, options)
   end
 
   @doc group: "Locator assertions"
@@ -736,15 +754,19 @@ defmodule Fluffy.Expect do
   @doc group: "Assertions"
   @doc playwright_only: true
   @doc """
-  Asserts the active page's ARIA snapshot against `expected`, like `to_match_aria_snapshot/3`.
+  Asserts the active page's ARIA snapshot against `expected`, or the file at `path:` in
+  its place, like `to_match_aria_snapshot/3`, which also says how a missing file behaves.
 
   ## Options
 
   #{NimbleOptions.docs(Options.expectation_schema(:to_match_aria_snapshot))}
   """
-  @spec page_to_match_aria_snapshot(String.t(), [to_match_aria_snapshot_option()]) :: Expect.t()
-  def page_to_match_aria_snapshot(expected, options \\ []) when is_binary(expected) and is_list(options) do
-    native_expectation(:to_match_aria_snapshot, :page, :aria_snapshot, expected, options)
+  @spec page_to_match_aria_snapshot(String.t() | [to_match_aria_snapshot_option()], [
+          to_match_aria_snapshot_option()
+        ]) :: Expect.t()
+  def page_to_match_aria_snapshot(expected_or_options, options \\ [])
+      when (is_binary(expected_or_options) or is_list(expected_or_options)) and is_list(options) do
+    aria_snapshot_expectation(:page, expected_or_options, options)
   end
 
   @doc group: "Assertions"
@@ -755,19 +777,8 @@ defmodule Fluffy.Expect do
     Internal.new(:page, :opener, expected, options)
   end
 
-  defp expect_active_page(%Session{} = session, %Expect{kind: :url} = expectation) do
-    Fluffy.__expect__(session, expectation)
-  end
-
-  defp expect_active_page(%Session{} = session, %Expect{kind: :title} = expectation) do
-    Fluffy.__expect__(session, expectation)
-  end
-
-  defp expect_active_page(%Session{} = session, %Expect{kind: :screenshot} = expectation) do
-    Fluffy.__expect__(session, expectation)
-  end
-
-  defp expect_active_page(%Session{} = session, %Expect{kind: :aria_snapshot} = expectation) do
+  defp expect_active_page(%Session{} = session, %Expect{kind: kind} = expectation)
+       when kind in [:url, :title, :screenshot, :aria_snapshot] do
     Fluffy.__expect__(session, expectation)
   end
 

@@ -456,11 +456,6 @@ then.
 `Fluffy.Playwright.tap/3` needs `browser_context: [has_touch: true]` and takes a
 required option list, so `import Fluffy.Playwright` leaves `Kernel.tap/2` usable.
 
-`Fluffy.Playwright.wait_for/3` also takes a required option list, which leaves
-`Fluffy.wait_for/2` usable when both modules are imported. Three-argument calls are
-ambiguous there: write `Fluffy.wait_for(session, event, options)`, or
-`import Fluffy.Playwright, except: [wait_for: 3]`.
-
 ## Assertions
 
 See [Assertion styles](assertion-styles.md) for native assertion imports,

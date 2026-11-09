@@ -3,7 +3,7 @@ defmodule Fluffy.Conformance.NetworkValueTest do
 
   import Fluffy
   import Fluffy.Locator
-  import Fluffy.Playwright, except: [wait_for: 3]
+  import Fluffy.Playwright
 
   alias Fluffy.Event
   alias Fluffy.Playwright

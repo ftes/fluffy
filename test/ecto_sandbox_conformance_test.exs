@@ -39,6 +39,14 @@ defmodule Fluffy.EctoSandboxConformanceTest do
            ) == %{"value" => value}
   end
 
+  test "a request after set_extra_http_headers still reaches the sandboxed connection", %{value: value} do
+    :playwright
+    |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+    |> Fluffy.Playwright.set_extra_http_headers(%{"x-fluffy-extra" => "1"})
+    |> visit("/database")
+    |> expect("Static values: #{value}" |> by_text() |> to_be_visible())
+  end
+
   for backend <- [:phoenix, :playwright] do
     @tag backend: backend
     test "shares one isolated transaction across Static and Live with #{backend}", %{

@@ -40,16 +40,16 @@ defmodule Fluffy.Route.Registration do
 
   def remove_all(session, options) do
     browser_context = Session.context(session).browser_context
-    {timeout, native} = Keyword.split(options, [:timeout])
-
-    Bounded.within!(Session.timeout(session, timeout), :unroute_all, fn ->
-      with :ok <- BrowserContext.unroute_all(browser_context, native), do: {:ok, :ok}
-    end)
-
     {:ok, resources} = SessionRuntime.resources(session.runtime)
 
-    for {:route, _key, _handler, _match, _listener} = resource <- resources,
-        do: SessionRuntime.release(session.runtime, resource)
+    # Released first, as in `remove/3`: a timeout below cannot leave them registered.
+    for {:route, _key, _handler, _match, _listener} = resource <- resources do
+      :ok = SessionRuntime.release(session.runtime, resource)
+    end
+
+    Bounded.within!(Session.timeout(session, options), :unroute_all, fn ->
+      with :ok <- BrowserContext.unroute_all(browser_context), do: {:ok, :ok}
+    end)
   end
 
   # What `unroute/3` compares: a regular expression's compiled form can differ

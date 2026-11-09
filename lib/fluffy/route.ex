@@ -7,8 +7,8 @@ defmodule Fluffy.Route do
   any other process it passes the route to. As in Playwright, a request never
   answered hangs until the action waiting for it times out.
 
-  Answers raise on failure. Reach the `PlaywrightEx.Route`, for members such as
-  `fetch`, with `Fluffy.unwrap_and_return/2`. See
+  Answers raise on failure. Reach the `PlaywrightEx.Route`, for members Fluffy does
+  not wrap, with `Fluffy.unwrap_and_return/2`. See
   [Routing requests](advanced-events.md#routing-requests).
   """
 
@@ -28,6 +28,20 @@ defmodule Fluffy.Route do
   """
   @spec fulfill(t(), PlaywrightEx.Route.fulfill_options()) :: :ok
   def fulfill(%__MODULE__{} = route, options \\ []), do: PlaywrightEx.Route.fulfill!(route.native, options)
+
+  @doc """
+  Performs the request and returns its `PlaywrightEx.APIResponse`, without answering
+  the route. Pass it to `fulfill/2` to answer, as is or with overrides:
+
+      response = Fluffy.Route.fetch(route)
+      Fluffy.Route.fulfill(route, response: response, status: 201)
+
+  Accepts the options of `PlaywrightEx.Route.fetch/2`, such as `:url`, `:method`,
+  `:headers`, `:post_data`, `:timeout`, and raises on failure. Read the response
+  with the functions of `PlaywrightEx.APIResponse`.
+  """
+  @spec fetch(t(), PlaywrightEx.Route.fetch_options()) :: PlaywrightEx.APIResponse.t()
+  def fetch(%__MODULE__{} = route, options \\ []), do: PlaywrightEx.Route.fetch!(route.native, options)
 
   @doc """
   Sends the request to the server, with no other route handling it.

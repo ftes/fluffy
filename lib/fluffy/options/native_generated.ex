@@ -245,6 +245,18 @@ defmodule Fluffy.Options.NativeGenerated do
          "When set to `:ai`, returns a snapshot optimized for AI consumption. Defaults to `:default`. See details for more information.",
          quote(do: :ai | :default)}
     ],
+    {PlaywrightEx.Locator, :drop, 3} => [
+      position:
+        {"`t:map/0`",
+         "A point to use relative to the top-left corner of element padding box. If not specified, uses some visible point of the element.",
+         quote(do: %{x: number(), y: number()})}
+    ],
+    {PlaywrightEx.Locator, :evaluate, 4} => [
+      expose_functions:
+        {"`t:boolean/0`",
+         "When set to `true`, functions passed inside `arg` are exposed in the page and can be called from the page function. Calling one returns a `Promise` of its result. Under the hood, each function is exposed via `PlaywrightEx.Page.expose_function/3`, so it is technically accessible from all frames of the page. Exposed functions are cleared upon the top-level navigation. Defaults to `false`, in which case functions are not serializable and passing one fails.",
+         quote(do: boolean())}
+    ],
     {PlaywrightEx.Page, :aria_snapshot, 2} => [
       boxes:
         {"`t:boolean/0`",
@@ -261,12 +273,6 @@ defmodule Fluffy.Options.NativeGenerated do
         {"`t:number/0` | `:raf`",
          "If `:polling` is `:raf`, then `expression` is constantly executed in `requestAnimationFrame` callback. If `:polling` is a number, then it is treated as an interval in milliseconds at which the function would be executed. Defaults to `:raf`.",
          quote(do: number() | :raf)}
-    ],
-    {PlaywrightEx.BrowserContext, :unroute_all, 2} => [
-      behavior:
-        {"`:wait` | `:ignore_errors` | `:default`",
-         "Specifies whether to wait for already running handlers and what to do if they raise:",
-         quote(do: :wait | :ignore_errors | :default)}
     ],
     {PlaywrightEx.Locator, :screenshot, 2} => [
       animations:
@@ -352,6 +358,61 @@ defmodule Fluffy.Options.NativeGenerated do
         {"`t:boolean/0`",
          "When true, takes a screenshot of the full scrollable page, instead of the currently visible viewport. Defaults to `false`.",
          quote(do: boolean())}
+    ],
+    {PlaywrightEx.Page, :content, 2} => [
+      include_shadow:
+        {"`t:boolean/0`",
+         "When true, contents of open shadow roots are included as [declarative shadow DOM](https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_shadow_DOM#declaratively_with_html), i.e. `<template shadowrootmode=\"open\">` elements nested inside their host elements. Closed shadow roots are never included. Defaults to `false`.",
+         quote(do: boolean())}
+    ],
+    {PlaywrightEx.Page, :pdf, 2} => [
+      display_header_footer: {"`t:boolean/0`", "Display header and footer. Defaults to `false`.", quote(do: boolean())},
+      footer_template:
+        {"`t:String.t/0`", "HTML template for the print footer. Should use the same format as the `:header_template`.",
+         quote(do: String.t())},
+      format:
+        {"`t:String.t/0`",
+         "Paper format. If set, takes priority over `:width` or `:height` options. Defaults to 'Letter'.",
+         quote(do: String.t())},
+      header_template:
+        {"`t:String.t/0`",
+         "HTML template for the print header. Should be valid HTML markup with following classes used to inject printing values into them:",
+         quote(do: String.t())},
+      height:
+        {"`t:String.t/0` | `t:number/0`", "Paper height, accepts values labeled with units.",
+         quote(do: String.t() | number())},
+      landscape: {"`t:boolean/0`", "Paper orientation. Defaults to `false`.", quote(do: boolean())},
+      margin:
+        {"`t:map/0`", "Paper margins, defaults to none.",
+         quote(
+           do: %{
+             optional(:top) => String.t() | number(),
+             optional(:right) => String.t() | number(),
+             optional(:bottom) => String.t() | number(),
+             optional(:left) => String.t() | number()
+           }
+         )},
+      outline:
+        {"`t:boolean/0`", "Whether or not to embed the document outline into the PDF. Defaults to `false`.",
+         quote(do: boolean())},
+      page_ranges:
+        {"`t:String.t/0`",
+         "Paper ranges to print, e.g., '1-5, 8, 11-13'. Defaults to the empty string, which means print all pages.",
+         quote(do: String.t())},
+      prefer_css_page_size:
+        {"`t:boolean/0`",
+         "Give any CSS `@page` size declared in the page priority over what is declared in `:width` and `:height` or `:format` options. Defaults to `false`, which will scale the content to fit the paper size.",
+         quote(do: boolean())},
+      print_background: {"`t:boolean/0`", "Print background graphics. Defaults to `false`.", quote(do: boolean())},
+      scale:
+        {"`t:number/0`", "Scale of the webpage rendering. Defaults to `1`. Scale amount must be between 0.1 and 2.",
+         quote(do: number())},
+      tagged:
+        {"`t:boolean/0`", "Whether or not to generate tagged (accessible) PDF. Defaults to `false`.",
+         quote(do: boolean())},
+      width:
+        {"`t:String.t/0` | `t:number/0`", "Paper width, accepts values labeled with units.",
+         quote(do: String.t() | number())}
     ],
     {PlaywrightEx.Page, :emulate_media, 2} => [
       color_scheme:
