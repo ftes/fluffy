@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- On Firefox, an action that closes its own page, such as a popup's `window.close()`, raises `Fluffy.OperationError` again, as it does in Playwright, which tracks it as a Firefox bug. Other browsers are unchanged.
+
+### Fixed
+
+- On Playwright, a session `timeout:` under a second no longer limits Fluffy's own reads of the page around an operation; they get at least a second, so a busy browser is far less likely to fail such a session with a `RuntimeError` naming a blocked script. A page whose main thread is blocked now reports after that second.
+- A page that closes while Fluffy adopts its document now fails the operation with `Fluffy.OperationError`, or an `ExUnit.AssertionError` from an expectation, instead of a `RuntimeError` about the LiveView connection. `unwrap`, clock calls, `visit`, `reload` and history navigation raise PlaywrightEx's closed-page error. An operation that succeeded is not failed by its page closing during the bookkeeping after it.
+
 ## 0.9.0-rc.1 — 2026-11-09
 
 ### Added

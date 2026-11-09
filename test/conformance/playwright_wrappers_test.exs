@@ -432,7 +432,8 @@ defmodule Fluffy.Conformance.PlaywrightWrappersTest do
       session = session_for_html(:playwright, "<p>Harness</p>")
       pending = wait_for(session, Fluffy.Event.popup())
       Playwright.evaluate(session, "window.open('/harness'); true")
-      popup = switch_page(session, await(pending))
+      # Adopted first, so the close races only the wait under test.
+      popup = session |> switch_page(await(pending)) |> wait_for(by_css("body"), state: :attached)
       Playwright.evaluate(popup, "setTimeout(() => window.close(), 500); true")
 
       assert_raise Fluffy.OperationError, ~r/wait_for_function.*closed/is, fn ->

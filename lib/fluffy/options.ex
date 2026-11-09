@@ -8,7 +8,8 @@ defmodule Fluffy.Options do
       type: :non_neg_integer,
       doc:
         "Maximum time in milliseconds to wait for the operation. Defaults to the session's `timeout:`. " <>
-          "Playwright browser bookkeeping and navigation synchronization use the session timeout separately."
+          "Playwright browser bookkeeping and navigation synchronization use the session timeout separately, " <>
+          "and at least 1 second."
     ]
   ]
 

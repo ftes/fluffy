@@ -39,6 +39,26 @@ defmodule Fluffy.Conformance.SessionTimeoutTest do
     end
   end
 
+  @tag driver: :playwright
+  test "a session timeout too short for Playwright's bookkeeping limits only the operation" do
+    session = start_session(:playwright, timeout: 1)
+
+    assert_raise Fluffy.OperationError, ~r/wait_for.*Timeout 1ms/s, fn ->
+      wait_for(session, by_css("#missing"), [])
+    end
+  end
+
+  @tag driver: :playwright
+  test "Playwright navigation bookkeeping does not depend on a short session timeout" do
+    :playwright
+    |> session_for_html(~s|<a href="/chamber">Chamber</a>|)
+    |> put_session_timeout(1)
+    |> click(by_role(:link, name: "Chamber"), timeout: 5_000)
+    |> reload(timeout: 5_000)
+    |> Fluffy.Playwright.go_back(timeout: 5_000)
+    |> expect(page_to_have_url("/harness"), timeout: 5_000)
+  end
+
   # No visit on Playwright: a navigation would share the budget under test on a loaded machine.
   defp short_session(:playwright), do: start_session(:playwright, timeout: @session_timeout)
 

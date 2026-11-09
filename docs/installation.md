@@ -48,6 +48,10 @@ to change that, or pass `timeout:` to `Fluffy.start_session/2` for one session. 
 sessions ignore it and use the `timeout` under `config :fluffy, playwright:` (default
 `15_000`), also overridden by `Fluffy.start_session/2`.
 
+A Playwright timeout under a second limits the operation only. Fluffy's own reads of the page
+around it still get a full second, so a page whose main thread is blocked takes a second to
+report, not the shorter timeout.
+
 ## Playwright setup
 
 Only the Playwright backend needs a browser. PlaywrightEx pins its Playwright

@@ -27,6 +27,14 @@ defmodule Fluffy.Conformance.BlockedPageTest do
     assert Playwright.evaluate(session_for_html(:playwright, "<p>ok</p>"), "1 + 1") == 2
   end
 
+  test "a blocked page on a sub-second session reports after a second" do
+    session = put_session_timeout(frozen_session(), 100)
+
+    assert_raise RuntimeError, ~r/document check within 1000ms/, fn ->
+      click(session, by_role(:button, name: "Other"))
+    end
+  end
+
   test "evaluate of a never-settling expression fails within the session timeout" do
     session =
       :playwright |> session_for_html("<p>ok</p>", base_url: Fluffy.TestServer.base_url()) |> put_session_timeout(1_000)
