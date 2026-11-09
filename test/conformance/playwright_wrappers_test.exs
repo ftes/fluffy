@@ -262,7 +262,226 @@ defmodule Fluffy.Conformance.PlaywrightWrappersTest do
     end
   end
 
+  describe "to_be_in_viewport" do
+    @html ~s(<div id="top" style="height: 200px">Top</div>
+              <div style="height: 4000px">Gap</div>
+              <div id="tall" style="height: 8000px">Tall</div>)
+
+    test "follows scrolling, and is retried and negated like other assertions" do
+      with_html(:playwright, @html, fn session ->
+        tall = by_css("#tall")
+
+        session
+        |> expect(to_be_in_viewport(by_css("#top")))
+        |> expect(not_(to_be_in_viewport(tall)))
+        |> scroll_into_view_if_needed(tall)
+        |> expect(to_be_in_viewport(tall))
+        |> expect(not_(to_be_in_viewport(by_css("#top"))))
+      end)
+    end
+
+    test "takes a minimal ratio" do
+      with_html(:playwright, @html, fn session ->
+        tall = by_css("#tall")
+
+        session
+        |> scroll_into_view_if_needed(tall)
+        |> expect(to_be_in_viewport(tall, ratio: 0.01))
+        |> expect(not_(to_be_in_viewport(tall, ratio: 0.99)))
+      end)
+    end
+
+    test "fails naming the ratio" do
+      with_html(:playwright, @html, fn session ->
+        assert_raise ExUnit.AssertionError, ~r/to be in viewport with ratio 0.5/, fn ->
+          expect(session, to_be_in_viewport(by_css("#tall"), ratio: 0.5, timeout: 100))
+        end
+      end)
+    end
+
+    test "rejects an unknown option" do
+      assert_raise NimbleOptions.ValidationError, ~r/unknown options.*:signal/, fn ->
+        to_be_in_viewport(by_css("#tall"), signal: :none)
+      end
+    end
+  end
+
+  describe "add_init_script" do
+    test "runs before the page's own scripts in documents loaded afterwards" do
+      session = session_for_html(:playwright, "<p>Harness</p>")
+
+      assert Playwright.add_init_script(session, "window.seeded = (window.seeded || 0) + 1") == session
+
+      # The current document was loaded before the script was added.
+      assert Playwright.evaluate(session, "window.seeded === undefined")
+
+      session = visit(session, "/harness")
+      assert Playwright.evaluate(session, "window.seeded") == 1
+    end
+
+    test "passes arg to a function, and takes a source map" do
+      session =
+        :playwright
+        |> session_for_html("<p>Harness</p>")
+        |> Playwright.add_init_script("name => { window.greeting = name }", "Harry")
+        |> Playwright.add_init_script(%{content: "window.fromContent = true"})
+        |> visit("/harness")
+
+      assert Playwright.evaluate(session, "window.greeting") == "Harry"
+      assert Playwright.evaluate(session, "window.fromContent")
+    end
+
+    @tag :tmp_dir
+    test "takes a path to a script file", %{tmp_dir: tmp_dir} do
+      path = Path.join(tmp_dir, "init.js")
+      File.write!(path, "window.fromPath = true")
+
+      session =
+        :playwright
+        |> session_for_html("<p>Harness</p>")
+        |> Playwright.add_init_script(%{path: path})
+        |> visit("/harness")
+
+      assert Playwright.evaluate(session, "window.fromPath")
+    end
+
+    test "rejects an arg with a source map" do
+      session = session_for_html(:playwright, "<p>Harness</p>")
+
+      assert_raise ArgumentError, ~r/script map takes no arg/, fn ->
+        Playwright.add_init_script(session, %{content: "window.seeded = true"}, "Harry")
+      end
+    end
+
+    test "covers new pages of the session" do
+      session = :playwright |> session_for_html("<p>Harness</p>") |> Playwright.add_init_script("window.seeded = true")
+
+      other = session |> new_page() |> then(&switch_page(session, &1)) |> visit("/harness")
+      assert Playwright.evaluate(other, "window.seeded")
+    end
+
+    test "covers popups of the session" do
+      session =
+        :playwright
+        |> session_for_html("<p>Harness</p>")
+        |> Playwright.add_init_script("window.seeded = true")
+
+      pending = wait_for(session, Fluffy.Event.popup())
+      Playwright.evaluate(session, "window.open('/harness'); true")
+      assert Playwright.evaluate(switch_page(session, await(pending)), "window.seeded")
+    end
+  end
+
+  describe "wait_for_function" do
+    test "waits for a truthy expression and returns the session" do
+      session = session_for_html(:playwright, "<p>Harness</p>")
+      Playwright.evaluate(session, "setTimeout(() => { window.editorReady = true }, 100); true")
+
+      assert Playwright.wait_for_function(session, "window.editorReady === true") == session
+    end
+
+    test "passes arg to a function and is pipeable" do
+      session =
+        :playwright
+        |> session_for_html("<p>Harness</p>")
+        |> Playwright.wait_for_function("min => window.innerWidth > min", 10)
+        |> Playwright.wait_for_function("() => true", nil, polling: 50, timeout: 1_000)
+
+      assert Playwright.evaluate(session, "1 + 1") == 2
+    end
+
+    test "fails after timeout: and leaves the session usable" do
+      session = session_for_html(:playwright, "<p>Harness</p>")
+      started = System.monotonic_time(:millisecond)
+
+      assert_raise Fluffy.OperationError, ~r/wait_for_function.*[Tt]imeout/s, fn ->
+        Playwright.wait_for_function(session, "() => false", nil, timeout: 100)
+      end
+
+      assert System.monotonic_time(:millisecond) - started < 5_000
+      assert Playwright.evaluate(session, "1 + 1") == 2
+    end
+
+    test "is bounded by the session's timeout, even while a script blocks the page" do
+      session = :playwright |> session_for_html("<p>Harness</p>") |> short_timeout()
+
+      # The freeze runs inside the evaluate, so it is in place before the wait reaches the page.
+      assert_raise RuntimeError, ~r/evaluate did not finish within 1000ms/, fn ->
+        Playwright.evaluate(session, "() => { while (true) {} }")
+      end
+
+      started = System.monotonic_time(:millisecond)
+
+      assert_raise RuntimeError, ~r/document check within 1000ms/, fn ->
+        Playwright.wait_for_function(session, "() => false")
+      end
+
+      # The default session timeout is much longer; failure artifacts can add a few seconds.
+      assert System.monotonic_time(:millisecond) - started < 10_000
+    end
+
+    test "reports a timeout, usually Playwright's own rather than Fluffy's backstop" do
+      session = session_for_html(:playwright, "<p>Harness</p>")
+
+      assert_raise Fluffy.OperationError, ~r/waitForFunction: Timeout 100ms exceeded|Timeout 100ms exceeded during/, fn ->
+        Playwright.wait_for_function(session, "() => false", nil, timeout: 100)
+      end
+    end
+
+    test "raises when the page closes during the wait" do
+      session = session_for_html(:playwright, "<p>Harness</p>")
+      pending = wait_for(session, Fluffy.Event.popup())
+      Playwright.evaluate(session, "window.open('/harness'); true")
+      popup = switch_page(session, await(pending))
+      Playwright.evaluate(popup, "setTimeout(() => window.close(), 500); true")
+
+      assert_raise Fluffy.OperationError, ~r/wait_for_function.*closed/is, fn ->
+        Playwright.wait_for_function(popup, "() => false", nil, timeout: 10_000)
+      end
+    end
+
+    test "adopts a navigation that happens during the wait" do
+      session = session_for_html(:playwright, "<p>Harness</p>")
+      Playwright.evaluate(session, "setTimeout(() => { location.href = #{JSON.encode!(chamber())} }, 50); true")
+
+      session
+      |> Playwright.wait_for_function("document.body.textContent.includes('The guardian sleeps')")
+      |> expect(page_to_have_url("/chamber"))
+      |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
+    end
+
+    test "rejects unknown options" do
+      session = session_for_html(:playwright, "<p>Harness</p>")
+
+      assert_raise NimbleOptions.ValidationError, ~r/unknown options.*:signal/, fn ->
+        Playwright.wait_for_function(session, "() => true", nil, signal: :none)
+      end
+    end
+  end
+
+  # Setup runs under the default timeout; only the blocked part runs under 1s.
+  defp short_timeout(session) do
+    Fluffy.Session.put_context(session, %{Fluffy.Session.context(session) | timeout: 1_000})
+  end
+
   defp with_html(driver, html, fun), do: fun.(session_for_html(driver, html))
+
+  for driver <- [:static, :live] do
+    @tag driver: driver
+    test "to_be_in_viewport requires a browser with #{driver}" do
+      session =
+        case unquote(driver) do
+          :static -> session_for_html(:static, "<p>Top</p>")
+          :live -> :phoenix |> start_session() |> visit("/live/potions")
+        end
+
+      for expectation <- [to_be_in_viewport(by_css("p")), not_(to_be_in_viewport(by_css("p")))] do
+        error = assert_raise Fluffy.CapabilityError, fn -> expect(session, expectation) end
+        assert error.driver == unquote(driver)
+        assert Fluffy.Capability.status(error.capability, unquote(driver)) == :browser_only
+      end
+    end
+  end
 
   test "browser actions reject Phoenix sessions" do
     session = start_session(:phoenix)
@@ -290,6 +509,14 @@ defmodule Fluffy.Conformance.PlaywrightWrappersTest do
           fn -> Mouse.wheel(session, 0, 0) end
         ] do
       assert_raise Fluffy.CapabilityError, operation
+    end
+
+    for operation <- [
+          fn -> Playwright.add_init_script(session, "window.x = 1") end,
+          fn -> Playwright.wait_for_function(session, "true") end
+        ] do
+      error = assert_raise Fluffy.CapabilityError, operation
+      assert Fluffy.Capability.status(error.capability, :static) == :browser_only
     end
 
     for input <- [fn -> Keyboard.press(session, "a") end, fn -> Mouse.down(session) end] do

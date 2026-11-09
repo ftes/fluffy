@@ -26,6 +26,20 @@ defmodule Fluffy.Conformance.AssertAPITest do
     |> refute(empty(note))
   end
 
+  @tag driver: :playwright
+  test "in_viewport delegates to to_be_in_viewport, with ratio" do
+    session =
+      session_for_html(
+        :playwright,
+        ~s(<div id="top" style="height: 10px">Top</div><div id="far" style="margin-top: 5000px">Far</div>)
+      )
+
+    session
+    |> assert(in_viewport(by_css("#top")))
+    |> assert(in_viewport(by_css("#top"), ratio: 0.5))
+    |> refute(in_viewport(by_css("#far")))
+  end
+
   for driver <- [:static, :playwright] do
     @tag driver: driver
     test "assert and refute preserve locator and page semantics with #{driver}" do

@@ -66,6 +66,7 @@ defmodule Fluffy.Playwright do
   @type locator_screenshot_option ::
           unquote(NimbleOptions.option_typespec(Options.action_schema(:locator_screenshot)))
   @type emulate_media_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:emulate_media)))
+  @type wait_for_function_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:wait_for_function)))
 
   @doc group: "Lifecycle and navigation"
   @doc playwright_only: true
@@ -592,6 +593,35 @@ defmodule Fluffy.Playwright do
 
   @doc playwright_only: true
   @doc """
+  Waits until a JavaScript expression returns a truthy value in the active page and returns the session.
+
+  The expression is JavaScript source, either an expression or a function that
+  receives `arg`, as in `evaluate/3`. It is re-evaluated until it is truthy, across
+  navigations of the page; a navigation meanwhile is adopted. The call raises
+  after the session's `timeout:` unless `timeout:` is given:
+
+      session
+      |> Fluffy.Playwright.wait_for_function("window.editor?.ready === true")
+      |> Fluffy.Playwright.wait_for_function("min => window.innerWidth > min", 800, timeout: 2_000)
+
+  Phoenix sessions raise `Fluffy.CapabilityError`.
+
+  ## Options
+
+  Playwright-only options pass through to #{Options.native_reference(:wait_for_function)}.
+
+  #{NimbleOptions.docs(Options.action_schema(:wait_for_function))}
+  """
+  @spec wait_for_function(Session.t(), String.t(), term(), [wait_for_function_option()]) :: Session.t()
+  def wait_for_function(%Session{} = session, expression, arg \\ nil, options \\ []) when is_binary(expression) do
+    ensure_playwright!(session)
+    options = Options.validate_action!(:wait_for_function, options)
+    wait = &PlaywrightEx.Page.wait_for_function(&1, expression, arg, &2)
+    Fluffy.__dispatch_driver__(session, :page_wait, [:wait_for_function, wait, options])
+  end
+
+  @doc playwright_only: true
+  @doc """
   Adds cookies to the browser context and returns the session.
 
   Cookie maps use the keys of `PlaywrightEx.BrowserContext.add_cookies/2`, such as
@@ -603,6 +633,37 @@ defmodule Fluffy.Playwright do
     session |> browser_context!(:add_cookies) |> BrowserContext.add_cookies!(cookies)
     session
   end
+
+  @doc playwright_only: true
+  @doc """
+  Adds a script that runs in every document of the session's browser context before
+  the document's own scripts, and returns the session.
+
+  Each session owns one context, so popups and new pages are covered too. The script
+  only affects documents loaded afterwards: add it before `visit/2`, or reload.
+
+  `script` is JavaScript source, or `%{path: path}` or `%{content: source}`, which
+  take no `arg`. With `arg`, source must be a function, which receives `arg`:
+
+      session
+      |> Fluffy.Playwright.add_init_script("name => { window.greeting = name }", "Harry")
+      |> visit("/potions")
+
+  Without `arg`, a string is evaluated as it stands, as in Playwright: a function
+  expression such as `"() => { window.seeded = true }"` is evaluated but not called.
+  Write statements instead, or call the function in the source.
+
+  Raises after the session's timeout. Phoenix sessions raise `Fluffy.CapabilityError`.
+  """
+  @spec add_init_script(Session.t(), String.t() | map(), term()) :: Session.t()
+  def add_init_script(session, script, arg \\ nil)
+
+  def add_init_script(_session, script, arg) when is_map(script) and not is_nil(arg) do
+    raise ArgumentError, "add_init_script: a script map takes no arg, got: #{inspect(arg)}"
+  end
+
+  def add_init_script(session, script, arg),
+    do: set_context!(session, :add_init_script, &BrowserContext.add_init_script(&1, script, arg))
 
   # Playwright ignores unknown cookie keys, such as the snake_case ones Fluffy 0.8 took.
   @snake_case_cookie_keys %{http_only: :httpOnly, same_site: :sameSite, partition_key: :partitionKey}

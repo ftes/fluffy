@@ -86,6 +86,8 @@ defmodule Fluffy.Expect.Internal do
   defp locator_matcher_description(:editable, _expected), do: "to be editable"
   defp locator_matcher_description(:enabled, _expected), do: "to be enabled"
   defp locator_matcher_description(:focused, _expected), do: "to be focused"
+  defp locator_matcher_description(:in_viewport, []), do: "to be in viewport"
+  defp locator_matcher_description(:in_viewport, ratio: ratio), do: "to be in viewport with ratio #{ratio}"
   defp locator_matcher_description(:value, expected), do: "to have value #{inspect(expected)}"
   defp locator_matcher_description(:values, expected), do: "to have values #{inspect(expected)}"
   defp locator_matcher_description(:visible, _expected), do: "to be visible"

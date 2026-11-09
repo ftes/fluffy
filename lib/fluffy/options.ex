@@ -45,6 +45,7 @@ defmodule Fluffy.Options do
     dispatch_event: {PlaywrightEx.Locator, :dispatch_event, 4, []},
     select_text: {PlaywrightEx.Locator, :select_text, 2, [:force]},
     scroll_into_view_if_needed: {PlaywrightEx.Locator, :scroll_into_view_if_needed, 2, []},
+    wait_for_function: {PlaywrightEx.Page, :wait_for_function, 4, [:polling]},
     locator_screenshot:
       {PlaywrightEx.Locator, :screenshot, 2,
        [:animations, :caret, :mask, :mask_color, :omit_background, :quality, :scale, :style, :type]},
@@ -99,6 +100,7 @@ defmodule Fluffy.Options do
     to_be_editable: {PlaywrightEx.Expect, :to_be_editable, 2, [:editable]},
     to_be_enabled: {PlaywrightEx.Expect, :to_be_enabled, 2, [:enabled]},
     to_be_focused: {PlaywrightEx.Expect, :to_be_focused, 2, []},
+    to_be_in_viewport: {PlaywrightEx.Expect, :to_be_in_viewport, 2, [:ratio]},
     to_be_checked: {PlaywrightEx.Expect, :to_be_checked, 2, [:checked, :indeterminate]},
     to_have_value: {PlaywrightEx.Expect, :to_have_value, 3, []},
     to_have_values: {PlaywrightEx.Expect, :to_have_values, 3, []},
@@ -125,6 +127,10 @@ defmodule Fluffy.Options do
     indeterminate: [type: :boolean, doc: "Expect the browser-owned indeterminate state."],
     ignore_case: [type: :boolean, doc: "Match a string or regular expression case-insensitively."],
     attached: [type: :boolean, doc: "Set to false to expect a detached target, like `not_/1`."],
+    ratio: [
+      type: {:or, [:integer, :float]},
+      doc: "The minimal share of the target that must intersect the viewport, from 0 to 1."
+    ],
     use_inner_text: [
       type: :boolean,
       doc: "*Playwright only.* Read the browser's rendered `innerText` instead of the text content."

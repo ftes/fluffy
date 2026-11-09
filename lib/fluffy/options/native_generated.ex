@@ -229,6 +229,12 @@ defmodule Fluffy.Options.NativeGenerated do
          "Whether to bypass the [actionability](https://playwright.dev/docs/actionability) checks. Defaults to `false`.",
          quote(do: boolean())}
     ],
+    {PlaywrightEx.Page, :wait_for_function, 4} => [
+      polling:
+        {"`t:number/0` | `:raf`",
+         "If `:polling` is `:raf`, then `expression` is constantly executed in `requestAnimationFrame` callback. If `:polling` is a number, then it is treated as an interval in milliseconds at which the function would be executed. Defaults to `:raf`.",
+         quote(do: number() | :raf)}
+    ],
     {PlaywrightEx.Locator, :screenshot, 2} => [
       animations:
         {"`:disabled` | `:allow`",
