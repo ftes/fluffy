@@ -579,6 +579,67 @@ defmodule Fluffy.Playwright do
     session |> browser_context!(:storage_state) |> BrowserContext.storage_state!(options)
   end
 
+  @doc playwright_only: true
+  @doc """
+  Grants browser permissions, such as `"geolocation"`, and returns the session.
+
+  Accepts `origin:` to limit them to one origin. See `PlaywrightEx.BrowserContext.grant_permissions/3`.
+  """
+  @spec grant_permissions(Session.t(), [String.t()], BrowserContext.grant_permissions_options()) :: Session.t()
+  def grant_permissions(session, permissions, options \\ []) when is_list(permissions) do
+    set_context!(session, :grant_permissions, &BrowserContext.grant_permissions(&1, permissions, options))
+  end
+
+  @doc playwright_only: true
+  @doc "Clears all granted browser permissions and returns the session."
+  @spec clear_permissions(Session.t()) :: Session.t()
+  def clear_permissions(session) do
+    set_context!(session, :clear_permissions, &BrowserContext.clear_permissions/1)
+  end
+
+  @doc playwright_only: true
+  @doc """
+  Sets the geolocation and returns the session; `:null` clears it.
+
+  Takes `%{latitude: latitude, longitude: longitude}` and optionally `:accuracy`.
+  Pages also need the `"geolocation"` permission from `grant_permissions/3`.
+  """
+  @spec set_geolocation(Session.t(), :null | map()) :: Session.t()
+  def set_geolocation(session, geolocation) do
+    set_context!(session, :set_geolocation, &BrowserContext.set_geolocation(&1, geolocation))
+  end
+
+  @doc playwright_only: true
+  @doc "Emulates the network being offline, or back online, and returns the session."
+  @spec set_offline(Session.t(), boolean()) :: Session.t()
+  def set_offline(session, offline) when is_boolean(offline) do
+    set_context!(session, :set_offline, &BrowserContext.set_offline(&1, offline))
+  end
+
+  @doc playwright_only: true
+  @doc """
+  Sets HTTP authentication credentials and returns the session; `:null` clears them.
+
+  Takes `%{username: username, password: password}` and optionally `:origin`, or
+  a list of those for different origins. Browsers may cache credentials for an
+  origin that has already authenticated.
+  """
+  @spec set_http_credentials(Session.t(), :null | map() | [map()]) :: Session.t()
+  def set_http_credentials(session, credentials) do
+    set_context!(session, :set_http_credentials, &BrowserContext.set_http_credentials(&1, credentials))
+  end
+
+  # These take no timeout of their own, and a blocked page can hold them up.
+  defp set_context!(session, operation, fun) do
+    browser_context = browser_context!(session, :browser_context_setters)
+
+    Bounded.within!(Session.timeout(session), operation, fn ->
+      with :ok <- fun.(browser_context), do: {:ok, :ok}
+    end)
+
+    session
+  end
+
   defp browser_context!(session, operation) do
     ensure_playwright_backend!(session, operation)
     Session.context(session).browser_context

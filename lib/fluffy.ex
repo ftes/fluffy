@@ -198,7 +198,7 @@ defmodule Fluffy do
   its PlaywrightEx counterpart and `unwrap/2` returns the callback's result.
   A Phoenix download has none and raises `Fluffy.CapabilityError`.
 
-      body = unwrap(response, &PlaywrightEx.Response.text!/1)
+      address = unwrap(response, &PlaywrightEx.Response.server_addr!/1)
 
   Native operations are not cross-driver compatible. Prefer the shared
   Fluffy API whenever it covers the behavior under test.

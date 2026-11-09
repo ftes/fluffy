@@ -22,7 +22,7 @@ Fluffy now runs on PlaywrightEx 0.17, a port of the official Playwright client w
 - On Phoenix, `go_back`/`go_forward` raise `Fluffy.CapabilityError` with `capability: :browser_history` instead of `:pages`.
 - On Playwright, a failed `visit`, `reload`, `go_back` or `go_forward` raises PlaywrightEx's exception, such as `PlaywrightEx.TimeoutError` or `PlaywrightEx.PlaywrightError`, instead of a `RuntimeError`.
 - `trace(coverage:)` is removed.
-- `Fluffy.Dialog.accept/2` and `dismiss/1` take no timeout; `Fluffy.Dialog` loses its `connection`, `id` and `timeout` fields, and `Fluffy.Download` its `timeout` field; `read!` and `save_as!` still raise after the session's `timeout:`, and now cancel the download so a pending save no longer writes the file later.
+- `Fluffy.Dialog.accept/2` and `dismiss/1` take no timeout; `Fluffy.Dialog` loses its `connection`, `id` and `timeout` fields, and `Fluffy.Download` its `timeout` field; `read!` and `save_as!` are renamed `read` and `save_as`, still raise after the session's `timeout:`, and now cancel the download so a pending save no longer writes the file later.
 - `page_status`, `page_to_have_status` and `Fluffy.Page.status` are removed, as in Playwright; on Playwright, assert on `Event.response` instead.
 - `OperationError.cause` and Playwright assertion messages carry native PlaywrightEx exceptions.
 - `Fluffy.Expect.checked_option` is now `to_be_checked_option`.
@@ -47,6 +47,9 @@ Fluffy now runs on PlaywrightEx 0.17, a port of the official Playwright client w
 - `Fluffy.Expect` gains `to_have_text`, `to_contain_text`, `to_have_attribute`, `to_have_class`, `to_contain_class`, `to_have_id`, `to_be_attached`, `to_be_hidden` and `to_be_empty` on every driver, following Playwright's whitespace normalization, regular expressions, per-element lists and strictness. `use_inner_text:` is Playwright only; Phoenix raises `Fluffy.CapabilityError` for it.
 - `Fluffy.clear/3` and `Fluffy.set_checked/4` work on every driver.
 - `Fluffy.Playwright` gains `dblclick`, `tap`, `dispatch_event`, `select_text`, `scroll_into_view_if_needed`, element `screenshot`, `set_viewport_size` and `emulate_media`; `Fluffy.Playwright.Keyboard` and `Fluffy.Playwright.Mouse` send page-wide input. As in Playwright, page-wide input and `dispatch_event` do not wait for a navigation they start; `expect` on the new page before the next action. They accept their PlaywrightEx options except `no_wait_after:` and `signal:`, and raise `Fluffy.CapabilityError` on Phoenix.
+- `Fluffy.Response` reads bodies and headers: `body`, `text`, `json`, `ok?`, `all_headers`, `header_value` and `header_values`, without `unwrap/2`. `Fluffy.Request` adds `all_headers`, `header_value`, `post_data_json`, `failure`, `redirected_from` and `redirected_to`. Reads raise after the session's `timeout:`.
+- `Fluffy.Download.path`, which raises `Fluffy.CapabilityError` on Phoenix.
+- `Fluffy.Playwright` changes the browser context at runtime with `grant_permissions`, `clear_permissions`, `set_geolocation`, `set_offline` and `set_http_credentials`, returning the session and raising after its `timeout:`; Phoenix raises `Fluffy.CapabilityError` for them.
 
 ### Fixed
 

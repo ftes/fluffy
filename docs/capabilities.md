@@ -37,6 +37,7 @@ boundaries described below.
 | Named pages and new tabs | - | equivalent |
 | Browser history navigation | - | equivalent |
 | Browser cookie helpers and storage-state export | - | equivalent |
+| Runtime permissions, geolocation, offline mode, and HTTP credentials | - | equivalent |
 | Hover, drag-and-drop, sequential typing, keyboard, and mouse input | - | equivalent |
 | Dialogs, frame navigation, and browser request/response events | - | equivalent |
 | Active-page JavaScript evaluation | - | equivalent |
@@ -206,13 +207,14 @@ fails when PlaywrightEx adds or removes one.
   `press_sequentially`, `focus`, `blur`, `dblclick`, `tap`, `dispatch_event`,
   `select_text`, `scroll_into_view_if_needed`, `set_viewport_size`, `emulate_media`,
   the expectations in `Fluffy.Expect`, navigation, page management, cookies,
-  storage state, tracing, page and element screenshots, page evaluation, the clock in
+  storage state, permissions, geolocation, offline mode, HTTP credentials, tracing,
+  page and element screenshots, page evaluation, the clock in
   `Fluffy.Playwright.Clock`, keyboard and mouse input in `Fluffy.Playwright.Keyboard`
-  and `Fluffy.Playwright.Mouse`, and the events in `Fluffy.Event`. Their options pass
-  through as documented.
+  and `Fluffy.Playwright.Mouse`, the events in `Fluffy.Event`, and the values they
+  deliver, including response bodies. Their options pass through as documented.
 - **Unwrap:** everything else page-, locator-, or value-local, such as reads like
-  `text_content`, assertions like `to_have_css`, routing, permissions, and response
-  bodies. Navigation these cause is adopted.
+  `text_content`, assertions like `to_have_css`, routing, and response timing.
+  Navigation these cause is adopted.
 - **Unsafe natively:** closing the page or context (use `Fluffy.Playwright.close_page/2`
   and `Fluffy.close_session/1`), `remove_all_listeners`, `set_default_timeout` and
   `set_default_navigation_timeout`, the `no_wait_after:` and `signal:` options,

@@ -31,6 +31,74 @@ defmodule Fluffy.Conformance.BrowserAPITest do
   end
 
   @tag driver: :playwright
+  test "grants and clears permissions and sets the geolocation, returning the session" do
+    session = :playwright |> start_session() |> visit("/harness")
+    state = "navigator.permissions.query({name: 'geolocation'}).then(status => status.state)"
+
+    assert Playwright.grant_permissions(session, ["geolocation"]) == session
+    assert Playwright.evaluate(session, state) == "granted"
+
+    assert Playwright.set_geolocation(session, %{latitude: 12.5, longitude: 41.9}) == session
+
+    assert Playwright.evaluate(session, """
+           new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(
+             ({coords}) => resolve([coords.latitude, coords.longitude]), reject))
+           """) == [12.5, 41.9]
+
+    assert Playwright.clear_permissions(session) == session
+    # WebKit reports the cleared state to a new document only.
+    session = visit(session, "/harness")
+    refute Playwright.evaluate(session, state) == "granted"
+  end
+
+  @tag driver: :playwright
+  test "grant_permissions limits a grant to an origin" do
+    session = :playwright |> start_session() |> visit("/harness")
+    state = "navigator.permissions.query({name: 'geolocation'}).then(status => status.state)"
+
+    Playwright.grant_permissions(session, ["geolocation"], origin: "https://elsewhere.example")
+    refute Playwright.evaluate(session, state) == "granted"
+
+    Playwright.grant_permissions(session, ["geolocation"], origin: Fluffy.TestServer.base_url())
+    assert Playwright.evaluate(session, state) == "granted"
+  end
+
+  @tag driver: :playwright
+  test "emulates going offline and back online, returning the session" do
+    session = :playwright |> start_session() |> visit("/harness")
+    fetch = "fetch(location.href, {cache: 'no-store'}).then(() => 'online', () => 'offline')"
+
+    # The browser's network layer applies the change after the call returns.
+    assert Playwright.set_offline(session, true) == session
+    assert_eventually(fn -> Playwright.evaluate(session, fetch) == "offline" end)
+
+    assert Playwright.set_offline(session, false) == session
+    assert_eventually(fn -> Playwright.evaluate(session, fetch) == "online" end)
+  end
+
+  @tag driver: :playwright
+  test "authenticates with HTTP credentials set at runtime, returning the session" do
+    fixture =
+      Fluffy.TestHTTPFixtures.register(fn request ->
+        if List.keymember?(request.headers, "authorization", 0) do
+          %{body: "<h1>Authenticated</h1>"}
+        else
+          %{status: 401, headers: [{"www-authenticate", ~s(Basic realm="fluffy")}], body: "Unauthorized"}
+        end
+      end)
+
+    session = start_session(:playwright)
+    assert Playwright.set_http_credentials(session, %{username: "user", password: "pass"}) == session
+
+    session
+    |> visit(Fluffy.TestHTTPFixtures.path(fixture, "/secret"))
+    |> expect("Authenticated" |> by_text() |> to_be_visible())
+
+    assert [_, %{headers: headers} | _] = Fluffy.TestHTTPFixtures.requests(fixture)
+    assert {"authorization", "Basic " <> _} = List.keyfind(headers, "authorization", 0)
+  end
+
+  @tag driver: :playwright
   test "navigates history and handles an empty history" do
     session = :playwright |> start_session() |> go_back() |> go_forward()
     session = session |> visit("/harness") |> visit("/chamber")
@@ -164,7 +232,12 @@ defmodule Fluffy.Conformance.BrowserAPITest do
           fn -> Playwright.cookies(session) end,
           fn -> Playwright.add_cookies(session, []) end,
           fn -> Playwright.clear_cookies(session) end,
-          fn -> Playwright.storage_state(session) end
+          fn -> Playwright.storage_state(session) end,
+          fn -> Playwright.grant_permissions(session, ["geolocation"]) end,
+          fn -> Playwright.clear_permissions(session) end,
+          fn -> Playwright.set_geolocation(session, %{latitude: 1, longitude: 2}) end,
+          fn -> Playwright.set_offline(session, true) end,
+          fn -> Playwright.set_http_credentials(session, %{username: "user", password: "pass"}) end
         ] do
       assert_raise Fluffy.CapabilityError, operation
     end
@@ -174,6 +247,19 @@ defmodule Fluffy.Conformance.BrowserAPITest do
       assert error.capability == :browser_history
     end
 
+    error = assert_raise Fluffy.CapabilityError, fn -> Playwright.set_offline(session, true) end
+    assert Fluffy.Capability.status(error.capability, :static) == :browser_only
+
     assert :ok = close_session(session)
+  end
+
+  defp assert_eventually(fun, attempts \\ 100)
+  defp assert_eventually(fun, 0), do: assert(fun.())
+
+  defp assert_eventually(fun, attempts) do
+    if !fun.() do
+      Process.sleep(10)
+      assert_eventually(fun, attempts - 1)
+    end
   end
 end

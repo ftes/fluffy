@@ -22,10 +22,10 @@ defmodule Fluffy.Conformance.DownloadEventTest do
       assert download.suggested_filename == "report.csv"
       assert String.ends_with?(download.url, "/report")
       assert download |> Download.page() |> Fluffy.Page.url() |> String.ends_with?("/start")
-      assert Download.read!(download) == "id,total\n1,42\n"
-      assert Download.read!(download) == "id,total\n1,42\n"
+      assert Download.read(download) == "id,total\n1,42\n"
+      assert Download.read(download) == "id,total\n1,42\n"
       destination = Path.join(tmp_dir, "copy.csv")
-      assert Download.save_as!(download, destination) == :ok
+      assert Download.save_as(download, destination) == :ok
 
       session
       |> expect(page_to_have_url(&String.ends_with?(&1.path, "/start")))
@@ -40,7 +40,18 @@ defmodule Fluffy.Conformance.DownloadEventTest do
 
       close_session(session)
       assert File.read!(destination) == "id,total\n1,42\n"
-      assert_raise ArgumentError, ~r/session is closed/, fn -> Download.read!(download) end
+      assert_raise ArgumentError, ~r/session is closed/, fn -> Download.read(download) end
+    end
+
+    @tag driver: driver
+    test "path raises once its session is closed with #{driver}", %{driver: driver} do
+      session = session(driver)
+      pending = wait_for(session, Event.download())
+      click(session, by_role(:link, name: "Report", exact: true))
+      download = await(pending)
+
+      close_session(session)
+      assert_raise ArgumentError, ~r/session is closed/, fn -> Download.path(download) end
     end
 
     @tag driver: driver
@@ -53,7 +64,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
       |> click(by_role(:link, name: "Report", exact: true))
       |> click(by_role(:link, name: "Renamed", exact: true))
 
-      assert Download.read!(await(pending)) == "id,total\n1,42\n"
+      assert Download.read(await(pending)) == "id,total\n1,42\n"
     end
 
     @tag driver: driver
@@ -71,7 +82,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
       |> session()
       |> expect_event(Event.download(), &click(&1, by_role(:link, name: "Redirect", exact: true)), fn download ->
         assert download.suggested_filename == "report.csv"
-        assert Download.read!(download) == "id,total\n1,42\n"
+        assert Download.read(download) == "id,total\n1,42\n"
       end)
       |> expect("Source" |> by_text() |> to_be_visible())
     end
@@ -82,7 +93,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
       |> session()
       |> expect_event(Event.download(), &click(&1, by_role(:link, name: "Renamed", exact: true)), fn download ->
         assert download.suggested_filename == "renamed.txt"
-        assert Download.read!(download) == "plain bytes"
+        assert Download.read(download) == "plain bytes"
       end)
     end
 
@@ -92,8 +103,8 @@ defmodule Fluffy.Conformance.DownloadEventTest do
       |> session()
       |> expect_event(Event.download(), &click(&1, by_role(:link, name: "Report", exact: true)), fn download ->
         assert download.suggested_filename == "report.csv"
-        assert_raise ExUnit.AssertionError, ~r/max_bytes/, fn -> Download.read!(download, max_bytes: 1) end
-        assert Download.read!(download) == "id,total\n1,42\n"
+        assert_raise ExUnit.AssertionError, ~r/max_bytes/, fn -> Download.read(download, max_bytes: 1) end
+        assert Download.read(download) == "id,total\n1,42\n"
       end)
     end
 
@@ -122,13 +133,83 @@ defmodule Fluffy.Conformance.DownloadEventTest do
     end
   end
 
+  @tag driver: :phoenix
+  test "a Phoenix download is held in memory and has no file" do
+    session = session(:phoenix)
+    pending = wait_for(session, Event.download())
+    click(session, by_role(:link, name: "Report", exact: true))
+    download = await(pending)
+
+    error = assert_raise Fluffy.CapabilityError, fn -> Download.path(download) end
+    assert error.capability == :download_path
+    assert Download.read(download) == "id,total\n1,42\n"
+  end
+
+  @tag driver: :playwright
+  test "path returns the downloaded file" do
+    session = session(:playwright)
+    pending = wait_for(session, Event.download())
+    click(session, by_role(:link, name: "Report", exact: true))
+    download = await(pending)
+
+    path = Download.path(download)
+    assert File.read!(path) == "id,total\n1,42\n"
+  end
+
+  @tag driver: :playwright
+  test "waiting for a download that never completes raises after the session timeout" do
+    owner = self()
+
+    fixture =
+      TestHTTPFixtures.register(fn request ->
+        case request.path do
+          "/start" ->
+            %{body: ~s(<a href="endless">Download</a>)}
+
+          "/endless" ->
+            %{
+              headers: [{"content-disposition", "attachment; filename=endless.txt"}],
+              stream: fn conn ->
+                {:ok, conn} = Plug.Conn.chunk(conn, "first" <> TestHTTPFixtures.sniff_padding())
+                send(owner, {:stream, self()})
+
+                receive do
+                  :finish -> conn
+                end
+              end
+            }
+        end
+      end)
+
+    session =
+      :playwright
+      |> start_session(base_url: Fluffy.TestServer.base_url(), timeout: 500)
+      |> visit(TestHTTPFixtures.path(fixture, "/start"))
+
+    pending = wait_for(session, Event.download(), timeout: 15_000)
+    click(session, by_role(:link, name: "Download"), timeout: 15_000)
+    assert_receive {:stream, server}, 15_000
+
+    try do
+      download = await(pending)
+
+      message = ~r/did not complete within the session's timeout of 500ms for path/
+      assert_raise RuntimeError, message, fn -> Download.path(download) end
+
+      # This read leaves the download running, unlike a timed-out save.
+      assert unwrap(download, &PlaywrightEx.Download.cancel/1) == :ok
+    after
+      send(server, :finish)
+    end
+  end
+
   @tag driver: :playwright
   test "a target-blank attachment is a download" do
     :playwright
     |> session()
     |> expect_event(Event.download(), &click(&1, by_role(:link, name: "New tab", exact: true)), fn download ->
       assert %Fluffy.Page{} = Download.page(download)
-      assert Download.read!(download) == "id,total\n1,42\n"
+      assert Download.read(download) == "id,total\n1,42\n"
     end)
     |> expect("Source" |> by_text() |> to_be_visible())
   end
@@ -176,7 +257,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
     try do
       download = await(pending)
       assert download.suggested_filename == "slow.txt"
-      reader = Task.async(fn -> Download.read!(download) end)
+      reader = Task.async(fn -> Download.read(download) end)
       assert Task.yield(reader, 20) == nil
       send(server, :finish)
       assert Task.await(reader) == first <> "last"
@@ -225,13 +306,13 @@ defmodule Fluffy.Conformance.DownloadEventTest do
       destination = Path.join(tmp_dir, "copy.txt")
 
       assert_raise RuntimeError, ~r/did not complete within the session's timeout of 2000ms and was canceled/, fn ->
-        Download.save_as!(download, destination)
+        Download.save_as(download, destination)
       end
 
       send(server, :finish)
       assert unwrap(download, &PlaywrightEx.Download.failure/1) == {:ok, "canceled"}
       refute File.exists?(destination)
-      assert_raise PlaywrightEx.PlaywrightError, ~r/canceled/, fn -> Download.read!(download) end
+      assert_raise PlaywrightEx.PlaywrightError, ~r/canceled/, fn -> Download.read(download) end
     after
       send(server, :finish)
     end
@@ -280,10 +361,10 @@ defmodule Fluffy.Conformance.DownloadEventTest do
     assert download.suggested_filename == "broken.txt"
     send(server, :abort)
 
-    assert_raise PlaywrightEx.PlaywrightError, ~r/download.saveAs/, fn -> Download.read!(download) end
+    assert_raise PlaywrightEx.PlaywrightError, ~r/download.saveAs/, fn -> Download.read(download) end
 
     assert_raise PlaywrightEx.PlaywrightError, ~r/download.saveAs/, fn ->
-      Download.save_as!(download, Path.join(tmp_dir, "copy.txt"))
+      Download.save_as(download, Path.join(tmp_dir, "copy.txt"))
     end
   end
 
