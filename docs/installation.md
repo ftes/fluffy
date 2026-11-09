@@ -44,8 +44,10 @@ Only the Playwright backend needs a browser. PlaywrightEx pins its Playwright
 driver; install it and a browser with:
 
 ```bash
-mix playwright_ex.install -- chromium
+MIX_ENV=test mix playwright_ex.install -- chromium
 ```
+
+The task needs `MIX_ENV=test` because PlaywrightEx comes in only through the test-only `:fluffy` dependency.
 
 Configure the backend in `config/test.exs`:
 
@@ -70,7 +72,7 @@ pinned driver is used.
 `launch_options: [timeout: 10_000]` to give browser launch a separate timeout;
 otherwise it uses the global Playwright `timeout`. To use a system browser, set
 `launch_options: [executable_path: System.find_executable("google-chrome-stable")]`.
-`mix playwright_ex.install --no-browsers` installs only the driver for an existing browser.
+`MIX_ENV=test mix playwright_ex.install --no-browsers` installs only the driver for an existing browser.
 If the browser disconnects, Fluffy launches a new one for the next session.
 
 Setting `artifact_dir` is recommended for every project that runs Playwright
@@ -84,7 +86,7 @@ Browser `console` messages and uncaught page errors go to Elixir's `Logger`; set
 calls `Fluffy.Playwright.trace/1` or `Fluffy.Playwright.trace/2`.
 
 Set `engine: :firefox` or `engine: :webkit` after installing the corresponding
-browser (`mix playwright_ex.install -- firefox`).
+browser (`MIX_ENV=test mix playwright_ex.install -- firefox`).
 See [Browser baseline](capabilities.md#browser-baseline) for conformance coverage.
 Fluffy creates a fresh isolated `BrowserContext` for each session, in a pool of
 `pool_size` browsers (default `1`). No driver or browser starts until a session
