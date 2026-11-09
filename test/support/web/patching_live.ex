@@ -1,3 +1,38 @@
+defmodule Fluffy.TestWeb.PatchingKeyComponent do
+  @moduledoc false
+  use Phoenix.LiveComponent
+
+  # The parent removes this component while the keydown's reply is on its way.
+  @impl true
+  def handle_event("component-keydown", _params, socket) do
+    send(self(), :remove_key_component)
+    {:noreply, socket}
+  end
+
+  def handle_event("component-keyup", _params, socket) do
+    send(self(), :component_keyup)
+    {:noreply, socket}
+  end
+
+  @impl true
+  def render(assigns) do
+    ~H"""
+    <section id="key-component">
+      <label>
+        Component keys
+        <input
+          type="text"
+          name="component-keys"
+          phx-keydown="component-keydown"
+          phx-keyup="component-keyup"
+          phx-target={@myself}
+        />
+      </label>
+    </section>
+    """
+  end
+end
+
 defmodule Fluffy.TestWeb.PatchingLive do
   @moduledoc false
   use Phoenix.LiveView
@@ -22,7 +57,11 @@ defmodule Fluffy.TestWeb.PatchingLive do
         input_hidden?: false,
         removed?: false,
         keys_label: "Keys",
-        keyup_event: "keyup"
+        keyup_event: "keyup",
+        rows: if(mode in ~w(rows-remove rows-append), do: ~w(a b), else: ~w(a)),
+        row_keyups: [],
+        component_removed?: false,
+        component_keyups: 0
       )
 
     socket =
@@ -42,6 +81,10 @@ defmodule Fluffy.TestWeb.PatchingLive do
 
   @impl true
   def handle_params(_params, _uri, socket), do: {:noreply, socket}
+
+  @impl true
+  def handle_info(:remove_key_component, socket), do: {:noreply, assign(socket, :component_removed?, true)}
+  def handle_info(:component_keyup, socket), do: {:noreply, update(socket, :component_keyups, &(&1 + 1))}
 
   defp handle_progress(:attachment, %{done?: true}, socket) do
     socket = update(socket, :uploaded, &(&1 + 1))
@@ -84,7 +127,26 @@ defmodule Fluffy.TestWeb.PatchingLive do
     {:noreply, socket |> assign(:keys_label, "Pressed") |> patch("keydown")}
   end
 
+  def handle_event("keydown", _params, %{assigns: %{mode: "keydown-remove-unpatched"}} = socket) do
+    {:noreply, assign(socket, :removed?, true)}
+  end
+
   def handle_event("keydown", _params, socket), do: {:noreply, patch(socket, "keydown")}
+
+  def handle_event("rows-keydown", %{"row" => row}, socket) do
+    rows =
+      case socket.assigns.mode do
+        "rows-remove" -> List.delete(socket.assigns.rows, row)
+        "rows-prepend" -> ["z" | socket.assigns.rows]
+        "rows-append" -> socket.assigns.rows ++ ["c"]
+      end
+
+    {:noreply, assign(socket, :rows, rows)}
+  end
+
+  def handle_event("rows-keyup", %{"row" => row}, socket) do
+    {:noreply, update(socket, :row_keyups, &(&1 ++ [row]))}
+  end
 
   def handle_event("row-keydown", _params, %{assigns: %{mode: "idless-rename"}} = socket) do
     {:noreply, assign(socket, :row_label, "Pressed row")}
@@ -123,6 +185,25 @@ defmodule Fluffy.TestWeb.PatchingLive do
       <p>Saves: {@saves}</p>
       <p>Consumed: {@consumed}</p>
       <p>Uploaded: {@uploaded}</p>
+      <p>Row keyups: {Enum.join(@row_keyups, ",")}.</p>
+      <p>Component keyups: {@component_keyups}</p>
+      <.live_component
+        :if={@mode == "component-myself" && !@component_removed?}
+        module={Fluffy.TestWeb.PatchingKeyComponent}
+        id="key-component"
+      />
+      <div :for={row <- @rows} :if={String.starts_with?(@mode, "rows-")}>
+        <label>
+          Twin
+          <input
+            type="text"
+            name="twin"
+            phx-keydown="rows-keydown"
+            phx-keyup="rows-keyup"
+            phx-value-row={row}
+          />
+        </label>
+      </div>
       <div :if={@row_inserted? && @mode == "idless-row"}>
         <label>Inserted <input type="text" name="inserted" phx-keyup="inserted-keyup" /></label>
       </div>

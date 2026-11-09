@@ -322,56 +322,57 @@ defmodule Fluffy.Driver.Live do
   def press(%Session{} = session, %Locator{} = locator, key, options \\ []) do
     act(session, :press, [locator, key, options], fn session, deadline ->
       case resolve_live_action(session, locator, deadline, &ClientDOM.target!(&1, locator)) do
-        {%Session{} = session, target} -> dispatch_keys(session, locator, target, key)
+        {%Session{} = session, target} -> dispatch_keys(session, target, key)
         navigation -> navigation
       end
     end)
   end
 
-  defp dispatch_keys(session, locator, target, key) do
+  # A browser sends keyup right after keydown, before the keydown's patch comes
+  # back, so a keyup after a keydown uses the binding its element had when the
+  # press started, whatever the patch then removes, moves, or rebinds. Only the
+  # first phase meets the document the target was found in.
+  defp dispatch_keys(session, target, key) do
     phases = Enum.filter([:keydown, :keyup], &key_binding?(target, &1))
-    phases = if phases == [], do: [:keydown], else: phases
-    identity = node_identity(Session.page_state(session).client_dom, target)
+    [first | rest] = if phases == [], do: [:keydown], else: phases
 
-    Enum.reduce_while(phases, session, fn phase, session ->
-      # A patch from the keydown can remove the target or its keyup binding.
-      with %{} = target <- key_target(Session.page_state(session).client_dom, identity, locator),
-           true <- phase == :keydown or key_binding?(target, :keyup),
-           %Session{} = session <- dispatch_key(session, target, key, phase) do
-        {:cont, session}
-      else
-        gone when gone in [nil, false] -> {:halt, session}
-        navigation -> {:halt, navigation}
-      end
-    end)
-  end
-
-  # A path names whatever sits there now, so an element without an id is found
-  # by its locator, or by its path once the keydown changed what that matches.
-  defp key_target(client_dom, {:path, _selector_path} = path, locator) do
-    case ClientDOM.targets(client_dom, locator) do
-      [target] -> target
-      _none_or_several -> find_by_identity(client_dom, path)
+    with {:ok, context} <- owning_view_context(session, target),
+         %Session{} = session <- dispatch_key(session, context, target, key, first) do
+      if rest == [], do: session, else: dispatch_bound_keyup(session, context, target, key)
     end
   end
-
-  defp key_target(client_dom, identity, _locator), do: find_by_identity(client_dom, identity)
 
   defp key_binding?(target, phase) do
     attribute(target.attributes, "phx-#{phase}") != nil or
       attribute(target.attributes, "phx-window-#{phase}") != nil
   end
 
-  defp dispatch_key(session, target, key, phase) do
+  defp dispatch_key(session, context, target, key, phase) do
     state = Session.page_state(session)
 
-    with {:ok, context} <- owning_view_context(session, target) do
-      result =
-        dispatch_view_event(session, fn ->
-          render_view_event(state.client_dom, context, target.selector, phase, %{"key" => key})
-        end)
+    result =
+      dispatch_view_event(session, fn ->
+        render_view_event(state.client_dom, context, target.selector, phase, %{"key" => key})
+      end)
 
-      commit_render_result(session, state.client_dom, result)
+    commit_render_result(session, state.client_dom, result)
+  end
+
+  defp dispatch_bound_keyup(session, context, target, key) do
+    state = Session.page_state(session)
+
+    case read_view(session, fn -> with {:ok, view} <- find_view(state.view, context.view.id), do: view end) do
+      # The keydown removed the nested view that owns the target.
+      {:ok, nil} ->
+        session
+
+      {:ok, view} ->
+        payload = Map.put(Event.key_values(target.attributes), "key", key)
+        result = dispatch_view_event(session, fn -> Event.push(view, target, :keyup, payload) end)
+        commit_render_result(session, state.client_dom, result)
+
+      redirected ->
+        redirected
     end
   end
 
@@ -803,7 +804,9 @@ defmodule Fluffy.Driver.Live do
   end
 
   # Patches are committed before the render, so it shows the last of them.
-  defp commit_render_result(session, client_dom, result) when is_binary(result) do
+  # LiveViewTest answers nil when the event's nested view was removed before its
+  # reply; the page is still whatever the root view renders now.
+  defp commit_render_result(session, client_dom, result) when is_binary(result) or is_nil(result) do
     session = apply_last_patch(session)
     state = Session.page_state(session)
 
@@ -986,7 +989,11 @@ defmodule Fluffy.Driver.Live do
     target = ClientDOM.target!(client_dom, Locator.by_css(selector))
 
     payload =
-      if kind in [:click, :keydown, :keyup], do: Map.merge(Event.values(target.attributes), payload), else: payload
+      case kind do
+        :click -> Map.merge(Event.values(target.attributes), payload)
+        kind when kind in [:keydown, :keyup] -> Map.merge(Event.key_values(target.attributes), payload)
+        _form_event -> payload
+      end
 
     Event.push(context.view, target, kind, payload)
   end

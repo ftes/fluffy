@@ -45,6 +45,15 @@ defmodule Fluffy.Driver.Live.Event do
     for {"phx-value-" <> key, value} <- attributes, into: %{}, do: {key, value}
   end
 
+  # A key event also carries the element's value attribute, as LiveViewTest's
+  # element events do.
+  def key_values(attributes) do
+    case attribute(attributes, "value") do
+      nil -> values(attributes)
+      value -> attributes |> values() |> Map.put("value", value)
+    end
+  end
+
   defp commands("[" <> _ = encoded), do: Phoenix.json_library().decode!(encoded)
   defp commands(event), do: [["push", %{"event" => event}]]
 
