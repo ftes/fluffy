@@ -51,6 +51,9 @@ jobs:
   # options and Dialyzer. No browser or database. Saves the deps and _build cache on main.
   checks:
     name: checks (${{ matrix.lane }})
+    # In a stack, only the top PR runs CI: it holds every change below it. `stack` is absent outside
+    # a stack and on other events. As the jobs below.
+    if: &stack_top github.event.pull_request.stack == null || github.event.pull_request.stack.position == github.event.pull_request.stack.size
     runs-on: ubuntu-26.04
     timeout-minutes: 20
     strategy:
@@ -114,6 +117,7 @@ jobs:
   # FLUFFY_ARTIFACT_DIR.
   test:
     name: test (${{ matrix.lane }}, ${{ matrix.browser }}, ${{ matrix.partition }}/${{ matrix.partitions }})
+    if: *stack_top
     runs-on: ubuntu-26.04
     # The slowest job took ~3.5 min at 6 partitions (webkit, a retry included), but a cold apt
     # cache can spend up to 3 x 5 min on the browser install; a hang fails here instead of running on.
@@ -196,6 +200,7 @@ jobs:
 
   consumer:
     name: consumer fixture
+    if: *stack_top
     runs-on: ubuntu-26.04
     timeout-minutes: 20
     env:
@@ -248,7 +253,10 @@ jobs:
       matrix:
         lane: [oldest, newest]
     steps:
-      - env:
+      # On the step: a matrix job skipped whole reports its name unexpanded, which would leave the
+      # required checks pending on a PR below the top of its stack.
+      - if: *stack_top
+        env:
           RESULTS: ${{ join(needs.*.result, ' ') }}
         run: |
           for result in $RESULTS; do
