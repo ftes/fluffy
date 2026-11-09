@@ -119,6 +119,7 @@ defmodule Fluffy.MixProject do
           Fluffy.FilePayload,
           Fluffy.Request,
           Fluffy.Response,
+          Fluffy.Route,
           Fluffy.Frame,
           Fluffy.ConsoleMessage,
           Fluffy.PageError,

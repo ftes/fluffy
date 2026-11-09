@@ -233,6 +233,13 @@ defmodule Fluffy.Capability do
       detail: "JavaScript and subresource network streams do not run in an in-process page driver."
     },
     %{
+      id: :routing,
+      feature: "Browser request routing",
+      drivers: %{static: :browser_only, live: :browser_only, playwright: :equivalent},
+      detail:
+        "Fluffy.Playwright.route/4 fulfills, continues, aborts, or falls back matching requests of a session's context, with handlers in their own process. Phoenix raises Fluffy.CapabilityError."
+    },
+    %{
       id: :javascript_evaluation,
       feature: "Active-page JavaScript evaluation",
       drivers: %{static: :browser_only, live: :browser_only, playwright: :equivalent},

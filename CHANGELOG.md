@@ -51,6 +51,7 @@ Fluffy now runs on PlaywrightEx 0.17, a port of the official Playwright client w
 - `Fluffy.Download.path`, which raises `Fluffy.CapabilityError` on Phoenix.
 - `Fluffy.Playwright` changes the browser context at runtime with `grant_permissions`, `clear_permissions`, `set_geolocation`, `set_offline` and `set_http_credentials`, returning the session and raising after its `timeout:`; Phoenix raises `Fluffy.CapabilityError` for them.
 - More Playwright events on `Fluffy.Event`: `console`, `page_error`, `worker` and `web_socket` (new values `Fluffy.ConsoleMessage`, `Fluffy.PageError`, `Fluffy.Worker` and `Fluffy.WebSocket`), `request_failed` and `request_finished` (a `Fluffy.Request`, with `scope:`), `load`, `dom_content_loaded` and `crash` (a `Fluffy.Page`), and `frame_attached` and `frame_detached` (a `Fluffy.Frame`). Phoenix raises `Fluffy.CapabilityError` for them.
+- `Fluffy.Playwright.route/4` and `unroute/3` intercept the requests of a session's browser context, with a new `Fluffy.Route` to `fulfill`, `continue`, `abort` or `fallback` them. A handler runs in its own process, allowed by the Ecto sandbox through `$callers`; a raising handler aborts the request and fails the test.
 
 ### Fixed
 

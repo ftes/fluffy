@@ -273,6 +273,66 @@ page's document reaches those states, and `Event.crash()` when it crashes. A cra
 the page's other waits, except `Event.close()`. `Event.frame_attached()` and `Event.frame_detached()` resolve
 with a `Fluffy.Frame`, like `Event.frame_navigated()`.
 
+## Routing requests
+
+`Fluffy.Playwright.route/4` intercepts matching requests of the session's browser
+context, including popups, before they reach the network. Register routes before
+the action that sends the request. The handler receives a `Fluffy.Route` with the
+`Fluffy.Request` in `route.request` and answers it once:
+
+```elixir
+import Fluffy.Playwright
+alias Fluffy.Route
+
+session
+|> route("/api/potions", fn route -> Route.fulfill(route, json: [%{name: "Felix Felicis"}]) end)
+|> route(~r{/api/orders$}, fn route -> Route.abort(route) end)
+|> visit("/potions")
+```
+
+`url` accepts what `page_to_have_url` accepts: a Playwright glob string (resolved
+against `base_url:`), a regular expression, a predicate over the `URI`, or
+path, query, and fragment components.
+
+Answers are `Route.fulfill/2` (status, headers, `body:`, `json:`, `path:`),
+`Route.continue/2` (with optional overrides), `Route.abort/2`, and `Route.fallback/2`.
+When several routes match, the last registered wins; `fallback` hands the
+request to the route registered before it, and finally to the server.
+`times:` limits how many requests a route handles, and `unroute/3` removes a route
+(for a given handler or all of them for that `url`). A request already at a handler
+may go on without it, as with Playwright's `unroute`, and an answer that comes too
+late fails nothing.
+Routing a document request, such as a `visit` or a link, works like any other:
+the page loads the fulfilled document and Fluffy keeps tracking it.
+
+Each handler runs in its own process, one per request, so a slow handler holds
+only its request; the test process is blocked in the action that caused it. That
+process has `$callers` through the process that called `route/4`, so Ecto sandbox
+queries work there as in the test. A handler that raises aborts its request and
+fails the process that called `route/4`, like `on/4` handlers. A route lasts until
+`unroute/3` or the session's end, even if the process that called `route/4` exits
+first, unlike an `on/4` listener; only while that process lives does a failure
+reach it.
+
+A handler may return without answering and leave the route to another process. To
+hold a request while the test observes the page, send the route to the test
+process and answer it there:
+
+```elixir
+test = self()
+route(session, "/api/report", &send(test, {:held, &1}))
+
+session
+|> visit("/report")
+|> expect("Loading" |> by_text() |> to_be_visible())
+
+assert_receive {:held, route}
+Route.fulfill(route, json: %{title: "Quarterly"})
+```
+
+As in Playwright, a request never answered hangs until the action waiting for it
+times out.
+
 ## File choosers
 
 Locate a file input directly when possible, including hidden inputs. For a button
@@ -314,7 +374,7 @@ These actions require Playwright and reconcile navigation caused by the action.
 
 Event values keep their PlaywrightEx counterpart private. `Fluffy.unwrap/2` passes
 it to a callback and returns the callback's result, for members Fluffy does not
-wrap: `PlaywrightEx.Request`, `PlaywrightEx.Response`, `PlaywrightEx.Dialog`,
+wrap: `PlaywrightEx.Request`, `PlaywrightEx.Response`, `PlaywrightEx.Route`, `PlaywrightEx.Dialog`,
 `PlaywrightEx.Download`, `PlaywrightEx.FileChooser`, `PlaywrightEx.Frame`,
 `PlaywrightEx.ConsoleMessage`, `PlaywrightEx.Worker`, and `PlaywrightEx.WebSocket`,
 and the PlaywrightEx exception of a page error. Phoenix downloads have none and raise
