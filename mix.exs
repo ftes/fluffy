@@ -40,6 +40,7 @@ defmodule Fluffy.MixProject do
       package: package(),
       deps: deps(),
       aliases: aliases(),
+      usage_rules: usage_rules(),
       dialyzer: [plt_add_apps: [:ex_unit, :mix]]
     ]
   end
@@ -70,6 +71,7 @@ defmodule Fluffy.MixProject do
       {:phoenix_ecto, "~> 4.7", optional: true},
       {:ecto_sql, "~> 3.10", optional: true},
       {:ex_doc, "~> 0.40.3", only: :dev, runtime: false},
+      {:usage_rules, "~> 1.3", only: :dev, runtime: false},
       {:styler, "~> 1.12", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
@@ -145,6 +147,18 @@ defmodule Fluffy.MixProject do
       licenses: ["MIT"],
       links: %{"GitHub" => @source_url, "Hex.pm" => @hex_url},
       files: ["lib", ".formatter.exs", "mix.exs", "README.md" | @doc_files]
+    ]
+  end
+
+  # `mix usage_rules.sync --yes` rewrites the managed block of AGENTS.md from this list.
+  defp usage_rules do
+    [
+      file: "AGENTS.md",
+      usage_rules: [
+        {:usage_rules, sub_rules: []},
+        "phoenix:html",
+        {"phoenix:liveview", link: :markdown}
+      ]
     ]
   end
 
