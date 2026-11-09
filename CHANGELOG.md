@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.0 — Unreleased
+
+### Added
+
+- `by_role` on Phoenix knows the implicit landmark roles as Playwright computes them: `article`, `banner`, `complementary`, `contentinfo`, `form`, `main`, `navigation`, `region` and `search`. Landmarks, explicit `role` ones included, take their name from `aria-labelledby`, `aria-label` or `title`, never from their content.
+
 ## 0.9.0-rc.0 — 2026-11-09
 
 Fluffy now runs on PlaywrightEx 0.17, a port of the official Playwright client with a pinned Playwright 1.65 driver.

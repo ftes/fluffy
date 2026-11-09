@@ -5,6 +5,12 @@ defmodule Fluffy.Locator.Static do
 
   @labelled_control_selector "button, input, meter, output, progress, select, textarea"
 
+  # A `header` or `footer` inside one of these belongs to it, not to the page.
+  @sectioning_tags ["article", "aside", "main", "nav", "section"]
+  @sectioning_roles ["article", "complementary", "main", "navigation", "region"]
+  # Named by their author only, never by their content.
+  @landmark_roles ["article", "banner", "complementary", "contentinfo", "form", "main", "navigation", "region", "search"]
+
   def resolve(document, %Locator{} = locator) do
     Enum.reduce(locator.operations, [document], fn
       {:and, right}, candidates ->
@@ -207,9 +213,11 @@ defmodule Fluffy.Locator.Static do
     scope
     |> LazyHTML.query("*")
     |> Enum.zip(entries)
-    |> Enum.filter(fn {_element, {tree, context}} ->
-      not context.hidden? and element_role(tree) == to_string(expected_role) and
-        accessible_name_matches?(tree, context, entries, expected_name, exact?)
+    |> Enum.filter(fn {element, {tree, context}} ->
+      role = to_string(expected_role)
+
+      not context.hidden? and element_role(tree, element) == role and
+        accessible_name_matches?(tree, role, context, entries, expected_name, exact?)
     end)
     |> Enum.map(&elem(&1, 0))
   end
@@ -249,11 +257,34 @@ defmodule Fluffy.Locator.Static do
       String.downcase(attribute(attributes, "aria-hidden") || "false") == "true"
   end
 
-  defp element_role({tag, attributes, _children}) do
+  defp element_role({tag, attributes, _children}, element) do
     case explicit_role(attributes) do
       role when role in ["none", "presentation"] -> nil
+      nil when tag == "header" -> page_landmark_role(element, "banner")
+      nil when tag == "footer" -> page_landmark_role(element, "contentinfo")
       nil -> implicit_role(tag, attributes)
       role -> role
+    end
+  end
+
+  defp page_landmark_role(element, role) do
+    if not sectioning_ancestor?(LazyHTML.parent_node(element)), do: role
+  end
+
+  defp sectioning_ancestor?(element) do
+    case LazyHTML.attributes(element) do
+      [attributes] ->
+        sectioning?(LazyHTML.tag(element), attributes) or sectioning_ancestor?(LazyHTML.parent_node(element))
+
+      _ ->
+        false
+    end
+  end
+
+  defp sectioning?([tag], attributes) do
+    case attribute(attributes, "role") do
+      nil -> tag in @sectioning_tags
+      role -> role in @sectioning_roles
     end
   end
 
@@ -276,6 +307,13 @@ defmodule Fluffy.Locator.Static do
   defp implicit_role(tag, _attributes) when tag in ["thead", "tbody", "tfoot"], do: "rowgroup"
   defp implicit_role("tr", _attributes), do: "row"
   defp implicit_role("td", _attributes), do: "cell"
+  defp implicit_role("article", _attributes), do: "article"
+  defp implicit_role("aside", _attributes), do: "complementary"
+  defp implicit_role("main", _attributes), do: "main"
+  defp implicit_role("nav", _attributes), do: "navigation"
+  defp implicit_role("search", _attributes), do: "search"
+  defp implicit_role("form", attributes), do: if(explicitly_named?(attributes), do: "form")
+  defp implicit_role("section", attributes), do: if(explicitly_named?(attributes), do: "region")
 
   defp implicit_role("th", attributes) do
     if String.downcase(attribute(attributes, "scope") || "") == "row",
@@ -352,15 +390,19 @@ defmodule Fluffy.Locator.Static do
 
   defp implicit_role(_tag, _attributes), do: nil
 
-  defp accessible_name_matches?(_tree, _context, _entries, nil, _exact?), do: true
+  defp explicitly_named?(attributes) do
+    has_attribute?(attributes, "aria-label") or has_attribute?(attributes, "aria-labelledby")
+  end
 
-  defp accessible_name_matches?(tree, context, entries, expected, exact?) do
+  defp accessible_name_matches?(_tree, _role, _context, _entries, nil, _exact?), do: true
+
+  defp accessible_name_matches?(tree, role, context, entries, expected, exact?) do
     tree
-    |> accessible_name(context, entries)
+    |> accessible_name(role, context, entries)
     |> text_matches?(expected, exact?)
   end
 
-  defp accessible_name({tag, attributes, _children} = tree, context, entries) do
+  defp accessible_name({tag, attributes, _children} = tree, role, context, entries) do
     referenced_name = referenced_name(attributes, entries)
     aria_label = attribute(attributes, "aria-label")
     native_labels = native_label_texts(tag, attributes, context, entries)
@@ -371,6 +413,7 @@ defmodule Fluffy.Locator.Static do
       native_labels != [] -> Enum.join(native_labels, " ")
       tag == "img" -> attribute(attributes, "alt") || ""
       tag == "input" -> input_name(attributes)
+      role in @landmark_roles -> attribute(attributes, "title") || ""
       true -> content_or_title_name(tree, attributes)
     end
   end
