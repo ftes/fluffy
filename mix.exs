@@ -67,7 +67,7 @@ defmodule Fluffy.MixProject do
       {:lazy_html, ">= 0.1.0 and < 1.0.0"},
       {:phoenix, "~> 1.7"},
       {:phoenix_live_view, "~> 1.0"},
-      {:playwright_ex, "~> 0.17.0-rc.3"},
+      {:playwright_ex, "~> 0.17.0-rc.4"},
       {:phoenix_ecto, "~> 4.7", optional: true},
       {:ecto_sql, "~> 3.10", optional: true},
       {:ex_doc, "~> 0.40.3", only: :dev, runtime: false},
@@ -157,7 +157,8 @@ defmodule Fluffy.MixProject do
       usage_rules: [
         {:usage_rules, sub_rules: []},
         "phoenix:html",
-        {"phoenix:liveview", link: :markdown}
+        {"phoenix:liveview", link: :markdown},
+        {:playwright_ex, link: :markdown}
       ]
     ]
   end
