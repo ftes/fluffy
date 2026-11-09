@@ -147,6 +147,8 @@ defmodule Fluffy.Conformance.CheckActionTest do
     end)
   end
 
+  @reverting_checkbox ~s|<label><input type="checkbox" oninput="queueMicrotask(() => this.checked = !this.checked)">Updates</label>|
+
   test "Playwright check and uncheck succeed when page code in an iframe reverts the click" do
     revert = ~s|oninput="queueMicrotask(() => this.checked = !this.checked)"|
 
@@ -163,6 +165,68 @@ defmodule Fluffy.Conformance.CheckActionTest do
       |> expect(to_be_checked(by_role(frame, :checkbox, name: "Updates"), checked: false))
       |> uncheck(by_role(frame, :checkbox, name: "Digest"))
       |> expect(to_be_checked(by_role(frame, :checkbox, name: "Digest")))
+    end)
+  end
+
+  test "Playwright check succeeds when page code reverts the click in a frame that loads later" do
+    with_html(:playwright, "<iframe></iframe>", fn session ->
+      Playwright.evaluate(session, """
+      () => {
+        setTimeout(() => {
+          document.querySelector('iframe').srcdoc = #{inspect(@reverting_checkbox)}
+        }, 300)
+      }
+      """)
+
+      frame = frame_locator("iframe")
+
+      session
+      |> check(by_role(frame, :checkbox, name: "Updates"))
+      |> expect(to_be_checked(by_role(frame, :checkbox, name: "Updates"), checked: false))
+    end)
+  end
+
+  test "Playwright check succeeds when page code reverts the click in a frame added later" do
+    with_html(:playwright, "<main></main>", fn session ->
+      Playwright.evaluate(session, """
+      () => {
+        setTimeout(() => {
+          const frame = document.createElement('iframe')
+          frame.srcdoc = #{inspect(@reverting_checkbox)}
+          document.querySelector('main').append(frame)
+        }, 300)
+      }
+      """)
+
+      frame = frame_locator("iframe")
+
+      session
+      |> check(by_role(frame, :checkbox, name: "Updates"))
+      |> expect(to_be_checked(by_role(frame, :checkbox, name: "Updates"), checked: false))
+    end)
+  end
+
+  test "Playwright check fails on a late checkbox that refuses the click after another one in its frame was checked" do
+    inner = ~s(<label><input type="checkbox">First</label>)
+
+    with_html(:playwright, ~s(<iframe srcdoc="#{String.replace(inner, "\"", "&quot;")}"></iframe>), fn session ->
+      frame = frame_locator("iframe")
+      check(session, by_role(frame, :checkbox, name: "First"))
+
+      Playwright.evaluate(session, """
+      () => {
+        setTimeout(() => {
+          document.querySelector('iframe').contentDocument.body.insertAdjacentHTML(
+            'beforeend',
+            '<label><input type="checkbox" onclick="event.preventDefault()">Refusing</label>'
+          )
+        }, 300)
+      }
+      """)
+
+      assert_raise Fluffy.OperationError, ~r/did not change its state/, fn ->
+        check(session, by_role(frame, :checkbox, name: "Refusing"))
+      end
     end)
   end
 

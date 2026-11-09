@@ -46,6 +46,7 @@ Fluffy now runs on PlaywrightEx 0.17, a port of the official Playwright client w
 
 ### Fixed
 
+- `check` and `uncheck` on Playwright succeed when page code reverts the click in a frame that loaded after the action started.
 - No unused-function warning when Fluffy is compiled without Ecto.
 - A Playwright session starts when `config :fluffy, :playwright` leaves out `timeout:`, using its 15 seconds default instead of raising `KeyError`.
 - Playwright actions and expectations default to the session's `timeout:`, like LiveView.
