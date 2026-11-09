@@ -116,9 +116,6 @@ defmodule Fluffy.HTML.Aria do
     caption code deletion emphasis generic insertion paragraph presentation strong subscript superscript
   )
 
-  # Not a JavaScript number (NaN) means no tabindex, the empty string is 0.
-  @js_number ~r/^[\s\x{FEFF}]*(?:[+-]?(?:[0-9]+\.?[0-9]*(?:[eE][+-]?[0-9]+)?|\.[0-9]+(?:[eE][+-]?[0-9]+)?|Infinity)|0[xX][0-9a-fA-F]+|0[oO][0-7]+|0[bB][01]+)?[\s\x{FEFF}]*$/u
-
   @naming_prohibited_roles ~w(
     caption code definition deletion emphasis generic insertion mark paragraph presentation strong
     subscript suggestion superscript term time
@@ -138,7 +135,7 @@ defmodule Fluffy.HTML.Aria do
   @ignored_tags ~w(script style noscript template)
 
   # Display none in the user-agent stylesheet.
-  @not_rendered_tags ~w(area base basefont datalist head link meta noembed noframes param rp script style template title)
+  @not_rendered_tags ~w(area base datalist head link meta noembed noframes param rp script style template title)
   # SVG's own metadata has no box, and keeps display inline.
   @svg_metadata_tags ~w(desc metadata)
   # A replaced element renders its own content, not its element children.
@@ -148,14 +145,10 @@ defmodule Fluffy.HTML.Aria do
                      ~w(
                        address article aside blockquote body br button caption center col colgroup dd
                        details dialog dir div dl dt fieldset figcaption figure footer form h1 h2 h3 h4
-                       h5 h6 header hgroup hr html input legend li listing main marquee menu meter nav
+                       h5 h6 header hgroup hr html input legend li listing main menu meter nav
                        ol optgroup option p plaintext pre progress ruby search section select slot
                        summary table tbody td textarea tfoot th thead tr ul xmp
                      )
-
-  # An element is foreign up to the nearest of these, whose content is HTML again.
-  @foreign_roots ["math", "svg"]
-  @html_integration_points ~w(foreignObject mi mn mo ms mtext)
 
   @context %{target: nil, labelled_by: nil, label: nil, native: nil}
 
@@ -203,11 +196,6 @@ defmodule Fluffy.HTML.Aria do
   def rendered?(%__MODULE__{} = aria, node) do
     not ignored?(node) and not hidden_in_dropdown?(aria, node) and
       closest(aria, node, &not_rendered?(aria, &1)) == nil
-  end
-
-  # Visibility also needs a box, which role matching does not ask for.
-  def visible?(%__MODULE__{} = aria, node) do
-    rendered?(aria, node) and closest(aria, node, &boxless?(aria, &1)) == nil
   end
 
   # Role matching also honors `aria-hidden`, which visibility checks ignore.
@@ -320,44 +308,19 @@ defmodule Fluffy.HTML.Aria do
   defp blank?(text), do: String.trim(text) == ""
 
   defp not_rendered?(aria, node) do
-    hidden_attribute?(aria, node) or node.tag in @not_rendered_tags or svg_metadata?(aria, node) or
+    hidden_attribute?(node) or node.tag in @not_rendered_tags or node.tag in @svg_metadata_tags or
       closed_by_state?(node) or closed_by_parent?(aria, node)
   end
 
-  # The user-agent's [hidden] rule covers HTML only, and marquee's display overrides it.
-  # until-found keeps the element's own box and hides only its content.
-  defp hidden_attribute?(aria, node) do
-    attribute?(node, "hidden") and not until_found?(node) and node.tag != "marquee" and not foreign?(aria, node)
-  end
-
-  defp until_found?(node), do: String.downcase(text_attribute(node, "hidden")) == "until-found"
-
-  defp svg_metadata?(aria, node), do: node.tag in @svg_metadata_tags and foreign?(aria, node)
-
-  defp foreign?(_aria, %{tag: tag}) when tag in @foreign_roots, do: true
-
-  defp foreign?(aria, node) do
-    boundary = closest(aria, parent(aria, node), &(&1.tag in @foreign_roots or &1.tag in @html_integration_points))
-    boundary != nil and boundary.tag in @foreign_roots
-  end
-
-  defp collapsed_until_found?(node), do: until_found?(node) and node.tag in @non_inline_tags
-
-  defp boxless?(aria, %{tag: "defs"} = node), do: foreign?(aria, node)
-  defp boxless?(aria, %{tag: "source"} = node), do: match?(%{tag: "picture"}, parent(aria, node))
-  defp boxless?(_aria, node), do: collapsed_until_found?(node)
+  # The user-agent's [hidden] rule covers HTML only.
+  defp hidden_attribute?(node), do: attribute?(node, "hidden") and node.tag not in ["math", "svg"]
 
   defp closed_by_state?(%{tag: "audio"} = node), do: not attribute?(node, "controls")
   defp closed_by_state?(%{tag: "input"} = node), do: Semantics.input_type(node) == "hidden"
   defp closed_by_state?(_node), do: false
 
-  # A non-replaced inline box has no containment for until-found to apply.
   defp closed_by_parent?(aria, node) do
-    case parent(aria, node) do
-      %{tag: tag} when tag in @fallback_content_tags -> true
-      %{} = parent -> collapsed_until_found?(parent)
-      nil -> false
-    end
+    match?(%{tag: tag} when tag in @fallback_content_tags, parent(aria, node))
   end
 
   # Only a list box renders groups and separators; a dropdown shows its options on its own.
@@ -406,7 +369,7 @@ defmodule Fluffy.HTML.Aria do
   defp tabindex?(node) do
     case attribute(node, "tabindex") do
       nil -> false
-      value -> value =~ @js_number
+      value -> String.trim(value) == "" or match?({_integer, ""}, value |> String.trim() |> Integer.parse())
     end
   end
 
@@ -531,6 +494,8 @@ defmodule Fluffy.HTML.Aria do
       true -> "columnheader"
     end
   end
+
+  defp adjacent_elements(_aria, %{parent_id: nil}), do: {nil, nil}
 
   defp adjacent_elements(aria, node) do
     siblings = child_elements(aria, parent(aria, node))
@@ -879,7 +844,7 @@ defmodule Fluffy.HTML.Aria do
   end
 
   defp non_inline?(aria, node) do
-    hidden_attribute?(aria, node) or closed_by_state?(node) or node.tag in @non_inline_tags or ruby_text?(aria, node)
+    hidden_attribute?(node) or closed_by_state?(node) or node.tag in @non_inline_tags or ruby_text?(aria, node)
   end
 
   # Outside a ruby, rt has no display of its own.

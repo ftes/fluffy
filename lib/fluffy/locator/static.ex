@@ -35,7 +35,7 @@ defmodule Fluffy.Locator.Static do
     end)
   end
 
-  def structurally_visible?(%Aria{} = aria, element), do: Aria.visible?(aria, Aria.node_for(aria, element))
+  def structurally_visible?(%Aria{} = aria, element), do: Aria.rendered?(aria, Aria.node_for(aria, element))
 
   defp apply_operation({:css, selector}, scopes) do
     query_scopes(scopes, selector)

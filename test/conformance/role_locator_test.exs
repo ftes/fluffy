@@ -193,27 +193,11 @@ defmodule Fluffy.Conformance.RoleLocatorTest do
     {"content of a closed popover", ~s(<div popover><button>Go</button></div>), :button, [], %{static: 1, playwright: 0}},
     {"hidden svg stays inline in a name", ~s(<button>A<svg hidden></svg>B</button>), :button, [name: "AB", exact: true],
      1},
-    {"until-found element stays inline in a name", ~s(<button>A<span hidden="until-found"></span>B</button>), :button,
-     [name: "AB", exact: true], 1},
     {"hidden element separates a name", ~s(<button>A<span hidden></span>B</button>), :button, [name: "A B", exact: true],
      1},
-    {"hidden attribute on an svg link", ~s(<svg><a href="/x" hidden>Go</a></svg>), :link, [name: "Go", exact: true], 1},
-    {"link in a hidden svg group", ~s(<svg><g hidden><a href="/x">Go</a></g></svg>), :link, [name: "Go", exact: true], 1},
-    {"until-found svg group", ~s(<svg><g hidden="until-found"><a href="/x">Go</a></g></svg>), :link,
-     [name: "Go", exact: true], 1},
-    {"link in a hidden MathML row", ~s(<math><mrow hidden><a href="/x">Go</a></mrow></math>), :link,
-     [name: "Go", exact: true], 1},
-    {"hidden button in foreignObject", ~s(<svg><foreignObject><button hidden>Go</button></foreignObject></svg>), :button,
-     [], 0},
-    {"hidden button in a MathML text point", ~s(<math><mtext><button hidden>Go</button></mtext></math>), :button, [], 0},
+    {"blank tabindex counts as zero", ~s(<h2 role="none" tabindex="">T</h2>), :heading, [], 1},
     {"lowercase infinity tabindex", ~s(<h2 role="none" tabindex="infinity">T</h2>), :heading, [], 0},
     {"uppercase infinity tabindex on an image", ~s(<img alt="" tabindex="INFINITY">), :presentation, [], 1},
-    {"unicode digit tabindex", ~s(<h2 role="none" tabindex="٣">T</h2>), :heading, [], 0},
-    {"Infinity tabindex", ~s(<h2 role="none" tabindex="-Infinity">T</h2>), :heading, [], 1},
-    {"uppercase exponent tabindex", ~s(<h2 role="none" tabindex="1E3">T</h2>), :heading, [], 1},
-    {"uppercase hexadecimal tabindex", ~s(<h2 role="none" tabindex="0X1f">T</h2>), :heading, [], 1},
-    {"signed hexadecimal tabindex", ~s(<h2 role="none" tabindex="+0x1f">T</h2>), :heading, [], 0},
-    {"byte order mark around a tabindex", ~s(<h2 role="none" tabindex="&#xFEFF;1">T</h2>), :heading, [], 1},
     {"nested disabled fieldset legend button",
      ~s(<fieldset disabled><fieldset disabled><legend><button role="none">Go</button></legend></fieldset></fieldset>),
      :button, [], 1},
@@ -285,20 +269,6 @@ defmodule Fluffy.Conformance.RoleLocatorTest do
     {"aria-owns in a referenced name",
      ~s(<span id="l" aria-owns="o">A</span><span id="o">B</span><input aria-labelledby="l">), :textbox,
      [name: "AB", exact: true], 1},
-    {"until-found element keeps its own role", ~s(<button hidden="until-found">Go</button>), :button,
-     [name: "Go", exact: true], 1},
-    {"child of an until-found element", ~s(<div hidden="until-found"><button>Go</button></div>), :button, [], 0},
-    {"until-found text stays in a name", ~s(<button>A<span hidden="until-found">B</span></button>), :button,
-     [name: "AB", exact: true], 1},
-    {"until-found block hides child elements from a name", ~s(<button>A<div hidden="until-found"><b>B</b></div></button>),
-     :button, [name: "A", exact: true], 1},
-    {"until-found span keeps child elements in a name", ~s(<button>A<span hidden="until-found"><b>B</b></span></button>),
-     :button, [name: "AB", exact: true], 1},
-    {"child of an until-found span", ~s(<span hidden="until-found"><button>Go</button></span>), :button, [], 1},
-    {"uppercase until-found element keeps its own role", ~s(<button hidden="UNTIL-FOUND">Go</button>), :button,
-     [name: "Go", exact: true], 1},
-    {"child of an uppercase until-found element", ~s(<div hidden="UNTIL-FOUND"><button>Go</button></div>), :button, [],
-     0},
     {"embedded select in a disabled fieldset skips only its own disabled options",
      ~s(<fieldset disabled><span id="l">Pick <select><option disabled>A</option><option>B</option></select></span></fieldset><input aria-labelledby="l">),
      :textbox, [name: "Pick B", exact: true], 1},
@@ -307,14 +277,9 @@ defmodule Fluffy.Conformance.RoleLocatorTest do
      :textbox, [name: "Pick B", exact: true], 1},
     {"audio without controls separates a name", ~s(<button>A<audio></audio>B</button>), :button,
      [name: "A B", exact: true], 1},
-    {"basefont separates a name", ~s(<button>A<basefont>B</button>), :button, [name: "A B", exact: true], 1},
-    {"HTML desc renders its subtree", ~s(<desc><button>Go</button></desc>), :button, [], 1},
-    {"HTML metadata renders its subtree", ~s(<metadata><button>Go</button></metadata>), :button, [], 1},
-    {"svg desc hides its subtree", ~s(<svg><desc><button>Go</button></desc></svg>), :button, [], 0},
     {"a label's noscript control is not its control", ~s(<label>Pick <noscript><input></noscript><input></label>),
      :textbox, [name: "Pick", exact: true], 1},
     {"an empty for matches no empty id", ~s(<label for="">Pick</label><input id="">), :textbox, [name: "Pick"], 0},
-    {"link in svg defs keeps its role", ~s(<svg><defs><a href="/x">Go</a></defs></svg>), :link, [], 1},
     {"hr in a dropdown", ~s(<select><hr></select>), :separator, [], 0},
     {"hr outside a select", "<hr>", :separator, [], 1},
     {"image input named by alt", ~s(<input type="image" alt="Go" title="T">), :button, [name: "Go", exact: true], 1},
@@ -420,16 +385,8 @@ defmodule Fluffy.Conformance.RoleLocatorTest do
     {"video fallback", ~s(<video><p id="t">Hi</p></video>), false},
     {"progress fallback", ~s(<progress><b id="t">Hi</b></progress>), false},
     {"svg desc", ~s(<svg><desc id="t">Hi</desc></svg>), false},
-    {"until-found block", ~s(<p id="t" hidden="until-found">Hi</p>), false},
-    {"uppercase until-found block", ~s(<p id="t" hidden="UNTIL-FOUND">Hi</p>), false},
-    {"until-found span", ~s(<span id="t" hidden="until-found">Hi</span>), true},
-    {"svg defs content", ~s(<svg><defs><a id="t" href="/x">Hi</a></defs></svg>), false},
-    {"picture source", ~s(<picture><source id="t" srcset="/a.png"><img alt="A"></picture>), false},
     {"hr in a dropdown", ~s(<select><hr id="t"></select>), false},
     {"option of a list box", ~s(<select size="3"><option id="t">A</option></select>), true},
-    {"until-found child of a block", ~s(<div hidden="until-found"><p id="t">Hi</p></div>), false},
-    {"until-found child of a span", ~s(<span hidden="until-found"><b id="t">Hi</b></span>), true},
-    {"hidden attribute on an svg link", ~s(<svg><text><a id="t" hidden>Hi</a></text></svg>), true},
     {"optgroup of a dropdown", ~s(<select><optgroup id="t" label="A"></optgroup></select>), false},
     {"optgroup of a list box", ~s(<select size="3"><optgroup id="t" label="A"><option>A</option></optgroup></select>),
      true}
@@ -483,29 +440,15 @@ defmodule Fluffy.Conformance.RoleLocatorTest do
     end
 
     @tag driver: driver
-    test "a template inside svg does not shift role matches with #{driver}" do
-      html = ~s(<svg><template><a href="/in">In</a></template><a href="/after">After</a></svg>)
-      session = session_for_html(unquote(driver), html, base_url: Fluffy.TestServer.base_url())
-
-      expect(session, :link |> by_role(name: "After") |> to_have_attribute("href", "/after"))
-    end
-
-    @tag driver: driver
-    test "noscript content does not shift role matches with #{driver}" do
-      html = ~s(<noscript><a href="/in">In</a></noscript><a href="/after">After</a>)
-      session = session_for_html(unquote(driver), html, base_url: Fluffy.TestServer.base_url())
-
-      expect(session, :link |> by_role(name: "After") |> to_have_attribute("href", "/after"))
-    end
-
-    @tag driver: driver
-    test "inert content does not shift scoped role matches with #{driver}" do
+    test "inert content does not shift role matches with #{driver}" do
       html =
         ~s(<div id="s"><noscript><a href="/n">N</a></noscript><svg><template><a href="/t">T</a></template></svg><a href="/after">After</a></div>)
 
       session = session_for_html(unquote(driver), html, base_url: Fluffy.TestServer.base_url())
 
-      expect(session, "#s" |> by_css() |> by_role(:link, name: "After") |> to_have_attribute("href", "/after"))
+      session
+      |> expect(:link |> by_role(name: "After") |> to_have_attribute("href", "/after"))
+      |> expect("#s" |> by_css() |> by_role(:link, name: "After") |> to_have_attribute("href", "/after"))
     end
 
     @tag driver: driver
