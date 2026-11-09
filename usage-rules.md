@@ -71,7 +71,7 @@ Prefer the shared API. For what it does not cover:
 
 - `Fluffy.unwrap(session, fun)` passes a `%Plug.Conn{}` (Static, return the updated conn), `%Phoenix.LiveViewTest.View{}` (LiveView) or `%PlaywrightEx.Page{}` (Playwright), and returns the session. It raises on a Phoenix session before its first visit.
 - `Fluffy.Playwright.unwrap(session, locator, fun)` passes the `%PlaywrightEx.Locator{}` for a Fluffy locator, resolved in the active page and through frame locators. A navigation it causes is adopted. It raises `Fluffy.CapabilityError` on Phoenix.
-- `unwrap(response, &PlaywrightEx.Response.server_addr!/1)` reaches an event value's native counterpart and returns the callback's result.
+- `unwrap_and_return(response, &PlaywrightEx.Response.server_addr!/1)` reaches an event value's native counterpart and returns the callback's result.
 - Use bang functions inside the callback so failures stop the test.
 - Do not natively close the page or context, call `remove_all_listeners`, `set_default_timeout`, `set_default_navigation_timeout` or `set_content`, stop tracing, or pass `no_wait_after:` or `signal:`. Those break Fluffy's tracking.
 - In a LiveView callback, do not consume `assert_patch` or `assert_redirect`; assert the resulting page after `unwrap`.
