@@ -45,10 +45,32 @@ defmodule Fluffy.Options do
     dispatch_event: {PlaywrightEx.Locator, :dispatch_event, 4, []},
     select_text: {PlaywrightEx.Locator, :select_text, 2, [:force]},
     scroll_into_view_if_needed: {PlaywrightEx.Locator, :scroll_into_view_if_needed, 2, []},
+    wait_for: {PlaywrightEx.Locator, :wait_for, 2, [:state]},
+    bounding_box: {PlaywrightEx.Locator, :bounding_box, 2, []},
+    aria_snapshot: {PlaywrightEx.Locator, :aria_snapshot, 2, [:boxes, :depth, :mode]},
+    page_aria_snapshot: {PlaywrightEx.Page, :aria_snapshot, 2, [:boxes, :depth, :mode]},
     wait_for_function: {PlaywrightEx.Page, :wait_for_function, 4, [:polling]},
+    wait_for_load_state: {PlaywrightEx.Page, :wait_for_load_state, 3, []},
+    unroute_all: {PlaywrightEx.BrowserContext, :unroute_all, 2, [:behavior]},
     locator_screenshot:
       {PlaywrightEx.Locator, :screenshot, 2,
        [:animations, :caret, :mask, :mask_color, :omit_background, :quality, :scale, :style, :type]},
+    to_have_screenshot:
+      {PlaywrightEx.Expect, :to_have_screenshot, 2,
+       [
+         :animations,
+         :caret,
+         :clip,
+         :full_page,
+         :mask,
+         :mask_color,
+         :max_diff_pixel_ratio,
+         :max_diff_pixels,
+         :omit_background,
+         :scale,
+         :style_path,
+         :threshold
+       ]},
     emulate_media:
       {PlaywrightEx.Page, :emulate_media, 2, [:color_scheme, :contrast, :forced_colors, :media, :reduced_motion]},
     keyboard_press: {PlaywrightEx.Keyboard, :press, 3, [:delay]},
@@ -82,14 +104,47 @@ defmodule Fluffy.Options do
     ]
   ]
 
-  @action_schemas Map.new(@native_actions ++ @playwright_actions, fn {action, {module, fun, arity, keys}} ->
+  # PlaywrightEx has no test runner to name a baseline, so its `path:` is required, and
+  # nothing derives one here.
+  @required_action_options [
+    to_have_screenshot: [
+      path: [
+        type: :string,
+        required: true,
+        doc:
+          "The baseline image, a `.png` or `.webp` file, resolved against the current working directory. " <>
+            "Required: Fluffy does not derive a path from the test name."
+      ]
+    ]
+  ]
+
+  # `path:` of a script or style tag is the file to inject, not a screenshot's positional
+  # path, so these are not classified with the upstream options above.
+  @tag_options [
+    content: [type: :string, doc: "Raw source to inject."],
+    path: [type: :string, doc: "File to inject, resolved against the current working directory."],
+    url: [type: :string, doc: "URL to load."]
+  ]
+
+  @action_schemas @native_actions
+                  |> Kernel.++(@playwright_actions)
+                  |> Map.new(fn {action, {module, fun, arity, keys}} ->
                     native =
                       for {key, entry} <- Native.schema(module, fun, arity, keys) do
                         {key, Keyword.merge(entry, Keyword.get(@native_option_overrides, key, []))}
                       end
 
-                    {action, NimbleOptions.new!(@timeout_options ++ native)}
+                    required = Keyword.get(@required_action_options, action, [])
+                    {action, NimbleOptions.new!(@timeout_options ++ required ++ native)}
                   end)
+                  |> Map.merge(%{
+                    add_script_tag:
+                      NimbleOptions.new!(
+                        @timeout_options ++
+                          @tag_options ++ [type: [type: :string, doc: "Script type, such as `module`."]]
+                      ),
+                    add_style_tag: NimbleOptions.new!(@timeout_options ++ @tag_options)
+                  })
 
   # The upstream assertion behind each expectation and the options Fluffy mirrors on
   # every driver. No assertion option passes through to the browser.
@@ -101,6 +156,13 @@ defmodule Fluffy.Options do
     to_be_enabled: {PlaywrightEx.Expect, :to_be_enabled, 2, [:enabled]},
     to_be_focused: {PlaywrightEx.Expect, :to_be_focused, 2, []},
     to_be_in_viewport: {PlaywrightEx.Expect, :to_be_in_viewport, 2, [:ratio]},
+    to_have_css: {PlaywrightEx.Expect, :to_have_css, 4, [:pseudo]},
+    to_have_js_property: {PlaywrightEx.Expect, :to_have_js_property, 4, []},
+    to_have_role: {PlaywrightEx.Expect, :to_have_role, 3, []},
+    to_have_accessible_name: {PlaywrightEx.Expect, :to_have_accessible_name, 3, [:ignore_case]},
+    to_have_accessible_description: {PlaywrightEx.Expect, :to_have_accessible_description, 3, [:ignore_case]},
+    to_have_accessible_error_message: {PlaywrightEx.Expect, :to_have_accessible_error_message, 3, [:ignore_case]},
+    to_match_aria_snapshot: {PlaywrightEx.Expect, :to_match_aria_snapshot, 3, []},
     to_be_checked: {PlaywrightEx.Expect, :to_be_checked, 2, [:checked, :indeterminate]},
     to_have_value: {PlaywrightEx.Expect, :to_have_value, 3, []},
     to_have_values: {PlaywrightEx.Expect, :to_have_values, 3, []},
@@ -134,6 +196,10 @@ defmodule Fluffy.Options do
     use_inner_text: [
       type: :boolean,
       doc: "*Playwright only.* Read the browser's rendered `innerText` instead of the text content."
+    ],
+    pseudo: [
+      type: {:in, [:before, :after]},
+      doc: "*Playwright only.* The pseudo-element to read computed styles from."
     ]
   ]
 

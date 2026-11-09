@@ -78,6 +78,7 @@ defmodule Fluffy.Backend.Playwright do
     context = %Context{
       browser_context: browser_context,
       base_url: base_url,
+      extra_http_headers: headers,
       resource_scope: resource_scope,
       timeout: timeout
     }

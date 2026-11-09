@@ -7,6 +7,7 @@ defmodule Fluffy.Route.Registration do
   # and the test process is blocked in the action that caused the request. `$callers`
   # runs through the registering caller, so the Ecto sandbox allows the handler.
 
+  alias Fluffy.Backend.Playwright.Bounded
   alias Fluffy.Backend.Playwright.Events
   alias Fluffy.Route
   alias Fluffy.Session
@@ -35,6 +36,20 @@ defmodule Fluffy.Route.Registration do
       :ok = SessionRuntime.release(session.runtime, resource)
       BrowserContext.unroute!(browser_context, match, listener)
     end
+  end
+
+  def remove_all(session, options) do
+    browser_context = Session.context(session).browser_context
+    {timeout, native} = Keyword.split(options, [:timeout])
+
+    Bounded.within!(Session.timeout(session, timeout), :unroute_all, fn ->
+      with :ok <- BrowserContext.unroute_all(browser_context, native), do: {:ok, :ok}
+    end)
+
+    {:ok, resources} = SessionRuntime.resources(session.runtime)
+
+    for {:route, _key, _handler, _match, _listener} = resource <- resources,
+        do: SessionRuntime.release(session.runtime, resource)
   end
 
   # What `unroute/3` compares: a regular expression's compiled form can differ

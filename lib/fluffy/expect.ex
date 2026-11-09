@@ -31,13 +31,18 @@ defmodule Fluffy.Expect do
   @type target :: {:locator, Locator.t()} | :page
 
   @type kind ::
-          :attached
+          :accessible_description
+          | :accessible_error_message
+          | :accessible_name
+          | :aria_snapshot
+          | :attached
           | :attribute
           | :checked
           | :class
           | :contain_class
           | :contain_text
           | :count
+          | :css
           | :disabled
           | :editable
           | :empty
@@ -46,7 +51,10 @@ defmodule Fluffy.Expect do
           | :hidden
           | :id
           | :in_viewport
+          | :js_property
           | :opener
+          | :role
+          | :screenshot
           | :text
           | :title
           | :url
@@ -73,6 +81,19 @@ defmodule Fluffy.Expect do
   @type to_be_focused_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_be_focused)))
   @type to_be_in_viewport_option ::
           unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_be_in_viewport)))
+  @type to_have_css_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_have_css)))
+  @type to_have_js_property_option ::
+          unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_have_js_property)))
+  @type to_have_screenshot_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:to_have_screenshot)))
+  @type to_have_role_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_have_role)))
+  @type to_have_accessible_name_option ::
+          unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_have_accessible_name)))
+  @type to_have_accessible_description_option ::
+          unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_have_accessible_description)))
+  @type to_have_accessible_error_message_option ::
+          unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_have_accessible_error_message)))
+  @type to_match_aria_snapshot_option ::
+          unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_match_aria_snapshot)))
   @type to_be_checked_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_be_checked)))
   @type to_have_value_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_have_value)))
   @type to_have_values_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_have_values)))
@@ -222,6 +243,155 @@ defmodule Fluffy.Expect do
     options = Options.validate_expectation!(:to_be_in_viewport, options)
     {matching, options} = Keyword.split(options, [:ratio])
     Internal.new({:locator, locator}, :in_viewport, matching, options)
+  end
+
+  @doc group: "Locator assertions"
+  @doc playwright_only: true
+  @doc """
+  Asserts a computed CSS property of the target, equal to a string or matching a regular
+  expression. Requires Playwright, including when negated.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.expectation_schema(:to_have_css))}
+  """
+  @spec to_have_css(Locator.t(), String.t(), text_expectation(), [to_have_css_option()]) :: t()
+  def to_have_css(%Locator{} = locator, name, value, options \\ [])
+      when is_binary(name) and (is_binary(value) or is_struct(value, Regex)) do
+    options = Options.validate_expectation!(:to_have_css, options)
+    {matching, options} = Keyword.split(options, [:pseudo])
+    Internal.new({:locator, locator}, :css, {name, value, matching}, options)
+  end
+
+  @doc group: "Locator assertions"
+  @doc playwright_only: true
+  @doc """
+  Asserts a JavaScript property of the target element, which can be a primitive or a
+  plain serializable object. Requires Playwright, including when negated.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.expectation_schema(:to_have_js_property))}
+  """
+  @spec to_have_js_property(Locator.t(), String.t(), term(), [to_have_js_property_option()]) :: t()
+  def to_have_js_property(%Locator{} = locator, name, value, options \\ []) when is_binary(name) do
+    native_expectation(:to_have_js_property, {:locator, locator}, :js_property, {name, value}, options)
+  end
+
+  @doc group: "Locator assertions"
+  @doc playwright_only: true
+  @doc """
+  Asserts that a screenshot of the target matches the baseline image at the required
+  `path:`, a `.png` or `.webp` file. Requires Playwright, including when negated.
+
+      expect(session, to_have_screenshot(by_role(:main), path: "test/screenshots/main-chromium.png"))
+
+  The baseline lives at `path:` itself; a relative path resolves against the current
+  working directory, under `mix test` the project root. Fluffy does not derive a path
+  from the test name, and leaving out `path:` raises `NimbleOptions.ValidationError`.
+  Give each baseline its own path and commit it, one per browser if you run several,
+  since renderings differ.
+
+  A missing baseline is written and the assertion passes; negated, it fails. A mismatch
+  writes `-actual`, `-diff`, `-previous` and `-expected` images next to the baseline.
+  `config :playwright_ex, :expect` sets `update_snapshots:`, where `:none` fails on a
+  missing baseline and `:changed` or `:all` rewrite a mismatching one, and comparison
+  defaults such as `to_have_screenshot: %{maxDiffPixels: 10}`.
+
+  ## Options
+
+  Playwright-only options pass through to #{Options.native_reference(:to_have_screenshot)}.
+
+  #{NimbleOptions.docs(Options.action_schema(:to_have_screenshot))}
+  """
+  @spec to_have_screenshot(Locator.t(), [to_have_screenshot_option()]) :: t()
+  def to_have_screenshot(%Locator{} = locator, options \\ []), do: screenshot_expectation({:locator, locator}, options)
+
+  defp screenshot_expectation(target, options) do
+    {timeout, native} = Options.split_action!(:to_have_screenshot, options)
+    Internal.new(target, :screenshot, native, timeout)
+  end
+
+  @doc group: "Locator assertions"
+  @doc playwright_only: true
+  @doc """
+  Asserts the target's ARIA role, such as `:button`. Requires Playwright, including when negated.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.expectation_schema(:to_have_role))}
+  """
+  @spec to_have_role(Locator.t(), atom(), [to_have_role_option()]) :: t()
+  def to_have_role(%Locator{} = locator, role, options \\ []) when is_atom(role) do
+    native_expectation(:to_have_role, {:locator, locator}, :role, role, options)
+  end
+
+  @doc group: "Locator assertions"
+  @doc playwright_only: true
+  @doc """
+  Asserts the target's accessible name, equal to a string or matching a regular
+  expression. Requires Playwright, including when negated.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.expectation_schema(:to_have_accessible_name))}
+  """
+  @spec to_have_accessible_name(Locator.t(), text_expectation(), [to_have_accessible_name_option()]) :: t()
+  def to_have_accessible_name(%Locator{} = locator, expected, options \\ [])
+      when is_binary(expected) or is_struct(expected, Regex) do
+    text_expectation(:to_have_accessible_name, locator, :accessible_name, expected, options)
+  end
+
+  @doc group: "Locator assertions"
+  @doc playwright_only: true
+  @doc """
+  Asserts the target's accessible description, equal to a string or matching a regular
+  expression. Requires Playwright, including when negated.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.expectation_schema(:to_have_accessible_description))}
+  """
+  @spec to_have_accessible_description(Locator.t(), text_expectation(), [to_have_accessible_description_option()]) :: t()
+  def to_have_accessible_description(%Locator{} = locator, expected, options \\ [])
+      when is_binary(expected) or is_struct(expected, Regex) do
+    text_expectation(:to_have_accessible_description, locator, :accessible_description, expected, options)
+  end
+
+  @doc group: "Locator assertions"
+  @doc playwright_only: true
+  @doc """
+  Asserts the target's accessible error message, equal to a string or matching a regular
+  expression. Requires Playwright, including when negated.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.expectation_schema(:to_have_accessible_error_message))}
+  """
+  @spec to_have_accessible_error_message(Locator.t(), text_expectation(), [to_have_accessible_error_message_option()]) ::
+          t()
+  def to_have_accessible_error_message(%Locator{} = locator, expected, options \\ [])
+      when is_binary(expected) or is_struct(expected, Regex) do
+    text_expectation(:to_have_accessible_error_message, locator, :accessible_error_message, expected, options)
+  end
+
+  @doc group: "Locator assertions"
+  @doc playwright_only: true
+  @doc """
+  Asserts the target's ARIA snapshot against `expected`, the snapshot as YAML text.
+  Requires Playwright, including when negated.
+
+  PlaywrightEx only compares inline snapshots, so `expected` is required and there is
+  no `path:` or baseline file. An empty `expected` fails with the current snapshot in
+  its message, to paste in.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.expectation_schema(:to_match_aria_snapshot))}
+  """
+  @spec to_match_aria_snapshot(Locator.t(), String.t(), [to_match_aria_snapshot_option()]) :: t()
+  def to_match_aria_snapshot(%Locator{} = locator, expected, options \\ []) when is_binary(expected) do
+    native_expectation(:to_match_aria_snapshot, {:locator, locator}, :aria_snapshot, expected, options)
   end
 
   @doc group: "Locator assertions"
@@ -549,6 +719,35 @@ defmodule Fluffy.Expect do
   end
 
   @doc group: "Assertions"
+  @doc playwright_only: true
+  @doc """
+  Asserts that a screenshot of the active page matches the baseline image at the required
+  `path:`, like `to_have_screenshot/2`, which also says where baselines go.
+
+  ## Options
+
+  Playwright-only options pass through to #{Options.native_reference(:to_have_screenshot)}.
+
+  #{NimbleOptions.docs(Options.action_schema(:to_have_screenshot))}
+  """
+  @spec page_to_have_screenshot([to_have_screenshot_option()]) :: Expect.t()
+  def page_to_have_screenshot(options \\ []) when is_list(options), do: screenshot_expectation(:page, options)
+
+  @doc group: "Assertions"
+  @doc playwright_only: true
+  @doc """
+  Asserts the active page's ARIA snapshot against `expected`, like `to_match_aria_snapshot/3`.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.expectation_schema(:to_match_aria_snapshot))}
+  """
+  @spec page_to_match_aria_snapshot(String.t(), [to_match_aria_snapshot_option()]) :: Expect.t()
+  def page_to_match_aria_snapshot(expected, options \\ []) when is_binary(expected) and is_list(options) do
+    native_expectation(:to_match_aria_snapshot, :page, :aria_snapshot, expected, options)
+  end
+
+  @doc group: "Assertions"
   @doc "Expects the active page to have the given opener handle, or no opener with `nil`."
   @spec page_to_have_opener(Fluffy.Page.t() | nil, [Expect.option()]) :: Expect.t()
   def page_to_have_opener(expected, options \\ [])
@@ -561,6 +760,14 @@ defmodule Fluffy.Expect do
   end
 
   defp expect_active_page(%Session{} = session, %Expect{kind: :title} = expectation) do
+    Fluffy.__expect__(session, expectation)
+  end
+
+  defp expect_active_page(%Session{} = session, %Expect{kind: :screenshot} = expectation) do
+    Fluffy.__expect__(session, expectation)
+  end
+
+  defp expect_active_page(%Session{} = session, %Expect{kind: :aria_snapshot} = expectation) do
     Fluffy.__expect__(session, expectation)
   end
 

@@ -229,11 +229,44 @@ defmodule Fluffy.Options.NativeGenerated do
          "Whether to bypass the [actionability](https://playwright.dev/docs/actionability) checks. Defaults to `false`.",
          quote(do: boolean())}
     ],
+    {PlaywrightEx.Locator, :wait_for, 2} => [
+      state:
+        {"`:attached` | `:detached` | `:visible` | `:hidden`", "Defaults to `:visible`. Can be either:",
+         quote(do: :attached | :detached | :visible | :hidden)}
+    ],
+    {PlaywrightEx.Locator, :aria_snapshot, 2} => [
+      boxes:
+        {"`t:boolean/0`",
+         "When `true`, appends each element's bounding box as `[box=x,y,width,height]` to the snapshot. Coordinates are relative to the viewport, in CSS pixels, as returned by [`Element.getBoundingClientRect()`](https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect). Defaults to `false`.",
+         quote(do: boolean())},
+      depth: {"`t:integer/0`", "When specified, limits the depth of the snapshot.", quote(do: integer())},
+      mode:
+        {"`:ai` | `:default`",
+         "When set to `:ai`, returns a snapshot optimized for AI consumption. Defaults to `:default`. See details for more information.",
+         quote(do: :ai | :default)}
+    ],
+    {PlaywrightEx.Page, :aria_snapshot, 2} => [
+      boxes:
+        {"`t:boolean/0`",
+         "When `true`, appends each element's bounding box as `[box=x,y,width,height]` to the snapshot. Coordinates are relative to the viewport, in CSS pixels, as returned by [`Element.getBoundingClientRect()`](https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect). Defaults to `false`.",
+         quote(do: boolean())},
+      depth: {"`t:integer/0`", "When specified, limits the depth of the snapshot.", quote(do: integer())},
+      mode:
+        {"`:ai` | `:default`",
+         "When set to `:ai`, returns a snapshot optimized for AI consumption: including element references like `[ref=e2]` and snapshots of `<iframe>`s. Defaults to `:default`.",
+         quote(do: :ai | :default)}
+    ],
     {PlaywrightEx.Page, :wait_for_function, 4} => [
       polling:
         {"`t:number/0` | `:raf`",
          "If `:polling` is `:raf`, then `expression` is constantly executed in `requestAnimationFrame` callback. If `:polling` is a number, then it is treated as an interval in milliseconds at which the function would be executed. Defaults to `:raf`.",
          quote(do: number() | :raf)}
+    ],
+    {PlaywrightEx.BrowserContext, :unroute_all, 2} => [
+      behavior:
+        {"`:wait` | `:ignore_errors` | `:default`",
+         "Specifies whether to wait for already running handlers and what to do if they raise:",
+         quote(do: :wait | :ignore_errors | :default)}
     ],
     {PlaywrightEx.Locator, :screenshot, 2} => [
       animations:
@@ -270,6 +303,55 @@ defmodule Fluffy.Options.NativeGenerated do
          quote(do: String.t())},
       type:
         {"`:png` | `:jpeg` | `:webp`", "Specify screenshot type, defaults to `:png`.", quote(do: :png | :jpeg | :webp)}
+    ],
+    {PlaywrightEx.Expect, :to_have_screenshot, 2} => [
+      animations:
+        {"`:disabled` | `:allow`",
+         "When set to `:disabled`, stops CSS animations, CSS transitions and Web Animations. Animations get different treatment depending on their duration:",
+         quote(do: :disabled | :allow)},
+      caret:
+        {"`:hide` | `:initial`",
+         "When set to `:hide`, screenshot will hide text caret. When set to `:initial`, text caret behavior will not be changed.  Defaults to `:hide`.",
+         quote(do: :hide | :initial)},
+      mask:
+        {"list of `t:PlaywrightEx.Locator.t/0`",
+         "Specify locators that should be masked when the screenshot is taken. Masked elements will be overlaid with a pink box `#FF00FF` (customized by `:mask_color`) that completely covers its bounding box. The mask is also applied to invisible elements, see [Matching only visible elements](https://playwright.dev/docs/locators#matching-only-visible-elements) to disable that.",
+         quote(do: [PlaywrightEx.Locator.t()])},
+      mask_color:
+        {"`t:String.t/0`",
+         "Specify the color of the overlay box for masked elements, in [CSS color format](https://developer.mozilla.org/en-US/docs/Web/CSS/color_value). Default color is pink `#FF00FF`.",
+         quote(do: String.t())},
+      max_diff_pixel_ratio:
+        {"`t:number/0`",
+         "An acceptable ratio of pixels that are different to the total amount of pixels, between `0` and `1`. Default is configurable with `config :playwright_ex, :expect` (see the configuration in `PlaywrightEx.Expect`). Note that `:threshold` defines which pixels are considered different.",
+         quote(do: number())},
+      max_diff_pixels:
+        {"`t:integer/0`",
+         "An acceptable amount of pixels that could be different. Default is configurable with `config :playwright_ex, :expect` (see the configuration in `PlaywrightEx.Expect`). Note that `:threshold` defines which pixels are considered different.",
+         quote(do: integer())},
+      omit_background:
+        {"`t:boolean/0`",
+         "Hides default white background and allows capturing screenshots with transparency. Not applicable to `jpeg` images. Defaults to `false`.",
+         quote(do: boolean())},
+      scale:
+        {"`:css` | `:device`",
+         "When set to `:css`, screenshot will have a single pixel per each css pixel on the page. For high-dpi devices, this will keep screenshots small. Using `:device` option will produce a single pixel per each device pixel, so screenshots of high-dpi devices will be twice as large or even larger.",
+         quote(do: :css | :device)},
+      style_path:
+        {"`t:String.t/0` | list of `t:String.t/0`",
+         "File name containing the stylesheet to apply while making the screenshot. This is where you can hide dynamic elements, make elements invisible or change their properties to help you creating repeatable screenshots. This stylesheet pierces the Shadow DOM and applies to the inner frames.",
+         quote(do: String.t() | [String.t()])},
+      threshold:
+        {"`t:number/0`",
+         "An acceptable perceived color difference in the [YIQ color space](https://en.wikipedia.org/wiki/YIQ) between the same pixel in compared images, between zero (strict) and one (lax), default is configurable with `config :playwright_ex, :expect` (see the configuration in `PlaywrightEx.Expect`). Defaults to `0.2`.",
+         quote(do: number())},
+      clip:
+        {"`t:map/0`", "An object which specifies clipping of the resulting image.",
+         quote(do: %{x: number(), y: number(), width: number(), height: number()})},
+      full_page:
+        {"`t:boolean/0`",
+         "When true, takes a screenshot of the full scrollable page, instead of the currently visible viewport. Defaults to `false`.",
+         quote(do: boolean())}
     ],
     {PlaywrightEx.Page, :emulate_media, 2} => [
       color_scheme:

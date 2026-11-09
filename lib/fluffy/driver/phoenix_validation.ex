@@ -7,6 +7,16 @@ defmodule Fluffy.Driver.PhoenixValidation do
   alias Fluffy.Session
 
   @playwright_locator_keys Fluffy.Options.playwright_locator_keys()
+  @browser_only_kinds [
+    :accessible_description,
+    :accessible_error_message,
+    :accessible_name,
+    :aria_snapshot,
+    :css,
+    :js_property,
+    :role,
+    :screenshot
+  ]
 
   def validate_operation!(session, _operation, arguments) do
     Enum.each(arguments, &validate_argument!(Session.current_driver(session), &1))
@@ -30,6 +40,8 @@ defmodule Fluffy.Driver.PhoenixValidation do
         detail: "viewport intersection requires a browser"
     end
 
+    if expectation.kind in @browser_only_kinds, do: browser_only_expectation!(driver)
+
     if expectation.kind == :checked and expectation.expected == :indeterminate do
       raise CapabilityError,
         capability: :indeterminate_checked_state,
@@ -44,6 +56,9 @@ defmodule Fluffy.Driver.PhoenixValidation do
         detail: "use_inner_text: reads text as the browser renders it"
     end
   end
+
+  defp validate_argument!(driver, %Expect{target: :page, kind: kind}) when kind in [:screenshot, :aria_snapshot],
+    do: browser_only_expectation!(driver)
 
   defp validate_argument!(driver, %Locator{} = locator) do
     if Locator.Internal.crosses_frame?(locator) do
@@ -82,4 +97,11 @@ defmodule Fluffy.Driver.PhoenixValidation do
   end
 
   defp validate_argument!(_driver, _argument), do: :ok
+
+  defp browser_only_expectation!(driver) do
+    raise CapabilityError,
+      capability: :computed_browser_semantics,
+      driver: driver,
+      detail: "computed styles, accessibility state, JavaScript properties and screenshots require a browser"
+  end
 end

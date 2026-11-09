@@ -36,16 +36,22 @@ defmodule Fluffy.Conformance.PlaywrightEvaluateTest do
              )
   end
 
-  test "rejects Fluffy 0.8 evaluate options passed as the argument" do
+  test "rejects the removed Fluffy 0.8 evaluate options as unknown" do
     session = session_for_html(:playwright, "<main>Options</main>", base_url: Fluffy.TestServer.base_url())
 
-    for options <- [[timeout: 1_000], [is_function: true, arg: "!"]] do
-      assert_raise ArgumentError,
-                   ~r/evaluate\/3 takes the JavaScript argument.*evaluate\(session, expression, arg\)/,
-                   fn ->
-                     Playwright.evaluate(session, "suffix => suffix", options)
-                   end
+    assert_raise NimbleOptions.ValidationError, ~r/unknown options.*:is_function.*:arg/, fn ->
+      Playwright.evaluate(session, "suffix => suffix", is_function: true, arg: "!")
     end
+
+    assert_raise NimbleOptions.ValidationError, ~r/unknown options.*:arg/, fn ->
+      Playwright.evaluate(session, "suffix => suffix", "!", arg: "!")
+    end
+  end
+
+  test "takes timeout: in place of the argument" do
+    session = session_for_html(:playwright, "<main>Options</main>", base_url: Fluffy.TestServer.base_url())
+
+    assert Playwright.evaluate(session, "1 + 1", timeout: 1_000) == 2
   end
 
   test "raises a capability error outside the Playwright driver" do
