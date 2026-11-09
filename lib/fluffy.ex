@@ -10,6 +10,12 @@ defmodule Fluffy do
   (`Phoenix.LiveViewTest`) driver for each page; the Playwright backend uses the
   Playwright driver.
 
+      start_session(:phoenix)
+      |> visit("/creatures/new")
+      |> fill(by_label("Name"), "Basilisk")
+      |> click(by_role(:button, name: "Register"))
+      |> assert(visible(by_text("Creature registered")))
+
   Unless a function documents additional entries, action, assertion, reload,
   and event-wait option lists accept:
 
@@ -91,7 +97,8 @@ defmodule Fluffy do
   def start_session(backend, options \\ []), do: Backend.start_session(backend, options)
 
   @doc group: "Lifecycle and navigation"
-  @doc "Closes a session and its resources. Returns `:ok` or `{:error, reason}`."
+  @doc "Closes a session and its resources. Returns `:ok`."
+  @spec close_session(Session.t()) :: :ok
   def close_session(%Session{} = session), do: Backend.close_session(session)
 
   @doc group: "Diagnostics and native access"
@@ -177,6 +184,11 @@ defmodule Fluffy do
   end
 
   @doc group: "Lifecycle and navigation"
+  @doc """
+  Navigates the active page to `path` and returns the updated session.
+
+  The Phoenix backend selects the Static or LiveView driver for the returned page.
+  """
   def visit(%Session{} = session, path), do: Backend.visit(session, path)
 
   @doc group: "Lifecycle and navigation"
@@ -318,16 +330,19 @@ defmodule Fluffy do
 
   @doc group: "Events"
   @doc "Registers a persistent handler. Handlers run independently, linked to the registering caller."
+  @spec on(Session.t(), Event.t(), (term() -> term()), [{:scope, :page | :context}]) :: Session.t()
   def on(%Session{} = session, %Event{} = event, handler, options \\ []),
     do: Event.listen(session, event, handler, options, :on)
 
   @doc group: "Events"
   @doc "Registers a handler for the first matching event, removing it before invocation."
+  @spec once(Session.t(), Event.t(), (term() -> term()), [{:scope, :page | :context}]) :: Session.t()
   def once(%Session{} = session, %Event{} = event, handler, options \\ []),
     do: Event.listen(session, event, handler, options, :once)
 
   @doc group: "Events"
   @doc "Removes the most recently registered listener matching this source, event type, and handler."
+  @spec off(Session.t(), Event.t(), (term() -> term()), [{:scope, :page | :context}]) :: Session.t()
   def off(%Session{} = session, %Event{} = event, handler, options \\ []), do: Event.off(session, event, handler, options)
 
   @doc false

@@ -10,7 +10,14 @@ defmodule Fluffy.PhoenixTest do
   APIs accept its contained `session` field. The function documentation below
   defines the supported overloads and options; unsupported options raise
   `ArgumentError`.
+
+      conn
+      |> visit("/creatures/new")
+      |> fill_in("Name", with: "Basilisk")
+      |> click_button("Register")
+      |> assert_has("#notice", text: "Creature registered")
   """
+  @moduledoc groups: ["Lifecycle and navigation", "Actions", "Assertions", "Diagnostics and native access"]
 
   alias Fluffy.Expect
   alias Fluffy.Locator
@@ -41,15 +48,19 @@ defmodule Fluffy.PhoenixTest do
   @typedoc "A facade session, or a native session accepted when entering the facade."
   @type session :: Session.t() | NativeSession.t()
 
+  @doc group: "Lifecycle and navigation"
   @doc "Starts an explicit Fluffy session with the selected backend."
   def start_session(backend), do: start_session(backend, [])
+  @doc group: "Lifecycle and navigation"
   @doc "Starts an explicit Fluffy session with backend options."
   def start_session(backend, options), do: %Session{session: Fluffy.start_session(backend, options)}
 
+  @doc group: "Lifecycle and navigation"
   @doc "Stores the Phoenix endpoint on a prepared connection."
   @spec put_endpoint(Plug.Conn.t(), module()) :: Plug.Conn.t()
   def put_endpoint(%Plug.Conn{} = conn, endpoint), do: Plug.Conn.put_private(conn, :phoenix_endpoint, endpoint)
 
+  @doc group: "Lifecycle and navigation"
   @doc """
   Visits a path. A connection always starts a Phoenix session.
   Used connections are recycled automatically; fresh prepared connections are preserved.
@@ -69,6 +80,7 @@ defmodule Fluffy.PhoenixTest do
 
   def visit(session, path), do: session |> map_session(&Fluffy.visit(&1, path)) |> clear_form()
 
+  @doc group: "Actions"
   @doc """
   Clicks a link by accessible name, or by CSS and text (optional `exact:`).
   CSS links fall back to label matching only when no text match exists at the
@@ -77,8 +89,12 @@ defmodule Fluffy.PhoenixTest do
   @spec click_link(session(), String.t()) :: session()
   @spec click_link(session(), String.t(), String.t()) :: session()
   def click_link(session, text), do: click_locator(session, role_locator(session, :link, text))
+  @doc group: "Actions"
+  @doc "Like `click_link/2`, by CSS `selector` and link `text`."
   def click_link(session, selector, text), do: click_link(session, selector, text, [])
 
+  @doc group: "Actions"
+  @doc "Like `click_link/3`, with `exact:` for matching `text`."
   @spec click_link(session(), String.t(), String.t(), keyword()) :: session()
   def click_link(session, selector, text, options) do
     string!(text, :text)
@@ -93,6 +109,7 @@ defmodule Fluffy.PhoenixTest do
     end)
   end
 
+  @doc group: "Actions"
   @doc "Clicks a button by accessible name, or by CSS and text or label (optional `exact:`)."
   @spec click_button(session(), String.t()) :: session()
   @spec click_button(session(), String.t(), String.t()) :: session()
@@ -102,16 +119,23 @@ defmodule Fluffy.PhoenixTest do
     click_locator(session, session |> role_locator(:button, text) |> Locator.and_(buttons))
   end
 
+  @doc group: "Actions"
+  @doc "Like `click_button/2`, by CSS `selector` and button text or label."
   def click_button(session, selector, text), do: click_button(session, selector, text, [])
 
+  @doc group: "Actions"
+  @doc "Like `click_button/3`, with `exact:` for matching `text`."
   @spec click_button(session(), String.t(), String.t(), keyword()) :: session()
   def click_button(session, selector, text, options), do: click_text(session, selector, text, options)
 
+  @doc group: "Actions"
   @doc "Fills a labeled field using a `String.Chars` value in `with:` and optional label `exact:`."
   @spec fill_in(session(), String.t(), keyword()) :: session()
   @spec fill_in(session(), String.t() | nil, String.t(), keyword()) :: session()
   def fill_in(session, label, options), do: fill_in(session, nil, label, options)
 
+  @doc group: "Actions"
+  @doc "Like `fill_in/3`, where the field must also match the CSS `selector` (`nil` for none)."
   def fill_in(session, selector, label, options) do
     options = options!(options, [:with, :exact])
     value = required!(options, :with)
@@ -119,6 +143,7 @@ defmodule Fluffy.PhoenixTest do
     field_action(session, locator, &Fluffy.fill(&1, locator, value))
   end
 
+  @doc group: "Actions"
   @doc """
   Selects exact option labels with `option: value_or_list` (or legacy `from: label`).
   Each option accepts `String.Chars`. Lists replace the selected set; use `[charlist]`
@@ -128,6 +153,8 @@ defmodule Fluffy.PhoenixTest do
   @spec select(session(), String.t() | nil, String.Chars.t() | [String.Chars.t()], keyword()) :: session()
   def select(session, label, options), do: select(session, nil, label, options)
 
+  @doc group: "Actions"
+  @doc "Like `select/3`, where the field must also match the CSS `selector` (`nil` for none)."
   def select(session, selector, label_or_option, options) do
     options = options!(options, [:option, :from, :exact, :exact_option])
     reject!(options[:exact_option] == false, "exact_option: false is unsupported")
@@ -145,16 +172,21 @@ defmodule Fluffy.PhoenixTest do
   end
 
   for {name, action} <- [check: :check, uncheck: :uncheck, choose: :check] do
+    @doc group: "Actions"
     @doc "Changes a labeled control's checked state, with optional CSS and label `exact:`."
     @spec unquote(name)(session(), String.t()) :: session()
     @spec unquote(name)(session(), String.t(), keyword() | String.t()) :: session()
     @spec unquote(name)(session(), String.t() | nil, String.t(), keyword()) :: session()
     def unquote(name)(session, label), do: unquote(name)(session, nil, label, [])
 
+    @doc group: "Actions"
+    @doc "Like `#{name}/2`, with `exact:` options after the label, or a CSS `selector` before it."
     def unquote(name)(session, label, options) when is_list(options), do: unquote(name)(session, nil, label, options)
 
     def unquote(name)(session, selector, label), do: unquote(name)(session, selector, label, [])
 
+    @doc group: "Actions"
+    @doc "Like `#{name}/2`, with a CSS `selector` (`nil` for none) the control must also match, and label `exact:`."
     def unquote(name)(session, selector, label, options) do
       options = options!(options, [:exact])
       locator = field_locator(session, selector, label, options)
@@ -162,6 +194,7 @@ defmodule Fluffy.PhoenixTest do
     end
   end
 
+  @doc group: "Actions"
   @doc """
   Selects one or more local files on a labeled input, with optional CSS and label `exact:`.
   Accepts a path string or a list of path strings, preserving selection order.
@@ -175,6 +208,8 @@ defmodule Fluffy.PhoenixTest do
   @spec upload(session(), String.t() | nil, String.t(), String.t() | [String.t()], keyword()) :: session()
   def upload(session, label, paths), do: upload(session, nil, label, paths, [])
 
+  @doc group: "Actions"
+  @doc "Like `upload/3`, with a final keyword list as label `exact:` options, or a CSS `selector` before the label."
   def upload(session, label_or_selector, paths_or_label, options_or_paths) when is_list(options_or_paths) do
     if Keyword.keyword?(options_or_paths) do
       upload(session, nil, label_or_selector, paths_or_label, options_or_paths)
@@ -185,6 +220,8 @@ defmodule Fluffy.PhoenixTest do
 
   def upload(session, selector, label, paths), do: upload(session, selector, label, paths, [])
 
+  @doc group: "Actions"
+  @doc "Like `upload/3`, with a CSS `selector` (`nil` for none) and label `exact:` options."
   def upload(session, selector, label, paths, options) do
     reject!(
       not (is_binary(paths) or (is_list(paths) and Enum.all?(paths, &is_binary/1))),
@@ -196,6 +233,7 @@ defmodule Fluffy.PhoenixTest do
     field_action(session, locator, &Fluffy.set_input_files(&1, locator, paths))
   end
 
+  @doc group: "Actions"
   @doc """
   Runs a callback with a CSS scope. Return the updated scoped session from the callback.
   Nested callbacks restore the outer scope. All operations retain the facade wrapper,
@@ -212,6 +250,7 @@ defmodule Fluffy.PhoenixTest do
     end
   end
 
+  @doc group: "Actions"
   @doc """
   Submits the form owning the most recently edited field. URL patches retain the
   active form; navigation to another document or LiveView clears it.
@@ -229,24 +268,29 @@ defmodule Fluffy.PhoenixTest do
     end
   end
 
+  @doc group: "Actions"
   @doc "Submits an explicit CSS form selector or native form locator, inside the current `within/3` scope."
   @spec submit(session(), String.t() | Locator.t()) :: Session.t()
   def submit(session, selector), do: submit_form(session, locator_in_scope(session, base_locator(selector)))
 
   defp submit_form(session, locator), do: session |> map_session(&Fluffy.submit(&1, locator)) |> clear_form()
 
+  @doc group: "Lifecycle and navigation"
   @doc "Reloads the active page using the current driver."
   @spec reload_page(session()) :: session()
   def reload_page(session), do: session |> map_session(&Fluffy.reload/1) |> clear_form()
 
+  @doc group: "Diagnostics and native access"
   @doc "Opens the current page using Fluffy's driver-specific browser preview."
   @spec open_browser(session()) :: session()
   def open_browser(session), do: map_session(session, &Fluffy.open_browser/1)
 
+  @doc group: "Diagnostics and native access"
   @doc "Runs a native callback with Fluffy's driver-specific unwrap semantics."
   @spec unwrap(session(), (term() -> term())) :: session()
   def unwrap(session, fun), do: session |> map_session(&Fluffy.unwrap(&1, fun)) |> clear_form()
 
+  @doc group: "Diagnostics and native access"
   @doc """
   Runs a native callback like `unwrap/2` and returns the callback's result instead of the session.
   Keep using the same session afterwards: on LiveView and Playwright, navigation the callback
@@ -259,6 +303,7 @@ defmodule Fluffy.PhoenixTest do
   def unwrap_and_return(session, fun), do: Fluffy.unwrap_and_return(wrap(session).session, fun)
 
   for {name, negated?} <- [assert_has: false, refute_has: true] do
+    @doc group: "Assertions"
     @doc """
     Checks whether any CSS or `Fluffy.Locator` match is visible, or negates that check.
     A locator resolves inside the current `within/3` scope and takes the same options.
@@ -287,6 +332,8 @@ defmodule Fluffy.PhoenixTest do
     @spec unquote(name)(session(), String.t() | Locator.t(), String.t(), keyword()) :: session()
     def unquote(name)(session, selector), do: unquote(name)(session, selector, [])
 
+    @doc group: "Assertions"
+    @doc "Like `#{name}/2`, with options, or with `text` as a shorthand for the `text:` option."
     def unquote(name)(session, selector, options) when is_list(options) do
       expectation = has_expectation(session, selector, options)
       execute(session, expectation, unquote(negated?))
@@ -294,12 +341,15 @@ defmodule Fluffy.PhoenixTest do
 
     def unquote(name)(session, selector, text), do: unquote(name)(session, selector, text, [])
 
+    @doc group: "Assertions"
+    @doc "Like `#{name}/3` with `text`, plus `exact:`, `count:`, `at:` and `timeout:`."
     def unquote(name)(session, selector, text, options) do
       options = options!(options, [:exact, :count, :at, :timeout])
       unquote(name)(session, selector, Keyword.put(options, :text, text))
     end
   end
 
+  @doc group: "Assertions"
   @doc """
   Checks a path, optionally with an exact flat `query_params:` map and `timeout:`.
   A whole `*` path segment matches one segment, including an empty segment.
@@ -309,6 +359,7 @@ defmodule Fluffy.PhoenixTest do
   @spec assert_path(session(), String.t(), keyword()) :: session()
   def assert_path(session, path, options \\ []), do: execute(session, path_expectation(path, options), false)
 
+  @doc group: "Assertions"
   @doc "Negates the combined path and optional query expectation."
   @spec refute_path(session(), String.t(), keyword()) :: session()
   def refute_path(session, path, options \\ []), do: execute(session, path_expectation(path, options), true)
