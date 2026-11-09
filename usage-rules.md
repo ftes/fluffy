@@ -4,9 +4,9 @@ Fluffy runs Phoenix feature tests through one Playwright-shaped API, in-process 
 
 ## Setup
 
-- `config :fluffy, endpoint: MyAppWeb.Endpoint` in `config/test.exs`. With Ecto, also `config :fluffy, ecto_repos: [MyApp.Repo]` and the sandbox plug and mount hook from `docs/installation.md`.
+- `config :fluffy, endpoint: MyAppWeb.Endpoint` in `config/test.exs`. With Ecto, also `config :fluffy, ecto_repos: [MyApp.Repo]` and the sandbox plug and mount hook from `docs/installation.md`, behind an `Application.compile_env` flag because Fluffy exists only in the test environment.
 - Call `Fluffy.Test.setup(context)` exactly once per test, with or without Ecto, ideally in a shared case module.
-- Browser tests need `server: true` on the endpoint, a `config :fluffy, playwright: [...]` block and `MIX_ENV=test mix playwright_ex.install -- chromium`. `MIX_ENV=test` is required because the driver arrives through a test-only dependency.
+- Browser tests need `server: true` and `check_origin: false` on the endpoint, a `config :fluffy, playwright: [...]` block and `MIX_ENV=test mix playwright_ex.install -- chromium`. `MIX_ENV=test` is required because the driver arrives through a test-only dependency.
 
 ## Choosing an API and a backend
 

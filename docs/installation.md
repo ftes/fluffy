@@ -26,13 +26,16 @@ configured with `port: 0`:
 ```elixir
 config :fluffy, endpoint: MyAppWeb.Endpoint
 
-config :my_app, MyAppWeb.Endpoint, server: true
+config :my_app, MyAppWeb.Endpoint, server: true, check_origin: false
 ```
 
-The server is required for Playwright tests. If Playwright targets an
-application hosted elsewhere, configure `config :fluffy, base_url: "..."`
-instead. Explicit `endpoint:` and `base_url:` session options override the
-global values for multi-endpoint or dynamic-server tests.
+The server is required for Playwright tests. The browser opens the listener's
+address, such as `127.0.0.1`, which a stock `localhost` endpoint URL does not
+match, so `check_origin: false` lets the LiveView socket connect. If Playwright
+targets an application hosted elsewhere, configure
+`config :fluffy, base_url: "..."` instead. Explicit `endpoint:` and `base_url:`
+session options override the global values for multi-endpoint or dynamic-server
+tests.
 
 The application's normal browser bundle must connect its LiveSocket. See
 [Actionability checks and waiting](usage.md#actionability-checks-and-waiting)
@@ -100,26 +103,53 @@ input for all of a browser's pages in one queue and times out under load, so set
 
 ## Ecto sandbox
 
-Add the standard Phoenix Ecto sandbox plug before the rest of the endpoint and
-expose request headers to the LiveView socket:
+Fluffy is a test-only dependency, so application code that names it must compile
+only for tests. As `Phoenix.Ecto.SQL.Sandbox` recommends, enable a flag in
+`config/test.exs`:
 
 ```elixir
-plug(Phoenix.Ecto.SQL.Sandbox,
-  header: Fluffy.Sandbox.header(),
-  sandbox: Fluffy.Sandbox.allowance()
-)
-
-socket("/live", Phoenix.LiveView.Socket,
-  websocket: [
-    connect_info: [Fluffy.Sandbox.connect_info(), session: @session_options]
-  ]
-)
+config :my_app, sql_sandbox: true
 ```
 
-Add the Fluffy mount hook before application hooks:
+Add the sandbox plug before the rest of the endpoint and expose request headers
+to the LiveView socket:
 
 ```elixir
-live_session :test, on_mount: Fluffy.Sandbox do
+if Application.compile_env(:my_app, :sql_sandbox) do
+  plug Phoenix.Ecto.SQL.Sandbox,
+    header: Fluffy.Sandbox.header(),
+    sandbox: Fluffy.Sandbox.allowance()
+end
+
+socket "/live", Phoenix.LiveView.Socket,
+  websocket: [connect_info: [:x_headers, session: @session_options]]
+```
+
+Run the Fluffy mount hook for every LiveView from `live_view/0` in
+`my_app_web.ex`:
+
+```elixir
+def live_view do
+  quote do
+    use Phoenix.LiveView
+
+    if Application.compile_env(:my_app, :sql_sandbox) do
+      on_mount Fluffy.Sandbox
+    end
+
+    # ...
+  end
+end
+```
+
+That hook runs after `live_session` hooks. If those use the database, as
+authentication hooks do, also add it ahead of them in the router:
+
+```elixir
+live_session :require_authenticated_user,
+  on_mount:
+    if(Application.compile_env(:my_app, :sql_sandbox), do: [Fluffy.Sandbox], else: []) ++
+      [{MyAppWeb.UserAuth, :ensure_authenticated}] do
   # routes
 end
 ```
@@ -167,17 +197,17 @@ Phoenix Ecto's `{module, function, extra_arguments}` form. For example:
 ```elixir
 defmodule MyApp.TestSandbox do
   def allow(repo, owner, child) do
-    :ok = Ecto.Adapters.SQL.Sandbox.allow(repo, owner, child)
+    Ecto.Adapters.SQL.Sandbox.allow(repo, owner, child)
     MyApp.Mocks.allow(owner, child)
   end
 end
 ```
 
-Fluffy validates this configuration when its application starts. The same header and
-allowance value must be passed to the endpoint plug, and `Fluffy.Sandbox.connect_info/0`
-selects `:user_agent` or `:x_headers` for the socket. An application may instead retain
-its own LiveView/channel hook when additional ownership rules require application state;
-use the same encoded metadata and call `Phoenix.Ecto.SQL.Sandbox.allow/2` there.
+Fluffy validates this configuration when its application starts. With the
+`user-agent` header, list `:user_agent` in the socket's `connect_info` in place of
+`:x_headers`. An application may instead retain its own LiveView/channel hook when
+additional ownership rules require application state; use the same encoded metadata
+and call `Phoenix.Ecto.SQL.Sandbox.allow/2` there.
 
 ## Upload limits
 
