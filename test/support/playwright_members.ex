@@ -94,17 +94,17 @@ defmodule Fluffy.PlaywrightMembers do
         expect([
           {~w(to_have_count to_be_visible to_be_disabled to_be_editable to_be_enabled to_be_focused to_be_checked
               to_have_value to_have_values to_have_text to_contain_text to_have_attribute to_have_class
-              to_contain_class to_have_id to_be_attached to_be_hidden to_be_empty)a, :wrapped},
+              to_contain_class to_have_id to_be_attached to_be_hidden to_be_empty to_be_in_viewport)a, :wrapped},
           {[:to_have_title], {:renamed, {Fluffy.Expect, :page_to_have_title, 2}}},
           {[:to_have_url], {:renamed, {Fluffy.Expect, :page_to_have_url, 2}}},
-          {~w(to_have_role to_have_accessible_name to_have_accessible_description to_have_accessible_error_message to_have_css to_be_in_viewport
+          {~w(to_have_role to_have_accessible_name to_have_accessible_description to_have_accessible_error_message to_have_css
               to_have_js_property to_match_aria_snapshot to_have_screenshot)a, @native_expect},
           {[:to_be_ok], {:na, "APIResponse assertion"}}
         ]),
       PlaywrightEx.Page =>
         [
           {~w(reload go_back go_forward url opener evaluate screenshot on once off)a, :wrapped},
-          {~w(set_viewport_size emulate_media)a, :wrapped},
+          {~w(set_viewport_size emulate_media wait_for_function)a, :wrapped},
           {[:keyboard], {:renamed, {Keyboard, :press, 3}}},
           {[:mouse], {:renamed, {Mouse, :click, 4}}},
           {[:goto], {:renamed, {Fluffy, :visit, 2}}},
@@ -128,7 +128,7 @@ defmodule Fluffy.PlaywrightMembers do
           {~w(route unroute)a, :wrapped},
           {~w(viewport_size unroute_all route_from_har route_web_socket touchscreen aria_snapshot
               aria_snapshot_json add_locator_handler remove_locator_handler)a, @page_gap},
-          {~w(wait_for_load_state wait_for_url wait_for_function content add_init_script add_script_tag
+          {~w(wait_for_load_state wait_for_url content add_init_script add_script_tag
               add_style_tag expose_binding expose_function set_extra_http_headers console_messages
               clear_console_messages page_errors clear_page_errors requests workers context main_frame frame
               frames local_storage session_storage request bring_to_front pdf coverage video screencast
@@ -159,7 +159,7 @@ defmodule Fluffy.PlaywrightMembers do
           {~w(first last nth)a, {:na, "select the iframe on the owner: owner |> first() |> content_frame()"}}
         ] ++ by(3),
       PlaywrightEx.BrowserContext => [
-        {~w(add_cookies cookies clear_cookies storage_state new_page pages)a, :wrapped},
+        {~w(add_cookies cookies clear_cookies storage_state new_page pages add_init_script)a, :wrapped},
         {[:tracing], {:renamed, {Fluffy.Playwright, :trace, 2}}},
         {[:on], {:renamed, {Fluffy, :on, 4}}},
         {[:once], {:renamed, {Fluffy, :once, 4}}},
@@ -174,7 +174,7 @@ defmodule Fluffy.PlaywrightMembers do
         {~w(route unroute)a, :wrapped},
         {~w(unroute_all route_from_har route_web_socket)a,
          {:unwrap, "gap: on PlaywrightEx.Page.context/1 inside Fluffy.unwrap/2"}},
-        {~w(set_extra_http_headers set_storage_state add_init_script expose_binding expose_function clock browser
+        {~w(set_extra_http_headers set_storage_state expose_binding expose_function clock browser
             background_pages service_workers new_cdp_session credentials debugger request is_closed
             prepend_listener)a, {:unwrap, "on PlaywrightEx.Page.context/1 inside Fluffy.unwrap/2"}},
         {[:close], {:denied, "the session owns its context; use Fluffy.close_session/1"}},

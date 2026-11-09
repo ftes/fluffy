@@ -23,6 +23,13 @@ defmodule Fluffy.Driver.PhoenixValidation do
         detail: "focus state requires a browser"
     end
 
+    if expectation.kind == :in_viewport do
+      raise CapabilityError,
+        capability: :computed_browser_semantics,
+        driver: driver,
+        detail: "viewport intersection requires a browser"
+    end
+
     if expectation.kind == :checked and expectation.expected == :indeterminate do
       raise CapabilityError,
         capability: :indeterminate_checked_state,

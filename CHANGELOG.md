@@ -5,6 +5,9 @@
 ### Added
 
 - `by_role` on Phoenix knows Playwright's implicit roles for everything markup can decide, landmarks included: `article`, `banner`, `complementary`, `contentinfo`, `form`, `main`, `navigation`, `region` and `search`, plus the likes of `paragraph`, `group`, `dialog`, `searchbox` and `status`. The usage guide has the full list.
+- `Fluffy.Expect.to_be_in_viewport/2` and `Fluffy.Assert.in_viewport/2`, with `ratio:` from 0 to 1, for Playwright; Phoenix raises `Fluffy.CapabilityError`.
+- `Fluffy.Playwright.add_init_script/3` runs a script in every later document of the session's browser context.
+- `Fluffy.Playwright.wait_for_function/4` waits on the active page and returns the session, within the session's `timeout:` unless `timeout:` is given.
 
 ### Changed
 

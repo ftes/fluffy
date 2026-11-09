@@ -224,7 +224,7 @@ defmodule Fluffy.Backend.Playwright.Document do
 
   # A wait returns a handle to its truthy result, which lives as long as the
   # document unless disposed. Nothing awaits the dispose.
-  defp release(handle) do
+  def release(handle) do
     {:ok, _pid} = Task.Supervisor.start_child(Fluffy.TaskSupervisor, fn -> JSHandle.dispose(handle) end)
     :ok
   end

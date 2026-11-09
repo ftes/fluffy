@@ -45,6 +45,7 @@ defmodule Fluffy.Expect do
           | :focused
           | :hidden
           | :id
+          | :in_viewport
           | :opener
           | :text
           | :title
@@ -70,6 +71,8 @@ defmodule Fluffy.Expect do
   @type to_be_editable_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_be_editable)))
   @type to_be_enabled_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_be_enabled)))
   @type to_be_focused_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_be_focused)))
+  @type to_be_in_viewport_option ::
+          unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_be_in_viewport)))
   @type to_be_checked_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_be_checked)))
   @type to_have_value_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_have_value)))
   @type to_have_values_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_have_values)))
@@ -203,6 +206,22 @@ defmodule Fluffy.Expect do
   @spec to_be_focused(Locator.t(), [to_be_focused_option()]) :: t()
   def to_be_focused(%Locator{} = locator, options \\ []) do
     native_expectation(:to_be_focused, {:locator, locator}, :focused, true, options)
+  end
+
+  @doc group: "Locator assertions"
+  @doc playwright_only: true
+  @doc """
+  Asserts that the target intersects the viewport. Requires Playwright, including when negated.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.expectation_schema(:to_be_in_viewport))}
+  """
+  @spec to_be_in_viewport(Locator.t(), [to_be_in_viewport_option()]) :: t()
+  def to_be_in_viewport(%Locator{} = locator, options \\ []) do
+    options = Options.validate_expectation!(:to_be_in_viewport, options)
+    {matching, options} = Keyword.split(options, [:ratio])
+    Internal.new({:locator, locator}, :in_viewport, matching, options)
   end
 
   @doc group: "Locator assertions"

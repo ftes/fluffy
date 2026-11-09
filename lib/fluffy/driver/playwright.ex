@@ -120,6 +120,7 @@ defmodule Fluffy.Driver.Playwright do
   defp locator_assertion(:text, {expected, options}), do: {:to_have_text, [expected], options}
   defp locator_assertion(:contain_text, {expected, options}), do: {:to_contain_text, [expected], options}
   defp locator_assertion(:attribute, {name, value, options}), do: {:to_have_attribute, [name, value], options}
+  defp locator_assertion(:in_viewport, options), do: {:to_be_in_viewport, [], options}
 
   defp locator_assertion(kind, _expected) when is_map_key(@state_assertions, kind),
     do: {Map.fetch!(@state_assertions, kind), [], []}
@@ -412,21 +413,39 @@ defmodule Fluffy.Driver.Playwright do
   end
 
   # Page-wide input and emulation have no timeout of their own and wait while a
-  # script blocks the page. Unlike a locator action, Playwright does not wait for
-  # a navigation the input starts, which may commit after this returns; the
-  # next call adopts it then.
-  def page_action(%Session{} = session, operation, fun, options) do
+  # script blocks the page, so this bound is what ends them. Unlike a locator
+  # action, Playwright does not wait for a navigation the input starts, which may
+  # commit after this returns; the next call adopts it then.
+  def page_action(%Session{} = session, operation, fun, options),
+    do: run_page_action(session, operation, fun, options, :action)
+
+  # A wait does not close its own page, so a page closing under it is a failure.
+  # `fun` gets the native options, with the timeout, and may return a handle.
+  def page_wait(%Session{} = session, operation, fun, options) do
+    native = Keyword.put(options, :timeout, Session.timeout(session, options))
+    wait = fn page -> with {:ok, handle} <- fun.(page, native), do: Document.release(handle) end
+    run_page_action(session, operation, wait, options, :wait)
+  end
+
+  defp run_page_action(session, operation, fun, options, kind) do
     page = Session.page_state(session).page
 
-    action(session, operation, nil, options, fn remaining ->
-      case Bounded.within(remaining, fn -> fun.(page) end) do
-        {:ok, result} ->
-          result
+    action(
+      session,
+      operation,
+      nil,
+      options,
+      fn remaining ->
+        case Bounded.within(remaining, fn -> fun.(page) end) do
+          {:ok, result} ->
+            result
 
-        :timeout ->
-          {:error, %TimeoutError{message: "Timeout #{remaining}ms exceeded during #{operation}"}}
-      end
-    end)
+          :timeout ->
+            {:error, %TimeoutError{message: "Timeout #{remaining}ms exceeded during #{operation}"}}
+        end
+      end,
+      kind
+    )
   end
 
   @impl true
@@ -489,10 +508,10 @@ defmodule Fluffy.Driver.Playwright do
     action(session, operation, locator, options, &fun.(native, &1))
   end
 
-  defp action(session, operation, target, options, fun) do
+  defp action(session, operation, target, options, fun, kind \\ :action) do
     timeout = Session.timeout(session, options)
 
-    case navigation_aware_action(session, timeout, &result(fun.(&1))) do
+    case navigation_aware_action(session, timeout, &result(fun.(&1)), kind) do
       {:ok, _value, outcome} -> outcome
       {:error, error} -> OperationFailure.raise_playwright!(operation, target, error)
     end
@@ -501,7 +520,7 @@ defmodule Fluffy.Driver.Playwright do
   defp result(:ok), do: {:ok, :ok}
   defp result(result), do: result
 
-  defp navigation_aware_action(session, operation_timeout, action) do
+  defp navigation_aware_action(session, operation_timeout, action, kind \\ :action) do
     # Browser bookkeeping has its own budget; it must not consume a short
     # action/assertion timeout or silently leave navigation state stale.
     {session, before} = prepare_document(session)
@@ -517,7 +536,7 @@ defmodule Fluffy.Driver.Playwright do
       # Playwright intends an action that closes its own page to succeed, but
       # Firefox can fail it. The page was open before the action.
       {:error, %TargetClosedError{} = error} ->
-        if closed_own_page?(browser_context, state.page, bookkeeping_timeout),
+        if kind == :action and closed_own_page?(browser_context, state.page, bookkeeping_timeout),
           do: {:ok, nil, session},
           else: {:error, error}
 

@@ -217,7 +217,8 @@ fails when PlaywrightEx adds or removes one.
   `select_text`, `scroll_into_view_if_needed`, `set_viewport_size`, `emulate_media`,
   the expectations in `Fluffy.Expect`, navigation, page management, cookies,
   storage state, permissions, geolocation, offline mode, HTTP credentials, request
-  routing, tracing, page and element screenshots, page evaluation, the clock in
+  routing, tracing, page and element screenshots, page evaluation, init scripts,
+  `wait_for_function` on the page, the clock in
   `Fluffy.Playwright.Clock`, keyboard and mouse input in `Fluffy.Playwright.Keyboard`
   and `Fluffy.Playwright.Mouse`, the events in `Fluffy.Event`, and the values they
   deliver, including response bodies. Their options pass through as documented.
