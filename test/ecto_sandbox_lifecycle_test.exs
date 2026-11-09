@@ -4,6 +4,7 @@ defmodule Fluffy.EctoSandboxLifecycleTest do
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
+  import Fluffy.TestCase, only: [monitor_running: 1]
 
   alias Fluffy.TestRepo
   alias Fluffy.TestRepoTwo
@@ -69,7 +70,7 @@ defmodule Fluffy.EctoSandboxLifecycleTest do
       )
 
     browser_context = Fluffy.Session.context(session).browser_context
-    scope_reference = Process.monitor(scope)
+    scope_reference = monitor_running(scope)
     Process.exit(owner, :kill)
 
     assert_receive {:DOWN, ^scope_reference, :process, ^scope, {:shutdown, {:sandbox_owner_down, :killed}}},
@@ -89,11 +90,11 @@ defmodule Fluffy.EctoSandboxLifecycleTest do
       )
 
     {_scope, runtime, _header} = TestScope.attach_session(scope)
-    live_view = spawn(fn -> Process.sleep(:infinity) end)
+    {:ok, live_view} = Agent.start(fn -> nil end)
     :ok = Fluffy.Backend.Phoenix.register_process(runtime, :live_view, live_view, 100)
 
-    owner_reference = Process.monitor(owner)
-    view_reference = Process.monitor(live_view)
+    owner_reference = monitor_running(owner)
+    view_reference = monitor_running(live_view)
     Supervisor.stop(supervisor)
 
     assert_receive {:DOWN, ^view_reference, :process, ^live_view, :shutdown}, 1_000

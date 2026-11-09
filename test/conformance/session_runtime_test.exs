@@ -181,7 +181,7 @@ defmodule Fluffy.Conformance.SessionRuntimeTest do
   test "native context closure closes the session runtime" do
     session = start_session(:playwright)
     runtime = session.runtime
-    monitor = Process.monitor(runtime)
+    monitor = monitor_running(runtime)
 
     assert :ok = PlaywrightEx.BrowserContext.close(Session.context(session).browser_context)
 
@@ -207,7 +207,7 @@ defmodule Fluffy.Conformance.SessionRuntimeTest do
 
       assert_receive {:started, runtime, browser_context}, 5_000
       assert browser_context.guid in context_guids()
-      monitor = Process.monitor(runtime)
+      monitor = monitor_running(runtime)
       send(owner, unquote(exit))
       assert_receive {:DOWN, ^monitor, :process, ^runtime, :normal}, 5_000
       refute browser_context.guid in context_guids()

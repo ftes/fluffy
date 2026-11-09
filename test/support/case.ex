@@ -5,7 +5,7 @@ defmodule Fluffy.TestCase do
 
   using do
     quote do
-      import Fluffy.TestCase, only: [assert_action_error: 4, playwright_engine?: 1]
+      import Fluffy.TestCase, only: [assert_action_error: 4, monitor_running: 1, playwright_engine?: 1]
     end
   end
 
@@ -14,6 +14,15 @@ defmodule Fluffy.TestCase do
   # included) in the app and fail at boot whenever it differs.
   def playwright_engine?(engine),
     do: engine == Keyword.get(Application.fetch_env!(:fluffy, :playwright), :engine, :chromium)
+
+  # Signals from different processes have no order, so an exit a test triggers through
+  # another process can reach `pid` before the monitor, which then reports :noproc. A
+  # request from this process is handled after its monitor, so that is in place on return.
+  def monitor_running(pid) do
+    monitor = Process.monitor(pid)
+    :sys.get_state(pid)
+    monitor
+  end
 
   def assert_action_error(session, structural_exception, structural_message, action) do
     error = ExUnit.Assertions.assert_raise(Fluffy.OperationError, action)

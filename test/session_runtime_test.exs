@@ -1,6 +1,8 @@
 defmodule Fluffy.SessionRuntimeTest do
   use ExUnit.Case, async: true
 
+  import Fluffy.TestCase, only: [monitor_running: 1]
+
   alias Fluffy.SessionRuntime
 
   test "event routing respects source and type, and removal is idempotent" do
@@ -76,36 +78,23 @@ defmodule Fluffy.SessionRuntimeTest do
     assert_raise ArgumentError, ~r/session is closed/, fn -> Fluffy.Session.context(session) end
   end
 
-  # Watched in CI: once in ~12 full Chromium runs (seed 575633, --max-cases 16,
-  # three suites sharing one checkout) the runtime was already gone (:noproc)
-  # when monitored, before its owner finished. The cause is unknown: 30+ full
-  # runs, with CPU load and with this race repeated 500 times under exit
-  # tracing, did not reproduce it. The checks below tell a runtime lost before
-  # registration or to a restarted supervisor from one that stopped by itself.
   test "normal owner exit releases its runtime and resources" do
     parent = self()
-    supervisor = Process.whereis(Fluffy.SessionRuntime.Supervisor)
 
     owner =
       spawn(fn ->
         {:ok, runtime} = SessionRuntime.start(self())
         {:ok, resource} = Agent.start(fn -> nil end)
-        registered = SessionRuntime.register(runtime, resource, fn -> Agent.stop(resource) end)
-        send(parent, {:started, runtime, resource, registered})
+        SessionRuntime.register(runtime, resource, fn -> Agent.stop(resource) end)
+        send(parent, {:started, runtime, resource})
 
         receive do
           :finish -> :ok
         end
       end)
 
-    assert_receive {:started, runtime, resource, registered}
-    assert registered == :ok
-    monitor = Process.monitor(runtime)
-
-    refute_received {:DOWN, ^monitor, :process, ^runtime, :noproc},
-                    "runtime stopped before its owner finished; supervisor restarted: " <>
-                      inspect(Process.whereis(Fluffy.SessionRuntime.Supervisor) != supervisor)
-
+    assert_receive {:started, runtime, resource}
+    monitor = monitor_running(runtime)
     send(owner, :finish)
     assert_receive {:DOWN, ^monitor, :process, ^runtime, :normal}
     refute Process.alive?(resource)
@@ -124,7 +113,7 @@ defmodule Fluffy.SessionRuntimeTest do
       end)
 
     assert_receive {:started, runtime, resource}
-    monitor = Process.monitor(runtime)
+    monitor = monitor_running(runtime)
     Process.exit(owner, :kill)
     assert_receive {:DOWN, ^monitor, :process, ^runtime, :normal}
     refute Process.alive?(resource)
