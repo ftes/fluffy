@@ -74,6 +74,7 @@ defmodule Fluffy.TestWeb.Router do
       live("/no-content", NoContentLive)
       live("/clock", ClockLive)
       live("/expectations", ExpectationsLive)
+      live("/facade-locators/:markup", FacadeLocatorsLive)
     end
   end
 

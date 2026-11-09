@@ -8,6 +8,12 @@
 - `Fluffy.Expect.to_be_in_viewport/2` and `Fluffy.Assert.in_viewport/2`, with `ratio:` from 0 to 1, for Playwright; Phoenix raises `Fluffy.CapabilityError`.
 - `Fluffy.Playwright.add_init_script/3` runs a script in every later document of the session's browser context.
 - `Fluffy.Playwright.wait_for_function/4` waits on the active page and returns the session, within the session's `timeout:` unless `timeout:` is given.
+- The facade's `assert_has` and `refute_has` accept a `%Fluffy.Locator{}` with the same options as a selector, inside the current `within/3` scope.
+
+### Fixed
+
+- Static and LiveView chained locators, `filter(has:)` and `within/3` search descendants only, as on Playwright, so a scoped locator no longer matches its own parent. `by_text` under a parent still matches the parent, as on Playwright. A Phoenix test that relied on matching the parent must drop the scope.
+- The facade's `submit/2` resolves a `%Fluffy.Locator{}` inside the current `within/3` scope instead of the whole page.
 
 ### Changed
 

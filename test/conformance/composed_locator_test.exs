@@ -7,6 +7,46 @@ defmodule Fluffy.Conformance.ComposedLocatorTest do
 
   for driver <- [:static, :playwright] do
     @tag driver: driver
+    test "by_label reads labels outside its parent with #{driver}" do
+      unquote(driver)
+      |> session_for_html("""
+      <label for="email">Email</label>
+      <span id="name-label">Name</span>
+      <section id="form"><input id="email"><input aria-labelledby="name-label"></section>
+      <section id="other"><input id="unlabelled"></section>
+      """)
+      |> expect(to_have_count(by_label(by_css("#form"), "Email"), 1))
+      |> expect(to_have_count(by_label(by_css("#form"), "Name"), 1))
+      |> expect(to_have_count(by_label(by_css("#other"), "Email"), 0))
+      |> expect(to_have_attribute(filter(by_css("section"), has: by_label("Email")), "id", "form"))
+    end
+
+    @tag driver: driver
+    test "a chained locator searches its parent's descendants only with #{driver}" do
+      outer = by_css("#outer")
+      boxes = by_css(".box")
+
+      unquote(driver)
+      |> session_for_html("""
+      <div id="outer" class="box" role="region" aria-label="Area" title="Hint" data-testid="area">
+        <div id="inner" class="box"><p>Shared</p></div>
+      </div>
+      """)
+      |> expect(to_have_count(by_css(outer, "#outer"), 0))
+      |> expect(to_have_count(by_css(outer, ".box"), 1))
+      |> expect(outer |> by_css(".box") |> first() |> to_have_attribute("id", "inner"))
+      |> expect(to_have_count(by_role(outer, :region), 0))
+      |> expect(to_have_count(by_title(outer, "Hint"), 0))
+      |> expect(to_have_count(by_test_id(outer, "area"), 0))
+      |> expect(to_have_count(by_text(by_css("p"), "Shared"), 1))
+      |> expect(to_have_count(by_css(boxes, "p"), 1))
+      |> expect(to_have_count(filter(boxes, has: by_css(".box")), 1))
+      |> expect(to_have_attribute(filter(boxes, has: by_css(".box")), "id", "outer"))
+    end
+  end
+
+  for driver <- [:static, :playwright] do
+    @tag driver: driver
     test "intersections and unions use current checked state on either side with #{driver}", %{driver: driver} do
       driver
       |> session_for_html("""

@@ -7,6 +7,117 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
   alias Fluffy.Locator
   alias Fluffy.PhoenixTest.Session
   alias Fluffy.TestWeb.Endpoint
+  alias Fluffy.TestWeb.FacadeLocatorsLive
+
+  for driver <- [:static, :live, :playwright] do
+    @tag driver: driver
+    test "assert_has and refute_has take a locator with the selector's options with #{driver}" do
+      field = ".field" |> Locator.by_css() |> Locator.filter(has: Locator.by_label("Email"))
+
+      unquote(driver)
+      |> locators_session("fields")
+      |> assert_has(field)
+      |> assert_has(field, "Hint one")
+      |> assert_has(field, text: "Hint one", exact: false, count: 1)
+      |> assert_has(Locator.by_css(".field"), count: 2)
+      |> assert_has(Locator.by_css(".field"), "Hint two", at: 2)
+      |> assert_has(Locator.by_css("input"), at: 1, value: "a@b")
+      |> assert_has(Locator.by_css("input"), label: "Phone", value: "", timeout: 1_000)
+      |> refute_has(field, "Hint two")
+      |> refute_has(Locator.by_css("#missing"))
+      |> refute_has(Locator.by_css("p"))
+      |> refute_has(Locator.by_css("p"), count: 0)
+    end
+
+    @tag driver: driver
+    test "assert_has and refute_has resolve a locator inside a within scope with #{driver}" do
+      session = locators_session(unquote(driver), "scopes")
+
+      inside = Locator.by_css(".in")
+      outside = Locator.by_css(".out")
+
+      session
+      |> assert_has(outside)
+      |> within("#one", fn scoped ->
+        scoped
+        |> assert_has(inside, "Inside")
+        |> refute_has(outside)
+        |> assert_has(outside, count: 0)
+        |> assert_has(Locator.by_css("p"), count: 1)
+        |> assert_has(Locator.or_(inside, outside), count: 1)
+        |> assert_has(Locator.and_(Locator.by_css("p"), inside), count: 1)
+        |> within("#inner", &assert_has(&1, Locator.by_css("p"), count: 1))
+      end)
+    end
+
+    @tag driver: driver
+    test "a within scope does not match its own root with #{driver}" do
+      unquote(driver)
+      |> locators_session("scopes")
+      |> within("#one", fn scoped ->
+        scoped
+        |> assert_has("#one", count: 0)
+        |> assert_has(Locator.by_css("#one"), count: 0)
+        |> assert_has(Locator.by_css(Locator.by_css("#inner"), "#inner"), count: 0)
+        |> assert_has("#inner", count: 1)
+      end)
+    end
+
+    @tag driver: driver
+    test "assert_has and submit reject a selector of another type with #{driver}" do
+      session = locators_session(unquote(driver), "scopes")
+
+      assert_raise ArgumentError, ~r/selector: must be a string or a Fluffy.Locator, got: :oops/, fn ->
+        assert_has(session, :oops)
+      end
+
+      assert_raise ArgumentError, ~r/selector: must be a string or a Fluffy.Locator, got: :oops/, fn ->
+        submit(session, :oops)
+      end
+    end
+  end
+
+  @tag driver: :live
+  test "submit resolves a locator inside a within scope with live" do
+    :live
+    |> locators_session("forms")
+    |> within("#two", &submit(&1, Locator.by_css("form")))
+    |> assert_has("#saved", text: "Saved two")
+  end
+
+  @tag driver: :live
+  test "submit keeps a form tracked outside the scope it is submitted from with live" do
+    :live
+    |> locators_session("tracked")
+    |> fill_in("One", with: "typed")
+    |> within("#two", &submit/1)
+    |> assert_has("#saved", text: "Saved typed")
+  end
+
+  @tag driver: :playwright
+  test "within/3 rejects a frame locator combined with a composed operand" do
+    frame = Locator.frame_locator("iframe")
+    field = Locator.by_css(frame, "input")
+
+    :playwright
+    |> Fluffy.session_for_html(
+      ~s(<section id="one"><iframe srcdoc="<label>Email <input value='a'></label>"></iframe></section>)
+    )
+    |> within("#one", fn scoped ->
+      for {locator, options} <- [
+            {Locator.and_(field, Locator.by_css("input")), []},
+            {Locator.or_(field, Locator.by_css(".absent")), []},
+            {Locator.filter(field, has_not: Locator.by_css(".absent")), []},
+            {field, [label: "Email"]}
+          ] do
+        assert_raise ArgumentError, ~r/within\/3 cannot scope a frame locator/, fn ->
+          refute_has(scoped, locator, options)
+        end
+      end
+
+      assert_has(scoped, field, count: 1)
+    end)
+  end
 
   for driver <- [:static, :playwright] do
     @tag driver: driver
@@ -411,6 +522,57 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
       |> assert_path(Fluffy.TestHTTPFixtures.path(fixture), query_params: %{choice: "none"})
       |> click_link("a", "None", exact: true)
       |> assert_path(Fluffy.TestHTTPFixtures.path(fixture), query_params: %{choice: "none"})
+    end
+
+    @tag driver: driver
+    test "submit resolves a locator inside a within scope with #{driver}" do
+      fixture =
+        Fluffy.TestHTTPFixtures.register_sequence([
+          %{
+            body: """
+            <html><body>
+              <section id="one"><form method="post"><input name="choice" value="one" aria-label="One"></form></section>
+              <section id="two"><form method="post"><input name="choice" value="two" aria-label="Two"></form></section>
+            </body></html>
+            """
+          },
+          %{body: "<html><body><p>Saved</p></body></html>"}
+        ])
+
+      unquote(driver)
+      |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+      |> visit(Fluffy.TestHTTPFixtures.path(fixture, "/start"))
+      |> within("#two", &submit(&1, Locator.by_css("form")))
+      |> assert_has("p", text: "Saved")
+
+      [_source, submission] = Fluffy.TestHTTPFixtures.requests(fixture)
+      assert URI.decode_query(submission.body) == %{"choice" => "two"}
+    end
+
+    @tag driver: driver
+    test "submit keeps a form tracked outside the scope it is submitted from with #{driver}" do
+      fixture =
+        Fluffy.TestHTTPFixtures.register_sequence([
+          %{
+            body: """
+            <html><body>
+              <section id="one"><form method="post"><input name="choice" aria-label="One"></form></section>
+              <section id="two"></section>
+            </body></html>
+            """
+          },
+          %{body: "<html><body><p>Saved</p></body></html>"}
+        ])
+
+      unquote(driver)
+      |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+      |> visit(Fluffy.TestHTTPFixtures.path(fixture, "/start"))
+      |> fill_in("One", with: "typed")
+      |> within("#two", &submit/1)
+      |> assert_has("p", text: "Saved")
+
+      [_source, submission] = Fluffy.TestHTTPFixtures.requests(fixture)
+      assert URI.decode_query(submission.body) == %{"choice" => "typed"}
     end
 
     @tag driver: driver
@@ -897,4 +1059,12 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
       assert_raise ArgumentError, message, fun
     end
   end
+
+  defp locators_session(:live, markup) do
+    :phoenix
+    |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+    |> visit("/live/facade-locators/#{markup}")
+  end
+
+  defp locators_session(driver, markup), do: Fluffy.session_for_html(driver, FacadeLocatorsLive.markup(markup))
 end

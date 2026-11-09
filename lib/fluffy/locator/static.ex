@@ -7,32 +7,52 @@ defmodule Fluffy.Locator.Static do
 
   @labelled_control_selector Enum.join(Semantics.labelable_tags(), ", ")
 
+  # Operations that search inside each candidate. As in Playwright's chains, they
+  # find descendants only, except that its text engine also matches the scope itself.
+  @descendant_queries [:css, :attribute, :test_id]
+
   def resolve(document, %Locator{} = locator), do: resolve(Aria.for_document(document), document, locator)
 
   # For a document built for one query, which must not evict the real document's model.
   def resolve_uncached(document, %Locator{} = locator), do: resolve(Aria.new(document), document, locator)
 
-  # `scope` is what the locator starts from; `aria` models the whole page, which
-  # role and accessible-name computation looks across regardless of the scope.
-  defp resolve(aria, scope, %Locator{} = locator) do
-    Enum.reduce(locator.operations, [scope], fn
+  # `root` is what the locator starts from; `aria` models the whole page, which
+  # role, name and label computation looks across regardless of it.
+  defp resolve(aria, root, %Locator{} = locator) do
+    Enum.reduce(locator.operations, [root], fn
       {:and, right}, candidates ->
-        matches = aria |> resolve(scope, right) |> MapSet.new(&LazyHTML.css_path/1)
+        matches = aria |> resolve(root, right) |> MapSet.new(&LazyHTML.css_path/1)
         Enum.filter(candidates, &MapSet.member?(matches, LazyHTML.css_path(&1)))
 
       {:or, right}, candidates ->
-        matches = MapSet.new(candidates ++ resolve(aria, scope, right), &LazyHTML.css_path/1)
-        scope |> LazyHTML.query("*") |> Enum.filter(&MapSet.member?(matches, LazyHTML.css_path(&1)))
+        matches = MapSet.new(candidates ++ resolve(aria, root, right), &LazyHTML.css_path/1)
+        root |> LazyHTML.query("*") |> Enum.filter(&MapSet.member?(matches, LazyHTML.css_path(&1)))
 
       {:role, role, options}, candidates ->
         role_matches(candidates, aria, role, options)
 
+      {:label, text, options}, candidates ->
+        label_matches(candidates, aria, text, options)
+
       {:filter, options}, candidates ->
         filter_candidates(candidates, aria, options)
+
+      operation, candidates when elem(operation, 0) in @descendant_queries ->
+        candidates
+        |> Enum.flat_map(&(operation |> apply_operation([&1]) |> without_scope(&1, aria.index.document)))
+        |> Enum.uniq_by(&LazyHTML.css_path/1)
 
       operation, candidates ->
         apply_operation(operation, candidates)
     end)
+  end
+
+  # Only the document, at the top of a query, can match itself.
+  defp without_scope(matches, document, document), do: matches
+
+  defp without_scope(matches, scope, _document) do
+    path = LazyHTML.css_path(scope)
+    Enum.reject(matches, &(LazyHTML.css_path(&1) == path))
   end
 
   def structurally_visible?(%Aria{} = aria, element), do: Aria.rendered?(aria, Aria.node_for(aria, element))
@@ -55,14 +75,6 @@ defmodule Fluffy.Locator.Static do
       |> Enum.drop(1)
       |> Enum.any?(&element_text_matches?(&1, text, exact?))
     end)
-  end
-
-  defp apply_operation({:label, text, options}, scopes) do
-    exact? = Keyword.get(options, :exact, false)
-
-    scopes
-    |> Enum.flat_map(&labelled_controls(&1, text, exact?))
-    |> Enum.uniq()
   end
 
   defp apply_operation({:attribute, attribute_name, text, options}, scopes) do
@@ -109,14 +121,33 @@ defmodule Fluffy.Locator.Static do
     exact? = Keyword.get(options, :exact, false)
 
     scopes
-    |> Enum.flat_map(&Aria.scoped_nodes(aria, &1))
-    |> Enum.uniq_by(fn {node, _element} -> node.id end)
-    |> Enum.sort_by(fn {node, _element} -> node.id end)
+    |> scoped_nodes(aria)
     |> Enum.filter(fn {node, _element} ->
       Aria.role(aria, node) == role and not Aria.hidden?(aria, node) and
         accessible_name_matches?(aria, node, expected_name, exact?)
     end)
     |> Enum.map(fn {_node, element} -> element end)
+  end
+
+  # A label or an aria-labelledby reference may be anywhere in the document; only
+  # the control has to be inside the scope.
+  defp label_matches(scopes, aria, text, options) do
+    labelled =
+      aria.index.document
+      |> labelled_controls(text, Keyword.get(options, :exact, false))
+      |> MapSet.new(&Aria.node_for(aria, &1).id)
+
+    scopes
+    |> scoped_nodes(aria)
+    |> Enum.filter(fn {node, _element} -> MapSet.member?(labelled, node.id) end)
+    |> Enum.map(fn {_node, element} -> element end)
+  end
+
+  defp scoped_nodes(scopes, aria) do
+    scopes
+    |> Enum.flat_map(&Aria.scoped_nodes(aria, &1))
+    |> Enum.uniq_by(fn {node, _element} -> node.id end)
+    |> Enum.sort_by(fn {node, _element} -> node.id end)
   end
 
   defp accessible_name_matches?(_aria, _node, nil, _exact?), do: true
