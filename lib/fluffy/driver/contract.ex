@@ -30,6 +30,7 @@ defmodule Fluffy.Driver.Contract do
   @callback press(Session.t(), Locator.t(), String.t(), keyword()) :: result()
   @callback open_browser(Session.t(), (String.t() -> term())) :: Session.t()
   @callback unwrap(Session.t(), (term() -> term())) :: result()
+  @callback unwrap_and_return(Session.t(), (term() -> value)) :: {:return, value, result()} when value: term()
 
   @optional_callbacks set_html: 2
 end

@@ -785,13 +785,23 @@ end)
 |> assert(visible(by_text("Chamber opened")))
 ```
 
+To read a value instead, use `Fluffy.unwrap_and_return/2`. It returns the
+callback's result. On LiveView and Playwright pages it reconciles the page like
+`Fluffy.unwrap/2`, including redirects the callback causes, so keep using the same
+session afterwards; a Static page stays as it is, whatever conn the callback returns:
+
+```elixir
+html = unwrap_and_return(session, &Phoenix.LiveViewTest.render/1)
+```
+
 The callback receives the current `%Plug.Conn{}` on a Static page, a
 `%Phoenix.LiveViewTest.View{}` on a LiveView page, or a
 `%PlaywrightEx.Page{}` on a Playwright page.
 
-A Static callback must return its updated `Plug.Conn` because connections are
-immutable. LiveView and Playwright callback results are ignored: Fluffy retains
-and reconciles the original View or Page. Exceptions, throws, and exits pass
+A Static `unwrap/2` callback must return its updated `Plug.Conn` because
+connections are immutable, while a Static `unwrap_and_return/2` callback may
+return anything and leaves the conn alone. LiveView and Playwright `unwrap/2`
+callback results are ignored: Fluffy retains and reconciles the original View or Page. Exceptions, throws, and exits pass
 through unchanged. Prefer PlaywrightEx bang functions inside the callback when
 failure should stop the test.
 
@@ -807,7 +817,8 @@ operations and registrations that must precede an action.
 
 `Fluffy.Playwright.unwrap/3` passes the `%PlaywrightEx.Locator{}` for a Fluffy
 locator instead, resolved in the active page and through its frame locators, with
-the same navigation handling:
+the same navigation handling. `Fluffy.Playwright.unwrap_and_return/3` returns the
+callback's result instead:
 
 ```elixir
 session
@@ -815,7 +826,7 @@ session
 |> assert(visible(by_label("Name")))
 ```
 
-Event values such as `Fluffy.Response` unwrap to their PlaywrightEx counterpart too;
-see [Native values](advanced-events.md#native-values). See
+Event values such as `Fluffy.Response` reach their PlaywrightEx counterpart through
+`Fluffy.unwrap_and_return/2`; see [Native values](advanced-events.md#native-values). See
 [PlaywrightEx coverage](capabilities.md#playwrightex-coverage) for which native
 calls are safe.

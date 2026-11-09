@@ -33,9 +33,9 @@ defmodule Fluffy.Conformance.DownloadEventTest do
 
       if driver == :playwright do
         assert Download.page(download) == Fluffy.Playwright.current_page(session)
-        assert unwrap(download, &PlaywrightEx.Download.suggested_filename/1) == "report.csv"
+        assert unwrap_and_return(download, &PlaywrightEx.Download.suggested_filename/1) == "report.csv"
       else
-        assert_raise Fluffy.CapabilityError, ~r/no native counterpart/, fn -> unwrap(download, & &1) end
+        assert_raise Fluffy.CapabilityError, ~r/no native counterpart/, fn -> unwrap_and_return(download, & &1) end
       end
 
       close_session(session)
@@ -197,7 +197,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
       assert_raise RuntimeError, message, fn -> Download.path(download) end
 
       # This read leaves the download running, unlike a timed-out save.
-      assert unwrap(download, &PlaywrightEx.Download.cancel/1) == :ok
+      assert unwrap_and_return(download, &PlaywrightEx.Download.cancel/1) == :ok
     after
       send(server, :finish)
     end
@@ -310,7 +310,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
       end
 
       send(server, :finish)
-      assert unwrap(download, &PlaywrightEx.Download.failure/1) == {:ok, "canceled"}
+      assert unwrap_and_return(download, &PlaywrightEx.Download.failure/1) == {:ok, "canceled"}
       refute File.exists?(destination)
       assert_raise PlaywrightEx.PlaywrightError, ~r/canceled/, fn -> Download.read(download) end
     after

@@ -450,25 +450,34 @@ defmodule Fluffy.Driver.Playwright do
 
   @impl true
   def unwrap(%Session{} = session, fun) when is_function(fun, 1),
+    do: session |> unwrap_and_return(fun) |> discard_return()
+
+  @impl true
+  def unwrap_and_return(%Session{} = session, fun) when is_function(fun, 1),
     do: run_unwrapped(session, Session.page_state(session).page, fun)
 
   # Like unwrap/2, with the locator resolved in the current frame.
   def unwrap_locator(%Session{} = session, %Locator{} = locator, fun) when is_function(fun, 1),
+    do: session |> unwrap_and_return_locator(locator, fun) |> discard_return()
+
+  def unwrap_and_return_locator(%Session{} = session, %Locator{} = locator, fun) when is_function(fun, 1),
     do: run_unwrapped(session, locator(session, locator), fun)
 
   defp run_unwrapped(session, native, fun) do
     page = Session.page_state(session).page
     context = Session.context(session)
 
-    {:ok, :unwrap, outcome} =
+    {:ok, result, outcome} =
       navigation_aware_action(session, context.timeout, fn _remaining ->
-        _ignored = fun.(native)
+        result = fun.(native)
         validate_unwrapped!(context.browser_context, page)
-        {:ok, :unwrap}
+        {:ok, result}
       end)
 
-    outcome
+    {:return, result, outcome}
   end
+
+  defp discard_return({:return, _ignored, outcome}), do: outcome
 
   # A clock call has no timeout of its own and waits while a timer it fires
   # blocks the page. Those timers can patch or navigate, as an action can.

@@ -51,7 +51,7 @@ defmodule Fluffy.Conformance.DialogEventTest do
     owner = self()
 
     once(session, Event.dialog(), fn dialog ->
-      send(owner, {:native_type, unwrap(dialog, &PlaywrightEx.Dialog.type/1)})
+      send(owner, {:native_type, unwrap_and_return(dialog, &PlaywrightEx.Dialog.type/1)})
       Dialog.dismiss(dialog)
     end)
 
@@ -64,7 +64,7 @@ defmodule Fluffy.Conformance.DialogEventTest do
     expect(session, "dismissed" |> by_text(exact: true) |> to_be_visible())
 
     close_session(session)
-    assert_raise ArgumentError, ~r/session is closed/, fn -> unwrap(dialog, & &1) end
+    assert_raise ArgumentError, ~r/session is closed/, fn -> unwrap_and_return(dialog, & &1) end
   end
 
   @tag driver: :playwright

@@ -3,7 +3,7 @@ defmodule Fluffy.Worker do
   A dedicated web worker delivered by `Fluffy.Event.worker/1`.
 
   `url` follows Playwright's `Worker`; `page` is the page that started it. Reach
-  the `PlaywrightEx.Worker`, to evaluate in it, with `Fluffy.unwrap/2`.
+  the `PlaywrightEx.Worker`, to evaluate in it, with `Fluffy.unwrap_and_return/2`.
   """
 
   @enforce_keys [:url, :page]

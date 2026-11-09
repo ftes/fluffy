@@ -56,7 +56,7 @@ A download handle exposes `suggested_filename` and `url` when downloading starts
 `Download.read(download, max_bytes: 10_000_000)` waits for completion and returns
 bytes, enforcing the indicated in-memory limit (10 MB by default).
 `Download.save_as(download, destination)` waits and saves using bounded memory.
-Failures raise when reading or saving; on Playwright, `Fluffy.unwrap/2` reaches
+Failures raise when reading or saving; on Playwright, `Fluffy.unwrap_and_return/2` reaches
 `failure` and `cancel` on the `PlaywrightEx.Download`. Handles belong to their
 session; saved files outlive it. In-process HTTP downloads use the same API and
 complete before delivery. `Download.path/1` returns the browser's copy of the file:
@@ -265,7 +265,7 @@ exception (`name`, `message`, `stack`, `page`). Waits and listeners do not affec
 `log_browser_console`: messages are logged as well.
 
 `Event.worker()` resolves with a `Fluffy.Worker` and `Event.web_socket()` with a
-`Fluffy.WebSocket`, each with its `url` and `page`; `unwrap/2` reaches the native value
+`Fluffy.WebSocket`, each with its `url` and `page`; `unwrap_and_return/2` reaches the native value
 for evaluating in a worker or listening to a socket's frames.
 
 `Event.dom_content_loaded()` and `Event.load()` resolve with the `Fluffy.Page` when that
@@ -372,7 +372,7 @@ These actions require Playwright and reconcile navigation caused by the action.
 
 ## Native values
 
-Event values keep their PlaywrightEx counterpart private. `Fluffy.unwrap/2` passes
+Event values keep their PlaywrightEx counterpart private. `Fluffy.unwrap_and_return/2` passes
 it to a callback and returns the callback's result, for members Fluffy does not
 wrap: `PlaywrightEx.Request`, `PlaywrightEx.Response`, `PlaywrightEx.Route`, `PlaywrightEx.Dialog`,
 `PlaywrightEx.Download`, `PlaywrightEx.FileChooser`, `PlaywrightEx.Frame`,

@@ -200,9 +200,10 @@ because application JavaScript opens the chooser.
 
 ### Native escape hatch
 
-`Fluffy.unwrap/2` exposes driver-specific APIs: `Plug.Conn`,
+`Fluffy.unwrap/2` exposes a session's driver-specific APIs: `Plug.Conn`,
 `Phoenix.LiveViewTest.View`, or `PlaywrightEx.Page`. `Fluffy.Playwright.unwrap/3`
-passes a `PlaywrightEx.Locator`. Use the shared event and page APIs for lifecycle
+passes a `PlaywrightEx.Locator`. `Fluffy.unwrap_and_return/2` also takes a browser
+value, such as a `Fluffy.Response`, and passes its PlaywrightEx counterpart. Use the shared event and page APIs for lifecycle
 operations. See [Native escape hatch](usage.md#native-escape-hatch) for callback
 behavior.
 
@@ -222,9 +223,11 @@ fails when PlaywrightEx adds or removes one.
   `Fluffy.Playwright.Clock`, keyboard and mouse input in `Fluffy.Playwright.Keyboard`
   and `Fluffy.Playwright.Mouse`, the events in `Fluffy.Event`, and the values they
   deliver, including response bodies. Their options pass through as documented.
-- **Unwrap:** everything else page-, locator-, or value-local, such as reads like
-  `text_content`, assertions like `to_have_css`, HAR routing, and response timing.
-  Navigation these cause is adopted.
+- **Unwrap:** everything else page-, locator-, or value-local, such as assertions
+  like `to_have_css`, HAR routing, and response timing. For reads like
+  `text_content`, `Fluffy.unwrap_and_return/2` and
+  `Fluffy.Playwright.unwrap_and_return/3` return the callback's result instead of
+  the session. Navigation these cause is adopted.
 - **Unsafe natively:** closing the page or context (use `Fluffy.Playwright.close_page/2`
   and `Fluffy.close_session/1`), `remove_all_listeners`, `set_default_timeout` and
   `set_default_navigation_timeout`, the `no_wait_after:` and `signal:` options,

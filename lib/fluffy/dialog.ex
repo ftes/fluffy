@@ -6,7 +6,7 @@ defmodule Fluffy.Dialog do
   accept or dismiss it. An unresolved dialog blocks browser actions. A wait only
   observes the dialog; it does not handle it. With no dialog registrations,
   Playwright dismisses dialogs automatically. Reach the `PlaywrightEx.Dialog`
-  with `Fluffy.unwrap/2`.
+  with `Fluffy.unwrap_and_return/2`.
   """
   @enforce_keys [:type, :message, :default_value, :page, :native]
   defstruct [:type, :message, :default_value, :page, :native]

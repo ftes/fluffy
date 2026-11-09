@@ -13,7 +13,7 @@ defmodule Fluffy.Request do
   closed, and after the session's `timeout:` when the browser does not answer.
   Phoenix delivers no requests: `Fluffy.Event.request/1` raises
   `Fluffy.CapabilityError`. `timing`, `sizes` and other members stay on the
-  `PlaywrightEx.Request` that `Fluffy.unwrap/2` passes.
+  `PlaywrightEx.Request` that `Fluffy.unwrap_and_return/2` passes.
   """
 
   alias Fluffy.Backend.Playwright.Bounded

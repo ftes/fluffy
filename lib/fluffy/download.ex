@@ -8,7 +8,7 @@ defmodule Fluffy.Download do
   session's `timeout:` passes without completion, as for an interrupted download
   on Firefox, which never completes. Handles belong to their session; saved files
   outlive it. On Playwright, reach `failure`, `cancel` and the rest of the
-  `PlaywrightEx.Download` with `Fluffy.unwrap/2`.
+  `PlaywrightEx.Download` with `Fluffy.unwrap_and_return/2`.
 
   `path/1` also waits for completion, and raises after the session's `timeout:`
   without canceling the download. A Phoenix download is complete when delivered

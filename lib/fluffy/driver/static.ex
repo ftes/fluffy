@@ -162,16 +162,25 @@ defmodule Fluffy.Driver.Static do
 
   @impl true
   def unwrap(%Session{} = session, fun) when is_function(fun, 1) do
+    case fun.(current_conn!(session)) do
+      %Plug.Conn{} = returned_conn ->
+        {:navigate, session, Navigation.static_conn(returned_conn)}
+
+      other ->
+        raise ArgumentError,
+              "Static unwrap callback must return an updated Plug.Conn, got: #{inspect(other)}"
+    end
+  end
+
+  # A read: the result is not a replacement conn, so the page stays as it is.
+  @impl true
+  def unwrap_and_return(%Session{} = session, fun) when is_function(fun, 1),
+    do: {:return, fun.(current_conn!(session)), session}
+
+  defp current_conn!(session) do
     case Session.page_state(session) do
       %{conn: %Plug.Conn{} = conn} ->
-        case fun.(conn) do
-          %Plug.Conn{} = returned_conn ->
-            {:navigate, session, Navigation.static_conn(returned_conn)}
-
-          other ->
-            raise ArgumentError,
-                  "Static unwrap callback must return an updated Plug.Conn, got: #{inspect(other)}"
-        end
+        conn
 
       _state ->
         raise ArgumentError,

@@ -9,6 +9,11 @@
 - `Fluffy.Playwright.add_init_script/3` runs a script in every later document of the session's browser context.
 - `Fluffy.Playwright.wait_for_function/4` waits on the active page and returns the session, within the session's `timeout:` unless `timeout:` is given.
 - The facade's `assert_has` and `refute_has` accept a `%Fluffy.Locator{}` with the same options as a selector, inside the current `within/3` scope.
+- `Fluffy.unwrap_and_return/2`, `Fluffy.Playwright.unwrap_and_return/3` and `Fluffy.PhoenixTest.unwrap_and_return/2` run a native callback and return its result. They reconcile like `unwrap`; a Static callback may return anything and leaves the page alone.
+
+### Changed
+
+- **Breaking:** `Fluffy.unwrap/2` takes only a session and returns it. Use `Fluffy.unwrap_and_return/2` for native values such as `Fluffy.Response`.
 
 ### Fixed
 
@@ -51,7 +56,7 @@ Fluffy now runs on PlaywrightEx 0.17, a port of the official Playwright client w
 - `page_status`, `page_to_have_status` and `Fluffy.Page.status` are removed, as in Playwright; on Playwright, assert on `Event.response` instead.
 - `OperationError.cause` and Playwright assertion messages carry native PlaywrightEx exceptions.
 - `Fluffy.Expect.checked_option` is now `to_be_checked_option`.
-- `Fluffy.Download` loses its `source` and `runtime` fields; its other fields besides `suggested_filename`, `url` and `page` are private. On Playwright, `unwrap(download, fun)` passes the `PlaywrightEx.Download`.
+- `Fluffy.Download` loses its `source` and `runtime` fields; its other fields besides `suggested_filename`, `url` and `page` are private. On Playwright, `unwrap_and_return(download, fun)` passes the `PlaywrightEx.Download`.
 - `Fluffy.Locator.describe`, `new` and `append` are internal; `inspect/1` renders a locator.
 - LiveView `set_input_files` on an upload input whose form has no id raises, saying to give the form an id, which LiveView's form recovery needs anyway.
 
