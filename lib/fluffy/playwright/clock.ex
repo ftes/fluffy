@@ -5,7 +5,7 @@ defmodule Fluffy.Playwright.Clock do
   Use it through `alias Fluffy.Playwright.Clock` and call `Clock.install/2`,
   `Clock.run_for/3` and so on; the names are too generic to import. Phoenix
   sessions raise `Fluffy.CapabilityError`. See
-  [Controlling time](usage.md#controlling-time).
+  [Controlling time](actions.md#controlling-time).
   """
 
   alias Fluffy.Options

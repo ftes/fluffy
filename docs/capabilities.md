@@ -60,7 +60,7 @@ boundaries described below.
 Use Playwright for computed style, layout, browser accessibility, native
 validation, arbitrary JavaScript, and browser network events. Phoenix operates
 on parsed HTML and mutable form state. Even Phoenix checks structural
-visibility; see [Visibility and DOM presence](usage.md#visibility-and-dom-presence)
+visibility; see [Visibility and DOM presence](assertions.md#visibility-and-dom-presence)
 for the distinction from browser rendering and DOM absence.
 
 Phoenix locators do not model `<details>`, `<dialog>`, `popover` and dropdown
@@ -136,7 +136,7 @@ All public page-management helpers live in `Fluffy.Playwright` and reject Phoeni
 sessions. Phoenix retains one current document internally; use shared page URL,
 and title assertions to inspect it.
 `Fluffy.Playwright.new_page/1` returns a handle; `Fluffy.Playwright.switch_page/2` selects it for subsequent actions.
-Use [frame locators](usage.md#frames-playwright) to query iframe contents with
+Use [frame locators](locators.md#frames-playwright) to query iframe contents with
 Playwright. Page switching does not select an iframe, and frame locators do not
 change the active page.
 
@@ -170,7 +170,7 @@ to catch a locator that matches the wrong input.
 For a Static or LiveView target with `data-confirm`, `Fluffy.click/2` ignores the
 attribute and continues with the normal structural action. It does not create, inspect,
 accept, or dismiss a browser dialog; use Playwright whenever the prompt or its
-cancellation path is part of the assertion. Both in-process drivers model the pinned
+cancellation path is part of the assertion. Static and LiveView both model the pinned
 Phoenix.HTML `data-method`/`data-to` hidden-form action for plain elements, including
 links and buttons. Custom `phoenix.link.click` listeners, cancellation, and competing
 LiveView actions remain browser-only.
@@ -204,7 +204,7 @@ because application JavaScript opens the chooser.
 ### Native escape hatch
 
 `Fluffy.unwrap/2` and `Fluffy.unwrap_and_return/2` reach driver-native APIs; see
-[Native escape hatch](usage.md#native-escape-hatch) for callback behavior.
+[Native escape hatch](debugging.md#native-escape-hatch) for callback behavior.
 
 ### PlaywrightEx coverage
 

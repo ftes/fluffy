@@ -622,7 +622,7 @@ defmodule Fluffy.Expect do
 
   Negating it requires a visible element. Static and LiveView use the
   structural visibility of `to_be_visible/2`; see
-  [Visibility and DOM presence](usage.md#visibility-and-dom-presence).
+  [Visibility and DOM presence](assertions.md#visibility-and-dom-presence).
 
   ## Options
 

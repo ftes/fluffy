@@ -27,7 +27,7 @@ start_session(:phoenix)
 ```
 
 This example assumes the imports and test setup below. Locators are reusable
-queries: find Fluffy's row in the “Hagrid's creatures” table and scope both the
+queries: find Fluffy's row in the "Hagrid's creatures" table and scope both the
 action and the assertion to it.
 
 <details>
@@ -119,14 +119,14 @@ Use the facade import on its own. The [migration guide](docs/migration-from-phoe
 shows complete setup, the same helpers with Playwright, and compatibility
 boundaries. Adopting the native locator API is optional.
 
-For native tests, choose an [assertion vocabulary](docs/assertion-styles.md):
+For native tests, choose an [assertion vocabulary](docs/assertions.md):
 `use Fluffy.Assert` or `import Fluffy.Expect`.
 
 ## Beyond page interactions
 
 Capture downloads, open new tabs, handle dialogs, and observe network events
 with Fluffy's event API. Register a wait before an action, then await a value.
-Predicates select events; ordinary ExUnit assertions inspect their metadata. See [Advanced events and pages](docs/advanced-events.md)
+Predicates select events; ordinary ExUnit assertions inspect their metadata. See [Events and pages](docs/advanced-events.md)
 for examples and the [Capability matrix](docs/capabilities.md) for what each
 backend supports.
 
@@ -134,42 +134,20 @@ backend supports.
 
 - [Installation and runtime](docs/installation.md) — endpoint, browser, and
   Ecto sandbox setup
-- [Usage](docs/usage.md) — locators, actions, expectations, backend choice, and
-  diagnostics
-- [Assertion styles](docs/assertion-styles.md) — imported `assert`/`refute` and
-  `expect` vocabularies compared
-- [Advanced events and pages](docs/advanced-events.md) — tabs, windows, iframe
+- [Usage](docs/usage.md) — your first test, backend choice, and a shared test case
+- [Locators and frames](docs/locators.md) — finding elements and reaching into iframes
+- [Actions and waiting](docs/actions.md) — actions, waiting, uploads, and controlling time
+- [Assertions](docs/assertions.md) — imported `assert`/`refute` and `expect`
+  vocabularies compared, visibility, and page assertions
+- [Debugging and native access](docs/debugging.md) — failures, browser diagnostics,
+  and the native escape hatch
+- [Events and pages](docs/advanced-events.md) — tabs, windows, iframe
   limitations, downloads, navigation, dialogs, and network events
 - [Coming from PhoenixTest](docs/migration-from-phoenix-test.md) — an alternate
   starting point for existing PhoenixTest suites
 - [Capability matrix](docs/capabilities.md) — backend differences and limitations
 
-## Developing Fluffy
-
-The project pins the current local-development toolchain in `.tool-versions`.
-Fluffy's compatibility floor is Elixir 1.18 on OTP 27; development also
-requires PostgreSQL. From a clean checkout:
-
-```bash
-mix setup
-mix test
-```
-
-`mix setup` installs Chromium. To run the suite on Firefox or WebKit, install it with
-`mix playwright_ex.install -- firefox` (or `webkit`) and set `FLUFFY_BROWSER=firefox`.
-
-Run the ordinary local gate—Styler-backed formatting, warnings-as-errors
-compilation, strict Credo, and the test suite—with:
-
-```bash
-mix check
-```
-
-Add test-environment Dialyzer analysis with:
-
-```bash
-mix quality
-```
+See [CONTRIBUTING.md](https://github.com/ftes/fluffy/blob/main/CONTRIBUTING.md) for developing Fluffy itself.
 
 ## License
 

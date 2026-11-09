@@ -123,8 +123,6 @@ session
 ```
 
 Pages share cookies and storage; start another session for an independent user.
-Pages are identified only by handles: `new_page/2`, `page_names/1`, `Page.name/1`,
-and atom names in switching, closing, and opener assertions have been removed.
 Retain `current_page(session)` to return to the initial page, and use `pages(session)`
 to list open handles. Phoenix follows links and submits forms in the current page,
 ignoring `target` and `formtarget`; page creation and closing require Playwright.
@@ -146,7 +144,7 @@ session
 
 `Fluffy.Playwright.go_back/2` and `Fluffy.Playwright.go_forward/2` require Playwright and accept the
 options of `PlaywrightEx.Page.go_back/2`.
-For reloading either backend, see [Reloading](usage.md#reloading).
+For reloading either backend, see [Reloading](actions.md#reloading).
 `Fluffy.close_session/1` releases session resources on either backend.
 
 ## Listeners and dialogs
@@ -361,7 +359,7 @@ with `start_session(:playwright, browser_context: [storage_state: state])`.
 ## Native values
 
 Event values keep their PlaywrightEx counterpart private; reach it with
-`Fluffy.unwrap_and_return/2` (see [Native escape hatch](usage.md#native-escape-hatch))
+`Fluffy.unwrap_and_return/2` (see [Native escape hatch](debugging.md#native-escape-hatch))
 for members Fluffy does not wrap: `PlaywrightEx.Request`, `PlaywrightEx.Response`, `PlaywrightEx.Route`, `PlaywrightEx.Dialog`,
 `PlaywrightEx.Download`, `PlaywrightEx.FileChooser`, `PlaywrightEx.Frame`,
 `PlaywrightEx.ConsoleMessage`, `PlaywrightEx.Worker`, and `PlaywrightEx.WebSocket`,
