@@ -144,7 +144,7 @@ defmodule Fluffy.MixProject do
       name: "fluffy",
       licenses: ["MIT"],
       links: %{"GitHub" => @source_url, "Hex.pm" => @hex_url},
-      files: ["lib", ".formatter.exs", "mix.exs", "README.md" | @doc_files]
+      files: ["lib", ".formatter.exs", "mix.exs", "README.md", "usage-rules.md" | @doc_files]
     ]
   end
 
