@@ -6,7 +6,7 @@ defmodule Fluffy.ConsoleMessage do
   method, such as `"log"` or `"error"`. `location` is the map of
   `PlaywrightEx.ConsoleMessage.location/1`. `page` is the page that logged it, or
   nil for a service worker. Reach the `PlaywrightEx.ConsoleMessage`, for
-  arguments as handles, with `Fluffy.unwrap/2`.
+  arguments as handles, with `Fluffy.unwrap_and_return/2`.
   """
 
   @enforce_keys [:type, :text, :location, :timestamp]

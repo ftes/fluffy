@@ -499,6 +499,45 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
     end
   end
 
+  describe "unwrap_and_return" do
+    @tag driver: :static
+    test "returns the callback's result from a Static page, keeping the active form" do
+      fixture = Fluffy.TestHTTPFixtures.register(%{body: ~s(<form><input aria-label="Name" name="name"></form>)})
+
+      session =
+        :phoenix
+        |> start_session(endpoint: Endpoint)
+        |> visit(Fluffy.TestHTTPFixtures.path(fixture))
+        |> fill_in("Name", with: "Ada")
+
+      assert unwrap_and_return(session, fn %Plug.Conn{} -> :read end) == :read
+      assert_has(session, "input", value: "Ada")
+      submit(session)
+
+      [_source, submission] = Fluffy.TestHTTPFixtures.requests(fixture)
+      assert URI.decode_query(submission.query) == %{"name" => "Ada"}
+    end
+
+    @tag driver: :live
+    test "follows a Live redirect and takes a native session" do
+      session = :phoenix |> Fluffy.start_session() |> Fluffy.visit("/live/chamber-map")
+
+      assert unwrap_and_return(session, fn view ->
+               _redirect = Phoenix.LiveViewTest.render_click(view, "redirect_static")
+               :read
+             end) == :read
+
+      session |> assert_path("/chamber") |> assert_has("body", text: "The guardian sleeps")
+    end
+
+    @tag driver: :playwright
+    test "returns the callback's result from a Playwright page" do
+      session = Fluffy.session_for_html(:playwright, "<p>Page</p>")
+
+      assert unwrap_and_return(%Session{session: session}, &PlaywrightEx.Page.title!/1) == "Fluffy test stage"
+    end
+  end
+
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
     test "exact CSS clicks distinguish overlapping button and link text with #{driver}" do

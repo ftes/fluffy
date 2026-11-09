@@ -38,10 +38,10 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
       Playwright.evaluate(session, "console.log('native', 7)")
       message = await(pending)
 
-      assert message |> unwrap(&PlaywrightEx.ConsoleMessage.args/1) |> length() == 2
+      assert message |> unwrap_and_return(&PlaywrightEx.ConsoleMessage.args/1) |> length() == 2
 
       close_session(session)
-      assert_raise ArgumentError, ~r/session is closed/, fn -> unwrap(message, & &1) end
+      assert_raise ArgumentError, ~r/session is closed/, fn -> unwrap_and_return(message, & &1) end
     end
 
     @tag driver: :playwright
@@ -90,7 +90,7 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
       assert error.message =~ "boom"
       assert is_binary(error.stack)
       assert error.page == current_page(session)
-      assert unwrap(error, &Exception.message/1) =~ "boom"
+      assert unwrap_and_return(error, &Exception.message/1) =~ "boom"
     end
 
     @tag driver: :playwright
@@ -102,7 +102,7 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
       assert %Fluffy.PageError{} = error = await(pending)
       assert error.message =~ "thrown string"
       assert error.page == current_page(session)
-      assert unwrap(error, &Exception.message/1) =~ "thrown string"
+      assert unwrap_and_return(error, &Exception.message/1) =~ "thrown string"
     end
 
     @tag driver: :playwright
@@ -137,7 +137,7 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
       assert %Fluffy.Request{method: "GET", resource_type: "fetch"} = request = await(pending)
       assert request.page == current_page(session)
       assert await(context) == request
-      assert %{errorText: reason} = unwrap(request, &PlaywrightEx.Request.failure/1)
+      assert %{errorText: reason} = unwrap_and_return(request, &PlaywrightEx.Request.failure/1)
       assert is_binary(reason)
       assert_raise ExUnit.AssertionError, ~r/no matching request_finished event/, fn -> await(finished) end
     end
@@ -154,7 +154,7 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
 
       assert %Fluffy.Request{method: "GET"} = request = await(pending)
       assert await(context) == request
-      assert {:ok, %PlaywrightEx.Response{}} = unwrap(request, &PlaywrightEx.Request.response/1)
+      assert {:ok, %PlaywrightEx.Response{}} = unwrap_and_return(request, &PlaywrightEx.Request.response/1)
       assert_raise ExUnit.AssertionError, ~r/no matching request_failed event/, fn -> await(failed) end
     end
 
@@ -237,7 +237,7 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
       Playwright.evaluate(session, "document.querySelector('iframe').remove(); true")
 
       assert %Frame{} = gone = await(detached)
-      assert unwrap(gone, &PlaywrightEx.Frame.is_detached/1)
+      assert unwrap_and_return(gone, &PlaywrightEx.Frame.is_detached/1)
       assert Frame.page(gone) == current_page(session)
     end
 
@@ -270,10 +270,10 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
 
       assert %Fluffy.Worker{} = worker = await(pending)
       assert worker.page == current_page(session)
-      assert unwrap(worker, &PlaywrightEx.Worker.evaluate!(&1, "1 + 1")) == 2
+      assert unwrap_and_return(worker, &PlaywrightEx.Worker.evaluate!(&1, "1 + 1")) == 2
 
       close_session(session)
-      assert_raise ArgumentError, ~r/session is closed/, fn -> unwrap(worker, & &1) end
+      assert_raise ArgumentError, ~r/session is closed/, fn -> unwrap_and_return(worker, & &1) end
     end
 
     @tag driver: :playwright
@@ -302,10 +302,10 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
 
       assert %Fluffy.WebSocket{url: ^url} = socket = await(pending)
       assert socket.page == current_page(session)
-      assert unwrap(socket, &PlaywrightEx.WebSocket.url/1) == url
+      assert unwrap_and_return(socket, &PlaywrightEx.WebSocket.url/1) == url
 
       close_session(session)
-      assert_raise ArgumentError, ~r/session is closed/, fn -> unwrap(socket, & &1) end
+      assert_raise ArgumentError, ~r/session is closed/, fn -> unwrap_and_return(socket, & &1) end
     end
   end
 

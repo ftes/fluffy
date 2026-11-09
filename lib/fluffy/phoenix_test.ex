@@ -247,6 +247,17 @@ defmodule Fluffy.PhoenixTest do
   @spec unwrap(session(), (term() -> term())) :: session()
   def unwrap(session, fun), do: session |> map_session(&Fluffy.unwrap(&1, fun)) |> clear_form()
 
+  @doc """
+  Runs a native callback like `unwrap/2` and returns the callback's result instead of the session.
+  Keep using the same session afterwards: on LiveView and Playwright, navigation the callback
+  causes is still followed. A Static page stays as it is, whatever `Plug.Conn` the callback returns.
+
+  The result cannot carry the session wrapper back, so the form `submit/1` would use is not
+  updated. If the callback replaces that form without navigating, use `unwrap/2`.
+  """
+  @spec unwrap_and_return(session(), (term() -> result)) :: result when result: term()
+  def unwrap_and_return(session, fun), do: Fluffy.unwrap_and_return(wrap(session).session, fun)
+
   for {name, negated?} <- [assert_has: false, refute_has: true] do
     @doc """
     Checks whether any CSS or `Fluffy.Locator` match is visible, or negates that check.

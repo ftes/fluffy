@@ -387,9 +387,15 @@ defmodule Fluffy.Driver.Live do
 
   @impl true
   def unwrap(%Session{} = session, fun) when is_function(fun, 1) do
+    {:return, _ignored, outcome} = unwrap_and_return(session, fun)
+    outcome
+  end
+
+  @impl true
+  def unwrap_and_return(%Session{} = session, fun) when is_function(fun, 1) do
     state = Session.page_state(session)
-    _ignored = fun.(state.view)
-    reconcile_unwrapped(session, state.client_dom)
+    result = fun.(state.view)
+    {:return, result, reconcile_unwrapped(session, state.client_dom)}
   end
 
   defp evaluate_expectation(%Session{} = session, %Expect{target: {:locator, _locator}} = expectation) do
@@ -463,10 +469,10 @@ defmodule Fluffy.Driver.Live do
         raise Fluffy.LiveViewError, reason: reason
 
       :none ->
+        # The render syncs with the view, so a patch the callback set off without
+        # waiting has arrived when the result commits it.
         try do
-          state.view
-          |> render()
-          |> then(&commit_render_result(session, client_dom, &1))
+          state.view |> render() |> then(&commit_render_result(session, client_dom, &1))
         catch
           :exit, reason -> follow_exit_redirect(session, reason, :exit)
         end
@@ -810,7 +816,7 @@ defmodule Fluffy.Driver.Live do
     follow_redirect_result(session, redirect)
   end
 
-  defp commit_render_result(_session, _client_dom, {:redirected, %Session{}, _navigation} = redirected, _after_render) do
+  defp commit_render_result(_session, _client_dom, {:redirected, %Session{}, _nav} = redirected, _after_render) do
     redirected
   end
 

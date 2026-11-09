@@ -461,6 +461,23 @@ defmodule Fluffy.Playwright do
 
   @doc playwright_only: true
   @doc """
+  Runs `fun` with the `PlaywrightEx.Locator` for `locator` and returns the callback's result.
+
+  Like `unwrap/3`, including the reconcile after the callback, but for reads:
+
+      text = Fluffy.Playwright.unwrap_and_return(session, by_css("#status"), &PlaywrightEx.Locator.text_content!/1)
+
+  Phoenix sessions raise `Fluffy.CapabilityError`.
+  """
+  @spec unwrap_and_return(Session.t(), Fluffy.Locator.t(), (PlaywrightEx.Locator.t() -> result)) :: result
+        when result: term()
+  def unwrap_and_return(%Session{} = session, %Fluffy.Locator{} = locator, fun) when is_function(fun, 1) do
+    ensure_playwright_backend!(session, :native_locator)
+    Fluffy.__dispatch_driver__(session, :unwrap_and_return_locator, [locator, fun])
+  end
+
+  @doc playwright_only: true
+  @doc """
   Starts a Playwright trace for this session's BrowserContext.
 
   The trace includes every page in the session and is saved when the test's

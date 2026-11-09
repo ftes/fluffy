@@ -8,7 +8,7 @@ defmodule Fluffy.Route do
   answered hangs until the action waiting for it times out.
 
   Answers raise on failure. Reach the `PlaywrightEx.Route`, for members such as
-  `fetch`, with `Fluffy.unwrap/2`. See
+  `fetch`, with `Fluffy.unwrap_and_return/2`. See
   [Routing requests](advanced-events.md#routing-requests).
   """
 

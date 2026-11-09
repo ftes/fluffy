@@ -87,7 +87,7 @@ defmodule Fluffy.Conformance.RouteTest do
       owner = self()
 
       route(session, "**/api", fn route ->
-        send(owner, {:native, unwrap(route, & &1)})
+        send(owner, {:native, unwrap_and_return(route, & &1)})
         Route.continue(route)
       end)
 

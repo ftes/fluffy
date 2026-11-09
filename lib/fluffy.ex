@@ -43,7 +43,7 @@ defmodule Fluffy do
     Fluffy.WebSocket
   ]
 
-  @typedoc "A browser value that `unwrap/2` resolves to its PlaywrightEx counterpart."
+  @typedoc "A browser value that `unwrap_and_return/2` resolves to its PlaywrightEx counterpart."
   @type native_value ::
           Fluffy.Request.t()
           | Fluffy.Route.t()
@@ -200,42 +200,62 @@ defmodule Fluffy do
 
   @doc group: "Diagnostics and native access"
   @doc """
-  Runs `fun` with the native counterpart of a session or a browser value.
-
-  With a session, `fun` runs a driver-specific native operation and `unwrap/2`
-  returns the reconciled session. Static callbacks receive the current
+  Runs a driver-specific native operation with the session's native counterpart
+  and returns the reconciled session. Static callbacks receive the current
   `Plug.Conn` and must return an updated `Plug.Conn`. LiveView callbacks
   receive the current `Phoenix.LiveViewTest.View`, and Playwright callbacks
   receive the `PlaywrightEx.Page`. Successful LiveView and Playwright callback
-  return values are ignored. `Fluffy.Playwright.unwrap/3` passes a native
-  locator instead.
-
-  With a `Fluffy.Request`, `Fluffy.Response`, `Fluffy.Route`, `Fluffy.Dialog`,
-  `Fluffy.Download`, `Fluffy.FileChooser`, `Fluffy.Frame`,
-  `Fluffy.ConsoleMessage`, `Fluffy.PageError`, `Fluffy.Worker` or
-  `Fluffy.WebSocket`, `fun` receives its PlaywrightEx counterpart and
-  `unwrap/2` returns the callback's result.
-  A Phoenix download has none and raises `Fluffy.CapabilityError`.
-
-      address = unwrap(response, &PlaywrightEx.Response.server_addr!/1)
+  return values are ignored; `unwrap_and_return/2` returns the callback's
+  result instead of the session. `Fluffy.Playwright.unwrap/3` passes a native
+  locator instead. For a native value such as a `Fluffy.Response`, use
+  `unwrap_and_return/2`.
 
   Native operations are not cross-driver compatible. Prefer the shared
   Fluffy API whenever it covers the behavior under test.
   """
   @spec unwrap(Session.t(), (term() -> term())) :: Session.t()
-  @spec unwrap(native_value(), (term() -> result)) :: result when result: term()
-  def unwrap(%Session{} = session, fun) when is_function(fun, 1) do
+  def unwrap(%Session{} = session, fun) when is_function(fun, 1), do: dispatch_unwrap(session, :unwrap, fun)
+
+  defp dispatch_unwrap(session, operation, fun) do
     case Session.current_driver(session) do
       :unvisited ->
         raise ArgumentError,
               "cannot unwrap a Phoenix session before its first visit has classified the page"
 
       _driver ->
-        dispatch_driver(session, :unwrap, [fun])
+        dispatch_driver(session, operation, [fun])
     end
   end
 
-  def unwrap(%module{} = value, fun) when module in @native_values and is_function(fun, 1), do: fun.(native!(value))
+  @doc group: "Diagnostics and native access"
+  @doc """
+  Runs `fun` with the session's native counterpart, like `unwrap/2`, and returns
+  the callback's result instead of the session.
+
+      html = unwrap_and_return(session, &Phoenix.LiveViewTest.render/1)
+      title = unwrap_and_return(session, &PlaywrightEx.Page.title!/1)
+
+  LiveView and Playwright reconcile as `unwrap/2` does, following redirects and
+  navigation the callback causes, so keep using the same session afterwards. A
+  Static callback may return anything: its `Plug.Conn` is not replaced and the
+  page stays as it is. `Fluffy.Playwright.unwrap_and_return/3` passes a native
+  locator instead.
+
+  With a `Fluffy.Request`, `Fluffy.Response`, `Fluffy.Route`, `Fluffy.Dialog`,
+  `Fluffy.Download`, `Fluffy.FileChooser`, `Fluffy.Frame`,
+  `Fluffy.ConsoleMessage`, `Fluffy.PageError`, `Fluffy.Worker` or
+  `Fluffy.WebSocket`, `fun` receives its PlaywrightEx counterpart.
+  A Phoenix download has none and raises `Fluffy.CapabilityError`.
+
+      address = unwrap_and_return(response, &PlaywrightEx.Response.server_addr!/1)
+  """
+  @spec unwrap_and_return(Session.t(), (term() -> result)) :: result when result: term()
+  @spec unwrap_and_return(native_value(), (term() -> result)) :: result when result: term()
+  def unwrap_and_return(%Session{} = session, fun) when is_function(fun, 1),
+    do: dispatch_unwrap(session, :unwrap_and_return, fun)
+
+  def unwrap_and_return(%module{} = value, fun) when module in @native_values and is_function(fun, 1),
+    do: fun.(native!(value))
 
   defp native!(%Fluffy.Download{native: nil}) do
     raise Fluffy.CapabilityError,
@@ -568,6 +588,11 @@ defmodule Fluffy do
   end
 
   defp resolve_driver_result(%Session{} = session), do: session
+
+  defp resolve_driver_result({:return, result, outcome}) do
+    resolve_driver_result(outcome)
+    result
+  end
 
   defp resolve_driver_result({:navigate, %Session{} = session, navigation}) do
     Backend.navigate(session, navigation)

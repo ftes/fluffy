@@ -52,12 +52,12 @@ defmodule Fluffy.Conformance.NetworkEventTest do
     click(session, by_role(:button, name: "Save"))
     response = await(response_wait)
 
-    assert unwrap(response, &PlaywrightEx.Response.text!/1) == ~s({"saved":true})
-    assert unwrap(response.request, &PlaywrightEx.Request.is_navigation_request/1) == false
+    assert unwrap_and_return(response, &PlaywrightEx.Response.text!/1) == ~s({"saved":true})
+    assert unwrap_and_return(response.request, &PlaywrightEx.Request.is_navigation_request/1) == false
 
     close_session(session)
-    assert_raise ArgumentError, ~r/session is closed/, fn -> unwrap(response, & &1) end
-    assert_raise ArgumentError, ~r/session is closed/, fn -> unwrap(response.request, & &1) end
+    assert_raise ArgumentError, ~r/session is closed/, fn -> unwrap_and_return(response, & &1) end
+    assert_raise ArgumentError, ~r/session is closed/, fn -> unwrap_and_return(response.request, & &1) end
   end
 
   @tag driver: :playwright

@@ -7,7 +7,7 @@ defmodule Fluffy.PlaywrightMembers do
   #   * `{:renamed, {module, fun, arity}}` - the Fluffy function that covers it.
   #   * `{:unwrap, reason}` - not wrapped, but safe natively: on the page through
   #     `Fluffy.unwrap/2`, on a locator through `Fluffy.Playwright.unwrap/3`, or on a
-  #     value through `Fluffy.unwrap/2`. "gap:" marks candidates for a Fluffy API.
+  #     value through `Fluffy.unwrap_and_return/2`. "gap:" marks candidates for a Fluffy API.
   #   * `{:denied, reason}` - breaks Fluffy's tracking or ownership when called natively.
   #   * `{:na, reason}` - not applicable: legacy, deprecated, or tooling.
   @moduledoc false
@@ -19,12 +19,12 @@ defmodule Fluffy.PlaywrightMembers do
   @discouraged {:na, "deprecated or discouraged upstream"}
   @tooling {:na, "debugging or authoring tool"}
   @native_locator {:unwrap, "gap: on the native locator of Fluffy.Playwright.unwrap/3"}
-  @native_read {:unwrap, "non-retrying read on the native locator; prefer an expectation"}
+  @native_read {:unwrap, "non-retrying read through Fluffy.Playwright.unwrap_and_return/3; prefer an expectation"}
   @native_expect {:unwrap, "gap: assert on the native locator of Fluffy.Playwright.unwrap/3"}
   @native_page {:unwrap, "on the page of Fluffy.unwrap/2"}
   @page_gap {:unwrap, "gap: on the page of Fluffy.unwrap/2"}
-  @native_value {:unwrap, "gap: on the PlaywrightEx value of Fluffy.unwrap/2"}
-  @native_only {:unwrap, "browser network detail on the PlaywrightEx value of Fluffy.unwrap/2"}
+  @native_value {:unwrap, "gap: on the PlaywrightEx value of Fluffy.unwrap_and_return/2"}
+  @native_only {:unwrap, "browser network detail on the PlaywrightEx value of Fluffy.unwrap_and_return/2"}
   @native_event {:unwrap, "gap: listen natively inside Fluffy.unwrap/2"}
   @own_timeouts {:denied, "Fluffy owns timeouts: the session's timeout: is the context default"}
   @own_listeners {:denied, "removes the listeners Fluffy relies on for pages and events"}
@@ -120,7 +120,7 @@ defmodule Fluffy.PlaywrightMembers do
           {~w(expect_response wait_for_response)a, {:renamed, {Fluffy.Event, :response, 1}}},
           {[:locator], {:renamed, {Fluffy.Locator, :by_css, 1}}},
           {[:frame_locator], {:renamed, {Fluffy.Locator, :frame_locator, 1}}},
-          {[:title], {:unwrap, "gap: read; page_to_have_title asserts it"}},
+          {[:title], {:unwrap, "read through Fluffy.unwrap_and_return/2; page_to_have_title asserts it"}},
           {[:expect_console_message], {:renamed, {Fluffy.Event, :console, 1}}},
           {[:expect_request_finished], {:renamed, {Fluffy.Event, :request_finished, 1}}},
           {[:expect_websocket], {:renamed, {Fluffy.Event, :web_socket, 1}}},
@@ -190,7 +190,7 @@ defmodule Fluffy.PlaywrightMembers do
         {[:save_as], {:renamed, {Fluffy.Download, :save_as, 2}}},
         {[:create_read_stream], {:renamed, {Fluffy.Download, :read, 2}}},
         {[:path], :wrapped},
-        {~w(failure delete cancel)a, {:unwrap, "on PlaywrightEx.Download inside Fluffy.unwrap/2"}}
+        {~w(failure delete cancel)a, {:unwrap, "on PlaywrightEx.Download inside Fluffy.unwrap_and_return/2"}}
       ],
       PlaywrightEx.FileChooser => [
         {[:page], :wrapped},
@@ -203,7 +203,7 @@ defmodule Fluffy.PlaywrightMembers do
         {[:all_headers], {:renamed, {Fluffy.Request, :all_headers, 1}}},
         {[:header_value], {:renamed, {Fluffy.Request, :header_value, 2}}},
         {[:post_data_json], {:renamed, {Fluffy.Request, :post_data_json, 1}}},
-        {[:frame], {:unwrap, "on the PlaywrightEx value of Fluffy.unwrap/2; Fluffy.Request has its page"}},
+        {[:frame], {:unwrap, "on the PlaywrightEx value of Fluffy.unwrap_and_return/2; Fluffy.Request has its page"}},
         {~w(timing sizes)a, @native_only},
         {~w(response headers_array post_data_buffer is_navigation_request existing_response service_worker)a,
          @native_value}
@@ -222,7 +222,7 @@ defmodule Fluffy.PlaywrightMembers do
       ],
       PlaywrightEx.Route => [
         {~w(abort continue fallback fulfill request)a, :wrapped},
-        {[:fetch], {:unwrap, "gap: on the PlaywrightEx.Route of Fluffy.unwrap/2"}}
+        {[:fetch], {:unwrap, "gap: on the PlaywrightEx.Route of Fluffy.unwrap_and_return/2"}}
       ],
       PlaywrightEx.ConsoleMessage => [
         {~w(location page text timestamp type)a, :wrapped},

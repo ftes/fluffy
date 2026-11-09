@@ -14,7 +14,7 @@ defmodule Fluffy.Response do
 
   Phoenix delivers no responses: `Fluffy.Event.response/1` raises
   `Fluffy.CapabilityError`. `security_details`, `server_addr` and other members
-  stay on the `PlaywrightEx.Response` that `Fluffy.unwrap/2` passes.
+  stay on the `PlaywrightEx.Response` that `Fluffy.unwrap_and_return/2` passes.
   """
 
   alias Fluffy.Request

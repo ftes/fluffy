@@ -44,6 +44,172 @@ defmodule Fluffy.Conformance.UnwrapTest do
     end
   end
 
+  describe "unwrap_and_return" do
+    test "rejects a Phoenix session before its first visit, like unwrap" do
+      assert_raise ArgumentError, ~r/unwrap.*before.*visit/i, fn ->
+        :phoenix |> start_test_session() |> unwrap_and_return(fn _native -> flunk("callback ran") end)
+      end
+    end
+
+    @tag driver: :static
+    test "returns anything from a Static callback and leaves the page and its conn alone" do
+      test_pid = self()
+      session = :phoenix |> start_test_session() |> visit("/chamber")
+      document = Session.current_page(session).document_id
+      conn = Session.page_state(session).conn
+
+      assert unwrap_and_return(session, fn %Plug.Conn{} = native ->
+               send(test_pid, {:conn, native})
+               native.request_path
+             end) == "/chamber"
+
+      assert_receive {:conn, ^conn}
+
+      assert unwrap_and_return(session, fn native -> %{native | resp_body: "<p>Replaced</p>"} end).resp_body ==
+               "<p>Replaced</p>"
+
+      assert Session.page_state(session).conn == conn
+      assert Session.current_page(session).document_id == document
+      expect(session, "The guardian sleeps" |> by_text() |> to_be_visible())
+    end
+
+    @tag driver: :static
+    test "keeps a form's unsubmitted state on a Static page" do
+      fixture = TestHTTPFixtures.register(%{body: ~s(<form><input aria-label="Name" name="name"></form>)})
+
+      session =
+        :phoenix
+        |> start_test_session()
+        |> visit(TestHTTPFixtures.path(fixture))
+        |> fill(by_label("Name"), "Ada")
+
+      assert unwrap_and_return(session, fn _conn -> :read end) == :read
+      expect(session, "Name" |> by_label() |> to_have_value("Ada"))
+    end
+
+    @tag driver: :live
+    test "keeps a form's unsubmitted state on a LiveView page" do
+      session =
+        :phoenix
+        |> start_test_session()
+        |> visit("/live/facade-locators/tracked")
+        |> fill(by_label("One"), "Ada")
+
+      assert unwrap_and_return(session, fn %View{} -> :read end) == :read
+      expect(session, "One" |> by_label() |> to_have_value("Ada"))
+    end
+
+    @tag driver: :live
+    test "returns a Live callback's result and commits its render" do
+      session = :phoenix |> start_test_session() |> visit("/live/three-heads")
+
+      html =
+        unwrap_and_return(session, fn %View{} = view -> Phoenix.LiveViewTest.render_click(view, "increment") end)
+
+      assert html =~ "Sleeping heads: 1"
+      expect(session, "Sleeping heads: 1" |> by_text() |> to_be_visible())
+    end
+
+    @tag driver: :live
+    test "keeps up with a patch the callback sets off without waiting for it" do
+      session = :phoenix |> start_test_session() |> visit("/live/chamber-map")
+
+      unwrap_and_return(session, fn %View{} = view -> send(view.pid, :patch) end)
+
+      assert Session.current_page(session).url =~ "step=late-patched"
+    end
+
+    @tag driver: :live
+    test "follows a Live redirect, so a later action on the same handle sees the new page" do
+      session = :phoenix |> start_test_session() |> visit("/live/chamber-map")
+
+      assert unwrap_and_return(session, fn view ->
+               _redirect = Phoenix.LiveViewTest.render_click(view, "redirect_static")
+               :read
+             end) == :read
+
+      assert Session.current_driver(session) == :static
+
+      session
+      |> expect(Fluffy.Expect.page_to_have_url("/chamber"))
+      |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
+    end
+
+    @tag driver: :live
+    test "raises when the callback kills the LiveView" do
+      session = :phoenix |> start_test_session() |> visit("/live/three-heads")
+
+      assert_raise Fluffy.LiveViewError, fn ->
+        unwrap_and_return(session, fn view ->
+          Process.exit(view.pid, :kill)
+          ref = Process.monitor(view.pid)
+          assert_receive {:DOWN, ^ref, :process, _pid, _reason}
+          :unreachable
+        end)
+      end
+    end
+
+    @tag driver: :live
+    test "propagates a Live callback's exception, throw and exit" do
+      session = :phoenix |> start_test_session() |> visit("/live/three-heads")
+
+      assert_raise RuntimeError, "native", fn -> unwrap_and_return(session, fn _ -> raise "native" end) end
+      assert catch_throw(unwrap_and_return(session, fn _ -> throw(:native) end)) == :native
+      assert catch_exit(unwrap_and_return(session, fn _ -> exit(:native) end)) == :native
+    end
+
+    @tag driver: :playwright
+    test "returns a Playwright callback's result, including an error tuple" do
+      session = playwright_html("<p>Page</p>")
+
+      assert unwrap_and_return(session, &BrowserPage.title!/1) == "Fluffy test stage"
+      assert unwrap_and_return(session, fn _page -> {:error, :native} end) == {:error, :native}
+      expect(session, "Page" |> by_text() |> to_be_visible())
+    end
+
+    @tag driver: :playwright
+    test "adopts a Playwright navigation, so a later action on the same handle sees the new page" do
+      session = playwright_html("<p>Before navigation</p>")
+
+      assert unwrap_and_return(session, fn page ->
+               BrowserPage.goto!(page, "/chamber")
+               :read
+             end) == :read
+
+      session
+      |> expect(Fluffy.Expect.page_to_have_url("/chamber"))
+      |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
+    end
+
+    @tag driver: :playwright
+    test "reads through a native locator, on the active page" do
+      session = playwright_html("<p id='target'>Secret</p>")
+
+      assert unwrap_and_return(session, by_css("#target"), &BrowserLocator.text_content!/1) == "Secret"
+    end
+
+    @tag driver: :playwright
+    test "reports invalidation when the callback closes the tracked page" do
+      session = playwright_html("<p>Tracked page</p>")
+
+      assert_raise ArgumentError, ~r/unwrap.*invalidated.*page/i, fn ->
+        unwrap_and_return(session, &BrowserPage.close!/1)
+      end
+    end
+
+    for driver <- [:static, :live] do
+      @tag driver: driver
+      test "rejects a native locator with #{driver}" do
+        path = if unquote(driver) == :static, do: "/chamber", else: "/live/nested"
+        session = :phoenix |> start_test_session() |> visit(path)
+
+        assert_raise Fluffy.CapabilityError, ~r/:native_locator requires a Playwright session/, fn ->
+          unwrap_and_return(session, by_css("body"), fn _locator -> flunk("callback ran") end)
+        end
+      end
+    end
+  end
+
   describe "Static" do
     test "a LiveView page kept by a no-content response passes that response's conn" do
       fixture = TestHTTPFixtures.register(%{status: 204})
