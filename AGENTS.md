@@ -152,4 +152,10 @@ mix usage_rules.search_docs "Enum.zip" --query-by title
 ## phoenix:liveview usage
 [phoenix:liveview usage rules](deps/phoenix/usage-rules/liveview.md)
 <!-- phoenix:liveview-end -->
+<!-- playwright_ex-start -->
+## playwright_ex usage
+_Elixir client for Playwright: a port of the official JavaScript client._
+
+[playwright_ex usage rules](deps/playwright_ex/usage-rules.md)
+<!-- playwright_ex-end -->
 <!-- usage-rules-end -->
