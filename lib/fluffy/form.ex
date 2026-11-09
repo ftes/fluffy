@@ -343,26 +343,13 @@ defmodule Fluffy.Form do
 
     selected_ids =
       case get_in(properties, [target.id, :selected_ids]) do
-        nil -> default_selected_ids(options, target.attributes)
+        nil -> Semantics.default_selected_ids(options, target.attributes)
         ids -> ids
       end
 
     options
     |> Enum.filter(&(&1.id in selected_ids and not &1.disabled?))
     |> Enum.map(& &1.value)
-  end
-
-  defp default_selected_ids(options, attributes) do
-    multiple? = has_attribute?(attributes, "multiple")
-    selected = options |> Enum.filter(& &1.selected?) |> Enum.map(& &1.id)
-
-    cond do
-      selected != [] -> if(multiple?, do: selected, else: Enum.take(selected, -1))
-      multiple? -> []
-      select_size(attributes) > 1 -> []
-      options == [] -> []
-      true -> options |> Enum.reject(& &1.disabled?) |> Enum.take(1) |> Enum.map(& &1.id)
-    end
   end
 
   defp checked?(target, properties) do
@@ -465,7 +452,7 @@ defmodule Fluffy.Form do
     %{
       id: target.id,
       value: attribute(target.attributes, "value") || normalize_option_text(target.children),
-      selected?: has_attribute?(target.attributes, "selected"),
+      attributes: target.attributes,
       disabled?:
         target.disabled? or has_attribute?(target.attributes, "disabled") or
           DocumentIndex.ancestor_has_attribute?(index, target.id, "optgroup", "disabled")
@@ -483,13 +470,6 @@ defmodule Fluffy.Form do
   defp tree_text({_tag, _attributes, children}), do: tree_text(children)
   defp tree_text(text) when is_binary(text), do: text
   defp tree_text(_comment), do: ""
-
-  defp select_size(attributes) do
-    case Integer.parse(attribute(attributes, "size") || "") do
-      {size, ""} when size > 0 -> size
-      _missing_or_invalid -> 1
-    end
-  end
 
   defp normalize_line_endings(value) do
     value

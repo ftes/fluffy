@@ -7,7 +7,7 @@ defmodule Fluffy.Locator.Static do
   @labelled_control_selector "button, input, meter, output, progress, select, textarea"
 
   def resolve(document, %Locator{} = locator) do
-    aria = if role_locator?(locator), do: Aria.new(document)
+    aria = if role_locator?(locator), do: Aria.for_document(document)
     resolve(aria, document, locator)
   end
 

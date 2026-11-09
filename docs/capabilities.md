@@ -63,11 +63,12 @@ on parsed HTML and mutable form state. Even Phoenix checks structural
 visibility; see [Visibility and DOM presence](usage.md#visibility-and-dom-presence)
 for the distinction from browser rendering and DOM absence.
 
-Phoenix locators do not model `<details>` and `<dialog>` open state, which a
-Phoenix test has no way to change. Content inside a closed `<details>` or
-`<dialog>` counts as visible on Phoenix, so a test can reach it without opening
-it; on Playwright it must be opened first. A `refute` on that content fails on
-Phoenix. Accessible names built from such content can differ the same way.
+Phoenix locators do not model `<details>`, `<dialog>` and `popover` open state,
+which a Phoenix test has no way to change. Content inside a closed `<details>`,
+`<dialog>` or `popover` counts as visible on Phoenix, so a test can reach it
+without opening it; on Playwright it must be opened first. A `refute` on that
+content fails on Phoenix. Accessible names built from such content can differ
+the same way.
 
 ### LiveView timing and keyboard events
 

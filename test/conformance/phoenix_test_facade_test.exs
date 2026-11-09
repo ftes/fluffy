@@ -648,6 +648,27 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
       assert submission.body =~ File.read!(path)
     end
 
+    @tag driver: driver
+    test "click_button skips a file input sharing the button's name with #{driver}" do
+      fixture =
+        Fluffy.TestHTTPFixtures.register_sequence([
+          %{
+            body: """
+            <html><body><form method="post" action="submit">
+              <label>Upload <input type="FILE" name="file"></label><button>Upload</button>
+            </form></body></html>
+            """
+          },
+          %{body: "<html><body><p>Uploaded</p></body></html>"}
+        ])
+
+      unquote(driver)
+      |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+      |> visit(Fluffy.TestHTTPFixtures.path(fixture, "/upload/start"))
+      |> click_button("Upload")
+      |> assert_has("p", "Uploaded")
+    end
+
     for variant <- [:label, :label_options, :selector, :selector_options, :clear] do
       @tag driver: driver
       test "multi-file upload #{variant} preserves submitted selection with #{driver}" do

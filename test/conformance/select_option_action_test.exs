@@ -145,12 +145,16 @@ defmodule Fluffy.Conformance.SelectOptionActionTest do
       <label>Queue
         <select size="2"><option value="first">First</option><option value="second">Second</option></select>
       </label>
+      <label>Sloppy
+        <select size="2x"><option value="first">First</option><option value="second">Second</option></select>
+      </label>
       """
 
       with_html(unquote(driver), html, fn session ->
         session
         |> expect("Plan" |> by_label() |> to_have_value("current"))
         |> expect("Queue" |> by_label() |> to_have_value(""))
+        |> expect("Sloppy" |> by_label() |> to_have_value(""))
       end)
     end
 

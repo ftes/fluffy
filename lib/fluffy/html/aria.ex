@@ -8,7 +8,7 @@ defmodule Fluffy.HTML.Aria do
   alias Fluffy.HTML.DocumentIndex
   alias Fluffy.HTML.Semantics
 
-  @enforce_keys [:document, :nodes, :roots, :html_ids, :labels]
+  @enforce_keys [:index, :html_ids, :labels]
   defstruct @enforce_keys
 
   @valid_roles ~w(
@@ -117,7 +117,7 @@ defmodule Fluffy.HTML.Aria do
   )
 
   # Not a JavaScript number (NaN) means no tabindex, the empty string is 0.
-  @js_number ~r/^\s*(?:[+-]?(?:\d+\.?\d*(?:e[+-]?\d+)?|\.\d+(?:e[+-]?\d+)?|Infinity)|0x[0-9a-f]+|0o[0-7]+|0b[01]+)?\s*$/iu
+  @js_number ~r/^[\s\x{FEFF}]*(?:[+-]?(?:[0-9]+\.?[0-9]*(?:[eE][+-]?[0-9]+)?|\.[0-9]+(?:[eE][+-]?[0-9]+)?|Infinity)|0[xX][0-9a-fA-F]+|0[oO][0-7]+|0[bB][01]+)?[\s\x{FEFF}]*$/u
 
   @naming_prohibited_roles ~w(
     caption code definition deletion emphasis generic insertion mark paragraph presentation strong
@@ -154,13 +154,24 @@ defmodule Fluffy.HTML.Aria do
                        summary table tbody td textarea tfoot th thead tr ul xmp
                      )
 
+  # An element is foreign up to the nearest of these, whose content is HTML again.
+  @foreign_roots ["math", "svg"]
+  @html_integration_points ~w(foreignObject mi mn mo ms mtext)
+
   @context %{target: nil, labelled_by: nil, label: nil, native: nil}
 
-  def new(%LazyHTML{} = document) do
-    {roots, {nodes, _next_id}} = document |> LazyHTML.to_tree() |> add_children(nil, {%{}, 0})
-    aria = %__MODULE__{document: document, nodes: nodes, roots: roots, html_ids: %{}, labels: %{}}
-    aria = %{aria | html_ids: html_ids(aria)}
-    %{aria | labels: labels_by_control(aria)}
+  # Like `ClientDOM.index/1`: one entry per process, so retries against an
+  # unchanged document do not rebuild the model.
+  def for_document(%LazyHTML{} = document) do
+    case Process.get({__MODULE__, :model}) do
+      {^document, aria} ->
+        aria
+
+      _missing ->
+        aria = build(document)
+        Process.put({__MODULE__, :model}, {document, aria})
+        aria
+    end
   end
 
   # The node and element of everything a locator's scope can match, in document
@@ -168,10 +179,10 @@ defmodule Fluffy.HTML.Aria do
   def scoped_nodes(%__MODULE__{} = aria, scope) do
     elements = scope |> LazyHTML.query("*") |> Enum.to_list()
 
-    if scope == aria.document do
+    if scope == aria.index.document do
       Enum.zip(all_nodes(aria), elements)
     else
-      scope_node = node_at(aria, DocumentIndex.path(scope))
+      scope_node = fetch(aria, DocumentIndex.id!(aria.index, scope))
       aria |> descendants(scope_node) |> Enum.zip(Enum.drop(elements, 1))
     end
   end
@@ -199,22 +210,11 @@ defmodule Fluffy.HTML.Aria do
     end
   end
 
-  defp add_children(trees, parent_id, accumulator) do
-    Enum.flat_map_reduce(trees, accumulator, &add_node(&1, parent_id, &2))
+  defp build(document) do
+    aria = %__MODULE__{index: DocumentIndex.new(document), html_ids: %{}, labels: %{}}
+    aria = %{aria | html_ids: html_ids(aria)}
+    %{aria | labels: labels_by_control(aria)}
   end
-
-  defp add_node(text, _parent_id, accumulator) when is_binary(text), do: {[text], accumulator}
-
-  defp add_node({tag, attributes, children}, parent_id, {nodes, id}) when is_binary(tag) do
-    # A template's content is not part of the document.
-    children = if tag == "template", do: [], else: children
-    {child_ids, {nodes, next_id}} = add_children(children, id, {nodes, id + 1})
-
-    node = %{id: id, tag: tag, attributes: attributes, parent: parent_id, children: child_ids, last: next_id - 1}
-    {[id], {Map.put(nodes, id, node), next_id}}
-  end
-
-  defp add_node(_comment, _parent_id, accumulator), do: {[], accumulator}
 
   defp html_ids(aria) do
     aria
@@ -251,17 +251,35 @@ defmodule Fluffy.HTML.Aria do
   defp labelable?(%{tag: "input"} = node), do: Semantics.input_type(node) != "hidden"
   defp labelable?(%{tag: tag}), do: tag in @labelable_tags
 
-  defp all_nodes(aria), do: Enum.map(0..(map_size(aria.nodes) - 1)//1, &fetch(aria, &1))
+  defp all_nodes(aria), do: aria.index.entries
 
-  defp descendants(aria, node), do: Enum.map((node.id + 1)..node.last//1, &fetch(aria, &1))
+  defp descendants(aria, node) do
+    (node.id + 1)..node.last_id//1 |> Enum.map(&fetch(aria, &1)) |> Enum.reject(& &1.inert?)
+  end
 
-  defp fetch(aria, id), do: Map.fetch!(aria.nodes, id)
+  defp fetch(aria, id), do: Map.fetch!(aria.index.nodes_by_id, id)
 
-  defp parent(_aria, %{parent: nil}), do: nil
-  defp parent(aria, %{parent: parent_id}), do: fetch(aria, parent_id)
+  defp parent(_aria, %{parent_id: nil}), do: nil
+  defp parent(aria, %{parent_id: parent_id}), do: fetch(aria, parent_id)
+
+  # A template's content is not part of the document.
+  defp children(_aria, %{tag: "template"}), do: []
+
+  # Text as is, elements by id. Ids are preorder, so each element follows its
+  # previous sibling's last descendant.
+  defp children(aria, node) do
+    {children, _next_id} =
+      Enum.flat_map_reduce(node.children, node.id + 1, fn
+        text, id when is_binary(text) -> {[text], id}
+        {tag, _attributes, _children}, id when is_binary(tag) -> {[id], fetch(aria, id).last_id + 1}
+        _comment, id -> {[], id}
+      end)
+
+    children
+  end
 
   defp child_elements(aria, node) do
-    node.children |> Enum.filter(&is_integer/1) |> Enum.map(&fetch(aria, &1))
+    aria |> children(node) |> Enum.filter(&is_integer/1) |> Enum.map(&fetch(aria, &1))
   end
 
   defp first_child(aria, node, tag), do: aria |> child_elements(node) |> Enum.find(&(&1.tag == tag))
@@ -270,15 +288,6 @@ defmodule Fluffy.HTML.Aria do
 
   defp closest(aria, node, predicate) do
     if predicate.(node), do: node, else: closest(aria, parent(aria, node), predicate)
-  end
-
-  defp node_at(aria, path), do: descend(aria, %{children: aria.roots}, path)
-
-  defp descend(_aria, node, []), do: node
-
-  defp descend(aria, node, [{_tag, position} | path]) do
-    id = node.children |> Enum.filter(&is_integer/1) |> Enum.at(position - 1)
-    descend(aria, fetch(aria, id), path)
   end
 
   defp attribute(node, name), do: Semantics.attribute(node.attributes, name)
@@ -294,41 +303,45 @@ defmodule Fluffy.HTML.Aria do
   defp blank?(text), do: String.trim(text) == ""
 
   defp not_rendered?(aria, node) do
-    hidden_attribute?(node) or String.downcase(text_attribute(node, "aria-hidden")) == "true" or
+    hidden_attribute?(aria, node) or String.downcase(text_attribute(node, "aria-hidden")) == "true" or
       node.tag in @not_rendered_tags or node.tag in @svg_metadata_tags or closed_by_state?(node) or
       closed_by_parent?(aria, node)
   end
 
   # The user-agent's [hidden] rule covers HTML only, and marquee's display overrides it.
   # until-found keeps the element's own box and hides only its content.
-  defp hidden_attribute?(node) do
-    attribute?(node, "hidden") and text_attribute(node, "hidden") != "until-found" and
-      node.tag not in ["marquee", "math", "svg"]
+  defp hidden_attribute?(aria, node) do
+    attribute?(node, "hidden") and not until_found?(node) and node.tag != "marquee" and not foreign?(aria, node)
   end
 
-  # `details` and `dialog` open state is not modeled: a Phoenix test cannot change
-  # it, so their content stays visible, unlike in a browser.
+  defp until_found?(node), do: text_attribute(node, "hidden") == "until-found"
+
+  defp foreign?(_aria, %{tag: tag}) when tag in @foreign_roots, do: true
+
+  defp foreign?(aria, node) do
+    boundary = closest(aria, parent(aria, node), &(&1.tag in @foreign_roots or &1.tag in @html_integration_points))
+    boundary != nil and boundary.tag in @foreign_roots
+  end
+
+  # `details`, `dialog` and `popover` open state is not modeled: a Phoenix test
+  # cannot change it, so their content stays visible, unlike in a browser.
   defp closed_by_state?(%{tag: "audio"} = node), do: not attribute?(node, "controls")
   defp closed_by_state?(%{tag: "input"} = node), do: Semantics.input_type(node) == "hidden"
   defp closed_by_state?(_node), do: false
 
+  # A non-replaced inline box has no containment for until-found to apply.
   defp closed_by_parent?(aria, node) do
     case parent(aria, node) do
-      %{tag: tag} when tag in @fallback_content_tags ->
-        true
-
-      %{} = parent ->
-        text_attribute(parent, "hidden") == "until-found"
-
-      nil ->
-        false
+      %{tag: tag} when tag in @fallback_content_tags -> true
+      %{} = parent -> until_found?(parent) and parent.tag in @non_inline_tags
+      nil -> false
     end
   end
 
   # Only a list box renders its groups; a dropdown shows its options on its own.
   defp dropdown_optgroup?(aria, %{tag: "optgroup"} = node) do
     case parent(aria, node) do
-      %{tag: "select"} = select -> not list_box?(select)
+      %{tag: "select"} = select -> not Semantics.list_box?(select.attributes)
       _other -> false
     end
   end
@@ -400,7 +413,7 @@ defmodule Fluffy.HTML.Aria do
 
       field_set ->
         legend = first_child(aria, field_set, "legend")
-        legend == nil or node.id not in legend.id..legend.last
+        legend == nil or node.id not in legend.id..legend.last_id
     end
   end
 
@@ -448,7 +461,9 @@ defmodule Fluffy.HTML.Aria do
     end
   end
 
-  defp tag_role(_aria, %{tag: "select"} = node), do: if(list_box?(node), do: "listbox", else: "combobox")
+  defp tag_role(_aria, %{tag: "select"} = node) do
+    if Semantics.list_box?(node.attributes), do: "listbox", else: "combobox"
+  end
 
   defp tag_role(aria, %{tag: "td"} = node) do
     table = closest(aria, node, &(&1.tag == "table"))
@@ -491,14 +506,6 @@ defmodule Fluffy.HTML.Aria do
   defp text_input_role("search"), do: "searchbox"
   defp text_input_role(_type), do: "textbox"
 
-  defp list_box?(select) do
-    attribute?(select, "multiple") or
-      case select |> text_attribute("size") |> String.trim_leading() |> Integer.parse() do
-        {size, _rest} -> size > 1
-        :error -> false
-      end
-  end
-
   defp inferred_header_role(aria, node) do
     {previous, next} = adjacent_elements(aria, node)
 
@@ -513,7 +520,7 @@ defmodule Fluffy.HTML.Aria do
   defp adjacent_elements(aria, node) do
     siblings =
       case parent(aria, node) do
-        nil -> aria.roots |> Enum.filter(&is_integer/1) |> Enum.map(&fetch(aria, &1))
+        nil -> aria |> all_nodes() |> Enum.filter(&(&1.parent_id == nil))
         parent -> child_elements(aria, parent)
       end
 
@@ -646,20 +653,16 @@ defmodule Fluffy.HTML.Aria do
 
   defp selected_options(aria, %{tag: "select"} = select, _role) do
     options = select_options(aria, select)
-    selected = Enum.filter(options, &attribute?(&1, "selected"))
 
-    cond_result =
-      cond do
-        attribute?(select, "multiple") -> selected
-        selected != [] -> [List.last(selected)]
-        list_box?(select) -> []
-        true -> options |> Enum.reject(&natively_disabled?(aria, &1)) |> Enum.take(1)
-      end
+    selected_ids =
+      options
+      |> Enum.map(&Map.put(&1, :disabled?, natively_disabled?(aria, &1)))
+      |> Semantics.default_selected_ids(select.attributes)
 
-    then(cond_result, fn
+    case Enum.filter(options, &(&1.id in selected_ids)) do
       [] -> Enum.take(options, 1)
-      chosen -> chosen
-    end)
+      selected -> selected
+    end
   end
 
   defp selected_options(aria, node, role) do
@@ -851,19 +854,13 @@ defmodule Fluffy.HTML.Aria do
 
   defp inner_text(aria, node, context, visited) do
     {parts, visited} =
-      Enum.map_reduce(node.children ++ references(aria, node, "aria-owns"), visited, fn
-        text, visited when is_binary(text) -> {rendered_text(node, text, context), visited}
+      Enum.map_reduce(children(aria, node) ++ references(aria, node, "aria-owns"), visited, fn
+        text, visited when is_binary(text) -> {text, visited}
         id, visited -> element_text(aria, fetch(aria, id), context, visited)
       end)
 
     {Enum.join(parts), visited}
   end
-
-  defp rendered_text(%{tag: "details"} = node, text, context) do
-    if attribute?(node, "open") or hidden_reference?(context), do: text, else: ""
-  end
-
-  defp rendered_text(_node, text, _context), do: text
 
   defp element_text(aria, node, context, visited) do
     {text, visited} = text_alternative(aria, node, context, visited)
@@ -872,7 +869,7 @@ defmodule Fluffy.HTML.Aria do
   end
 
   defp non_inline?(aria, node) do
-    attribute?(node, "hidden") or node.tag in @non_inline_tags or ruby_text?(aria, node)
+    hidden_attribute?(aria, node) or node.tag in @non_inline_tags or ruby_text?(aria, node)
   end
 
   # Outside a ruby, rt has no display of its own.
@@ -880,7 +877,9 @@ defmodule Fluffy.HTML.Aria do
   defp ruby_text?(_aria, _node), do: false
 
   defp text_content(aria, node) do
-    Enum.map_join(node.children, fn
+    aria
+    |> children(node)
+    |> Enum.map_join(fn
       text when is_binary(text) -> text
       id -> text_content(aria, fetch(aria, id))
     end)

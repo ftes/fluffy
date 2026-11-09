@@ -94,7 +94,11 @@ defmodule Fluffy.PhoenixTest do
   @doc "Clicks a button by accessible name, or by CSS and text or label (optional `exact:`)."
   @spec click_button(session(), String.t()) :: session()
   @spec click_button(session(), String.t(), String.t()) :: session()
-  def click_button(session, text), do: click_role(session, :button, text)
+  def click_button(session, text) do
+    # `by_role(:button)` matches a file input, as in Playwright; `click_button` never means one.
+    click_role(session, :button, text, &Locator.and_(&1, css_locator(session, ":not(input[type=file i])")))
+  end
+
   def click_button(session, selector, text), do: click_button(session, selector, text, [])
 
   @spec click_button(session(), String.t(), String.t(), keyword()) :: session()
@@ -293,9 +297,12 @@ defmodule Fluffy.PhoenixTest do
   @spec refute_path(session(), String.t(), keyword()) :: session()
   def refute_path(session, path, options \\ []), do: execute(session, path_expectation(path, options), true)
 
-  defp click_role(session, role, text) do
+  defp click_role(session, role, text, narrow \\ & &1) do
     string!(text, :text)
-    locator = scoped(session, &Locator.by_role(&1, role, name: text), fn -> Locator.by_role(role, name: text) end)
+
+    locator =
+      narrow.(scoped(session, &Locator.by_role(&1, role, name: text), fn -> Locator.by_role(role, name: text) end))
+
     map_session(session, &Fluffy.click(&1, locator))
   end
 

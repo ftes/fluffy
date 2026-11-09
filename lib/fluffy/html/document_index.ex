@@ -32,6 +32,7 @@ defmodule Fluffy.HTML.DocumentIndex do
           identity: term(),
           implicit_form_id: non_neg_integer() | nil,
           inert?: boolean(),
+          last_id: non_neg_integer(),
           parent_id: non_neg_integer() | nil,
           path: path(),
           selector_path: path(),
@@ -182,6 +183,11 @@ defmodule Fluffy.HTML.DocumentIndex do
           element_position = element_position + 1
           path = parent_path ++ [{tag, element_position}]
           selector_path = parent_selector_path ++ [{tag, tag_position}]
+          child_form_id = if tag == "form", do: id, else: implicit_form_id
+          child_inert? = inert? or tag == "template"
+
+          {descendants, following_id} =
+            index_nodes(children, id, child_form_id, child_inert?, path, selector_path, id + 1)
 
           entry = %{
             attributes: attributes,
@@ -190,17 +196,12 @@ defmodule Fluffy.HTML.DocumentIndex do
             identity: identity(tag, attributes, selector_path),
             implicit_form_id: implicit_form_id,
             inert?: inert?,
+            last_id: following_id - 1,
             parent_id: parent_id,
             path: path,
             selector_path: selector_path,
             tag: tag
           }
-
-          child_form_id = if tag == "form", do: id, else: implicit_form_id
-          child_inert? = inert? or tag == "template"
-
-          {descendants, following_id} =
-            index_nodes(children, id, child_form_id, child_inert?, path, selector_path, id + 1)
 
           {
             descendants ++ [entry | entries],

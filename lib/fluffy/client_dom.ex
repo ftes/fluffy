@@ -568,35 +568,11 @@ defmodule Fluffy.ClientDOM do
 
     selected_ids =
       case get_in(client_dom.properties, [target.id, :selected_ids]) do
-        nil -> default_selected_ids(options, target.attributes)
+        nil -> Semantics.default_selected_ids(options, target.attributes)
         ids -> ids
       end
 
     Enum.filter(options, &(&1.id in selected_ids))
-  end
-
-  defp default_selected_ids(options, attributes) do
-    multiple? = has_attribute?(attributes, "multiple")
-
-    selected =
-      options
-      |> Enum.filter(&has_attribute?(&1.attributes, "selected"))
-      |> Enum.map(& &1.id)
-
-    cond do
-      selected != [] -> if(multiple?, do: selected, else: Enum.take(selected, -1))
-      multiple? -> []
-      select_size(attributes) > 1 -> []
-      options == [] -> []
-      true -> options |> Enum.reject(& &1.disabled?) |> Enum.take(1) |> Enum.map(& &1.id)
-    end
-  end
-
-  defp select_size(attributes) do
-    case Integer.parse(attribute(attributes, "size") || "") do
-      {size, ""} when size > 0 -> size
-      _missing_or_invalid -> 1
-    end
   end
 
   defp tree_text(nodes) when is_list(nodes), do: Enum.map_join(nodes, &tree_text/1)
