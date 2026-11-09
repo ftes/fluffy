@@ -24,7 +24,7 @@ defmodule Fluffy.ClientDOM.Query do
 
       tree
       |> LazyHTML.from_tree()
-      |> Static.resolve(rewritten)
+      |> Static.resolve_uncached(rewritten)
       |> Enum.map(&Map.fetch!(original_nodes, DocumentIndex.path(&1)))
     end
   end

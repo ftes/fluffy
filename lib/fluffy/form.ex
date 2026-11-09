@@ -453,9 +453,7 @@ defmodule Fluffy.Form do
       id: target.id,
       value: attribute(target.attributes, "value") || normalize_option_text(target.children),
       attributes: target.attributes,
-      disabled?:
-        has_attribute?(target.attributes, "disabled") or
-          DocumentIndex.ancestor_has_attribute?(index, target.id, "optgroup", "disabled")
+      disabled?: DocumentIndex.option_disabled?(index, target)
     }
   end
 

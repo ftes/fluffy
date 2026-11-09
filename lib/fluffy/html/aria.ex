@@ -8,7 +8,7 @@ defmodule Fluffy.HTML.Aria do
   alias Fluffy.HTML.DocumentIndex
   alias Fluffy.HTML.Semantics
 
-  @enforce_keys [:index, :html_ids, :labels]
+  @enforce_keys [:index, :html_ids, :labels, :document_nodes]
   defstruct @enforce_keys
 
   @valid_roles ~w(
@@ -167,30 +167,37 @@ defmodule Fluffy.HTML.Aria do
         aria
 
       _missing ->
-        aria = build(document)
+        aria = build(DocumentIndex.for_document(document))
         Process.put({__MODULE__, :model}, {document, aria})
         aria
     end
   end
 
+  # For a document built for one query, which must not evict the real document's entries.
+  def uncached(%LazyHTML{} = document), do: build(DocumentIndex.new(document))
+
   # The node and element of everything a locator's scope can match, in document
   # order. A scope is never one of its own matches.
   def scoped_nodes(%__MODULE__{} = aria, scope) do
-    elements = scope |> LazyHTML.query("*") |> Enum.to_list()
-
     if scope == aria.index.document do
-      Enum.zip(all_nodes(aria), elements)
+      aria.document_nodes
     else
-      aria |> descendants(node_for(aria, scope)) |> Enum.zip(Enum.drop(elements, 1))
+      scope |> LazyHTML.query("*") |> Enum.drop(1) |> Enum.map(&{node_for(aria, &1), &1})
     end
   end
 
   # What markup alone says about rendering, shared by role matching and visibility
-  # checks. `details`, `dialog` and `popover` open state is not modeled: a Phoenix
-  # test cannot change it, so their content stays visible, unlike in a browser.
+  # checks. `details`, `dialog`, `popover` and dropdown `select` open state is not
+  # modeled: a Phoenix test cannot change it, so their content stays visible, unlike
+  # in a browser.
   def rendered?(%__MODULE__{} = aria, node) do
-    not ignored?(aria, node) and not dropdown_optgroup?(aria, node) and
+    not ignored?(aria, node) and not hidden_in_dropdown?(aria, node) and
       closest(aria, node, &not_rendered?(aria, &1)) == nil
+  end
+
+  # Visibility also needs a box, which role matching does not ask for.
+  def visible?(%__MODULE__{} = aria, node) do
+    rendered?(aria, node) and closest(aria, node, &boxless?(aria, &1)) == nil
   end
 
   # Role matching also honors `aria-hidden`, which visibility checks ignore.
@@ -220,10 +227,15 @@ defmodule Fluffy.HTML.Aria do
     end
   end
 
-  defp build(document) do
-    aria = %__MODULE__{index: DocumentIndex.for_document(document), html_ids: %{}, labels: %{}}
+  defp build(%DocumentIndex{} = index) do
+    aria = %__MODULE__{index: index, html_ids: %{}, labels: %{}, document_nodes: []}
     aria = %{aria | html_ids: html_ids(aria)}
-    %{aria | labels: labels_by_control(aria)}
+    # Resolving an element is slow, so a retried document-wide locator must not repeat it.
+    %{aria | labels: labels_by_control(aria), document_nodes: document_nodes(aria)}
+  end
+
+  defp document_nodes(aria) do
+    aria.index.document |> LazyHTML.query("*") |> Enum.map(&{node_for(aria, &1), &1})
   end
 
   defp html_ids(aria) do
@@ -232,7 +244,7 @@ defmodule Fluffy.HTML.Aria do
     |> Enum.reject(&inert?(aria, &1))
     |> Enum.reduce(%{}, fn node, html_ids ->
       case attribute(node, "id") do
-        nil -> html_ids
+        html_id when html_id in [nil, ""] -> html_ids
         html_id -> Map.put_new(html_ids, html_id, node.id)
       end
     end)
@@ -247,10 +259,12 @@ defmodule Fluffy.HTML.Aria do
 
   defp labeled_control_id(aria, label) do
     case attribute(label, "for") do
-      nil -> aria |> descendants(label) |> Enum.find(&Semantics.labelable?/1) |> then(&(&1 && &1.id))
+      nil -> aria |> descendants(label) |> Enum.find(&labelable_descendant?(aria, &1)) |> then(&(&1 && &1.id))
       html_id -> labelable_id(aria, Map.get(aria.html_ids, html_id))
     end
   end
+
+  defp labelable_descendant?(aria, node), do: Semantics.labelable?(node) and not inert?(aria, node)
 
   defp labelable_id(_aria, nil), do: nil
 
@@ -331,6 +345,12 @@ defmodule Fluffy.HTML.Aria do
     boundary != nil and boundary.tag in @foreign_roots
   end
 
+  defp collapsed_until_found?(node), do: until_found?(node) and node.tag in @non_inline_tags
+
+  defp boxless?(aria, %{tag: "defs"} = node), do: foreign?(aria, node)
+  defp boxless?(aria, %{tag: "source"} = node), do: match?(%{tag: "picture"}, parent(aria, node))
+  defp boxless?(_aria, node), do: collapsed_until_found?(node)
+
   defp closed_by_state?(%{tag: "audio"} = node), do: not attribute?(node, "controls")
   defp closed_by_state?(%{tag: "input"} = node), do: Semantics.input_type(node) == "hidden"
   defp closed_by_state?(_node), do: false
@@ -339,20 +359,20 @@ defmodule Fluffy.HTML.Aria do
   defp closed_by_parent?(aria, node) do
     case parent(aria, node) do
       %{tag: tag} when tag in @fallback_content_tags -> true
-      %{} = parent -> until_found?(parent) and parent.tag in @non_inline_tags
+      %{} = parent -> collapsed_until_found?(parent)
       nil -> false
     end
   end
 
-  # Only a list box renders its groups; a dropdown shows its options on its own.
-  defp dropdown_optgroup?(aria, %{tag: "optgroup"} = node) do
+  # Only a list box renders groups and separators; a dropdown shows its options on its own.
+  defp hidden_in_dropdown?(aria, %{tag: tag} = node) when tag in ["hr", "optgroup"] do
     case parent(aria, node) do
       %{tag: "select"} = select -> not Semantics.list_box?(select.attributes)
       _other -> false
     end
   end
 
-  defp dropdown_optgroup?(_aria, _node), do: false
+  defp hidden_in_dropdown?(_aria, _node), do: false
 
   defp ignored?(aria, node), do: node.tag in @ignored_tags or inert?(aria, node)
 
@@ -401,16 +421,13 @@ defmodule Fluffy.HTML.Aria do
 
   defp natively_disabled?(aria, %{tag: tag} = node)
        when tag in ["button", "input", "select", "textarea", "option", "optgroup"] do
-    attribute?(node, "disabled") or disabled_option_group?(aria, node) or disabled_field_set?(aria, node)
+    attribute?(node, "disabled") or disabled_option?(aria, node) or disabled_field_set?(aria, node)
   end
 
   defp natively_disabled?(_aria, _node), do: false
 
-  defp disabled_option_group?(aria, %{tag: "option"} = node) do
-    closest(aria, node, &(&1.tag == "optgroup" and attribute?(&1, "disabled"))) != nil
-  end
-
-  defp disabled_option_group?(_aria, _node), do: false
+  defp disabled_option?(aria, %{tag: "option"} = node), do: DocumentIndex.option_disabled?(aria.index, node)
+  defp disabled_option?(_aria, _node), do: false
 
   # Only the closest disabled fieldset counts, as in Playwright.
   defp disabled_field_set?(aria, node) do
@@ -658,7 +675,7 @@ defmodule Fluffy.HTML.Aria do
 
     selected_ids =
       options
-      |> Enum.map(&Map.put(&1, :disabled?, attribute?(&1, "disabled") or disabled_option_group?(aria, &1)))
+      |> Enum.map(&Map.put(&1, :disabled?, DocumentIndex.option_disabled?(aria.index, &1)))
       |> Semantics.default_selected_ids(select.attributes)
 
     case Enum.filter(options, &(&1.id in selected_ids)) do

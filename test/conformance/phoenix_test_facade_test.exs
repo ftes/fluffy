@@ -648,6 +648,32 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
       assert submission.body =~ File.read!(path)
     end
 
+    for {name, control} <- [
+          {"a submit input", ~s(<input type="submit" value="Upload">)},
+          {"an explicit button role", ~s(<a role="button" href="submit">Upload</a>)}
+        ] do
+      @tag driver: driver
+      test "click_button still clicks #{name} next to a file input with #{driver}" do
+        fixture =
+          Fluffy.TestHTTPFixtures.register_sequence([
+            %{
+              body: """
+              <html><body><form method="get" action="submit">
+                <label>Upload <input type="file" name="file"></label>#{unquote(control)}
+              </form></body></html>
+              """
+            },
+            %{body: "<html><body><p>Uploaded</p></body></html>"}
+          ])
+
+        unquote(driver)
+        |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+        |> visit(Fluffy.TestHTTPFixtures.path(fixture, "/upload/start"))
+        |> click_button("Upload")
+        |> assert_has("p", "Uploaded")
+      end
+    end
+
     @tag driver: driver
     test "click_button skips a file input sharing the button's name with #{driver}" do
       fixture =

@@ -172,6 +172,13 @@ defmodule Fluffy.HTML.DocumentIndex do
     |> has_ancestor_attribute?(index, tag, attribute)
   end
 
+  # Default selection honors this alone: a disabled fieldset does not count.
+  @spec option_disabled?(t(), %{:id => non_neg_integer(), :attributes => list(), optional(atom()) => term()}) :: boolean()
+  def option_disabled?(%__MODULE__{} = index, option) do
+    Semantics.has_attribute?(option.attributes, "disabled") or
+      ancestor_has_attribute?(index, option.id, "optgroup", "disabled")
+  end
+
   @spec target!(t(), LazyHTML.t()) :: Target.t()
   def target!(%__MODULE__{} = index, %LazyHTML{} = element) do
     entry = Map.fetch!(index.nodes_by_path, path(element))

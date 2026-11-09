@@ -7,8 +7,13 @@ defmodule Fluffy.Locator.Static do
 
   @labelled_control_selector Enum.join(Semantics.labelable_tags(), ", ")
 
-  def resolve(document, %Locator{} = locator) do
-    aria = if needs_aria?(locator), do: Aria.for_document(document)
+  def resolve(document, %Locator{} = locator), do: resolve_with(document, locator, &Aria.for_document/1)
+
+  # For a document built for one query.
+  def resolve_uncached(document, %Locator{} = locator), do: resolve_with(document, locator, &Aria.uncached/1)
+
+  defp resolve_with(document, locator, model) do
+    aria = if needs_aria?(locator), do: model.(document)
     resolve(aria, document, locator)
   end
 
@@ -50,7 +55,7 @@ defmodule Fluffy.Locator.Static do
 
   defp aria_operation?(_operation), do: false
 
-  def structurally_visible?(%Aria{} = aria, element), do: Aria.rendered?(aria, Aria.node_for(aria, element))
+  def structurally_visible?(%Aria{} = aria, element), do: Aria.visible?(aria, Aria.node_for(aria, element))
 
   defp apply_operation({:css, selector}, scopes) do
     query_scopes(scopes, selector)

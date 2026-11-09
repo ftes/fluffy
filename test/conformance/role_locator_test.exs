@@ -311,6 +311,12 @@ defmodule Fluffy.Conformance.RoleLocatorTest do
     {"HTML desc renders its subtree", ~s(<desc><button>Go</button></desc>), :button, [], 1},
     {"HTML metadata renders its subtree", ~s(<metadata><button>Go</button></metadata>), :button, [], 1},
     {"svg desc hides its subtree", ~s(<svg><desc><button>Go</button></desc></svg>), :button, [], 0},
+    {"a label's noscript control is not its control", ~s(<label>Pick <noscript><input></noscript><input></label>),
+     :textbox, [name: "Pick", exact: true], 1},
+    {"an empty for matches no empty id", ~s(<label for="">Pick</label><input id="">), :textbox, [name: "Pick"], 0},
+    {"link in svg defs keeps its role", ~s(<svg><defs><a href="/x">Go</a></defs></svg>), :link, [], 1},
+    {"hr in a dropdown", ~s(<select><hr></select>), :separator, [], 0},
+    {"hr outside a select", "<hr>", :separator, [], 1},
     {"image input named by alt", ~s(<input type="image" alt="Go" title="T">), :button, [name: "Go", exact: true], 1},
     {"image input named by title", ~s(<input type="image" alt="  " title="T">), :button, [name: "T", exact: true], 1},
     {"image input default name", ~s(<input type="image">), :button, [name: "Submit", exact: true], 1},
@@ -414,6 +420,13 @@ defmodule Fluffy.Conformance.RoleLocatorTest do
     {"video fallback", ~s(<video><p id="t">Hi</p></video>), false},
     {"progress fallback", ~s(<progress><b id="t">Hi</b></progress>), false},
     {"svg desc", ~s(<svg><desc id="t">Hi</desc></svg>), false},
+    {"until-found block", ~s(<p id="t" hidden="until-found">Hi</p>), false},
+    {"uppercase until-found block", ~s(<p id="t" hidden="UNTIL-FOUND">Hi</p>), false},
+    {"until-found span", ~s(<span id="t" hidden="until-found">Hi</span>), true},
+    {"svg defs content", ~s(<svg><defs><a id="t" href="/x">Hi</a></defs></svg>), false},
+    {"picture source", ~s(<picture><source id="t" srcset="/a.png"><img alt="A"></picture>), false},
+    {"hr in a dropdown", ~s(<select><hr id="t"></select>), false},
+    {"option of a list box", ~s(<select size="3"><option id="t">A</option></select>), true},
     {"until-found child of a block", ~s(<div hidden="until-found"><p id="t">Hi</p></div>), false},
     {"until-found child of a span", ~s(<span hidden="until-found"><b id="t">Hi</b></span>), true},
     {"hidden attribute on an svg link", ~s(<svg><text><a id="t" hidden>Hi</a></text></svg>), true},
@@ -429,7 +442,9 @@ defmodule Fluffy.Conformance.RoleLocatorTest do
         {"content of closed details", ~s(<details><summary>S</summary><p id="t">Hi</p></details>),
          %{static: true, playwright: false}},
         {"closed dialog", ~s(<dialog id="t">Hi</dialog>), %{static: true, playwright: false}},
-        {"closed popover", ~s(<div id="t" popover>Hi</div>), %{static: true, playwright: false}}
+        {"closed popover", ~s(<div id="t" popover>Hi</div>), %{static: true, playwright: false}},
+        {"option of a closed dropdown", ~s(<select><option id="t">A</option></select>),
+         %{static: true, playwright: false}}
       ]
 
   for {case_name, html, expected} <- visibility_cases, driver <- [:static, :playwright] do
@@ -465,6 +480,14 @@ defmodule Fluffy.Conformance.RoleLocatorTest do
       session
       |> expect(:button |> by_role() |> to_have_count(0))
       |> expect("button" |> by_css() |> to_be_visible())
+    end
+
+    @tag driver: driver
+    test "a template inside svg does not shift role matches with #{driver}" do
+      html = ~s(<svg><template><a href="/in">In</a></template><a href="/after">After</a></svg>)
+      session = session_for_html(unquote(driver), html, base_url: Fluffy.TestServer.base_url())
+
+      expect(session, :link |> by_role(name: "After") |> to_have_attribute("href", "/after"))
     end
 
     @tag driver: driver

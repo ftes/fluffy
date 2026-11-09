@@ -520,8 +520,8 @@ selected option.
 Phoenix does not compute CSS or browser layout: a CSS class or inline
 `display: none` alone does not make an element structurally invisible. Use
 `:playwright` to test rendered visibility. Open state is not modeled either:
-see [Boundaries](capabilities.md#boundaries) for `<details>`, `<dialog>` and
-`popover`.
+see [Boundaries](capabilities.md#boundaries) for `<details>`, `<dialog>`,
+`popover` and the options of a closed `<select>`.
 
 Choose the assertion that expresses the intended behavior:
 
