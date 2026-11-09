@@ -14,6 +14,9 @@ release-sensitive changes.
   firefox or webkit.
 - Tests in `test/conformance/` run the same behavior against several drivers. The matrix in
   `docs/capabilities.md` is rendered from `Fluffy.Capability`, and a test keeps them in sync.
+- The block marked `usage_rules` below is generated: after updating deps run
+  `mix usage_rules.sync --yes`; `mix check` fails when it's stale. On Renovate's PRs a workflow
+  commits it.
 - After upgrading PlaywrightEx or adding an action or locator option, run
   `mix fluffy.gen.native_options`; `mix check` fails if its output is stale.
 - The compatibility floor is Elixir 1.18 on OTP 27 (`.tool-versions.oldest`).
