@@ -12,6 +12,7 @@
 /integration/.consumer-build-*/
 /.pg/
 .DS_Store
+erl_crash.dump
 .claude/
 # Left over in checkouts from before test assets were built with the Hex esbuild package.
 /node_modules/

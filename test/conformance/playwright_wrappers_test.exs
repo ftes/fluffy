@@ -403,7 +403,7 @@ defmodule Fluffy.Conformance.PlaywrightWrappersTest do
     end
 
     test "is bounded by the session's timeout, even while a script blocks the page" do
-      session = :playwright |> session_for_html("<p>Harness</p>") |> short_timeout()
+      session = :playwright |> session_for_html("<p>Harness</p>") |> put_session_timeout(1_000)
 
       # The freeze runs inside the evaluate, so it is in place before the wait reaches the page.
       assert_raise RuntimeError, ~r/evaluate did not finish within 1000ms/, fn ->
@@ -457,11 +457,6 @@ defmodule Fluffy.Conformance.PlaywrightWrappersTest do
         Playwright.wait_for_function(session, "() => true", nil, signal: :none)
       end
     end
-  end
-
-  # Setup runs under the default timeout; only the blocked part runs under 1s.
-  defp short_timeout(session) do
-    Fluffy.Session.put_context(session, %{Fluffy.Session.context(session) | timeout: 1_000})
   end
 
   defp with_html(driver, html, fun), do: fun.(session_for_html(driver, html))

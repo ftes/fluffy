@@ -156,12 +156,13 @@ defmodule Fluffy.Conformance.NetworkValueTest do
 
     session =
       :playwright
-      |> start_session(base_url: Fluffy.TestServer.base_url(), timeout: 500)
+      |> start_session(base_url: Fluffy.TestServer.base_url())
       |> visit(TestHTTPFixtures.path(fixture, "/start"))
 
-    pending = wait_for(session, Event.response(&String.ends_with?(&1.url, "/endless")), timeout: 15_000)
-    click(session, by_role(:button, name: "Fetch"), timeout: 15_000)
+    pending = wait_for(session, Event.response(&String.ends_with?(&1.url, "/endless")))
+    click(session, by_role(:button, name: "Fetch"))
     assert_receive {:stream, server}, 15_000
+    put_session_timeout(session, 500)
 
     try do
       assert_raise RuntimeError, ~r/body did not finish within 500ms/, fn -> Response.body(await(pending)) end

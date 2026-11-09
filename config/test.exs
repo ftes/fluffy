@@ -49,6 +49,9 @@ config :fluffy,
   playwright: [
     enabled: true,
     engine: browser_engine,
+    # Firefox dispatches input for all of a browser's pages in one queue; a second browser
+    # measurably shortens its latency tail.
+    pool_size: if(browser_engine == :firefox, do: 2, else: 1),
     timeout: 15_000,
     launch_options: [headless: true],
     artifact_dir: System.get_env("FLUFFY_ARTIFACT_DIR")

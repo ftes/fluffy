@@ -1006,7 +1006,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
       |> click_button("Later")
 
     assert_received {:page, page}
-    :ok = PlaywrightEx.Page.wait_for_url(page, &String.ends_with?(&1, "?next"), wait_until: :commit, timeout: 2_000)
+    :ok = PlaywrightEx.Page.wait_for_url(page, &String.ends_with?(&1, "?next"), wait_until: :commit, timeout: 10_000)
 
     assert_raise ArgumentError, ~r/no active form/, fn -> submit(session) end
   end

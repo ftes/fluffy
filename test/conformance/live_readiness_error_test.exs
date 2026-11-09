@@ -36,7 +36,7 @@ defmodule Fluffy.Conformance.LiveReadinessErrorTest do
   test "a disconnected nested channel is not ready even with a connected CSS marker" do
     session =
       :playwright
-      |> start_session(base_url: Fluffy.TestServer.base_url(), timeout: 1_000)
+      |> start_session(base_url: Fluffy.TestServer.base_url())
       |> visit("/live/nested")
 
     Playwright.evaluate(
@@ -52,7 +52,7 @@ defmodule Fluffy.Conformance.LiveReadinessErrorTest do
     )
 
     assert_raise RuntimeError, ~r/expected every LiveView root to be connected/, fn ->
-      visit(session, "/live/nested#disconnected-child")
+      session |> put_session_timeout(1_000) |> visit("/live/nested#disconnected-child")
     end
   end
 

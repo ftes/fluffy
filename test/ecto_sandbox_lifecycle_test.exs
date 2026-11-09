@@ -73,7 +73,7 @@ defmodule Fluffy.EctoSandboxLifecycleTest do
     Process.exit(owner, :kill)
 
     assert_receive {:DOWN, ^scope_reference, :process, ^scope, {:shutdown, {:sandbox_owner_down, :killed}}},
-                   1_000
+                   5_000
 
     refute browser_context.guid in Fluffy.TestCase.browser_context_guids()
   end

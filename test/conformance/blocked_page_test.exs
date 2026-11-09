@@ -28,7 +28,9 @@ defmodule Fluffy.Conformance.BlockedPageTest do
   end
 
   test "evaluate of a never-settling expression fails within the session timeout" do
-    session = :playwright |> session_for_html("<p>ok</p>", base_url: Fluffy.TestServer.base_url()) |> short_timeout()
+    session =
+      :playwright |> session_for_html("<p>ok</p>", base_url: Fluffy.TestServer.base_url()) |> put_session_timeout(1_000)
+
     started = System.monotonic_time(:millisecond)
 
     assert_raise RuntimeError, ~r/evaluate did not finish within 1000ms/, fn ->
@@ -105,7 +107,9 @@ defmodule Fluffy.Conformance.BlockedPageTest do
   end
 
   test "a blocked page that page code navigated reports its URL without waiting for the page" do
-    session = :playwright |> session_for_html(@html, base_url: Fluffy.TestServer.base_url()) |> short_timeout()
+    session =
+      :playwright |> session_for_html(@html, base_url: Fluffy.TestServer.base_url()) |> put_session_timeout(1_000)
+
     Playwright.evaluate(session, "history.pushState(null, '', 'pushed')")
 
     assert_raise RuntimeError, ~r/evaluate did not finish within 1000ms/, fn ->
@@ -113,7 +117,7 @@ defmodule Fluffy.Conformance.BlockedPageTest do
     end
 
     # Waiting for the page under this timeout would outlast the test's own.
-    session = Fluffy.Session.put_context(session, %{Fluffy.Session.context(session) | timeout: 600_000})
+    session = put_session_timeout(session, 600_000)
     assert session |> Playwright.current_page() |> Fluffy.Page.url() |> String.ends_with?("/pushed")
   end
 
@@ -127,7 +131,8 @@ defmodule Fluffy.Conformance.BlockedPageTest do
   end
 
   defp frozen_session do
-    session = :playwright |> session_for_html(@html, base_url: Fluffy.TestServer.base_url()) |> short_timeout()
+    session =
+      :playwright |> session_for_html(@html, base_url: Fluffy.TestServer.base_url()) |> put_session_timeout(1_000)
 
     # The freeze runs inside the evaluate, so it is in place before any later
     # Fluffy call reaches the page; the abandoned evaluate keeps it blocked.
@@ -136,12 +141,5 @@ defmodule Fluffy.Conformance.BlockedPageTest do
     end
 
     session
-  end
-
-  # Setup (visit, LiveView join, set_html) runs under the default timeout so a
-  # loaded machine cannot fail it; only the blocked part runs under 1s. No
-  # public API changes a live session's timeout, so this uses the internal one.
-  defp short_timeout(session) do
-    Fluffy.Session.put_context(session, %{Fluffy.Session.context(session) | timeout: 1_000})
   end
 end

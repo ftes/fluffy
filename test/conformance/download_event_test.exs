@@ -183,12 +183,13 @@ defmodule Fluffy.Conformance.DownloadEventTest do
 
     session =
       :playwright
-      |> start_session(base_url: Fluffy.TestServer.base_url(), timeout: 500)
+      |> start_session(base_url: Fluffy.TestServer.base_url())
       |> visit(TestHTTPFixtures.path(fixture, "/start"))
 
-    pending = wait_for(session, Event.download(), timeout: 15_000)
-    click(session, by_role(:link, name: "Download"), timeout: 15_000)
+    pending = wait_for(session, Event.download())
+    click(session, by_role(:link, name: "Download"))
     assert_receive {:stream, server}, 15_000
+    put_session_timeout(session, 500)
 
     try do
       download = await(pending)
@@ -293,13 +294,13 @@ defmodule Fluffy.Conformance.DownloadEventTest do
 
     session =
       :playwright
-      |> start_session(base_url: Fluffy.TestServer.base_url(), timeout: 2_000)
+      |> start_session(base_url: Fluffy.TestServer.base_url())
       |> visit(TestHTTPFixtures.path(fixture, "/start"))
 
-    # Only saving is bound by the short session timeout; starting the download is not.
-    pending = wait_for(session, Event.download(), timeout: 15_000)
-    click(session, by_role(:link, name: "Download"), timeout: 15_000)
+    pending = wait_for(session, Event.download())
+    click(session, by_role(:link, name: "Download"))
     assert_receive {:stream, server}, 15_000
+    put_session_timeout(session, 2_000)
 
     try do
       download = await(pending)

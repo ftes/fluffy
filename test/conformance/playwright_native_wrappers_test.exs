@@ -195,7 +195,7 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
       paint(session, "rgb(200, 0, 0)")
 
       assert_raise ExUnit.AssertionError, ~r/to match the screenshot at/, fn ->
-        expect(session, to_have_screenshot(box, path: path, timeout: 500))
+        expect(session, to_have_screenshot(box, path: path))
       end
 
       assert File.read!(path) == baseline
@@ -211,7 +211,7 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
       session = session_for_html(:playwright, @html)
 
       assert_raise ExUnit.AssertionError, ~r/not .*to match the screenshot at/s, fn ->
-        expect(session, not_(to_have_screenshot(box, path: path, timeout: 500)))
+        expect(session, not_(to_have_screenshot(box, path: path)))
       end
 
       refute File.exists?(path)
@@ -233,7 +233,7 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
       paint(session, "rgb(200, 0, 0)")
 
       assert_raise ExUnit.AssertionError, ~r/active page to match the screenshot at/, fn ->
-        expect(session, page_to_have_screenshot(path: path, timeout: 500))
+        expect(session, page_to_have_screenshot(path: path))
       end
     end
 
@@ -493,7 +493,7 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
         wait_for(session, by_css("#missing"), timeout: 100)
       end
 
-      bounded = session_for_html(:playwright, "<p>Harness</p>", timeout: 300)
+      bounded = start_session(:playwright, timeout: 300)
       started = System.monotonic_time(:millisecond)
 
       assert_raise Fluffy.OperationError, ~r/wait_for.*[Tt]imeout/s, fn ->
@@ -684,7 +684,7 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
     test "releases the routes even when Playwright does not finish", %{session: session} do
       Playwright.route(session, "**/api", fn route -> Route.fulfill(route, body: "routed") end)
 
-      session = short_timeout(session)
+      session = put_session_timeout(session, 1_000)
 
       # A frozen page holds up unroute_all on some browsers.
       assert_raise RuntimeError, ~r/evaluate did not finish within 1000ms/, fn ->
@@ -913,10 +913,6 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
         ] do
       assert_raise Fluffy.CapabilityError, operation
     end
-  end
-
-  defp short_timeout(session) do
-    Fluffy.Session.put_context(session, %{Fluffy.Session.context(session) | timeout: 1_000})
   end
 
   # A popup showing `html` that closes itself soon, which its opener's page does not allow.

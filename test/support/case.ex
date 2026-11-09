@@ -6,7 +6,13 @@ defmodule Fluffy.TestCase do
   using do
     quote do
       import Fluffy.TestCase,
-        only: [assert_action_error: 4, browser_context_guids: 0, monitor_running: 1, playwright_engine?: 1]
+        only: [
+          assert_action_error: 4,
+          browser_context_guids: 0,
+          monitor_running: 1,
+          playwright_engine?: 1,
+          put_session_timeout: 2
+        ]
     end
   end
 
@@ -15,6 +21,12 @@ defmodule Fluffy.TestCase do
   # included) in the app and fail at boot whenever it differs.
   def playwright_engine?(engine),
     do: engine == Keyword.get(Application.fetch_env!(:fluffy, :playwright), :engine, :chromium)
+
+  # Sets the session's timeout after its setup, which runs under the default so a loaded
+  # machine cannot fail it. No public API changes a live session's timeout.
+  def put_session_timeout(session, timeout) do
+    Fluffy.Session.put_context(session, %{Fluffy.Session.context(session) | timeout: timeout})
+  end
 
   # Signals from different processes have no order, so an exit a test triggers through
   # another process can reach `pid` before the monitor, which then reports :noproc. A

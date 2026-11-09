@@ -4,8 +4,8 @@ Application.put_env(:fluffy, :playwright_boot_state, %{
 })
 
 # As many modules at once as Playwright runs workers (half the logical cores), not ExUnit's
-# twice the cores: every session shares one browser, and Firefox dispatches input for all its
-# pages in one queue. `FLUFFY_MAX_CASES` or `--max-cases` overrides it.
+# twice the cores: sessions share one browser (two on Firefox), and Firefox dispatches input
+# for all of a browser's pages in one queue. `FLUFFY_MAX_CASES` or `--max-cases` overrides it.
 max_cases =
   case System.get_env("FLUFFY_MAX_CASES", "") do
     "" -> max(div(System.schedulers_online(), 2), 1)
