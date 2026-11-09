@@ -49,6 +49,22 @@ defmodule Fluffy.HTML.DocumentIndex do
           disabled_ids: MapSet.t(non_neg_integer())
         }
 
+  # The immutable LazyHTML document is a shared NIF resource. Keep its derived
+  # index in the caller instead of copying its large tree through SessionRuntime.
+  # One entry bounds retention; changing documents simply rebuilds the index.
+  @spec for_document(LazyHTML.t()) :: t()
+  def for_document(%LazyHTML{} = document) do
+    case Process.get({__MODULE__, :index}) do
+      {^document, index} ->
+        index
+
+      _missing ->
+        index = new(document)
+        Process.put({__MODULE__, :index}, {document, index})
+        index
+    end
+  end
+
   @spec new(LazyHTML.t()) :: t()
   def new(%LazyHTML{} = document) do
     {all_entries, _next_id} = document |> LazyHTML.to_tree() |> index_nodes(nil, nil, false, [], [], 0)

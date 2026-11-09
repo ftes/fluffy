@@ -135,11 +135,10 @@ defmodule Fluffy.HTML.Aria do
     )
   ]
 
-  @labelable_tags ~w(button input meter output progress select textarea)
   @ignored_tags ~w(script style noscript template)
 
   # Display none in the user-agent stylesheet.
-  @not_rendered_tags ~w(area base datalist head link meta noembed noframes param rp script style template title)
+  @not_rendered_tags ~w(area base basefont datalist head link meta noembed noframes param rp script style template title)
   # SVG's own metadata has no box, and keeps display inline.
   @svg_metadata_tags ~w(desc metadata)
   # A replaced element renders its own content, not its element children.
@@ -160,7 +159,7 @@ defmodule Fluffy.HTML.Aria do
 
   @context %{target: nil, labelled_by: nil, label: nil, native: nil}
 
-  # Like `ClientDOM.index/1`: one entry per process, so retries against an
+  # Like `DocumentIndex.for_document/1`: one entry per process, so retries against an
   # unchanged document do not rebuild the model.
   def for_document(%LazyHTML{} = document) do
     case Process.get({__MODULE__, :model}) do
@@ -222,7 +221,7 @@ defmodule Fluffy.HTML.Aria do
   end
 
   defp build(document) do
-    aria = %__MODULE__{index: DocumentIndex.new(document), html_ids: %{}, labels: %{}}
+    aria = %__MODULE__{index: DocumentIndex.for_document(document), html_ids: %{}, labels: %{}}
     aria = %{aria | html_ids: html_ids(aria)}
     %{aria | labels: labels_by_control(aria)}
   end
@@ -248,7 +247,7 @@ defmodule Fluffy.HTML.Aria do
 
   defp labeled_control_id(aria, label) do
     case attribute(label, "for") do
-      nil -> aria |> descendants(label) |> Enum.find(&labelable?/1) |> then(&(&1 && &1.id))
+      nil -> aria |> descendants(label) |> Enum.find(&Semantics.labelable?/1) |> then(&(&1 && &1.id))
       html_id -> labelable_id(aria, Map.get(aria.html_ids, html_id))
     end
   end
@@ -256,11 +255,8 @@ defmodule Fluffy.HTML.Aria do
   defp labelable_id(_aria, nil), do: nil
 
   defp labelable_id(aria, id) do
-    if aria |> fetch(id) |> labelable?(), do: id
+    if aria |> fetch(id) |> Semantics.labelable?(), do: id
   end
-
-  defp labelable?(%{tag: "input"} = node), do: Semantics.input_type(node) != "hidden"
-  defp labelable?(%{tag: tag}), do: tag in @labelable_tags
 
   defp all_nodes(aria), do: aria.index.entries
 
@@ -314,7 +310,7 @@ defmodule Fluffy.HTML.Aria do
   defp blank?(text), do: String.trim(text) == ""
 
   defp not_rendered?(aria, node) do
-    hidden_attribute?(aria, node) or node.tag in @not_rendered_tags or node.tag in @svg_metadata_tags or
+    hidden_attribute?(aria, node) or node.tag in @not_rendered_tags or svg_metadata?(aria, node) or
       closed_by_state?(node) or closed_by_parent?(aria, node)
   end
 
@@ -324,7 +320,9 @@ defmodule Fluffy.HTML.Aria do
     attribute?(node, "hidden") and not until_found?(node) and node.tag != "marquee" and not foreign?(aria, node)
   end
 
-  defp until_found?(node), do: text_attribute(node, "hidden") == "until-found"
+  defp until_found?(node), do: String.downcase(text_attribute(node, "hidden")) == "until-found"
+
+  defp svg_metadata?(aria, node), do: node.tag in @svg_metadata_tags and foreign?(aria, node)
 
   defp foreign?(_aria, %{tag: tag}) when tag in @foreign_roots, do: true
 
@@ -414,6 +412,7 @@ defmodule Fluffy.HTML.Aria do
 
   defp disabled_option_group?(_aria, _node), do: false
 
+  # Only the closest disabled fieldset counts, as in Playwright.
   defp disabled_field_set?(aria, node) do
     case closest(aria, node, &(&1.tag == "fieldset" and attribute?(&1, "disabled"))) do
       nil ->
@@ -526,12 +525,7 @@ defmodule Fluffy.HTML.Aria do
   end
 
   defp adjacent_elements(aria, node) do
-    siblings =
-      case parent(aria, node) do
-        nil -> aria |> all_nodes() |> Enum.filter(&(&1.parent_id == nil))
-        parent -> child_elements(aria, parent)
-      end
-
+    siblings = child_elements(aria, parent(aria, node))
     index = Enum.find_index(siblings, &(&1.id == node.id))
     {if(index > 0, do: Enum.at(siblings, index - 1)), Enum.at(siblings, index + 1)}
   end
@@ -664,7 +658,7 @@ defmodule Fluffy.HTML.Aria do
 
     selected_ids =
       options
-      |> Enum.map(&Map.put(&1, :disabled?, natively_disabled?(aria, &1)))
+      |> Enum.map(&Map.put(&1, :disabled?, attribute?(&1, "disabled") or disabled_option_group?(aria, &1)))
       |> Semantics.default_selected_ids(select.attributes)
 
     case Enum.filter(options, &(&1.id in selected_ids)) do
@@ -877,7 +871,7 @@ defmodule Fluffy.HTML.Aria do
   end
 
   defp non_inline?(aria, node) do
-    hidden_attribute?(aria, node) or node.tag in @non_inline_tags or ruby_text?(aria, node)
+    hidden_attribute?(aria, node) or closed_by_state?(node) or node.tag in @non_inline_tags or ruby_text?(aria, node)
   end
 
   # Outside a ruby, rt has no display of its own.

@@ -6,6 +6,8 @@ defmodule Fluffy.HTML.Semantics do
     number range color checkbox radio file submit image reset button
   )
 
+  @labelable_tags ~w(button input meter output progress select textarea)
+
   def attributes(%{attributes: attributes}), do: attributes
 
   def input_type(%{tag: "input", attributes: attributes}) do
@@ -39,6 +41,11 @@ defmodule Fluffy.HTML.Semantics do
   end
 
   def has_attribute?(attributes, name), do: List.keymember?(attributes, name, 0)
+
+  def labelable_tags, do: @labelable_tags
+
+  def labelable?(%{tag: "input"} = target), do: input_type(target) != "hidden"
+  def labelable?(%{tag: tag}), do: tag in @labelable_tags
 
   def list_box?(attributes) do
     has_attribute?(attributes, "multiple") or

@@ -35,22 +35,9 @@ defmodule Fluffy.ClientDOM do
     }
   end
 
-  # The immutable LazyHTML document is a shared NIF resource. Keep its derived
-  # index in the caller instead of copying its large tree through SessionRuntime.
-  # One entry bounds retention; changing documents simply rebuilds the index.
   @doc false
   @spec index(%__MODULE__{}) :: DocumentIndex.t()
-  def index(%__MODULE__{document: document}) do
-    case Process.get({__MODULE__, :index}) do
-      {^document, index} ->
-        index
-
-      _missing ->
-        index = DocumentIndex.new(document)
-        Process.put({__MODULE__, :index}, {document, index})
-        index
-    end
-  end
+  def index(%__MODULE__{document: document}), do: DocumentIndex.for_document(document)
 
   def reconcile(%__MODULE__{} = client_dom, html) when is_binary(html) do
     reconcile(client_dom, LazyHTML.from_fragment(html))

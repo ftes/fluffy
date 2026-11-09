@@ -2,9 +2,10 @@ defmodule Fluffy.Locator.Static do
   @moduledoc false
 
   alias Fluffy.HTML.Aria
+  alias Fluffy.HTML.Semantics
   alias Fluffy.Locator
 
-  @labelled_control_selector "button, input, meter, output, progress, select, textarea"
+  @labelled_control_selector Enum.join(Semantics.labelable_tags(), ", ")
 
   def resolve(document, %Locator{} = locator) do
     aria = if needs_aria?(locator), do: Aria.for_document(document)
@@ -188,14 +189,8 @@ defmodule Fluffy.Locator.Static do
 
   defp labelable?(control) do
     case LazyHTML.to_tree(control) do
-      [{"input", attributes, _children}] ->
-        String.downcase(attribute(attributes, "type") || "text") != "hidden"
-
-      [{_tag, _attributes, _children}] ->
-        true
-
-      _other ->
-        false
+      [{tag, attributes, _children}] -> Semantics.labelable?(%{tag: tag, attributes: attributes})
+      _other -> false
     end
   end
 
