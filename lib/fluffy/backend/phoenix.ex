@@ -3,6 +3,7 @@ defmodule Fluffy.Backend.Phoenix do
 
   @behaviour Fluffy.Backend.Contract
 
+  import Fluffy.Event, only: [is_network_type: 1]
   import Phoenix.ConnTest
   import Phoenix.LiveViewTest
 
@@ -191,15 +192,17 @@ defmodule Fluffy.Backend.Phoenix do
   @impl true
   def event_source(session, :download, _scope), do: session.active_page
 
-  def event_source(session, type, _scope) when type in [:page, :popup, :close], do: require_browser_pages!(session)
+  def event_source(session, type, _scope) when type in [:page, :popup, :close, :load, :dom_content_loaded, :crash],
+    do: require_browser_pages!(session)
 
   def event_source(session, type, _scope) do
     capability =
       case type do
         :dialog -> :browser_dialogs
         :file_chooser -> :file_chooser_events
-        :frame_navigated -> :browser_frame_events
-        type when type in [:request, :response] -> :browser_network_events
+        type when type in [:frame_navigated, :frame_attached, :frame_detached] -> :browser_frame_events
+        type when is_network_type(type) -> :browser_network_events
+        type when type in [:console, :page_error, :worker, :web_socket] -> :browser_events
       end
 
     raise Fluffy.CapabilityError,

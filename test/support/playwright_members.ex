@@ -63,6 +63,7 @@ defmodule Fluffy.PlaywrightMembers do
   def counterparts(PlaywrightEx.FileChooser), do: [Fluffy.FileChooser]
   def counterparts(PlaywrightEx.Request), do: [Fluffy.Request]
   def counterparts(PlaywrightEx.Response), do: [Fluffy.Response]
+  def counterparts(PlaywrightEx.ConsoleMessage), do: [Fluffy.ConsoleMessage]
   def counterparts(:event), do: [Fluffy.Event]
   def counterparts(_module), do: []
 
@@ -119,7 +120,10 @@ defmodule Fluffy.PlaywrightMembers do
           {[:locator], {:renamed, {Fluffy.Locator, :by_css, 1}}},
           {[:frame_locator], {:renamed, {Fluffy.Locator, :frame_locator, 1}}},
           {[:title], {:unwrap, "gap: read; page_to_have_title asserts it"}},
-          {~w(expect_console_message expect_request_finished expect_websocket expect_worker)a, @native_event},
+          {[:expect_console_message], {:renamed, {Fluffy.Event, :console, 1}}},
+          {[:expect_request_finished], {:renamed, {Fluffy.Event, :request_finished, 1}}},
+          {[:expect_websocket], {:renamed, {Fluffy.Event, :web_socket, 1}}},
+          {[:expect_worker], {:renamed, {Fluffy.Event, :worker, 1}}},
           {~w(viewport_size route unroute unroute_all route_from_har route_web_socket touchscreen aria_snapshot
               aria_snapshot_json add_locator_handler remove_locator_handler)a, @page_gap},
           {~w(wait_for_load_state wait_for_url wait_for_function content add_init_script add_script_tag
@@ -217,8 +221,8 @@ defmodule Fluffy.PlaywrightMembers do
         {~w(abort continue fallback fetch fulfill request)a, {:unwrap, "gap: in a PlaywrightEx.Page.route/3 handler"}}
       ],
       PlaywrightEx.ConsoleMessage => [
-        {~w(args location page text timestamp type worker)a,
-         {:unwrap, "gap: from a native console listener; log_browser_console: logs messages"}}
+        {~w(location page text timestamp type)a, :wrapped},
+        {~w(args worker)a, @native_value}
       ],
       PlaywrightEx.WebError => [
         {~w(error location page)a, {:unwrap, "gap: from a native web_error listener; log_browser_console: logs them"}}
@@ -239,15 +243,15 @@ defmodule Fluffy.PlaywrightMembers do
   def events do
     %{
       PlaywrightEx.Page => [
-        {~w(close dialog download file_chooser frame_navigated popup request response)a, :wrapped},
-        {~w(console dialog_closed dom_content_loaded load frame_attached frame_detached page_error request_failed
-            request_finished web_socket worker)a, @native_event},
-        {[:crash], {:na, "a crash fails Fluffy's pending waits"}}
+        {~w(close console crash dialog dom_content_loaded download file_chooser frame_attached frame_detached
+            frame_navigated load page_error popup request request_failed request_finished response web_socket
+            worker)a, :wrapped},
+        {[:dialog_closed], @native_event}
       ],
       PlaywrightEx.BrowserContext => [
-        {~w(page request response)a, :wrapped},
+        {~w(page request response request_failed request_finished)a, :wrapped},
         {~w(console dialog dialog_closed download frame_attached frame_detached frame_navigated page_close page_load
-            web_error request_failed request_finished background_page service_worker)a, @native_event},
+            web_error background_page service_worker)a, @native_event},
         {[:close], {:na, "the session owns its context"}}
       ]
     }
@@ -268,6 +272,10 @@ defmodule Fluffy.PlaywrightMembers do
       {PlaywrightEx.Page, :expect_file_chooser} => "Fluffy.Event waits take timeout: and scope:",
       {PlaywrightEx.Page, :expect_request} => "Fluffy.Event waits take timeout: and scope:",
       {PlaywrightEx.Page, :expect_response} => "Fluffy.Event waits take timeout: and scope:",
+      {PlaywrightEx.Page, :expect_console_message} => "Fluffy.Event waits take timeout: and scope:",
+      {PlaywrightEx.Page, :expect_request_finished} => "Fluffy.Event waits take timeout: and scope:",
+      {PlaywrightEx.Page, :expect_websocket} => "Fluffy.Event waits take timeout: and scope:",
+      {PlaywrightEx.Page, :expect_worker} => "Fluffy.Event waits take timeout: and scope:",
       {PlaywrightEx.Page, :wait_for_request} => "Fluffy.Event waits take timeout: and scope:",
       {PlaywrightEx.Page, :wait_for_response} => "Fluffy.Event waits take timeout: and scope:",
       {PlaywrightEx.BrowserContext, :wait_for_event} => "Fluffy.Event waits take timeout: and scope:",

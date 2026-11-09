@@ -39,7 +39,7 @@ boundaries described below.
 | Browser cookie helpers and storage-state export | - | equivalent |
 | Runtime permissions, geolocation, offline mode, and HTTP credentials | - | equivalent |
 | Hover, drag-and-drop, sequential typing, keyboard, and mouse input | - | equivalent |
-| Dialogs, frame navigation, and browser request/response events | - | equivalent |
+| Dialogs, console, page errors, frames, workers, WebSockets, and browser network events | - | equivalent |
 | Active-page JavaScript evaluation | - | equivalent |
 | Fake page clock and timers | - | equivalent |
 | JavaScript-owned DOM and default actions | - | equivalent |

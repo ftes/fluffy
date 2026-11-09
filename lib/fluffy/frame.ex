@@ -1,6 +1,7 @@
 defmodule Fluffy.Frame do
   @moduledoc """
-  A live browser frame returned by `Fluffy.Event.frame_navigated/1`.
+  A live browser frame returned by `Fluffy.Event.frame_navigated/1`,
+  `Fluffy.Event.frame_attached/1` and `Fluffy.Event.frame_detached/1`.
 
   A page has one main frame and may contain child frames. Metadata resolves
   current state; the navigation event does not wait for page loading to finish.

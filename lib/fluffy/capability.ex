@@ -228,9 +228,9 @@ defmodule Fluffy.Capability do
     },
     %{
       id: :browser_events,
-      feature: "Dialogs, frame navigation, and browser request/response events",
+      feature: "Dialogs, console, page errors, frames, workers, WebSockets, and browser network events",
       drivers: %{static: :browser_only, live: :browser_only, playwright: :equivalent},
-      detail: "JavaScript dialogs and subresource network streams do not occur in an in-process page driver."
+      detail: "JavaScript and subresource network streams do not run in an in-process page driver."
     },
     %{
       id: :javascript_evaluation,
