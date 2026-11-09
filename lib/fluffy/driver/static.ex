@@ -109,10 +109,19 @@ defmodule Fluffy.Driver.Static do
 
   @impl true
   def fill(%Session{} = session, %Locator{} = locator, value, options \\ []) do
+    fill_value(session, :fill, locator, value, options)
+  end
+
+  @impl true
+  def clear(%Session{} = session, %Locator{} = locator, options \\ []) do
+    fill_value(session, :clear, locator, "", options)
+  end
+
+  defp fill_value(session, action, locator, value, options) do
     Keyword.validate!(options, [:timeout])
     state = Session.page_state(session)
     client_dom = Map.fetch!(state, :client_dom)
-    {client_dom, _target} = ClientDOM.fill(client_dom, locator, value, :static)
+    {client_dom, _target} = ClientDOM.fill(client_dom, locator, value, :static, action)
     Session.put_page_state(session, %{state | client_dom: client_dom})
   end
 

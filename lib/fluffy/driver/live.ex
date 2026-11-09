@@ -209,8 +209,17 @@ defmodule Fluffy.Driver.Live do
 
   @impl true
   def fill(%Session{} = session, %Locator{} = locator, value, options \\ []) do
-    act(session, :fill, [locator, value, options], fn session, deadline ->
-      case resolve_live_action(session, locator, deadline, &ClientDOM.fill(&1, locator, value, :live)) do
+    fill_value(session, :fill, [locator, value, options], locator, value)
+  end
+
+  @impl true
+  def clear(%Session{} = session, %Locator{} = locator, options \\ []) do
+    fill_value(session, :clear, [locator, options], locator, "")
+  end
+
+  defp fill_value(session, operation, arguments, locator, value) do
+    act(session, operation, arguments, fn session, deadline ->
+      case resolve_live_action(session, locator, deadline, &ClientDOM.fill(&1, locator, value, :live, operation)) do
         {%Session{} = session, {client_dom, target}} -> dispatch_live_change(session, client_dom, target)
         navigation -> navigation
       end

@@ -17,6 +17,7 @@ defmodule Fluffy.Driver.Contract do
   @callback click(Session.t(), Locator.t(), keyword()) :: result()
   @callback submit(Session.t(), Locator.t(), keyword()) :: result()
   @callback fill(Session.t(), Locator.t(), String.t(), keyword()) :: result()
+  @callback clear(Session.t(), Locator.t(), keyword()) :: result()
   @callback set_input_files(
               Session.t(),
               Locator.t() | Fluffy.FileChooser.t(),

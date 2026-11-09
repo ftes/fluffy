@@ -281,6 +281,11 @@ defmodule Fluffy.Driver.Playwright do
   end
 
   @impl true
+  def clear(%Session{} = session, %Locator{} = locator, options \\ []) do
+    locator_action(session, :clear, locator, options, &BrowserLocator.clear(&1, native(options, &2)))
+  end
+
+  @impl true
   def set_input_files(%Session{} = session, %Locator{} = locator, source, _selected_files, options) do
     files = files(source)
     locator_action(session, :set_input_files, locator, options, &BrowserLocator.set_input_files(&1, files, timeout: &2))
@@ -370,6 +375,57 @@ defmodule Fluffy.Driver.Playwright do
   def press_sequentially(session, locator, text, options) when is_binary(text) do
     locator_action(session, :press_sequentially, locator, options, fn native_locator, remaining ->
       BrowserLocator.press_sequentially(native_locator, text, native(options, remaining))
+    end)
+  end
+
+  def dblclick(session, locator, options) do
+    locator_action(session, :dblclick, locator, options, &BrowserLocator.dblclick(&1, native(options, &2)))
+  end
+
+  def tap(session, locator, options) do
+    locator_action(session, :tap, locator, options, &BrowserLocator.tap(&1, native(options, &2)))
+  end
+
+  def dispatch_event(session, locator, type, event_init, options) do
+    locator_action(session, :dispatch_event, locator, options, fn native_locator, remaining ->
+      BrowserLocator.dispatch_event(native_locator, type, event_init, native(options, remaining))
+    end)
+  end
+
+  def select_text(session, locator, options) do
+    locator_action(session, :select_text, locator, options, &BrowserLocator.select_text(&1, native(options, &2)))
+  end
+
+  def scroll_into_view_if_needed(session, locator, options) do
+    locator_action(session, :scroll_into_view_if_needed, locator, options, fn native_locator, remaining ->
+      BrowserLocator.scroll_into_view_if_needed(native_locator, native(options, remaining))
+    end)
+  end
+
+  def screenshot(session, locator, path, options) do
+    options =
+      options
+      |> Keyword.put(:path, path)
+      |> Keyword.replace_lazy(:mask, fn mask -> Enum.map(mask, &locator(session, &1)) end)
+
+    locator_action(session, :screenshot, locator, options, &BrowserLocator.screenshot(&1, native(options, &2)))
+  end
+
+  # Page-wide input and emulation have no timeout of their own and wait while a
+  # script blocks the page. Unlike a locator action, Playwright does not wait for
+  # a navigation the input starts, which may commit after this returns; the
+  # next call adopts it then.
+  def page_action(%Session{} = session, operation, fun, options) do
+    page = Session.page_state(session).page
+
+    action(session, operation, nil, options, fn remaining ->
+      case Bounded.within(remaining, fn -> fun.(page) end) do
+        {:ok, result} ->
+          result
+
+        :timeout ->
+          {:error, %TimeoutError{message: "Timeout #{remaining}ms exceeded during #{operation}"}}
+      end
     end)
   end
 

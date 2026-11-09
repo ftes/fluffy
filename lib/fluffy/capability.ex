@@ -215,9 +215,10 @@ defmodule Fluffy.Capability do
     },
     %{
       id: :browser_pointer_typing,
-      feature: "Hover, drag-and-drop, and sequential typing",
+      feature: "Hover, drag-and-drop, sequential typing, keyboard, and mouse input",
       drivers: %{static: :browser_only, live: :browser_only, playwright: :equivalent},
-      detail: "Native pointer and per-character keyboard events require Playwright."
+      detail:
+        "Native pointer, touch, and keyboard events, viewport and media emulation, and element screenshots require Playwright."
     },
     %{
       id: :browser_events,
