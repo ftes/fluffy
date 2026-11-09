@@ -18,6 +18,9 @@ release-sensitive changes.
   `mix fluffy.gen.native_options`; `mix check` fails if its output is stale.
 - The compatibility floor is Elixir 1.18 on OTP 27 (`.tool-versions.oldest`).
 
+The Phoenix rules below are written for applications, so in this library they mainly apply to the
+fixtures under `test/`.
+
 <!-- usage-rules-start -->
 <!-- usage_rules-start -->
 ## usage_rules usage
