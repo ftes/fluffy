@@ -157,7 +157,8 @@ defmodule Fluffy.MixProject do
       usage_rules: [
         {:usage_rules, sub_rules: []},
         "phoenix:html",
-        {"phoenix:liveview", link: :markdown}
+        {"phoenix:liveview", link: :markdown},
+        {:playwright_ex, link: :markdown}
       ]
     ]
   end
