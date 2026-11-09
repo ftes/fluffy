@@ -441,7 +441,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
       browser_context = BrowserPage.context(untracked)
       :ok = GenServer.stop(Fluffy.TestScope.current())
 
-      refute browser_context.guid in Enum.map(PlaywrightEx.Browser.contexts(Fluffy.BrowserRuntime.browser()), & &1.guid)
+      refute browser_context.guid in browser_context_guids()
     end
 
     @tag driver: :playwright

@@ -306,6 +306,7 @@ defmodule Fluffy.Options do
                        executable: [type: :string],
                        timeout: [type: :pos_integer, default: 15_000],
                        launch_options: [type: :keyword_list, default: []],
+                       pool_size: [type: :pos_integer, default: 1],
                        artifact_dir: [type: {:or, [nil, :string]}],
                        trace_dir: [type: :string, default: "traces"],
                        log_browser_console: [type: :boolean, default: true]

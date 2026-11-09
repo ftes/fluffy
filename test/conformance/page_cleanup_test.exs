@@ -11,7 +11,6 @@ defmodule Fluffy.Conformance.PageCleanupTest do
   alias Fluffy.Session
   alias Fluffy.TestHTTPFixtures
   alias Fluffy.TestScope
-  alias PlaywrightEx.Browser
 
   @tag driver: :playwright
   test "closing the test scope closes every page left in its BrowserContext" do
@@ -36,7 +35,7 @@ defmodule Fluffy.Conformance.PageCleanupTest do
     browser_context = Session.context(session).browser_context
     :ok = GenServer.stop(TestScope.current())
 
-    refute browser_context.guid in Enum.map(Browser.contexts(Fluffy.BrowserRuntime.browser()), & &1.guid)
+    refute browser_context.guid in browser_context_guids()
   end
 
   @tag driver: :playwright

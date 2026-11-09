@@ -61,6 +61,7 @@ defmodule Fluffy.Backend.Playwright do
         # context open in the shared browser.
         close = fn ->
           Bounded.within(timeout, fn -> BrowserContext.close(browser_context) end, on_timeout: :leave)
+          BrowserRuntime.release()
         end
 
         {browser_context, {:browser_context, browser_context.guid}, close}

@@ -5,7 +5,8 @@ defmodule Fluffy.TestCase do
 
   using do
     quote do
-      import Fluffy.TestCase, only: [assert_action_error: 4, monitor_running: 1, playwright_engine?: 1]
+      import Fluffy.TestCase,
+        only: [assert_action_error: 4, browser_context_guids: 0, monitor_running: 1, playwright_engine?: 1]
     end
   end
 
@@ -22,6 +23,13 @@ defmodule Fluffy.TestCase do
     monitor = Process.monitor(pid)
     :sys.get_state(pid)
     monitor
+  end
+
+  # Every context open across the pool: a session's context may be in any of its browsers.
+  def browser_context_guids do
+    for %{browser: %{} = browser} <- Fluffy.BrowserRuntime.status().slots,
+        browser_context <- PlaywrightEx.Browser.contexts(browser),
+        do: browser_context.guid
   end
 
   def assert_action_error(session, structural_exception, structural_message, action) do

@@ -30,6 +30,7 @@ defmodule Fluffy.Application do
             {Fluffy.BrowserRuntime,
              timeout: timeout,
              engine: Keyword.get(config, :engine, :chromium),
+             pool_size: Keyword.fetch!(config, :pool_size),
              playwright_options: Keyword.take(config, [:executable]),
              launch_options: Keyword.fetch!(config, :launch_options)}
           ]
