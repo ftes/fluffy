@@ -2,6 +2,12 @@ defmodule Fluffy.Event do
   @moduledoc """
   Event descriptions shared by waits and listeners.
 
+      session
+      |> assert_event(
+        Fluffy.Event.download(),
+        &click(&1, by_role(:link, name: "Download the Marauder's Map"))
+      )
+
   Constructors accept an optional unary predicate. A false or nil result skips
   the event. Predicates inspect event metadata; use ordinary assertions on the
   awaited value to check its contents.

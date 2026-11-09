@@ -187,16 +187,8 @@ use `exact: true` for a complete match. Role names follow accessible-name
 precedence: `aria-labelledby`, then `aria-label`, then native labels and
 captions, then content for the roles Playwright names from content, then
 `title`. Landmarks, lists, list items and dialogs are not named by their content.
-Explicit ARIA roles override implicit roles. The Phoenix backend knows the
-implicit roles `article`, `banner`, `blockquote`, `button`, `caption`, `cell`,
-`checkbox`, `code`, `columnheader`, `combobox`, `complementary`, `contentinfo`,
-`definition`, `deletion`, `dialog`, `document`, `emphasis`, `figure`, `form`,
-`gridcell`, `group`, `heading`, `img`, `insertion`, `link`, `list`, `listbox`,
-`listitem`, `main`, `mark`, `math`, `meter`, `navigation`, `option`, `paragraph`,
-`presentation`, `progressbar`, `radio`, `region`, `row`, `rowgroup`, `rowheader`,
-`search`, `searchbox`, `separator`, `slider`, `spinbutton`, `status`, `strong`,
-`subscript`, `superscript`, `table`, `term`, `textbox` and `time`; any other role
-needs an explicit `role` attribute there. Phoenix computes these from markup, so
+Explicit ARIA roles override implicit roles. See `Fluffy.Locator.by_role/2` for the
+implicit roles the Phoenix backend knows. Phoenix computes these from markup, so
 computed CSS and live input state stay browser-only. CSS must be valid browser
 CSS; escape special characters in IDs or use a semantic/test-id locator.
 

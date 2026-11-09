@@ -14,7 +14,7 @@ defmodule Fluffy.Expect do
 
   #{NimbleOptions.docs(Fluffy.Options.expectation_schema())}
   """
-  @moduledoc groups: ["Locator assertions"]
+  @moduledoc groups: ["Running expectations", "Locator assertions", "Page assertions", "Events"]
 
   alias Fluffy.Expect
   alias Fluffy.Expect.Internal
@@ -111,6 +111,7 @@ defmodule Fluffy.Expect do
           unquote(NimbleOptions.option_typespec(Options.expectation_schema(:page_to_have_title)))
   @type page_to_have_url_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:page_to_have_url)))
 
+  @doc group: "Running expectations"
   @doc "Executes an expectation and returns the unchanged or reconciled session."
   @spec expect(Session.t(), t(), [option()]) :: Session.t()
   def expect(%Session{} = session, %Expect{} = expectation, options \\ []) do
@@ -128,6 +129,7 @@ defmodule Fluffy.Expect do
     end
   end
 
+  @doc group: "Events"
   @doc """
   Registers before the action, awaits a matching event, and optionally asserts on
   its value. Action and assertion callbacks run once in the caller; their return
@@ -135,6 +137,7 @@ defmodule Fluffy.Expect do
   """
   def expect_event(session, event, action), do: Fluffy.Event.expect(session, event, action, nil, [])
 
+  @doc group: "Events"
   @doc "Expects an event with an assertion callback or wait options."
   def expect_event(session, event, action, assertion) when is_function(assertion, 1),
     do: Fluffy.Event.expect(session, event, action, assertion, [])
@@ -142,10 +145,12 @@ defmodule Fluffy.Expect do
   def expect_event(session, event, action, options) when is_list(options),
     do: Fluffy.Event.expect(session, event, action, nil, options)
 
+  @doc group: "Events"
   @doc "Expects an event with an assertion callback and wait options."
   def expect_event(session, event, action, assertion, options) when is_function(assertion, 1) and is_list(options),
     do: Fluffy.Event.expect(session, event, action, assertion, options)
 
+  @doc group: "Running expectations"
   @doc "Negates an expectation while preserving its target and options."
   @spec not_(t()) :: t()
   def not_(%__MODULE__{} = expectation), do: Internal.negate(expectation)
@@ -672,7 +677,7 @@ defmodule Fluffy.Expect do
 
   defp text_values!(expected), do: expected
 
-  @doc group: "Assertions"
+  @doc group: "Page assertions"
   @doc """
   Expects the active page title to equal a string or match a regular expression.
 
@@ -690,7 +695,7 @@ defmodule Fluffy.Expect do
     native_expectation(:page_to_have_title, :page, :title, expected, options)
   end
 
-  @doc group: "Assertions"
+  @doc group: "Page assertions"
   @doc """
   Expects the active page to have the requested URL.
 
@@ -736,7 +741,7 @@ defmodule Fluffy.Expect do
     Internal.new(:page, :url, URLMatcher.new!(components), options)
   end
 
-  @doc group: "Assertions"
+  @doc group: "Page assertions"
   @doc playwright_only: true
   @doc """
   Asserts that a screenshot of the active page matches the baseline image at the required
@@ -751,7 +756,7 @@ defmodule Fluffy.Expect do
   @spec page_to_have_screenshot([to_have_screenshot_option()]) :: Expect.t()
   def page_to_have_screenshot(options \\ []) when is_list(options), do: screenshot_expectation(:page, options)
 
-  @doc group: "Assertions"
+  @doc group: "Page assertions"
   @doc playwright_only: true
   @doc """
   Asserts the active page's ARIA snapshot against `expected`, or the file at `path:` in
@@ -769,7 +774,7 @@ defmodule Fluffy.Expect do
     aria_snapshot_expectation(:page, expected_or_options, options)
   end
 
-  @doc group: "Assertions"
+  @doc group: "Page assertions"
   @doc "Expects the active page to have the given opener handle, or no opener with `nil`."
   @spec page_to_have_opener(Fluffy.Page.t() | nil, [Expect.option()]) :: Expect.t()
   def page_to_have_opener(expected, options \\ [])

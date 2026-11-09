@@ -107,14 +107,18 @@ defmodule Fluffy.MixProject do
           Fluffy.PhoenixTest,
           Fluffy.Page,
           Fluffy.Event,
+          Fluffy.Event.Pending,
+          Fluffy.Sandbox
+        ],
+        Playwright: [
           Fluffy.Playwright,
           Fluffy.Playwright.Clock,
           Fluffy.Playwright.Keyboard,
-          Fluffy.Playwright.Mouse,
-          Fluffy.Sandbox
+          Fluffy.Playwright.Mouse
         ],
         "Sessions and results": [
           Fluffy.Session,
+          Fluffy.PhoenixTest.Session,
           Fluffy.Download,
           Fluffy.Dialog,
           Fluffy.FileChooser,
@@ -126,8 +130,7 @@ defmodule Fluffy.MixProject do
           Fluffy.ConsoleMessage,
           Fluffy.PageError,
           Fluffy.Worker,
-          Fluffy.WebSocket,
-          Fluffy.Event.Pending
+          Fluffy.WebSocket
         ],
         "Capabilities and errors": [
           Fluffy.Capability,

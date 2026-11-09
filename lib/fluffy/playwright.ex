@@ -8,6 +8,15 @@ defmodule Fluffy.Playwright do
   `Fluffy.Playwright.Clock`, page-wide input in `Fluffy.Playwright.Keyboard` and
   `Fluffy.Playwright.Mouse`.
   """
+  @moduledoc groups: [
+               "Lifecycle and navigation",
+               "Actions",
+               "Page inspection",
+               "JavaScript",
+               "Network",
+               "Browser context",
+               "Diagnostics and native access"
+             ]
 
   alias Fluffy.Backend
   alias Fluffy.Backend.Playwright, as: PlaywrightBackend
@@ -375,6 +384,7 @@ defmodule Fluffy.Playwright do
     Fluffy.__dispatch_driver__(session, :scroll_into_view_if_needed, [locator, options])
   end
 
+  @doc group: "Page inspection"
   @doc playwright_only: true
   @doc """
   Returns the bounding box of a locator as `%{x: x, y: y, width: width, height: height}`,
@@ -395,6 +405,7 @@ defmodule Fluffy.Playwright do
     Fluffy.__dispatch_driver__(session, :bounding_box, [locator, Options.validate_action!(:bounding_box, options)])
   end
 
+  @doc group: "Page inspection"
   @doc playwright_only: true
   @doc """
   Returns the ARIA snapshot of the active page, or of a locator, as YAML text.
@@ -421,6 +432,7 @@ defmodule Fluffy.Playwright do
     Fluffy.__dispatch_driver__(session, :aria_snapshot, [locator, Options.validate_action!(:aria_snapshot, options)])
   end
 
+  @doc group: "Page inspection"
   @doc playwright_only: true
   @doc """
   Returns one `Fluffy.Locator` per element the locator matches right now, built with `Fluffy.Locator.nth/2`.
@@ -459,6 +471,7 @@ defmodule Fluffy.Playwright do
     Fluffy.__dispatch_driver__(session, :drop, [locator, payload, Options.validate_action!(:drop, options)])
   end
 
+  @doc group: "Diagnostics and native access"
   @doc playwright_only: true
   @doc """
   Saves the active page as a PDF and returns the session.
@@ -481,6 +494,7 @@ defmodule Fluffy.Playwright do
     page_action(session, :pdf, &PlaywrightEx.Page.pdf(&1, native), timeout)
   end
 
+  @doc group: "Lifecycle and navigation"
   @doc playwright_only: true
   @doc "Brings the active page to the front and returns the session. Accepts `timeout:`."
   @spec bring_to_front(Session.t(), [Fluffy.action_option()]) :: Session.t()
@@ -489,6 +503,7 @@ defmodule Fluffy.Playwright do
     page_action(session, :bring_to_front, &PlaywrightEx.Page.bring_to_front/1, Options.validate_action!(options))
   end
 
+  @doc group: "Page inspection"
   @doc playwright_only: true
   @doc "Returns the full HTML of the active page, including the doctype. Accepts `timeout:`."
   @spec content(Session.t(), [content_option()]) :: String.t()
@@ -498,6 +513,7 @@ defmodule Fluffy.Playwright do
     page_read(session, :content, &PlaywrightEx.Page.content(&1, native), timeout)
   end
 
+  @doc group: "Page inspection"
   @doc playwright_only: true
   @doc "Returns the active page's title. To assert it, use `Fluffy.Expect.page_to_have_title/2`. Accepts `timeout:`."
   @spec title(Session.t(), [Fluffy.action_option()]) :: String.t()
@@ -507,6 +523,7 @@ defmodule Fluffy.Playwright do
     page_read(session, :title, &PlaywrightEx.Page.title/1, Options.validate_action!(options))
   end
 
+  @doc group: "Page inspection"
   @doc playwright_only: true
   @doc """
   Returns the active page's `localStorage` for its current origin, as
@@ -520,6 +537,7 @@ defmodule Fluffy.Playwright do
     page_read(session, :local_storage, read, Options.validate_action!(options))
   end
 
+  @doc group: "Page inspection"
   @doc playwright_only: true
   @doc """
   Returns the active page's `sessionStorage` for its current origin, as
@@ -535,6 +553,7 @@ defmodule Fluffy.Playwright do
   defp page_read(session, operation, fun, options),
     do: Fluffy.__dispatch_driver__(session, :page_read, [operation, fun, options])
 
+  @doc group: "Page inspection"
   @doc playwright_only: true
   @doc """
   Returns the active page's viewport as `%{width: width, height: height}`, or `nil`
@@ -675,6 +694,7 @@ defmodule Fluffy.Playwright do
     session
   end
 
+  @doc group: "Diagnostics and native access"
   @doc playwright_only: true
   @doc """
   Runs `fun` with the `PlaywrightEx.Locator` for `locator` and returns the reconciled session.
@@ -697,6 +717,7 @@ defmodule Fluffy.Playwright do
     Fluffy.__dispatch_driver__(session, :unwrap_locator, [locator, fun])
   end
 
+  @doc group: "Diagnostics and native access"
   @doc playwright_only: true
   @doc """
   Runs `fun` with the `PlaywrightEx.Locator` for `locator` and returns the callback's result.
@@ -714,6 +735,7 @@ defmodule Fluffy.Playwright do
     Fluffy.__dispatch_driver__(session, :unwrap_and_return_locator, [locator, fun])
   end
 
+  @doc group: "Diagnostics and native access"
   @doc playwright_only: true
   @doc """
   Starts a Playwright trace for this session's BrowserContext.
@@ -748,6 +770,7 @@ defmodule Fluffy.Playwright do
     Session.put_context(session, Map.put(context, :trace, Trace.public_state(trace)))
   end
 
+  @doc group: "Diagnostics and native access"
   @doc playwright_only: true
   @doc """
   Saves a screenshot of the active page and returns the session.
@@ -769,6 +792,7 @@ defmodule Fluffy.Playwright do
   def screenshot(session, %Fluffy.Locator{} = locator, path) when is_binary(path),
     do: screenshot(session, locator, path, [])
 
+  @doc group: "Diagnostics and native access"
   @doc playwright_only: true
   @doc """
   Saves a screenshot of one element and returns the session.
@@ -787,6 +811,7 @@ defmodule Fluffy.Playwright do
     Fluffy.__dispatch_driver__(session, :screenshot, [locator, path, options])
   end
 
+  @doc group: "JavaScript"
   @doc playwright_only: true
   @doc """
   Evaluates JavaScript in the active Playwright page and returns the value.
@@ -835,6 +860,7 @@ defmodule Fluffy.Playwright do
   @spec evaluate(Session.t(), String.t()) :: term()
   def evaluate(session, expression) when is_binary(expression), do: run_evaluate(session, nil, expression, nil, [])
 
+  @doc group: "JavaScript"
   @doc playwright_only: true
   @doc """
   With a string, like `evaluate/2` with `arg` or options. With a `Fluffy.Locator`,
@@ -856,6 +882,7 @@ defmodule Fluffy.Playwright do
 
   def evaluate(session, expression, arg) when is_binary(expression), do: run_evaluate(session, nil, expression, arg, [])
 
+  @doc group: "JavaScript"
   @doc playwright_only: true
   @doc "Like `evaluate/3`, with `arg` and options on the page, or `arg` or options on a locator."
   @spec evaluate(Session.t(), String.t(), term(), [evaluate_option()]) :: term()
@@ -866,6 +893,7 @@ defmodule Fluffy.Playwright do
   def evaluate(session, expression, arg, options) when is_binary(expression),
     do: run_evaluate(session, nil, expression, arg, options)
 
+  @doc group: "JavaScript"
   @doc playwright_only: true
   @doc "Like `evaluate/4` on a locator, with both `arg` and options."
   @spec evaluate(Session.t(), Fluffy.Locator.t(), String.t(), term(), [locator_evaluate_option()]) :: term()
@@ -895,6 +923,7 @@ defmodule Fluffy.Playwright do
     Fluffy.__dispatch_driver__(session, :locator_evaluate, [locator, expression, arg, options])
   end
 
+  @doc group: "JavaScript"
   @doc playwright_only: true
   @doc """
   Evaluates `expression` on all elements of a locator and returns the value: a function
@@ -920,6 +949,7 @@ defmodule Fluffy.Playwright do
     Fluffy.__dispatch_driver__(session, :evaluate_all, [locator, expression, arg, Options.validate_action!(options)])
   end
 
+  @doc group: "JavaScript"
   @doc playwright_only: true
   @doc """
   Waits until a JavaScript expression returns a truthy value in the active page and returns the session.
@@ -947,6 +977,7 @@ defmodule Fluffy.Playwright do
   def wait_for_function(%Session{} = session, expression) when is_binary(expression),
     do: run_wait_for_function(session, nil, expression, nil, [])
 
+  @doc group: "JavaScript"
   @doc playwright_only: true
   @doc """
   With a string, like `wait_for_function/2` with `arg` or options. With a
@@ -969,6 +1000,7 @@ defmodule Fluffy.Playwright do
   def wait_for_function(%Session{} = session, expression, arg) when is_binary(expression),
     do: run_wait_for_function(session, nil, expression, arg, [])
 
+  @doc group: "JavaScript"
   @doc playwright_only: true
   @doc "Like `wait_for_function/3`, with `arg` and options on the page, or `arg` or options on a locator."
   @spec wait_for_function(Session.t(), String.t(), term(), [wait_for_function_option()]) :: Session.t()
@@ -980,6 +1012,7 @@ defmodule Fluffy.Playwright do
   def wait_for_function(%Session{} = session, expression, arg, options) when is_binary(expression),
     do: run_wait_for_function(session, nil, expression, arg, options)
 
+  @doc group: "JavaScript"
   @doc playwright_only: true
   @doc "Like `wait_for_function/4` on a locator, with both `arg` and options."
   @spec wait_for_function(Session.t(), Fluffy.Locator.t(), String.t(), term(), [locator_wait_for_function_option()]) ::
@@ -1005,6 +1038,7 @@ defmodule Fluffy.Playwright do
     Fluffy.__dispatch_driver__(session, :locator_wait_for_function, [locator, expression, arg, options])
   end
 
+  @doc group: "Browser context"
   @doc playwright_only: true
   @doc """
   Adds cookies to the browser context and returns the session.
@@ -1019,6 +1053,7 @@ defmodule Fluffy.Playwright do
     session
   end
 
+  @doc group: "JavaScript"
   @doc playwright_only: true
   @doc """
   Adds a script that runs in every document of the session's browser context before
@@ -1050,6 +1085,7 @@ defmodule Fluffy.Playwright do
   def add_init_script(session, script, arg),
     do: set_context!(session, :add_init_script, &BrowserContext.add_init_script(&1, script, arg))
 
+  @doc group: "JavaScript"
   @doc playwright_only: true
   @doc """
   Adds a `<script>` tag to the active page's current document and returns the session.
@@ -1067,6 +1103,7 @@ defmodule Fluffy.Playwright do
     add_tag(session, :add_script_tag, &PlaywrightEx.Page.add_script_tag/2, options)
   end
 
+  @doc group: "JavaScript"
   @doc playwright_only: true
   @doc """
   Adds a `<style>` or `<link rel="stylesheet">` tag to the active page's current
@@ -1103,6 +1140,7 @@ defmodule Fluffy.Playwright do
 
   defp reject_snake_case_cookie_keys!(_cookie), do: :ok
 
+  @doc group: "Browser context"
   @doc playwright_only: true
   @doc "Returns browser cookies, optionally only those for `urls`. See `PlaywrightEx.BrowserContext.cookies/2`."
   @spec cookies(Session.t(), String.t() | [String.t()] | nil) :: [map()]
@@ -1121,6 +1159,7 @@ defmodule Fluffy.Playwright do
 
   defp reject_cookies_options!(_urls), do: :ok
 
+  @doc group: "Browser context"
   @doc playwright_only: true
   @doc """
   Clears cookies and returns the session.
@@ -1133,6 +1172,7 @@ defmodule Fluffy.Playwright do
     session
   end
 
+  @doc group: "Browser context"
   @doc playwright_only: true
   @doc """
   Returns the context's storage state for reuse as `browser_context: [storage_state: state]`.
@@ -1144,6 +1184,7 @@ defmodule Fluffy.Playwright do
     session |> browser_context!(:storage_state) |> BrowserContext.storage_state!(options)
   end
 
+  @doc group: "Browser context"
   @doc playwright_only: true
   @doc """
   Replaces the context's storage with `state`, a saved state from `storage_state/2`
@@ -1158,6 +1199,7 @@ defmodule Fluffy.Playwright do
     set_context!(session, :set_storage_state, &BrowserContext.set_storage_state(&1, state))
   end
 
+  @doc group: "Browser context"
   @doc playwright_only: true
   @doc """
   Grants browser permissions, such as `"geolocation"`, and returns the session.
@@ -1169,6 +1211,7 @@ defmodule Fluffy.Playwright do
     set_context!(session, :grant_permissions, &BrowserContext.grant_permissions(&1, permissions, options))
   end
 
+  @doc group: "Browser context"
   @doc playwright_only: true
   @doc "Clears all granted browser permissions and returns the session."
   @spec clear_permissions(Session.t()) :: Session.t()
@@ -1176,6 +1219,7 @@ defmodule Fluffy.Playwright do
     set_context!(session, :clear_permissions, &BrowserContext.clear_permissions/1)
   end
 
+  @doc group: "Browser context"
   @doc playwright_only: true
   @doc """
   Sets the geolocation and returns the session; `:null` clears it.
@@ -1188,6 +1232,7 @@ defmodule Fluffy.Playwright do
     set_context!(session, :set_geolocation, &BrowserContext.set_geolocation(&1, geolocation))
   end
 
+  @doc group: "Network"
   @doc playwright_only: true
   @doc "Emulates the network being offline, or back online, and returns the session."
   @spec set_offline(Session.t(), boolean()) :: Session.t()
@@ -1195,6 +1240,7 @@ defmodule Fluffy.Playwright do
     set_context!(session, :set_offline, &BrowserContext.set_offline(&1, offline))
   end
 
+  @doc group: "Network"
   @doc playwright_only: true
   @doc """
   Sets HTTP authentication credentials and returns the session; `:null` clears them.
@@ -1208,6 +1254,7 @@ defmodule Fluffy.Playwright do
     set_context!(session, :set_http_credentials, &BrowserContext.set_http_credentials(&1, credentials))
   end
 
+  @doc group: "Network"
   @doc playwright_only: true
   @doc """
   Sets extra HTTP headers for every request of the session's browser context and

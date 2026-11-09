@@ -1,6 +1,8 @@
 defmodule Fluffy.Sandbox do
   @moduledoc """
   Integrates Ecto SQL sandbox ownership with a Fluffy test scope.
+
+  See [Ecto sandbox](installation.md#ecto-sandbox) for setup.
   """
 
   alias Ecto.Adapters.SQL.Sandbox
@@ -77,6 +79,7 @@ defmodule Fluffy.Sandbox do
       {owners, {header(), metadata}}
     end
 
+    @doc "LiveView `on_mount` hook that allows a connected LiveView to use the test's sandbox connection."
     def on_mount(:default, _params, _session, socket) do
       if connected?(socket) do
         metadata = sandbox_metadata(socket)
