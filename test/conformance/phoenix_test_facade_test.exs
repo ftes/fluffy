@@ -51,6 +51,19 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
     end
 
     @tag driver: driver
+    test "a within scope does not match its own root with #{driver}" do
+      unquote(driver)
+      |> locators_session("scopes")
+      |> within("#one", fn scoped ->
+        scoped
+        |> assert_has("#one", count: 0)
+        |> assert_has(Locator.by_css("#one"), count: 0)
+        |> assert_has(Locator.by_css(Locator.by_css("#inner"), "#inner"), count: 0)
+        |> assert_has("#inner", count: 1)
+      end)
+    end
+
+    @tag driver: driver
     test "assert_has and submit reject a selector of another type with #{driver}" do
       session = locators_session(unquote(driver), "scopes")
 
