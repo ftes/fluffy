@@ -525,7 +525,7 @@ defmodule Fluffy.ClientDOM do
       label: attribute(target.attributes, "label") || text,
       attributes: target.attributes,
       disabled?:
-        target.disabled? or has_attribute?(target.attributes, "disabled") or
+        has_attribute?(target.attributes, "disabled") or
           DocumentIndex.ancestor_has_attribute?(index, target.id, "optgroup", "disabled")
     }
   end

@@ -55,7 +55,8 @@ defmodule Fluffy.HTML.Semantics do
       end
   end
 
-  # What a `select` shows before input. Each option needs :id, :attributes and :disabled?.
+  # What a `select` shows before input. Each option needs :id, :attributes and
+  # :disabled?, its own or its optgroup's state: a disabled fieldset does not count.
   def default_selected_ids(options, attributes) do
     selected = options |> Enum.filter(&has_attribute?(&1.attributes, "selected")) |> Enum.map(& &1.id)
 

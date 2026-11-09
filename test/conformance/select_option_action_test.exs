@@ -159,6 +159,38 @@ defmodule Fluffy.Conformance.SelectOptionActionTest do
     end
 
     @tag driver: driver
+    test "a disabled fieldset does not change a select's default option with #{driver}" do
+      html = """
+      <fieldset disabled>
+        <select aria-label="Plain"><option value="first">First</option></select>
+        <select aria-label="Own"><option disabled value="first">First</option><option value="second">Second</option></select>
+        <select aria-label="Group">
+          <optgroup disabled><option value="first">First</option></optgroup>
+          <option value="second">Second</option>
+        </select>
+      </fieldset>
+      """
+
+      with_html(unquote(driver), html, fn session ->
+        session
+        |> expect("Plain" |> by_label() |> to_have_value("first"))
+        |> expect("Own" |> by_label() |> to_have_value("second"))
+        |> expect("Group" |> by_label() |> to_have_value("second"))
+      end)
+    end
+
+    @tag driver: driver
+    test "select_option rejects a select in a disabled fieldset with #{driver}" do
+      html = ~s(<fieldset disabled><select aria-label="Plan"><option>First</option></select></fieldset>)
+
+      with_html(unquote(driver), html, fn session ->
+        assert_action_error(session, Fluffy.ActionabilityError, ~r/disabled/, fn ->
+          select_option(session, by_label("Plan"), "First", timeout: 5)
+        end)
+      end)
+    end
+
+    @tag driver: driver
     test "select_option rejects an option disabled by its optgroup with #{driver}" do
       html =
         ~s(<select aria-label="Plan"><optgroup disabled><option>Legacy</option></optgroup></select>)
