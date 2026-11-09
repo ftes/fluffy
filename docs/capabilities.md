@@ -12,7 +12,7 @@ boundaries described below.
 | Feature | Phoenix | Playwright |
 | --- | --- | --- |
 | Frame locators and traversal | - | equivalent |
-| Documented CSS locator subset | equivalent | equivalent |
+| Conformance-tested CSS locators | equivalent | equivalent |
 | Text, label, and attribute locators | equivalent | equivalent |
 | Structural role and accessible-name subset | structural subset | equivalent |
 | Role-state and regular-expression locator options | - | equivalent |
@@ -34,7 +34,7 @@ boundaries described below.
 | Specialized scalar input values | structural subset | equivalent |
 | Computed style, layout, and browser accessibility tree | - | equivalent |
 | Downloads | equivalent | equivalent |
-| Named pages and new tabs | - | equivalent |
+| Multiple pages and new tabs | - | equivalent |
 | Browser history navigation | - | equivalent |
 | Browser cookie helpers and storage-state export | - | equivalent |
 | Runtime permissions, geolocation, offline mode, and HTTP credentials | - | equivalent |

@@ -24,7 +24,7 @@ defmodule Fluffy.Capability do
     },
     %{
       id: :css_locators,
-      feature: "Documented CSS locator subset",
+      feature: "Conformance-tested CSS locators",
       drivers: %{static: :equivalent, live: :equivalent, playwright: :equivalent},
       detail:
         "The shared contract covers the selectors in the CSS conformance corpus; arbitrary browser-only pseudo-classes are not advertised."
@@ -196,7 +196,7 @@ defmodule Fluffy.Capability do
     },
     %{
       id: :pages,
-      feature: "Named pages and new tabs",
+      feature: "Multiple pages and new tabs",
       drivers: %{static: :browser_only, live: :browser_only, playwright: :equivalent},
       detail: "Multiple pages, new tabs, and page lifecycle operations require Playwright."
     },

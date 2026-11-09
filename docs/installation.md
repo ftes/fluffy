@@ -41,6 +41,13 @@ The application's normal browser bundle must connect its LiveSocket. See
 [Actionability checks and waiting](usage.md#actionability-checks-and-waiting)
 for Fluffy's automatic LiveView connection wait.
 
+## Timeouts
+
+Phoenix sessions wait up to 1 second by default. Set `config :fluffy, timeout: 2_000`
+to change that, or pass `timeout:` to `start_session/2` for one session. Playwright
+sessions ignore it and use the `timeout` under `config :fluffy, playwright:` (default
+`15_000`), also overridden by `start_session/2`.
+
 ## Playwright setup
 
 Only the Playwright backend needs a browser. PlaywrightEx pins its Playwright

@@ -339,7 +339,8 @@ LiveView expectations observe fresh renders and retry until they pass or reach
 their deadline. Supported LiveView actions also retry transient missing or
 actionability failures, as listed below. Waiting is enabled by default; pass
 `timeout:` to an action or expectation to change its deadline. It defaults to the
-session's `timeout:` from `start_session/2`, then the configured timeout. Static checks
+session's `timeout:` from `start_session/2`, then the backend's
+[configured timeout](installation.md#timeouts). Static checks
 are immediate. Playwright uses the browser's native waiting behavior.
 
 When a Playwright visit finds LiveView roots, it waits for every root, including
@@ -461,21 +462,21 @@ required option list, so `import Fluffy.Playwright` leaves `Kernel.tap/2` usable
 See [Assertion styles](assertion-styles.md) for native assertion imports,
 constructor names, options, and negation semantics.
 
-`Fluffy.Expect` asserts text, attributes, classes, ids, and states the same way
+`Fluffy.Assert` asserts text, attributes, classes, ids, and states the same way
 on every driver:
 
 ```elixir
 session
-|> expect(to_have_text(by_role(:heading), "Creature saved"))
-|> expect(to_contain_text(by_role(:alert), ~r/\d+ spells/))
-|> expect(to_have_text(by_css("li"), ["Fluffy", "Norbert"]))
-|> expect(to_have_attribute(by_role(:link, name: "Docs"), "href", "/docs"))
-|> expect(to_have_class(by_css("#card"), "card selected"))
-|> expect(to_contain_class(by_css("#card"), "selected"))
-|> expect(to_have_id(by_label("Name"), "name"))
-|> expect(to_be_attached(by_css("#card")))
-|> expect(to_be_hidden(by_text("Saving")))
-|> expect(to_be_empty(by_label("Notes")))
+|> assert(text(by_role(:heading), "Creature saved"))
+|> assert(contain_text(by_role(:alert), ~r/\d+ spells/))
+|> assert(text(by_css("li"), ["Fluffy", "Norbert"]))
+|> assert(attribute(by_role(:link, name: "Docs"), "href", "/docs"))
+|> assert(class(by_css("#card"), "card selected"))
+|> assert(contain_class(by_css("#card"), "selected"))
+|> assert(id(by_label("Name"), "name"))
+|> assert(attached(by_css("#card")))
+|> assert(hidden(by_text("Saving")))
+|> assert(empty(by_label("Notes")))
 ```
 
 A string compares normalized whitespace in the text; a regular expression sees
@@ -486,18 +487,18 @@ without the `u` flag `.` matches one byte there rather than one character.
 `ignore_case:` takes precedence over a regular expression's own flag.
 A list checks each matched element in order, while any other form requires
 exactly one match. `use_inner_text: true` reads rendered text and requires
-Playwright, so `to_have_text` and `to_contain_text` raise
+Playwright, so `text` and `contain_text` raise
 `Fluffy.CapabilityError` on Static and LiveView when given it.
 
-`to_be_hidden` passes when nothing matches, as does `not_(to_be_visible(locator))`.
-Negating `to_have_text`, `to_contain_text`, `to_have_attribute`, `to_have_class`,
-`to_contain_class`, `to_have_id`, or `to_be_empty` still fails when nothing matches.
+`hidden` passes when nothing matches, as does `refute(visible(locator))`.
+Negating `text`, `contain_text`, `attribute`, `class`,
+`contain_class`, `id`, or `empty` still fails when nothing matches.
 
-Known limits: on Static and LiveView, `to_be_empty` can differ from a browser for
+Known limits: on Static and LiveView, `empty` can differ from a browser for
 a checkbox, radio, range or color input and a script-only element, and attribute
 names match exactly; on Playwright, `submit` can return early when a submit handler
 that does not cancel changes the URL in the document (`pushState`, `replaceState`,
-`location.hash`), so assert with a retrying `expect` afterwards.
+`location.hash`), so use a retrying `assert` afterwards.
 
 ## Visibility and DOM presence
 
@@ -742,8 +743,8 @@ page of the session, including documents loaded later. Install the clock before
 visiting the page, then pause it and advance it explicitly:
 
 ```elixir
+use Fluffy.Assert
 import Fluffy
-import Fluffy.Expect
 import Fluffy.Locator
 
 alias Fluffy.Playwright.Clock
@@ -755,7 +756,7 @@ session
 # The search input has phx-debounce="500": nothing is sent yet.
 |> fill(by_label("Search"), "Lumos")
 |> Clock.run_for(500)
-|> expect(to_be_visible(by_text("1 spell found")))
+|> assert(visible(by_text("1 spell found")))
 ```
 
 `Clock.run_for/3` fires every timer due on the way, `Clock.fast_forward/3` jumps

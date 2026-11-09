@@ -41,7 +41,7 @@ start_session(:phoenix)
 - `refute(visible(l))` passes for an absent or invisible element. Use `assert(count(l, 0))` to require DOM absence.
 - URL strings match the complete URL, including query and fragment. Use `page_url(path: "/x")` when only the path matters.
 - There is no page status assertion. On Playwright, assert on `Event.response` instead.
-- Phoenix drivers check structural visibility (`hidden`, `aria-hidden="true"`, `type="hidden"`) and do not compute CSS, so `display: none` alone counts as visible there. Use `:playwright` to test rendered visibility.
+- Phoenix drivers check structural visibility (`hidden`, `type="hidden"`) and do not compute CSS, so `display: none` alone counts as visible there. `aria-hidden="true"` does not affect visibility; only `by_role` excludes it. Use `:playwright` to test rendered visibility.
 
 ## Hidden inputs
 
