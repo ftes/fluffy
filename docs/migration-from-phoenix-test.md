@@ -141,9 +141,7 @@ The facade preserves PhoenixTest vocabulary and conveniences:
 The facade uses Fluffy's execution engine, so it is not an exact compatibility
 implementation. Check these differences when migrating:
 
-- **Strict matching:** single-target actions and native visibility assertions reject
-  ambiguous matches. Facade `assert_has` accepts any visible match; `refute_has`
-  requires no visible matches.
+- **Strict matching:** actions reject ambiguous matches; see [Locators](usage.md#locators).
 - **CSS links:** text matches take precedence over labels. Label matching is a
   fallback only when no text match exists when the action starts.
 - **Form behavior:** submissions use current DOM ownership and control state.
@@ -221,9 +219,8 @@ Each call below is a pipeline step:
 
 When rewriting, preserve the original assertion's intent:
 
-- Native `visible` uses the same visibility rules but rejects multiple matches;
-  facade `assert_has` accepts any visible match. For DOM presence/absence,
-  use counts as described in [Visibility and DOM presence](usage.md#visibility-and-dom-presence).
+- Native `visible` uses the same visibility rules but rejects multiple matches.
+  For DOM presence/absence, use counts as described in [Visibility and DOM presence](usage.md#visibility-and-dom-presence).
 - Native text, role-name, and label locators default to substring matching;
   use `exact: true` to retain exact field labels. Native `nth` is zero-based, whereas facade `at:` is
   one-based. Use locator composition in place of facade `within`; see

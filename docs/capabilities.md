@@ -102,7 +102,8 @@ input and textarea controls; they do not emulate editing element text.
 ### Focus and client state
 
 `Fluffy.Playwright.focus/3`, `Fluffy.Playwright.blur/3`, and focus assertions
-require Playwright. Static and LiveView do not track or simulate focus.
+require Playwright; with `import Fluffy.Playwright`, call `focus` and `blur` directly.
+Static and LiveView track current input properties but neither track nor simulate focus.
 
 On a changed LiveView render, local text values adopt the rendered value,
 except during `phx-trigger-action` handoff. Unchanged document renders preserve
@@ -114,8 +115,8 @@ Selected options survive while the select name and option signature are
 unchanged; files survive while the matched control remains a file input with the
 same name. Elements without an `id` are matched by position, so id-less controls
 with the same name and value can still exchange state when a patch shifts them;
-give such controls stable ids. Use Playwright for focused input protection and exact browser patch
-behavior.
+give such controls stable ids. Use Playwright for focused input protection,
+focus-sensitive patches, blur or debounce timing, and exact browser patch behavior.
 
 ### LiveView document and patch boundaries
 
@@ -139,12 +140,14 @@ Use [frame locators](usage.md#frames-playwright) to query iframe contents with
 Playwright. Page switching does not select an iframe, and frame locators do not
 change the active page.
 
-Static and LiveView can query the iframe element in their current markup, but
-do not load its `src` or parse its `srcdoc` as a child document. They do not
-flatten iframe contents into the parent document or ignore frame boundaries:
+Static works on the response HTML and LiveView on its rendered document. Both can
+query an iframe element and its attributes, but do not load its `src` or parse its
+`srcdoc` as a child document, so ordinary locators cannot find elements inside it.
+They do not flatten iframe contents into the parent document or ignore frame boundaries:
 executing a frame-traversing query raises `Fluffy.CapabilityError`. Visit the
 embedded route directly to test it independently with Phoenix; use Playwright
-to test the embedding behavior. See
+to test the embedding behavior, including interactions between the parent page and
+iframe. See
 [Pages, popups, and frames](advanced-events.md#pages-popups-and-frames)
 for how pages, browser contexts, and frames relate.
 
@@ -200,12 +203,8 @@ because application JavaScript opens the chooser.
 
 ### Native escape hatch
 
-`Fluffy.unwrap/2` exposes a session's driver-specific APIs: `Plug.Conn`,
-`Phoenix.LiveViewTest.View`, or `PlaywrightEx.Page`. `Fluffy.Playwright.unwrap/3`
-passes a `PlaywrightEx.Locator`. `Fluffy.unwrap_and_return/2` also takes a browser
-value, such as a `Fluffy.Response`, and passes its PlaywrightEx counterpart. Use the shared event and page APIs for lifecycle
-operations. See [Native escape hatch](usage.md#native-escape-hatch) for callback
-behavior.
+`Fluffy.unwrap/2` and `Fluffy.unwrap_and_return/2` reach driver-native APIs; see
+[Native escape hatch](usage.md#native-escape-hatch) for callback behavior.
 
 ### PlaywrightEx coverage
 
