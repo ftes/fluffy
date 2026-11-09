@@ -184,14 +184,21 @@ Available constructors are `by_role`, `by_text`, `by_label`,
 `by_placeholder`, `by_alt_text`, `by_title`, `by_test_id`, and `by_css`.
 Text, role-name, and label matching default to normalized substring matching;
 use `exact: true` for a complete match. Role names follow accessible-name
-precedence: `aria-labelledby`, then `aria-label`, then native labels. Explicit
-ARIA roles override implicit roles. The Phoenix backend knows the implicit roles
-`article`, `banner`, `button`, `cell`, `checkbox`, `columnheader`, `combobox`,
-`complementary`, `contentinfo`, `form`, `heading`, `img`, `link`, `list`,
-`listbox`, `listitem`, `main`, `navigation`, `option`, `radio`, `region`, `row`,
-`rowgroup`, `rowheader`, `search`, `slider`, `spinbutton`, `table` and `textbox`;
-any other role needs an explicit `role` attribute there. CSS must be valid
-browser CSS; escape special characters in IDs or use a semantic/test-id locator.
+precedence: `aria-labelledby`, then `aria-label`, then native labels and
+captions, then content for the roles Playwright names from content, then
+`title`. Landmarks, lists, list items and dialogs are not named by their content.
+Explicit ARIA roles override implicit roles. The Phoenix backend knows the
+implicit roles `article`, `banner`, `blockquote`, `button`, `caption`, `cell`,
+`checkbox`, `code`, `columnheader`, `combobox`, `complementary`, `contentinfo`,
+`definition`, `deletion`, `dialog`, `document`, `emphasis`, `figure`, `form`,
+`gridcell`, `group`, `heading`, `img`, `insertion`, `link`, `list`, `listbox`,
+`listitem`, `main`, `mark`, `math`, `meter`, `navigation`, `option`, `paragraph`,
+`presentation`, `progressbar`, `radio`, `region`, `row`, `rowgroup`, `rowheader`,
+`search`, `searchbox`, `separator`, `slider`, `spinbutton`, `status`, `strong`,
+`subscript`, `superscript`, `table`, `term`, `textbox` and `time`; any other role
+needs an explicit `role` attribute there. Phoenix computes these from markup, so
+computed CSS and live input state stay browser-only. CSS must be valid browser
+CSS; escape special characters in IDs or use a semantic/test-id locator.
 
 Options marked *Playwright only.* in `Fluffy.Locator`, such as
 `by_role(:button, pressed: true)`, `by_role(:heading, level: 2)` or a regex
