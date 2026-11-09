@@ -60,7 +60,7 @@ bytes, enforcing the indicated in-memory limit (10 MB by default).
 Failures raise when reading or saving; on Playwright, `Fluffy.unwrap_and_return/2` reaches
 `failure` and `cancel` on the `PlaywrightEx.Download`. Handles belong to their
 session; saved files outlive it. In-process HTTP downloads use the same API and
-complete before delivery. `Download.path/1` returns the browser's copy of the file:
+complete before delivery. `Fluffy.Download.path/1` returns the browser's copy of the file:
 Phoenix holds the bytes in memory and raises `Fluffy.CapabilityError`.
 JavaScript-generated downloads require Playwright.
 
@@ -180,7 +180,7 @@ end)
 
 Use `Dialog.accept(dialog, "prompt text")` for prompts or `Dialog.dismiss(dialog)`.
 Types are `:alert`, `:confirm`, `:prompt`, and `:beforeunload`; metadata also includes
-`message`, `default_value`, and the `page` that opened it (also `Dialog.page/1`). Register a persistent catch-all handler when needed:
+`message`, `default_value`, and the `page` that opened it (also `Fluffy.Dialog.page/1`). Register a persistent catch-all handler when needed:
 
 ```elixir
 accept_dialog = &Dialog.accept/1
@@ -226,16 +226,18 @@ assert Response.ok?(response)
 assert Response.json(response) == %{"saved" => true}
 ```
 
-`Response` also has `body/1`, `text/1`, `all_headers/1`, `header_value/2` and
-`header_values/2`. `Request` has `all_headers/1`, `header_value/2`,
-`post_data_json/1`, `failure/1`, `redirected_from/1` and `redirected_to/1`. These
-readers raise once the session is closed or after its `timeout:`. Timing, sizes,
+`Response` also has `Fluffy.Response.body/1`, `Fluffy.Response.text/1`,
+`Fluffy.Response.all_headers/1`, `Fluffy.Response.header_value/2` and
+`Fluffy.Response.header_values/2`. `Request` has `Fluffy.Request.all_headers/1`,
+`Fluffy.Request.header_value/2`, `Fluffy.Request.post_data_json/1`,
+`Fluffy.Request.failure/1`, `Fluffy.Request.redirected_from/1` and
+`Fluffy.Request.redirected_to/1`. These readers raise once the session is closed or after its `timeout:`. Timing, sizes,
 security details and the server address stay on the native value.
 
 `Event.request_failed()` and `Event.request_finished()` resolve with the
 `Fluffy.Request` once it fails or its response body has downloaded. An HTTP error
 status is a finished request, not a failed one. Read the reason with
-`Request.failure/1`:
+`Fluffy.Request.failure/1`:
 
 ```elixir
 %{errorText: reason} = Request.failure(request)
@@ -261,7 +263,7 @@ exception (`name`, `message`, `stack`, `page`). Waits and listeners do not affec
 `log_browser_console`: messages are logged as well.
 
 `Event.worker()` resolves with a `Fluffy.Worker` and `Event.web_socket()` with a
-`Fluffy.WebSocket`, each with its `url` and `page`; `unwrap_and_return/2` reaches the native value
+`Fluffy.WebSocket`, each with its `url` and `page`; `Fluffy.unwrap_and_return/2` reaches the native value
 for evaluating in a worker or listening to a socket's frames.
 
 `Event.dom_content_loaded()` and `Event.load()` resolve with the `Fluffy.Page` when that
@@ -287,11 +289,12 @@ session
 against `base_url:`), a regular expression, a predicate over the `URI`, or
 path, query, and fragment components.
 
-Answers are `Route.fulfill/2` (status, headers, `body:`, `json:`, `path:`),
-`Route.continue/2` (with optional overrides), `Route.abort/2`, and `Route.fallback/2`.
+Answers are `Fluffy.Route.fulfill/2` (status, headers, `body:`, `json:`, `path:`),
+`Fluffy.Route.continue/2` (with optional overrides), `Fluffy.Route.abort/2`, and
+`Fluffy.Route.fallback/2`.
 When several routes match, the last registered wins; `fallback` hands the
 request to the route registered before it, and finally to the server.
-`times:` limits how many requests a route handles, and `unroute/3` removes a route
+`times:` limits how many requests a route handles, and `Fluffy.Playwright.unroute/3` removes a route
 (for a given handler or all of them for that `url`). A request already at a handler
 may go on without it, as with Playwright's `unroute`, and an answer that comes too
 late fails nothing.
@@ -300,11 +303,11 @@ the page loads the fulfilled document and Fluffy keeps tracking it.
 
 Each handler runs in its own process, one per request, so a slow handler holds
 only its request; the test process is blocked in the action that caused it. That
-process has `$callers` through the process that called `route/4`, so Ecto sandbox
+process has `$callers` through the process that called `Fluffy.Playwright.route/4`, so Ecto sandbox
 queries work there as in the test. A handler that raises aborts its request and
-fails the process that called `route/4`, like `on/4` handlers. A route lasts until
-`unroute/3` or the session's end, even if the process that called `route/4` exits
-first, unlike an `on/4` listener; only while that process lives does a failure
+fails the process that called `Fluffy.Playwright.route/4`, like `Fluffy.on/4` handlers. A route lasts until
+`Fluffy.Playwright.unroute/3` or the session's end, even if the process that called `Fluffy.Playwright.route/4` exits
+first, unlike a `Fluffy.on/4` listener; only while that process lives does a failure
 reach it.
 
 A handler may return without answering and leave the route to another process. To
@@ -343,7 +346,7 @@ The chooser identifies its source page. Setting files preserves the current-page
 selection, even after switching elsewhere. This sets files programmatically; it
 does not operate the OS picker. Choosers require Playwright.
 
-## Cookies, storage, and browser interactions
+## Cookies and storage
 
 `Fluffy.Playwright.add_cookies/2` and `Fluffy.Playwright.clear_cookies/2` return the
 session. `Fluffy.Playwright.cookies/2` returns cookie maps; its optional URL list
@@ -355,19 +358,11 @@ filters by URL. Cookie maps use Playwright's camelCase atom keys, such as
 (`:cookies`, `:origins`) and optionally writes JSON with `path:`. Include IndexedDB with `indexed_db: true`. Reuse the result
 with `start_session(:playwright, browser_context: [storage_state: state])`.
 
-For browser interaction, use `Fluffy.Playwright.hover(session, locator)`,
-`Fluffy.Playwright.drag_to(session, source, target)`, or
-`Fluffy.Playwright.press_sequentially(session, locator, text, delay: 20)`. All accept
-`timeout:` and the options of the matching `PlaywrightEx.Locator` action.
-Sequential typing emits keyboard events for each character and appends at the
-current caret position. Drag source and target must belong to the same frame.
-These actions require Playwright and reconcile navigation caused by the action.
-
 ## Native values
 
-Event values keep their PlaywrightEx counterpart private. `Fluffy.unwrap_and_return/2` passes
-it to a callback and returns the callback's result, for members Fluffy does not
-wrap: `PlaywrightEx.Request`, `PlaywrightEx.Response`, `PlaywrightEx.Route`, `PlaywrightEx.Dialog`,
+Event values keep their PlaywrightEx counterpart private; reach it with
+`Fluffy.unwrap_and_return/2` (see [Native escape hatch](usage.md#native-escape-hatch))
+for members Fluffy does not wrap: `PlaywrightEx.Request`, `PlaywrightEx.Response`, `PlaywrightEx.Route`, `PlaywrightEx.Dialog`,
 `PlaywrightEx.Download`, `PlaywrightEx.FileChooser`, `PlaywrightEx.Frame`,
 `PlaywrightEx.ConsoleMessage`, `PlaywrightEx.Worker`, and `PlaywrightEx.WebSocket`,
 and the PlaywrightEx exception of a page error. Phoenix downloads have none and raise

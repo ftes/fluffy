@@ -68,16 +68,6 @@ action and the assertion to it.
 
 </details>
 
-> #### Coming from PhoenixTest? {: .info}
->
-> Use `import Fluffy.PhoenixTest` to keep familiar helpers such as `fill_in`,
-> `click_button`, and `assert_has`. The facade makes Fluffy mostly a drop-in
-> replacement for supported tests, including browser tests. Get automatic
-> waiting for LiveView actions and assertions, plus automatic LiveView
-> connection waiting in browser tests. LiveView tests also see the whole page,
-> including the root layout, `live_title` updates, and portal content.
-> [Start with the migration guide →](docs/migration-from-phoenix-test.md)
-
 ## Getting started
 
 Follow [Installation and runtime](docs/installation.md) for the dependency,
@@ -105,8 +95,8 @@ setup, then [Usage](docs/usage.md) for writing tests and a shared `FluffyCase`.
 ## Coming from PhoenixTest
 
 Replace `import PhoenixTest` with `import Fluffy.PhoenixTest` and add
-`Fluffy.Test.setup/1` to your test setup. Existing pipelines can keep their
-helper names and prepared connections:
+`Fluffy.Test.setup/1` to your test setup. Existing pipelines keep familiar helpers
+such as `fill_in`, `click_button`, and `assert_has`, and their prepared connections:
 
 ```elixir
 import Fluffy.PhoenixTest
@@ -119,6 +109,11 @@ conn
 |> assert_has("#notice", text: "Creature registered")
 |> assert_path("/creatures")
 ```
+
+The facade makes Fluffy mostly a drop-in replacement for supported tests, including
+browser tests. You also get automatic waiting for LiveView actions and assertions,
+automatic LiveView connection waiting in browser tests, and LiveView tests that see
+the whole page, including the root layout, `live_title` updates, and portal content.
 
 Use the facade import on its own. The [migration guide](docs/migration-from-phoenix-test.md)
 shows complete setup, the same helpers with Playwright, and compatibility

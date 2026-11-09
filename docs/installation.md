@@ -44,9 +44,9 @@ for Fluffy's automatic LiveView connection wait.
 ## Timeouts
 
 Phoenix sessions wait up to 1 second by default. Set `config :fluffy, timeout: 2_000`
-to change that, or pass `timeout:` to `start_session/2` for one session. Playwright
+to change that, or pass `timeout:` to `Fluffy.start_session/2` for one session. Playwright
 sessions ignore it and use the `timeout` under `config :fluffy, playwright:` (default
-`15_000`), also overridden by `start_session/2`.
+`15_000`), also overridden by `Fluffy.start_session/2`.
 
 ## Playwright setup
 
@@ -83,7 +83,6 @@ pinned driver is used.
 otherwise it uses the global Playwright `timeout`. To use a system browser, set
 `launch_options: [executable_path: System.find_executable("google-chrome-stable")]`.
 `MIX_ENV=test mix playwright_ex.install --no-browsers` installs only the driver for an existing browser.
-If the browser disconnects, Fluffy launches a new one for the next session.
 
 Setting `artifact_dir` is recommended for every project that runs Playwright
 tests. Fluffy writes HTML, a full-page screenshot, and the formatted error

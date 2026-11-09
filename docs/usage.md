@@ -53,7 +53,7 @@ state belongs to the session runtime: existing handles see action results even
 when the returned handle is discarded. Use each session sequentially from its
 owning test process; concurrent use of the same session is unsupported.
 
-For page selection and handle lifetime, see
+For page selection, handle lifetime, and user isolation, see
 [Pages, popups, and frames](advanced-events.md#pages-popups-and-frames).
 
 The examples describe an illustrative Hogwarts application; routes, controls,
@@ -93,9 +93,6 @@ test "updates the preview rendered by a JavaScript hook" do
   |> assert(visible(by_text("Preview: Basilisk")))
 end
 ```
-
-See [Pages, popups, and frames](advanced-events.md#pages-popups-and-frames)
-for page selection and user isolation.
 
 See the [capability matrix](capabilities.md) for backend differences.
 
@@ -217,27 +214,21 @@ changes made by `check`, `uncheck`, and `select_option`. For example,
 Attribute selectors such as `[checked]` and `[selected]` still match the
 rendered HTML attributes, which can differ from the user's input.
 
-The Phoenix backend tracks current input properties but does not model focus.
-On changed LiveView renders, local text adopts the server-rendered value except
-for `phx-trigger-action` handoff. Unchanged renders retain local values; checkbox,
-select, and file state follow the rules described in
+Focus requires Playwright, and LiveView renders can replace local input state; see
 [Focus and client state](capabilities.md#focus-and-client-state).
-
-Use `Fluffy.Playwright.focus/3`, `Fluffy.Playwright.blur/3`, and focus assertions
-with browser sessions. With `import Fluffy.Playwright`, call `focus` and `blur`
-directly. Use Playwright when a test depends on focus-sensitive LiveView patches
-or blur/debounce timing.
 
 Single-target actions and native visibility assertions are strict: if a locator
 matches more than one element, Fluffy reports the ambiguity instead of choosing
-for you. Facade `assert_has` accepts any visible match. Narrow the
-locator, or use `assert(count(locator, n))` when multiple matches are
-the intended assertion.
+for you. Facade `assert_has` accepts any visible match, and `refute_has` requires
+no visible matches. Narrow the locator, or use `assert(count(locator, n))` when
+multiple matches are the intended assertion.
 
 ## Frames (Playwright)
 
 Use a frame locator to query elements inside an iframe. Frame locators are lazy;
-Playwright resolves the frame and target when an action or assertion runs.
+Playwright resolves the frame and target when an action or assertion runs. See
+[Playwright's FrameLocator API](https://playwright.dev/docs/api/class-framelocator)
+for the underlying browser behavior.
 
 ```elixir
 checkout = frame_locator("#checkout")
@@ -270,20 +261,8 @@ A frame locator never changes the active page. Page URL/title assertions and
 navigation helpers continue to target the page's main frame. Child navigation
 leaves that page state unchanged; navigation targeting `_top` updates it normally.
 
-The Phoenix backend does not flatten frames into one document. Static operates
-on the response HTML; LiveView operates on the current rendered LiveView. An
-`<iframe>` in that markup is an element whose attributes can be queried, but
-neither driver loads its `src` nor turns its `srcdoc` into a child document.
-Ordinary locators therefore cannot find elements inside it. Frame traversal is
-not supported by Static and LiveView and raises `Fluffy.CapabilityError` when
-an action or assertion executes the query; frame boundaries are never silently
-ignored.
-
-To test the embedded route on its own with Phoenix, visit it directly. Use
-Playwright to test it as an embedded document, including interactions between
-the parent page and iframe. See
-[Playwright's FrameLocator API](https://playwright.dev/docs/api/class-framelocator)
-for the underlying browser behavior.
+Static and LiveView raise `Fluffy.CapabilityError` for frame traversal; see
+[Tabs, windows, and iframes](capabilities.md#tabs-windows-and-iframes).
 
 ## Actions and expectations
 
@@ -331,7 +310,7 @@ LiveView expectations observe fresh renders and retry until they pass or reach
 their deadline. Supported LiveView actions also retry transient missing or
 actionability failures, as listed below. Waiting is enabled by default; pass
 `timeout:` to an action or expectation to change its deadline. It defaults to the
-session's `timeout:` from `start_session/2`, then the backend's
+session's `timeout:` from `Fluffy.start_session/2`, then the backend's
 [configured timeout](installation.md#timeouts). Static checks
 are immediate. Playwright uses the browser's native waiting behavior.
 
@@ -393,18 +372,12 @@ Removed or disabled controls are omitted; renamed and newly inserted controls
 use their current names and owners. Duplicate names preserve their order,
 hidden inputs remain independent entries, and readonly controls submit even
 though they cannot be filled. Multiple selections replace the selected set.
-See [Forms and files](capabilities.md#forms-and-files) for validation and
-serialization boundaries.
+See [Forms and files](capabilities.md#forms-and-files) for validation, reset-button,
+and serialization boundaries.
 
-Native reset-button behavior requires Playwright. Static and LiveView clicks do
-not restore form defaults or clear file selections. LiveView reset buttons with
-`phx-click` still dispatch their server event.
-
-`Fluffy.press/4` uses native key behavior with Playwright. With LiveView, it
-forwards the supplied key unchanged to LiveViewTest keydown/keyup handlers on
-the selected element. It does not simulate focus, editing, checkbox activation,
-Enter submission, or `phx-key` filtering. Supply the desired event key yourself;
-modifier strings are not parsed. Static does not support `press`.
+`Fluffy.press/4` presses natively with Playwright, only invokes bound key handlers
+with LiveView, and is unsupported on Static; see
+[LiveView timing and keyboard events](capabilities.md#liveview-timing-and-keyboard-events).
 
 ```elixir
 # LiveView: invoke bound handlers with key = "Backspace"; do not delete text.
@@ -417,7 +390,6 @@ session
 ```
 
 For character-by-character browser typing, use `Fluffy.Playwright.press_sequentially/4`.
-See [LiveView timing and keyboard events](capabilities.md#liveview-timing-and-keyboard-events).
 
 ### Browser-only actions
 
@@ -448,6 +420,12 @@ then.
 
 `Fluffy.Playwright.tap/3` needs `browser_context: [has_touch: true]` and takes a
 required option list, so `import Fluffy.Playwright` leaves `Kernel.tap/2` usable.
+
+`Fluffy.Playwright.hover/3`, `Fluffy.Playwright.drag_to/4`, and
+`Fluffy.Playwright.press_sequentially/4` also require Playwright. They accept `timeout:`
+and the options of the matching `PlaywrightEx.Locator` action, and reconcile navigation
+the action causes. Sequential typing emits keyboard events for each character and appends
+at the current caret position. Drag source and target must belong to the same frame.
 
 ## Assertions
 
@@ -502,9 +480,8 @@ rendering as invisible: a `hidden` attribute on the element or an ancestor, an
 `<video>`'s children. `aria-hidden="true"` does not count, as in Playwright: it
 only keeps an element out of `by_role`.
 
-Without `count:` or a field predicate, the PhoenixTest-style facade's
-`assert_has` requires any visible match and `refute_has` requires no visible
-matches. Native visibility assertions require an unambiguous locator.
+Without `count:` or a field predicate, the PhoenixTest-style facade's `assert_has`
+and `refute_has` check visibility; [Locators](#locators) covers strictness.
 Counts and field predicates (`value:`, `checked:`, `selected:`) add no visibility
 requirement. Use `assert_has(selector, count: 1)` for DOM presence, including
 hidden inputs or script elements, and `selected:` on a select to check its
@@ -751,15 +728,16 @@ session
 |> assert(visible(by_text("1 spell found")))
 ```
 
-`Clock.run_for/3` fires every timer due on the way, `Clock.fast_forward/3` jumps
-ahead firing due timers once, and `Clock.resume/2` lets time flow again.
-`Clock.set_fixed_time/3` freezes only `Date`; `Clock.set_system_time/3` shifts it
-without firing timers. Timer-started navigation is adopted, as after an action.
+`Fluffy.Playwright.Clock.run_for/3` fires every timer due on the way,
+`Fluffy.Playwright.Clock.fast_forward/3` jumps ahead firing due timers once, and
+`Fluffy.Playwright.Clock.resume/2` lets time flow again.
+`Fluffy.Playwright.Clock.set_fixed_time/3` freezes only `Date`;
+`Fluffy.Playwright.Clock.set_system_time/3` shifts it without firing timers. Timer-started navigation is adopted, as after an action.
 
 While the clock is paused, actions, assertions, and navigation keep working:
 Fluffy's waits do not use page timers. The application's own timers are frozen
-though: LiveView's `phx-debounce` and `phx-throttle`, `JS.transition/2` (which
-also holds back LiveView's DOM updates until it ends), page title updates, and the
+though: LiveView's `phx-debounce` and `phx-throttle`,
+`Phoenix.LiveView.JS.transition/2` (which also holds back LiveView's DOM updates until it ends), page title updates, and the
 socket's heartbeat and reconnects. An assertion that depends on them fails
 after its timeout until the test advances or resumes the clock. Phoenix sessions
 raise `Fluffy.CapabilityError`.
@@ -791,9 +769,9 @@ The callback receives the current `%Plug.Conn{}` on a Static page, a
 `%Phoenix.LiveViewTest.View{}` on a LiveView page, or a
 `%PlaywrightEx.Page{}` on a Playwright page.
 
-A Static `unwrap/2` callback must return its updated `Plug.Conn` because
-connections are immutable, while a Static `unwrap_and_return/2` callback may
-return anything and leaves the conn alone. LiveView and Playwright `unwrap/2`
+A Static `Fluffy.unwrap/2` callback must return its updated `Plug.Conn` because
+connections are immutable, while a Static `Fluffy.unwrap_and_return/2` callback may
+return anything and leaves the conn alone. LiveView and Playwright `Fluffy.unwrap/2`
 callback results are ignored: Fluffy retains and reconciles the original View or Page. Exceptions, throws, and exits pass
 through unchanged. Prefer PlaywrightEx bang functions inside the callback when
 failure should stop the test.
