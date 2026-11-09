@@ -90,6 +90,9 @@ Locator constructors take a locator; page constructors target the active page.
 | `assert(enabled(locator))` | `expect(to_be_enabled(locator))` |
 | `assert(count(locator, 3))` | `expect(to_have_count(locator, 3))` |
 | `assert(value(locator, "Basilisk"))` | `expect(to_have_value(locator, "Basilisk"))` |
+| `assert(text(locator, "Basilisk"))` | `expect(to_have_text(locator, "Basilisk"))` |
+| `assert(attribute(locator, "href", "/creatures"))` | `expect(to_have_attribute(locator, "href", "/creatures"))` |
+| `assert(hidden(locator))` | `expect(to_be_hidden(locator))` |
 | `assert(page_url("/creatures"))` | `expect(page_to_have_url("/creatures"))` |
 | `assert(page_title("Creatures"))` | `expect(page_to_have_title("Creatures"))` |
 

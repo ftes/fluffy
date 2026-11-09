@@ -15,15 +15,23 @@ defmodule Fluffy.Expect.Internal do
 
   @doc "Whether a page title matches `expected`, comparing normalized whitespace."
   def title_matches?(expected, actual) when is_binary(actual) do
-    actual = normalize_title(actual)
+    actual = normalize_text(actual)
 
     case expected do
       %Regex{} -> matches?(expected, actual)
-      expected when is_binary(expected) -> normalize_title(expected) == actual
+      expected when is_binary(expected) -> normalize_text(expected) == actual
     end
   end
 
   def title_matches?(_expected, _actual), do: false
+
+  @doc "`text` with Playwright's whitespace normalization."
+  def normalize_text(text) do
+    text
+    |> String.replace(["\u200B", "\u00AD"], "")
+    |> String.replace(~r/\s+/u, " ")
+    |> String.trim()
+  end
 
   @doc "An expectation with validated shared options."
   def new(target, kind, expected, options \\ []) when is_atom(kind) and is_list(options) do
@@ -81,14 +89,26 @@ defmodule Fluffy.Expect.Internal do
   defp locator_matcher_description(:value, expected), do: "to have value #{inspect(expected)}"
   defp locator_matcher_description(:values, expected), do: "to have values #{inspect(expected)}"
   defp locator_matcher_description(:visible, _expected), do: "to be visible"
+  defp locator_matcher_description(:attached, _expected), do: "to be attached"
+  defp locator_matcher_description(:hidden, _expected), do: "to be hidden"
+  defp locator_matcher_description(:empty, _expected), do: "to be empty"
+  defp locator_matcher_description(:class, expected), do: "to have class #{inspect(expected)}"
+  defp locator_matcher_description(:contain_class, expected), do: "to contain class #{inspect(expected)}"
+  defp locator_matcher_description(:id, expected), do: "to have id #{inspect(expected)}"
+
+  defp locator_matcher_description(:text, {expected, options}),
+    do: "to have text #{inspect(expected)}#{ignoring_case(options)}"
+
+  defp locator_matcher_description(:contain_text, {expected, options}),
+    do: "to contain text #{inspect(expected)}#{ignoring_case(options)}"
+
+  defp locator_matcher_description(:attribute, {name, nil, _options}), do: "to have attribute #{inspect(name)}"
+
+  defp locator_matcher_description(:attribute, {name, value, options}),
+    do: "to have attribute #{inspect(name)} with value #{inspect(value)}#{ignoring_case(options)}"
+
+  defp ignoring_case(options), do: if(options[:ignore_case], do: ", ignoring case", else: "")
 
   defp maybe_negated(description, false), do: description
   defp maybe_negated(description, true), do: "not " <> description
-
-  defp normalize_title(title) do
-    title
-    |> String.replace(["\u200B", "\u00AD"], "")
-    |> String.replace(~r/\s+/u, " ")
-    |> String.trim()
-  end
 end

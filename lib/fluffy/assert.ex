@@ -99,6 +99,33 @@ defmodule Fluffy.Assert do
   @doc "Equivalent to `Fluffy.Expect.to_have_values/3`."
   defdelegate values(locator, expected, options \\ []), to: Fluffy.Expect, as: :to_have_values
 
+  @doc "Equivalent to `Fluffy.Expect.to_have_text/3`."
+  defdelegate text(locator, expected, options \\ []), to: Fluffy.Expect, as: :to_have_text
+
+  @doc "Equivalent to `Fluffy.Expect.to_contain_text/3`."
+  defdelegate contain_text(locator, expected, options \\ []), to: Fluffy.Expect, as: :to_contain_text
+
+  @doc "Equivalent to `Fluffy.Expect.to_have_attribute/4`."
+  defdelegate attribute(locator, name, value \\ nil, options \\ []), to: Fluffy.Expect, as: :to_have_attribute
+
+  @doc "Equivalent to `Fluffy.Expect.to_have_class/3`."
+  defdelegate class(locator, expected, options \\ []), to: Fluffy.Expect, as: :to_have_class
+
+  @doc "Equivalent to `Fluffy.Expect.to_contain_class/3`."
+  defdelegate contain_class(locator, expected, options \\ []), to: Fluffy.Expect, as: :to_contain_class
+
+  @doc "Equivalent to `Fluffy.Expect.to_have_id/3`."
+  defdelegate id(locator, expected, options \\ []), to: Fluffy.Expect, as: :to_have_id
+
+  @doc "Equivalent to `Fluffy.Expect.to_be_attached/2`."
+  defdelegate attached(locator, options \\ []), to: Fluffy.Expect, as: :to_be_attached
+
+  @doc "Equivalent to `Fluffy.Expect.to_be_hidden/2`."
+  defdelegate hidden(locator, options \\ []), to: Fluffy.Expect, as: :to_be_hidden
+
+  @doc "Equivalent to `Fluffy.Expect.to_be_empty/2`."
+  defdelegate empty(locator, options \\ []), to: Fluffy.Expect, as: :to_be_empty
+
   @doc "Equivalent to `Fluffy.Expect.page_to_have_title/2`."
   defdelegate page_title(expected, options \\ []), to: Fluffy.Expect, as: :page_to_have_title
 

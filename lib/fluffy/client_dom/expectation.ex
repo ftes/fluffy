@@ -3,7 +3,12 @@ defmodule Fluffy.ClientDOM.Expectation do
 
   alias Fluffy.ClientDOM
   alias Fluffy.Expect
+  alias Fluffy.HTML.Semantics
   alias Fluffy.Locator.Static
+  alias Fluffy.URLMatcher
+
+  # Elements whose content Playwright's text matching skips.
+  @not_matched ~w(script noscript style)
 
   # Evaluate one DOM snapshot. Drivers own retries, negation, and diagnostics.
   def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :count, expected: expected}) do
@@ -12,14 +17,75 @@ defmodule Fluffy.ClientDOM.Expectation do
   end
 
   def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :visible}) do
-    candidates = ClientDOM.resolve(client_dom, locator)
-
-    if length(candidates) > 1 do
-      raise ExUnit.AssertionError, message: Fluffy.Expectation.strictness_message(locator, candidates)
-    end
-
-    actual = Enum.count(candidates, &Static.structurally_visible?/1)
+    actual = client_dom |> strict_candidates!(locator) |> Enum.count(&Static.structurally_visible?/1)
     {actual > 0, actual}
+  end
+
+  # An empty locator passes `to_be_hidden` and, negated, still fails, as in Playwright.
+  def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :hidden}) do
+    candidates = strict_candidates!(client_dom, locator)
+    actual = Enum.count(candidates, &Static.structurally_visible?/1)
+    {actual == 0, actual}
+  end
+
+  def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :attached}) do
+    actual = client_dom |> strict_candidates!(locator) |> length()
+    {actual > 0, actual}
+  end
+
+  def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :empty} = expectation) do
+    with_element(client_dom, locator, expectation, fn
+      %{tag: tag} when tag in ["input", "textarea"] ->
+        actual = ClientDOM.value(client_dom, locator)
+        {actual == "", actual}
+
+      target ->
+        actual = element_text(target)
+        {String.trim(actual) == "", actual}
+    end)
+  end
+
+  def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :text, expected: {expected, options}} = expectation) do
+    match = &text_matches?(&1, &2, normalize: true, ignore_case: options[:ignore_case])
+    evaluate_text(client_dom, locator, expectation, expected, match, true)
+  end
+
+  def evaluate(
+        client_dom,
+        %Expect{target: {:locator, locator}, kind: :contain_text, expected: {expected, options}} = expectation
+      ) do
+    match = &text_matches?(&1, &2, normalize: true, ignore_case: options[:ignore_case], contains: true)
+    evaluate_text(client_dom, locator, expectation, expected, match, false)
+  end
+
+  def evaluate(
+        client_dom,
+        %Expect{target: {:locator, locator}, kind: :attribute, expected: {name, value, options}} = expectation
+      ) do
+    with_element(client_dom, locator, expectation, fn target ->
+      actual = Semantics.attribute(target.attributes, name)
+
+      cond do
+        is_nil(value) -> {not is_nil(actual), actual}
+        is_nil(actual) -> {false, actual}
+        true -> {text_matches?(value, actual, ignore_case: options[:ignore_case]), actual}
+      end
+    end)
+  end
+
+  def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :class, expected: expected} = expectation) do
+    evaluate_class(client_dom, locator, expectation, expected, &text_matches?(&1, &2, []))
+  end
+
+  def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :contain_class, expected: expected} = expectation) do
+    evaluate_class(client_dom, locator, expectation, expected, &contains_classes?/2)
+  end
+
+  def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :id, expected: expected} = expectation) do
+    with_element(client_dom, locator, expectation, fn target ->
+      actual = Semantics.attribute(target.attributes, "id") || ""
+      {text_matches?(expected, actual, []), actual}
+    end)
   end
 
   def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :disabled}) do
@@ -51,4 +117,100 @@ defmodule Fluffy.ClientDOM.Expectation do
     actual = ClientDOM.selected_values(client_dom, locator)
     {actual == expected, actual}
   end
+
+  defp evaluate_text(client_dom, locator, _expectation, expected, match, exact_length?) when is_list(expected) do
+    actual = client_dom |> ClientDOM.targets(locator) |> Enum.map(&element_text/1)
+    {matches_in_order?(expected, actual, match, exact_length?), actual}
+  end
+
+  defp evaluate_text(client_dom, locator, expectation, expected, match, _exact_length?) do
+    with_element(client_dom, locator, expectation, fn target ->
+      actual = element_text(target)
+      {match.(expected, actual), actual}
+    end)
+  end
+
+  defp evaluate_class(client_dom, locator, _expectation, expected, match) when is_list(expected) do
+    actual = client_dom |> ClientDOM.targets(locator) |> Enum.map(&class_attribute/1)
+    {matches_in_order?(expected, actual, match, true), actual}
+  end
+
+  defp evaluate_class(client_dom, locator, expectation, expected, match) do
+    with_element(client_dom, locator, expectation, fn target ->
+      actual = class_attribute(target)
+      {match.(expected, actual), actual}
+    end)
+  end
+
+  # Without an element, neither the assertion nor its negation can pass.
+  defp with_element(client_dom, locator, %Expect{negated?: negated?}, fun) do
+    case ClientDOM.targets(client_dom, locator) do
+      [] -> {negated?, :not_found}
+      [target] -> fun.(target)
+      targets -> strictness_error!(locator, Enum.map(targets, & &1.element))
+    end
+  end
+
+  defp strict_candidates!(client_dom, locator) do
+    candidates = ClientDOM.resolve(client_dom, locator)
+    if length(candidates) > 1, do: strictness_error!(locator, candidates)
+    candidates
+  end
+
+  defp strictness_error!(locator, candidates) do
+    raise ExUnit.AssertionError, message: Fluffy.Expectation.strictness_message(locator, candidates)
+  end
+
+  # Each expected value must match a later element than the one before it. An
+  # exact length makes that a pairwise comparison.
+  defp matches_in_order?(expected, actual, match, exact_length?) do
+    (not exact_length? or length(expected) == length(actual)) and matches_sequentially?(expected, actual, match)
+  end
+
+  defp matches_sequentially?([], _actual, _match), do: true
+  defp matches_sequentially?(_expected, [], _match), do: false
+
+  defp matches_sequentially?([expected | rest] = values, [actual | remaining], match) do
+    if match.(expected, actual) do
+      matches_sequentially?(rest, remaining, match)
+    else
+      matches_sequentially?(values, remaining, match)
+    end
+  end
+
+  defp text_matches?(%Regex{} = expected, actual, options) do
+    expected |> URLMatcher.ignore_case(options[:ignore_case]) |> Regex.match?(actual)
+  end
+
+  defp text_matches?(expected, actual, options) when is_binary(expected) do
+    expected = comparable(expected, options)
+    actual = comparable(actual, options)
+    if options[:contains], do: String.contains?(actual, expected), else: actual == expected
+  end
+
+  defp comparable(text, options) do
+    text = if options[:normalize], do: Expect.Internal.normalize_text(text), else: text
+    if options[:ignore_case], do: String.downcase(text), else: text
+  end
+
+  defp contains_classes?(expected, actual) do
+    classes = String.split(actual)
+    expected |> String.split() |> Enum.all?(&(&1 in classes))
+  end
+
+  defp class_attribute(target), do: Semantics.attribute(target.attributes, "class") || ""
+
+  defp element_text(target), do: matched_text({target.tag, target.attributes, target.children})
+
+  defp matched_text({tag, _attributes, _children}) when tag in @not_matched, do: ""
+  defp matched_text({"template", _attributes, _children}), do: ""
+
+  defp matched_text({"input", attributes, _children}) do
+    type = String.downcase(Semantics.attribute(attributes, "type") || "")
+    if type in ~w(submit button reset), do: Semantics.attribute(attributes, "value") || "", else: ""
+  end
+
+  defp matched_text({_tag, _attributes, children}), do: Enum.map_join(children, &matched_text/1)
+  defp matched_text(text) when is_binary(text), do: text
+  defp matched_text(_comment), do: ""
 end

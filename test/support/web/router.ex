@@ -73,6 +73,7 @@ defmodule Fluffy.TestWeb.Router do
       live("/submit-used", SubmitUsedLive)
       live("/no-content", NoContentLive)
       live("/clock", ClockLive)
+      live("/expectations", ExpectationsLive)
     end
   end
 
