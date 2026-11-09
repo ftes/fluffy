@@ -19,6 +19,7 @@
 
 - Static and LiveView chained locators, `filter(has:)` and `within/3` search descendants only, as on Playwright, so a scoped locator no longer matches its own parent. `by_text` under a parent still matches the parent, as on Playwright. A Phoenix test that relied on matching the parent must drop the scope.
 - The facade's `submit/2` resolves a `%Fluffy.Locator{}` inside the current `within/3` scope instead of the whole page.
+- Playwright `check` and `uncheck` no longer pass on a box that stayed unchanged after an earlier activation of the same element, or when the target refuses the click and its handler calls `el.click()` on another checkbox.
 
 ### Changed
 

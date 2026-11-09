@@ -300,34 +300,40 @@ defmodule Fluffy.Driver.Playwright do
     end)
   end
 
+  # A target found at the last moment still gets a real chance at the click.
+  @min_click_budget 250
+
   @impl true
   def set_checked(%Session{} = session, %Locator{} = locator, desired, options \\ []) when is_boolean(desired) do
     {operation, set} = if desired, do: {:check, &BrowserLocator.check/2}, else: {:uncheck, &BrowserLocator.uncheck/2}
 
     locator_action(session, operation, locator, options, fn native, remaining ->
-      # Only the activations after this point count, so the cursor is read
-      # before the click even though the fallback below rarely needs it. Like
-      # the read after the click, it is bookkeeping with the session's budget,
-      # so a slow page neither loses the fallback nor shortens the click's.
-      cursor = Document.activation_cursor(native, Session.timeout(session))
+      deadline = Deadline.new(remaining)
 
-      case set.(native, native(options, remaining)) do
-        # Playwright reads the state after its click, which a LiveView patch
-        # may already have changed (in Firefox and WebKit it usually has). As on
-        # Phoenix, the action succeeds once the click set the requested state.
-        # The driver reports that as a plain `Error`, known only by its message;
-        # check_action_test pins it.
-        {:error, %PlaywrightError{message: message}} = error ->
-          if message =~ "Clicking the checkbox did not change its state" and
-               Document.activated?(native, cursor, desired, Session.timeout(session)),
-             do: :ok,
-             else: error
+      # Only the activations after this point count, so the cursor is read before
+      # the click even though the fallback below rarely needs it. It waits for the
+      # target; if none comes, the check reports its own timeout.
+      cursor = Document.activation_cursor(native, remaining)
 
-        result ->
-          result
-      end
+      native
+      |> set.(native(options, Deadline.remaining(deadline, @min_click_budget)))
+      |> allow_reverted_click(session, native, cursor, desired)
     end)
   end
+
+  # Playwright reads the state after its click, which a LiveView patch may
+  # already have changed (in Firefox and WebKit it usually has). As on Phoenix,
+  # the action succeeds once the click set the requested state. The driver
+  # reports that as a plain `Error`, known only by its message;
+  # check_action_test pins it.
+  defp allow_reverted_click({:error, %PlaywrightError{message: message}} = error, session, native, cursor, desired) do
+    if message =~ "Clicking the checkbox did not change its state" and
+         Document.activated?(native, cursor, desired, Session.timeout(session)),
+       do: :ok,
+       else: error
+  end
+
+  defp allow_reverted_click(result, _session, _native, _cursor, _desired), do: result
 
   @impl true
   def select_option(%Session{} = session, %Locator{} = locator, requested, options \\ []) do
