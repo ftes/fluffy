@@ -496,6 +496,33 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
     end
 
     @tag driver: driver
+    test "a control inside noscript is not submitted with #{driver}", %{driver: driver} do
+      fixture =
+        TestHTTPFixtures.register_sequence([
+          %{
+            body:
+              html("""
+              <form method="post" action="submit">
+                <noscript><input name="noscript" value="no"></noscript>
+                <input name="kept" value="yes">
+                <button>Save</button>
+              </form>
+              """)
+          },
+          %{body: html("<h1>Saved</h1>")}
+        ])
+
+      driver
+      |> start_test_session()
+      |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+      |> click(by_role(:button, name: "Save"))
+      |> expect("Saved" |> by_text() |> to_be_visible())
+
+      [_source, submission] = TestHTTPFixtures.requests(fixture)
+      assert submission.body == "kept=yes"
+    end
+
+    @tag driver: driver
     test "a select in a disabled fieldset is not submitted with #{driver}", %{driver: driver} do
       fixture =
         TestHTTPFixtures.register_sequence([

@@ -491,6 +491,24 @@ defmodule Fluffy.Conformance.RoleLocatorTest do
     end
 
     @tag driver: driver
+    test "noscript content does not shift role matches with #{driver}" do
+      html = ~s(<noscript><a href="/in">In</a></noscript><a href="/after">After</a>)
+      session = session_for_html(unquote(driver), html, base_url: Fluffy.TestServer.base_url())
+
+      expect(session, :link |> by_role(name: "After") |> to_have_attribute("href", "/after"))
+    end
+
+    @tag driver: driver
+    test "inert content does not shift scoped role matches with #{driver}" do
+      html =
+        ~s(<div id="s"><noscript><a href="/n">N</a></noscript><svg><template><a href="/t">T</a></template></svg><a href="/after">After</a></div>)
+
+      session = session_for_html(unquote(driver), html, base_url: Fluffy.TestServer.base_url())
+
+      expect(session, "#s" |> by_css() |> by_role(:link, name: "After") |> to_have_attribute("href", "/after"))
+    end
+
+    @tag driver: driver
     test "a role filter sees names outside the candidate with #{driver}" do
       html = ~s(<span id="t">Pay</span><div class="c"><button aria-labelledby="t"></button></div><div class="c"></div>)
       session = session_for_html(unquote(driver), html, base_url: Fluffy.TestServer.base_url())

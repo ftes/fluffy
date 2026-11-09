@@ -3,6 +3,7 @@ defmodule Fluffy.ClientDOM do
 
   alias Fluffy.Actionability
   alias Fluffy.ClientDOM.Query
+  alias Fluffy.HTML.Aria
   alias Fluffy.HTML.DocumentIndex
   alias Fluffy.HTML.Semantics
   alias Fluffy.HTML.Target
@@ -37,7 +38,7 @@ defmodule Fluffy.ClientDOM do
 
   @doc false
   @spec index(%__MODULE__{}) :: DocumentIndex.t()
-  def index(%__MODULE__{document: document}), do: DocumentIndex.for_document(document)
+  def index(%__MODULE__{document: document}), do: Aria.for_document(document).index
 
   def reconcile(%__MODULE__{} = client_dom, html) when is_binary(html) do
     reconcile(client_dom, LazyHTML.from_fragment(html))

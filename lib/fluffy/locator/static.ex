@@ -7,15 +7,10 @@ defmodule Fluffy.Locator.Static do
 
   @labelled_control_selector Enum.join(Semantics.labelable_tags(), ", ")
 
-  def resolve(document, %Locator{} = locator), do: resolve_with(document, locator, &Aria.for_document/1)
+  def resolve(document, %Locator{} = locator), do: resolve(Aria.for_document(document), document, locator)
 
-  # For a document built for one query.
-  def resolve_uncached(document, %Locator{} = locator), do: resolve_with(document, locator, &Aria.uncached/1)
-
-  defp resolve_with(document, locator, model) do
-    aria = if needs_aria?(locator), do: model.(document)
-    resolve(aria, document, locator)
-  end
+  # For a document built for one query, which must not evict the real document's model.
+  def resolve_uncached(document, %Locator{} = locator), do: resolve(Aria.new(document), document, locator)
 
   # `scope` is what the locator starts from; `aria` models the whole page, which
   # role and accessible-name computation looks across regardless of the scope.
@@ -39,21 +34,6 @@ defmodule Fluffy.Locator.Static do
         apply_operation(operation, candidates)
     end)
   end
-
-  defp needs_aria?(%Locator{operations: operations}), do: Enum.any?(operations, &aria_operation?/1)
-
-  defp aria_operation?({:role, _role, _options}), do: true
-  defp aria_operation?({operator, %Locator{} = right}) when operator in [:and, :or], do: needs_aria?(right)
-
-  defp aria_operation?({:filter, options}) do
-    Enum.any?(options, fn
-      {:visible, _visible?} -> true
-      {_option, %Locator{} = child} -> needs_aria?(child)
-      _option -> false
-    end)
-  end
-
-  defp aria_operation?(_operation), do: false
 
   def structurally_visible?(%Aria{} = aria, element), do: Aria.visible?(aria, Aria.node_for(aria, element))
 

@@ -8,7 +8,7 @@ defmodule Fluffy.HTML.Aria do
   alias Fluffy.HTML.DocumentIndex
   alias Fluffy.HTML.Semantics
 
-  @enforce_keys [:index, :html_ids, :labels, :document_nodes]
+  @enforce_keys [:index, :html_ids, :labels]
   defstruct @enforce_keys
 
   @valid_roles ~w(
@@ -159,30 +159,40 @@ defmodule Fluffy.HTML.Aria do
 
   @context %{target: nil, labelled_by: nil, label: nil, native: nil}
 
-  # Like `DocumentIndex.for_document/1`: one entry per process, so retries against an
-  # unchanged document do not rebuild the model.
+  # The elements `DocumentIndex.entries` holds: LazyHTML.query/2 finds no HTML template
+  # content, and this leaves out the rest of what the index marks inert.
+  @entry_elements ":not(noscript *):not(template *)"
+
+  # The immutable LazyHTML document is a shared NIF resource. Keep the derived model
+  # in the caller instead of copying its large tree through SessionRuntime. One
+  # entry bounds retention; changing documents simply rebuilds it.
   def for_document(%LazyHTML{} = document) do
     case Process.get({__MODULE__, :model}) do
       {^document, aria} ->
         aria
 
       _missing ->
-        aria = build(DocumentIndex.for_document(document))
+        aria = new(document)
         Process.put({__MODULE__, :model}, {document, aria})
         aria
     end
   end
 
-  # For a document built for one query, which must not evict the real document's entries.
-  def uncached(%LazyHTML{} = document), do: build(DocumentIndex.new(document))
+  def new(%LazyHTML{} = document) do
+    aria = %__MODULE__{index: DocumentIndex.new(document), html_ids: %{}, labels: %{}}
+    aria = %{aria | html_ids: html_ids(aria)}
+    %{aria | labels: labels_by_control(aria)}
+  end
 
   # The node and element of everything a locator's scope can match, in document
   # order. A scope is never one of its own matches.
   def scoped_nodes(%__MODULE__{} = aria, scope) do
+    elements = scope |> LazyHTML.query(@entry_elements) |> Enum.to_list()
+
     if scope == aria.index.document do
-      aria.document_nodes
+      Enum.zip(all_nodes(aria), elements)
     else
-      scope |> LazyHTML.query("*") |> Enum.drop(1) |> Enum.map(&{node_for(aria, &1), &1})
+      aria |> descendants(node_for(aria, scope)) |> Enum.zip(Enum.drop(elements, 1))
     end
   end
 
@@ -191,7 +201,7 @@ defmodule Fluffy.HTML.Aria do
   # modeled: a Phoenix test cannot change it, so their content stays visible, unlike
   # in a browser.
   def rendered?(%__MODULE__{} = aria, node) do
-    not ignored?(aria, node) and not hidden_in_dropdown?(aria, node) and
+    not ignored?(node) and not hidden_in_dropdown?(aria, node) and
       closest(aria, node, &not_rendered?(aria, &1)) == nil
   end
 
@@ -227,21 +237,9 @@ defmodule Fluffy.HTML.Aria do
     end
   end
 
-  defp build(%DocumentIndex{} = index) do
-    aria = %__MODULE__{index: index, html_ids: %{}, labels: %{}, document_nodes: []}
-    aria = %{aria | html_ids: html_ids(aria)}
-    # Resolving an element is slow, so a retried document-wide locator must not repeat it.
-    %{aria | labels: labels_by_control(aria), document_nodes: document_nodes(aria)}
-  end
-
-  defp document_nodes(aria) do
-    aria.index.document |> LazyHTML.query("*") |> Enum.map(&{node_for(aria, &1), &1})
-  end
-
   defp html_ids(aria) do
     aria
     |> all_nodes()
-    |> Enum.reject(&inert?(aria, &1))
     |> Enum.reduce(%{}, fn node, html_ids ->
       case attribute(node, "id") do
         html_id when html_id in [nil, ""] -> html_ids
@@ -253,18 +251,16 @@ defmodule Fluffy.HTML.Aria do
   defp labels_by_control(aria) do
     aria
     |> all_nodes()
-    |> Enum.filter(&(&1.tag == "label" and not inert?(aria, &1)))
+    |> Enum.filter(&(&1.tag == "label"))
     |> Enum.group_by(&labeled_control_id(aria, &1), & &1.id)
   end
 
   defp labeled_control_id(aria, label) do
     case attribute(label, "for") do
-      nil -> aria |> descendants(label) |> Enum.find(&labelable_descendant?(aria, &1)) |> then(&(&1 && &1.id))
+      nil -> aria |> descendants(label) |> Enum.find(&Semantics.labelable?/1) |> then(&(&1 && &1.id))
       html_id -> labelable_id(aria, Map.get(aria.html_ids, html_id))
     end
   end
-
-  defp labelable_descendant?(aria, node), do: Semantics.labelable?(node) and not inert?(aria, node)
 
   defp labelable_id(_aria, nil), do: nil
 
@@ -374,12 +370,7 @@ defmodule Fluffy.HTML.Aria do
 
   defp hidden_in_dropdown?(_aria, _node), do: false
 
-  defp ignored?(aria, node), do: node.tag in @ignored_tags or inert?(aria, node)
-
-  # A browser parses noscript's content as text.
-  defp inert?(aria, node) do
-    closest(aria, parent(aria, node), &(&1.tag == "noscript")) != nil
-  end
+  defp ignored?(node), do: node.tag in @ignored_tags or node.inert?
 
   defp explicit_role(node) do
     node
@@ -590,7 +581,7 @@ defmodule Fluffy.HTML.Aria do
       MapSet.member?(visited, node.id) ->
         {"", visited}
 
-      ignored?(aria, node) or (hidden?(aria, node) and not hidden_reference?(context)) ->
+      ignored?(node) or (hidden?(aria, node) and not hidden_reference?(context)) ->
         {"", MapSet.put(visited, node.id)}
 
       true ->
