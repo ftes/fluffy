@@ -9,7 +9,10 @@ defmodule Fluffy.MixProject do
   @guides [
     "docs/installation.md",
     "docs/usage.md",
-    "docs/assertion-styles.md",
+    "docs/locators.md",
+    "docs/actions.md",
+    "docs/assertions.md",
+    "docs/debugging.md",
     "docs/advanced-events.md"
   ]
 

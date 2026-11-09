@@ -13,12 +13,12 @@ become enabled. PhoenixTest supports assertion waiting with an explicit positive
 `timeout:`; Fluffy also waits before actions and enables waiting by default.
 Static pages are checked immediately.
 
-With the browser backend, visiting a LiveView waits for it to connect before
+With the Playwright backend, visiting a LiveView waits for it to connect before
 returning. Unlike PhoenixTest.Playwright, you don't need to add
 `assert_has("body .phx-connected")` after each visit. Application-specific loading
 may still need an assertion.
 
-See [Actionability checks and waiting](usage.md#actionability-checks-and-waiting)
+See [Actionability checks and waiting](actions.md#actionability-checks-and-waiting)
 for supported retries, timeout options, and connection readiness.
 
 ## The whole page in LiveView tests
@@ -131,7 +131,7 @@ The facade preserves PhoenixTest vocabulary and conveniences:
 - Field actions use exact labels by default. `within` scopes a callback, and
   field actions remember their owning form for `submit()`.
 - Without `count:` or a field predicate, `assert_has` and `refute_has` check
-  visibility; hidden or absent elements satisfy `refute_has`. Static/Live check
+  visibility; hidden or absent elements satisfy `refute_has`. Static and LiveView check
   structural visibility, while Playwright checks rendered visibility. Counts and
   field predicates add no visibility requirement, matching native assertions.
   They retain one-based `at:` positions and familiar text and field predicates.
@@ -141,18 +141,18 @@ The facade preserves PhoenixTest vocabulary and conveniences:
 The facade uses Fluffy's execution engine, so it is not an exact compatibility
 implementation. Check these differences when migrating:
 
-- **Strict matching:** actions reject ambiguous matches; see [Locators](usage.md#locators).
+- **Strict matching:** actions reject ambiguous matches; see [Locators](locators.md#locators).
 - **CSS links:** text matches take precedence over labels. Label matching is a
   fallback only when no text match exists when the action starts.
 - **Form behavior:** submissions use current DOM ownership and control state.
-  See [Form submission and keyboard actions](usage.md#form-submission-and-keyboard-actions)
+  See [Form submission and keyboard actions](actions.md#form-submission-and-keyboard-actions)
   and [Forms and files](capabilities.md#forms-and-files) for supported behavior.
 - **JavaScript and timing:** choose Playwright for browser-owned behavior. The
   [capability matrix](capabilities.md) is the reference for driver boundaries,
   including LiveView debounce/throttle timing and the document boundary.
 - **Native callbacks:** remove PhoenixTest continuation tuples such as
   `{:ok, view, metadata}` from `unwrap` callbacks. Follow the return-value rules
-  in [Native escape hatch](usage.md#native-escape-hatch), then assert the outcome
+  in [Native escape hatch](debugging.md#native-escape-hatch), then assert the outcome
   with `assert_has` or `assert_path` in the facade pipeline.
 - **Downloads:** there is no facade `assert_download/2`. Use the native
   [event API](advanced-events.md#downloads) when testing downloads.
@@ -220,15 +220,15 @@ Each call below is a pipeline step:
 When rewriting, preserve the original assertion's intent:
 
 - Native `visible` uses the same visibility rules but rejects multiple matches.
-  For DOM presence/absence, use counts as described in [Visibility and DOM presence](usage.md#visibility-and-dom-presence).
+  For DOM presence/absence, use counts as described in [Visibility and DOM presence](assertions.md#visibility-and-dom-presence).
 - Native text, role-name, and label locators default to substring matching;
   use `exact: true` to retain exact field labels. Native `nth` is zero-based, whereas facade `at:` is
   one-based. Use locator composition in place of facade `within`; see
-  [Locators](usage.md#locators).
+  [Locators](locators.md#locators).
 - Native `page_title("Potions")` is an exact normalized match. Use a regex
   for an intentional substring title assertion. Native URL strings match the
   complete URL; use `page_url(path: ...)` to retain path-only intent. See
-  [Page assertions](usage.md#page-assertions).
+  [Page assertions](assertions.md#page-assertions).
 - The native API does not track an active form. Select a form explicitly for
   `submit`, or click the intended submitter. The facade continues to support
   active-form tracking.

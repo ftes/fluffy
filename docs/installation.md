@@ -38,7 +38,7 @@ session options override the global values for multi-endpoint or dynamic-server
 tests.
 
 The application's normal browser bundle must connect its LiveSocket. See
-[Actionability checks and waiting](usage.md#actionability-checks-and-waiting)
+[Actionability checks and waiting](actions.md#actionability-checks-and-waiting)
 for Fluffy's automatic LiveView connection wait.
 
 ## Timeouts
