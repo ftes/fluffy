@@ -71,10 +71,10 @@ already calls `Fluffy.Test.setup/1`, do not call it again in individual modules.
 
 ## Using native assertions alongside the facade
 
-The facade's `assert_has` and `refute_has` accept selectors and options such as
-`text:` and `count:`. The similarly named `Fluffy.Assert` helpers take native
-locators and are visibility shortcuts; native count assertions remain explicit
-with `assert(session, count(locator, n))`.
+The facade's `assert_has` and `refute_has` accept selectors or a `%Fluffy.Locator{}`
+and options such as `text:` and `count:`. The similarly named `Fluffy.Assert`
+helpers take native locators and are visibility shortcuts; native count assertions
+remain explicit with `assert(session, count(locator, n))`.
 
 If using `Fluffy.Assert` alongside the facade, exclude its overlapping names:
 

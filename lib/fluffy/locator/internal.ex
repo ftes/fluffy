@@ -14,6 +14,31 @@ defmodule Fluffy.Locator.Internal do
     update_in(locator.operations, &(&1 ++ [operation]))
   end
 
+  @doc """
+  `locator` as if built from `scope`. Operands of `and_/2` and `or_/2` resolve from
+  the query root, so they are scoped too. A locator that enters a frame and has such
+  an operand, or one of `has:` or `has_not:`, is rejected: `scope` does not apply
+  inside the frame, so it could only match nothing.
+  """
+  def within(%Locator{} = scope, %Locator{operations: operations} = locator) do
+    if crosses_frame?(locator) and Enum.any?(operations, &composed?/1) do
+      raise ArgumentError,
+            "within/3 cannot scope a frame locator combined with and_, or_, has:, has_not: or label:, " <>
+              "got: #{describe(locator)}"
+    end
+
+    %Locator{operations: scope.operations ++ Enum.map(operations, &within_operation(scope, &1))}
+  end
+
+  defp within_operation(scope, {operator, %Locator{} = right}) when operator in [:and, :or],
+    do: {operator, within(scope, right)}
+
+  defp within_operation(_scope, operation), do: operation
+
+  defp composed?({operator, %Locator{}}) when operator in [:and, :or], do: true
+  defp composed?({:filter, options}), do: Keyword.has_key?(options, :has) or Keyword.has_key?(options, :has_not)
+  defp composed?(_operation), do: false
+
   @doc "Whether `locator` or a nested locator enters a frame."
   def crosses_frame?(%Locator{operations: operations}) do
     Enum.any?(operations, fn

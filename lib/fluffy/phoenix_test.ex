@@ -225,14 +225,15 @@ defmodule Fluffy.PhoenixTest do
         raise ArgumentError, "no active form; fill, select, check, choose, or upload a field first"
 
       %Session{active_form: locator} = session ->
-        submit(session, locator)
+        submit_form(session, locator)
     end
   end
 
-  @doc "Submits an explicit CSS form selector or native form locator."
+  @doc "Submits an explicit CSS form selector or native form locator, inside the current `within/3` scope."
   @spec submit(session(), String.t() | Locator.t()) :: Session.t()
-  def submit(session, selector) when is_binary(selector), do: submit(session, css_locator(session, selector))
-  def submit(session, %Locator{} = locator), do: session |> map_session(&Fluffy.submit(&1, locator)) |> clear_form()
+  def submit(session, selector), do: submit_form(session, locator_in_scope(session, base_locator(selector)))
+
+  defp submit_form(session, locator), do: session |> map_session(&Fluffy.submit(&1, locator)) |> clear_form()
 
   @doc "Reloads the active page using the current driver."
   @spec reload_page(session()) :: session()
@@ -248,7 +249,8 @@ defmodule Fluffy.PhoenixTest do
 
   for {name, negated?} <- [assert_has: false, refute_has: true] do
     @doc """
-    Checks whether any CSS match is visible, or negates that check.
+    Checks whether any CSS or `Fluffy.Locator` match is visible, or negates that check.
+    A locator resolves inside the current `within/3` scope and takes the same options.
     Multiple matches are allowed; refutation requires every match to be hidden or absent.
     Static and Live use structural visibility; Playwright uses rendered visibility.
     Without a count or field predicate, hidden and absent elements satisfy refutation.
@@ -269,9 +271,9 @@ defmodule Fluffy.PhoenixTest do
     The special selector `"title"` accepts `text:`, `exact:`, and `timeout:`.
     Text defaults to substring matching; without text it requires a nonempty title.
     """
-    @spec unquote(name)(session(), String.t()) :: session()
-    @spec unquote(name)(session(), String.t(), String.t() | keyword()) :: session()
-    @spec unquote(name)(session(), String.t(), String.t(), keyword()) :: session()
+    @spec unquote(name)(session(), String.t() | Locator.t()) :: session()
+    @spec unquote(name)(session(), String.t() | Locator.t(), String.t() | keyword()) :: session()
+    @spec unquote(name)(session(), String.t() | Locator.t(), String.t(), keyword()) :: session()
     def unquote(name)(session, selector), do: unquote(name)(session, selector, [])
 
     def unquote(name)(session, selector, options) when is_list(options) do
@@ -302,7 +304,7 @@ defmodule Fluffy.PhoenixTest do
 
   defp role_locator(session, role, text) do
     string!(text, :text)
-    scoped(session, &Locator.by_role(&1, role, name: text), fn -> Locator.by_role(role, name: text) end)
+    locator_in_scope(session, Locator.by_role(role, name: text))
   end
 
   defp click_locator(session, locator), do: map_session(session, &Fluffy.click(&1, locator))
@@ -318,22 +320,25 @@ defmodule Fluffy.PhoenixTest do
 
   defp field_locator(session, selector, label, options) do
     string!(label, :label)
-    exact = Keyword.get(options, :exact, true)
-
-    label_locator =
-      scoped(session, &Locator.by_label(&1, label, exact: exact), fn -> Locator.by_label(label, exact: exact) end)
+    label_locator = locator_in_scope(session, Locator.by_label(label, exact: Keyword.get(options, :exact, true)))
 
     if is_nil(selector), do: label_locator, else: Locator.and_(css_locator(session, selector), label_locator)
   end
 
   defp css_locator(session, selector) do
     string!(selector, :selector)
-    scoped(session, &Locator.by_css(&1, selector), fn -> Locator.by_css(selector) end)
+    locator_in_scope(session, Locator.by_css(selector))
   end
 
-  defp scoped(%Session{scope: nil}, _scoped, unscoped), do: unscoped.()
-  defp scoped(%Session{scope: scope}, scoped, _unscoped), do: scoped.(scope)
-  defp scoped(%NativeSession{}, _scoped, unscoped), do: unscoped.()
+  defp locator_in_scope(%Session{scope: %Locator{} = scope}, locator), do: Locator.Internal.within(scope, locator)
+  defp locator_in_scope(_session, locator), do: locator
+
+  defp base_locator(selector) when is_binary(selector), do: Locator.by_css(selector)
+  defp base_locator(%Locator{} = locator), do: locator
+
+  defp base_locator(selector) do
+    raise ArgumentError, "selector: must be a string or a Fluffy.Locator, got: #{inspect(selector)}"
+  end
 
   defp wrap(%Session{} = session), do: session
   defp wrap(%NativeSession{} = native), do: %Session{session: native}
@@ -404,16 +409,14 @@ defmodule Fluffy.PhoenixTest do
       "exact: requires label: or text:"
     )
 
-    locator = css_locator(session, selector)
+    locator = base_locator(selector)
 
     locator =
-      if Keyword.has_key?(options, :label) do
-        label = field_locator(session, nil, options[:label], exact: Keyword.get(options, :exact, false))
-        Locator.and_(locator, label)
-      else
-        locator
-      end
+      if Keyword.has_key?(options, :label),
+        do: Locator.and_(locator, Locator.by_label(options[:label], exact: Keyword.get(options, :exact, false))),
+        else: locator
 
+    locator = locator_in_scope(session, locator)
     locator = if options[:at], do: Locator.nth(locator, options[:at] - 1), else: locator
 
     locator =
