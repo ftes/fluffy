@@ -6,7 +6,8 @@ Register before the triggering action, then await an ordinary value:
 use Fluffy.Assert
 import Fluffy
 import Fluffy.Locator
-alias Fluffy.{Dialog, Download, Event, FileChooser, Frame, Page}
+import Fluffy.Playwright
+alias Fluffy.{Dialog, Download, Event, FileChooser, Frame, Page, Request, Response, Route}
 
 pending = wait_for(session, Event.download())
 click(session, by_role(:button, name: "Download report"))
@@ -103,19 +104,14 @@ page's handle once it closes, by its own script or `Fluffy.Playwright.close_page
 
 ```elixir
 popup
-|> expect_event(Event.close(), &click(&1, by_role(:button, name: "Authorize")))
+|> assert_event(Event.close(), &click(&1, by_role(:button, name: "Authorize")))
 |> switch_page(main)
 ```
 
 `Fluffy.Playwright.new_page(session)` returns a new blank page handle without changing the session's
 selection. Pass that handle to `Fluffy.Playwright.switch_page/2` or `Fluffy.Playwright.close_page/2`:
 
-Import `Fluffy.Playwright` alongside `Fluffy` to use browser-only helpers
-without module qualifiers.
-
 ```elixir
-import Fluffy.Playwright
-
 main = current_page(session)
 dashboard = new_page(session)
 
@@ -281,9 +277,6 @@ the action that sends the request. The handler receives a `Fluffy.Route` with th
 `Fluffy.Request` in `route.request` and answers it once:
 
 ```elixir
-import Fluffy.Playwright
-alias Fluffy.Route
-
 session
 |> route("/api/potions", fn route -> Route.fulfill(route, json: [%{name: "Felix Felicis"}]) end)
 |> route(~r{/api/orders$}, fn route -> Route.abort(route) end)
@@ -324,7 +317,7 @@ route(session, "/api/report", &send(test, {:held, &1}))
 
 session
 |> visit("/report")
-|> expect("Loading" |> by_text() |> to_be_visible())
+|> assert("Loading" |> by_text() |> visible())
 
 assert_receive {:held, route}
 Route.fulfill(route, json: %{title: "Quarterly"})
