@@ -5,6 +5,8 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
   import Fluffy.Expect
   import Fluffy.Locator
 
+  @down_tag Fluffy.Driver.Live.State.down_tag()
+
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
     test "commits a Live patch with #{driver}", %{driver: driver} do
@@ -346,7 +348,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     Process.exit(state.view.pid, {:shutdown, {:live_redirect, %{kind: :push, to: "/redirect/loop"}}})
 
     assert_receive {:DOWN, ^proxy_reference, :process, ^proxy_pid, _reason}, 1_000
-    assert_receive {:DOWN, ^view_monitor, :process, _view, _reason} = view_exit, 1_000
+    assert_receive {@down_tag, ^view_monitor, :process, _view, _reason} = view_exit, 1_000
     send(self(), view_exit)
 
     for _attempt <- 1..2 do
@@ -367,7 +369,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     Process.exit(state.view.pid, {:shutdown, {:live_redirect, %{kind: :push, to: "/redirect/loop"}}})
 
     assert_receive {:DOWN, ^proxy_reference, :process, ^proxy_pid, _reason}, 1_000
-    assert_receive {:DOWN, ^view_monitor, :process, _view, _reason} = view_exit, 1_000
+    assert_receive {@down_tag, ^view_monitor, :process, _view, _reason} = view_exit, 1_000
     send(self(), view_exit)
 
     for _attempt <- 1..2 do
@@ -388,7 +390,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     Process.exit(state.view.pid, {:shutdown, {:live_redirect, %{kind: :push, to: "/redirect/loop"}}})
 
     assert_receive {:DOWN, ^proxy_reference, :process, ^proxy_pid, _reason}, 1_000
-    assert_receive {:DOWN, ^view_monitor, :process, _view, _reason} = view_exit, 1_000
+    assert_receive {@down_tag, ^view_monitor, :process, _view, _reason} = view_exit, 1_000
     send(self(), view_exit)
 
     for _attempt <- 1..2 do
@@ -544,7 +546,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     Process.exit(state.view.pid, {:shutdown, {:live_redirect, %{kind: :push, to: "/live/secret-chamber"}}})
 
     assert_receive {:DOWN, ^proxy_reference, :process, ^proxy_pid, _reason}, 1_000
-    assert_receive {:DOWN, ^view_monitor, :process, _view, _reason} = view_exit, 1_000
+    assert_receive {@down_tag, ^view_monitor, :process, _view, _reason} = view_exit, 1_000
     send(self(), view_exit)
 
     assert_raise Fluffy.OperationError, ~r/navigated away before the action reached it/, fn ->
