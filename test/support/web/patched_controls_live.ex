@@ -49,6 +49,12 @@ defmodule Fluffy.TestWeb.PatchedControlsComponent do
       <input name="component_note" aria-label="Component note" />
       <button type="button" phx-click="bump" phx-target={@myself}>Bump component</button>
       <p>Component count: {@count}</p>
+      <.portal id="component-portal" target="body">
+        <div>
+          <input name="portal_note" aria-label="Portal note" />
+          <output>{@count}</output>
+        </div>
+      </.portal>
     </section>
     """
   end

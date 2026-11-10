@@ -136,6 +136,8 @@ defmodule Fluffy.Driver.Live.Document do
 
   # Mirrors DOMPatch.teleport in the LiveView client: append the template's
   # root element to the target and mark it with the owning view and source.
+  # Unlike the client, also mark the LiveComponent that renders the template, if
+  # any, as the client patches the content with that component.
   defp teleport_portals(html) do
     if String.contains?(html, "data-phx-portal"),
       do: html |> LazyHTML.from_document() |> LazyHTML.to_tree() |> teleport_tree(),
@@ -145,7 +147,7 @@ defmodule Fluffy.Driver.Live.Document do
   # Teleport one portal at a time and rescan, so portals inside teleported
   # content are found too, like the client's teleports after each morph.
   defp teleport_tree(tree, teleported_ids \\ []) do
-    case tree |> portals(nil, []) |> Enum.reverse() |> Enum.find(&(&1.id not in teleported_ids)) do
+    case tree |> portals({nil, nil}, []) |> Enum.reverse() |> Enum.find(&(&1.id not in teleported_ids)) do
       nil -> serialize(tree)
       portal -> tree |> teleport(portal) |> teleport_tree([portal.id | teleported_ids])
     end
@@ -157,43 +159,55 @@ defmodule Fluffy.Driver.Live.Document do
         tree
 
       index ->
+        {view_id, cid} = portal.owner
+        cid_attribute = if cid, do: [{"data-phx-teleported-cid", cid}], else: []
+
         teleported =
-          put_attributes(portal.root, [
-            {"data-phx-teleported", portal.view_id},
-            {"data-phx-teleported-src", portal.id}
-          ])
+          put_attributes(
+            portal.root,
+            [{"data-phx-teleported", view_id}, {"data-phx-teleported-src", portal.id}] ++ cid_attribute
+          )
 
         update_at(tree, index, fn {tag, attributes, children} -> {tag, attributes, children ++ [teleported]} end)
     end
   end
 
-  defp portals(nodes, view_id, acc) do
+  # `owner` is the `{view_id, cid}` rendering the nodes; `cid` is nil outside a
+  # LiveComponent.
+  defp portals(nodes, owner, acc) do
     Enum.reduce(nodes, acc, fn
       {"template", attributes, children}, acc ->
         with target when is_binary(target) <- attribute(attributes, "data-phx-portal"),
              id when is_binary(id) <- attribute(attributes, "id"),
-             true <- is_binary(view_id),
+             {view_id, _cid} when is_binary(view_id) <- owner,
              {_tag, _attributes, _children} = root <- Enum.find(children, &element?/1) do
-          [%{id: id, root: root, target: target, view_id: view_id} | acc]
+          [%{id: id, root: root, target: target, owner: owner} | acc]
         else
           _not_a_portal -> acc
         end
 
       {tag, attributes, children}, acc when is_binary(tag) ->
-        portals(children, owning_view_id(attributes, view_id), acc)
+        portals(children, owner(attributes, owner), acc)
 
       _text_or_comment, acc ->
         acc
     end)
   end
 
-  # Teleported content belongs to the view that owns its portal.
-  defp owning_view_id(attributes, view_id) do
+  # Teleported content belongs to the view, and component, that own its portal.
+  defp owner(attributes, owner) do
+    {view_id, _cid} = owner = teleported_owner(attributes) || owner
+
     cond do
-      teleported = attribute(attributes, "data-phx-teleported") -> teleported
-      attribute(attributes, "data-phx-session") -> attribute(attributes, "id")
-      true -> view_id
+      attribute(attributes, "data-phx-session") -> {attribute(attributes, "id"), nil}
+      cid = attribute(attributes, "data-phx-component") -> {view_id, cid}
+      true -> owner
     end
+  end
+
+  defp teleported_owner(attributes) do
+    if view_id = attribute(attributes, "data-phx-teleported"),
+      do: {view_id, attribute(attributes, "data-phx-teleported-cid")}
   end
 
   # Resolve the portal's CSS target like document.querySelector by tagging
