@@ -14,6 +14,7 @@ defmodule Fluffy.Driver.Live do
   alias Fluffy.Driver.Live.Document
   alias Fluffy.Driver.Live.Event
   alias Fluffy.Driver.Live.Retry
+  alias Fluffy.Driver.Live.State
   alias Fluffy.Driver.Live.UploadState
   alias Fluffy.Expect
   alias Fluffy.Form
@@ -776,8 +777,10 @@ defmodule Fluffy.Driver.Live do
   end
 
   defp live_view_event(monitor, wait) do
+    tag = State.down_tag()
+
     receive do
-      {:DOWN, ^monitor, :process, _pid, reason} = message ->
+      {^tag, ^monitor, :process, _pid, reason} = message ->
         leave_unread(message)
         view_exit(reason)
     after
@@ -802,12 +805,13 @@ defmodule Fluffy.Driver.Live do
     state = Session.page_state(session)
     %{proxy: {reference, topic, _proxy_pid}} = state.view
     monitor = state.monitor
+    tag = State.down_tag()
 
     receive do
       {^reference, {:patch, ^topic, %{to: destination}}} ->
         commit_patch(session, destination)
 
-      {:DOWN, ^monitor, :process, _pid, reason} = message ->
+      {^tag, ^monitor, :process, _pid, reason} = message ->
         leave_unread(message)
 
         case view_exit(reason) do

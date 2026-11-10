@@ -12,6 +12,8 @@ defmodule Fluffy.Conformance.PageCleanupTest do
   alias Fluffy.TestHTTPFixtures
   alias Fluffy.TestScope
 
+  @down_tag Fluffy.Driver.Live.State.down_tag()
+
   @tag driver: :playwright
   test "closing the test scope closes every page left in its BrowserContext" do
     fixture =
@@ -85,27 +87,33 @@ defmodule Fluffy.Conformance.PageCleanupTest do
     assert :ok = Backend.close_session(session)
     refute Process.alive?(page.state.view.pid)
     refute Process.alive?(live_view_proxy_pid(page))
-    refute monitoring?(page.state.view.pid)
+
+    # The view's tagged monitor reports the exit, which a test's own
+    # `receive {:DOWN, ...}` can't take.
+    view_pid = page.state.view.pid
+    assert_receive {@down_tag, _monitor, :process, ^view_pid, _reason}
+    refute_received {:DOWN, _monitor, :process, ^view_pid, _reason}
   end
 
   defp assert_live_page_alive(page) do
     assert Process.alive?(page.state.view.pid)
     assert Process.alive?(live_view_proxy_pid(page))
-    assert monitoring?(page.state.view.pid)
+    assert {:process, page.state.view.pid} in elem(Process.info(self(), :monitors), 1)
   end
 
   defp assert_live_page_released(session, page) do
     refute Process.alive?(page.state.view.pid)
     refute Process.alive?(live_view_proxy_pid(page))
-    refute monitoring?(page.state.view.pid)
+
+    # Releasing the page drops the view's monitor and any exit it reported.
+    monitor = page.state.monitor
+    refute_received {@down_tag, ^monitor, :process, _pid, _reason}
 
     {:ok, resources} = Fluffy.SessionRuntime.resources(session.runtime)
 
     refute {:live_view, page.state.view.pid} in resources
     refute {:live_view, live_view_proxy_pid(page)} in resources
   end
-
-  defp monitoring?(pid), do: {:process, pid} in elem(Process.info(self(), :monitors), 1)
 
   defp live_view_proxy_pid(page) do
     {_reference, _topic, proxy_pid} = page.state.view.proxy

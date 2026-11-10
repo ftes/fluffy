@@ -273,7 +273,7 @@ defmodule Fluffy.Backend.Phoenix do
   def commit_live(%Session{} = session, view, html, destination, redirects \\ 0) do
     # LiveViewTest links its client proxy to the test process, and the proxy
     # exits with the view's reason. Unlink it so a view that redirects or
-    # crashes doesn't take the test down; the watcher reports how it left.
+    # crashes doesn't take the test down; the view's monitor reports how it left.
     proxy_pid = live_view_proxy_pid(view)
     Process.unlink(proxy_pid)
 
@@ -285,7 +285,7 @@ defmodule Fluffy.Backend.Phoenix do
       )
 
     # The Live driver reads how the view left from this monitor's message.
-    monitor = Process.monitor(view.pid)
+    monitor = LiveState.monitor_view(view.pid)
 
     :ok =
       register_process(session.runtime, :live_view, view.pid, Session.context(session).timeout)

@@ -15,4 +15,14 @@ defmodule Fluffy.Driver.Live.State do
           monitor: reference(),
           live_uploads: UploadState.t()
         }
+
+  # The view's monitor tags its message, so a test's own `receive {:DOWN, ...}`
+  # can't take it.
+  @down_tag :fluffy_live_view_down
+
+  @spec monitor_view(pid()) :: reference()
+  def monitor_view(pid), do: :erlang.monitor(:process, pid, tag: @down_tag)
+
+  @spec down_tag() :: atom()
+  def down_tag, do: @down_tag
 end
