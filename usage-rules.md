@@ -10,7 +10,7 @@ Fluffy runs Phoenix feature tests through one Playwright-shaped API, in-process 
 
 ## Choosing an API and a backend
 
-- Native API: `import Fluffy`, `import Fluffy.Locator`, and `use Fluffy.Assert` (or `import Fluffy.Expect`). PhoenixTest-style facade: `import Fluffy.PhoenixTest` on its own, never alongside `import Fluffy`, whose names overlap. Follow what the suite already uses.
+- Native API: `import Fluffy`, `import Fluffy.Locator`, and `use Fluffy.Assert` (or `import Fluffy.Expect`). PhoenixTest-style facade: `import Fluffy.PhoenixTest` on its own, never alongside `import Fluffy`, whose names overlap. Follow what the suite already uses; a new suite defaults to `use Fluffy.Assert` (`docs/assertions.md` compares the two).
 - A suite coming from PhoenixTest can keep the facade. Native calls accept the facade's `facade.session`.
 - `start_session(:phoenix)` is the default choice. Its first visit picks the Static or LiveView driver, and later navigations pick again. There is nothing to select between those two.
 - `start_session(:playwright)` is for JavaScript, computed style and layout, native validation, dialogs, network events, tabs or focus.
