@@ -671,18 +671,20 @@ defmodule Fluffy.ClientDOM do
     end
   end
 
-  # `used` and values deliberately carry by identity alone. LiveView keeps
-  # `used` on the DOM element morphdom pairs by position, and values survive
-  # only unchanged renders and phx-trigger-action handoff. Checked, selected
-  # and file state stand in for subtrees LiveView leaves untouched, so they
-  # only carry to the same control.
+  # `used`, values and selections deliberately carry by identity alone.
+  # LiveView keeps `used` on the DOM element morphdom pairs by position, and
+  # morphdom resets an unfocused control's value and selection from the render,
+  # so they survive only unchanged renders and phx-trigger-action handoff.
+  # Playwright's select_option does not focus the select. Checked and file
+  # state stand in for subtrees LiveView leaves untouched, so they only carry
+  # to the same control.
   defp reconcile_properties(properties, old, new, old_to_new, patched?) do
     %{}
     |> preserve_property(properties, :used, true)
     |> preserve_current_value(properties, patched?)
     |> preserve_checkedness(properties, old, new)
     |> preserve_files(properties, old, new)
-    |> preserve_selection(properties, old, new, old_to_new)
+    |> preserve_selection(properties, old_to_new, patched?)
   end
 
   defp preserve_property(reconciled, properties, name, true) do
@@ -729,17 +731,12 @@ defmodule Fluffy.ClientDOM do
     end
   end
 
-  defp preserve_selection(reconciled, properties, old, new, old_to_new) do
+  defp preserve_selection(reconciled, properties, old_to_new, patched?) do
     case Map.fetch(properties, :selected_ids) do
-      {:ok, selected_ids} ->
-        if same_control?(old, new) and option_signature(old.children) == option_signature(new.children) do
-          mapped_ids = Enum.flat_map(selected_ids, &List.wrap(Map.get(old_to_new, &1)))
-          Map.put(reconciled, :selected_ids, mapped_ids)
-        else
-          reconciled
-        end
+      {:ok, selected_ids} when not patched? ->
+        Map.put(reconciled, :selected_ids, Enum.flat_map(selected_ids, &List.wrap(Map.get(old_to_new, &1))))
 
-      :error ->
+      _reset_or_none ->
         reconciled
     end
   end
@@ -749,18 +746,6 @@ defmodule Fluffy.ClientDOM do
   end
 
   defp file_input?(_node), do: false
-
-  defp option_signature(nodes) when is_list(nodes), do: Enum.flat_map(nodes, &option_signature/1)
-
-  defp option_signature({"option", attributes, children}) do
-    [
-      {attribute(attributes, "id"), attribute(attributes, "value"), has_attribute?(attributes, "selected"),
-       has_attribute?(attributes, "disabled"), tree_text(children)}
-    ]
-  end
-
-  defp option_signature({_tag, _attributes, children}), do: option_signature(children)
-  defp option_signature(_text), do: []
 
   defp put_property(properties, id, name, value) do
     Map.update(properties, id, %{name => value}, &Map.put(&1, name, value))

@@ -111,15 +111,17 @@ except during `phx-trigger-action` handoff. As in LiveView's client, a change
 counts per LiveView and LiveComponent, not per control: an update to one resets
 local text anywhere in it, including its portal content, but not in other views,
 unchanged components or the root layout, so a title update resets nothing.
-Checkbox/radio state survives while the
-rendered `checked` attribute is unchanged and the matched control keeps its type,
-name, and value; a radio the server renders as newly checked clears its group.
-Selected options survive while the select name and option signature are
-unchanged; files survive while the matched control remains a file input with the
-same name. Elements without an `id` are matched by position, so id-less controls
-with the same name and value can still exchange state when a patch shifts them;
-give such controls stable ids. Use Playwright for focused input protection,
-focus-sensitive patches, blur or debounce timing, and exact browser patch behavior.
+Selected options reset the same way, as LiveView's client resets a select that
+has no focus and Playwright's `select_option` does not focus it.
+Checkbox/radio state survives while the rendered `checked` attribute is
+unchanged and the matched control keeps its type, name, and value; a radio the
+server renders as newly checked clears its group. A browser resets it like text
+unless the control still has focus, which Phoenix does not track. Files survive
+while the matched control remains a file input with the same name. Elements
+without an `id` are matched by position, so id-less controls with the same name
+and value can still exchange state when a patch shifts them; give such controls
+stable ids. Use Playwright for focused input protection, focus-sensitive
+patches, blur or debounce timing, and exact browser patch behavior.
 
 ### LiveView document and patch boundaries
 

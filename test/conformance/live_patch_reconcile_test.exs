@@ -128,6 +128,41 @@ defmodule Fluffy.Conformance.LivePatchReconcileTest do
       |> expect(to_have_value(by_label("Tune"), "Lullaby"))
       |> expect(to_have_value(by_label(dialog, "Treat name"), ""))
     end
+
+    for {label, pick, rendered} <- [{"Pick", "b", "a"}, {"Preset", "c", "b"}] do
+      @tag driver: driver
+      test "a view patch resets the #{label} select to its rendered option with #{driver}", %{driver: driver} do
+        driver
+        |> start_test_session()
+        |> visit("/live/patched-controls")
+        |> select_option(by_label(unquote(label)), unquote(pick))
+        |> click(by_role(:button, name: "Bump", exact: true))
+        |> expect("Count: 1" |> by_text() |> to_be_visible())
+        |> expect(to_have_value(by_label(unquote(label)), unquote(rendered)))
+      end
+    end
+
+    @tag driver: driver
+    test "a view patch resets a multiple select to its rendered options with #{driver}", %{driver: driver} do
+      driver
+      |> start_test_session()
+      |> visit("/live/patched-controls")
+      |> select_option(by_label("Many"), ["a"])
+      |> click(by_role(:button, name: "Bump", exact: true))
+      |> expect("Count: 1" |> by_text() |> to_be_visible())
+      |> expect(to_have_values(by_label("Many"), ["b"]))
+    end
+
+    @tag driver: driver
+    test "a title update keeps a select's choice with #{driver}", %{driver: driver} do
+      driver
+      |> start_test_session()
+      |> visit("/live/patched-controls")
+      |> select_option(by_label("Pick"), "b")
+      |> click(by_role(:button, name: "Retitle"))
+      |> expect(page_to_have_title("Retitled controls"))
+      |> expect(to_have_value(by_label("Pick"), "b"))
+    end
   end
 
   defp start_test_session(driver) do
