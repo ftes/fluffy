@@ -7,6 +7,7 @@ defmodule Fluffy.Driver.Live.Event do
   # layout (to the main view) and in teleported portal content (to the view
   # that owns the portal); its events also send server-rendered values.
 
+  import Fluffy.HTML.Semantics, only: [attribute: 2]
   import Phoenix.LiveViewTest
 
   alias Fluffy.ClientDOM
@@ -159,11 +160,4 @@ defmodule Fluffy.Driver.Live.Event do
   end
 
   defp dispatch(_command, _view, _attributes, _kind, _payload), do: :skip
-
-  defp attribute(attributes, name) do
-    case List.keyfind(attributes, name, 0) do
-      {^name, value} -> value
-      nil -> nil
-    end
-  end
 end

@@ -1,6 +1,8 @@
 defmodule Fluffy.Actionability do
   @moduledoc false
 
+  import Fluffy.HTML.Semantics, only: [attribute: 2]
+
   @fillable_input_types [
     "color",
     "date",
@@ -184,12 +186,5 @@ defmodule Fluffy.Actionability do
       action: action,
       reason: reason,
       locator: locator
-  end
-
-  defp attribute(attributes, name) do
-    case List.keyfind(attributes, name, 0) do
-      {^name, value} -> value
-      nil -> nil
-    end
   end
 end
