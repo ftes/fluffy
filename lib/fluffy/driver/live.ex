@@ -539,7 +539,7 @@ defmodule Fluffy.Driver.Live do
   end
 
   # Reports how the view left a call that failed on it, waiting briefly for its
-  # watcher.
+  # exit.
   defp left_view(session) do
     left_view_event(Session.page_state(session), min(Session.context(session).timeout, @retry_interval))
   end
@@ -732,8 +732,8 @@ defmodule Fluffy.Driver.Live do
     end
   end
 
-  # An action keeps a patch the view pushed before it died, however soon the
-  # watcher reported the death.
+  # An action keeps a patch the view pushed before it died, however soon its
+  # exit arrived.
   defp raise_after_patches(session, reason) do
     apply_last_patch(session)
     raise Fluffy.LiveViewError, reason: reason
@@ -763,24 +763,29 @@ defmodule Fluffy.Driver.Live do
   defp navigation_found({:redirected, session, navigation}), do: {session, navigation}
   defp navigation_found(_result), do: :none
 
-  # Reports how the view left: the redirect its client handed Fluffy, or what
-  # its watcher saw, waiting up to `wait` for the watcher.
+  # Reports how the view left: the redirect its client handed Fluffy, or its
+  # exit, waiting up to `wait` for the exit.
   defp left_view_event(state, wait) do
     case current_redirect(state.view) do
       {:error, redirect} -> {:redirect, redirect}
-      nil -> live_view_event(state.watcher, wait)
+      nil -> live_view_event(state.monitor, wait)
     end
   end
 
-  defp live_view_event(watcher, wait) do
+  defp live_view_event(monitor, wait) do
     receive do
-      {:fluffy_live_view, ^watcher, event} = message ->
+      {:DOWN, ^monitor, :process, _pid, reason} = message ->
         leave_unread(message)
-        event
+        view_exit(reason)
     after
       wait -> :none
     end
   end
+
+  defp view_exit({:shutdown, {kind, _options} = redirect}) when kind in [:redirect, :live_redirect],
+    do: {:redirect, redirect}
+
+  defp view_exit(reason), do: {:died, reason}
 
   # A view leaves once, and that stays true until the session leaves its page,
   # so reading how it left leaves the message for the session's next call. A
@@ -793,19 +798,19 @@ defmodule Fluffy.Driver.Live do
   defp wait_for_retry(session, wait) do
     state = Session.page_state(session)
     %{proxy: {reference, topic, _proxy_pid}} = state.view
-    watcher = state.watcher
+    monitor = state.monitor
 
     receive do
       {^reference, {:patch, ^topic, %{to: destination}}} ->
         commit_patch(session, destination)
 
-      {:fluffy_live_view, ^watcher, {:died, reason}} = message ->
+      {:DOWN, ^monitor, :process, _pid, reason} = message ->
         leave_unread(message)
-        raise Fluffy.LiveViewError, reason: reason
 
-      {:fluffy_live_view, ^watcher, {:redirect, redirect}} = message ->
-        leave_unread(message)
-        follow_redirect_result(session, {:error, redirect})
+        case view_exit(reason) do
+          {:died, reason} -> raise Fluffy.LiveViewError, reason: reason
+          {:redirect, redirect} -> follow_redirect_result(session, {:error, redirect})
+        end
     after
       wait -> session
     end

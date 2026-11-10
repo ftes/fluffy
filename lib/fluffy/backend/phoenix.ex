@@ -24,7 +24,6 @@ defmodule Fluffy.Backend.Phoenix do
   alias Fluffy.Internal.Navigation.Redirect
   alias Fluffy.Internal.Navigation.StaticConn
   alias Fluffy.Internal.Navigation.Submission
-  alias Fluffy.LiveViewWatcher
   alias Fluffy.Page
   alias Fluffy.PageLifecycle
   alias Fluffy.Session
@@ -285,13 +284,8 @@ defmodule Fluffy.Backend.Phoenix do
         session
       )
 
-    {:ok, watcher} =
-      DynamicSupervisor.start_child(
-        Fluffy.SessionRuntime.Supervisor,
-        {LiveViewWatcher, caller: self(), view: view}
-      )
-
-    :ok = register_process(session.runtime, :watcher, watcher, Session.context(session).timeout)
+    # The Live driver reads how the view left from this monitor's message.
+    monitor = Process.monitor(view.pid)
 
     :ok =
       register_process(session.runtime, :live_view, view.pid, Session.context(session).timeout)
@@ -319,7 +313,7 @@ defmodule Fluffy.Backend.Phoenix do
       document: document,
       live_uploads: UploadState.new(),
       view: view,
-      watcher: watcher
+      monitor: monitor
     }
 
     session = PageLifecycle.replace_document(session, :live, state, URI.to_string(url), [], &release_page/3)
@@ -565,8 +559,7 @@ defmodule Fluffy.Backend.Phoenix do
   defp release_page(session, %Page.State{driver: :live} = page, _reason) do
     proxy_pid = live_view_proxy_pid(page.state.view)
     :ok = LiveDriver.release_page_uploads(session, page)
-    stop_process(page.state.watcher, Session.context(session).timeout, :normal)
-    Fluffy.SessionRuntime.release(session.runtime, {:watcher, page.state.watcher})
+    Process.demonitor(page.state.monitor, [:flush])
     stop_process(page.state.view.pid, Session.context(session).timeout, :normal)
     stop_process(proxy_pid, Session.context(session).timeout, :normal)
 
@@ -574,20 +567,11 @@ defmodule Fluffy.Backend.Phoenix do
 
     Fluffy.SessionRuntime.release(session.runtime, {:live_view, proxy_pid})
 
-    flush_watcher_event(page.state.watcher)
     flush_view_messages(page.state.view)
     :ok
   end
 
   defp release_page(_session, %Page.State{}, _reason), do: :ok
-
-  defp flush_watcher_event(watcher) do
-    receive do
-      {:fluffy_live_view, ^watcher, _event} -> :ok
-    after
-      0 -> :ok
-    end
-  end
 
   defp flush_view_messages(%{proxy: {reference, _topic, _proxy_pid}} = view) do
     receive do

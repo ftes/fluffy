@@ -85,25 +85,27 @@ defmodule Fluffy.Conformance.PageCleanupTest do
     assert :ok = Backend.close_session(session)
     refute Process.alive?(page.state.view.pid)
     refute Process.alive?(live_view_proxy_pid(page))
-    refute Process.alive?(page.state.watcher)
+    refute monitoring?(page.state.view.pid)
   end
 
   defp assert_live_page_alive(page) do
     assert Process.alive?(page.state.view.pid)
     assert Process.alive?(live_view_proxy_pid(page))
-    assert Process.alive?(page.state.watcher)
+    assert monitoring?(page.state.view.pid)
   end
 
   defp assert_live_page_released(session, page) do
     refute Process.alive?(page.state.view.pid)
     refute Process.alive?(live_view_proxy_pid(page))
-    refute Process.alive?(page.state.watcher)
+    refute monitoring?(page.state.view.pid)
 
     {:ok, resources} = Fluffy.SessionRuntime.resources(session.runtime)
 
     refute {:live_view, page.state.view.pid} in resources
     refute {:live_view, live_view_proxy_pid(page)} in resources
   end
+
+  defp monitoring?(pid), do: {:process, pid} in elem(Process.info(self(), :monitors), 1)
 
   defp live_view_proxy_pid(page) do
     {_reference, _topic, proxy_pid} = page.state.view.proxy

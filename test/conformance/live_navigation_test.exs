@@ -334,19 +334,20 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
   end
 
   @tag driver: :phoenix
-  test "the next action follows a navigation only the view watcher reported after a retry failed before leaving the page" do
+  test "the next action follows a navigation only the view's exit reported after a retry failed before leaving the page" do
     session = :phoenix |> live_session() |> visit("/live/chamber-map")
     state = Fluffy.Session.page_state(session)
     {_reference, _topic, proxy_pid} = state.view.proxy
     proxy_reference = Process.monitor(proxy_pid)
-    watcher_reference = Process.monitor(state.watcher)
+    view_monitor = state.monitor
 
     # The destination's HTTP redirects loop, so following it fails before the
     # session leaves the page.
     Process.exit(state.view.pid, {:shutdown, {:live_redirect, %{kind: :push, to: "/redirect/loop"}}})
 
     assert_receive {:DOWN, ^proxy_reference, :process, ^proxy_pid, _reason}, 1_000
-    assert_receive {:DOWN, ^watcher_reference, :process, _watcher, _reason}, 1_000
+    assert_receive {:DOWN, ^view_monitor, :process, _view, _reason} = view_exit, 1_000
+    send(self(), view_exit)
 
     for _attempt <- 1..2 do
       assert_raise RuntimeError, ~r/exceeded 20 redirects at .*\/redirect\/loop/, fn ->
@@ -356,17 +357,18 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
   end
 
   @tag driver: :phoenix
-  test "the next expectation follows a navigation only the view watcher reported after a retry failed before leaving the page" do
+  test "the next expectation follows a navigation only the view's exit reported after a retry failed before leaving the page" do
     session = :phoenix |> live_session() |> visit("/live/chamber-map")
     state = Fluffy.Session.page_state(session)
     {_reference, _topic, proxy_pid} = state.view.proxy
     proxy_reference = Process.monitor(proxy_pid)
-    watcher_reference = Process.monitor(state.watcher)
+    view_monitor = state.monitor
 
     Process.exit(state.view.pid, {:shutdown, {:live_redirect, %{kind: :push, to: "/redirect/loop"}}})
 
     assert_receive {:DOWN, ^proxy_reference, :process, ^proxy_pid, _reason}, 1_000
-    assert_receive {:DOWN, ^watcher_reference, :process, _watcher, _reason}, 1_000
+    assert_receive {:DOWN, ^view_monitor, :process, _view, _reason} = view_exit, 1_000
+    send(self(), view_exit)
 
     for _attempt <- 1..2 do
       assert_raise RuntimeError, ~r/exceeded 20 redirects at .*\/redirect\/loop/, fn ->
@@ -376,17 +378,18 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
   end
 
   @tag driver: :phoenix
-  test "the next unwrap follows a navigation only the view watcher reported after following it failed before leaving the page" do
+  test "the next unwrap follows a navigation only the view's exit reported after following it failed before leaving the page" do
     session = :phoenix |> live_session() |> visit("/live/chamber-map")
     state = Fluffy.Session.page_state(session)
     {_reference, _topic, proxy_pid} = state.view.proxy
     proxy_reference = Process.monitor(proxy_pid)
-    watcher_reference = Process.monitor(state.watcher)
+    view_monitor = state.monitor
 
     Process.exit(state.view.pid, {:shutdown, {:live_redirect, %{kind: :push, to: "/redirect/loop"}}})
 
     assert_receive {:DOWN, ^proxy_reference, :process, ^proxy_pid, _reason}, 1_000
-    assert_receive {:DOWN, ^watcher_reference, :process, _watcher, _reason}, 1_000
+    assert_receive {:DOWN, ^view_monitor, :process, _view, _reason} = view_exit, 1_000
+    send(self(), view_exit)
 
     for _attempt <- 1..2 do
       assert_raise RuntimeError, ~r/exceeded 20 redirects at .*\/redirect\/loop/, fn ->
@@ -531,17 +534,18 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
   end
 
   @tag driver: :phoenix
-  test "an action without timeout budget fails on a navigation only the view watcher reported and leaves it for the next call" do
+  test "an action without timeout budget fails on a navigation only the view's exit reported and leaves it for the next call" do
     session = :phoenix |> live_session() |> visit("/live/chamber-map")
     state = Fluffy.Session.page_state(session)
     {_reference, _topic, proxy_pid} = state.view.proxy
     proxy_reference = Process.monitor(proxy_pid)
-    watcher_reference = Process.monitor(state.watcher)
+    view_monitor = state.monitor
 
     Process.exit(state.view.pid, {:shutdown, {:live_redirect, %{kind: :push, to: "/live/secret-chamber"}}})
 
     assert_receive {:DOWN, ^proxy_reference, :process, ^proxy_pid, _reason}, 1_000
-    assert_receive {:DOWN, ^watcher_reference, :process, _watcher, _reason}, 1_000
+    assert_receive {:DOWN, ^view_monitor, :process, _view, _reason} = view_exit, 1_000
+    send(self(), view_exit)
 
     assert_raise Fluffy.OperationError, ~r/navigated away before the action reached it/, fn ->
       click(session, by_role(:button, name: "Lull guardian", exact: true), timeout: 0)
