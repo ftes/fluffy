@@ -208,6 +208,10 @@ submits its form and a link is followed. Only `href="#"` and LiveView links
 prevent it. The form is submitted as the click found it, before the event's
 render. `Phoenix.LiveViewTest.render_click/2` sends only the event.
 
+On Phoenix, a click or key event sends a form control's current `value` and a
+list item's number; other elements send no `value`, while a browser also sends
+one for `meter`, `progress`, `output`, `data` and `param`.
+
 File selection supports bounded local paths and typed in-memory payloads,
 ordered multiple selection, clearing, and ordinary multipart forms, including
 empty-file entries. Managed LiveView uploads support validation, progress,

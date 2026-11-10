@@ -12,8 +12,9 @@ defmodule Fluffy.Conformance.BlockedPageTest do
   @html "<button>Other</button>"
 
   # Calls that, as in Playwright, have no timeout wait on a blocked page until the test
-  # times out if Fluffy calls Playwright directly (page `evaluate`, a context setter).
-  # The others, `content` among them, first make Fluffy's bounded document check.
+  # times out if Fluffy calls Playwright directly (page `evaluate`, a context setter,
+  # `unroute_all`). The others, `content` among them, first make Fluffy's bounded
+  # document check.
 
   test "an action on a blocked page fails within the session timeout" do
     session = frozen_session()

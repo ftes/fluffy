@@ -85,6 +85,7 @@ defmodule Fluffy.TestWeb.ClickBindingsLive do
     </div>
     <form id="inner-form" phx-submit="save">
       <button type="submit"><span>Save by text</span></button>
+      <button type="submit" disabled><span>Save disabled</span></button>
     </form>
     <a href="/chamber"><span>Leave by text</span></a>
     <.link navigate="/live/secret-chamber"><span>Navigate by text</span></.link>

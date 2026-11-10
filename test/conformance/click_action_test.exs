@@ -88,6 +88,66 @@ defmodule Fluffy.Conformance.ClickActionTest do
       end)
     end
 
+    # Like Playwright, text inside a button takes the button's enabled state.
+    @tag driver: driver
+    test "click rejects text inside a disabled button with #{driver}" do
+      html = """
+      <form method="get" action="/search">
+        <button disabled><span>Search</span></button>
+        <fieldset disabled><button><span>Search all</span></button></fieldset>
+      </form>
+      """
+
+      with_html(unquote(driver), html, fn session ->
+        for text <- ["Search", "Search all"] do
+          span = by_text(text, exact: true)
+          expect(session, to_be_disabled(span))
+
+          assert_action_error(session, Fluffy.ActionabilityError, ~r/disabled/, fn ->
+            click(session, span, timeout: 5)
+          end)
+        end
+      end)
+    end
+
+    # Known difference: Playwright follows a label to its control, for the
+    # enabled state as for the click's activation. Phoenix treats a label as a
+    # plain element, so its text is enabled and clicking it does nothing (#134).
+    @tag driver: driver
+    test "a label takes its control's state and activation only on Playwright with #{driver}" do
+      html = """
+      <label><input type="checkbox" disabled> Accept</label>
+      <label for="terms">Terms</label><input id="terms" type="checkbox">
+      """
+
+      playwright? = unquote(driver) == :playwright
+
+      with_html(unquote(driver), html, fn session ->
+        accept = by_text("Accept", exact: true)
+
+        session
+        |> expect(if(playwright?, do: to_be_disabled(accept), else: to_be_enabled(accept)))
+        |> click(by_text("Terms", exact: true))
+        |> expect(:checkbox |> by_role(name: "Terms") |> to_be_checked(checked: playwright?))
+      end)
+    end
+
+    # Like Playwright, a disabled attribute or fieldset disables only a native form control.
+    @tag driver: driver
+    test "click ignores a disabled attribute outside native form controls with #{driver}" do
+      html = """
+      <div role="button" disabled>Go</div>
+      <button type="button"><span disabled>Search</span></button>
+      <fieldset disabled><div role="button">Stay</div></fieldset>
+      """
+
+      with_html(unquote(driver), html, fn session ->
+        for target <- [by_role(:button, name: "Go"), by_text("Search", exact: true), by_role(:button, name: "Stay")] do
+          session |> expect(to_be_enabled(target)) |> click(target)
+        end
+      end)
+    end
+
     @tag driver: driver
     test "click rejects a structurally hidden target with #{driver}" do
       with_html(unquote(driver), "<button hidden>Save</button>", fn session ->

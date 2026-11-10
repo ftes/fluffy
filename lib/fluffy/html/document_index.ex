@@ -313,6 +313,10 @@ defmodule Fluffy.HTML.DocumentIndex do
     |> Map.new()
   end
 
+  # A disabled fieldset disables only the native form controls inside it, as
+  # Playwright's isNativelyDisabled does.
+  @native_form_controls ~w(button input select textarea option optgroup)
+
   defp disabled_ids(entries) do
     entries
     |> Enum.filter(&(&1.tag == "fieldset" and Semantics.has_attribute?(&1.attributes, "disabled")))
@@ -322,6 +326,7 @@ defmodule Fluffy.HTML.DocumentIndex do
 
       Enum.reduce(entries, disabled, fn entry, disabled ->
         cond do
+          entry.tag not in @native_form_controls -> disabled
           not descendant?(entry.path, fieldset.path) -> disabled
           first_legend && within?(entry.path, first_legend.path) -> disabled
           true -> MapSet.put(disabled, entry.id)
