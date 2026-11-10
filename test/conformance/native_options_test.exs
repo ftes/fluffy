@@ -115,6 +115,21 @@ defmodule Fluffy.Conformance.NativeOptionsTest do
     end)
   end
 
+  @tag driver: :playwright
+  test "position: clicks at an offset from the element's top-left corner" do
+    pad =
+      ~s(<div id="pad" style="width: 80px; height: 40px" onclick="this.textContent = event.offsetX + ',' + event.offsetY"></div>)
+
+    pad_locator = by_css("#pad")
+
+    :playwright
+    |> session_for_html(pad, base_url: Fluffy.TestServer.base_url())
+    |> click(pad_locator)
+    |> expect(to_have_text(pad_locator, "40,20"))
+    |> click(pad_locator, position: %{x: 5, y: 7})
+    |> expect(to_have_text(pad_locator, "5,7"))
+  end
+
   for driver <- [:static, :live] do
     @tag driver: driver
     test "Playwright-only options raise a capability error with #{driver}" do

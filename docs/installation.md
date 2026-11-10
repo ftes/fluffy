@@ -6,13 +6,28 @@ database. Then follow [Usage](usage.md) for your first test and shared test case
 
 ## Elixir dependency
 
-```elixir
-defp deps do
-  [
-    {:fluffy, "~> 0.9.0-rc.1", only: :test}
-  ]
-end
+In `mix.exs`:
+
+```diff
+ defp deps do
+   [
+     # ...
+-    {:lazy_html, ">= 0.1.0", only: :test},
++    {:lazy_html, ">= 0.1.0", only: [:dev, :test]},
++    {:fluffy, "~> 0.9.0-rc.1", only: [:dev, :test]}
+   ]
+ end
 ```
+
+Prefer `only: [:dev, :test]` to `only: :test`: PlaywrightEx's Mix tasks, and
+[`mix usage_rules.sync`](https://hexdocs.pm/usage_rules) for Fluffy's usage rules, then work
+in `:dev`, where Fluffy needs no config and starts no driver or browser. Mix requires a
+dependency you list to cover every environment Fluffy needs it in, so widen the
+`lazy_html` line `phx.new` generates, if your app has it.
+PlaywrightEx comes with Fluffy in the same environments, so `mix playwright_ex.install`
+works without listing it. List it only to sync its usage rules, since `usage_rules.sync`
+reads only the dependencies `mix.exs` lists:
+`{:playwright_ex, "~> 0.17.0-rc.4", only: [:dev, :test]}`.
 
 ## Phoenix endpoint
 
@@ -77,12 +92,11 @@ Only the Playwright backend needs a browser. PlaywrightEx pins its Playwright
 driver; install it and a browser with:
 
 ```bash
-MIX_ENV=test mix playwright_ex.install -- chromium
+mix playwright_ex.install -- chromium
 ```
 
-The task needs `MIX_ENV=test` because PlaywrightEx comes in only through the test-only `:fluffy` dependency.
 On Linux CI runners, add `--with-deps` to install the browser's system packages too:
-`MIX_ENV=test mix playwright_ex.install -- chromium --with-deps`.
+`mix playwright_ex.install -- chromium --with-deps`.
 
 Configure the backend in `config/test.exs`:
 
@@ -106,7 +120,7 @@ config :fluffy,
 `launch_options: [timeout: 10_000]` to limit browser launch; otherwise Playwright's
 default of 3 minutes applies. To use a system browser, set
 `launch_options: [executable_path: System.find_executable("google-chrome-stable")]`.
-`MIX_ENV=test mix playwright_ex.install --no-browsers` installs only the driver for an existing browser.
+`mix playwright_ex.install --no-browsers` installs only the driver for an existing browser.
 
 Setting `artifact_dir` is recommended for every project that runs Playwright
 tests. Fluffy writes HTML, a full-page screenshot, and the formatted error
@@ -119,7 +133,7 @@ printed; set `log_browser_console: true` to send them to Elixir's `Logger`. Trac
 calls `Fluffy.Playwright.trace/1` or `Fluffy.Playwright.trace/2`.
 
 Set `engine: :firefox` or `engine: :webkit` after installing the corresponding
-browser (`MIX_ENV=test mix playwright_ex.install -- firefox`).
+browser (`mix playwright_ex.install -- firefox`).
 See [Browser baseline](capabilities.md#browser-baseline) for conformance coverage.
 Fluffy creates a fresh isolated `BrowserContext` for each session, in a pool of
 `pool_size` browsers (default `1`). No driver or browser starts until a session
@@ -131,27 +145,10 @@ when browser startup or the host becomes resource-constrained. Firefox dispatche
 input for all of a browser's pages in one queue and times out under load, so set
 `pool_size` to about half the logical cores for Firefox suites.
 
-## Test-only tasks
-
-Fluffy and PlaywrightEx exist only in the test environment, so Mix sees their tasks and
-usage rules only there. `mix usage_rules.sync` reads the current environment's
-dependencies, and only the ones `mix.exs` lists itself. To sync the rules both packages
-ship, list PlaywrightEx too, add `usage_rules` to `:test`, and run the task, like any
-alias that wraps `playwright_ex.install`, in that environment:
-
-```elixir
-{:playwright_ex, "~> 0.17.0-rc.4", only: :test},
-{:usage_rules, "~> 1.3", only: [:dev, :test], runtime: false}
-
-def cli do
-  [preferred_envs: ["usage_rules.sync": :test]]
-end
-```
-
 ## Ecto sandbox
 
-Fluffy is a test-only dependency, so application code that names it must compile
-only for tests. As `Phoenix.Ecto.SQL.Sandbox` recommends, enable a flag in
+Fluffy is not a production dependency, so application code that names it must
+compile only for tests. As `Phoenix.Ecto.SQL.Sandbox` recommends, enable a flag in
 `config/test.exs`:
 
 ```elixir

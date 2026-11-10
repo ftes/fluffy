@@ -11,20 +11,27 @@ matched once can now match twice.
 
 ## Setup
 
-- Install the pinned driver and a browser with
-  `MIX_ENV=test mix playwright_ex.install -- chromium`. Drop the npm `playwright` package
-  and the `assets_dir` config; Node.js is no longer needed. `executable:` now takes a
-  Playwright 1.65 CLI such as `node_modules/.bin/playwright`, not `cli.js`; usually drop
-  it and let PlaywrightEx install the driver.
+- Install the pinned driver and a browser with `mix playwright_ex.install -- chromium`.
+  Drop the npm `playwright` package and the `assets_dir` config; Node.js is no longer
+  needed. `executable:` now takes a Playwright 1.65 CLI such as
+  `node_modules/.bin/playwright`, not `cli.js`; usually drop it and let PlaywrightEx
+  install the driver.
 - Run the install in CI too, with `-- chromium --with-deps` on Linux runners; the driver
   would install itself in the first browser test, but browsers do not. For a system
   browser, as on Nix or in Docker, pass `--no-browsers` and set
   `launch_options: [executable_path: ...]` or `channel:`; see
   [Playwright setup](installation.md#playwright-setup).
-- Fluffy and PlaywrightEx now ship usage rules. As test-only dependencies, they reach
-  `mix usage_rules.sync` only in the test environment, and PlaywrightEx's only as a
-  direct dependency; see
-  [Test-only tasks](installation.md#test-only-tasks).
+- Prefer `only: [:dev, :test]` to `only: :test`, so PlaywrightEx's Mix tasks and
+  `mix usage_rules.sync` work in `:dev`, and widen the `lazy_html` line `phx.new`
+  generates to match. List PlaywrightEx too for its usage rules; see
+  [Elixir dependency](installation.md#elixir-dependency).
+
+  ```diff
+  -    {:lazy_html, ">= 0.1.0", only: :test},
+  -    {:fluffy, "~> 0.8.0", only: :test}
+  +    {:lazy_html, ">= 0.1.0", only: [:dev, :test]},
+  +    {:fluffy, "~> 0.9.0-rc.1", only: [:dev, :test]}
+  ```
 - Playwright 1.65's own breaking changes apply: actions wait for an element to be not
   inert, cookie matching follows RFC 6265, and text the browser does not render is no
   longer part of accessible names.
