@@ -258,6 +258,23 @@ defmodule Fluffy.Conformance.RouteTest do
     end
 
     @tag driver: :playwright
+    @tag capture_log: true
+    test "that a closed target fails gets Playwright's hint and fails the registering process" do
+      Process.flag(:trap_exit, true)
+      {session, fixture} = session()
+
+      # Raised by a call on a page or context closed under the handler.
+      route(session, "**/api", fn _route ->
+        raise %PlaywrightEx.TargetClosedError{message: "Target page, context or browser has been closed"}
+      end)
+
+      assert fetch(session, fixture) == "rejected"
+      assert_receive {:EXIT, _pid, {%PlaywrightEx.TargetClosedError{message: message}, [_ | _]}}, 5_000
+      assert message =~ ~s("Target page, context or browser has been closed" while running route callback.)
+      assert message =~ "unroute_all(session, behavior: :ignore_errors)"
+    end
+
+    @tag driver: :playwright
     test "that returns without answering leaves the action to fail at its own timeout" do
       session = start_session(:playwright, base_url: Fluffy.TestServer.base_url(), timeout: 500)
       fixture = TestHTTPFixtures.register(fn _request -> %{body: "<h1>Never</h1>"} end)

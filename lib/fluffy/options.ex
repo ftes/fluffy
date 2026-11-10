@@ -33,9 +33,7 @@ defmodule Fluffy.Options do
     :mouse_up,
     :mouse_move,
     :unroute_all,
-    :install_clock,
-    :add_script_tag,
-    :add_style_tag
+    :install_clock
   ]
 
   # The upstream call behind each cross-driver action and its options that pass through

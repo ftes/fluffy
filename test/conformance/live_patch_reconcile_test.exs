@@ -26,7 +26,7 @@ defmodule Fluffy.Conformance.LivePatchReconcileTest do
       driver
       |> start_test_session()
       |> visit("/live/radio-shift?override=a")
-      |> check_reverted(by_role(:radio, name: "c"))
+      |> click(by_role(:radio, name: "c"))
       |> expect("Choice: c" |> by_text() |> to_be_visible())
       |> expect(to_be_checked(by_role(:radio, name: "a")))
       |> expect("input[type=radio]:checked" |> by_css() |> to_have_count(1))
@@ -37,7 +37,7 @@ defmodule Fluffy.Conformance.LivePatchReconcileTest do
       driver
       |> start_test_session()
       |> visit("/live/radio-shift")
-      |> check_reverted(by_role(:checkbox, name: "y"))
+      |> click(by_role(:checkbox, name: "y"))
       |> expect("Changed: true" |> by_text() |> to_be_visible())
       |> expect(to_be_checked(by_role(:checkbox, name: "x"), checked: false))
     end

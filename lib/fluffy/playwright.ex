@@ -1075,7 +1075,7 @@ defmodule Fluffy.Playwright do
   expression such as `"() => { window.seeded = true }"` is evaluated but not called.
   Write statements instead, or call the function in the source.
 
-  Raises after the session's timeout. Phoenix sessions raise `Fluffy.CapabilityError`.
+  As in Playwright, it has no timeout. Phoenix sessions raise `Fluffy.CapabilityError`.
   """
   @spec add_init_script(Session.t(), String.t() | map(), term()) :: Session.t()
   def add_init_script(session, script, arg \\ nil)
@@ -1155,7 +1155,7 @@ defmodule Fluffy.Playwright do
   defp reject_cookies_options!([{key, _value} | _] = options) when is_atom(key) do
     raise ArgumentError,
           "cookies/2 takes the URL list, not the options #{inspect(Keyword.keys(options))}; " <>
-            "call cookies(session, urls): the call is bounded by the session's timeout:"
+            "call cookies(session, urls): as in Playwright, it has no timeout"
   end
 
   defp reject_cookies_options!(_urls), do: :ok

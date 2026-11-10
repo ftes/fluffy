@@ -36,19 +36,19 @@ defmodule Fluffy.Response do
 
   @doc "Waits for the response to end and returns its body, as raw bytes."
   @spec body(t()) :: binary()
-  def body(%__MODULE__{} = response), do: read!(response, :body, &PlaywrightEx.Response.body/1)
+  def body(%__MODULE__{} = response), do: read!(response, &PlaywrightEx.Response.body/1)
 
   @doc "Waits for the response to end and returns its body as text."
   @spec text(t()) :: String.t()
-  def text(%__MODULE__{} = response), do: read!(response, :text, &PlaywrightEx.Response.text/1)
+  def text(%__MODULE__{} = response), do: read!(response, &PlaywrightEx.Response.text/1)
 
   @doc "Waits for the response to end and returns its body parsed as JSON. Raises if it is not valid JSON."
   @spec json(t()) :: term()
-  def json(%__MODULE__{} = response), do: read!(response, :json, &PlaywrightEx.Response.json/1)
+  def json(%__MODULE__{} = response), do: read!(response, &PlaywrightEx.Response.json/1)
 
   @doc "Returns all response headers, with lowercase names, including the security-related ones `headers` leaves out."
   @spec all_headers(t()) :: %{optional(String.t()) => String.t()}
-  def all_headers(%__MODULE__{} = response), do: read!(response, :all_headers, &PlaywrightEx.Response.all_headers/1)
+  def all_headers(%__MODULE__{} = response), do: read!(response, &PlaywrightEx.Response.all_headers/1)
 
   @doc """
   Returns the value of a header, matched case-insensitively, or nil if it is absent.
@@ -57,16 +57,16 @@ defmodule Fluffy.Response do
   """
   @spec header_value(t(), String.t()) :: String.t() | nil
   def header_value(%__MODULE__{} = response, name) when is_binary(name) do
-    read!(response, :header_value, &PlaywrightEx.Response.header_value(&1, name))
+    read!(response, &PlaywrightEx.Response.header_value(&1, name))
   end
 
   @doc "Returns every value of a header, matched case-insensitively, such as each `set-cookie`."
   @spec header_values(t(), String.t()) :: [String.t()]
   def header_values(%__MODULE__{} = response, name) when is_binary(name) do
-    read!(response, :header_values, &PlaywrightEx.Response.header_values(&1, name))
+    read!(response, &PlaywrightEx.Response.header_values(&1, name))
   end
 
-  defp read!(%__MODULE__{request: request, native: native}, _operation, fun) do
+  defp read!(%__MODULE__{request: request, native: native}, fun) do
     Request.__read__!(request, fn -> fun.(native) end)
   end
 end

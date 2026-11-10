@@ -224,7 +224,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
          if(playwright_engine?(:firefox),
            do: "Firefox never completes or fails an interrupted download"
          )
-  test "failed downloads expose metadata but raise when reading or saving", %{tmp_dir: tmp_dir} do
+  test "failed downloads expose metadata but raise when reading, saving or getting the path", %{tmp_dir: tmp_dir} do
     owner = self()
 
     fixture =
@@ -269,6 +269,9 @@ defmodule Fluffy.Conformance.DownloadEventTest do
     error = assert_raise Fluffy.OperationError, fn -> Download.save_as(download, Path.join(tmp_dir, "copy.txt")) end
     assert %{operation: :save_as, cause: %PlaywrightEx.PlaywrightError{}} = error
     assert error.cause.message =~ "download.saveAs"
+
+    assert %{operation: :path, cause: %PlaywrightEx.PlaywrightError{}} =
+             assert_raise(Fluffy.OperationError, fn -> Download.path(download) end)
   end
 
   defp session(driver) do

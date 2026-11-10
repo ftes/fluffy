@@ -1108,14 +1108,7 @@ defmodule Fluffy.Driver.Live do
 
   defp render_view_event(client_dom, %{root_id: nil} = context, selector, kind, payload) do
     target = ClientDOM.target!(client_dom, Locator.by_css(selector))
-
-    payload =
-      case kind do
-        :click -> Map.merge(Event.values(target.attributes), payload)
-        kind when kind in [:keydown, :keyup] -> Map.merge(Event.key_values(target.attributes), payload)
-      end
-
-    Event.push(context.view, target, kind, payload)
+    Event.push(context.view, target, kind, Map.merge(Event.key_values(target.attributes), payload))
   end
 
   defp render_view_event(client_dom, context, selector, kind, payload) do
