@@ -106,16 +106,14 @@ input and textarea controls; they do not emulate editing element text.
 require Playwright; with `import Fluffy.Playwright`, call `focus` and `blur` directly.
 Static and LiveView track current input properties but neither track nor simulate focus.
 
-On a changed LiveView render, local text values adopt the rendered value,
-except during `phx-trigger-action` handoff. As in LiveView's client, a change
-counts per LiveView and LiveComponent, not per control: an update to one resets
-local text anywhere in it, including its portal content, but not in other views,
-unchanged components or the root layout, so a title update resets nothing.
-Selected options reset the same way, as LiveView's client resets a select that
-has no focus and Playwright's `select_option` does not focus it.
-Checkbox/radio state resets the same way, focused or not, as LiveView's client
-resets it to the rendered `checked` attribute even during the control's own
-`phx-change`. Content under `phx-update="ignore"` keeps all of its local state.
+As in LiveView's client, a render resets local text, select choices and
+checkbox/radio state to the rendered ones per LiveView and LiveComponent: an
+update to one resets them anywhere in it, including its portal content, but not
+in other views, unchanged components or the root layout, so a title update
+resets nothing. Checkboxes and radios reset even with focus or during their own
+`phx-change`; selects reset because Playwright's `select_option` does not focus
+them. A form during its `phx-trigger-action` handoff and content under
+`phx-update="ignore"` keep all of their local state.
 Checkbox/radio state carries only to a control with the same type, name, and
 value; a radio the server renders as newly checked clears its group. Files
 survive while the matched control remains a file input with the same name. Elements
@@ -149,14 +147,15 @@ The Playwright backend exposes page handles for browser tabs and popup windows.
 All public page-management helpers live in `Fluffy.Playwright` and reject Phoenix
 sessions. Phoenix retains one current document internally; use shared page URL,
 and title assertions to inspect it.
-On Phoenix, a link with `target="_blank"` opens in that one document, so a test can
-still follow it; a click with `modifiers:` raises `Fluffy.CapabilityError`, as other
-Playwright options do. A test that should behave the same on Playwright handles the new
-tab there with `Fluffy.Event.popup/0`.
 `Fluffy.Playwright.new_page/1` returns a handle; `Fluffy.Playwright.switch_page/2` selects it for subsequent actions.
 Use [frame locators](locators.md#frames-playwright) to query iframe contents with
 Playwright. Page switching does not select an iframe, and frame locators do not
 change the active page.
+
+On Phoenix, a link with `target="_blank"` opens in that one document, so a test can
+still follow it; a click with `modifiers:` raises `Fluffy.CapabilityError`, as other
+Playwright options do. A test that should behave the same on Playwright handles the new
+tab there with `Fluffy.Event.popup/0`.
 
 Static works on the response HTML and LiveView on its rendered document. Both can
 query an iframe element and its attributes, but do not load its `src` or parse its

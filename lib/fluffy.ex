@@ -590,9 +590,9 @@ defmodule Fluffy do
   Playwright performs a native key press, including browser default actions,
   and accepts Playwright key names, characters, and modifier combinations.
 
-  LiveView sends `%{"key" => key}` unchanged, with the element's values and
-  `phx-target` as LiveView's client sends them, to bindings on the selected
-  element. Either or both phases may be bound, including `phx-window-keydown` and
+  LiveView sends `%{"key" => key}`, with the element's values and `phx-target`
+  as LiveView's client sends them, to bindings on the selected element; as
+  there, a `phx-value-key` wins over the pressed key. Either or both phases may be bound, including `phx-window-keydown` and
   `phx-window-keyup` on that element. An element with no keyboard binding, or a
   disabled one, raises. Fluffy does not filter
   `phx-key`, translate key names, parse modifier combinations, synthesize input

@@ -693,13 +693,13 @@ defmodule Fluffy.ClientDOM do
 
   # `used`, values and selections deliberately carry by identity alone.
   # LiveView keeps `used` on the DOM element morphdom pairs by position, and
-  # morphdom resets an unfocused control's value and selection from the render,
-  # so they survive only unchanged renders, phx-update="ignore" and
-  # phx-trigger-action handoff.
-  # Playwright's select_option does not focus the select. LiveView resets
-  # checked state from the rendered attribute even when the box has focus, so
-  # it too survives only those. Checked and file state stand in for subtrees
-  # LiveView leaves untouched, so they only carry to the same control.
+  # morphdom resets an unfocused control's value and selection from the render;
+  # a select stays unfocused, as Playwright's select_option does not focus it.
+  # LiveView resets checked state from the rendered attribute even when the box
+  # has focus. So values, selections and checked state survive only unchanged
+  # renders, phx-update="ignore" and phx-trigger-action handoff. Checked and
+  # file state stand in for subtrees LiveView leaves untouched, so they only
+  # carry to the same control.
   defp reconcile_properties(properties, old, new, old_to_new, patched?) do
     %{}
     |> preserve_property(properties, :used, true)
