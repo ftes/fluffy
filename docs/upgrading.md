@@ -30,7 +30,7 @@ matched once can now match twice.
   -    {:lazy_html, ">= 0.1.0", only: :test},
   -    {:fluffy, "~> 0.8.0", only: :test}
   +    {:lazy_html, ">= 0.1.0", only: [:dev, :test]},
-  +    {:fluffy, "~> 0.9.0-rc.1", only: [:dev, :test]}
+  +    {:fluffy, "~> 0.9.0-rc.2", only: [:dev, :test]}
   ```
 - Playwright 1.65's own breaking changes apply: actions wait for an element to be not
   inert, cookie matching follows RFC 6265, and text the browser does not render is no

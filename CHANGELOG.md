@@ -2,7 +2,7 @@
 
 Upgrading from 0.8? The [upgrade guide](docs/upgrading.md) lists the net changes.
 
-## Unreleased
+## 0.9.0-rc.2 — 2026-11-11
 
 ### Added
 
