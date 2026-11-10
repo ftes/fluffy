@@ -49,6 +49,24 @@ defmodule Fluffy.Conformance.ClickActionTest do
     end
 
     @tag driver: driver
+    test "click selects a radio and keeps it selected with #{driver}" do
+      small = by_role(:radio, name: "Small")
+      large = by_role(:radio, name: "Large")
+
+      html =
+        ~s(<label><input type="radio" name="size" checked>Small</label><label><input type="radio" name="size">Large</label>)
+
+      with_html(unquote(driver), html, fn session ->
+        session
+        |> click(large)
+        |> expect(to_be_checked(large))
+        |> expect(not_(to_be_checked(small)))
+        |> click(large)
+        |> expect(to_be_checked(large))
+      end)
+    end
+
+    @tag driver: driver
     test "click requires exactly one target with #{driver}" do
       with_html(unquote(driver), "<button>Save</button><button>Save draft</button>", fn session ->
         assert_action_error(session, Fluffy.StrictnessError, ~r/it matched 2/, fn ->

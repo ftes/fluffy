@@ -405,8 +405,9 @@ defmodule Fluffy.ClientDOM do
       "checkbox" ->
         put_checked(client_dom, target.id, not checked_target?(client_dom, target))
 
+      # A click on a selected radio changes nothing, like a browser's.
       "radio" ->
-        put_checked_target(client_dom, target, true)
+        if checked_target?(client_dom, target), do: client_dom, else: put_checked_target(client_dom, target, true)
 
       _other ->
         client_dom

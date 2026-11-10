@@ -68,6 +68,7 @@ defmodule Fluffy.TestWeb.Router do
       live("/patching/:mode", PatchingLive)
       live("/checked-controls", CheckedControlsLive)
       live("/radio-shift", RadioShiftLive)
+      live("/click-checkable", ClickCheckableLive)
       live("/shifted-controls", ShiftedControlsLive)
       live("/used-shift", UsedShiftLive)
       live("/submit-used", SubmitUsedLive)
