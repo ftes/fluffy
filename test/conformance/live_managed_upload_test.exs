@@ -349,6 +349,18 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       |> expect("Completed uploads: 0" |> by_text() |> to_be_visible())
     end
 
+    test "a submit whose phx-click removes its upload form uploads nothing with #{driver}" do
+      unquote(driver)
+      |> start_test_session()
+      |> visit("/live/scrolls")
+      |> set_input_files(by_label("Attachment"), fixture_path())
+      |> expect("Pending uploads: 1" |> by_text() |> to_be_visible())
+      |> click(by_role(:button, name: "Finish and close"))
+      |> expect(:button |> by_role(name: "Save") |> to_have_count(0))
+      |> expect("Completed uploads: 0" |> by_text() |> to_be_visible())
+      |> expect("Pending uploads: 1" |> by_text() |> to_be_visible())
+    end
+
     test "clearing the file input does not cancel its pending LiveView entry with #{driver}" do
       unquote(driver)
       |> start_test_session()

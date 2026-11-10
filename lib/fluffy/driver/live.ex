@@ -1379,9 +1379,18 @@ defmodule Fluffy.Driver.Live do
   defp dispatch_live_upload_submit(session, form_key, upload_state, submission) do
     # LiveView marks the form before any upload runs, so the marks survive a
     # submit that an upload entry error blocks.
+    # A click's phx-click render may have removed the form; the uploads below
+    # then find their input gone.
     state = Session.page_state(session)
-    form = find_by_identity(state.client_dom, form_key)
-    session = Session.put_page_state(session, %{state | client_dom: ClientDOM.mark_form_used(state.client_dom, form.id)})
+
+    session =
+      case find_by_identity(state.client_dom, form_key) do
+        nil ->
+          session
+
+        form ->
+          Session.put_page_state(session, %{state | client_dom: ClientDOM.mark_form_used(state.client_dom, form.id)})
+      end
 
     upload_result =
       Enum.reduce_while(upload_state.batches, {:ok, session}, fn entry_upload, {:ok, session} ->

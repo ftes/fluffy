@@ -90,6 +90,10 @@ defmodule Fluffy.TestWeb.LiveUploadLive do
     {:noreply, assign(socket, :input_state, :removed)}
   end
 
+  def handle_event("remove-form", _params, socket) do
+    {:noreply, assign(socket, :form_removed?, true)}
+  end
+
   def handle_event("replace-input", _params, socket) do
     {:noreply, assign(socket, :input_state, :replaced)}
   end
@@ -185,6 +189,7 @@ defmodule Fluffy.TestWeb.LiveUploadLive do
         </button>
         <button type="button" phx-click="cancel-all">Cancel all uploads</button>
         <button>Save</button>
+        <button phx-click="remove-form">Finish and close</button>
         <button name="intent" value="draft">Draft</button>
         <a href="/chamber?from=upload-link">Leave upload form</a>
       </form>
