@@ -62,7 +62,8 @@ defmodule Fluffy.ClientDOM do
 
     old_by_id = Map.new(old_nodes, &{&1.id, &1})
     new_by_id = Map.new(new_nodes, &{&1.id, &1})
-    patched? = patch_tree(LazyHTML.to_tree(client_dom.document)) != patch_tree(LazyHTML.to_tree(new_document))
+    old_renders = owner_renders(client_dom.document)
+    new_renders = owner_renders(new_document)
 
     {properties, locally_checked} =
       Enum.reduce(client_dom.properties, {%{}, MapSet.new()}, fn
@@ -76,7 +77,8 @@ defmodule Fluffy.ClientDOM do
                    old,
                    new,
                    old_to_new,
-                   patched? and not triggered_form_control?(new, new_index)
+                   patched?(old_renders, new_renders, owner_of(new_index, new.id)) and
+                     not triggered_form_control?(new, new_index)
                  ) do
             locally_checked =
               if Map.get(reconciled, :checked) == true,
@@ -606,16 +608,59 @@ defmodule Fluffy.ClientDOM do
   defp tree_text(text) when is_binary(text), do: text
   defp tree_text(_comment), do: ""
 
-  # LiveViewTest regenerates signed child-session tokens when rendering, even
-  # when the server sent no DOM changes. They must not reset client input values.
-  defp patch_tree(nodes) when is_list(nodes), do: Enum.map(nodes, &patch_tree/1)
+  # LiveView patches each view's container on its own, teleported content with
+  # the view that owns its portal, and skips the components a patch leaves
+  # unchanged. It never patches the root layout around them, <title> included.
+  # So a control's local values reset only when its owner renders differently.
+  defp patched?(_old_renders, _new_renders, :layout), do: false
+  defp patched?(old_renders, new_renders, owner), do: Map.get(old_renders, owner) != Map.get(new_renders, owner)
 
-  defp patch_tree({tag, attributes, children}) do
-    attributes = Enum.reject(attributes, fn {name, _value} -> name == "data-phx-session" end)
-    {tag, attributes, patch_tree(children)}
+  defp owner_of(_index, nil), do: :layout
+
+  defp owner_of(index, id) do
+    entry = Map.fetch!(index.nodes_by_id, id)
+    owner(entry.attributes, owner_of(index, entry.parent_id))
   end
 
-  defp patch_tree(node), do: node
+  defp owner(attributes, parent) do
+    cond do
+      has_attribute?(attributes, "data-phx-session") -> {:view, attribute(attributes, "id")}
+      view_id = attribute(attributes, "data-phx-teleported") -> {:view, view_id}
+      cid = attribute(attributes, "data-phx-component") -> {:component, owner_view_id(parent), cid}
+      true -> parent
+    end
+  end
+
+  defp owner_view_id({:view, view_id}), do: view_id
+  defp owner_view_id({:component, view_id, _cid}), do: view_id
+  defp owner_view_id(:layout), do: nil
+
+  # Each owner's rendering, with the views and components it renders reduced
+  # to a reference.
+  defp owner_renders(document) do
+    {_layout, renders} = document |> LazyHTML.to_tree() |> owner_renders(:layout, %{})
+    renders
+  end
+
+  defp owner_renders(nodes, parent, renders) do
+    Enum.map_reduce(nodes, renders, fn
+      {tag, attributes, children}, renders when is_binary(tag) ->
+        owner = owner(attributes, parent)
+        {children, renders} = owner_renders(children, owner, renders)
+        element = {tag, render_attributes(attributes), children}
+
+        if owner == parent,
+          do: {element, renders},
+          else: {{:owner, owner}, Map.update(renders, owner, [element], &[element | &1])}
+
+      node, renders ->
+        {node, renders}
+    end)
+  end
+
+  # LiveViewTest regenerates signed child-session tokens when rendering, even
+  # when the server sent no DOM changes. They must not reset client input values.
+  defp render_attributes(attributes), do: Enum.reject(attributes, fn {name, _value} -> name == "data-phx-session" end)
 
   # LiveView skips input property updates inside a form that is being handed
   # off to HTTP by phx-trigger-action, preserving the user's current values.

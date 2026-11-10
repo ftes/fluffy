@@ -70,6 +70,64 @@ defmodule Fluffy.Conformance.LivePatchReconcileTest do
       [submission] = TestHTTPFixtures.requests(fixture)
       refute submission.body =~ ~s(filename="fluffy-upload.txt")
     end
+
+    @tag driver: driver
+    test "a title update keeps typed text with #{driver}", %{driver: driver} do
+      driver
+      |> start_test_session()
+      |> visit("/live/patched-controls")
+      |> fill(by_label("Note", exact: true), "typed")
+      |> click(by_role(:button, name: "Retitle"))
+      |> expect(page_to_have_title("Retitled controls"))
+      |> expect(to_have_value(by_label("Note", exact: true), "typed"))
+    end
+
+    @tag driver: driver
+    test "a view patch resets typed text in the view but not in an unchanged component with #{driver}", %{
+      driver: driver
+    } do
+      driver
+      |> start_test_session()
+      |> visit("/live/patched-controls")
+      |> fill(by_label("Note", exact: true), "typed")
+      |> fill(by_label("Component note"), "typed")
+      |> click(by_role(:button, name: "Bump", exact: true))
+      |> expect("Count: 1" |> by_text() |> to_be_visible())
+      |> expect(to_have_value(by_label("Note", exact: true), ""))
+      |> expect(to_have_value(by_label("Component note"), "typed"))
+    end
+
+    @tag driver: driver
+    test "a component patch resets typed text in the component but not in its view with #{driver}", %{
+      driver: driver
+    } do
+      driver
+      |> start_test_session()
+      |> visit("/live/patched-controls")
+      |> fill(by_label("Note", exact: true), "typed")
+      |> fill(by_label("Component note"), "typed")
+      |> click(by_role(:button, name: "Bump component"))
+      |> expect("Component count: 1" |> by_text() |> to_be_visible())
+      |> expect(to_have_value(by_label("Note", exact: true), "typed"))
+      |> expect(to_have_value(by_label("Component note"), ""))
+    end
+
+    @tag driver: driver
+    test "a view patch keeps typed text in the root layout but resets it in the view's portal with #{driver}", %{
+      driver: driver
+    } do
+      dialog = by_role(:dialog, name: "Treats")
+
+      driver
+      |> start_test_session()
+      |> visit("/live/kennel")
+      |> fill(by_label("Tune"), "Lullaby")
+      |> fill(by_label(dialog, "Treat name"), "Bone")
+      |> click(by_role(dialog, :button, name: "Give treat"))
+      |> expect(dialog |> by_text("Treats: 1") |> to_be_visible())
+      |> expect(to_have_value(by_label("Tune"), "Lullaby"))
+      |> expect(to_have_value(by_label(dialog, "Treat name"), ""))
+    end
   end
 
   defp start_test_session(driver) do
