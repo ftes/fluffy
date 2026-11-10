@@ -5,6 +5,33 @@ defmodule Fluffy.Conformance.ClickActionTest do
   import Fluffy.Expect
   import Fluffy.Locator
 
+  alias Fluffy.TestWeb.Endpoint
+
+  for driver <- [:phoenix, :playwright] do
+    @tag driver: driver
+    test "click with timeout: 0 makes one attempt on Phoenix and is rejected on Playwright with #{driver}",
+         %{driver: driver} do
+      session =
+        driver
+        |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+        |> visit("/live/three-heads")
+
+      flute = by_role(:button, name: "Play the flute")
+
+      if driver == :phoenix do
+        session
+        |> click(flute, timeout: 0)
+        |> expect("Sleeping heads: 1" |> by_text() |> to_be_visible())
+      else
+        assert_raise ArgumentError, ~r/timeout: 0 means check once.*pass a positive timeout/, fn ->
+          click(session, flute, timeout: 0)
+        end
+
+        expect(session, "Sleeping heads: 0" |> by_text() |> to_be_visible(), timeout: 0)
+      end
+    end
+  end
+
   for driver <- [:static, :playwright] do
     @tag driver: driver
     test "click toggles a checkbox property with #{driver}" do
@@ -75,7 +102,7 @@ defmodule Fluffy.Conformance.ClickActionTest do
       session =
         start_session(unquote(driver),
           base_url: Fluffy.TestServer.base_url(),
-          endpoint: Fluffy.TestWeb.Endpoint
+          endpoint: Endpoint
         )
 
       session
