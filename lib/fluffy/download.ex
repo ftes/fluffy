@@ -11,8 +11,8 @@ defmodule Fluffy.Download do
   `failure`, `cancel` and the rest of the `PlaywrightEx.Download` with
   `Fluffy.unwrap_and_return/2`.
 
-  `path/1` also waits for completion. A Phoenix download is complete when delivered
-  and held in memory, so `path/1` raises `Fluffy.CapabilityError`.
+  `path/1` also waits for completion and raises the same way. A Phoenix download is
+  complete when delivered and held in memory, so `path/1` raises `Fluffy.CapabilityError`.
   """
 
   alias Fluffy.CapabilityError
@@ -32,15 +32,16 @@ defmodule Fluffy.Download do
   @spec read(t(), keyword()) :: binary()
   def read(%__MODULE__{} = download, options \\ []) do
     options = NimbleOptions.validate!(options, max_bytes: [type: :non_neg_integer, default: 10_000_000])
-    context = Fluffy.Page.context!(download.page)
-    read_source!(download, options[:max_bytes], context)
+    # Raises once the session is closed.
+    Fluffy.Page.context!(download.page)
+    read_source!(download, options[:max_bytes])
   end
 
   @doc "Waits for completion and saves to the destination using bounded memory."
   @spec save_as(t(), Path.t()) :: :ok
   def save_as(%__MODULE__{} = download, destination) do
-    context = Fluffy.Page.context!(download.page)
-    save_source!(download, destination, context, :save_as)
+    Fluffy.Page.context!(download.page)
+    save_source!(download, destination, :save_as)
   end
 
   @doc """
@@ -50,20 +51,20 @@ defmodule Fluffy.Download do
   """
   @spec path(t()) :: Path.t()
   def path(%__MODULE__{} = download) do
-    context = Fluffy.Page.context!(download.page)
-    source_path!(download, context)
+    Fluffy.Page.context!(download.page)
+    source_path!(download)
   end
 
-  defp read_source!(%{body: bytes}, limit, _context) when is_binary(bytes) do
+  defp read_source!(%{body: bytes}, limit) when is_binary(bytes) do
     check_size!(byte_size(bytes), limit)
     bytes
   end
 
-  defp read_source!(download, limit, context) do
+  defp read_source!(download, limit) do
     path = Path.join(System.tmp_dir!(), "fluffy-download-#{System.unique_integer([:positive])}")
 
     try do
-      save_source!(download, path, context, :read)
+      save_source!(download, path, :read)
       check_size!(File.stat!(path).size, limit)
       File.read!(path)
     after
@@ -71,26 +72,25 @@ defmodule Fluffy.Download do
     end
   end
 
-  defp save_source!(%{body: bytes}, destination, _context, _operation) when is_binary(bytes),
-    do: File.write!(destination, bytes)
+  defp save_source!(%{body: bytes}, destination, _operation) when is_binary(bytes), do: File.write!(destination, bytes)
 
   # As for an action, PlaywrightEx's error becomes the cause of a `Fluffy.OperationError`.
-  defp save_source!(%{native: %PlaywrightEx.Download{} = native}, destination, _context, operation) do
+  defp save_source!(%{native: %PlaywrightEx.Download{} = native}, destination, operation) do
     with {:error, error} <- PlaywrightEx.Download.save_as(native, destination),
          do: OperationFailure.raise_playwright!(operation, nil, error)
   end
 
-  defp source_path!(%{body: bytes}, _context) when is_binary(bytes) do
+  defp source_path!(%{body: bytes}) when is_binary(bytes) do
     raise CapabilityError,
       capability: :download_path,
       driver: :phoenix,
       detail: "a Phoenix download is held in memory and has no file; use read/2 or save_as/2"
   end
 
-  defp source_path!(%{native: native}, _context) do
+  defp source_path!(%{native: native}) do
     case PlaywrightEx.Download.path(native) do
       {:ok, path} -> path
-      {:error, error} -> raise error
+      {:error, error} -> OperationFailure.raise_playwright!(:path, nil, error)
     end
   end
 

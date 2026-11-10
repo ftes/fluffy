@@ -113,13 +113,26 @@ defmodule Fluffy.Route.Registration do
         :atomics.get(tracker, 1) == 1 ->
           PlaywrightEx.Route.fallback(native)
 
-        # The session, page or context went away under the handler.
-        not Process.alive?(session.runtime) or is_struct(reason, PlaywrightEx.TargetClosedError) ->
+        # The session ended under the handler, as at the end of a test.
+        not Process.alive?(session.runtime) ->
           :ok
 
         true ->
           PlaywrightEx.Route.abort(native, "failed")
-          Process.exit(owner, {Exception.normalize(kind, reason, __STACKTRACE__), __STACKTRACE__})
+          Process.exit(owner, {kind |> Exception.normalize(reason, __STACKTRACE__) |> hint(), __STACKTRACE__})
       end
   end
+
+  # As in Playwright, a handler that its page or context closed under gets a hint.
+  defp hint(%PlaywrightEx.TargetClosedError{} = error) do
+    %{
+      error
+      | message:
+          ~s("#{error.message}" while running route callback.\n) <>
+            "Consider calling `Fluffy.Playwright.unroute_all(session, behavior: :ignore_errors)`\n" <>
+            "before the end of the test to ignore remaining routes in flight."
+    }
+  end
+
+  defp hint(error), do: error
 end

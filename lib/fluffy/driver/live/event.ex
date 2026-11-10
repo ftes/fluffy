@@ -40,7 +40,7 @@ defmodule Fluffy.Driver.Live.Event do
   end
 
   # Click and key events carry the element's phx-value-* attributes, while
-  # form events carry the serialized form.
+  # form events carry the serialized form and the form's phx-value-*.
   def values(attributes) do
     for {"phx-value-" <> key, value} <- attributes, into: %{}, do: {key, value}
   end
