@@ -31,7 +31,7 @@ defmodule Fluffy.Conformance.LivePatchActionTest do
       driver
       |> live_session()
       |> visit("/live/patching/toggle")
-      |> check(by_label("Toggle", exact: true))
+      |> check_reverted(by_label("Toggle", exact: true))
       |> visible("Changes: 1")
     end
 

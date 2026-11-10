@@ -71,7 +71,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
       driver
       |> live_session()
       |> visit("/live/nested")
-      |> check(by_label(child, "Shift child", exact: true))
+      |> check_reverted(by_label(child, "Shift child", exact: true))
       |> expect("Child shifted" |> by_text(exact: true) |> to_be_visible())
       |> expect(child |> by_text("Child shift changes: 1", exact: true) |> to_be_visible())
     end
