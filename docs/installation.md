@@ -63,8 +63,10 @@ report, not the shorter timeout.
 As in Playwright, calls that have no timeout there have none in Fluffy and take no
 `timeout:`: page `evaluate`, `content` and `title`, page-wide keyboard and mouse input,
 clock calls, context setters, closing a page, `unroute_all`, and reading a download or a
-response body. On a blocked page they wait until the test times out (ExUnit's default
-is 60 seconds).
+response body. Page `evaluate`, context setters, closing a page and network and download
+reads wait on a blocked page until the test times out (ExUnit's default is 60 seconds).
+The others first check the page's document, so on a page that is already blocked they fail
+after the session timeout, or a second if that is shorter.
 
 ## Playwright setup
 
