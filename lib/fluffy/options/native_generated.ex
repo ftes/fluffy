@@ -274,6 +274,12 @@ defmodule Fluffy.Options.NativeGenerated do
          "If `:polling` is `:raf`, then `expression` is constantly executed in `requestAnimationFrame` callback. If `:polling` is a number, then it is treated as an interval in milliseconds at which the function would be executed. Defaults to `:raf`.",
          quote(do: number() | :raf)}
     ],
+    {PlaywrightEx.BrowserContext, :unroute_all, 2} => [
+      behavior:
+        {"`:wait` | `:ignore_errors` | `:default`",
+         "Specifies whether to wait for already running handlers and what to do if they raise:",
+         quote(do: :wait | :ignore_errors | :default)}
+    ],
     {PlaywrightEx.Locator, :screenshot, 2} => [
       animations:
         {"`:disabled` | `:allow`",

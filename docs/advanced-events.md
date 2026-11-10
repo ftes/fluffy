@@ -294,9 +294,11 @@ Answers are `Fluffy.Route.fulfill/2` (status, headers, `body:`, `json:`, `path:`
 When several routes match, the last registered wins; `fallback` hands the
 request to the route registered before it, and finally to the server.
 `times:` limits how many requests a route handles, and `Fluffy.Playwright.unroute/3` removes a route
-(for a given handler or all of them for that `url`). A request already at a handler
-may go on without it, as with Playwright's `unroute`, and an answer that comes too
-late fails nothing.
+(for a given handler or all of them for that `url`). As in Playwright, it does not
+wait for handlers already running: removing the last route lets their requests go on
+to the server, so a late answer fails its handler. `Fluffy.Playwright.unroute_all/2`
+takes Playwright's `behavior:` to wait for them (`:wait`) or ignore their failures
+(`:ignore_errors`).
 Routing a document request, such as a `visit` or a link, works like any other:
 the page loads the fulfilled document and Fluffy keeps tracking it.
 

@@ -37,11 +37,15 @@ defmodule Fluffy.Route do
       Fluffy.Route.fulfill(route, response: response, status: 201)
 
   Accepts the options of `PlaywrightEx.Route.fetch/2`, such as `:url`, `:method`,
-  `:headers`, `:post_data`, `:timeout`, and raises on failure. Read the response
-  with the functions of `PlaywrightEx.APIResponse`.
+  `:headers`, `:post_data`, `:timeout`, and raises on failure. As elsewhere in
+  Fluffy, `timeout: 0` gives up at once instead of meaning no timeout. Read the
+  response with the functions of `PlaywrightEx.APIResponse`.
   """
   @spec fetch(t(), PlaywrightEx.Route.fetch_options()) :: PlaywrightEx.APIResponse.t()
-  def fetch(%__MODULE__{} = route, options \\ []), do: PlaywrightEx.Route.fetch!(route.native, options)
+  def fetch(%__MODULE__{} = route, options \\ []) do
+    # Playwright's 0 is no timeout; Fluffy's is a single check (`Fluffy.Session.timeout/2`).
+    PlaywrightEx.Route.fetch!(route.native, Keyword.replace_lazy(options, :timeout, &max(&1, 1)))
+  end
 
   @doc """
   Sends the request to the server, with no other route handling it.
