@@ -73,6 +73,7 @@ defmodule Fluffy.TestWeb.Router do
       live("/unchecked-controls", UncheckedControlsLive)
       live("/shifted-controls", ShiftedControlsLive)
       live("/patched-controls", PatchedControlsLive)
+      live("/patched-checks", PatchedChecksLive)
       live("/used-shift", UsedShiftLive)
       live("/submit-used", SubmitUsedLive)
       live("/no-content", NoContentLive)

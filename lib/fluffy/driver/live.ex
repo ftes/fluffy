@@ -329,14 +329,20 @@ defmodule Fluffy.Driver.Live do
 
     case commit_click(session, client_dom, target) do
       %Session{} = session ->
-        client_dom = Session.page_state(session).client_dom
+        clicked_dom = Session.page_state(session).client_dom
 
         # A selector such as :checked stops matching after uncheck. Follow the
         # original control across any click patch instead of resolving it again,
         # and find the view that owns it there, since the click may have moved it.
-        case find_by_identity(client_dom, identity) do
-          nil -> session
-          target -> dispatch_live_change(session, client_dom, target)
+        # The browser sends the change before the click's patch arrives, so it
+        # carries the state the click set, which that patch may have reset.
+        case find_by_identity(clicked_dom, identity) do
+          nil ->
+            session
+
+          clicked ->
+            sent_dom = ClientDOM.carry_checked(clicked_dom, clicked, client_dom, target)
+            dispatch_live_change(session, clicked_dom, clicked, sent_dom)
         end
 
       navigation ->
@@ -913,9 +919,9 @@ defmodule Fluffy.Driver.Live do
     end
   end
 
-  defp dispatch_live_change(session, client_dom, %Target{} = target) do
+  defp dispatch_live_change(session, client_dom, %Target{} = target, sent_dom \\ nil) do
     with {:ok, event_context} <- owning_view_context(session, target) do
-      push_change_event(session, client_dom, ClientDOM.change_event(client_dom, target), event_context)
+      push_change_event(session, client_dom, ClientDOM.change_event(sent_dom || client_dom, target), event_context)
     end
   end
 

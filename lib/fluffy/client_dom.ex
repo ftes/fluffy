@@ -78,7 +78,7 @@ defmodule Fluffy.ClientDOM do
                    new,
                    old_to_new,
                    patched?(old_renders, new_renders, owner_of(new_index, new.id)) and
-                     not triggered_form_control?(new, new_index)
+                     not triggered_form_control?(new, new_index) and not ignored?(new_index, new.id)
                  ) do
             locally_checked =
               if Map.get(reconciled, :checked) == true,
@@ -315,6 +315,10 @@ defmodule Fluffy.ClientDOM do
 
     {client_dom, target}
   end
+
+  @doc false
+  def carry_checked(%__MODULE__{} = client_dom, target, %__MODULE__{} = from_dom, from_target),
+    do: put_checked_target(client_dom, target, checked_target?(from_dom, from_target))
 
   def select_option(%__MODULE__{} = client_dom, %Locator{} = locator, requested) do
     target = target!(client_dom, locator)
@@ -676,18 +680,29 @@ defmodule Fluffy.ClientDOM do
     end
   end
 
+  # LiveView's client leaves an element with phx-update="ignore", and all its
+  # content, as the user left it.
+  defp ignored?(_index, nil), do: false
+
+  defp ignored?(index, id) do
+    entry = Map.fetch!(index.nodes_by_id, id)
+    attribute(entry.attributes, "phx-update") == "ignore" or ignored?(index, entry.parent_id)
+  end
+
   # `used`, values and selections deliberately carry by identity alone.
   # LiveView keeps `used` on the DOM element morphdom pairs by position, and
   # morphdom resets an unfocused control's value and selection from the render,
-  # so they survive only unchanged renders and phx-trigger-action handoff.
-  # Playwright's select_option does not focus the select. Checked and file
-  # state stand in for subtrees LiveView leaves untouched, so they only carry
-  # to the same control.
+  # so they survive only unchanged renders, phx-update="ignore" and
+  # phx-trigger-action handoff.
+  # Playwright's select_option does not focus the select. LiveView resets
+  # checked state from the rendered attribute even when the box has focus, so
+  # it too survives only those. Checked and file state stand in for subtrees
+  # LiveView leaves untouched, so they only carry to the same control.
   defp reconcile_properties(properties, old, new, old_to_new, patched?) do
     %{}
     |> preserve_property(properties, :used, true)
     |> preserve_current_value(properties, patched?)
-    |> preserve_checkedness(properties, old, new)
+    |> preserve_checkedness(properties, old, new, patched?)
     |> preserve_files(properties, old, new)
     |> preserve_selection(properties, old_to_new, patched?)
   end
@@ -711,10 +726,10 @@ defmodule Fluffy.ClientDOM do
     end
   end
 
-  defp preserve_checkedness(reconciled, properties, old, new) do
+  defp preserve_checkedness(reconciled, properties, old, new, patched?) do
     case Map.fetch(properties, :checked) do
       {:ok, checked?} ->
-        if same_control?(old, new) and
+        if not patched? and same_control?(old, new) and
              has_attribute?(old.attributes, "checked") == has_attribute?(new.attributes, "checked"),
            do: Map.put(reconciled, :checked, checked?),
            else: reconciled

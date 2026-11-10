@@ -154,6 +154,58 @@ defmodule Fluffy.Conformance.LivePatchReconcileTest do
     end
 
     @tag driver: driver
+    test "a view patch resets a checkbox and radio to their rendered state but not an ignored one with #{driver}", %{
+      driver: driver
+    } do
+      driver
+      |> start_test_session()
+      |> visit("/live/patched-checks")
+      |> check(by_label("Loose", exact: true))
+      |> check(by_label("Loose b"))
+      |> check(by_label("Ignored"))
+      |> click(by_role(:button, name: "Bump"))
+      |> expect("Count: 1" |> by_text() |> to_be_visible())
+      |> expect(to_be_checked(by_label("Loose", exact: true), checked: false))
+      |> expect(to_be_checked(by_label("Loose a")))
+      |> expect(to_be_checked(by_label("Ignored")))
+    end
+
+    # Even with focus, LiveView resets a checkbox or radio to its rendered state.
+    # These click: Playwright's check fails when the patch beats its own check
+    # of the new state, as it does in Firefox.
+    @tag driver: driver
+    test "a checkbox's own phx-change patch resets it to its rendered state with #{driver}", %{driver: driver} do
+      driver
+      |> start_test_session()
+      |> visit("/live/patched-checks")
+      |> click(by_label("Tracked"))
+      |> expect("Changes: 1" |> by_text() |> to_be_visible())
+      |> expect(to_be_checked(by_label("Tracked"), checked: false))
+    end
+
+    @tag driver: driver
+    test "a checkbox's phx-click patch resets it though its phx-change renders nothing with #{driver}", %{
+      driver: driver
+    } do
+      driver
+      |> start_test_session()
+      |> visit("/live/patched-checks")
+      |> click(by_label("Clicked"))
+      |> expect("Count: 1" |> by_text() |> to_be_visible())
+      |> expect(to_be_checked(by_label("Clicked"), checked: false))
+    end
+
+    @tag driver: driver
+    test "a radio's own phx-change patch resets its group to the rendered choice with #{driver}", %{driver: driver} do
+      driver
+      |> start_test_session()
+      |> visit("/live/patched-checks")
+      |> click(by_label("Pick b"))
+      |> expect("Changes: 1" |> by_text() |> to_be_visible())
+      |> expect(to_be_checked(by_label("Pick a")))
+    end
+
+    @tag driver: driver
     test "a title update keeps a select's choice with #{driver}", %{driver: driver} do
       driver
       |> start_test_session()

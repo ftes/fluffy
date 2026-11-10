@@ -129,26 +129,21 @@ defmodule Fluffy.Conformance.CheckedLocatorTest do
     end
 
     @tag driver: driver
-    test "unchanged checked attributes during a LiveView patch have backend-specific reconciliation with #{driver}", %{
+    test "a LiveView patch resets a checkbox whose checked attribute is unchanged with #{driver}", %{
       driver: driver
     } do
       topic = "checked-controls-#{System.unique_integer([:positive])}"
       field = by_label("Enabled")
 
-      # Phoenix preserves a local checked property when its rendered attribute
-      # has not changed. The browser's patcher can restore the server default.
-      expected = driver == :phoenix
-
       driver
       |> start_test_session()
       |> visit("/live/checked-controls?topic=#{topic}")
       |> check(field)
-      |> then(fn session -> if driver == :playwright, do: blur(session, field), else: session end)
       |> expect("#enabled:checked" |> by_css() |> to_have_count(1))
       |> tap(fn _session -> Phoenix.PubSub.broadcast(Fluffy.TestPubSub, topic, :choose_blue) end)
       |> expect("Revision 1" |> by_text(exact: true) |> to_be_visible())
-      |> expect(to_be_checked(field, checked: expected))
-      |> expect("#enabled:checked" |> by_css() |> to_have_count(if(expected, do: 1, else: 0)))
+      |> expect(to_be_checked(field, checked: false))
+      |> expect("#enabled:checked" |> by_css() |> to_have_count(0))
     end
   end
 
