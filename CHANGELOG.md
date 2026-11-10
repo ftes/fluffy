@@ -13,6 +13,7 @@
 - Browser launch uses Playwright's default timeout of 3 minutes instead of the global `timeout:`; set `launch_options: [timeout: ...]` to change it.
 - `select_option` raises `ArgumentError` for a list that mixes values or labels with option maps, on every driver. Playwright types a list by its first element, so such a list was never valid there.
 - On Playwright, `open_browser` and `Fluffy.Download.read/2` and `save_as/2` raise `Fluffy.OperationError` with PlaywrightEx's exception as its `cause`, as actions do.
+- Playwright `submit` waits like a Playwright action: for the navigation it starts to commit or fail, rather than following its redirects to the final response itself. A submit that times out, such as one a Content-Security-Policy `form-action` blocks, reports Playwright's navigation timeout.
 
 ### Fixed
 

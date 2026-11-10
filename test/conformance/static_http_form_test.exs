@@ -637,7 +637,10 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
         {"a new-window target", ~s(<form id="note" method="post" action="save" target="_blank"></form>)},
         {"a named window target", ~s(<form id="note" method="post" action="save" target="elsewhere"></form>)},
         {"dialog method", ~s(<dialog open><form id="note" method="dialog"></form></dialog>)},
-        {"a cancelled submit event", ~s[<form id="note" action="save" onsubmit="event.preventDefault()"></form>]}
+        {"a cancelled submit event", ~s[<form id="note" action="save" onsubmit="event.preventDefault()"></form>]},
+        {"a submit handler returning false", ~s[<form id="note" action="save" onsubmit="return false"></form>]},
+        {"a submit handler removing the form", ~s[<form id="note" action="save" onsubmit="this.remove()"></form>]},
+        {"a javascript: action", ~s[<form id="note" action="javascript:void 0"></form>]}
       ] do
     @tag driver: :playwright
     test "Playwright submit with #{name} does not wait for a page navigation" do
@@ -722,7 +725,10 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
 
   @tag driver: :playwright
   @tag :capture_log
-  test "Playwright submit names the navigation request it waited for when the browser sends none" do
+  # The browser blocks the navigation after the submit event and only reports it
+  # to the page later, so submit waits for it like for any other. A Playwright
+  # click waits too on Chromium, which reports the navigation before blocking it.
+  test "Playwright submit times out when the browser blocks the form's navigation" do
     body = """
     <!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="form-action 'none'"></head>
     <body><form id="note" method="post" action="save"></form></body></html>
@@ -731,16 +737,14 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
     fixture = TestHTTPFixtures.register(%{body: body})
     session = :playwright |> start_test_session() |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
 
-    assert_raise Fluffy.OperationError,
-                 ~r/Timeout 2000ms exceeded while waiting for the submitted form's navigation request/,
-                 fn ->
-                   submit(session, by_css("#note"), timeout: 2_000)
-                 end
+    assert_raise Fluffy.OperationError, ~r/Timeout 2000ms exceeded/, fn ->
+      submit(session, by_css("#note"), timeout: 2_000)
+    end
   end
 
   @tag driver: :playwright
   @tag :capture_log
-  test "Playwright submit names its timeout when the server does not answer in time" do
+  test "Playwright submit times out when the server does not answer in time" do
     test_pid = self()
 
     slow = fn _request ->
@@ -756,7 +760,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
 
     session = :playwright |> start_test_session() |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
 
-    assert_raise Fluffy.OperationError, ~r/Timeout 2000ms exceeded while waiting for the form submission response/, fn ->
+    assert_raise Fluffy.OperationError, ~r/Timeout 2000ms exceeded/, fn ->
       submit(session, by_css("#note"), timeout: 2_000)
     end
 
