@@ -49,8 +49,8 @@ sessions ignore it and use the `timeout` under `config :fluffy, playwright:` (de
 `15_000`), also overridden by `Fluffy.start_session/2`.
 
 An operation's `timeout: 0` checks once, unlike Playwright, where `0` disables the timeout.
-Playwright assertions check once too; other Playwright operations get 1ms, which rarely
-suffices.
+Playwright assertions check once too, but Playwright actions and waits reject 0 with an
+`ArgumentError`, as they cannot check once; pass a positive timeout.
 
 A Playwright timeout under a second limits the operation only. Fluffy's own reads of the page
 around it still get a full second, so a page whose main thread is blocked takes a second to

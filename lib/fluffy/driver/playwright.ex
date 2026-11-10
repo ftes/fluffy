@@ -400,7 +400,7 @@ defmodule Fluffy.Driver.Playwright do
   end
 
   defp read(session, operation, target, options, fun) do
-    case navigation_aware_action(session, Session.timeout(session, options), fun) do
+    case navigation_aware_action(session, operation_timeout!(session, operation, options), fun) do
       {:ok, value, outcome} -> {:return, value, outcome}
       {:error, error} -> OperationFailure.raise_playwright!(operation, target, error)
     end
@@ -526,12 +526,25 @@ defmodule Fluffy.Driver.Playwright do
   end
 
   defp action(session, operation, target, options, fun) do
-    timeout = Session.timeout(session, options)
+    timeout = operation_timeout!(session, operation, options)
 
     case navigation_aware_action(session, timeout, &result(fun.(&1))) do
       {:ok, _value, outcome} -> outcome
       {:error, error} -> OperationFailure.raise_playwright!(operation, target, error)
     end
+  end
+
+  # Fluffy's `timeout: 0` checks once. An expectation can: Playwright makes one
+  # check before its timeout applies. An action, wait or locator read cannot, and
+  # would time out at 1ms, so it rejects 0 before reaching the browser.
+  defp operation_timeout!(session, operation, options) do
+    if Keyword.get(options, :timeout) == 0 do
+      raise ArgumentError,
+            "#{operation}: timeout: 0 means check once, which Playwright actions and waits can't do; " <>
+              "pass a positive timeout"
+    end
+
+    Session.timeout(session, options)
   end
 
   defp result(:ok), do: {:ok, :ok}

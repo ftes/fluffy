@@ -4,6 +4,7 @@
 
 ### Changed
 
+- On Playwright, actions, locator waits, `wait_for_function` and `wait_for_load_state` raise `ArgumentError` for `timeout: 0` instead of timing out after 1ms. Fluffy's `timeout: 0` checks once, which they cannot do; assertions still accept it, and Phoenix actions still make one attempt.
 - On Firefox, an action that closes its own page, such as a popup's `window.close()`, raises `Fluffy.OperationError` again, as it does in Playwright, which tracks it as a Firefox bug. Other browsers are unchanged.
 - Playwright `check` and `uncheck` behave as in Playwright again: they fail with "Clicking the checkbox did not change its state" when page code, such as a LiveView patch answering the click, reverts the box before Playwright reads it back. That happens mostly in Firefox and WebKit, for a box whose new state the server does not render. Phoenix is unchanged: it has no page code to revert the click, so it still succeeds there.
 - On Playwright, `visit`, `reload`, `go_back`, `go_forward`, clock calls and the page handling around an `unwrap` callback raise `Fluffy.OperationError` with PlaywrightEx's exception as its `cause`, as actions do. The callback's own errors pass through.

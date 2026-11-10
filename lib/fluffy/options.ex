@@ -8,8 +8,8 @@ defmodule Fluffy.Options do
       type: :non_neg_integer,
       doc:
         "Maximum time in milliseconds to wait for the operation. Defaults to the session's `timeout:`. " <>
-          "`0` checks once, unlike Playwright, where `0` disables the timeout. On Playwright, assertions " <>
-          "check once too; other operations get 1ms, which rarely suffices. " <>
+          "`0` checks once, unlike Playwright, where `0` disables the timeout. Playwright actions and waits " <>
+          "reject `0` with an `ArgumentError`, as they cannot check once; Playwright assertions accept it. " <>
           "Playwright browser bookkeeping and navigation synchronization use the session timeout separately, " <>
           "and at least 1 second."
     ]
