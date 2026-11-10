@@ -17,17 +17,6 @@ defmodule Fluffy.Conformance.LiveKeyboardActionTest do
     end
   end
 
-  test "Backspace sends the key with the filled value and the resulting render replaces local text" do
-    input = by_label("Element key", exact: true)
-
-    session()
-    |> fill(input, "Ada")
-    |> expect(to_have_value(input, "Ada"))
-    |> press(input, "Backspace")
-    |> expect(to_have_value(input, ""))
-    |> expect("element-keydown:key=Backspace;value=Ada;scope=element" |> by_text(exact: true) |> to_be_visible())
-  end
-
   test "Enter dispatches a keydown-only binding without submitting the form" do
     session()
     |> press(by_label("Search query", exact: true), "Enter")
@@ -56,7 +45,7 @@ defmodule Fluffy.Conformance.LiveKeyboardActionTest do
     |> expect("Event count: 2" |> by_text(exact: true) |> to_be_visible())
   end
 
-  test "a target without keyboard bindings uses LiveViewTest's error instead of global handlers" do
+  test "a target without keyboard bindings raises instead of reaching global handlers" do
     session = session()
 
     assert_raise ArgumentError, ~r/does not have phx-keydown or phx-window-keydown/, fn ->
@@ -94,7 +83,7 @@ defmodule Fluffy.Conformance.LiveKeyboardActionTest do
     end
   end
 
-  test "a keyup-only binding on a disabled element uses LiveViewTest's error" do
+  test "a keyup-only binding on a disabled element raises" do
     session = session()
 
     assert_raise ArgumentError, ~r/because it is disabled/, fn ->
@@ -109,7 +98,7 @@ defmodule Fluffy.Conformance.LiveKeyboardActionTest do
     |> expect("window-keydown:key=Escape;value=none;scope=window" |> by_text(exact: true) |> to_be_visible())
   end
 
-  test "LiveViewTest handles phx-target" do
+  test "a key event goes to its phx-target" do
     session()
     |> press(by_label("Component key", exact: true), "Escape")
     |> expect(

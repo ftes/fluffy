@@ -189,7 +189,8 @@ not restore form defaults or clear file selections. LiveView reset buttons with
 A LiveView click on an element with its own `phx-click` sends the event and
 then takes the element's default action, as a browser does: a submit button
 submits its form and a link is followed. Only `href="#"` and LiveView links
-prevent it. `Phoenix.LiveViewTest.render_click/2` sends only the event.
+prevent it. The form is submitted as the click found it, before the event's
+render. `Phoenix.LiveViewTest.render_click/2` sends only the event.
 
 File selection supports bounded local paths and typed in-memory payloads,
 ordered multiple selection, clearing, and ordinary multipart forms, including
