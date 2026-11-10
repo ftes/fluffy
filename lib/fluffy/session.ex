@@ -41,8 +41,8 @@ defmodule Fluffy.Session do
     session
   end
 
-  # An operation's `timeout:`, else the session's. A Playwright timeout of 0
-  # waits forever; Fluffy's gives up at once.
+  # An operation's `timeout:`, else the session's. Fluffy's 0 checks once;
+  # PlaywrightEx's waits forever, so it never gets 0.
   @doc false
   def timeout(session, options \\ []), do: max(Keyword.get(options, :timeout) || context(session).timeout, 1)
 

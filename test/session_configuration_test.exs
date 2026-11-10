@@ -97,6 +97,16 @@ defmodule Fluffy.SessionConfigurationTest do
     end
   end
 
+  test "a configured Phoenix timeout must be positive, as an operation's 0 checks once" do
+    original = Application.get_env(:fluffy, :timeout)
+    on_exit(fn -> restore_env(:timeout, original) end)
+    Application.put_env(:fluffy, :timeout, 0)
+
+    assert_raise ArgumentError, ~r/config :fluffy, timeout: to be a positive integer, got: 0/, fn ->
+      start_session(:phoenix, endpoint: Endpoint)
+    end
+  end
+
   test "rejects unknown common session options" do
     assert_raise NimbleOptions.ValidationError, ~r/unknown options.*:mystery/, fn ->
       start_session(:phoenix, endpoint: Endpoint, mystery: true)
