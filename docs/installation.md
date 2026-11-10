@@ -31,7 +31,9 @@ config :my_app, MyAppWeb.Endpoint, server: true, check_origin: false
 
 The server is required for Playwright tests. The browser opens the listener's
 address, such as `127.0.0.1`, which a stock `localhost` endpoint URL does not
-match, so `check_origin: false` lets the LiveView socket connect. If Playwright
+match, so `check_origin: false` lets the LiveView socket connect. By default Phoenix
+checks only the origin's host against the endpoint's `url` host, so an endpoint
+with `url: [host: "127.0.0.1"]` needs no `check_origin: false`. If Playwright
 targets an application hosted elsewhere, configure
 `config :fluffy, base_url: "..."` instead. Explicit `endpoint:` and `base_url:`
 session options override the global values for multi-endpoint or dynamic-server
@@ -79,6 +81,8 @@ MIX_ENV=test mix playwright_ex.install -- chromium
 ```
 
 The task needs `MIX_ENV=test` because PlaywrightEx comes in only through the test-only `:fluffy` dependency.
+On Linux CI runners, add `--with-deps` to install the browser's system packages too:
+`MIX_ENV=test mix playwright_ex.install -- chromium --with-deps`.
 
 Configure the backend in `config/test.exs`:
 
@@ -95,8 +99,8 @@ config :fluffy,
   ]
 ```
 
-`executable` optionally points at another Playwright 1.65 driver; by default the
-pinned driver is used.
+`executable` optionally points at a Playwright 1.65 CLI such as
+`node_modules/.bin/playwright`, not `cli.js`; by default the pinned driver is used.
 
 `launch_options` are passed to `PlaywrightEx.BrowserType.launch/2` unchanged. Set
 `launch_options: [timeout: 10_000]` to limit browser launch; otherwise Playwright's
@@ -126,6 +130,23 @@ others keep running. ExUnit `max_cases` remains the concurrency bound; lower it
 when browser startup or the host becomes resource-constrained. Firefox dispatches
 input for all of a browser's pages in one queue and times out under load, so set
 `pool_size` to about half the logical cores for Firefox suites.
+
+## Test-only tasks
+
+Fluffy and PlaywrightEx exist only in the test environment, so Mix sees their tasks and
+usage rules only there. `mix usage_rules.sync` reads the current environment's
+dependencies, and only the ones `mix.exs` lists itself. To sync the rules both packages
+ship, list PlaywrightEx too, add `usage_rules` to `:test`, and run the task, like any
+alias that wraps `playwright_ex.install`, in that environment:
+
+```elixir
+{:playwright_ex, "~> 0.17.0-rc.4", only: :test},
+{:usage_rules, "~> 1.3", only: [:dev, :test], runtime: false}
+
+def cli do
+  [preferred_envs: ["usage_rules.sync": :test]]
+end
+```
 
 ## Ecto sandbox
 
