@@ -107,9 +107,11 @@ require Playwright; with `import Fluffy.Playwright`, call `focus` and `blur` dir
 Static and LiveView track current input properties but neither track nor simulate focus.
 
 On a changed LiveView render, local text values adopt the rendered value,
-except during `phx-trigger-action` handoff. Unchanged document renders preserve
-local values. Changes are detected across the document, not per control, so an
-unrelated update can discard local text. Checkbox/radio state survives while the
+except during `phx-trigger-action` handoff. As in LiveView's client, a change
+counts per LiveView and LiveComponent, not per control: an update to one resets
+local text anywhere in it, including its portal content, but not in other views,
+unchanged components or the root layout, so a title update resets nothing.
+Checkbox/radio state survives while the
 rendered `checked` attribute is unchanged and the matched control keeps its type,
 name, and value; a radio the server renders as newly checked clears its group.
 Selected options survive while the select name and option signature are

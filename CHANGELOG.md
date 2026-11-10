@@ -37,6 +37,7 @@
 - `click` and `press` on Phoenix send a form control's current `value`, such as one `fill` left, instead of its server-rendered `value` attribute, and an empty one as `""`, as LiveView's client does.
 - `click` and `press` on Phoenix send a `JS.push` with its own `target:` only to that target, as LiveView's client does, not also to the element's `phx-target`, and no longer fail with LiveViewTest's "to return a single element" for some elements inside the LiveView.
 - On Phoenix, an upload entry the view cancels is no longer uploaded on submit, whatever event cancelled it: as in LiveView's client, entries leave once the input's `data-phx-active-refs` drops them, not only after a click with their `phx-value-ref`.
+- On Phoenix, a LiveView render resets local text only in the views and components whose rendering changed, as LiveView's client patches them; before, any change, even to the page title, reset it everywhere.
 
 ## 0.9.0-rc.1 — 2026-11-09
 
