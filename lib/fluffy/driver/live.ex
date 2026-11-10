@@ -130,30 +130,46 @@ defmodule Fluffy.Driver.Live do
             commit_default_click(session, client_dom, target, event_context)
 
           action ->
-            if binding.id == target.id or live_link?(binding) do
-              commit_click_binding(session, client_dom, binding, event_context, action)
-            else
-              commit_ancestor_click(session, client_dom, binding, target, event_context, action)
-            end
+            commit_click_then_default(session, client_dom, binding, target, event_context, action)
         end
     end
   end
 
-  # The click event reaches the ancestor's binding before the target's own
-  # default action, such as submitting its form, takes place.
-  defp commit_ancestor_click(session, client_dom, binding, target, event_context, action) do
-    identity = node_identity(client_dom, target)
+  # The click event reaches the binding before the target's default action,
+  # such as submitting its form, takes place. LiveView's client prevents that
+  # action only for a LiveView link or href="#", so a browser also submits a
+  # submit button's form or follows a link after its own phx-click, which
+  # render_click does not. The browser settles on the action before the server
+  # replies, so a click without one sends only the event.
+  defp commit_click_then_default(session, client_dom, binding, target, event_context, action) do
+    default_target =
+      if not live_link?(binding) and attribute(binding.attributes, "href") != "#",
+        do: default_action_target(client_dom, target)
 
-    with %Session{} = session <- commit_click_binding(session, client_dom, binding, event_context, action) do
-      client_dom = Session.page_state(session).client_dom
+    if default_target do
+      identity = node_identity(client_dom, default_target)
 
-      with %Target{} = target <- find_by_identity(client_dom, identity),
-           {:ok, event_context} <- owning_view_context(session, target) do
-        commit_default_click(session, client_dom, target, event_context)
-      else
-        nil -> session
-        redirected -> redirected
+      with %Session{} = session <- commit_click_binding(session, client_dom, binding, event_context, action) do
+        client_dom = Session.page_state(session).client_dom
+
+        with %Target{} = target <- find_by_identity(client_dom, identity),
+             {:ok, event_context} <- owning_view_context(session, target) do
+          commit_default_click(session, client_dom, target, event_context)
+        else
+          nil -> session
+          redirected -> redirected
+        end
       end
+    else
+      commit_click_binding(session, client_dom, binding, event_context, action)
+    end
+  end
+
+  defp default_action_target(client_dom, target) do
+    case ClientDOM.activation_target(client_dom, target) do
+      nil -> nil
+      %{tag: tag} = link when tag in ["a", "area"] -> link
+      submitter -> if ClientDOM.form_submission(client_dom, submitter, :live), do: submitter
     end
   end
 

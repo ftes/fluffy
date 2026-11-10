@@ -186,6 +186,11 @@ Native reset-button behavior requires Playwright. Static and LiveView clicks do
 not restore form defaults or clear file selections. LiveView reset buttons with
 `phx-click` still dispatch their server event.
 
+A LiveView click on an element with its own `phx-click` sends the event and
+then takes the element's default action, as a browser does: a submit button
+submits its form and a link is followed. Only `href="#"` and LiveView links
+prevent it. `Phoenix.LiveViewTest.render_click/2` sends only the event.
+
 File selection supports bounded local paths and typed in-memory payloads,
 ordered multiple selection, clearing, and ordinary multipart forms, including
 empty-file entries. Managed LiveView uploads support validation, progress,
