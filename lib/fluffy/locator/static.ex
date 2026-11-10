@@ -34,6 +34,9 @@ defmodule Fluffy.Locator.Static do
       {:label, text, options}, candidates ->
         label_matches(candidates, aria, text, options)
 
+      {:text, text, options}, candidates ->
+        text_matches(candidates, aria, text, Keyword.get(options, :exact, false))
+
       {:filter, options}, candidates ->
         filter_candidates(candidates, aria, options)
 
@@ -68,22 +71,6 @@ defmodule Fluffy.Locator.Static do
     query_scopes(scopes, selector)
   end
 
-  defp apply_operation({:text, text, options}, scopes) do
-    exact? = Keyword.get(options, :exact, false)
-
-    candidates =
-      scopes
-      |> query_scopes("*")
-      |> Enum.filter(&element_text_matches?(&1, text, exact?))
-
-    Enum.reject(candidates, fn candidate ->
-      candidate
-      |> LazyHTML.query("*")
-      |> Enum.drop(1)
-      |> Enum.any?(&element_text_matches?(&1, text, exact?))
-    end)
-  end
-
   defp apply_operation({:attribute, attribute_name, text, options}, scopes) do
     exact? = Keyword.get(options, :exact, false)
 
@@ -112,8 +99,8 @@ defmodule Fluffy.Locator.Static do
   defp filter_candidates(candidates, aria, options) do
     Enum.filter(candidates, fn candidate ->
       Enum.all?(options, fn
-        {:has_text, text} -> text_matches?(LazyHTML.text(candidate), text, Keyword.get(options, :exact, false))
-        {:has_not_text, text} -> not text_matches?(LazyHTML.text(candidate), text, Keyword.get(options, :exact, false))
+        {:has_text, text} -> text_matches?(text(aria, candidate), text, Keyword.get(options, :exact, false))
+        {:has_not_text, text} -> not text_matches?(text(aria, candidate), text, Keyword.get(options, :exact, false))
         {:visible, visible?} -> structurally_visible?(aria, candidate) == visible?
         {:exact, _exact?} -> true
         {:has, %Locator{} = child} -> resolve(aria, candidate, child) != []
@@ -136,12 +123,31 @@ defmodule Fluffy.Locator.Static do
     |> Enum.map(fn {_node, element} -> element end)
   end
 
+  # Playwright's text engine also matches the scope itself, and keeps the deepest
+  # matches: those without a matching descendant. Ids are preorder, so a match's
+  # descendants are the matches up to its last_id.
+  defp text_matches(scopes, aria, text, exact?) do
+    scopes
+    |> Enum.flat_map(&self_and_scoped_nodes(aria, &1))
+    |> Enum.uniq_by(fn {node, _element} -> node.id end)
+    |> Enum.sort_by(fn {node, _element} -> node.id end)
+    |> Enum.filter(fn {node, _element} -> node_text_matches?(node, text, exact?) end)
+    |> Enum.chunk_every(2, 1)
+    |> Enum.flat_map(fn
+      [{%{last_id: last_id}, _element}, {%{id: next_id}, _next}] when next_id <= last_id -> []
+      [{_node, element} | _next] -> [element]
+    end)
+  end
+
+  defp self_and_scoped_nodes(%Aria{index: %{document: document}} = aria, document), do: Aria.scoped_nodes(aria, document)
+  defp self_and_scoped_nodes(aria, scope), do: [{Aria.node_for(aria, scope), scope} | Aria.scoped_nodes(aria, scope)]
+
   # A label or an aria-labelledby reference may be anywhere in the document; only
   # the control has to be inside the scope.
   defp label_matches(scopes, aria, text, options) do
     labelled =
       aria.index.document
-      |> labelled_controls(text, Keyword.get(options, :exact, false))
+      |> labelled_controls(aria, text, Keyword.get(options, :exact, false))
       |> MapSet.new(&Aria.node_for(aria, &1).id)
 
     scopes
@@ -169,13 +175,13 @@ defmodule Fluffy.Locator.Static do
     |> Enum.uniq()
   end
 
-  defp labelled_controls(scope, expected, exact?) do
+  defp labelled_controls(scope, aria, expected, exact?) do
     controls = query_scopes([scope], @labelled_control_selector)
 
     html_labelled =
       scope
       |> LazyHTML.query("label")
-      |> Enum.filter(&text_matches?(LazyHTML.text(&1), expected, exact?))
+      |> Enum.filter(&text_matches?(text(aria, &1), expected, exact?))
       |> Enum.flat_map(fn label ->
         case element_attribute(label, "for") do
           nil ->
@@ -196,7 +202,7 @@ defmodule Fluffy.Locator.Static do
       |> Enum.filter(fn control ->
         case element_attribute(control, "aria-labelledby") do
           nil -> direct_label_matches?(control, expected, exact?)
-          _references -> referenced_label_matches?(scope, control, expected, exact?)
+          _references -> referenced_label_matches?(scope, aria, control, expected, exact?)
         end
       end)
 
@@ -222,7 +228,7 @@ defmodule Fluffy.Locator.Static do
       element_attribute(control, "aria-label") != nil
   end
 
-  defp referenced_label_matches?(scope, control, expected, exact?) do
+  defp referenced_label_matches?(scope, aria, control, expected, exact?) do
     case element_attribute(control, "aria-labelledby") do
       nil ->
         false
@@ -234,46 +240,20 @@ defmodule Fluffy.Locator.Static do
         |> LazyHTML.query("[id]")
         |> Enum.any?(fn reference ->
           element_attribute(reference, "id") in references and
-            text_matches?(LazyHTML.text(reference), expected, exact?)
+            text_matches?(text(aria, reference), expected, exact?)
         end)
     end
   end
 
-  defp element_text_matches?(element, expected, exact?) do
-    case element_tag_and_attributes(element) do
-      {tag, _attributes} when tag in ["script", "style", "noscript"] ->
-        false
+  defp node_text_matches?(%{tag: tag}, _expected, _exact?) when tag in ~w(script style noscript), do: false
+  defp node_text_matches?(node, expected, exact?), do: text_matches?(Semantics.text(node), expected, exact?)
 
-      {"input", attributes} ->
-        if attribute(attributes, "type") in ["button", "submit"] do
-          text_matches?(attribute(attributes, "value") || "", expected, exact?)
-        else
-          false
-        end
-
-      {_tag, _attributes} ->
-        text_matches?(LazyHTML.text(element), expected, exact?)
-    end
-  end
-
-  defp element_tag_and_attributes(element) do
-    case LazyHTML.to_tree(element) do
-      [{tag, attributes, _children}] -> {tag, attributes}
-      _other -> {nil, []}
-    end
-  end
+  defp text(aria, element), do: Semantics.text(Aria.node_for(aria, element))
 
   defp element_attribute(element, name) do
     case LazyHTML.attribute(element, name) do
       [value] -> value
       [] -> nil
-    end
-  end
-
-  defp attribute(attributes, name) do
-    case List.keyfind(attributes, name, 0) do
-      {^name, value} -> value
-      nil -> nil
     end
   end
 

@@ -8,9 +8,6 @@ defmodule Fluffy.ClientDOM.Expectation do
   alias Fluffy.Locator.Static
   alias Fluffy.URLMatcher
 
-  # Elements whose content Playwright's text matching skips.
-  @not_matched ~w(script noscript style)
-
   # Evaluate one DOM snapshot. Drivers own retries, negation, and diagnostics.
   def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :count, expected: expected}) do
     actual = client_dom |> ClientDOM.resolve(locator) |> length()
@@ -40,7 +37,7 @@ defmodule Fluffy.ClientDOM.Expectation do
         {actual == "", actual}
 
       target ->
-        actual = element_text(target)
+        actual = Semantics.text(target)
         {String.trim(actual) == "", actual}
     end)
   end
@@ -119,13 +116,13 @@ defmodule Fluffy.ClientDOM.Expectation do
   end
 
   defp evaluate_text(client_dom, locator, _expectation, expected, match, exact_length?) when is_list(expected) do
-    actual = client_dom |> ClientDOM.targets(locator) |> Enum.map(&element_text/1)
+    actual = client_dom |> ClientDOM.targets(locator) |> Enum.map(&Semantics.text/1)
     {matches_in_order?(expected, actual, match, exact_length?), actual}
   end
 
   defp evaluate_text(client_dom, locator, expectation, expected, match, _exact_length?) do
     with_element(client_dom, locator, expectation, fn target ->
-      actual = element_text(target)
+      actual = Semantics.text(target)
       {match.(expected, actual), actual}
     end)
   end
@@ -206,18 +203,4 @@ defmodule Fluffy.ClientDOM.Expectation do
   end
 
   defp class_attribute(target), do: Semantics.attribute(target.attributes, "class") || ""
-
-  defp element_text(target), do: matched_text({target.tag, target.attributes, target.children})
-
-  defp matched_text({tag, _attributes, _children}) when tag in @not_matched, do: ""
-  defp matched_text({"template", _attributes, _children}), do: ""
-
-  defp matched_text({"input", attributes, _children}) do
-    type = String.downcase(Semantics.attribute(attributes, "type") || "")
-    if type in ~w(submit button reset), do: Semantics.attribute(attributes, "value") || "", else: ""
-  end
-
-  defp matched_text({_tag, _attributes, children}), do: Enum.map_join(children, &matched_text/1)
-  defp matched_text(text) when is_binary(text), do: text
-  defp matched_text(_comment), do: ""
 end

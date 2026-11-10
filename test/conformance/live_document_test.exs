@@ -74,6 +74,17 @@ defmodule Fluffy.Conformance.LiveDocumentTest do
     end
 
     @tag driver: driver
+    test "matches portal content only where it is teleported with #{driver}", %{driver: driver} do
+      driver
+      |> kennel_session()
+      |> visit("/live/kennel")
+      |> expect("Treats: 0" |> by_text() |> to_have_count(1))
+      |> expect("Bones: 0" |> by_text() |> to_have_count(1))
+      |> expect("main" |> by_css() |> filter(has_text: "Treats") |> to_have_count(0))
+      |> expect(:button |> by_role(name: "Give treat") |> to_have_count(1))
+    end
+
+    @tag driver: driver
     test "sends the element's current value with both phases of a key press in portal content with #{driver}", %{
       driver: driver
     } do

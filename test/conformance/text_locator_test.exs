@@ -14,6 +14,8 @@ defmodule Fluffy.Conformance.TextLocatorTest do
     {"can match a parent including descendant text", "<div>Outer <span>Inner</span></div>", "Outer Inner", [exact: true],
      1},
     {"uses button input values as text", ~s(<input type="submit" value="Log in">), "Log in", [], 1},
+    {"leaves script and style text out of an element's text", "<p>Hi<script>x = 1</script><style>b {}</style></p>", "Hi",
+     [exact: true], 1},
     {"escapes quotes in selector values", "<p>Say &quot;hello&quot;</p>", ~s(Say "hello"), [exact: true], 1},
     {"escapes backslashes in selector values", ~S(<p>Use C:\temp</p>), ~S(Use C:\temp), [exact: true], 1}
   ]
