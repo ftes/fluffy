@@ -443,7 +443,7 @@ defmodule Fluffy.Driver.Live do
     {passed?, actual} = ClientDOM.Expectation.evaluate(client_dom(session), expectation)
 
     actual =
-      if expectation.kind == :visible and actual == 0, do: normalize(LazyHTML.text(document(session))), else: actual
+      if expectation.kind == :visible and actual == 0, do: document_text(session), else: actual
 
     {:ok, passed?, actual}
   end
@@ -465,6 +465,12 @@ defmodule Fluffy.Driver.Live do
 
   defp client_dom(session), do: session |> Session.page_state() |> Map.fetch!(:client_dom)
   defp document(session), do: session |> client_dom() |> Map.fetch!(:document)
+
+  # The page's text as Playwright reads it, without <template> content.
+  defp document_text(session) do
+    {:ok, root} = session |> client_dom() |> ClientDOM.index() |> DocumentIndex.fetch_by_id(0)
+    root |> Semantics.text() |> normalize()
+  end
 
   defp resolve_live_action(session, locator, deadline, action) do
     case Retry.run_current(
