@@ -7,6 +7,19 @@ defmodule Fluffy.Conformance.SelectOptionActionTest do
 
   for driver <- [:static, :playwright] do
     @tag driver: driver
+    test "select_option with an empty list deselects every option of a multiple select with #{driver}" do
+      html =
+        ~s(<select aria-label="Colours" multiple><option selected>red</option><option selected>green</option></select>)
+
+      field = by_label("Colours")
+
+      unquote(driver)
+      |> session_for_html(html)
+      |> select_option(field, [])
+      |> expect(to_have_values(field, []))
+    end
+
+    @tag driver: driver
     test "select_option converts scalar and explicit option values with #{driver}" do
       session =
         session_for_html(unquote(driver), """

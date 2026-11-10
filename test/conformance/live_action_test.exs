@@ -218,6 +218,46 @@ defmodule Fluffy.Conformance.LiveActionTest do
       |> expect(to_have_text(log, ~r/ click:m click:yes notify-change:yes$/))
       |> expect(to_be_checked(notify))
     end
+
+    @tag driver: driver
+    test "a click reaches the closest phx-click, and an inner binding wins, with #{driver}", %{driver: driver} do
+      log = by_css("#log")
+
+      driver
+      |> live_session()
+      |> visit("/live/click-bindings")
+      |> click(by_text("Alpha", exact: true))
+      |> expect(to_have_text(log, "Log: select:alpha"))
+      |> click(by_role(:button, name: "Remove beta", exact: true))
+      |> expect(to_have_text(log, "Log: select:alpha remove:beta"))
+      |> click(by_text("Gamma", exact: true))
+      |> expect(to_have_text(log, "Log: select:alpha remove:beta component-pick:gamma"))
+      # The submit button has no binding of its own: the click reaches the
+      # outer phx-click, then the button submits its form.
+      |> click(by_role(:button, name: "Save", exact: true))
+      |> expect(to_have_text(log, "Log: select:alpha remove:beta component-pick:gamma outer save"))
+    end
+
+    @tag driver: driver
+    test "unchecked checkboxes and deselected options leave the form payload with #{driver}", %{driver: driver} do
+      last = by_css("#last")
+
+      driver
+      |> live_session()
+      |> visit("/live/unchecked-controls")
+      |> uncheck(by_label("Tag a", exact: true))
+      |> expect(to_have_text(last, "Last: change tag_ids=b bare=on solo=on colours=red,green"))
+      |> click(by_label("Tag b", exact: true))
+      |> expect(to_have_text(last, "Last: change tag_ids=- bare=on solo=on colours=red,green"))
+      |> uncheck(by_label("Bare", exact: true))
+      |> expect(to_have_text(last, "Last: change tag_ids=- bare=- solo=on colours=red,green"))
+      |> uncheck(by_label("Solo", exact: true))
+      |> expect(to_have_text(last, "Last: solo tag_ids=- bare=- solo=- colours=-"))
+      |> select_option(by_label("Colours", exact: true), [])
+      |> expect(to_have_text(last, "Last: change tag_ids=- bare=- solo=- colours=-"))
+      |> click(by_role(:button, name: "Save", exact: true))
+      |> expect(to_have_text(last, "Last: save tag_ids=- bare=- solo=- colours=-"))
+    end
   end
 
   defp live_session(driver) do

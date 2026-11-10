@@ -19,6 +19,7 @@ defmodule Fluffy.Driver.Live do
   alias Fluffy.Form
   alias Fluffy.HTML.DocumentIndex
   alias Fluffy.HTML.Semantics
+  alias Fluffy.HTML.Target
   alias Fluffy.Internal.Navigation
   alias Fluffy.Internal.Navigation.Redirect
   alias Fluffy.LiveViewTest.UploadCompat
@@ -119,51 +120,112 @@ defmodule Fluffy.Driver.Live do
   end
 
   defp commit_plain_click(session, client_dom, target, event_context) do
+    case click_binding(client_dom, target) do
+      nil ->
+        commit_default_click(session, client_dom, target, event_context)
+
+      binding ->
+        case live_click_action(binding) do
+          :none ->
+            commit_default_click(session, client_dom, target, event_context)
+
+          action when binding.id == target.id ->
+            commit_click_binding(session, client_dom, binding, event_context, action)
+
+          action ->
+            commit_ancestor_click(session, client_dom, binding, target, event_context, action)
+        end
+    end
+  end
+
+  # The click event reaches the ancestor's binding before the target's own
+  # default action, such as submitting its form, takes place.
+  defp commit_ancestor_click(session, client_dom, binding, target, event_context, action) do
+    identity = node_identity(client_dom, target)
+
+    with %Session{} = session <- commit_click_binding(session, client_dom, binding, event_context, action) do
+      client_dom = Session.page_state(session).client_dom
+
+      with %Target{} = target <- find_by_identity(client_dom, identity),
+           {:ok, event_context} <- owning_view_context(session, target) do
+        commit_default_click(session, client_dom, target, event_context)
+      else
+        nil -> session
+        redirected -> redirected
+      end
+    end
+  end
+
+  # Like the LiveView client's closestPhxBinding, a click goes to the closest
+  # element with phx-click that is not disabled, up to its LiveView's container.
+  # A LiveView link handles its own click.
+  defp click_binding(client_dom, target) do
+    if attribute(target.attributes, "data-phx-link") || attribute(target.attributes, "phx-click") do
+      target
+    else
+      target.ancestors
+      |> Enum.reverse()
+      |> Enum.reduce_while(nil, fn ancestor, nil ->
+        cond do
+          attribute(ancestor.attributes, "data-phx-session") -> {:halt, nil}
+          attribute(ancestor.attributes, "phx-click") && not disabled_control?(ancestor) -> {:halt, ancestor}
+          true -> {:cont, nil}
+        end
+      end)
+      |> case do
+        nil -> nil
+        ancestor -> DocumentIndex.target_by_id(ClientDOM.index(client_dom), ancestor.id)
+      end
+    end
+  end
+
+  defp disabled_control?(element) do
+    element.tag in ~w(button fieldset input optgroup option select textarea) and
+      List.keymember?(element.attributes, "disabled", 0)
+  end
+
+  defp commit_click_binding(session, client_dom, binding, event_context, :dispatch_change),
+    do: dispatch_live_click_change(session, client_dom, binding, event_context)
+
+  defp commit_click_binding(session, client_dom, binding, event_context, :render_click) do
+    result =
+      dispatch_view_event(session, fn ->
+        Click.render(event_context.view, client_dom, binding, view_selector(client_dom, binding.selector, event_context))
+      end)
+
+    case commit_render_result(session, client_dom, result) do
+      %Session{} = session -> release_cancelled_live_upload(session, binding)
+      navigation -> navigation
+    end
+  end
+
+  defp commit_default_click(session, client_dom, target, event_context) do
     state = Session.page_state(session)
-    event_view = event_context.view
+    session = Session.put_page_state(session, %{state | client_dom: client_dom})
 
-    case live_click_action(target) do
-      :dispatch_change ->
-        dispatch_live_click_change(session, client_dom, target, event_context)
+    case ClientDOM.form_submission(client_dom, target, :live) do
+      %{phx_submit?: true} = submission ->
+        case live_upload_for_submit(session, target) do
+          {:ok, form_id, upload} ->
+            dispatch_live_upload_submit(session, form_id, upload, submission)
 
-      :render_click ->
-        result =
-          dispatch_view_event(session, fn ->
-            Click.render(event_view, client_dom, target, view_selector(client_dom, target.selector, event_context))
-          end)
-
-        case commit_render_result(session, client_dom, result) do
-          %Session{} = session -> release_cancelled_live_upload(session, target)
-          navigation -> navigation
+          :none ->
+            dispatch_live_submit(session, client_dom, submission, event_context)
         end
 
-      :none ->
-        session = Session.put_page_state(session, %{state | client_dom: client_dom})
+      %{phx_submit?: false} = submission ->
+        {:navigate, session, Navigation.submission(submission)}
 
-        case ClientDOM.form_submission(client_dom, target, :live) do
-          %{phx_submit?: true} = submission ->
-            case live_upload_for_submit(session, target) do
-              {:ok, form_id, upload} ->
-                dispatch_live_upload_submit(session, form_id, upload, submission)
+      nil ->
+        case {target.tag, attribute(target.attributes, "href")} do
+          {tag, href} when tag in ["a", "area"] and is_binary(href) ->
+            {:navigate, session,
+             Navigation.link(href,
+               download: attribute(target.attributes, "download")
+             )}
 
-              :none ->
-                dispatch_live_submit(session, client_dom, submission, event_context)
-            end
-
-          %{phx_submit?: false} = submission ->
-            {:navigate, session, Navigation.submission(submission)}
-
-          nil ->
-            case {target.tag, attribute(target.attributes, "href")} do
-              {tag, href} when tag in ["a", "area"] and is_binary(href) ->
-                {:navigate, session,
-                 Navigation.link(href,
-                   download: attribute(target.attributes, "download")
-                 )}
-
-              _other ->
-                session
-            end
+          _other ->
+            session
         end
     end
   end
@@ -883,7 +945,7 @@ defmodule Fluffy.Driver.Live do
     end
   end
 
-  defp dispatch_live_change(session, client_dom, %Fluffy.HTML.Target{} = target) do
+  defp dispatch_live_change(session, client_dom, %Target{} = target) do
     with {:ok, event_context} <- owning_view_context(session, target) do
       state = Session.page_state(session)
       session = Session.put_page_state(session, %{state | client_dom: client_dom})
@@ -1014,6 +1076,18 @@ defmodule Fluffy.Driver.Live do
   defp view_selector(_client_dom, _selector, %{root_id: nil}), do: nil
   defp view_selector(client_dom, selector, context), do: selector_for_view(client_dom, selector, context)
 
+  # LiveViewTest's element form events fill in the form as the server rendered
+  # it, which brings back a checkbox the user unchecked or an option they
+  # deselected. Push the browser's serialization instead, with the form's
+  # phx-value-* attributes, as the LiveView client does.
+  defp render_view_event(client_dom, context, selector, kind, payload) when kind in [:change, :submit] do
+    target = ClientDOM.target!(client_dom, Locator.by_css(selector))
+    form = if target.tag == "form", do: target, else: DocumentIndex.form_owner(ClientDOM.index(client_dom), target)
+    form_values = if form, do: Event.values(form.attributes), else: %{}
+
+    Event.push(context.view, target, kind, Map.merge(form_values, payload))
+  end
+
   defp render_view_event(client_dom, %{root_id: nil} = context, selector, kind, payload) do
     target = ClientDOM.target!(client_dom, Locator.by_css(selector))
 
@@ -1021,7 +1095,6 @@ defmodule Fluffy.Driver.Live do
       case kind do
         :click -> Map.merge(Event.values(target.attributes), payload)
         kind when kind in [:keydown, :keyup] -> Map.merge(Event.key_values(target.attributes), payload)
-        _form_event -> payload
       end
 
     Event.push(context.view, target, kind, payload)
@@ -1032,8 +1105,6 @@ defmodule Fluffy.Driver.Live do
 
     result =
       case kind do
-        :change -> render_change(element, payload)
-        :submit -> render_submit(element, payload)
         :keydown -> render_keydown(element, payload)
         :keyup -> render_keyup(element, payload)
       end

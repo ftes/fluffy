@@ -23,6 +23,9 @@
 - A page that closes while Fluffy adopts its document now fails the operation with `Fluffy.OperationError`, or an `ExUnit.AssertionError` from an expectation, instead of a `RuntimeError` about the LiveView connection. An operation that succeeded is not failed by its page closing during the bookkeeping after it.
 - `Fluffy.Playwright.wait_for_load_state/3` and `wait_for_function/4` time out with Playwright's own error, even while a script blocks the page, instead of sometimes Fluffy's.
 - `click` on a checkbox or radio on Phoenix sends the form's `phx-change` after the control's `phx-click`, as a browser does. A click on a selected radio sends only `phx-click`.
+- `click` on Phoenix sends the closest ancestor's `phx-click`, with its `phx-value-*` and `phx-target`, when the target has none, as LiveView's client does, then runs the target's own action, such as submitting its form.
+- Form events on Phoenix send the browser's serialization: an unchecked checkbox or deselected option no longer comes back with its server-rendered value.
+- `select_option` with `[]` deselects every option of a multiple select on Phoenix, as on Playwright.
 
 ## 0.9.0-rc.1 — 2026-11-09
 
