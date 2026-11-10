@@ -513,20 +513,22 @@ defmodule Fluffy.Driver.Playwright do
 
   @impl true
   def unwrap(%Session{} = session, fun) when is_function(fun, 1),
-    do: session |> unwrap_and_return(fun) |> discard_return()
+    do: session |> run_unwrapped(:unwrap, nil, Session.page_state(session).page, fun) |> discard_return()
 
   @impl true
   def unwrap_and_return(%Session{} = session, fun) when is_function(fun, 1),
-    do: run_unwrapped(session, Session.page_state(session).page, fun)
+    do: run_unwrapped(session, :unwrap_and_return, nil, Session.page_state(session).page, fun)
 
   # Like unwrap/2, with the locator resolved in the current frame.
   def unwrap_locator(%Session{} = session, %Locator{} = locator, fun) when is_function(fun, 1),
-    do: session |> unwrap_and_return_locator(locator, fun) |> discard_return()
+    do: session |> run_unwrapped(:unwrap, locator, locator(session, locator), fun) |> discard_return()
 
   def unwrap_and_return_locator(%Session{} = session, %Locator{} = locator, fun) when is_function(fun, 1),
-    do: run_unwrapped(session, locator(session, locator), fun)
+    do: run_unwrapped(session, :unwrap_and_return, locator, locator(session, locator), fun)
 
-  defp run_unwrapped(session, native, fun) do
+  # The callback's own errors pass through; Fluffy's adoption before it raises
+  # `Fluffy.OperationError`.
+  defp run_unwrapped(session, operation, target, native, fun) do
     page = Session.page_state(session).page
     context = Session.context(session)
 
@@ -538,7 +540,7 @@ defmodule Fluffy.Driver.Playwright do
 
     case navigation_aware_action(session, context.timeout, action) do
       {:ok, result, outcome} -> {:return, result, outcome}
-      {:error, error} -> raise error
+      {:error, error} -> OperationFailure.raise_playwright!(operation, target, error)
     end
   end
 
@@ -550,14 +552,11 @@ defmodule Fluffy.Driver.Playwright do
     clock = BrowserPage.clock(Session.page_state(session).page)
     timeout = Session.timeout(session, options)
 
-    action = fn remaining ->
-      Bounded.within!(remaining, operation, fn -> with :ok <- fun.(clock), do: {:ok, :ok} end)
-      {:ok, :clock}
-    end
+    action = &bounded(operation, &1, fn -> result(fun.(clock)) end)
 
     case navigation_aware_action(session, timeout, action) do
-      {:ok, :clock, outcome} -> outcome
-      {:error, error} -> raise error
+      {:ok, :ok, outcome} -> outcome
+      {:error, error} -> OperationFailure.raise_playwright!(operation, nil, error)
     end
   end
 

@@ -6,7 +6,9 @@ The snippets assume the imports from [Your first test](usage.md#your-first-test)
 
 Element-action failures raise `Fluffy.OperationError` across drivers. Rescue it
 uniformly and inspect `backend`, `driver`, `operation`, `locator` (or file-chooser
-handle), and `cause` for details. This includes `submit` and file selection.
+handle), and `cause` for details. This includes `submit` and file selection, and on
+Playwright also `visit`, `reload`, history navigation, clock calls, and the page
+handling around an `unwrap` callback, whose own errors pass through.
 
 For Playwright, `cause` is the native PlaywrightEx exception (such as
 `PlaywrightEx.TimeoutError`), including its call log. For Phoenix, it retains `Fluffy.StrictnessError` or

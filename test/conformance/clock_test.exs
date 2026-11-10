@@ -116,7 +116,7 @@ defmodule Fluffy.Conformance.ClockTest do
 
       started = System.monotonic_time(:millisecond)
 
-      assert_raise RuntimeError, ~r/Clock.run_for did not finish within 500ms/, fn ->
+      assert_raise Fluffy.OperationError, ~r/Timeout 500ms exceeded during Clock.run_for/, fn ->
         Clock.run_for(session, 200, timeout: 500)
       end
 

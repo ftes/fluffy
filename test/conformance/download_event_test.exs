@@ -195,7 +195,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
       download = await(pending)
 
       message = ~r/did not complete within the session's timeout of 500ms for path/
-      assert_raise RuntimeError, message, fn -> Download.path(download) end
+      assert_raise PlaywrightEx.TimeoutError, message, fn -> Download.path(download) end
 
       # This read leaves the download running, unlike a timed-out save.
       assert unwrap_and_return(download, &PlaywrightEx.Download.cancel/1) == :ok
@@ -306,9 +306,11 @@ defmodule Fluffy.Conformance.DownloadEventTest do
       download = await(pending)
       destination = Path.join(tmp_dir, "copy.txt")
 
-      assert_raise RuntimeError, ~r/did not complete within the session's timeout of 2000ms and was canceled/, fn ->
-        Download.save_as(download, destination)
-      end
+      assert_raise PlaywrightEx.TimeoutError,
+                   ~r/did not complete within the session's timeout of 2000ms and was canceled/,
+                   fn ->
+                     Download.save_as(download, destination)
+                   end
 
       send(server, :finish)
       assert unwrap_and_return(download, &PlaywrightEx.Download.failure/1) == {:ok, "canceled"}

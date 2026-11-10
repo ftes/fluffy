@@ -6,11 +6,13 @@
 
 - On Firefox, an action that closes its own page, such as a popup's `window.close()`, raises `Fluffy.OperationError` again, as it does in Playwright, which tracks it as a Firefox bug. Other browsers are unchanged.
 - Playwright `check` and `uncheck` behave as in Playwright again: they fail with "Clicking the checkbox did not change its state" when page code, such as a LiveView patch answering the click, reverts the box before Playwright reads it back. That happens mostly in Firefox and WebKit, for a box whose new state the server does not render. Phoenix is unchanged: it has no page code to revert the click, so it still succeeds there.
+- On Playwright, `visit`, `reload`, `go_back`, `go_forward`, clock calls and the page handling around an `unwrap` callback raise `Fluffy.OperationError` with PlaywrightEx's exception as its `cause`, as actions do. The callback's own errors pass through.
+- On Playwright, a call Fluffy bounds itself, such as `evaluate`, `content`, `close_page` or a download's `path`, raises `PlaywrightEx.TimeoutError` instead of a `RuntimeError` when it runs out of time; clock calls wrap it in `Fluffy.OperationError`.
 
 ### Fixed
 
 - On Playwright, a session `timeout:` under a second no longer limits Fluffy's own reads of the page around an operation; they get at least a second, so a busy browser is far less likely to fail such a session with a `RuntimeError` naming a blocked script. A page whose main thread is blocked now reports after that second.
-- A page that closes while Fluffy adopts its document now fails the operation with `Fluffy.OperationError`, or an `ExUnit.AssertionError` from an expectation, instead of a `RuntimeError` about the LiveView connection. `unwrap`, clock calls, `visit`, `reload` and history navigation raise PlaywrightEx's closed-page error. An operation that succeeded is not failed by its page closing during the bookkeeping after it.
+- A page that closes while Fluffy adopts its document now fails the operation with `Fluffy.OperationError`, or an `ExUnit.AssertionError` from an expectation, instead of a `RuntimeError` about the LiveView connection. An operation that succeeded is not failed by its page closing during the bookkeeping after it.
 
 ## 0.9.0-rc.1 — 2026-11-09
 

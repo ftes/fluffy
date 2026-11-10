@@ -406,7 +406,7 @@ defmodule Fluffy.Conformance.PlaywrightWrappersTest do
       session = :playwright |> session_for_html("<p>Harness</p>") |> put_session_timeout(1_000)
 
       # The freeze runs inside the evaluate, so it is in place before the wait reaches the page.
-      assert_raise RuntimeError, ~r/evaluate did not finish within 1000ms/, fn ->
+      assert_raise PlaywrightEx.TimeoutError, ~r/Timeout 1000ms exceeded during evaluate/, fn ->
         Playwright.evaluate(session, "() => { while (true) {} }")
       end
 
