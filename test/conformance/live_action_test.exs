@@ -246,17 +246,41 @@ defmodule Fluffy.Conformance.LiveActionTest do
       |> live_session()
       |> visit("/live/unchecked-controls")
       |> uncheck(by_label("Tag a", exact: true))
-      |> expect(to_have_text(last, "Last: change tag_ids=b bare=on solo=on colours=red,green"))
+      |> expect(to_have_text(last, "Last: change tag_ids=b bare=on solo=on colours=red,green plan=pro"))
       |> click(by_label("Tag b", exact: true))
-      |> expect(to_have_text(last, "Last: change tag_ids=- bare=on solo=on colours=red,green"))
+      |> expect(to_have_text(last, "Last: change tag_ids=- bare=on solo=on colours=red,green plan=pro"))
       |> uncheck(by_label("Bare", exact: true))
-      |> expect(to_have_text(last, "Last: change tag_ids=- bare=- solo=on colours=red,green"))
+      |> expect(to_have_text(last, "Last: change tag_ids=- bare=- solo=on colours=red,green plan=pro"))
       |> uncheck(by_label("Solo", exact: true))
-      |> expect(to_have_text(last, "Last: solo tag_ids=- bare=- solo=- colours=-"))
+      |> expect(to_have_text(last, "Last: solo tag_ids=- bare=- solo=- colours=- plan=-"))
       |> select_option(by_label("Colours", exact: true), [])
-      |> expect(to_have_text(last, "Last: change tag_ids=- bare=- solo=- colours=-"))
+      |> expect(to_have_text(last, "Last: change tag_ids=- bare=- solo=- colours=- plan=pro"))
       |> click(by_role(:button, name: "Save", exact: true))
-      |> expect(to_have_text(last, "Last: save tag_ids=- bare=- solo=- colours=-"))
+      |> expect(to_have_text(last, "Last: save tag_ids=- bare=- solo=- colours=- plan=pro"))
+    end
+
+    @tag driver: driver
+    test "a single select with every option deselected leaves the form payload with #{driver}", %{driver: driver} do
+      last = by_css("#last")
+
+      driver
+      |> live_session()
+      |> visit("/live/unchecked-controls")
+      |> select_option(by_label("Plan", exact: true), [])
+      |> expect(to_have_text(last, "Last: change tag_ids=a,b bare=on solo=on colours=red,green plan=-"))
+    end
+
+    @tag driver: driver
+    test "the form's phx-value-* wins over a field of the same name with #{driver}", %{driver: driver} do
+      last = by_css("#last")
+
+      driver
+      |> live_session()
+      |> visit("/live/unchecked-controls")
+      |> fill(by_label("Note", exact: true), "typed")
+      |> expect(to_have_text(last, "Last: note-change note=meta"))
+      |> click(by_role(:button, name: "Save note", exact: true))
+      |> expect(to_have_text(last, "Last: note-save note=meta"))
     end
   end
 

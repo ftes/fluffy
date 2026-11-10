@@ -15,6 +15,9 @@ defmodule Fluffy.TestWeb.UncheckedControlsLive do
   def handle_event("change", params, socket), do: {:noreply, record(socket, "change", params)}
   def handle_event("save", params, socket), do: {:noreply, record(socket, "save", params)}
 
+  def handle_event(event, %{"note" => note}, socket) when event in ~w(note-change note-save),
+    do: {:noreply, assign(socket, last: "#{event} note=#{note}")}
+
   def handle_event("solo-change", params, socket) do
     socket = assign(socket, solo?: params["solo"] == "on")
     {:noreply, assign(socket, last: "solo #{describe(params)}")}
@@ -31,7 +34,7 @@ defmodule Fluffy.TestWeb.UncheckedControlsLive do
   end
 
   defp describe(params) do
-    Enum.map_join(~w(tag_ids bare solo colours), " ", fn key ->
+    Enum.map_join(~w(tag_ids bare solo colours plan), " ", fn key ->
       "#{key}=#{params |> Map.get(key, "-") |> List.wrap() |> Enum.join(",")}"
     end)
   end
@@ -51,7 +54,16 @@ defmodule Fluffy.TestWeb.UncheckedControlsLive do
           {colour}
         </option>
       </select>
+      <label for="plan">Plan</label>
+      <select id="plan" name="plan">
+        <option value="free">free</option>
+        <option value="pro" selected>pro</option>
+      </select>
       <button type="submit">Save</button>
+    </form>
+    <form id="note-form" phx-change="note-change" phx-submit="note-save" phx-value-note="meta">
+      <label>Note <input name="note" value="field" /></label>
+      <button type="submit">Save note</button>
     </form>
     <p id="last">Last: {@last}</p>
     """
