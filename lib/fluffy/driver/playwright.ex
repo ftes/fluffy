@@ -5,7 +5,6 @@ defmodule Fluffy.Driver.Playwright do
 
   alias Fluffy.Backend.Playwright.Bounded
   alias Fluffy.Backend.Playwright.Document
-  alias Fluffy.Backend.Playwright.Events
   alias Fluffy.Backend.Playwright.Listeners
   alias Fluffy.Deadline
   alias Fluffy.Expect
@@ -16,13 +15,14 @@ defmodule Fluffy.Driver.Playwright do
   alias Fluffy.Locator.Playwright, as: PlaywrightLocator
   alias Fluffy.Session
   alias Fluffy.URLMatcher
+  alias PlaywrightEx.AbortController
   alias PlaywrightEx.BrowserContext
+  alias PlaywrightEx.Dialog
   alias PlaywrightEx.Expect, as: BrowserExpect
   alias PlaywrightEx.Frame
   alias PlaywrightEx.Locator, as: BrowserLocator
   alias PlaywrightEx.Page, as: BrowserPage
-  alias PlaywrightEx.Request
-  alias PlaywrightEx.Response
+  alias PlaywrightEx.Promise
   alias PlaywrightEx.TargetClosedError
   alias PlaywrightEx.TimeoutError
 
@@ -181,140 +181,79 @@ defmodule Fluffy.Driver.Playwright do
     locator_action(session, :click, locator, options, &BrowserLocator.click(&1, native(options, &2)))
   end
 
-  # Submits the form and reports whether it navigates the page's main frame to
-  # another document: validation let the submit event fire, no handler (such as
-  # LiveView's phx-submit) cancelled it, its target is that frame, and it is not
-  # a GET to the current URL with a fragment, which the browser navigates to
-  # within the document. Page inputs can shadow form properties, so they are
-  # read from the prototype.
+  # Submits the form and reports whether it asks the page's main frame to
+  # navigate: validation let the submit event fire, no handler (such as
+  # LiveView's phx-submit) cancelled it, and its target is that frame. This
+  # stands in for the browser's navigation request that a Playwright action
+  # waits on, which WebKit sends only after requestSubmit has returned. Page
+  # inputs can shadow form properties, so they are read from the prototype.
   @submit """
   form => {
     if (form.localName !== 'form')
       throw new Error(`submit/2 requires a form locator, got ${form.localName}`)
     const view = form.ownerDocument.defaultView
     const property = name => Object.getOwnPropertyDescriptor(HTMLFormElement.prototype, name).get.call(form)
-    let submitted, data
-    const listen = event => {
-      if (event.target !== form) return
-      if (event.type === 'submit') submitted = event
-      else data = event.formData
-    }
+    let submitted
+    const listen = event => { if (event.target === form) submitted = event }
     view.addEventListener('submit', listen, true)
-    view.addEventListener('formdata', listen, true)
     try { HTMLFormElement.prototype.requestSubmit.call(form) } finally {
       view.removeEventListener('submit', listen, true)
-      view.removeEventListener('formdata', listen, true)
     }
 
-    const method = property('method')
-    if (!submitted || submitted.defaultPrevented || !form.isConnected || method === 'dialog') return false
-    const url = new URL(property('action'))
-    if (!['http:', 'https:'].includes(url.protocol)) return false
+    if (!submitted || submitted.defaultPrevented || !form.isConnected || property('method') === 'dialog') return false
+    if (!['http:', 'https:'].includes(new URL(property('action')).protocol)) return false
     const name = property('target') || form.ownerDocument.querySelector('base[target]')?.getAttribute('target') || '_self'
     const keyword = name.toLowerCase()
     const target = keyword === '_self' ? view : keyword === '_parent' ? view.parent : keyword === '_top' ? view.top
       : name === view.name ? view : null
-    if (target !== view.top) return false
-    if (method !== 'get' || !data) return true
-
-    // A GET replaces the action's query with the form data, keeping its fragment.
-    const entries = [...data].map(([key, value]) => [key, typeof value === 'string' ? value : value.name])
-    url.search = '?' + new URLSearchParams(entries)
-    let current
-    try { current = target.location.href } catch { return true }
-    const withoutFragment = href => href.split('#')[0]
-    return !(url.href.includes('#') && withoutFragment(url.href) === withoutFragment(current))
+    return target === view.top
   }
   """
 
-  # Like a Playwright action, submit waits for a navigation it initiates;
-  # WebKit can start it after requestSubmit has returned. The wait ends with the
-  # final response of its redirect chain, when the server has handled the
-  # request, not the commit, which a no-content or download response never
-  # makes. Page code can still turn the navigation into a same-document one (the
-  # Navigation API's `intercept()`), which ends the wait too. So does a
-  # `beforeunload` dialog: dismissing it cancels the navigation, and its close
-  # does not say how it was handled, so submit then returns like click.
+  # Like a Playwright action, submit waits for the navigation it starts to
+  # commit, navigate within the document or fail (a no-content or download
+  # response aborts it), and no longer. Waiting before submitting misses no
+  # commit. A `beforeunload` prompt also ends the wait: dismissing it cancels
+  # the navigation before the browser requests it, so a click would not wait,
+  # and its close does not say how it was handled.
   @impl true
   def submit(%Session{} = session, %Locator{} = locator, options \\ []) do
     %{page: page, frame: frame} = Session.page_state(session)
 
     locator_action(session, :submit, locator, options, fn native, remaining ->
-      deadline = Deadline.new(remaining)
+      prompted = AbortController.new()
 
-      # Listening first misses no request the submit starts.
-      Listeners.listening(submission_listeners(page, frame), fn ref ->
+      navigation =
+        Frame.wait_for_navigation(frame,
+          wait_until: :commit,
+          timeout: remaining,
+          signal: AbortController.signal(prompted)
+        )
+
+      unload_prompted = fn dialog -> if Dialog.type(dialog) == "beforeunload", do: AbortController.abort(prompted) end
+      listeners = Listeners.register([{BrowserPage, page, :dialog_closed, unload_prompted}])
+
+      try do
         case BrowserLocator.evaluate(native, @submit, nil, timeout: remaining) do
-          {:ok, true} -> await_submission(ref, deadline, remaining)
+          {:ok, true} -> await_navigation(navigation)
           {:ok, false} -> :ok
           {:error, error} -> {:error, error}
         end
-      end)
+      after
+        Listeners.release(listeners)
+        Promise.free(navigation)
+      end
     end)
   end
 
-  # A navigation request comes before the frame commits to another document, so
-  # a commit seen first navigated within the document. Listening for a dialog
-  # would stop Playwright from handling it, so the wait listens for its close.
-  defp submission_listeners(page, frame) do
-    guid = frame.guid
-
-    fn ref ->
-      request = fn request ->
-        if Request.is_navigation_request(request) and match?(%{guid: ^guid}, Events.request_frame(request)),
-          do: send(ref, {ref, :request, request})
-      end
-
-      navigated = fn navigated -> if navigated.guid == guid, do: send(ref, {ref, :navigated}) end
-
-      unload_prompted = fn dialog ->
-        if PlaywrightEx.Dialog.type(dialog) == "beforeunload", do: send(ref, {ref, :unload_prompted})
-      end
-
-      [
-        {BrowserPage, page, :request, request},
-        {BrowserPage, page, :frame_navigated, navigated},
-        {BrowserPage, page, :dialog_closed, unload_prompted}
-      ]
+  # Playwright's wait ends without error when the navigation fails or its page
+  # closes; only a timeout fails the action.
+  defp await_navigation(navigation) do
+    case Promise.await(navigation) do
+      {:error, %TimeoutError{} = error} -> {:error, error}
+      _committed_failed_or_prompted -> :ok
     end
   end
-
-  # Like Playwright's, a timeout message names the action's timeout.
-  defp await_submission(ref, deadline, timeout) do
-    receive do
-      {^ref, :request, request} -> await_response(ref, request, deadline, timeout)
-      {^ref, :navigated} -> :ok
-      {^ref, :unload_prompted} -> :ok
-    after
-      Deadline.remaining(deadline, 1) ->
-        {:error,
-         %TimeoutError{
-           message:
-             "Timeout #{timeout}ms exceeded while waiting for the submitted form's navigation request; " <>
-               "the browser sent none (a Content-Security-Policy form-action can block it silently)"
-         }}
-    end
-  end
-
-  # Reading the response has no timeout of its own; a failed request has none.
-  # A redirect continues the navigation with another request.
-  defp await_response(ref, request, deadline, timeout) do
-    case Bounded.within(Deadline.remaining(deadline, 1), fn -> Request.response(request) end) do
-      {:ok, {:ok, response}} ->
-        if redirect?(response), do: await_submission(ref, deadline, timeout), else: :ok
-
-      {:ok, {:error, error}} ->
-        {:error, error}
-
-      :timeout ->
-        {:error, %TimeoutError{message: "Timeout #{timeout}ms exceeded while waiting for the form submission response"}}
-    end
-  end
-
-  defp redirect?(nil), do: false
-
-  defp redirect?(response),
-    do: Response.status(response) in [301, 302, 303, 307, 308] and Map.has_key?(Response.headers(response), "location")
 
   @impl true
   def fill(%Session{} = session, %Locator{} = locator, value, options \\ []) when is_binary(value) do
