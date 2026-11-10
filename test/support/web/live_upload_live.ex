@@ -102,13 +102,21 @@ defmodule Fluffy.TestWeb.LiveUploadLive do
     {:noreply, cancel_upload(socket, :attachment, ref)}
   end
 
-  def handle_event("cancel-all", _params, socket) do
-    socket =
-      Enum.reduce(socket.assigns.uploads.attachment.entries, socket, fn entry, socket ->
-        cancel_upload(socket, :attachment, entry.ref)
-      end)
+  def handle_event("cancel-all", _params, socket), do: {:noreply, cancel_all(socket)}
 
+  # Cancels after the click's reply, so only a server-pushed render reports it.
+  def handle_event("cancel-all-later", _params, socket) do
+    Process.send_after(self(), :cancel_all, 100)
     {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info(:cancel_all, socket), do: {:noreply, cancel_all(socket)}
+
+  defp cancel_all(socket) do
+    Enum.reduce(socket.assigns.uploads.attachment.entries, socket, fn entry, socket ->
+      cancel_upload(socket, :attachment, entry.ref)
+    end)
   end
 
   defp handle_progress(:attachment, entry, socket) do
@@ -188,6 +196,9 @@ defmodule Fluffy.TestWeb.LiveUploadLive do
           Cancel upload
         </button>
         <button type="button" phx-click="cancel-all">Cancel all uploads</button>
+        <button id="cancel-all-later" type="button" phx-click="cancel-all-later">
+          Cancel later
+        </button>
         <button>Save</button>
         <button phx-click="remove-form">Finish and close</button>
         <button name="intent" value="draft">Draft</button>
