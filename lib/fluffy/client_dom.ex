@@ -158,7 +158,7 @@ defmodule Fluffy.ClientDOM do
         {:link, link}
 
       control ->
-        case form_submission(client_dom, control, driver) do
+        case Fluffy.Form.build(index(client_dom), client_dom.properties, control, driver) do
           nil -> nil
           submission -> {:submit, control, submission}
         end
@@ -174,10 +174,6 @@ defmodule Fluffy.ClientDOM do
     do: has_attribute?(attributes, "href")
 
   defp activation_behavior?(%{tag: tag}), do: tag in ["button", "input"]
-
-  def form_submission(%__MODULE__{} = client_dom, target, driver \\ :static) do
-    Fluffy.Form.build(index(client_dom), client_dom.properties, target, driver)
-  end
 
   @doc false
   def submit_form(%__MODULE__{} = client_dom, target, driver \\ :static) do
