@@ -99,7 +99,11 @@ defmodule Fluffy.ClientDOM do
 
   def click(%__MODULE__{} = client_dom, %Locator{} = locator) do
     target = target!(client_dom, locator)
-    ensure_target_enabled!(target, :click, locator)
+
+    if target_disabled?(client_dom, state_target(client_dom, target)) do
+      raise Fluffy.ActionabilityError, action: :click, reason: :disabled, locator: locator
+    end
+
     Actionability.ensure_clickable!(target.element, :click, locator)
 
     client_dom = maybe_toggle_checked(client_dom, target)
@@ -387,8 +391,24 @@ defmodule Fluffy.ClientDOM do
 
   @doc false
   def disabled?(%__MODULE__{} = client_dom, %Locator{} = locator) do
-    target = target!(client_dom, locator)
-    target.disabled? or Actionability.disabled?(target.element)
+    target_disabled?(client_dom, state_target(client_dom, target!(client_dom, locator)))
+  end
+
+  defp target_disabled?(client_dom, target) do
+    target.disabled? or Actionability.disabled?(target.element) or
+      (target.tag == "option" and DocumentIndex.option_disabled?(index(client_dom), target))
+  end
+
+  # Like Playwright, an element other than a form control takes its enabled
+  # state from the closest button, so text inside a disabled button is disabled.
+  # Unlike Playwright's retarget(..., "follow-label"), a label doesn't take its
+  # control's state, as a click on it doesn't activate the control (#134).
+  defp state_target(_client_dom, %Target{tag: tag} = target) when tag in ["input", "textarea", "select"], do: target
+
+  defp state_target(client_dom, target) do
+    closest(client_dom, target, fn %{tag: tag, attributes: attributes} ->
+      tag == "button" or attribute(attributes, "role") in ["button", "checkbox", "radio"]
+    end) || target
   end
 
   @doc false

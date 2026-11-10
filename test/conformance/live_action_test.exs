@@ -257,9 +257,14 @@ defmodule Fluffy.Conformance.LiveActionTest do
 
     @tag driver: driver
     test "a click on text inside a submit button or link takes its default action with #{driver}", %{driver: driver} do
-      driver
-      |> live_session()
-      |> visit("/live/click-bindings")
+      session = driver |> live_session() |> visit("/live/click-bindings")
+
+      # Text inside a disabled button takes its disabled state, so nothing submits.
+      assert_action_error(session, Fluffy.ActionabilityError, ~r/disabled/, fn ->
+        click(session, by_text("Save disabled", exact: true), timeout: 5)
+      end)
+
+      session
       |> click(by_text("Save by text", exact: true))
       |> expect(to_have_text(by_css("#log"), "Log: save"))
       |> click(by_text("Leave by text", exact: true))

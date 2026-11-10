@@ -18,6 +18,8 @@ defmodule Fluffy.Actionability do
     "week"
   ]
 
+  @native_form_controls ~w(button input select textarea option optgroup)
+
   def ensure_enabled!(element, action, locator) do
     if disabled?(element) do
       raise Fluffy.ActionabilityError,
@@ -29,9 +31,8 @@ defmodule Fluffy.Actionability do
     :ok
   end
 
+  # The enabled check belongs to the click's state target, see `Fluffy.ClientDOM.click/2`.
   def ensure_clickable!(element, action, locator) do
-    ensure_enabled!(element, action, locator)
-
     if LazyHTML.attribute(element, "hidden") != [] do
       raise_error(action, :hidden, locator)
     end
@@ -39,10 +40,11 @@ defmodule Fluffy.Actionability do
     :ok
   end
 
+  # As in Playwright, the disabled attribute disables only a native form control.
   def disabled?(element) do
-    case LazyHTML.attributes(element) do
-      [attributes] ->
-        List.keymember?(attributes, "disabled", 0) or
+    case {LazyHTML.tag(element), LazyHTML.attributes(element)} do
+      {[tag], [attributes]} ->
+        (tag in @native_form_controls and List.keymember?(attributes, "disabled", 0)) or
           String.downcase(attribute(attributes, "aria-disabled") || "false") == "true"
 
       _other ->
