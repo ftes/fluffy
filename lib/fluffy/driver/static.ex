@@ -69,18 +69,15 @@ defmodule Fluffy.Driver.Static do
         {:navigate, session, Navigation.submission(submission)}
 
       nil ->
-        case target do
-          %{tag: tag, attributes: attributes} when tag in ["a", "area"] ->
-            case attribute(attributes, "href") do
-              href when is_binary(href) ->
-                {:navigate, session,
-                 Navigation.link(href,
-                   download: attribute(attributes, "download")
-                 )}
+        case ClientDOM.activation_target(client_dom, target) do
+          nil ->
+            session
 
-              nil ->
-                session
-            end
+          %{tag: tag, attributes: attributes} when tag in ["a", "area"] ->
+            {:navigate, session,
+             Navigation.link(attribute(attributes, "href"),
+               download: attribute(attributes, "download")
+             )}
 
           submitter ->
             case ClientDOM.form_submission(client_dom, submitter) do

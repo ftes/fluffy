@@ -129,11 +129,12 @@ defmodule Fluffy.Driver.Live do
           :none ->
             commit_default_click(session, client_dom, target, event_context)
 
-          action when binding.id == target.id ->
-            commit_click_binding(session, client_dom, binding, event_context, action)
-
           action ->
-            commit_ancestor_click(session, client_dom, binding, target, event_context, action)
+            if binding.id == target.id or live_link?(binding) do
+              commit_click_binding(session, client_dom, binding, event_context, action)
+            else
+              commit_ancestor_click(session, client_dom, binding, target, event_context, action)
+            end
         end
     end
   end
@@ -158,26 +159,23 @@ defmodule Fluffy.Driver.Live do
 
   # Like the LiveView client's closestPhxBinding, a click goes to the closest
   # element with phx-click that is not disabled, up to its LiveView's container.
-  # A LiveView link handles its own click.
+  # The closest LiveView link wins over any phx-click: its handler stops the
+  # event and prevents the default action.
   defp click_binding(client_dom, target) do
-    if attribute(target.attributes, "data-phx-link") || attribute(target.attributes, "phx-click") do
-      target
-    else
-      target.ancestors
-      |> Enum.reverse()
-      |> Enum.reduce_while(nil, fn ancestor, nil ->
-        cond do
-          attribute(ancestor.attributes, "data-phx-session") -> {:halt, nil}
-          attribute(ancestor.attributes, "phx-click") && not disabled_control?(ancestor) -> {:halt, ancestor}
-          true -> {:cont, nil}
-        end
-      end)
-      |> case do
-        nil -> nil
-        ancestor -> DocumentIndex.target_by_id(ClientDOM.index(client_dom), ancestor.id)
-      end
+    closest_binding(client_dom, target, "data-phx-link") || closest_binding(client_dom, target, "phx-click")
+  end
+
+  defp closest_binding(client_dom, target, name) do
+    boundary? = &(&1.id != target.id and attribute(&1.attributes, "data-phx-session") != nil)
+    bound? = &(attribute(&1.attributes, name) != nil and not disabled_control?(&1))
+
+    case ClientDOM.closest(client_dom, target, &(boundary?.(&1) or bound?.(&1))) do
+      nil -> nil
+      element -> if boundary?.(element), do: nil, else: element
     end
   end
+
+  defp live_link?(element), do: attribute(element.attributes, "data-phx-link") != nil
 
   defp disabled_control?(element) do
     element.tag in ~w(button fieldset input optgroup option select textarea) and
@@ -203,6 +201,13 @@ defmodule Fluffy.Driver.Live do
     state = Session.page_state(session)
     session = Session.put_page_state(session, %{state | client_dom: client_dom})
 
+    case ClientDOM.activation_target(client_dom, target) do
+      nil -> session
+      target -> commit_activation(session, client_dom, target, event_context)
+    end
+  end
+
+  defp commit_activation(session, client_dom, target, event_context) do
     case ClientDOM.form_submission(client_dom, target, :live) do
       %{phx_submit?: true} = submission ->
         case live_upload_for_submit(session, target) do
@@ -216,17 +221,14 @@ defmodule Fluffy.Driver.Live do
       %{phx_submit?: false} = submission ->
         {:navigate, session, Navigation.submission(submission)}
 
-      nil ->
-        case {target.tag, attribute(target.attributes, "href")} do
-          {tag, href} when tag in ["a", "area"] and is_binary(href) ->
-            {:navigate, session,
-             Navigation.link(href,
-               download: attribute(target.attributes, "download")
-             )}
+      nil when target.tag in ["a", "area"] ->
+        {:navigate, session,
+         Navigation.link(attribute(target.attributes, "href"),
+           download: attribute(target.attributes, "download")
+         )}
 
-          _other ->
-            session
-        end
+      nil ->
+        session
     end
   end
 

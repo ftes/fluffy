@@ -25,7 +25,10 @@ defmodule Fluffy.TestWeb.ClickBindingsLive do
   # Logs every event in arrival order, so a test sees which binding a click on
   # an element without its own phx-click reaches.
   @impl true
-  def mount(_params, _session, socket), do: {:ok, assign(socket, log: [])}
+  def mount(_params, _session, socket), do: {:ok, assign(socket, log: [], tab: nil)}
+
+  @impl true
+  def handle_params(params, _uri, socket), do: {:noreply, assign(socket, tab: params["tab"])}
 
   @impl true
   def handle_event("select", %{"name" => name}, socket), do: {:noreply, log(socket, "select:#{name}")}
@@ -54,7 +57,16 @@ defmodule Fluffy.TestWeb.ClickBindingsLive do
         <button type="submit">Save</button>
       </form>
     </div>
+    <form id="inner-form" phx-submit="save">
+      <button type="submit"><span>Save by text</span></button>
+    </form>
+    <a href="/chamber"><span>Leave by text</span></a>
+    <.link navigate="/live/secret-chamber"><span>Navigate by text</span></.link>
+    <.link patch="/live/click-bindings?tab=two">
+      <span phx-click="select" phx-value-name="patch">Patch by text</span>
+    </.link>
     <p id="log">Log: {Enum.join(@log, " ")}</p>
+    <p id="tab">Tab: {@tab}</p>
     """
   end
 end

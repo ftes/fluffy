@@ -28,6 +28,7 @@
 - `select_option` with `[]` deselects every option of a multiple select on Phoenix, as on Playwright.
 - `select_option` with `[]` also deselects a single select on Phoenix, which then submits nothing, as on Playwright.
 - A form's `phx-value-*` on Phoenix wins over a field of the same name in `phx-change` and `phx-submit`, as in LiveView's client.
+- `click` on text or another element inside a button or link on Phoenix submits the form or follows the link, as a browser does. Inside a `<.link navigate>` or `<.link patch>`, it navigates or patches even past a closer `phx-click`, as LiveView's client does.
 
 ## 0.9.0-rc.1 — 2026-11-09
 

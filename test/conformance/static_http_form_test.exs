@@ -90,6 +90,31 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
     end
 
     @tag driver: driver
+    test "a click on text inside a submit button submits its form with #{driver}", %{driver: driver} do
+      fixture =
+        TestHTTPFixtures.register_sequence([
+          %{
+            body:
+              html("""
+              <form method="get" action="search">
+                <input type="hidden" name="query" value="fluffy">
+                <button name="commit" value="on"><span>Search</span></button>
+              </form>
+              """)
+          },
+          %{body: html("<h1>Search results</h1>")}
+        ])
+
+      driver
+      |> start_test_session()
+      |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+      |> click(by_text("Search", exact: true))
+      |> expect("Search results" |> by_text() |> to_be_visible())
+
+      assert [_source, %{query: "query=fluffy&commit=on"}] = TestHTTPFixtures.requests(fixture)
+    end
+
+    @tag driver: driver
     test "submit returns once the server has received the submission using #{driver}", %{driver: driver} do
       fixture =
         TestHTTPFixtures.register_sequence([
