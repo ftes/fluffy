@@ -5,6 +5,7 @@ on:
     branches: [main]
   # Any base, so a PR stacked on another PR's branch gets CI too.
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   # Nightly, so Firefox and WebKit regressions show up without a push.
   schedule:
     - cron: "0 3 * * *"
@@ -50,9 +51,9 @@ jobs:
   # options and Dialyzer. No browser or database. Saves the deps and _build cache on main.
   checks:
     name: checks (${{ matrix.lane }})
-    # In a stack, only the top PR runs CI: it holds every change below it. `stack` is absent outside
-    # a stack and on other events. As the jobs below.
-    if: &stack_top github.event.pull_request.stack == null || github.event.pull_request.stack.position == github.event.pull_request.stack.size
+    # Draft PRs skip CI until marked ready, and in a stack only the top PR runs it: it holds every
+    # change below it. `pull_request` and `stack` are absent on other events. As the jobs below.
+    if: &stack_top ${{ !github.event.pull_request.draft && (github.event.pull_request.stack == null || github.event.pull_request.stack.position == github.event.pull_request.stack.size) }}
     runs-on: ubuntu-26.04
     timeout-minutes: 20
     strategy:
@@ -286,7 +287,7 @@ jobs:
         lane: [oldest, newest]
     steps:
       # On the step: a matrix job skipped whole reports its name unexpanded, which would leave the
-      # required checks pending on a PR below the top of its stack.
+      # required checks pending on a draft or a PR below the top of its stack.
       - if: *stack_top
         env:
           RESULTS: ${{ join(needs.*.result, ' ') }}
