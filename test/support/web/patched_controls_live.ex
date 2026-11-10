@@ -15,6 +15,13 @@ defmodule Fluffy.TestWeb.PatchedControlsLive do
     ~H"""
     <main>
       <input name="note" aria-label="Note" />
+      <select name="pick" aria-label="Pick"><option>a</option><option>b</option></select>
+      <select name="preset" aria-label="Preset">
+        <option>a</option><option selected>b</option><option>c</option>
+      </select>
+      <select name="many" aria-label="Many" multiple>
+        <option>a</option><option selected>b</option>
+      </select>
       <button type="button" phx-click="bump">Bump</button>
       <button type="button" phx-click="retitle">Retitle</button>
       <p>Count: {@count}</p>
