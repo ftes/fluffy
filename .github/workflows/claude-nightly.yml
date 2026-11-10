@@ -153,6 +153,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          # Else checkout's read-only token can override the app token Claude pushes with: from v6
+          # it sits in an includeIf file claude-code-action doesn't clear, so the push gets a 403.
+          persist-credentials: false
           fetch-depth: 0
       - name: Set up toolchain and deps
         uses: ./.github/actions/setup
@@ -217,6 +220,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          # Else checkout's read-only token can override the app token Claude pushes with: from v6
+          # it sits in an includeIf file claude-code-action doesn't clear, so the push gets a 403.
+          persist-credentials: false
           ref: ${{ matrix.pr.branch }}
           fetch-depth: 0
       - name: Set up toolchain and deps
@@ -319,6 +325,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          # Else checkout's read-only token can override the app token Claude pushes with: from v6
+          # it sits in an includeIf file claude-code-action doesn't clear, so the push gets a 403.
+          persist-credentials: false
           fetch-depth: 0
       - name: Set up toolchain and deps
         uses: ./.github/actions/setup
