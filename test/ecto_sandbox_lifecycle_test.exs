@@ -72,8 +72,9 @@ defmodule Fluffy.EctoSandboxLifecycleTest do
     scope_reference = monitor_running(scope)
     Process.exit(owner, :kill)
 
+    # Teardown waits up to the session timeout for the browser context to close.
     assert_receive {:DOWN, ^scope_reference, :process, ^scope, {:shutdown, {:sandbox_owner_down, :killed}}},
-                   5_000
+                   Fluffy.Session.context(session).timeout + 1_000
 
     refute browser_context.guid in Fluffy.TestCase.browser_context_guids()
   end

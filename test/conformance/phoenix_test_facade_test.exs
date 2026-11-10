@@ -985,15 +985,14 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
     end
   end
 
-  # The page navigates after the click returns, and no Fluffy action has read
-  # its new document when submit checks the form.
+  # A page script navigates outside any Fluffy action, and no Fluffy action has
+  # read its new document when submit checks the form.
   @tag driver: :playwright
   test "a page script navigation Fluffy has not adopted clears the active form" do
     fixture =
       Fluffy.TestHTTPFixtures.register(%{
         body: """
-        <html><body><form method="post"><input name="name" aria-label="Name"></form>
-        <button onclick="setTimeout(() => location.assign('?next'), 200)">Later</button></body></html>
+        <html><body><form method="post"><input name="name" aria-label="Name"></form></body></html>
         """
       })
 
@@ -1003,9 +1002,9 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
       |> visit(Fluffy.TestHTTPFixtures.path(fixture))
       |> unwrap(&send(self(), {:page, &1}))
       |> fill_in("Name", with: "Ada")
-      |> click_button("Later")
 
     assert_received {:page, page}
+    PlaywrightEx.Page.evaluate!(page, "setTimeout(() => location.assign('?next'))")
     :ok = PlaywrightEx.Page.wait_for_url(page, &String.ends_with?(&1, "?next"), wait_until: :commit, timeout: 10_000)
 
     assert_raise ArgumentError, ~r/no active form/, fn -> submit(session) end

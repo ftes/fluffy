@@ -6,6 +6,22 @@ Playwright).
 Treat observable public behavior as the contract. Keep driver-specific
 boundaries explicit and cover behavior changes with focused conformance tests.
 
+Upstream Playwright is the reference. Fluffy is modeled on Playwright and adds only what Phoenix
+LiveView needs (waiting for LiveViews to connect, following their navigations, form state). Before
+adding a timeout budget, retry, extra check or browser workaround, check what Playwright does and
+match it; the pinned source is in PlaywrightEx's download cache (`<cache_dir>/<version>/upstream`,
+see `PlaywrightEx.Driver.cache_dir/1`). Don't work around Playwright or browser bugs (upstream
+`fixme` tests mark the known ones); let Playwright's behavior show through. Only as a last
+resort, when LiveView support can't work without it, add a workaround, and say why in a comment.
+Timeouts follow Elixir: `0` means check once, not Playwright's no limit, so never pass it to
+PlaywrightEx as 0.
+
+Phoenix upstream is the secondary reference, for the Phoenix drivers. Playwright decides what
+behavior is correct; LiveView's client JS and `Phoenix.LiveViewTest` decide how the Phoenix drivers
+get there. Build on LiveViewTest rather than reimplementing it, and don't work around its
+limitations unless a test would see the browser behave differently; then match the browser,
+mirroring LiveView's JS. Document the differences you leave.
+
 Run `mix check` before handing off code changes; use `mix quality` for
 release-sensitive changes.
 
