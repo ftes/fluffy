@@ -316,10 +316,6 @@ defmodule Fluffy.ClientDOM do
     {client_dom, target}
   end
 
-  @doc false
-  def carry_checked(%__MODULE__{} = client_dom, target, %__MODULE__{} = from_dom, from_target),
-    do: put_checked_target(client_dom, target, checked_target?(from_dom, from_target))
-
   def select_option(%__MODULE__{} = client_dom, %Locator{} = locator, requested) do
     target = target!(client_dom, locator)
     ensure_target_enabled!(target, :select_option, locator)
