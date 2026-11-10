@@ -39,7 +39,7 @@ defmodule Fluffy.Event.Subscription do
 
     case SessionRuntime.subscribe(session.runtime, self(), source, event.type, handler) do
       :ok ->
-        timer = if deadline, do: Process.send_after(self(), :timeout, Deadline.remaining(deadline))
+        timer = if deadline, do: Deadline.send_after(deadline, self(), :timeout)
 
         {:ok,
          %{

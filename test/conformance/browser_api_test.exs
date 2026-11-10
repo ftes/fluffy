@@ -215,7 +215,7 @@ defmodule Fluffy.Conformance.BrowserAPITest do
   @tag driver: :playwright
   test "history validates its timeout like other actions" do
     session = start_session(:playwright)
-    assert_raise NimbleOptions.ValidationError, ~r/:timeout/, fn -> go_back(session, timeout: :infinity) end
+    assert_raise NimbleOptions.ValidationError, ~r/:timeout/, fn -> go_back(session, timeout: :forever) end
     assert_raise NimbleOptions.ValidationError, ~r/:timeout/, fn -> go_forward(session, timeout: -1) end
   end
 

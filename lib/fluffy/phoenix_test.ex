@@ -581,8 +581,15 @@ defmodule Fluffy.PhoenixTest do
   defp validate_option!({key, value}) when key in [:exact, :exact_option, :checked],
     do: reject!(not is_boolean(value), "#{key}: must be a boolean")
 
-  defp validate_option!({key, value}) when key in [:count, :timeout],
-    do: reject!(not (is_integer(value) and value >= 0), "#{key}: must be a nonnegative integer")
+  defp validate_option!({:count, value}),
+    do: reject!(not (is_integer(value) and value >= 0), "count: must be a nonnegative integer")
+
+  defp validate_option!({:timeout, value}),
+    do:
+      reject!(
+        not (value == :infinity or (is_integer(value) and value >= 0)),
+        "timeout: must be a nonnegative integer or :infinity"
+      )
 
   defp validate_option!({:at, value}),
     do: reject!(not (is_integer(value) and value > 0), "at: must be a positive one-based position")

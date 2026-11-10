@@ -982,6 +982,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
       |> visit("/live/async?delay=40")
       |> assert_has("p", "Status: ready", timeout: 1_000)
       |> refute_has("p", "Status: waiting", timeout: 0)
+      |> assert_has("button", "Appeared", timeout: :infinity)
     end
   end
 
@@ -1072,7 +1073,8 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
           {[value: "x", checked: true], ~r/only one of text:, value:, checked:, or selected:/},
           {[exact: true], ~r/exact: requires label: or text:/},
           {[count: -1], ~r/count: must be a nonnegative integer/},
-          {[timeout: -1], ~r/timeout: must be a nonnegative integer/},
+          {[timeout: -1], ~r/timeout: must be a nonnegative integer or :infinity/},
+          {[timeout: :forever], ~r/timeout: must be a nonnegative integer or :infinity/},
           {[checked: :yes], ~r/checked: must be a boolean/},
           {[value: 42], ~r/value: must be a string/},
           {[text: {:safe, "x"}], ~r/text: must be a string/},

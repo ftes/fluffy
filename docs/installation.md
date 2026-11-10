@@ -52,6 +52,10 @@ An operation's `timeout: 0` checks once, unlike Playwright, where `0` disables t
 Playwright assertions check once too, but Playwright actions and waits reject 0 with an
 `ArgumentError`, as they cannot check once; pass a positive timeout.
 
+For no timeout, pass `timeout: :infinity`, never Playwright's `0`. Playwright then waits
+with no timeout, and LiveView retries and event waits go on until the test times out; Static
+checks once, as with any timeout, since nothing on its page changes.
+
 A Playwright timeout under a second limits the operation only. Fluffy's own reads of the page
 around it still get a full second, so a page whose main thread is blocked takes a second to
 report, not the shorter timeout.
