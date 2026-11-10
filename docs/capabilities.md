@@ -134,6 +134,14 @@ connected by LiveViewTest: they show their dead render, and actions on them rais
 `Fluffy.CapabilityError`. LiveView-managed uploads inside portals require Playwright.
 LiveView `Fluffy.unwrap/2` receives only the View.
 
+LiveView follows a live navigation (`<.link navigate>` or `push_navigate`) over HTTP,
+even within a `live_session`: the router's plugs run again, the root layout is
+rendered again, losing local values in it, and the new view mounts disconnected
+before it connects. A browser joins the new view over its open socket instead and
+keeps the root layout. `Phoenix.LiveViewTest.live_redirect/2` needs the old view
+still running, which `push_navigate` has already stopped, and drops the flash, so
+Fluffy does not use it.
+
 ### Tabs, windows, and iframes
 
 The Playwright backend exposes page handles for browser tabs and popup windows.
