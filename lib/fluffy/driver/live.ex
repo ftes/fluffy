@@ -166,10 +166,10 @@ defmodule Fluffy.Driver.Live do
   end
 
   defp default_action_target(client_dom, target) do
-    case ClientDOM.activation_target(client_dom, target) do
+    case ClientDOM.default_action(client_dom, target, :live) do
       nil -> nil
-      %{tag: tag} = link when tag in ["a", "area"] -> link
-      submitter -> if ClientDOM.form_submission(client_dom, submitter, :live), do: submitter
+      {:link, link} -> link
+      {:submit, submitter, _submission} -> submitter
     end
   end
 
@@ -198,8 +198,10 @@ defmodule Fluffy.Driver.Live do
       List.keymember?(element.attributes, "disabled", 0)
   end
 
-  defp commit_click_binding(session, client_dom, binding, event_context, :dispatch_change),
-    do: dispatch_live_click_change(session, client_dom, binding, event_context)
+  defp commit_click_binding(session, client_dom, binding, event_context, :dispatch_change) do
+    event = ClientDOM.dispatch_change_event(client_dom, binding)
+    push_change_event(session, client_dom, event, event_context)
+  end
 
   defp commit_click_binding(session, client_dom, binding, event_context, :render_click) do
     result =
@@ -217,16 +219,15 @@ defmodule Fluffy.Driver.Live do
     state = Session.page_state(session)
     session = Session.put_page_state(session, %{state | client_dom: client_dom})
 
-    case ClientDOM.activation_target(client_dom, target) do
-      nil -> session
-      target -> commit_activation(session, client_dom, target, event_context)
-    end
-  end
+    case ClientDOM.default_action(client_dom, target, :live) do
+      nil ->
+        session
 
-  defp commit_activation(session, client_dom, target, event_context) do
-    case ClientDOM.form_submission(client_dom, target, :live) do
-      %{phx_submit?: true} = submission ->
-        case live_upload_for_submit(session, target) do
+      {:link, %{attributes: attributes}} ->
+        {:navigate, session, Navigation.link(attribute(attributes, "href"), download: attribute(attributes, "download"))}
+
+      {:submit, submitter, %{phx_submit?: true} = submission} ->
+        case live_upload_for_submit(session, submitter) do
           {:ok, form_id, upload} ->
             dispatch_live_upload_submit(session, form_id, upload, submission)
 
@@ -234,41 +235,8 @@ defmodule Fluffy.Driver.Live do
             dispatch_live_submit(session, client_dom, submission, event_context)
         end
 
-      %{phx_submit?: false} = submission ->
+      {:submit, _submitter, %{phx_submit?: false} = submission} ->
         {:navigate, session, Navigation.submission(submission)}
-
-      nil when target.tag in ["a", "area"] ->
-        {:navigate, session,
-         Navigation.link(attribute(target.attributes, "href"),
-           download: attribute(target.attributes, "download")
-         )}
-
-      nil ->
-        session
-    end
-  end
-
-  defp dispatch_live_click_change(session, client_dom, target, event_context) do
-    state = Session.page_state(session)
-    session = Session.put_page_state(session, %{state | client_dom: client_dom})
-
-    case ClientDOM.dispatch_change_event(client_dom, target) do
-      nil ->
-        session
-
-      event ->
-        payload =
-          event.fields
-          |> Form.to_params()
-          |> Map.put("_target", event.target_name || "undefined")
-          |> decode_merge_target()
-
-        result =
-          dispatch_view_event(session, fn ->
-            render_view_event(client_dom, event_context, event.dispatcher_selector, :change, payload)
-          end)
-
-        commit_render_result(session, client_dom, result)
     end
   end
 
@@ -432,14 +400,16 @@ defmodule Fluffy.Driver.Live do
   # A browser sends keyup right after keydown, before the keydown's patch comes
   # back, so a keyup after a keydown uses the binding its element had when the
   # press started, whatever the patch then removes, moves, or rebinds. Only the
-  # first phase meets the document the target was found in.
+  # first phase meets the document the target was found in. A Phoenix press
+  # types nothing, so both phases carry the value the element had then.
   defp dispatch_keys(session, target, key) do
     phases = Enum.filter([:keydown, :keyup], &key_binding?(target, &1))
     [first | rest] = if phases == [], do: [:keydown], else: phases
+    payload = Map.put(Event.element_values(Session.page_state(session).client_dom, target), "key", key)
 
     with {:ok, context} <- owning_view_context(session, target),
-         %Session{} = session <- dispatch_key(session, context, target, key, first) do
-      if rest == [], do: session, else: dispatch_bound_keyup(session, context, target, key)
+         %Session{} = session <- dispatch_key(session, context, target, payload, first) do
+      if rest == [], do: session, else: dispatch_bound_keyup(session, context, target, payload)
     end
   end
 
@@ -448,18 +418,18 @@ defmodule Fluffy.Driver.Live do
       attribute(target.attributes, "phx-window-#{phase}") != nil
   end
 
-  defp dispatch_key(session, context, target, key, phase) do
+  defp dispatch_key(session, context, target, payload, phase) do
     state = Session.page_state(session)
 
     result =
       dispatch_view_event(session, fn ->
-        render_view_event(state.client_dom, context, target.selector, phase, %{"key" => key})
+        render_view_event(state.client_dom, context, target.selector, phase, payload)
       end)
 
     commit_render_result(session, state.client_dom, result)
   end
 
-  defp dispatch_bound_keyup(session, context, target, key) do
+  defp dispatch_bound_keyup(session, context, target, payload) do
     state = Session.page_state(session)
 
     case read_view(session, fn -> with {:ok, view} <- find_view(state.view, context.view.id), do: view end) do
@@ -468,7 +438,6 @@ defmodule Fluffy.Driver.Live do
         session
 
       {:ok, view} ->
-        payload = Map.put(Event.key_values(target.attributes), "key", key)
         result = dispatch_view_event(session, fn -> Event.push(view, target, :keyup, payload) end)
         commit_render_result(session, state.client_dom, result)
 
@@ -885,6 +854,8 @@ defmodule Fluffy.Driver.Live do
       Enum.any?(commands, &match?([command, _] when command in ["navigate", "patch", "push"], &1)) ->
         :render_click
 
+      # Mirrors the LiveView client's JS.dispatch("change"), which fires a
+      # change event on the element so its form sends phx-change.
       Enum.any?(commands, &match?(["dispatch", %{"event" => "change"}], &1)) ->
         :dispatch_change
 
@@ -965,27 +936,29 @@ defmodule Fluffy.Driver.Live do
 
   defp dispatch_live_change(session, client_dom, %Target{} = target) do
     with {:ok, event_context} <- owning_view_context(session, target) do
-      state = Session.page_state(session)
-      session = Session.put_page_state(session, %{state | client_dom: client_dom})
+      push_change_event(session, client_dom, ClientDOM.change_event(client_dom, target), event_context)
+    end
+  end
 
-      case ClientDOM.change_event(client_dom, target) do
-        nil ->
-          session
+  # Like the LiveView client, `_target` is the input's name, or "undefined";
+  # the channel decodes it into the path that handle_event sees.
+  defp push_change_event(session, client_dom, event, event_context) do
+    state = Session.page_state(session)
+    session = Session.put_page_state(session, %{state | client_dom: client_dom})
 
-        event ->
-          payload =
-            event.fields
-            |> Form.to_params()
-            |> Map.put("_target", event.target_name || "undefined")
-            |> decode_merge_target()
+    case event do
+      nil ->
+        session
 
-          result =
-            dispatch_view_event(session, fn ->
-              render_view_event(client_dom, event_context, event.dispatcher_selector, :change, payload)
-            end)
+      %{} ->
+        payload = event.fields |> Form.to_params() |> Map.put("_target", event.target_name || "undefined")
 
-          commit_render_result(session, client_dom, result)
-      end
+        result =
+          dispatch_view_event(session, fn ->
+            render_view_event(client_dom, event_context, event.dispatcher_selector, :change, payload)
+          end)
+
+        commit_render_result(session, client_dom, result)
     end
   end
 
@@ -1107,10 +1080,11 @@ defmodule Fluffy.Driver.Live do
   end
 
   defp render_view_event(client_dom, %{root_id: nil} = context, selector, kind, payload) do
-    target = ClientDOM.target!(client_dom, Locator.by_css(selector))
-    Event.push(context.view, target, kind, Map.merge(Event.key_values(target.attributes), payload))
+    Event.push(context.view, ClientDOM.target!(client_dom, Locator.by_css(selector)), kind, payload)
   end
 
+  # LiveViewTest adds the element's value attribute; the payload's current value
+  # replaces it.
   defp render_view_event(client_dom, context, selector, kind, payload) do
     element = element(context.view, selector_for_view(client_dom, selector, context))
 
@@ -1612,29 +1586,6 @@ defmodule Fluffy.Driver.Live do
 
     UploadCompat.stop(upload)
   end
-
-  # Keep this in step with Phoenix.LiveView.Channel's `_target` decoding. The
-  # browser sends the input name as a string; the channel query-decodes that
-  # name and walks the resulting single keyspace to produce the target path.
-  defp decode_merge_target(%{"_target" => target} = params) when is_list(target), do: params
-
-  defp decode_merge_target(%{"_target" => target} = params) when is_binary(target) do
-    keyspace = target |> Plug.Conn.Query.decode() |> gather_keys([])
-    Map.put(params, "_target", Enum.reverse(keyspace))
-  end
-
-  defp decode_merge_target(%{} = params), do: params
-
-  defp gather_keys(%{} = map, acc) do
-    case :maps.next(:maps.iterator(map)) do
-      {key, value, _iterator} -> gather_keys(value, [key | acc])
-      :none -> acc
-    end
-  end
-
-  defp gather_keys([], acc), do: acc
-  defp gather_keys([%{} = map], acc), do: gather_keys(map, acc)
-  defp gather_keys(_value, acc), do: acc
 
   defp normalize(text) do
     text

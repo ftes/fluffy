@@ -74,14 +74,20 @@ defmodule Fluffy.Conformance.LiveDocumentTest do
     end
 
     @tag driver: driver
-    test "sends the element's value with both phases of a key press in portal content with #{driver}", %{driver: driver} do
+    test "sends the element's current value with both phases of a key press in portal content with #{driver}", %{
+      driver: driver
+    } do
       dialog = by_role(:dialog, name: "Treats")
+      key = by_label(dialog, "Treat key")
 
       driver
       |> kennel_session()
       |> visit("/live/kennel")
-      |> press(by_label(dialog, "Treat key"), "Enter")
+      |> press(key, "Enter")
       |> expect(dialog |> by_text("Treat keys: keydown:Enter=x, keyup:Enter=x") |> to_be_visible())
+      |> fill(key, "y")
+      |> press(key, "Enter")
+      |> expect(dialog |> by_text("keydown:Enter=x, keyup:Enter=x, keydown:Enter=y, keyup:Enter=y") |> to_be_visible())
     end
   end
 

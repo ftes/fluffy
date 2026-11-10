@@ -144,12 +144,29 @@ defmodule Fluffy.ClientDOM do
     end
   end
 
+  # A click's default action: `{:link, link}` to follow a link,
+  # `{:submit, submitter, submission}` to submit a submit button's form, or nil.
+  @doc false
+  def default_action(%__MODULE__{} = client_dom, %Target{} = target, driver \\ :static) do
+    case activation_target(client_dom, target) do
+      nil ->
+        nil
+
+      %{tag: tag} = link when tag in ["a", "area"] ->
+        {:link, link}
+
+      control ->
+        case form_submission(client_dom, control, driver) do
+          nil -> nil
+          submission -> {:submit, control, submission}
+        end
+    end
+  end
+
   # Like a browser's click dispatch, the default action belongs to the closest
   # inclusive ancestor with activation behavior. Actionability already rejects
   # a click inside a disabled control.
-  @doc false
-  def activation_target(%__MODULE__{} = client_dom, %Target{} = target),
-    do: closest(client_dom, target, &activation_behavior?/1)
+  defp activation_target(client_dom, target), do: closest(client_dom, target, &activation_behavior?/1)
 
   defp activation_behavior?(%{tag: tag, attributes: attributes}) when tag in ["a", "area"],
     do: has_attribute?(attributes, "href")

@@ -272,6 +272,9 @@ defmodule Fluffy.Backend.Phoenix do
 
   @doc false
   def commit_live(%Session{} = session, view, html, destination, redirects \\ 0) do
+    # LiveViewTest links its client proxy to the test process, and the proxy
+    # exits with the view's reason. Unlink it so a view that redirects or
+    # crashes doesn't take the test down; the watcher reports how it left.
     proxy_pid = live_view_proxy_pid(view)
     Process.unlink(proxy_pid)
 
@@ -363,6 +366,9 @@ defmodule Fluffy.Backend.Phoenix do
     session |> put_http(http) |> finish_response(response, download_name)
   end
 
+  # Like the LiveView client's Browser.redirect, a redirect's flash travels to
+  # the next page in a 60-second __phoenix_flash__ cookie, signed as
+  # LiveViewTest's follow_redirect signs a flash that is still a map.
   defp put_live_redirect_flash(session, _url, nil), do: session
 
   defp put_live_redirect_flash(session, url, flash) do
