@@ -671,6 +671,77 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
         Playwright.wait_for_load_state(popup, :networkidle, timeout: 10_000)
       end
     end
+
+    # Only Fluffy's LiveView readiness check reads this root's view, so the page
+    # closes exactly while Fluffy adopts its document.
+    @closes_on_adoption """
+    <div id="root" data-phx-main></div>
+    <script>
+      document.getElementById('root').phxPrivate = {get view() { setTimeout(() => window.close()) }}
+    </script>
+    """
+
+    test "a page closing while Fluffy adopts it fails the operation" do
+      for {operation, call} <- [
+            wait_for: &wait_for(&1, by_css("#never"), timeout: 10_000),
+            click: &click(&1, by_css("#never"), timeout: 10_000),
+            evaluate_all: &Playwright.evaluate_all(&1, by_css("#never"), "() => 1")
+          ] do
+        popup = popup_showing(@closes_on_adoption)
+        assert_raise Fluffy.OperationError, ~r/#{operation}.*closed/is, fn -> call.(popup) end
+      end
+    end
+
+    test "a page closing while Fluffy adopts it fails an expectation" do
+      popup = popup_showing(@closes_on_adoption)
+
+      assert_raise ExUnit.AssertionError, ~r/closed/i, fn ->
+        expect(popup, to_be_visible(by_css("#never")), timeout: 10_000)
+      end
+    end
+
+    test "a page closing while Fluffy adopts it raises from unwrap and clock calls" do
+      for call <- [&unwrap(&1, fn _page -> :ok end), &Fluffy.Playwright.Clock.install/1] do
+        popup = popup_showing(@closes_on_adoption)
+        assert_raise PlaywrightEx.TargetClosedError, fn -> call.(popup) end
+      end
+    end
+
+    test "an action navigating to a page that closes while Fluffy adopts it succeeds" do
+      closing = TestHTTPFixtures.register(%{body: @closes_on_adoption})
+      popup = popup_showing(~s|<a href="#{TestHTTPFixtures.path(closing)}">Next</a>|)
+
+      assert %Fluffy.Session{} = click(popup, by_role(:link, name: "Next"))
+    end
+
+    # Like @closes_on_adoption, but only when the document was reached by the
+    # navigation type named in `?close=`.
+    @closes_on_navigation """
+    <div id="root" data-phx-main></div>
+    <script>
+      const want = new URLSearchParams(location.search).get('close')
+      let type = performance.getEntriesByType('navigation')[0].type
+      addEventListener('pageshow', e => { if (e.persisted) type = 'back_forward' })
+      const root = document.getElementById('root')
+      root.phxPrivate = {get view() { if (type === want) setTimeout(() => window.close()); else root.classList.add('phx-connected') }}
+    </script>
+    """
+
+    test "a page closing while Fluffy adopts a navigation raises from visit, reload and history navigation" do
+      closing = TestHTTPFixtures.register(%{body: @closes_on_navigation})
+      plain = TestHTTPFixtures.path(TestHTTPFixtures.register(%{body: "<p>Plain</p>"}))
+      closes_on = &TestHTTPFixtures.path(closing, "?close=#{&1}")
+
+      for call <- [
+            &visit(&1, closes_on.("navigate")),
+            &(&1 |> visit(closes_on.("reload")) |> reload()),
+            &(&1 |> visit(closes_on.("back_forward")) |> visit(plain) |> Playwright.go_back()),
+            &(&1 |> visit(closes_on.("back_forward")) |> Playwright.go_back() |> Playwright.go_forward())
+          ] do
+        popup = popup_showing("<p>Start</p>")
+        assert_raise PlaywrightEx.TargetClosedError, fn -> call.(popup) end
+      end
+    end
   end
 
   describe "unroute_all when Playwright does not finish" do
@@ -915,6 +986,22 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
     end
   end
 
+  # A popup whose `body` has loaded, not yet adopted by any Fluffy action.
+  defp popup_showing(body) do
+    ready = "<script>window.opener.postMessage('ready', '*')</script>"
+    fixture = TestHTTPFixtures.register(%{body: body <> ready})
+    session = session_for_html(:playwright, "<p>Opener</p>")
+    pending = wait_for(session, Fluffy.Event.popup())
+
+    Playwright.evaluate(
+      session,
+      "url => new Promise(resolve => { window.addEventListener('message', resolve); window.open(url) }).then(() => true)",
+      TestHTTPFixtures.path(fixture)
+    )
+
+    Playwright.switch_page(session, await(pending))
+  end
+
   # A popup showing `html` that closes itself soon, which its opener's page does not allow.
   defp closing_popup(html, script \\ "1") do
     session = session_for_html(:playwright, "<p>Opener</p>")
@@ -925,10 +1012,12 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
     Playwright.evaluate(popup, """
     document.body.innerHTML = #{JSON.encode!(html)}
     #{script}
-    setTimeout(() => window.close(), 500)
     true
     """)
 
+    # Adopted first, so the close races only the wait under test.
+    popup = wait_for(popup, by_css("body"), state: :attached)
+    Playwright.evaluate(popup, "setTimeout(() => window.close(), 500); true")
     popup
   end
 end

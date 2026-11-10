@@ -99,7 +99,8 @@ their own selection. Closed page handles are invalid; closing a page does not ch
 session handle's selection. Explicitly switch to an open page before continuing. Closing
 an opener leaves its child pages alive.
 
-An action that closes its own page succeeds. `Event.close()` resolves with the selected
+As in Playwright, an action that closes its own page succeeds, except on Firefox, which
+fails it with a closed-page error. `Event.close()` resolves with the selected
 page's handle once it closes, by its own script or `Fluffy.Playwright.close_page/2`:
 
 ```elixir

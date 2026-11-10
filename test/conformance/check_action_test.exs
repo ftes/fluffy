@@ -149,6 +149,15 @@ defmodule Fluffy.Conformance.CheckActionTest do
 
   @reverting_checkbox ~s|<label><input type="checkbox" oninput="queueMicrotask(() => this.checked = !this.checked)">Updates</label>|
 
+  test "Playwright check trusts a reverted click under a short session timeout" do
+    with_html(:playwright, @reverting_checkbox, fn session ->
+      session
+      |> put_session_timeout(1)
+      |> check(by_role(:checkbox, name: "Updates"), timeout: 5_000)
+      |> expect(to_be_checked(by_role(:checkbox, name: "Updates"), checked: false), timeout: 5_000)
+    end)
+  end
+
   test "Playwright check and uncheck succeed when page code in an iframe reverts the click" do
     revert = ~s|oninput="queueMicrotask(() => this.checked = !this.checked)"|
 

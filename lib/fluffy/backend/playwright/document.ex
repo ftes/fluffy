@@ -10,11 +10,16 @@ defmodule Fluffy.Backend.Playwright.Document do
 
   alias Fluffy.Backend.Playwright.Bounded
   alias Fluffy.Deadline
+  alias Fluffy.Session
   alias PlaywrightEx.Frame
   alias PlaywrightEx.JSHandle
   alias PlaywrightEx.Locator
 
   @cursor_grace 250
+
+  # What Fluffy's own browser calls around an operation may take. A sub-second
+  # session timeout limits the operation; a merely busy browser should not fail these.
+  @min_bookkeeping_timeout 1_000
 
   # The element Playwright's check reads the state of: its injected script's
   # `follow-label` retarget.
@@ -93,6 +98,8 @@ defmodule Fluffy.Backend.Playwright.Document do
   """
 
   def init_script, do: @state
+
+  def bookkeeping_timeout(session), do: max(Session.context(session).timeout, @min_bookkeeping_timeout)
 
   @doc "A page listener that flags the state when its main frame navigates."
   def navigation_listener(state) do
@@ -204,6 +211,9 @@ defmodule Fluffy.Backend.Playwright.Document do
       {:ok, handle} ->
         release(handle)
 
+      {:error, %PlaywrightEx.TargetClosedError{} = error} ->
+        raise error
+
       {:error, error} ->
         raise "LiveView browser connection failed for #{inspect(destination)}: expected every LiveView root " <>
                 "to be connected with its join complete, got: " <> Exception.message(error)
@@ -220,6 +230,9 @@ defmodule Fluffy.Backend.Playwright.Document do
     case Frame.wait_for_function(frame, expression, cursor, timeout: timeout) do
       {:ok, handle} ->
         release(handle)
+
+      {:error, %PlaywrightEx.TargetClosedError{} = error} ->
+        raise error
 
       {:error, error} ->
         raise "LiveView browser navigation failed for #{inspect(destination)}: expected redirect completion " <>

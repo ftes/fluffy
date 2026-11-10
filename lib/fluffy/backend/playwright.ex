@@ -113,8 +113,8 @@ defmodule Fluffy.Backend.Playwright do
   end
 
   @impl true
-  def page_snapshot(context, page) do
-    document_id = {document_identity(context, page.state), page.document_id}
+  def page_snapshot(_context, page) do
+    document_id = {document_identity(page.state), page.document_id}
     %{page | url: BrowserPage.url(page.state.page), document_id: document_id}
   end
 
@@ -125,9 +125,9 @@ defmodule Fluffy.Backend.Playwright do
   # Actions adopt the document they find. One that page code navigated to
   # since is read from the page; a closed or unresponsive page keeps the
   # adopted identity.
-  defp document_identity(context, state) do
+  defp document_identity(state) do
     if Document.navigated?(state),
-      do: Document.probe!(state.frame, nil, min(context.timeout, @snapshot_probe_timeout)).document,
+      do: Document.probe!(state.frame, nil, @snapshot_probe_timeout).document,
       else: state.document_identity
   rescue
     _error -> state.document_identity
@@ -267,7 +267,7 @@ defmodule Fluffy.Backend.Playwright do
     state = Session.page_state(session)
     timeout = Session.context(session).timeout
     _response = navigate!(:goto, [state.page, path, [wait_until: :load, timeout: timeout]])
-    adopt_navigated_document(session, state, timeout)
+    adopt_navigated_document(session, state)
   end
 
   @impl true
@@ -275,13 +275,12 @@ defmodule Fluffy.Backend.Playwright do
     state = Session.page_state(session)
     native = navigation_options(session, options)
     _response = navigate!(:reload, [state.page, native])
-    # Bookkeeping uses the session timeout, as after other actions.
-    adopt_navigated_document(session, state, Session.timeout(session))
+    adopt_navigated_document(session, state)
   end
 
   @impl true
   def navigate(%Session{} = session, %BrowserCommitted{state: state, url: url, live_navigation_cursor: cursor}) do
-    timeout = Session.context(session).timeout
+    timeout = Document.bookkeeping_timeout(session)
 
     if cursor do
       :ok = ready_navigated_document(state, url, timeout, cursor)
@@ -305,16 +304,15 @@ defmodule Fluffy.Backend.Playwright do
   @impl true
   def history(session, direction, options) do
     state = Session.page_state(session)
-    session_timeout = Session.timeout(session)
+    timeout = Document.bookkeeping_timeout(session)
     previous_url = Session.current_page(session).url
     native = navigation_options(session, options)
     response = navigate!(direction, [state.page, native])
-    # Bookkeeping uses the session timeout, as after other actions.
-    probe = Document.adopted_probe!(state, nil, session_timeout)
+    probe = Document.adopted_probe!(state, nil, timeout)
 
     if is_nil(response) and probe.url == previous_url and probe.document == state.document_identity,
       do: session,
-      else: adopt_probed_document(session, state, probe, session_timeout)
+      else: adopt_probed_document(session, state, probe, timeout)
   end
 
   @impl true
@@ -348,7 +346,8 @@ defmodule Fluffy.Backend.Playwright do
     end
   end
 
-  defp adopt_navigated_document(session, state, timeout) do
+  defp adopt_navigated_document(session, state) do
+    timeout = Document.bookkeeping_timeout(session)
     adopt_probed_document(session, state, Document.adopted_probe!(state, nil, timeout), timeout)
   end
 
