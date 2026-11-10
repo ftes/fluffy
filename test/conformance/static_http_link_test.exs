@@ -32,6 +32,22 @@ defmodule Fluffy.Conformance.StaticHTTPLinkTest do
     end
 
     @tag driver: driver
+    test "a click on text inside a link follows the link with #{driver}", %{driver: driver} do
+      fixture =
+        TestHTTPFixtures.register_sequence([
+          %{body: html(~s(<a href="next"><span>Next order</span></a>))},
+          %{body: html("<h1>Next order page</h1>")}
+        ])
+
+      driver
+      |> start_test_session()
+      |> visit(TestHTTPFixtures.path(fixture, "/orders/current"))
+      |> click(by_text("Next order", exact: true))
+      |> expect("Next order page" |> by_text() |> to_be_visible())
+      |> expect(Fluffy.Expect.page_to_have_url(TestHTTPFixtures.url(fixture, "/orders/next")))
+    end
+
+    @tag driver: driver
     test "follows an absolute same-origin link with #{driver}", %{driver: driver} do
       destination = Fluffy.TestServer.base_url() <> "/chamber"
 

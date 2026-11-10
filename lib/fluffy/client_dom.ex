@@ -135,6 +135,27 @@ defmodule Fluffy.ClientDOM do
     end)
   end
 
+  @doc false
+  def closest(%__MODULE__{} = client_dom, %Target{} = target, fun) do
+    case Enum.find([target | Enum.reverse(target.ancestors)], fun) do
+      nil -> nil
+      %{id: id} when id == target.id -> target
+      element -> DocumentIndex.target_by_id(index(client_dom), element.id)
+    end
+  end
+
+  # Like a browser's click dispatch, the default action belongs to the closest
+  # inclusive ancestor with activation behavior. Actionability already rejects
+  # a click inside a disabled control.
+  @doc false
+  def activation_target(%__MODULE__{} = client_dom, %Target{} = target),
+    do: closest(client_dom, target, &activation_behavior?/1)
+
+  defp activation_behavior?(%{tag: tag, attributes: attributes}) when tag in ["a", "area"],
+    do: has_attribute?(attributes, "href")
+
+  defp activation_behavior?(%{tag: tag}), do: tag in ["button", "input"]
+
   def form_submission(%__MODULE__{} = client_dom, target, driver \\ :static) do
     Fluffy.Form.build(index(client_dom), client_dom.properties, target, driver)
   end

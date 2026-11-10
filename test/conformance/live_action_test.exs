@@ -239,6 +239,36 @@ defmodule Fluffy.Conformance.LiveActionTest do
     end
 
     @tag driver: driver
+    test "a click on text inside a submit button or link takes its default action with #{driver}", %{driver: driver} do
+      driver
+      |> live_session()
+      |> visit("/live/click-bindings")
+      |> click(by_text("Save by text", exact: true))
+      |> expect(to_have_text(by_css("#log"), "Log: save"))
+      |> click(by_text("Leave by text", exact: true))
+      |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
+    end
+
+    # LiveView's link handler takes the click from the closest link before any
+    # phx-click binding sees it.
+    @tag driver: driver
+    test "a click on text inside a LiveView link patches or navigates, past a closer phx-click, with #{driver}", %{
+      driver: driver
+    } do
+      log = by_css("#log")
+
+      driver
+      |> live_session()
+      |> visit("/live/click-bindings")
+      |> click(by_text("Patch by text", exact: true))
+      |> expect(to_have_text(by_css("#tab"), "Tab: two"))
+      |> click(by_text("Alpha", exact: true))
+      |> expect(to_have_text(log, "Log: select:alpha"))
+      |> click(by_text("Navigate by text", exact: true))
+      |> expect("The secret chamber is open" |> by_text() |> to_be_visible())
+    end
+
+    @tag driver: driver
     test "unchecked checkboxes and deselected options leave the form payload with #{driver}", %{driver: driver} do
       last = by_css("#last")
 
