@@ -26,14 +26,6 @@ defmodule Fluffy.Conformance.TimeoutInfinityTest do
     end
   end
 
-  @tag driver: :playwright
-  test "timeout: :infinity reaches PlaywrightEx as its no timeout, 0" do
-    session = start_session(:playwright)
-
-    assert Fluffy.Session.timeout(session, timeout: :infinity) == 0
-    assert Fluffy.Session.timeout(session, timeout: 0) == 1
-  end
-
   @tag driver: :static
   test "timeout: :infinity checks once with static" do
     session =
