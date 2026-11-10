@@ -10,13 +10,12 @@ defmodule Fluffy.Request do
   initial request, or a request of a page that closed before Fluffy saw it).
 
   The functions below read from the browser, so they raise once the session is
-  closed, and after the session's `timeout:` when the browser does not answer.
+  closed. As in Playwright, they have no timeout.
   Phoenix delivers no requests: `Fluffy.Event.request/1` raises
   `Fluffy.CapabilityError`. `timing`, `sizes` and other members stay on the
   `PlaywrightEx.Request` that `Fluffy.unwrap_and_return/2` passes.
   """
 
-  alias Fluffy.Backend.Playwright.Bounded
   alias Fluffy.Backend.Playwright.Events
   alias Fluffy.SessionRuntime
 
@@ -35,13 +34,13 @@ defmodule Fluffy.Request do
   @doc "Returns all request headers, with lowercase names, including the security-related ones `headers` leaves out."
   @spec all_headers(t()) :: %{optional(String.t()) => String.t()}
   def all_headers(%__MODULE__{} = request) do
-    __bounded__!(request, :all_headers, fn -> PlaywrightEx.Request.all_headers(request.native) end)
+    __read__!(request, fn -> PlaywrightEx.Request.all_headers(request.native) end)
   end
 
   @doc "Returns the value of a header, matched case-insensitively, or nil if it is absent."
   @spec header_value(t(), String.t()) :: String.t() | nil
   def header_value(%__MODULE__{} = request, name) when is_binary(name) do
-    __bounded__!(request, :header_value, fn -> PlaywrightEx.Request.header_value(request.native, name) end)
+    __read__!(request, fn -> PlaywrightEx.Request.header_value(request.native, name) end)
   end
 
   @doc """
@@ -79,10 +78,14 @@ defmodule Fluffy.Request do
   defp redirect(_request, nil), do: nil
   defp redirect(%{runtime: runtime}, native), do: Events.request(%{runtime: runtime}, native)
 
-  # PlaywrightEx's reads take no timeout of their own, and a response body may never end.
   @doc false
-  def __bounded__!(%__MODULE__{} = request, operation, fun) do
-    Bounded.within!(context!(request).timeout, operation, fun)
+  def __read__!(%__MODULE__{} = request, fun) do
+    context!(request)
+
+    case fun.() do
+      {:ok, value} -> value
+      {:error, error} -> raise error
+    end
   end
 
   defp context!(%__MODULE__{runtime: runtime}) do

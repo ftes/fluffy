@@ -3,7 +3,6 @@ defmodule Fluffy.Driver.Playwright do
 
   @behaviour Fluffy.Driver.Contract
 
-  alias Fluffy.Backend.Playwright.Bounded
   alias Fluffy.Backend.Playwright.Document
   alias Fluffy.Backend.Playwright.Listeners
   alias Fluffy.Deadline
@@ -31,11 +30,9 @@ defmodule Fluffy.Driver.Playwright do
     frame = Session.page_state(session).frame
 
     html =
-      try do
-        Bounded.within!(Session.timeout(session), :content, fn -> Frame.content(frame) end)
-      rescue
-        error in [PlaywrightEx.PlaywrightError, TimeoutError, TargetClosedError] ->
-          reraise OperationFailure.playwright(:open_browser, nil, error), __STACKTRACE__
+      case Frame.content(frame) do
+        {:ok, html} -> html
+        {:error, error} -> OperationFailure.raise_playwright!(:open_browser, nil, error)
       end
 
     url = Session.current_page(session).url
@@ -172,7 +169,7 @@ defmodule Fluffy.Driver.Playwright do
   def set_html(%Session{} = session, html) when is_binary(html) do
     frame = Session.page_state(session).frame
     expression = "html => { document.querySelector('#fluffy-test-root').innerHTML = html }"
-    Bounded.within!(Session.timeout(session), :set_html, fn -> Frame.evaluate(frame, expression, html) end)
+    with {:error, error} <- Frame.evaluate(frame, expression, html), do: raise(error)
     session
   end
 
@@ -369,8 +366,9 @@ defmodule Fluffy.Driver.Playwright do
     )
   end
 
+  # As in Playwright, `timeout:` limits finding the element, not reading its box.
   def bounding_box(session, locator, options) do
-    bounded_read(session, :bounding_box, locator, options, &BrowserLocator.bounding_box(&1, native(options, &2)))
+    locator_read(session, :bounding_box, locator, options, &BrowserLocator.bounding_box(&1, native(options, &2)))
   end
 
   def aria_snapshot(session, locator, options) do
@@ -383,18 +381,19 @@ defmodule Fluffy.Driver.Playwright do
     read(session, :aria_snapshot, nil, options, &BrowserPage.aria_snapshot(page, native(options, &1)))
   end
 
-  def page_read(session, operation, fun, options) do
+  # As in Playwright, a page read has no timeout and waits while a script blocks the page.
+  def page_read(session, operation, fun) do
     page = Session.page_state(session).page
-
-    read(session, operation, nil, options, &bounded(operation, &1, fn -> fun.(page) end))
+    read(session, operation, nil, [], fn _remaining -> fun.(page) end)
   end
 
+  # As in Playwright, `timeout:` limits finding the element, not the evaluation.
   def locator_evaluate(session, locator, expression, arg, options) do
-    bounded_read(session, :evaluate, locator, options, &BrowserLocator.evaluate(&1, expression, arg, native(options, &2)))
+    locator_read(session, :evaluate, locator, options, &BrowserLocator.evaluate(&1, expression, arg, native(options, &2)))
   end
 
-  def evaluate_all(session, locator, expression, arg, options) do
-    bounded_read(session, :evaluate_all, locator, options, fn native_locator, _remaining ->
+  def evaluate_all(session, locator, expression, arg) do
+    locator_read(session, :evaluate_all, locator, [], fn native_locator, _remaining ->
       BrowserLocator.evaluate_all(native_locator, expression, arg)
     end)
   end
@@ -415,13 +414,13 @@ defmodule Fluffy.Driver.Playwright do
     locator_action(session, :screenshot, locator, options, &BrowserLocator.screenshot(&1, native(options, &2)))
   end
 
-  # Page-wide input and emulation have no timeout of their own and wait while a
-  # script blocks the page, so this bound is what ends them. Unlike a locator
-  # action, Playwright does not wait for a navigation the input starts, which may
-  # commit after this returns; the next call adopts it then.
-  def page_action(%Session{} = session, operation, fun, options) do
+  # As in Playwright, page-wide input and emulation have no timeout and wait while
+  # a script blocks the page. Unlike a locator action, Playwright does not wait for
+  # a navigation the input starts, which may commit after this returns; the next
+  # call adopts it then.
+  def page_action(%Session{} = session, operation, fun) do
     page = Session.page_state(session).page
-    action(session, operation, nil, options, &bounded(operation, &1, fn -> fun.(page) end))
+    action(session, operation, nil, [], fn _remaining -> fun.(page) end)
   end
 
   # `fun` gets the native options, with the timeout, and may return a handle.
@@ -437,20 +436,9 @@ defmodule Fluffy.Driver.Playwright do
   defp resolve_mask(options, session),
     do: Keyword.replace_lazy(options, :mask, fn mask -> Enum.map(mask, &locator(session, &1)) end)
 
-  # A read whose Playwright call a script blocking the page could otherwise hold up.
-  defp bounded_read(session, operation, locator, options, call) do
+  defp locator_read(session, operation, locator, options, call) do
     native_locator = locator(session, locator)
-
-    read(session, operation, locator, options, fn remaining ->
-      bounded(operation, remaining, fn -> call.(native_locator, remaining) end)
-    end)
-  end
-
-  defp bounded(operation, remaining, fun) do
-    case Bounded.within(remaining, fun) do
-      {:ok, result} -> result
-      :timeout -> {:error, %TimeoutError{message: "Timeout #{remaining}ms exceeded during #{operation}"}}
-    end
+    read(session, operation, locator, options, &call.(native_locator, &1))
   end
 
   @impl true
@@ -488,15 +476,12 @@ defmodule Fluffy.Driver.Playwright do
 
   defp discard_return({:return, _ignored, outcome}), do: outcome
 
-  # A clock call has no timeout of its own and waits while a timer it fires
-  # blocks the page. Those timers can patch or navigate, as an action can.
-  def clock(%Session{} = session, operation, fun, options) do
+  # As in Playwright, a clock call has no timeout and waits while a timer it
+  # fires blocks the page. Those timers can patch or navigate, as an action can.
+  def clock(%Session{} = session, operation, fun) do
     clock = BrowserPage.clock(Session.page_state(session).page)
-    timeout = Session.timeout(session, options)
 
-    action = &bounded(operation, &1, fn -> result(fun.(clock)) end)
-
-    case navigation_aware_action(session, timeout, action) do
+    case navigation_aware_action(session, Session.timeout(session), fn _remaining -> result(fun.(clock)) end) do
       {:ok, :ok, outcome} -> outcome
       {:error, error} -> OperationFailure.raise_playwright!(operation, nil, error)
     end

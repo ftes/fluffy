@@ -16,9 +16,6 @@ defmodule Fluffy.Conformance.ClockTest do
   <button onclick="this.nextElementSibling.textContent = new Date().getUTCFullYear()">Year</button><output></output>
   """
 
-  # The timer blocks the page's main thread once the clock fires it.
-  @freeze ~s|<button onclick="setTimeout(() => { while (true) {} }, 100)">Freeze</button>|
-
   describe "Playwright" do
     @describetag driver: :playwright
 
@@ -106,21 +103,13 @@ defmodule Fluffy.Conformance.ClockTest do
       |> expect(to_be_visible(by_text("Rings: 1")))
     end
 
-    test "a clock call that a blocked page cannot finish fails after its timeout" do
-      session =
-        :playwright
-        |> session_for_html(@freeze, base_url: Fluffy.TestServer.base_url())
-        |> Clock.install(time: @noon)
-        |> Clock.pause_at(@later)
-        |> click(by_role(:button, name: "Freeze"))
+    # As in Playwright, clock calls have no timeout.
+    test "clock calls reject timeout:" do
+      session = session_for_html(:playwright, @dates, base_url: Fluffy.TestServer.base_url())
 
-      started = System.monotonic_time(:millisecond)
-
-      assert_raise Fluffy.OperationError, ~r/Timeout 500ms exceeded during Clock.run_for/, fn ->
-        Clock.run_for(session, 200, timeout: 500)
+      for call <- [&Clock.install(session, &1), &Clock.run_for(session, 200, &1), &Clock.resume(session, &1)] do
+        assert_raise NimbleOptions.ValidationError, ~r/unknown options.*:timeout/, fn -> call.(timeout: 500) end
       end
-
-      assert System.monotonic_time(:millisecond) - started < 5_000
     end
 
     # The call runs in a task, which logs the crash.

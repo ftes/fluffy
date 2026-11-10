@@ -167,16 +167,17 @@ defmodule Fluffy.Conformance.PlaywrightWrappersTest do
       expect(session, to_be_visible(by_text("Hi")))
     end
 
-    test "is bounded by its timeout while a script blocks the page" do
-      html = ~s|<input aria-label="Name" onkeydown="const end = Date.now() + 1000; while (Date.now() < end) {}">|
-      session = :playwright |> session_for_html(html) |> Playwright.focus(by_label("Name"))
+    # As in Playwright, page-wide input has no timeout.
+    test "rejects timeout:" do
+      session = session_for_html(:playwright, "<p>Hi</p>")
 
-      error =
-        assert_raise Fluffy.OperationError, ~r/Timeout 100ms exceeded/, fn ->
-          Keyboard.press(session, "a", timeout: 100)
-        end
-
-      assert %PlaywrightEx.TimeoutError{} = error.cause
+      for call <- [
+            &Keyboard.press(session, "a", &1),
+            &Keyboard.down(session, "a", &1),
+            &Keyboard.insert_text(session, "a", &1)
+          ] do
+        assert_raise NimbleOptions.ValidationError, ~r/unknown options.*:timeout/, fn -> call.(timeout: 100) end
+      end
     end
   end
 
@@ -403,13 +404,7 @@ defmodule Fluffy.Conformance.PlaywrightWrappersTest do
     end
 
     test "is bounded by the session's timeout, even while a script blocks the page" do
-      session = :playwright |> session_for_html("<p>Harness</p>") |> put_session_timeout(1_000)
-
-      # The freeze runs inside the evaluate, so it is in place before the wait reaches the page.
-      assert_raise PlaywrightEx.TimeoutError, ~r/Timeout 1000ms exceeded during evaluate/, fn ->
-        Playwright.evaluate(session, "() => { while (true) {} }")
-      end
-
+      session = :playwright |> session_for_html("<p>Harness</p>") |> put_session_timeout(1_000) |> freeze_page()
       started = System.monotonic_time(:millisecond)
 
       assert_raise RuntimeError, ~r/document check within 1000ms/, fn ->

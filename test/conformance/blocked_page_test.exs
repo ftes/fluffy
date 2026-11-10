@@ -11,6 +11,10 @@ defmodule Fluffy.Conformance.BlockedPageTest do
 
   @html "<button>Other</button>"
 
+  # Calls that, as in Playwright, have no timeout (such as `evaluate`, `content` or a
+  # context setter) wait on a blocked page until the test times out. Fluffy's own
+  # document checks around an operation are bounded.
+
   test "an action on a blocked page fails within the session timeout" do
     session = frozen_session()
     started = System.monotonic_time(:millisecond)
@@ -35,95 +39,12 @@ defmodule Fluffy.Conformance.BlockedPageTest do
     end
   end
 
-  test "evaluate of a never-settling expression fails within the session timeout" do
-    session =
-      :playwright |> session_for_html("<p>ok</p>", base_url: Fluffy.TestServer.base_url()) |> put_session_timeout(1_000)
-
-    started = System.monotonic_time(:millisecond)
-
-    assert_raise PlaywrightEx.TimeoutError, ~r/Timeout 1000ms exceeded during evaluate/, fn ->
-      Playwright.evaluate(session, "() => new Promise(() => {})")
-    end
-
-    assert System.monotonic_time(:millisecond) - started < 5_000
-    assert Playwright.evaluate(session, "1 + 1") == 2
-  end
-
-  test "a PhoenixTest CSS link probe on a blocked page fails within the session timeout" do
-    session = frozen_session()
-    started = System.monotonic_time(:millisecond)
-
-    assert_raise Fluffy.OperationError, ~r/click_link failed.*Timeout 1000ms exceeded while counting matches/s, fn ->
-      Fluffy.PhoenixTest.click_link(session, "a", "Other")
-    end
-
-    assert System.monotonic_time(:millisecond) - started < 10_000
-  end
-
-  # Browsers close a blocked page today; the session timeout bounds it if one waits.
-  test "closing a blocked page is bounded by the session timeout" do
-    session = frozen_session()
-    page = Playwright.current_page(session)
-    started = System.monotonic_time(:millisecond)
-
-    try do
-      Playwright.close_page(session, page)
-    rescue
-      error in PlaywrightEx.TimeoutError -> assert error.message =~ "Timeout 1000ms exceeded during close_page"
-    end
-
-    assert System.monotonic_time(:millisecond) - started < 10_000
-  end
-
-  for {operation, setter} <- [
-        grant_permissions: quote(do: &Playwright.grant_permissions(&1, ["geolocation"])),
-        clear_permissions: quote(do: &Playwright.clear_permissions/1),
-        set_geolocation: quote(do: &Playwright.set_geolocation(&1, %{latitude: 1, longitude: 2})),
-        set_offline: quote(do: &Playwright.set_offline(&1, true)),
-        set_http_credentials: quote(do: &Playwright.set_http_credentials(&1, %{username: "u", password: "p"}))
-      ] do
-    # Which setters a blocked page holds up differs per browser.
-    test "#{operation} on a blocked page is bounded by the session timeout" do
-      session = frozen_session()
-      started = System.monotonic_time(:millisecond)
-
-      try do
-        assert unquote(setter).(session) == session
-      rescue
-        error in PlaywrightEx.TimeoutError ->
-          assert error.message =~ "Timeout 1000ms exceeded during #{unquote(operation)}"
-      end
-
-      assert System.monotonic_time(:millisecond) - started < 5_000
-    end
-  end
-
-  test "a context setter a blocked page holds up raises within the session timeout" do
-    session = frozen_session()
-    started = System.monotonic_time(:millisecond)
-
-    if playwright_engine?(:firefox) do
-      assert_raise PlaywrightEx.TimeoutError, ~r/Timeout 1000ms exceeded during grant_permissions/, fn ->
-        Playwright.grant_permissions(session, ["geolocation"])
-      end
-    else
-      assert_raise PlaywrightEx.TimeoutError, ~r/Timeout 1000ms exceeded during set_offline/, fn ->
-        Playwright.set_offline(session, true)
-      end
-    end
-
-    assert System.monotonic_time(:millisecond) - started < 5_000
-  end
-
   test "a blocked page that page code navigated reports its URL without waiting for the page" do
     session =
       :playwright |> session_for_html(@html, base_url: Fluffy.TestServer.base_url()) |> put_session_timeout(1_000)
 
     Playwright.evaluate(session, "history.pushState(null, '', 'pushed')")
-
-    assert_raise PlaywrightEx.TimeoutError, ~r/Timeout 1000ms exceeded during evaluate/, fn ->
-      Playwright.evaluate(session, "() => { while (true) {} }")
-    end
+    freeze_page(session)
 
     # Waiting for the page under this timeout would outlast the test's own.
     session = put_session_timeout(session, 600_000)
@@ -140,15 +61,9 @@ defmodule Fluffy.Conformance.BlockedPageTest do
   end
 
   defp frozen_session do
-    session =
-      :playwright |> session_for_html(@html, base_url: Fluffy.TestServer.base_url()) |> put_session_timeout(1_000)
-
-    # The freeze runs inside the evaluate, so it is in place before any later
-    # Fluffy call reaches the page; the abandoned evaluate keeps it blocked.
-    assert_raise PlaywrightEx.TimeoutError, ~r/Timeout 1000ms exceeded during evaluate/, fn ->
-      Playwright.evaluate(session, "() => { while (true) {} }")
-    end
-
-    session
+    :playwright
+    |> session_for_html(@html, base_url: Fluffy.TestServer.base_url())
+    |> put_session_timeout(1_000)
+    |> freeze_page()
   end
 end

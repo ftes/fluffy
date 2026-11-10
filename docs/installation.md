@@ -56,6 +56,12 @@ A Playwright timeout under a second limits the operation only. Fluffy's own read
 around it still get a full second, so a page whose main thread is blocked takes a second to
 report, not the shorter timeout.
 
+As in Playwright, calls that have no timeout there have none in Fluffy and take no
+`timeout:`: page `evaluate`, `content` and `title`, page-wide keyboard and mouse input,
+clock calls, context setters, closing a page, `unroute_all`, and reading a download or a
+response body. On a blocked page they wait until the test times out (ExUnit's default
+is 60 seconds).
+
 ## Playwright setup
 
 Only the Playwright backend needs a browser. PlaywrightEx pins its Playwright

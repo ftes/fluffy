@@ -230,7 +230,7 @@ assert Response.json(response) == %{"saved" => true}
 `Fluffy.Response.header_values/2`. `Request` has `Fluffy.Request.all_headers/1`,
 `Fluffy.Request.header_value/2`, `Fluffy.Request.post_data_json/1`,
 `Fluffy.Request.failure/1`, `Fluffy.Request.redirected_from/1` and
-`Fluffy.Request.redirected_to/1`. These readers raise once the session is closed or after its `timeout:`. Timing, sizes,
+`Fluffy.Request.redirected_to/1`. These readers raise once the session is closed; as in Playwright, they have no timeout. Timing, sizes,
 security details and the server address stay on the native value.
 
 `Event.request_failed()` and `Event.request_finished()` resolve with the

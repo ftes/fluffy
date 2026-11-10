@@ -35,8 +35,8 @@ defmodule Fluffy.Playwright.Mouse do
   """
   @spec click(Session.t(), number(), number(), [click_option()]) :: Session.t()
   def click(%Session{} = session, x, y, options \\ []) when is_number(x) and is_number(y) do
-    {timeout, native} = Options.split_action!(:mouse_click, options)
-    input(session, :"Mouse.click", timeout, &BrowserMouse.click(&1, x, y, native))
+    native = Options.validate_action!(:mouse_click, options)
+    input(session, :"Mouse.click", &BrowserMouse.click(&1, x, y, native))
   end
 
   @doc playwright_only: true
@@ -51,8 +51,8 @@ defmodule Fluffy.Playwright.Mouse do
   """
   @spec dblclick(Session.t(), number(), number(), [dblclick_option()]) :: Session.t()
   def dblclick(%Session{} = session, x, y, options \\ []) when is_number(x) and is_number(y) do
-    {timeout, native} = Options.split_action!(:mouse_dblclick, options)
-    input(session, :"Mouse.dblclick", timeout, &BrowserMouse.dblclick(&1, x, y, native))
+    native = Options.validate_action!(:mouse_dblclick, options)
+    input(session, :"Mouse.dblclick", &BrowserMouse.dblclick(&1, x, y, native))
   end
 
   @doc playwright_only: true
@@ -67,8 +67,8 @@ defmodule Fluffy.Playwright.Mouse do
   """
   @spec down(Session.t(), [down_option()]) :: Session.t()
   def down(%Session{} = session, options \\ []) do
-    {timeout, native} = Options.split_action!(:mouse_down, options)
-    input(session, :"Mouse.down", timeout, &BrowserMouse.down(&1, native))
+    native = Options.validate_action!(:mouse_down, options)
+    input(session, :"Mouse.down", &BrowserMouse.down(&1, native))
   end
 
   @doc playwright_only: true
@@ -83,8 +83,8 @@ defmodule Fluffy.Playwright.Mouse do
   """
   @spec up(Session.t(), [up_option()]) :: Session.t()
   def up(%Session{} = session, options \\ []) do
-    {timeout, native} = Options.split_action!(:mouse_up, options)
-    input(session, :"Mouse.up", timeout, &BrowserMouse.up(&1, native))
+    native = Options.validate_action!(:mouse_up, options)
+    input(session, :"Mouse.up", &BrowserMouse.up(&1, native))
   end
 
   @doc playwright_only: true
@@ -99,17 +99,18 @@ defmodule Fluffy.Playwright.Mouse do
   """
   @spec move(Session.t(), number(), number(), [move_option()]) :: Session.t()
   def move(%Session{} = session, x, y, options \\ []) when is_number(x) and is_number(y) do
-    {timeout, native} = Options.split_action!(:mouse_move, options)
-    input(session, :"Mouse.move", timeout, &BrowserMouse.move(&1, x, y, native))
+    native = Options.validate_action!(:mouse_move, options)
+    input(session, :"Mouse.move", &BrowserMouse.move(&1, x, y, native))
   end
 
   @doc playwright_only: true
-  @doc "Scrolls by `delta_x`, `delta_y` with the wheel. Accepts `timeout:`. See `PlaywrightEx.Mouse.wheel/3`."
-  @spec wheel(Session.t(), number(), number(), [Fluffy.action_option()]) :: Session.t()
+  @doc "Scrolls by `delta_x`, `delta_y` with the wheel. See `PlaywrightEx.Mouse.wheel/3`."
+  @spec wheel(Session.t(), number(), number(), []) :: Session.t()
   def wheel(%Session{} = session, delta_x, delta_y, options \\ []) when is_number(delta_x) and is_number(delta_y) do
-    input(session, :"Mouse.wheel", Options.validate_action!(options), &BrowserMouse.wheel(&1, delta_x, delta_y))
+    Options.validate_untimed!(options)
+    input(session, :"Mouse.wheel", &BrowserMouse.wheel(&1, delta_x, delta_y))
   end
 
-  defp input(session, operation, options, fun),
-    do: Fluffy.Playwright.__page_input__(session, &PlaywrightEx.Page.mouse/1, operation, options, fun)
+  defp input(session, operation, fun),
+    do: Fluffy.Playwright.__page_input__(session, &PlaywrightEx.Page.mouse/1, operation, fun)
 end

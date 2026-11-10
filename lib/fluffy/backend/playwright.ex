@@ -3,7 +3,6 @@ defmodule Fluffy.Backend.Playwright do
 
   @behaviour Fluffy.Backend.Contract
 
-  alias Fluffy.Backend.Playwright.Bounded
   alias Fluffy.Backend.Playwright.Context
   alias Fluffy.Backend.Playwright.Document
   alias Fluffy.Backend.Playwright.Events
@@ -58,11 +57,9 @@ defmodule Fluffy.Backend.Playwright do
       SessionRuntime.run_registered(runtime, fn ->
         browser_context = new_context!(context_options)
 
-        # The runtime waits at most `timeout` for the close, which has no timeout
-        # of its own; a slower close continues unlinked rather than leaving the
-        # context open in the shared browser.
+        # As in Playwright, closing the context has no timeout.
         close = fn ->
-          Bounded.within(timeout, fn -> BrowserContext.close(browser_context) end, on_timeout: :leave)
+          BrowserContext.close(browser_context)
           BrowserRuntime.release()
         end
 
@@ -337,11 +334,9 @@ defmodule Fluffy.Backend.Playwright do
   @impl true
   defdelegate subscribe_event(session, type, source, pid), to: Events
 
-  # Like closing the context, closing a page has no timeout of its own.
-  defp release_page(session, page, :page_closed) do
-    timeout = Session.timeout(session)
-    Bounded.within!(timeout, :close_page, fn -> with :ok <- BrowserPage.close(page.state.page), do: {:ok, :ok} end)
-    :ok
+  # As in Playwright, closing a page has no timeout.
+  defp release_page(_session, page, :page_closed) do
+    with {:error, error} <- BrowserPage.close(page.state.page), do: raise(error)
   end
 
   # As in Playwright, `wait_until:` defaults to `:load`.

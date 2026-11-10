@@ -39,8 +39,8 @@ defmodule Fluffy.Playwright.Clock do
   @spec install(Session.t(), [install_option()]) :: Session.t()
   def install(%Session{} = session, options \\ []) do
     Fluffy.Playwright.__ensure_playwright_backend__!(session, :clock)
-    {timeout, native} = Keyword.split(Options.validate_action!(:install_clock, options), [:timeout])
-    clock(session, :"Clock.install", &PlaywrightEx.Clock.install(&1, native), timeout)
+    native = Options.validate_action!(:install_clock, options)
+    clock(session, :"Clock.install", &PlaywrightEx.Clock.install(&1, native))
   end
 
   @doc playwright_only: true
@@ -54,9 +54,9 @@ defmodule Fluffy.Playwright.Clock do
   Install the clock at an earlier time and visit first, so the page loads with
   running timers. See `PlaywrightEx.Clock.pause_at/2`.
 
-  Accepts `timeout:`, which defaults to the session's `timeout:`.
+  As in Playwright, clock calls have no timeout and take no options.
   """
-  @spec pause_at(Session.t(), time(), [Fluffy.action_option()]) :: Session.t()
+  @spec pause_at(Session.t(), time(), []) :: Session.t()
   def pause_at(%Session{} = session, time, options \\ []) do
     clock_call(session, :"Clock.pause_at", options, &PlaywrightEx.Clock.pause_at(&1, time))
   end
@@ -69,8 +69,6 @@ defmodule Fluffy.Playwright.Clock do
   `"02:34:10"`. A navigation the timers start is adopted, as after an action.
   See `PlaywrightEx.Clock.run_for/2`.
 
-  Accepts `timeout:`, which defaults to the session's `timeout:`.
-
       session
       |> Clock.install(time: ~U[2024-02-02 09:00:00Z])
       |> visit("/spells")
@@ -79,7 +77,7 @@ defmodule Fluffy.Playwright.Clock do
       |> Clock.run_for(500)
       |> expect(to_be_visible(by_text("Lumos found")))
   """
-  @spec run_for(Session.t(), ticks(), [Fluffy.action_option()]) :: Session.t()
+  @spec run_for(Session.t(), ticks(), []) :: Session.t()
   def run_for(%Session{} = session, ticks, options \\ []) do
     clock_call(session, :"Clock.run_for", options, &PlaywrightEx.Clock.run_for(&1, ticks))
   end
@@ -89,10 +87,9 @@ defmodule Fluffy.Playwright.Clock do
   Jumps the clock forward by `ticks`, firing due timers at most once, like a laptop
   waking from sleep.
 
-  Takes `ticks` and `timeout:` like `run_for/3`. See
-  `PlaywrightEx.Clock.fast_forward/2`.
+  Takes `ticks` like `run_for/3`. See `PlaywrightEx.Clock.fast_forward/2`.
   """
-  @spec fast_forward(Session.t(), ticks(), [Fluffy.action_option()]) :: Session.t()
+  @spec fast_forward(Session.t(), ticks(), []) :: Session.t()
   def fast_forward(%Session{} = session, ticks, options \\ []) do
     clock_call(session, :"Clock.fast_forward", options, &PlaywrightEx.Clock.fast_forward(&1, ticks))
   end
@@ -101,10 +98,9 @@ defmodule Fluffy.Playwright.Clock do
   @doc """
   Resumes a paused clock; time flows and timers fire again.
 
-  Accepts `timeout:`, which defaults to the session's `timeout:`. See
-  `PlaywrightEx.Clock.resume/1`.
+  See `PlaywrightEx.Clock.resume/1`.
   """
-  @spec resume(Session.t(), [Fluffy.action_option()]) :: Session.t()
+  @spec resume(Session.t(), []) :: Session.t()
   def resume(%Session{} = session, options \\ []) do
     clock_call(session, :"Clock.resume", options, &PlaywrightEx.Clock.resume/1)
   end
@@ -113,10 +109,9 @@ defmodule Fluffy.Playwright.Clock do
   @doc """
   Makes `Date` always return `time`, while timers keep running.
 
-  Accepts `timeout:`, which defaults to the session's `timeout:`. See
-  `PlaywrightEx.Clock.set_fixed_time/2`.
+  See `PlaywrightEx.Clock.set_fixed_time/2`.
   """
-  @spec set_fixed_time(Session.t(), time(), [Fluffy.action_option()]) :: Session.t()
+  @spec set_fixed_time(Session.t(), time(), []) :: Session.t()
   def set_fixed_time(%Session{} = session, time, options \\ []) do
     clock_call(session, :"Clock.set_fixed_time", options, &PlaywrightEx.Clock.set_fixed_time(&1, time))
   end
@@ -126,18 +121,18 @@ defmodule Fluffy.Playwright.Clock do
   Sets the clock's current time without firing timers, such as to test a time-zone
   or daylight saving shift.
 
-  Accepts `timeout:`, which defaults to the session's `timeout:`. See
-  `PlaywrightEx.Clock.set_system_time/2`.
+  See `PlaywrightEx.Clock.set_system_time/2`.
   """
-  @spec set_system_time(Session.t(), time(), [Fluffy.action_option()]) :: Session.t()
+  @spec set_system_time(Session.t(), time(), []) :: Session.t()
   def set_system_time(%Session{} = session, time, options \\ []) do
     clock_call(session, :"Clock.set_system_time", options, &PlaywrightEx.Clock.set_system_time(&1, time))
   end
 
   defp clock_call(session, operation, options, fun) do
     Fluffy.Playwright.__ensure_playwright_backend__!(session, :clock)
-    clock(session, operation, fun, Options.validate_action!(options))
+    Options.validate_untimed!(options)
+    clock(session, operation, fun)
   end
 
-  defp clock(session, operation, fun, options), do: Fluffy.__dispatch_driver__(session, :clock, [operation, fun, options])
+  defp clock(session, operation, fun), do: Fluffy.__dispatch_driver__(session, :clock, [operation, fun])
 end

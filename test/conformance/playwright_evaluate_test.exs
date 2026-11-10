@@ -48,10 +48,13 @@ defmodule Fluffy.Conformance.PlaywrightEvaluateTest do
     end
   end
 
-  test "takes timeout: in place of the argument" do
+  # As in Playwright, page evaluation has no timeout.
+  test "rejects timeout: in place of the argument" do
     session = session_for_html(:playwright, "<main>Options</main>", base_url: Fluffy.TestServer.base_url())
 
-    assert Playwright.evaluate(session, "1 + 1", timeout: 1_000) == 2
+    assert_raise NimbleOptions.ValidationError, ~r/unknown options.*:timeout/, fn ->
+      Playwright.evaluate(session, "1 + 1", timeout: 1_000)
+    end
   end
 
   test "raises a capability error outside the Playwright driver" do
