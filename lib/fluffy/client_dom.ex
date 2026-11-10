@@ -617,56 +617,56 @@ defmodule Fluffy.ClientDOM do
   # the view or component that owns its portal, and skips the components a patch leaves
   # unchanged. It never patches the root layout around them, <title> included.
   # So a control's local values reset only when its owner renders differently.
-  defp patched?(_old_renders, _new_renders, :layout), do: false
+  # An owner is `{view_id, cid}`; the root layout is `{nil, nil}`.
+  defp patched?(_old_renders, _new_renders, {nil, _cid}), do: false
   defp patched?(old_renders, new_renders, owner), do: Map.get(old_renders, owner) != Map.get(new_renders, owner)
 
-  defp owner_of(_index, nil), do: :layout
+  defp owner_of(_index, nil), do: {nil, nil}
 
   defp owner_of(index, id) do
     entry = Map.fetch!(index.nodes_by_id, id)
-    owner(entry.attributes, owner_of(index, entry.parent_id))
+    owner(entry.attributes, owner_of(index, portal_id(index, entry.attributes) || entry.parent_id))
   end
 
-  defp owner(attributes, parent) do
-    parent = teleported_owner(attributes) || parent
+  # Teleported content belongs to the owner of its portal's template, which
+  # stays at its source.
+  defp portal_id(index, attributes) do
+    if source = attribute(attributes, "data-phx-teleported-src") do
+      index
+      |> DocumentIndex.targets_with_attribute("template", "data-phx-portal")
+      |> Enum.find_value(&(attribute(&1.attributes, "id") == source && &1.id))
+    end
+  end
 
+  defp owner(attributes, {view_id, _cid} = parent) do
     cond do
-      has_attribute?(attributes, "data-phx-session") -> {:view, attribute(attributes, "id")}
-      cid = attribute(attributes, "data-phx-component") -> {:component, owner_view_id(parent), cid}
+      has_attribute?(attributes, "data-phx-session") -> {attribute(attributes, "id"), nil}
+      cid = attribute(attributes, "data-phx-component") -> {view_id, cid}
       true -> parent
     end
   end
 
-  # Teleported content belongs to the view, or LiveComponent, rendering its portal.
-  defp teleported_owner(attributes) do
-    case {attribute(attributes, "data-phx-teleported"), attribute(attributes, "data-phx-teleported-cid")} do
-      {nil, _cid} -> nil
-      {view_id, nil} -> {:view, view_id}
-      {view_id, cid} -> {:component, view_id, cid}
-    end
-  end
-
-  defp owner_view_id({:view, view_id}), do: view_id
-  defp owner_view_id({:component, view_id, _cid}), do: view_id
-  defp owner_view_id(:layout), do: nil
-
   # Each owner's rendering, with the views and components it renders reduced
-  # to a reference.
+  # to a reference. Teleported content counts only in its portal's template.
   defp owner_renders(document) do
-    {_layout, renders} = document |> LazyHTML.to_tree() |> owner_renders(:layout, %{})
+    {_layout, renders} = document |> LazyHTML.to_tree() |> owner_renders({nil, nil}, %{})
     renders
   end
 
   defp owner_renders(nodes, parent, renders) do
     Enum.map_reduce(nodes, renders, fn
       {tag, attributes, children}, renders when is_binary(tag) ->
-        owner = owner(attributes, parent)
-        {children, renders} = owner_renders(children, owner, renders)
-        element = {tag, render_attributes(attributes), children}
+        if has_attribute?(attributes, "data-phx-teleported") do
+          {:teleported, renders}
+        else
+          owner = owner(attributes, parent)
+          {children, renders} = owner_renders(children, owner, renders)
+          element = {tag, render_attributes(attributes), children}
 
-        if owner == parent,
-          do: {element, renders},
-          else: {{:owner, owner}, Map.update(renders, owner, [element], &[element | &1])}
+          if owner == parent,
+            do: {element, renders},
+            else: {{:owner, owner}, Map.update(renders, owner, [element], &[element | &1])}
+        end
 
       node, renders ->
         {node, renders}
