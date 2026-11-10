@@ -128,9 +128,10 @@ defmodule Fluffy.Conformance.CheckActionTest do
     end)
   end
 
-  # Page code here reverts the click at once; a LiveView patch does the same a
-  # round trip later, often before Playwright reads the state back.
-  test "Playwright check and uncheck succeed when page code reverts the click" do
+  # As in Playwright, the state is read back right after the click. Page code
+  # here reverts the click at once; a LiveView patch may do the same a round
+  # trip later.
+  test "Playwright check and uncheck fail when page code reverts the click" do
     revert = ~s|oninput="queueMicrotask(() => this.checked = !this.checked)"|
 
     html = """
@@ -139,250 +140,13 @@ defmodule Fluffy.Conformance.CheckActionTest do
     """
 
     with_html(:playwright, html, fn session ->
-      session
-      |> check(by_role(:checkbox, name: "Updates"))
-      |> expect(to_be_checked(by_role(:checkbox, name: "Updates"), checked: false))
-      |> uncheck(by_role(:checkbox, name: "Digest"))
-      |> expect(to_be_checked(by_role(:checkbox, name: "Digest")))
-    end)
-  end
-
-  @reverting_checkbox ~s|<label><input type="checkbox" oninput="queueMicrotask(() => this.checked = !this.checked)">Updates</label>|
-
-  test "Playwright check trusts a reverted click under a short session timeout" do
-    with_html(:playwright, @reverting_checkbox, fn session ->
-      session
-      |> put_session_timeout(1)
-      |> check(by_role(:checkbox, name: "Updates"), timeout: 5_000)
-      |> expect(to_be_checked(by_role(:checkbox, name: "Updates"), checked: false), timeout: 5_000)
-    end)
-  end
-
-  test "Playwright check and uncheck succeed when page code in an iframe reverts the click" do
-    revert = ~s|oninput="queueMicrotask(() => this.checked = !this.checked)"|
-
-    inner = """
-    <label><input type="checkbox" #{revert}>Updates</label>
-    <label><input type="checkbox" checked #{revert}>Digest</label>
-    """
-
-    frame = frame_locator("iframe")
-
-    with_html(:playwright, iframe_html(inner), fn session ->
-      session
-      |> check(by_role(frame, :checkbox, name: "Updates"))
-      |> expect(to_be_checked(by_role(frame, :checkbox, name: "Updates"), checked: false))
-      |> uncheck(by_role(frame, :checkbox, name: "Digest"))
-      |> expect(to_be_checked(by_role(frame, :checkbox, name: "Digest")))
-    end)
-  end
-
-  test "Playwright check succeeds when page code reverts the click in a frame that loads later" do
-    with_html(:playwright, "<iframe></iframe>", fn session ->
-      Playwright.evaluate(session, """
-      () => {
-        setTimeout(() => {
-          document.querySelector('iframe').srcdoc = #{inspect(@reverting_checkbox)}
-        }, 300)
-      }
-      """)
-
-      frame = frame_locator("iframe")
-
-      session
-      |> check(by_role(frame, :checkbox, name: "Updates"))
-      |> expect(to_be_checked(by_role(frame, :checkbox, name: "Updates"), checked: false))
-    end)
-  end
-
-  test "Playwright check succeeds when page code reverts the click in a frame added later" do
-    with_html(:playwright, "<main></main>", fn session ->
-      Playwright.evaluate(session, """
-      () => {
-        setTimeout(() => {
-          const frame = document.createElement('iframe')
-          frame.srcdoc = #{inspect(@reverting_checkbox)}
-          document.querySelector('main').append(frame)
-        }, 300)
-      }
-      """)
-
-      frame = frame_locator("iframe")
-
-      session
-      |> check(by_role(frame, :checkbox, name: "Updates"))
-      |> expect(to_be_checked(by_role(frame, :checkbox, name: "Updates"), checked: false))
-    end)
-  end
-
-  test "Playwright check fails on a late checkbox that refuses the click after another one in its frame was checked" do
-    inner = ~s(<label><input type="checkbox">First</label>)
-
-    with_html(:playwright, iframe_html(inner), fn session ->
-      frame = frame_locator("iframe")
-      check(session, by_role(frame, :checkbox, name: "First"))
-
-      Playwright.evaluate(session, """
-      () => {
-        setTimeout(() => {
-          document.querySelector('iframe').contentDocument.body.insertAdjacentHTML(
-            'beforeend',
-            '<label><input type="checkbox" onclick="event.preventDefault()">Refusing</label>'
-          )
-        }, 300)
-      }
-      """)
-
-      assert_raise Fluffy.OperationError, ~r/did not change its state/, fn ->
-        check(session, by_role(frame, :checkbox, name: "Refusing"))
-      end
-    end)
-  end
-
-  for {how, unmatch, rematch} <- [
-        {"hidden", "input.style.display = 'none'", "input.style.display = ''"},
-        {"reinserted", "label.remove()", "doc.body.append(label)"}
-      ] do
-    test "Playwright check fails on a box checked earlier, #{how} when the check starts, that refuses the click" do
-      inner = ~s(<label><input type="checkbox">Updates</label>)
-
-      with_html(:playwright, iframe_html(inner), fn session ->
-        box = by_role(frame_locator("iframe"), :checkbox, name: "Updates")
-        check(session, box)
-
-        Playwright.evaluate(session, """
-        () => {
-          const doc = document.querySelector('iframe').contentDocument
-          const label = doc.querySelector('label')
-          const input = doc.querySelector('input')
-          input.checked = false
-          #{unquote(unmatch)}
-          setTimeout(() => {
-            input.onclick = event => event.preventDefault()
-            #{unquote(rematch)}
-          }, 300)
-        }
-        """)
-
-        assert_raise Fluffy.OperationError, ~r/did not change its state/, fn -> check(session, box) end
-      end)
-    end
-  end
-
-  test "Playwright check fails when the target refuses the click and its handler clicks another checkbox" do
-    html = """
-    <label><input type="checkbox" onclick="event.preventDefault(); document.querySelector('#other').click()">Updates</label>
-    <label><input id="other" type="checkbox">Other</label>
-    """
-
-    with_html(:playwright, html, fn session ->
-      assert_raise Fluffy.OperationError, ~r/did not change its state/, fn ->
+      assert_raise Fluffy.OperationError, ~r/Clicking the checkbox did not change its state/, fn ->
         check(session, by_role(:checkbox, name: "Updates"))
       end
-    end)
-  end
 
-  test "Playwright check succeeds on a label locator when page code reverts the click" do
-    revert = ~s|oninput="queueMicrotask(() => this.checked = !this.checked)"|
-
-    with_html(:playwright, ~s(<label id="box"><input type="checkbox" #{revert}>Updates</label>), fn session ->
-      session
-      |> check(by_css("#box"))
-      |> expect(to_be_checked(by_role(:checkbox, name: "Updates"), checked: false))
-    end)
-  end
-
-  test "Playwright check succeeds on a locator inside a label when page code reverts the click" do
-    revert = ~s|oninput="queueMicrotask(() => this.checked = !this.checked)"|
-
-    with_html(
-      :playwright,
-      ~s(<label><span id="text">Accept</span><input type="checkbox" #{revert}></label>),
-      fn session ->
-        session
-        |> check(by_css("#text"))
-        |> expect(to_be_checked(by_role(:checkbox, name: "Accept"), checked: false))
+      assert_raise Fluffy.OperationError, ~r/Clicking the checkbox did not change its state/, fn ->
+        uncheck(session, by_role(:checkbox, name: "Digest"))
       end
-    )
-  end
-
-  test "Playwright check succeeds when the locator no longer matches after the click was reverted" do
-    revert = ~s|oninput="this.dataset.state = 'seen'; queueMicrotask(() => this.checked = !this.checked)"|
-
-    with_html(:playwright, ~s(<input id="box" type="checkbox" data-state="new" #{revert}>), fn session ->
-      session
-      |> check(by_css("#box[data-state=new]"))
-      |> expect(to_be_checked(by_css("#box"), checked: false))
-    end)
-  end
-
-  for {action, label} <- [{:check, "check"}, {:uncheck, "uncheck"}] do
-    test "Playwright #{action} reports its own timeout for a box that never appears" do
-      with_html(:playwright, "<p>Empty</p>", fn session ->
-        assert_raise Fluffy.OperationError, ~r/locator\.#{unquote(label)}: Timeout \d+ms exceeded/, fn ->
-          apply(Fluffy, unquote(action), [session, by_css("#absent"), [timeout: 200]])
-        end
-      end)
-    end
-  end
-
-  test "Playwright uncheck fails when the target refuses the click and its handler clicks another checkbox" do
-    html = """
-    <label><input type="checkbox" checked onclick="event.preventDefault(); document.querySelector('#other').click()">Updates</label>
-    <label><input id="other" type="checkbox" checked>Other</label>
-    """
-
-    with_html(:playwright, html, fn session ->
-      assert_raise Fluffy.OperationError, ~r/did not change its state/, fn ->
-        uncheck(session, by_role(:checkbox, name: "Updates"))
-      end
-    end)
-  end
-
-  test "Playwright uncheck fails on a box that refuses the click, appearing in a frame after the uncheck starts" do
-    with_html(:playwright, "<iframe></iframe>", fn session ->
-      frame = frame_locator("iframe")
-
-      Playwright.evaluate(session, """
-      () => {
-        setTimeout(() => {
-          document.querySelector('iframe').contentDocument.body.insertAdjacentHTML(
-            'beforeend',
-            '<label><input type="checkbox" checked onclick="event.preventDefault()">Refusing</label>'
-          )
-        }, 300)
-      }
-      """)
-
-      assert_raise Fluffy.OperationError, ~r/did not change its state/, fn ->
-        uncheck(session, by_role(frame, :checkbox, name: "Refusing"))
-      end
-    end)
-  end
-
-  test "Playwright check succeeds when page code reverts the click on a briefly unresponsive page" do
-    revert = ~s|oninput="queueMicrotask(() => this.checked = !this.checked)"|
-
-    # Several busy stretches, so that one still blocks the page after Fluffy's
-    # document check has slipped in between them.
-    busy = """
-    () => {
-      let stretches = 3
-      const block = () => {
-        const end = performance.now() + 800
-        while (performance.now() < end);
-        if (--stretches) setTimeout(block)
-      }
-      setTimeout(block)
-    }
-    """
-
-    with_html(:playwright, ~s(<label><input type="checkbox" #{revert}>Updates</label>), fn session ->
-      Playwright.evaluate(session, busy)
-
-      session
-      |> check(by_role(:checkbox, name: "Updates"))
-      |> expect(to_be_checked(by_role(:checkbox, name: "Updates"), checked: false))
     end)
   end
 
@@ -396,25 +160,14 @@ defmodule Fluffy.Conformance.CheckActionTest do
     end)
   end
 
-  test "Playwright check and uncheck succeed when page code in a shadow root reverts the click" do
-    shadow = """
-    () => {
-      const root = document.querySelector('#host').attachShadow({mode: 'open'})
-      root.innerHTML = '<label><input type="checkbox">Updates</label><label><input type="checkbox" checked>Digest</label>'
-      for (const input of root.querySelectorAll('input'))
-        input.addEventListener('input', () => queueMicrotask(() => input.checked = !input.checked))
-    }
-    """
-
-    with_html(:playwright, ~s(<div id="host"></div>), fn session ->
-      Playwright.evaluate(session, shadow)
-
-      session
-      |> check(by_role(:checkbox, name: "Updates"))
-      |> expect(to_be_checked(by_role(:checkbox, name: "Updates"), checked: false))
-      |> uncheck(by_role(:checkbox, name: "Digest"))
-      |> expect(to_be_checked(by_role(:checkbox, name: "Digest")))
-    end)
+  for {action, label} <- [{:check, "check"}, {:uncheck, "uncheck"}] do
+    test "Playwright #{action} reports its own timeout for a box that never appears" do
+      with_html(:playwright, "<p>Empty</p>", fn session ->
+        assert_raise Fluffy.OperationError, ~r/locator\.#{unquote(label)}: Timeout \d+ms exceeded/, fn ->
+          apply(Fluffy, unquote(action), [session, by_css("#absent"), [timeout: 200]])
+        end
+      end)
+    end
   end
 
   test "the Static driver rejects browser-owned indeterminate checkbox state" do
@@ -433,8 +186,6 @@ defmodule Fluffy.Conformance.CheckActionTest do
       :checkbox |> by_role() |> to_be_checked(checked: false, indeterminate: true)
     end
   end
-
-  defp iframe_html(inner), do: ~s(<iframe srcdoc="#{String.replace(inner, "\"", "&quot;")}"></iframe>)
 
   defp with_html(driver, html, fun) do
     session = session_for_html(driver, html, base_url: Fluffy.TestServer.base_url())

@@ -5,6 +5,7 @@
 ### Changed
 
 - On Firefox, an action that closes its own page, such as a popup's `window.close()`, raises `Fluffy.OperationError` again, as it does in Playwright, which tracks it as a Firefox bug. Other browsers are unchanged.
+- Playwright `check` and `uncheck` behave as in Playwright again: they fail with "Clicking the checkbox did not change its state" when page code, such as a LiveView patch answering the click, reverts the box before Playwright reads it back. That happens mostly in Firefox and WebKit, for a box whose new state the server does not render. Phoenix is unchanged: it has no page code to revert the click, so it still succeeds there.
 
 ### Fixed
 

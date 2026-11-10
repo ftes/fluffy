@@ -87,7 +87,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
       driver
       |> start_test_session()
       |> visit("/live/used-shift")
-      |> check(by_role(:radio, name: "c"))
+      |> check_reverted(by_role(:radio, name: "c"))
       |> expect("Changed: true" |> by_text() |> to_be_visible())
       |> fill(by_label("Other"), "x")
       |> expect("key:other" |> by_text(exact: true) |> to_be_visible())

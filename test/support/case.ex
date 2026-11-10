@@ -9,6 +9,7 @@ defmodule Fluffy.TestCase do
         only: [
           assert_action_error: 4,
           browser_context_guids: 0,
+          check_reverted: 2,
           monitor_running: 1,
           playwright_engine?: 1,
           put_session_timeout: 2
@@ -26,6 +27,15 @@ defmodule Fluffy.TestCase do
   # machine cannot fail it. No public API changes a live session's timeout.
   def put_session_timeout(session, timeout) do
     Fluffy.Session.put_context(session, %{Fluffy.Session.context(session) | timeout: timeout})
+  end
+
+  # Checks a box that the LiveView patch answering the click reverts in some browsers.
+  # Playwright's check reads the box back after its click and fails if the patch got there
+  # first, so Playwright just clicks it, as a user would.
+  def check_reverted(session, locator) do
+    if Fluffy.Session.current_driver(session) == :playwright,
+      do: Fluffy.click(session, locator),
+      else: Fluffy.check(session, locator)
   end
 
   # Signals from different processes have no order, so an exit a test triggers through
