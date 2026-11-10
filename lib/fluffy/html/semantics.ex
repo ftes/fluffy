@@ -57,6 +57,10 @@ defmodule Fluffy.HTML.Semantics do
   defp tree_text(text) when is_binary(text), do: text
   defp tree_text(_comment), do: ""
 
+  # HTML's "strip and collapse ASCII whitespace", as document.title and
+  # option.text apply it.
+  def collapse_whitespace(text), do: text |> String.split(~r/[\t\n\f\r ]+/, trim: true) |> Enum.join(" ")
+
   def labelable_tags, do: @labelable_tags
 
   def labelable?(%{tag: "input"} = target), do: input_type(target) != "hidden"

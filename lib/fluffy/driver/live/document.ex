@@ -1,6 +1,8 @@
 defmodule Fluffy.Driver.Live.Document do
   @moduledoc false
 
+  alias Fluffy.HTML.Semantics
+
   # LiveViewTest renders only the LiveView container element. A browser keeps
   # the dead-rendered root layout around it, applies title updates to <title>,
   # and teleports portal content into its target. Rebuild that document from
@@ -99,7 +101,7 @@ defmodule Fluffy.Driver.Live.Document do
     text = unescape(page_title)
 
     cond do
-      normalize(page_title) == title.text -> title.html
+      Semantics.collapse_whitespace(page_title) == title.text -> title.html
       String.trim(text) != "" -> escape(title.prefix <> text <> title.suffix)
       is_binary(title.default) -> escape(title.prefix <> title.default <> title.suffix)
       true -> title.html
@@ -120,16 +122,13 @@ defmodule Fluffy.Driver.Live.Document do
     text = [title] |> LazyHTML.from_tree() |> LazyHTML.text()
 
     %{
-      text: normalize(text),
+      text: Semantics.collapse_whitespace(text),
       html: escape(text),
       prefix: attribute(attributes, "data-prefix") || "",
       suffix: attribute(attributes, "data-suffix") || "",
       default: attribute(attributes, "data-default")
     }
   end
-
-  # document.title strips and collapses ASCII whitespace.
-  defp normalize(text), do: text |> String.split(~r/[\t\n\f\r ]+/, trim: true) |> Enum.join(" ")
 
   defp unescape(html), do: html |> LazyHTML.from_fragment() |> LazyHTML.text()
   defp escape(text), do: text |> Phoenix.HTML.html_escape() |> Phoenix.HTML.safe_to_string()

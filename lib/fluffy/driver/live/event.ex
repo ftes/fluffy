@@ -32,8 +32,11 @@ defmodule Fluffy.Driver.Live.Event do
       disabled?(target) ->
         raise ArgumentError, "cannot #{kind} element #{inspect(target.selector)} because it is disabled"
 
+      commands = kind == :click && live_link(attributes) ->
+        exec(view, commands, attributes, kind, payload)
+
       declaration = Enum.find_value(names, &attribute(attributes, &1)) ->
-        exec(view, declaration, attributes, kind, payload)
+        exec(view, commands(declaration), attributes, kind, payload)
 
       true ->
         raise ArgumentError,
@@ -41,12 +44,26 @@ defmodule Fluffy.Driver.Live.Event do
     end
   end
 
+  # Like the LiveView client, a LiveView link takes the click before any
+  # phx-click binding sees it.
+  defp live_link(attributes) do
+    case {attribute(attributes, "data-phx-link"), attribute(attributes, "href")} do
+      {"patch", href} when is_binary(href) ->
+        [["patch", %{"href" => href}]]
+
+      {"redirect", href} when is_binary(href) ->
+        [["navigate", %{"href" => href, "replace" => attribute(attributes, "data-phx-link-state") == "replace"}]]
+
+      _not_a_live_link ->
+        nil
+    end
+  end
+
   # Each command that reaches the view records its delivery, so a later
   # command that finds the view gone does not undo the earlier ones. Only
   # commands that send the view nothing, such as JS.show, need a render.
-  def exec(view, declaration, attributes, kind, payload) do
-    declaration
-    |> commands()
+  defp exec(view, commands, attributes, kind, payload) do
+    commands
     |> Enum.reduce_while(:none, fn command, result ->
       case dispatch(command, view, attributes, kind, payload) do
         :skip -> {:cont, result}
@@ -71,8 +88,8 @@ defmodule Fluffy.Driver.Live.Event do
   # the element's `value` property, where it has one: a form control's current
   # value, where LiveViewTest sends the server-rendered attribute and misses a
   # fill. An unchecked checkbox or radio sends no value, not even its
-  # phx-value-value. An element without the property, such as a div or a link,
-  # sends only its phx-value-*.
+  # phx-value-value. Elements other than form controls, options and list
+  # items send only their phx-value-*, as a div or a link does.
   def element_values(client_dom, %{attributes: attributes} = target) do
     case value_property(client_dom, target) do
       :none -> values(attributes)
@@ -93,35 +110,10 @@ defmodule Fluffy.Driver.Live.Event do
   end
 
   defp value_property(_client_dom, %{tag: "option"} = target),
-    do: {:ok, attribute(target.attributes, "value") || target.children |> text() |> normalize()}
+    do: {:ok, attribute(target.attributes, "value") || target |> Semantics.text() |> Semantics.collapse_whitespace()}
 
-  defp value_property(_client_dom, %{tag: tag} = target) when tag in ["data", "param"],
-    do: {:ok, attribute(target.attributes, "value") || ""}
-
-  defp value_property(_client_dom, %{tag: "output"} = target), do: {:ok, text(target.children)}
   defp value_property(_client_dom, %{tag: "li"} = target), do: {:ok, integer(attribute(target.attributes, "value"))}
-
-  defp value_property(_client_dom, %{tag: "meter", attributes: attributes}) do
-    min = number(attribute(attributes, "min")) || 0
-    max = max(number(attribute(attributes, "max")) || 1, min)
-    {:ok, attributes |> attribute("value") |> number() |> Kernel.||(0) |> max(min) |> min(max) |> js_number()}
-  end
-
-  defp value_property(_client_dom, %{tag: "progress", attributes: attributes}) do
-    max = attributes |> attribute("max") |> number()
-    max = if max && max > 0, do: max, else: 1
-    {:ok, attributes |> attribute("value") |> number() |> Kernel.||(0) |> max(0) |> min(max) |> js_number()}
-  end
-
   defp value_property(_client_dom, _target), do: :none
-
-  defp text(nil), do: ""
-  defp text(nodes) when is_list(nodes), do: Enum.map_join(nodes, &text/1)
-  defp text({_tag, _attributes, children}), do: text(children)
-  defp text(text) when is_binary(text), do: text
-  defp text(_comment), do: ""
-
-  defp normalize(text), do: text |> String.split(~r/[\t\n\f\r ]+/, trim: true) |> Enum.join(" ")
 
   # HTML's rules for parsing integers, as `li.value` reflects its attribute.
   defp integer(nil), do: 0
@@ -132,19 +124,6 @@ defmodule Fluffy.Driver.Live.Event do
       :error -> 0
     end
   end
-
-  defp number(nil), do: nil
-
-  defp number(value) do
-    case Float.parse(value) do
-      {number, ""} -> number
-      _invalid -> nil
-    end
-  end
-
-  # JSON sends an integral JavaScript number as an integer.
-  defp js_number(number) when number == trunc(number), do: trunc(number)
-  defp js_number(number), do: number
 
   defp disabled?(%{tag: tag} = target) when tag in ["button", "input", "select", "textarea"],
     do: target.disabled? or List.keymember?(target.attributes, "disabled", 0)

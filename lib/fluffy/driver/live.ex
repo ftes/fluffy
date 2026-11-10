@@ -10,7 +10,6 @@ defmodule Fluffy.Driver.Live do
   alias Fluffy.Deadline
   alias Fluffy.Driver.Live.ActionResolver
   alias Fluffy.Driver.Live.ActionScope
-  alias Fluffy.Driver.Live.Click
   alias Fluffy.Driver.Live.Document
   alias Fluffy.Driver.Live.Event
   alias Fluffy.Driver.Live.Retry
@@ -183,7 +182,8 @@ defmodule Fluffy.Driver.Live do
   end
 
   defp commit_click_binding(session, client_dom, binding, event_context, :render_click) do
-    result = dispatch_view_event(session, fn -> Click.render(event_context.view, client_dom, binding) end)
+    payload = Event.element_values(client_dom, binding)
+    result = dispatch_view_event(session, fn -> Event.push(event_context.view, binding, :click, payload) end)
 
     commit_render_result(session, client_dom, result)
   end
@@ -825,17 +825,8 @@ defmodule Fluffy.Driver.Live do
     end
   end
 
-  defp live_click_action(target) do
-    cond do
-      attribute(target.attributes, "data-phx-link") != nil ->
-        :render_click
-
-      is_nil(attribute(target.attributes, "phx-click")) ->
-        :none
-
-      true ->
-        phx_click_action(attribute(target.attributes, "phx-click"))
-    end
+  defp live_click_action(binding) do
+    if live_link?(binding), do: :render_click, else: phx_click_action(attribute(binding.attributes, "phx-click"))
   end
 
   defp phx_click_action("[" <> _ = encoded) do
