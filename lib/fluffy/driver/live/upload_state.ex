@@ -50,6 +50,7 @@ defmodule Fluffy.Driver.Live.UploadState do
   def fetch(%__MODULE__{forms: forms}, form_id), do: Map.fetch(forms, form_id)
   def get(%__MODULE__{forms: forms}, form_id), do: Map.get(forms, form_id)
   def forms(%__MODULE__{forms: forms}), do: Map.values(forms)
+  def form_ids(%__MODULE__{forms: forms}), do: Map.keys(forms)
 
   def put(%__MODULE__{} = state, form_id, identity, upload, selected_files, options) do
     options = Keyword.validate!(options, append: false, uploaded: false)
@@ -84,17 +85,6 @@ defmodule Fluffy.Driver.Live.UploadState do
   def delete_form(%__MODULE__{} = state, form_id) do
     {Map.get(state.forms, form_id), %{state | forms: Map.delete(state.forms, form_id)}}
   end
-
-  def find_entry(%__MODULE__{forms: forms}, entry_ref) when is_binary(entry_ref) do
-    Enum.find_value(forms, fn {form_id, form} ->
-      case Enum.find(form.batches, &Enum.any?(&1.entries, fn entry -> entry.ref == entry_ref end)) do
-        nil -> nil
-        batch -> {form_id, form, batch}
-      end
-    end)
-  end
-
-  def find_entry(%__MODULE__{}, _entry_ref), do: nil
 
   def put_entries(%__MODULE__{} = state, form_id, upload_pid, entries) do
     entry_refs = MapSet.new(entries, & &1.ref)

@@ -184,10 +184,7 @@ defmodule Fluffy.Driver.Live do
   defp commit_click_binding(session, client_dom, binding, event_context, :render_click) do
     result = dispatch_view_event(session, fn -> Click.render(event_context.view, client_dom, binding) end)
 
-    case commit_render_result(session, client_dom, result) do
-      %Session{} = session -> release_cancelled_live_upload(session, binding)
-      navigation -> navigation
-    end
+    commit_render_result(session, client_dom, result)
   end
 
   defp commit_default_click(session, client_dom, target, event_context) do
@@ -1305,43 +1302,45 @@ defmodule Fluffy.Driver.Live do
     end
   end
 
-  # A LiveView cancel control carries the selected entry's `phx-value-ref`.
-  # Once its event removes that entry from the rendered page, the test upload
-  # client is unreachable and must be released before a later submit can try
-  # to transfer the cancelled bytes.
-  defp release_cancelled_live_upload(session, target) do
-    entry_ref = attribute(target.attributes, "phx-value-ref")
+  # Like LiveView's client after each patch, drop the selected files whose
+  # entries the input's `data-phx-active-refs` no longer lists, such as ones
+  # `cancel_upload/3` removed, so a later submit does not upload them. The
+  # client is released with the last entry of its batch.
+  defp prune_cancelled_live_uploads(session, form_id) do
     state = Session.page_state(session)
+    upload_state = UploadState.get(state.live_uploads, form_id)
 
-    case find_live_upload_entry(state, entry_ref) do
-      {form_id, upload_state, entry_upload} when is_binary(entry_ref) ->
-        release_missing_live_upload_entry(
-          session,
-          state.client_dom,
-          form_id,
-          upload_state,
-          entry_upload,
-          entry_ref
-        )
+    with %{attributes: attributes} <- find_by_identity(state.client_dom, upload_state.input_identity),
+         refs when is_binary(refs) <- attribute(attributes, "data-phx-active-refs") do
+      active_refs = String.split(refs, ",")
 
-      _no_matching_entry ->
-        session
-    end
-  end
-
-  defp release_missing_live_upload_entry(session, client_dom, form_id, upload_state, entry_upload, entry_ref) do
-    if live_upload_entry_rendered?(client_dom, entry_ref) do
-      session
+      upload_state.batches
+      |> Enum.reject(& &1.uploaded?)
+      |> Enum.reduce(session, fn batch, session ->
+        case Enum.split_with(batch.entries, &(&1.ref in active_refs)) do
+          {_active, []} -> session
+          {active, _cancelled} -> cancel_live_upload_entries(session, form_id, upload_state, batch, active)
+        end
+      end)
     else
-      remaining_entries = Enum.reject(entry_upload.entries, &(&1.ref == entry_ref))
-      sync_cancelled_live_upload(session, form_id, upload_state, entry_upload, remaining_entries)
+      _no_active_refs -> session
     end
   end
 
-  defp sync_cancelled_live_upload(session, form_id, upload_state, entry_upload, []) do
-    session = release_live_upload_client(session, entry_upload.upload)
-    session = remove_live_upload(session, form_id, entry_upload.upload.pid)
+  defp cancel_live_upload_entries(session, form_id, upload_state, batch, []) do
+    session
+    |> release_live_upload_client(batch.upload)
+    |> remove_live_upload(form_id, batch.upload.pid)
+    |> put_selected_live_upload_files(form_id, upload_state)
+  end
 
+  defp cancel_live_upload_entries(session, form_id, upload_state, batch, active_entries) do
+    session
+    |> put_live_upload_entries(form_id, batch.upload.pid, active_entries)
+    |> put_selected_live_upload_files(form_id, upload_state)
+  end
+
+  defp put_selected_live_upload_files(session, form_id, upload_state) do
     selected_files =
       case UploadState.get(Session.page_state(session).live_uploads, form_id) do
         nil -> []
@@ -1349,17 +1348,6 @@ defmodule Fluffy.Driver.Live do
       end
 
     put_live_upload_files(session, upload_state, selected_files)
-  end
-
-  defp sync_cancelled_live_upload(session, form_id, upload_state, entry_upload, remaining_entries) do
-    session
-    |> put_live_upload_files(upload_state, Enum.map(remaining_entries, & &1.selected_file))
-    |> put_live_upload_entries(form_id, entry_upload.upload.pid, remaining_entries)
-  end
-
-  defp live_upload_entry_rendered?(client_dom, entry_ref) do
-    selector = ~s([phx-value-ref="#{entry_ref}"])
-    ClientDOM.resolve(client_dom, Locator.by_css(selector)) != []
   end
 
   defp put_live_upload_files(session, %{input_identity: identity}, selected_files) do
@@ -1469,12 +1457,6 @@ defmodule Fluffy.Driver.Live do
     end
   end
 
-  defp find_live_upload_entry(state, entry_ref) when is_binary(entry_ref) do
-    UploadState.find_entry(state.live_uploads, entry_ref)
-  end
-
-  defp find_live_upload_entry(_state, _entry_ref), do: nil
-
   defp remove_live_upload(session, form_id, upload_pid) do
     state = Session.page_state(session)
     live_uploads = UploadState.remove_batch(state.live_uploads, form_id, upload_pid)
@@ -1546,8 +1528,9 @@ defmodule Fluffy.Driver.Live do
       end)
 
     Enum.each(stale_uploads, &release_live_upload_clients(session, &1))
+    session = Session.put_page_state(session, %{state | live_uploads: live_uploads})
 
-    Session.put_page_state(session, %{state | live_uploads: live_uploads})
+    live_uploads |> UploadState.form_ids() |> Enum.reduce(session, &prune_cancelled_live_uploads(&2, &1))
   end
 
   defp release_upload_client(session, upload) do
