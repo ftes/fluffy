@@ -47,6 +47,12 @@ defmodule Fluffy.Session do
   def timeout(session, options \\ []),
     do: Fluffy.Deadline.playwright(Keyword.get(options, :timeout) || context(session).timeout)
 
+  # The same for an operation that can't check once, such as an action: it
+  # rejects Fluffy's 0.
+  @doc false
+  def operation_timeout!(session, operation, options),
+    do: Fluffy.Deadline.playwright_operation!(operation, Keyword.get(options, :timeout) || context(session).timeout)
+
   @doc false
   def page_state(session), do: Page.record(handle(session)).state
   @doc false

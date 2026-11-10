@@ -46,15 +46,12 @@ defmodule Fluffy.Driver.Playwright do
 
   @impl true
   def expect(%Session{} = session, %Expect{} = expectation) do
-    timeout = Session.timeout(session, expectation.options)
-
-    # `execute_expectation/2` takes the same timeout from the expectation's options.
-    action = fn _timeout ->
+    action = fn ->
       execute_expectation(session, expectation)
       {:ok, :expectation}
     end
 
-    case navigation_aware_action(session, timeout, action) do
+    case navigation_aware_action(session, action) do
       {:ok, :expectation, outcome} -> outcome
       {:error, error} -> expectation_failed!(expectation, error)
     end
@@ -400,7 +397,9 @@ defmodule Fluffy.Driver.Playwright do
   end
 
   defp read(session, operation, target, options, fun) do
-    case navigation_aware_action(session, operation_timeout!(session, operation, options), fun) do
+    timeout = Session.operation_timeout!(session, operation, options)
+
+    case navigation_aware_action(session, fn -> fun.(timeout) end) do
       {:ok, value, outcome} -> {:return, value, outcome}
       {:error, error} -> OperationFailure.raise_playwright!(operation, target, error)
     end
@@ -463,13 +462,13 @@ defmodule Fluffy.Driver.Playwright do
     page = Session.page_state(session).page
     context = Session.context(session)
 
-    action = fn _remaining ->
+    action = fn ->
       result = fun.(native)
       validate_unwrapped!(context.browser_context, page)
       {:ok, result}
     end
 
-    case navigation_aware_action(session, context.timeout, action) do
+    case navigation_aware_action(session, action) do
       {:ok, result, outcome} -> {:return, result, outcome}
       {:error, error} -> OperationFailure.raise_playwright!(operation, target, error)
     end
@@ -482,7 +481,7 @@ defmodule Fluffy.Driver.Playwright do
   def clock(%Session{} = session, operation, fun) do
     clock = BrowserPage.clock(Session.page_state(session).page)
 
-    case navigation_aware_action(session, Session.timeout(session), fn _remaining -> result(fun.(clock)) end) do
+    case navigation_aware_action(session, fn -> result(fun.(clock)) end) do
       {:ok, :ok, outcome} -> outcome
       {:error, error} -> OperationFailure.raise_playwright!(operation, nil, error)
     end
@@ -512,30 +511,26 @@ defmodule Fluffy.Driver.Playwright do
   end
 
   defp action(session, operation, target, options, fun) do
-    timeout = operation_timeout!(session, operation, options)
+    timeout = Session.operation_timeout!(session, operation, options)
 
-    case navigation_aware_action(session, timeout, &result(fun.(&1))) do
+    case navigation_aware_action(session, fn -> result(fun.(timeout)) end) do
       {:ok, _value, outcome} -> outcome
       {:error, error} -> OperationFailure.raise_playwright!(operation, target, error)
     end
   end
-
-  # Rejects Fluffy's check-once 0; `:infinity` reaches PlaywrightEx as its 0.
-  defp operation_timeout!(session, operation, options),
-    do: Deadline.playwright_operation!(operation, Keyword.get(options, :timeout) || Session.context(session).timeout)
 
   defp result(:ok), do: {:ok, :ok}
   defp result(result), do: result
 
   # An action's own error is Playwright's; Firefox fails an action that closes its
   # own page, which Playwright leaves as a known Firefox bug.
-  defp navigation_aware_action(session, operation_timeout, action) do
+  defp navigation_aware_action(session, action) do
     # Browser bookkeeping has its own budget; it must not consume a short
     # action/assertion timeout or silently leave navigation state stale.
     with {:ok, session, before} <- prepare_document(session) do
       state = Session.page_state(session)
 
-      with {:ok, value} <- action.(operation_timeout),
+      with {:ok, value} <- action.(),
            do: {:ok, value, reconcile_action_navigation(session, state, before, Document.bookkeeping_timeout(session))}
     end
   end

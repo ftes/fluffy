@@ -334,10 +334,8 @@ defmodule Fluffy.Backend.Playwright do
 
   # As in Playwright, `wait_until:` defaults to `:load`. Like an action, a
   # navigation can't check once, so it rejects Fluffy's `timeout: 0`.
-  defp navigation_options(session, operation, options) do
-    timeout = Keyword.get(options, :timeout) || Session.context(session).timeout
-    Keyword.put(options, :timeout, Deadline.playwright_operation!(operation, timeout))
-  end
+  defp navigation_options(session, operation, options),
+    do: Keyword.put(options, :timeout, Session.operation_timeout!(session, operation, options))
 
   # As for an action, PlaywrightEx's error, which keeps Playwright's call log,
   # becomes the cause of a `Fluffy.OperationError`.
