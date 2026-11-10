@@ -238,6 +238,23 @@ defmodule Fluffy.Conformance.LiveActionTest do
       |> expect(to_have_text(log, "Log: select:alpha remove:beta component-pick:gamma outer save"))
     end
 
+    # LiveView's client sends an element's `value` property, which a div lacks
+    # and a list item has as a number, and lets phx-value-key win over the key.
+    @tag driver: driver
+    test "click and press send the element's value property and phx-value-* with #{driver}", %{driver: driver} do
+      log = by_css("#log")
+
+      driver
+      |> live_session()
+      |> visit("/live/click-bindings")
+      |> click(by_text("Inspect div", exact: true))
+      |> expect(to_have_text(log, ~s(Log: inspect:name="div")))
+      |> click(by_text("Inspect item", exact: true))
+      |> expect(to_have_text(log, ~s(Log: inspect:name="div" inspect:value=3)))
+      |> press(by_label("Keyed"), "Enter")
+      |> expect(to_have_text(log, ~s(Log: inspect:name="div" inspect:value=3 inspect:key="custom",value="typed")))
+    end
+
     @tag driver: driver
     test "a click on text inside a submit button or link takes its default action with #{driver}", %{driver: driver} do
       driver

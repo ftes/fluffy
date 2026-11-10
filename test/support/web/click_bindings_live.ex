@@ -56,6 +56,12 @@ defmodule Fluffy.TestWeb.ClickBindingsLive do
   def handle_event("rename", _params, socket), do: {:noreply, socket |> assign(name: "Fido") |> log("rename")}
   def handle_event("save-name", %{"name" => name}, socket), do: {:noreply, log(socket, "save-name:#{name}")}
 
+  # Logs the whole payload, with each value's JSON type.
+  def handle_event("inspect", params, socket) do
+    payload = params |> Enum.sort() |> Enum.map_join(",", fn {name, value} -> "#{name}=#{inspect(value)}" end)
+    {:noreply, log(socket, "inspect:#{payload}")}
+  end
+
   @impl true
   def handle_info({:log, entry}, socket), do: {:noreply, log(socket, entry)}
 
@@ -98,6 +104,11 @@ defmodule Fluffy.TestWeb.ClickBindingsLive do
       <input aria-label="Name" name="name" value={@name} />
       <button phx-click="rename">Rename and save</button>
     </form>
+    <div id="valued-div" value="div-value" phx-click="inspect" phx-value-name="div">Inspect div</div>
+    <ol>
+      <li id="valued-item" value="3" phx-click="inspect">Inspect item</li>
+    </ol>
+    <input aria-label="Keyed" value="typed" phx-keydown="inspect" phx-value-key="custom" />
     <p id="log">Log: {Enum.join(@log, " ")}</p>
     <p id="tab">Tab: {@tab}</p>
     """

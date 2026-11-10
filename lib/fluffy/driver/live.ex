@@ -391,7 +391,8 @@ defmodule Fluffy.Driver.Live do
   defp dispatch_keys(session, target, key) do
     phases = Enum.filter([:keydown, :keyup], &key_binding?(target, &1))
     [first | rest] = if phases == [], do: [:keydown], else: phases
-    payload = Map.put(Event.element_values(Session.page_state(session).client_dom, target), "key", key)
+    # As in LiveView's client, phx-value-key wins over the pressed key.
+    payload = Map.merge(%{"key" => key}, Event.element_values(Session.page_state(session).client_dom, target))
 
     with {:ok, context} <- owning_view_context(session, target),
          %Session{} = session <- dispatch_key(session, context, target, payload, first) do
