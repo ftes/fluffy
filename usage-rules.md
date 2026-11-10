@@ -6,7 +6,8 @@ Fluffy runs Phoenix feature tests through one Playwright-shaped API, in-process 
 
 - `config :fluffy, endpoint: MyAppWeb.Endpoint` in `config/test.exs`. With Ecto, also `config :fluffy, ecto_repos: [MyApp.Repo]` and the sandbox plug and mount hook from `docs/installation.md`, behind an `Application.compile_env` flag because Fluffy exists only in the test environment.
 - Call `Fluffy.Test.setup(context)` exactly once per test, with or without Ecto, ideally in a shared case module.
-- Browser tests need `server: true` and `check_origin: false` on the endpoint, a `config :fluffy, playwright: [...]` block and `MIX_ENV=test mix playwright_ex.install -- chromium`. `MIX_ENV=test` is required because the driver arrives through a test-only dependency.
+- Browser tests need `server: true` on the endpoint, a `config :fluffy, playwright: [...]` block and `MIX_ENV=test mix playwright_ex.install -- chromium`. `MIX_ENV=test` is required because the driver arrives through a test-only dependency. For a system browser, install with `--no-browsers` and set `launch_options: [executable_path: ...]`.
+- The browser opens the endpoint listener's address, such as `127.0.0.1`. Set `check_origin: false` on the endpoint only when its `url` host differs from that address, as a stock `localhost` does.
 
 ## Choosing an API and a backend
 
@@ -43,10 +44,11 @@ start_session(:phoenix)
 - URL strings match the complete URL, including query and fragment. Use `page_url(path: "/x")` when only the path matters.
 - There is no page status assertion. On Playwright, assert on `Event.response` instead.
 - Static and LiveView check structural visibility (`hidden`, `type="hidden"`) and do not compute CSS, so `display: none` alone counts as visible there. `aria-hidden="true"` does not affect visibility; only `by_role` excludes it. Use `:playwright` to test rendered visibility.
+- Text matching skips `<script>` and `<style>`, as in Playwright, so `assert_has("script", text: ...)` fails even with `count:`. Match attributes with `count:`, or read the text natively: `unwrap` on Static passes the conn (`conn.resp_body`), and on Playwright use `Fluffy.Playwright.evaluate(session, locator, "el => el.textContent")`.
 
 ## Hidden inputs
 
-- `visible` and a plain facade `assert_has` fail on hidden inputs, and role locators exclude them. Assert with CSS, without a visibility requirement:
+- `visible` and a plain facade `assert_has` fail on hidden inputs and inside `hidden` elements, even with an attribute selector such as `input[value='x']`, and role locators exclude them. Assert with CSS, without a visibility requirement:
   - Facade: `assert_has("#token", count: 1)`, `assert_has("#token", value: "x")`, `assert_has("#terms", checked: true)`.
   - Native: `assert(count(by_css("#token"), 1))`, `assert(value(by_css("#token"), "x"))`, `assert(checked(by_css("#terms")))`.
 - A checkbox or radio hidden and styled through its label differs by backend. On Playwright, `check(by_label("Terms"))` resolves to the input and times out as it is not visible. Target the label: `set_checked(session, by_css("label[for=terms]"), true)`.

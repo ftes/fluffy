@@ -5,20 +5,37 @@ a pinned Playwright 1.65 driver. It follows Playwright more closely, and its Pho
 drivers follow LiveView's client. This guide lists what a 0.8 suite must change, as one
 step from 0.8; the [changelog](../CHANGELOG.md) has the details.
 
+From an earlier release, also read the changelog up to 0.8. The 0.8 change most likely
+to bite: LiveView sessions see the root layout and portal content, so a locator that
+matched once can now match twice.
+
 ## Setup
 
 - Install the pinned driver and a browser with
   `MIX_ENV=test mix playwright_ex.install -- chromium`. Drop the npm `playwright` package
-  and the `assets_dir` config; Node.js is no longer needed. `executable:` now names a
-  Playwright driver, so drop it if it pointed at npm's `cli.js`.
+  and the `assets_dir` config; Node.js is no longer needed. `executable:` now takes a
+  Playwright 1.65 CLI such as `node_modules/.bin/playwright`, not `cli.js`; usually drop
+  it and let PlaywrightEx install the driver.
+- Run the install in CI too, with `-- chromium --with-deps` on Linux runners; the driver
+  would install itself in the first browser test, but browsers do not. For a system
+  browser, as on Nix or in Docker, pass `--no-browsers` and set
+  `launch_options: [executable_path: ...]` or `channel:`; see
+  [Playwright setup](installation.md#playwright-setup).
+- Fluffy and PlaywrightEx now ship usage rules. As test-only dependencies, they reach
+  `mix usage_rules.sync` only in the test environment, and PlaywrightEx's only as a
+  direct dependency; see
+  [Test-only tasks](installation.md#test-only-tasks).
 - Playwright 1.65's own breaking changes apply: actions wait for an element to be not
-  inert, and text the browser does not render is no longer part of accessible names.
+  inert, cookie matching follows RFC 6265, and text the browser does not render is no
+  longer part of accessible names.
 - Browser console messages are no longer logged, as in Playwright. Replace `js_logger:`
   with `log_browser_console: true` to log them; custom loggers and
   `Fluffy.Playwright.ConsoleLogger` are gone, and `console.warn` logs at `:warning`.
-- Playwright sessions use Playwright's defaults: the `en-US` locale instead of `en`,
-  and a 3-minute browser launch timeout instead of `timeout:`. Set `browser_context:
-  [locale: "en"]` or `launch_options: [timeout: ...]` to keep the old ones.
+- Playwright sessions use Playwright's `en-US` locale instead of `en`; set
+  `browser_context: [locale: "en"]` to keep it.
+- Browser launch gets Playwright's 3-minute default instead of `timeout:`. A
+  `launch_options: [timeout: ...]` that raised the limit on 0.8 now shortens it and can
+  fail a loaded machine with `browserType.launch: Timeout ... exceeded`, so drop it.
 - `browser_context:`, `launch_options:` and the options of `screenshot`, `storage_state`,
   cookies and `trace` pass through to PlaywrightEx, which rejects unknown ones.
 
@@ -62,6 +79,36 @@ Timeouts follow Elixir: `0` checks once and `:infinity` means no limit; see
 - On Phoenix, `go_back` and `go_forward` raise `Fluffy.CapabilityError` with
   `capability: :browser_history` instead of `:pages`.
 
+## Workarounds that can go
+
+Most `unwrap` callbacks that called PlaywrightEx with the handle's `frame_id`,
+`context_id` or `page_id` have a Fluffy function now. Replace them rather than port them:
+
+- `add_init_script`: `Fluffy.Playwright.add_init_script/3`.
+- `Frame.wait_for_function` with `is_function:` and `arg:`:
+  `Fluffy.Playwright.wait_for_function(session, expression, arg)`.
+- An `evaluate` of `document.querySelector(...)`, say to read a `dataset`:
+  `Fluffy.Playwright.evaluate(session, locator, "el => el.dataset.state")`.
+- `Frame.expect(expression: "to.be.in.viewport")`: `Fluffy.Assert.in_viewport/2` or
+  `Fluffy.Expect.to_be_in_viewport/2`.
+- `Page.route` with `PlaywrightEx.Route.fulfill`: `Fluffy.Playwright.route/4` with
+  `Fluffy.Route.fulfill/2`.
+- `BrowserContext.clock_install` and `clock_fast_forward`:
+  `Fluffy.Playwright.Clock.install/2` and `fast_forward/3`.
+- `Frame.press`: `Fluffy.press/4`, which takes any Playwright key.
+- A click at a position, mouse moves or a bounding box: `click(session, locator,
+  position: %{x: 5, y: 5})`, `Fluffy.Playwright.Mouse` and
+  `Fluffy.Playwright.bounding_box/3`.
+- `Frame.is_checked`, then a click on the label of a hidden input:
+  `Fluffy.set_checked(session, by_css("label[for=terms]"), true)`. As in Playwright, the
+  label stands for its input.
+
+The other callbacks get a `%PlaywrightEx.Page{}`; see PlaywrightEx's
+[migration guide](https://hexdocs.pm/playwright_ex/migration.html).
+
+On Phoenix, `by_role` knows the landmark roles, so a `by_css("nav")` stand-in becomes
+`by_role(:navigation)`, and a named `<section>` is `by_role(:region, name: "...")`.
+
 ## Phoenix behavior
 
 The Phoenix drivers now act like a browser running LiveView's client, so some tests
@@ -84,15 +131,24 @@ that passed on 0.8 act differently:
 - Chained locators, `filter(has:)` and `within/3` search descendants only, so they no
   longer match their scope element; `by_text` under a parent still matches the parent,
   as on Playwright.
-- Visibility ignores `aria-hidden`, as in Playwright, while `<title>`, `<script>`,
-  `<template>` and similar content counts as hidden.
+- Visibility ignores `aria-hidden`, as in Playwright, while `<input type="hidden">`,
+  descendants of `hidden`, `<title>`, `<script>`, `<template>` and similar content count
+  as hidden. So a facade `assert_has("input#flag[value='true']")` on a hidden input
+  fails; use `assert_has("input#flag", value: "true")` or `count: 1`, which add no
+  visibility requirement.
+- Text matching skips `<script>` and `<style>`, as in Playwright, even as the matched
+  element, so `assert_has("script", text: "...")` fails even with `count:`. Match
+  attributes with `count:` (`assert_has("script[nonce]", count: 1)`), or read the text
+  natively: on Static, `unwrap` passes the `Plug.Conn`, so check `conn.resp_body`; on
+  Playwright, use `Fluffy.Playwright.evaluate(session, by_css("script#data"),
+  "el => el.textContent")`. On LiveView, `unwrap` passes the view, whose
+  `Phoenix.LiveViewTest.render/1` covers the LiveView's markup but not the layout.
 - `select_option` with `[]` deselects every option, and a list mixing values with
   option maps raises. `to_have_values` requires a multiple select.
 - The facade's `click_button` no longer matches `<input type="file">`.
 - LiveView `set_input_files` raises unless the upload's form has an id.
 
 Rarer differences follow the browser too: some implicit roles and accessible names
-changed, text in `<template>`, `<script>` and `<style>` no longer matches text
-locators, controls inside `<noscript>` are not submitted, `press` raises in layout
-content without key bindings, and a render resets local field state only in the
-views it changed. See the [changelog](../CHANGELOG.md) for the full list.
+changed, text in `<template>` no longer matches text locators, controls inside
+`<noscript>` are not submitted, `press` raises in layout content without key
+bindings, and a render resets local field state only in the views it changed. See the [changelog](../CHANGELOG.md) for the full list.
