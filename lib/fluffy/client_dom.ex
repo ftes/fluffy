@@ -378,9 +378,14 @@ defmodule Fluffy.ClientDOM do
     end
   end
 
+  # As in Playwright, only a multiple select has values, enabled or not.
   def selected_values(%__MODULE__{} = client_dom, %Locator{} = locator) do
     target = target!(client_dom, locator)
-    Actionability.ensure_selectable!(target.element, :read_value, locator)
+
+    if target.tag != "select" or not has_attribute?(target.attributes, "multiple") do
+      raise Fluffy.ActionabilityError, action: :read_value, reason: :not_multiple_select, locator: locator
+    end
+
     selected_values_for_target(client_dom, target)
   end
 
