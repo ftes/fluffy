@@ -20,6 +20,17 @@ defmodule Fluffy.Conformance.SelectOptionActionTest do
     end
 
     @tag driver: driver
+    test "select_option with an empty list deselects every option of a single select with #{driver}" do
+      html = ~s(<select aria-label="Plan"><option>Free</option><option selected>Pro</option></select>)
+      field = by_label("Plan")
+
+      unquote(driver)
+      |> session_for_html(html)
+      |> select_option(field, [])
+      |> expect(to_have_value(field, ""))
+    end
+
+    @tag driver: driver
     test "select_option converts scalar and explicit option values with #{driver}" do
       session =
         session_for_html(unquote(driver), """

@@ -553,6 +553,34 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       assert submission.body == "legend=Second"
     end
 
+    @tag driver: driver
+    test "a single select with every option deselected is not submitted with #{driver}", %{driver: driver} do
+      fixture =
+        TestHTTPFixtures.register_sequence([
+          %{
+            body:
+              html("""
+              <form method="post" action="submit">
+                <input type="hidden" name="kept" value="yes">
+                <label>Plan <select name="plan"><option>Free</option><option selected>Pro</option></select></label>
+                <button>Save</button>
+              </form>
+              """)
+          },
+          %{body: html("<h1>Saved</h1>")}
+        ])
+
+      driver
+      |> start_test_session()
+      |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+      |> select_option(by_label("Plan"), [])
+      |> click(by_role(:button, name: "Save"))
+      |> expect("Saved" |> by_text() |> to_be_visible())
+
+      [_source, submission] = TestHTTPFixtures.requests(fixture)
+      assert submission.body == "kept=yes"
+    end
+
     for {status, redirected_method} <- [{303, "GET"}, {307, "POST"}] do
       @tag driver: driver
       test "follows HTTP #{status} after POST with browser method semantics using #{driver}", %{

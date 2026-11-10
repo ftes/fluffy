@@ -26,6 +26,8 @@
 - `click` on Phoenix sends the closest ancestor's `phx-click`, with its `phx-value-*` and `phx-target`, when the target has none, as LiveView's client does, then runs the target's own action, such as submitting its form.
 - Form events on Phoenix send the browser's serialization: an unchecked checkbox or deselected option no longer comes back with its server-rendered value.
 - `select_option` with `[]` deselects every option of a multiple select on Phoenix, as on Playwright.
+- `select_option` with `[]` also deselects a single select on Phoenix, which then submits nothing, as on Playwright.
+- A form's `phx-value-*` on Phoenix wins over a field of the same name in `phx-change` and `phx-submit`, as in LiveView's client.
 
 ## 0.9.0-rc.1 — 2026-11-09
 

@@ -1079,13 +1079,13 @@ defmodule Fluffy.Driver.Live do
   # LiveViewTest's element form events fill in the form as the server rendered
   # it, which brings back a checkbox the user unchecked or an option they
   # deselected. Push the browser's serialization instead, with the form's
-  # phx-value-* attributes, as the LiveView client does.
+  # phx-value-* attributes winning over fields, as the LiveView client does.
   defp render_view_event(client_dom, context, selector, kind, payload) when kind in [:change, :submit] do
     target = ClientDOM.target!(client_dom, Locator.by_css(selector))
     form = if target.tag == "form", do: target, else: DocumentIndex.form_owner(ClientDOM.index(client_dom), target)
     form_values = if form, do: Event.values(form.attributes), else: %{}
 
-    Event.push(context.view, target, kind, Map.merge(form_values, payload))
+    Event.push(context.view, target, kind, Map.merge(payload, form_values))
   end
 
   defp render_view_event(client_dom, %{root_id: nil} = context, selector, kind, payload) do

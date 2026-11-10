@@ -287,10 +287,8 @@ defmodule Fluffy.ClientDOM do
     multiple? = has_attribute?(target.attributes, "multiple")
     selected = if multiple?, do: matches, else: Enum.take(matches, 1)
 
-    # An empty list deselects every option of a multiple select, like Playwright's.
-    deselect_all? = multiple? and requested == []
-
-    if (selected == [] and not deselect_all?) or (multiple? and not all_options_matched?(requested, matches)) do
+    # An empty list deselects every option, like Playwright's.
+    if (selected == [] and requested != []) or (multiple? and not all_options_matched?(requested, matches)) do
       raise Fluffy.ActionabilityError,
         action: :select_option,
         reason: :option_not_found,
