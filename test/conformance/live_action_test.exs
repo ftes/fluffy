@@ -289,6 +289,39 @@ defmodule Fluffy.Conformance.LiveActionTest do
     end
 
     @tag driver: driver
+    test "a JS.push target replaces the element's phx-target with #{driver}", %{driver: driver} do
+      driver
+      |> live_session()
+      |> visit("/live/click-bindings")
+      |> click(by_role(:button, name: "Ping b", exact: true))
+      |> expect(to_have_text(by_css("#log"), "Log: ping:target-b"))
+    end
+
+    @tag driver: driver
+    test "a click sends the element's current value with #{driver}", %{driver: driver} do
+      input = by_label("Pick value", exact: true)
+
+      driver
+      |> live_session()
+      |> visit("/live/click-bindings")
+      |> fill(input, "typed")
+      |> click(input)
+      |> expect(to_have_text(by_css("#log"), "Log: pick-value:typed"))
+    end
+
+    # The browser submits the form as the click finds it, before the reply to
+    # the click's own phx-click renders.
+    @tag driver: driver
+    test "a click submits the form as it was before its phx-click renders with #{driver}", %{driver: driver} do
+      driver
+      |> live_session()
+      |> visit("/live/click-bindings")
+      |> click(by_role(:button, name: "Rename and save", exact: true))
+      |> expect(to_have_text(by_css("#log"), "Log: rename save-name:Rex"))
+      |> expect(to_have_value(by_label("Name", exact: true), "Fido"))
+    end
+
+    @tag driver: driver
     test "unchecked checkboxes and deselected options leave the form payload with #{driver}", %{driver: driver} do
       last = by_css("#last")
 

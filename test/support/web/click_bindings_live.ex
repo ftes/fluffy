@@ -18,14 +18,30 @@ defmodule Fluffy.TestWeb.ClickBindingsComponent do
   end
 end
 
+defmodule Fluffy.TestWeb.ClickBindingsTargetComponent do
+  @moduledoc false
+  use Phoenix.LiveComponent
+
+  @impl true
+  def handle_event("ping", _params, socket) do
+    send(self(), {:log, "ping:#{socket.assigns.id}"})
+    {:noreply, socket}
+  end
+
+  @impl true
+  def render(assigns), do: ~H"<div id={@id}></div>"
+end
+
 defmodule Fluffy.TestWeb.ClickBindingsLive do
   @moduledoc false
   use Phoenix.LiveView
 
+  alias Phoenix.LiveView.JS
+
   # Logs every event in arrival order, so a test sees which binding a click on
   # an element without its own phx-click reaches.
   @impl true
-  def mount(_params, _session, socket), do: {:ok, assign(socket, log: [], tab: nil)}
+  def mount(_params, _session, socket), do: {:ok, assign(socket, log: [], tab: nil, name: "Rex")}
 
   @impl true
   def handle_params(params, _uri, socket), do: {:noreply, assign(socket, tab: params["tab"])}
@@ -36,6 +52,9 @@ defmodule Fluffy.TestWeb.ClickBindingsLive do
   def handle_event("outer", _params, socket), do: {:noreply, log(socket, "outer")}
   def handle_event("save", _params, socket), do: {:noreply, log(socket, "save")}
   def handle_event("track", _params, socket), do: {:noreply, log(socket, "track")}
+  def handle_event("pick-value", %{"value" => value}, socket), do: {:noreply, log(socket, "pick-value:#{value}")}
+  def handle_event("rename", _params, socket), do: {:noreply, socket |> assign(name: "Fido") |> log("rename")}
+  def handle_event("save-name", %{"name" => name}, socket), do: {:noreply, log(socket, "save-name:#{name}")}
 
   @impl true
   def handle_info({:log, entry}, socket), do: {:noreply, log(socket, entry)}
@@ -71,6 +90,14 @@ defmodule Fluffy.TestWeb.ClickBindingsLive do
       <button phx-click="track">Track and save</button>
     </form>
     <a href="/chamber" phx-click="track">Track and leave</a>
+    <.live_component module={Fluffy.TestWeb.ClickBindingsTargetComponent} id="target-a" />
+    <.live_component module={Fluffy.TestWeb.ClickBindingsTargetComponent} id="target-b" />
+    <button type="button" phx-target="#target-a" phx-click={JS.push("ping", target: "#target-b")}>Ping b</button>
+    <input aria-label="Pick value" value="rendered" phx-click="pick-value" />
+    <form id="rename-form" phx-submit="save-name">
+      <input aria-label="Name" name="name" value={@name} />
+      <button phx-click="rename">Rename and save</button>
+    </form>
     <p id="log">Log: {Enum.join(@log, " ")}</p>
     <p id="tab">Tab: {@tab}</p>
     """

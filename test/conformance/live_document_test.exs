@@ -106,6 +106,17 @@ defmodule Fluffy.Conformance.LiveDocumentTest do
     end
   end
 
+  # As inside the LiveView container, rather than doing nothing where window
+  # bindings would hear the key in the browser.
+  @tag driver: :phoenix
+  test "a key press on portal content without keyboard bindings raises with phoenix" do
+    session = :phoenix |> kennel_session() |> visit("/live/kennel")
+
+    assert_raise ArgumentError, ~r/does not have phx-keydown or phx-window-keydown/, fn ->
+      press(session, by_label(by_role(:dialog, name: "Treats"), "Treat name"), "Enter")
+    end
+  end
+
   @tag driver: :playwright
   test "interacts with a LiveView rendered in the root layout with playwright" do
     :playwright

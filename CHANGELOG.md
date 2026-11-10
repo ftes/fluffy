@@ -19,7 +19,8 @@
 - Browser launch uses Playwright's default timeout of 3 minutes instead of the global `timeout:`; set `launch_options: [timeout: ...]` to change it.
 - `select_option` raises `ArgumentError` for a list that mixes values or labels with option maps, on every driver. Playwright types a list by its first element, so such a list was never valid there.
 - Playwright `submit` waits like a Playwright action: for the navigation it starts to commit or fail, rather than following its redirects to the final response itself. A submit that times out, such as one a Content-Security-Policy `form-action` blocks, reports Playwright's navigation timeout.
-- `click` on Phoenix on an element with its own `phx-click` also takes its default action after the event, as a browser does: a submit button submits its form and a link is followed. Only `href="#"` and LiveView links prevent it, as in LiveView's client. Before, only the event was sent, like `render_click`.
+- `click` on Phoenix on an element with its own `phx-click` also takes its default action after the event, as a browser does: a submit button submits its form and a link is followed. Only `href="#"` and LiveView links prevent it, as in LiveView's client, and the form goes as the click found it, before the event's render. Before, only the event was sent, like `render_click`.
+- `press` on Phoenix raises for an element without keyboard bindings in root layout or portal content too, as inside the LiveView, instead of doing nothing.
 
 ### Fixed
 
@@ -33,7 +34,8 @@
 - `select_option` with `[]` also deselects a single select on Phoenix, which then submits nothing, as on Playwright.
 - A form's `phx-value-*` on Phoenix wins over a field of the same name in `phx-change` and `phx-submit`, as in LiveView's client.
 - `click` on text or another element inside a button or link on Phoenix submits the form or follows the link, as a browser does. Inside a `<.link navigate>` or `<.link patch>`, it navigates or patches even past a closer `phx-click`, as LiveView's client does.
-- `press` on Phoenix, and `click` in root layout or portal content, send a form control's current `value`, such as one `fill` left, instead of its server-rendered `value` attribute, and an empty one as `""`, as LiveView's client does.
+- `click` and `press` on Phoenix send a form control's current `value`, such as one `fill` left, instead of its server-rendered `value` attribute, and an empty one as `""`, as LiveView's client does.
+- `click` and `press` on Phoenix send a `JS.push` with its own `target:` only to that target, as LiveView's client does, not also to the element's `phx-target`, and no longer fail with LiveViewTest's "to return a single element" for some elements inside the LiveView.
 
 ## 0.9.0-rc.1 — 2026-11-09
 

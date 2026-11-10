@@ -1,10 +1,11 @@
 defmodule Fluffy.Driver.Live.Event do
   @moduledoc false
 
-  # Pushes a binding's event straight to its owning view. LiveViewTest's
-  # element/2 only finds elements inside the LiveView container, while the
-  # browser also routes bindings in the root layout (to the main view) and in
-  # teleported portal content (to the view that owns the portal).
+  # Pushes a binding's event straight to its owning view, as the LiveView
+  # client does. LiveViewTest's element/2 finds elements only inside the
+  # LiveView container, while the browser also routes bindings in the root
+  # layout (to the main view) and in teleported portal content (to the view
+  # that owns the portal); its events also send server-rendered values.
 
   import Phoenix.LiveViewTest
 
@@ -21,10 +22,22 @@ defmodule Fluffy.Driver.Live.Event do
     keyup: ["phx-keyup", "phx-window-keyup"]
   }
 
-  def push(view, %{attributes: attributes}, kind, payload) do
-    case Enum.find_value(Map.fetch!(@bindings, kind), &attribute(attributes, &1)) do
-      nil -> render(view)
-      declaration -> exec(view, declaration, attributes, kind, payload)
+  # A disabled control or an element without the binding gets no event in the
+  # browser. These raise, as LiveViewTest's element events do, so a test does
+  # not pass without noticing.
+  def push(view, %{attributes: attributes} = target, kind, payload) do
+    names = Map.fetch!(@bindings, kind)
+
+    cond do
+      disabled?(target) ->
+        raise ArgumentError, "cannot #{kind} element #{inspect(target.selector)} because it is disabled"
+
+      declaration = Enum.find_value(names, &attribute(attributes, &1)) ->
+        exec(view, declaration, attributes, kind, payload)
+
+      true ->
+        raise ArgumentError,
+              "element selected by #{inspect(target.selector)} does not have #{Enum.join(names, " or ")}"
     end
   end
 
@@ -75,6 +88,11 @@ defmodule Fluffy.Driver.Live.Event do
       value -> attributes |> values() |> Map.put("value", value)
     end
   end
+
+  defp disabled?(%{tag: tag} = target) when tag in ["button", "input", "select", "textarea"],
+    do: target.disabled? or List.keymember?(target.attributes, "disabled", 0)
+
+  defp disabled?(_target), do: false
 
   defp commands("[" <> _ = encoded), do: Phoenix.json_library().decode!(encoded)
   defp commands(event), do: [["push", %{"event" => event}]]
