@@ -20,6 +20,22 @@ defmodule Fluffy.Conformance.SelectOptionActionTest do
     end
 
     @tag driver: driver
+    test "to_have_values reads a disabled multiple select and fails on a single select with #{driver}" do
+      session =
+        session_for_html(unquote(driver), """
+        <select aria-label="Colours" multiple disabled><option selected>red</option></select>
+        <select aria-label="Plan"><option>Free</option></select>
+        """)
+
+      expect(session, to_have_values(by_label("Colours"), ["red"]))
+
+      for expectation <- [to_have_values(by_label("Plan"), ["Free"]), not_(to_have_values(by_label("Plan"), ["Pro"]))] do
+        error = assert_raise ExUnit.AssertionError, fn -> expect(session, expectation) end
+        assert error.message =~ ~r/not a select element with a multiple attribute/i
+      end
+    end
+
+    @tag driver: driver
     test "select_option with an empty list deselects every option of a single select with #{driver}" do
       html = ~s(<select aria-label="Plan"><option>Free</option><option selected>Pro</option></select>)
       field = by_label("Plan")

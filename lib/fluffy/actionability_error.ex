@@ -32,6 +32,7 @@ defmodule Fluffy.ActionabilityError do
   defp reason_label(:not_editable), do: "not editable"
   defp reason_label(:not_checkable), do: "not checkable"
   defp reason_label(:not_selectable), do: "not selectable"
+  defp reason_label(:not_multiple_select), do: "not a select element with a multiple attribute"
   defp reason_label(:cannot_uncheck_radio), do: "cannot uncheck a selected radio"
   defp reason_label(:disabled_option), do: "a disabled option"
   defp reason_label(:option_not_found), do: "the requested option was not found"

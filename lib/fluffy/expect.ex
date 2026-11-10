@@ -465,7 +465,8 @@ defmodule Fluffy.Expect do
 
   @doc group: "Locator assertions"
   @doc """
-  Expects the selected values of a multi-select.
+  Expects the selected values of a multi-select. As in Playwright, it fails on
+  any other element, a single select included; use `to_have_value/3` there.
 
   ## Options
 
