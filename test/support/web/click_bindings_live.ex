@@ -35,6 +35,7 @@ defmodule Fluffy.TestWeb.ClickBindingsLive do
   def handle_event("remove", %{"name" => name}, socket), do: {:noreply, log(socket, "remove:#{name}")}
   def handle_event("outer", _params, socket), do: {:noreply, log(socket, "outer")}
   def handle_event("save", _params, socket), do: {:noreply, log(socket, "save")}
+  def handle_event("track", _params, socket), do: {:noreply, log(socket, "track")}
 
   @impl true
   def handle_info({:log, entry}, socket), do: {:noreply, log(socket, entry)}
@@ -65,6 +66,11 @@ defmodule Fluffy.TestWeb.ClickBindingsLive do
     <.link patch="/live/click-bindings?tab=two">
       <span phx-click="select" phx-value-name="patch">Patch by text</span>
     </.link>
+    <a href="#" phx-click="track">Track here</a>
+    <form id="tracked-form" phx-submit="save">
+      <button phx-click="track">Track and save</button>
+    </form>
+    <a href="/chamber" phx-click="track">Track and leave</a>
     <p id="log">Log: {Enum.join(@log, " ")}</p>
     <p id="tab">Tab: {@tab}</p>
     """

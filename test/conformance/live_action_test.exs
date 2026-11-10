@@ -268,6 +268,26 @@ defmodule Fluffy.Conformance.LiveActionTest do
       |> expect("The secret chamber is open" |> by_text() |> to_be_visible())
     end
 
+    # Only a LiveView link or href="#" has its default action prevented.
+    @tag driver: driver
+    test "an element's own phx-click goes before its default action unless its href is # with #{driver}", %{
+      driver: driver
+    } do
+      log = by_css("#log")
+      page = Fluffy.TestServer.base_url() <> "/live/click-bindings"
+
+      driver
+      |> live_session()
+      |> visit("/live/click-bindings")
+      |> click(by_role(:link, name: "Track here", exact: true))
+      |> expect(to_have_text(log, "Log: track"))
+      |> expect(page_to_have_url(page))
+      |> click(by_role(:button, name: "Track and save", exact: true))
+      |> expect(to_have_text(log, "Log: track track save"))
+      |> click(by_role(:link, name: "Track and leave", exact: true))
+      |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
+    end
+
     @tag driver: driver
     test "unchecked checkboxes and deselected options leave the form payload with #{driver}", %{driver: driver} do
       last = by_css("#last")
