@@ -59,7 +59,8 @@ boundaries described below.
 
 Use Playwright for computed style, layout, browser accessibility, native
 validation, arbitrary JavaScript, and browser network events. Phoenix operates
-on parsed HTML and mutable form state. Even Phoenix checks structural
+on parsed HTML and mutable form state, and follows `Phoenix.LiveViewTest` where
+that doesn't change what a test observes. Even Phoenix checks structural
 visibility; see [Visibility and DOM presence](assertions.md#visibility-and-dom-presence)
 for the distinction from browser rendering and DOM absence.
 
