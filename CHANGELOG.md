@@ -41,6 +41,7 @@
 - On Phoenix, a LiveView render that changes a select's view or component resets the select to its rendered options, as in the browser after `select_option`; before, the choice survived while the options were unchanged.
 - On Phoenix, a LiveView render that changes a checkbox's or radio's view or component resets it to its rendered `checked` state, even after its own `phx-change`, as LiveView's client does; before, local state survived while the attribute was unchanged. Controls under `phx-update="ignore"` keep their local state and text.
 - `to_have_values` on Phoenix fails on a single select and reads a disabled multiple select, as on Playwright. It passed and failed the other way round.
+- `by_text`, `by_label` and `filter(has_text:)` on Phoenix no longer match text inside a `<template>`, such as a LiveView portal's, which the browser keeps out of the document. They read text as `to_have_text` does, so script and style text no longer counts either.
 
 ## 0.9.0-rc.1 — 2026-11-09
 

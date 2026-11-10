@@ -42,6 +42,21 @@ defmodule Fluffy.HTML.Semantics do
 
   def has_attribute?(attributes, name), do: List.keymember?(attributes, name, 0)
 
+  # The text Playwright matches and asserts on. Like textContent, it leaves out a
+  # template's content, which is not part of the document.
+  def text(%{tag: tag, attributes: attributes, children: children}), do: tree_text({tag, attributes, children})
+
+  defp tree_text({tag, _attributes, _children}) when tag in ~w(script noscript style template), do: ""
+
+  defp tree_text({"input", attributes, _children}) do
+    type = String.downcase(attribute(attributes, "type") || "")
+    if type in ~w(submit button reset), do: attribute(attributes, "value") || "", else: ""
+  end
+
+  defp tree_text({_tag, _attributes, children}), do: Enum.map_join(children, &tree_text/1)
+  defp tree_text(text) when is_binary(text), do: text
+  defp tree_text(_comment), do: ""
+
   def labelable_tags, do: @labelable_tags
 
   def labelable?(%{tag: "input"} = target), do: input_type(target) != "hidden"
