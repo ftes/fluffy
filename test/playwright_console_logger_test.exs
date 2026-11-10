@@ -10,10 +10,22 @@ defmodule Fluffy.PlaywrightConsoleLoggerTest do
   alias Fluffy.Playwright
   alias Fluffy.TestHTTPFixtures
 
-  test "log_browser_console: false disables browser logging" do
+  setup context do
     config = Application.fetch_env!(:fluffy, :playwright)
-    Application.put_env(:fluffy, :playwright, Keyword.put(config, :log_browser_console, false))
     on_exit(fn -> Application.put_env(:fluffy, :playwright, config) end)
+
+    logging =
+      if context[:default_logging],
+        do: Keyword.delete(config, :log_browser_console),
+        else: Keyword.put(config, :log_browser_console, true)
+
+    Application.put_env(:fluffy, :playwright, logging)
+    :ok
+  end
+
+  # As in Playwright, the browser console is not printed by default.
+  @tag :default_logging
+  test "browser logging is off by default" do
     session = start_session(:playwright, base_url: Fluffy.TestServer.base_url())
 
     refute capture_log(fn -> Playwright.evaluate(session, "console.error('silenced error')") end) =~ "silenced error"

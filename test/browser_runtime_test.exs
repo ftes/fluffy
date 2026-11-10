@@ -18,7 +18,7 @@ defmodule Fluffy.BrowserRuntimeTest do
 
     assert Enum.uniq(browsers) == [%{guid: "browser-1"}]
     assert_receive :transport_started
-    assert_receive {:browser_launched, [timeout: 100]}
+    assert_receive {:browser_launched, []}
     refute_receive :transport_started
     refute_receive {:browser_launched, _options}
     assert BrowserRuntime.status(runtime_name).launch_count == 1
@@ -342,7 +342,7 @@ defmodule Fluffy.BrowserRuntimeTest do
     assert Enum.sort(config) ==
              Enum.sort(
                trace_dir: "traces",
-               log_browser_console: true,
+               log_browser_console: false,
                enabled: true,
                pool_size: 1,
                engine: :firefox,
@@ -352,7 +352,7 @@ defmodule Fluffy.BrowserRuntimeTest do
                artifact_dir: nil
              )
 
-    refute Options.validate_playwright!(log_browser_console: false)[:log_browser_console]
+    assert Options.validate_playwright!(log_browser_console: true)[:log_browser_console]
     assert false == Options.validate_playwright!(false)
 
     assert_raise NimbleOptions.ValidationError, ~r/unknown options.*:js_logger/, fn ->

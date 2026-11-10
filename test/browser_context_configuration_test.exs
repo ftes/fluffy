@@ -60,6 +60,9 @@ defmodule Fluffy.BrowserContextConfigurationTest do
                })
                """
              )
+
+    # Playwright Test's default locale.
+    assert Playwright.evaluate(defaults, "navigator.language") == "en-US"
   end
 
   test "rejects unknown session and BrowserContext options before creation" do

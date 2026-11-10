@@ -36,7 +36,7 @@ defmodule Fluffy.Conformance.SelectOptionActionTest do
       |> expect(to_have_values(field, ["literal"]))
       |> select_option(field, %{index: 1})
       |> expect(to_have_values(field, ["42"]))
-      |> select_option(field, [%{value: 12.5}, :ready, %{value: ~D[2026-09-30]}, %{label: :Number}])
+      |> select_option(field, [%{value: 12.5}, %{value: :ready}, %{value: ~D[2026-09-30]}, %{label: :Number}])
       |> expect(to_have_values(field, ["42", "12.5", "ready", "2026-09-30"]))
       |> select_option(field, %{value: ~c"ready"})
       |> expect(to_have_values(field, ["ready"]))
@@ -222,44 +222,24 @@ defmodule Fluffy.Conformance.SelectOptionActionTest do
     end)
   end
 
-  # As for a list of strings alone, Playwright waits for the options to appear.
-  @tag driver: :playwright
-  test "select_option with a mixed list waits for its options" do
-    html = """
-    <select aria-label="Plan" multiple><option>Free</option></select>
-    <button onclick="setTimeout(() => this.previousElementSibling.add(new Option('Pro', 'pro')), 300)">Add</button>
-    """
+  # Playwright types a list by its first element, which a mixed list breaks.
+  for driver <- [:static, :live, :playwright] do
+    @tag driver: driver
+    test "select_option rejects a list mixing values and option maps with #{driver}", %{driver: driver} do
+      session =
+        if driver == :live do
+          :phoenix |> start_session(endpoint: Fluffy.TestWeb.Endpoint) |> visit("/live/potions")
+        else
+          html = ~s(<select aria-label="Potion colours" multiple><option>blue</option></select>)
+          session_for_html(driver, html, base_url: Fluffy.TestServer.base_url())
+        end
 
-    with_html(:playwright, html, fn session ->
-      session
-      |> click(by_role(:button, name: "Add"))
-      |> select_option(by_label("Plan"), [%{index: 0}, "Pro"])
-      |> expect(to_have_values(by_label("Plan"), ["Free", "pro"]))
-    end)
-  end
-
-  @tag driver: :playwright
-  test "select_option with a mixed list keeps its value and label maps" do
-    html = """
-    <select aria-label="Plan" multiple>
-      <option value="free">Free</option><option value="pro">Pro</option><option value="team">Team</option>
-    </select>
-    """
-
-    with_html(:playwright, html, fn session ->
-      session
-      |> select_option(by_label("Plan"), [%{value: "free"}, "Pro", %{label: "Team"}])
-      |> expect(to_have_values(by_label("Plan"), ["free", "pro", "team"]))
-    end)
-  end
-
-  @tag driver: :playwright
-  test "select_option with a mixed list fails when an option never appears" do
-    with_html(:playwright, ~s(<select aria-label="Plan" multiple><option>Free</option></select>), fn session ->
-      assert_raise Fluffy.OperationError, ~r/did not find some options/, fn ->
-        select_option(session, by_label("Plan"), [%{index: 0}, "Pro"], timeout: 2_000)
+      for requested <- [[:blue, %{value: :green}], [%{value: :green}, "blue"]] do
+        assert_raise ArgumentError, ~r/values and labels or a list of option maps/, fn ->
+          select_option(session, by_label("Potion colours"), requested)
+        end
       end
-    end)
+    end
   end
 
   defp with_html(driver, html, fun) do

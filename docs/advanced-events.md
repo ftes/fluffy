@@ -259,7 +259,7 @@ session
 `Event.console()` resolves with a `Fluffy.ConsoleMessage` (`type`, `text`, `location`,
 `timestamp`, `page`) and `Event.page_error()` with a `Fluffy.PageError` for an uncaught
 exception (`name`, `message`, `stack`, `page`). Waits and listeners do not affect
-`log_browser_console`: messages are logged as well.
+`log_browser_console: true`: messages are logged as well.
 
 `Event.worker()` resolves with a `Fluffy.Worker` and `Event.web_socket()` with a
 `Fluffy.WebSocket`, each with its `url` and `page`; `Fluffy.unwrap_and_return/2` reaches the native value

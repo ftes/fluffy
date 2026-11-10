@@ -57,6 +57,9 @@ defmodule Fluffy.Backend.Playwright.Document do
   }
   """
 
+  # Fluffy can adopt a document right after it commits, such as after an
+  # action's navigation, before the body is parsed. Without the readyState
+  # check, the `every` over its LiveView roots would pass with none found yet.
   @live_view_ready """
   () => document.readyState !== 'loading' &&
       Array.from(document.querySelectorAll('[data-phx-main], [data-phx-session]'))

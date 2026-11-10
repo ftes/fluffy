@@ -150,10 +150,8 @@ defmodule Fluffy.BrowserRuntime.Slot do
   # Invalid launch options raise in PlaywrightEx. That raise belongs to the
   # caller too, not to the runtime.
   defp launch(state) do
-    launch_options = Keyword.put_new(state.launch_options, :timeout, state.timeout)
-
     with :ok <- state.transport_starter.(state.runtime_supervisor, state.playwright_name, state.playwright_options) do
-      state.browser_launcher.(state.engine, state.playwright_name, launch_options)
+      state.browser_launcher.(state.engine, state.playwright_name, state.launch_options)
     end
   rescue
     exception -> {:error, exception}

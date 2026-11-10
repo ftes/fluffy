@@ -420,10 +420,10 @@ defmodule Fluffy.Conformance.PlaywrightWrappersTest do
       assert System.monotonic_time(:millisecond) - started < 10_000
     end
 
-    test "reports a timeout, usually Playwright's own rather than Fluffy's backstop" do
+    test "reports Playwright's own timeout" do
       session = session_for_html(:playwright, "<p>Harness</p>")
 
-      assert_raise Fluffy.OperationError, ~r/waitForFunction: Timeout 100ms exceeded|Timeout 100ms exceeded during/, fn ->
+      assert_raise Fluffy.OperationError, ~r/waitForFunction: Timeout 100ms exceeded/, fn ->
         Playwright.wait_for_function(session, "() => false", nil, timeout: 100)
       end
     end
