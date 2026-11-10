@@ -22,11 +22,11 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
     test "evaluate's timeout overrides the session's" do
       session = session_for_html(:playwright, "<p>Harness</p>")
 
-      assert_raise RuntimeError, ~r/evaluate did not finish within 100ms/, fn ->
+      assert_raise PlaywrightEx.TimeoutError, ~r/Timeout 100ms exceeded during evaluate/, fn ->
         Playwright.evaluate(session, "new Promise(() => {})", timeout: 100)
       end
 
-      assert_raise RuntimeError, ~r/evaluate did not finish within 100ms/, fn ->
+      assert_raise PlaywrightEx.TimeoutError, ~r/Timeout 100ms exceeded during evaluate/, fn ->
         Playwright.evaluate(session, "new Promise(() => {})", nil, timeout: 100)
       end
     end
@@ -700,10 +700,14 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
       end
     end
 
-    test "a page closing while Fluffy adopts it raises from unwrap and clock calls" do
-      for call <- [&unwrap(&1, fn _page -> :ok end), &Fluffy.Playwright.Clock.install/1] do
+    test "a page closing while Fluffy adopts it fails unwrap and clock calls" do
+      for {operation, call} <- [
+            unwrap: &unwrap(&1, fn _page -> :ok end),
+            "Clock.install": &Fluffy.Playwright.Clock.install/1
+          ] do
         popup = popup_showing(@closes_on_adoption)
-        assert_raise PlaywrightEx.TargetClosedError, fn -> call.(popup) end
+        error = assert_raise Fluffy.OperationError, fn -> call.(popup) end
+        assert %Fluffy.OperationError{operation: ^operation, cause: %PlaywrightEx.TargetClosedError{}} = error
       end
     end
 
@@ -727,19 +731,20 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
     </script>
     """
 
-    test "a page closing while Fluffy adopts a navigation raises from visit, reload and history navigation" do
+    test "a page closing while Fluffy adopts a navigation fails visit, reload and history navigation" do
       closing = TestHTTPFixtures.register(%{body: @closes_on_navigation})
       plain = TestHTTPFixtures.path(TestHTTPFixtures.register(%{body: "<p>Plain</p>"}))
       closes_on = &TestHTTPFixtures.path(closing, "?close=#{&1}")
 
-      for call <- [
-            &visit(&1, closes_on.("navigate")),
-            &(&1 |> visit(closes_on.("reload")) |> reload()),
-            &(&1 |> visit(closes_on.("back_forward")) |> visit(plain) |> Playwright.go_back()),
-            &(&1 |> visit(closes_on.("back_forward")) |> Playwright.go_back() |> Playwright.go_forward())
+      for {operation, call} <- [
+            visit: &visit(&1, closes_on.("navigate")),
+            reload: &(&1 |> visit(closes_on.("reload")) |> reload()),
+            go_back: &(&1 |> visit(closes_on.("back_forward")) |> visit(plain) |> Playwright.go_back()),
+            go_forward: &(&1 |> visit(closes_on.("back_forward")) |> Playwright.go_back() |> Playwright.go_forward())
           ] do
         popup = popup_showing("<p>Start</p>")
-        assert_raise PlaywrightEx.TargetClosedError, fn -> call.(popup) end
+        error = assert_raise Fluffy.OperationError, fn -> call.(popup) end
+        assert %Fluffy.OperationError{operation: ^operation, cause: %PlaywrightEx.TargetClosedError{}} = error
       end
     end
   end
@@ -758,14 +763,14 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
       session = put_session_timeout(session, 1_000)
 
       # A frozen page holds up unroute_all on some browsers.
-      assert_raise RuntimeError, ~r/evaluate did not finish within 1000ms/, fn ->
+      assert_raise PlaywrightEx.TimeoutError, ~r/Timeout 1000ms exceeded during evaluate/, fn ->
         Playwright.evaluate(session, "() => { while (true) {} }")
       end
 
       try do
         Playwright.unroute_all(session)
       rescue
-        error in RuntimeError -> assert error.message =~ "unroute_all did not finish within 1000ms"
+        error in PlaywrightEx.TimeoutError -> assert error.message =~ "Timeout 1000ms exceeded during unroute_all"
       end
 
       {:ok, resources} = Fluffy.SessionRuntime.resources(session.runtime)

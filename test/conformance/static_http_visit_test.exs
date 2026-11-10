@@ -183,6 +183,6 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
   end
 
   # Playwright raises its own exception for a failed navigation.
-  defp navigation_error(:playwright), do: PlaywrightEx.PlaywrightError
+  defp navigation_error(:playwright), do: Fluffy.OperationError
   defp navigation_error(:phoenix), do: RuntimeError
 end

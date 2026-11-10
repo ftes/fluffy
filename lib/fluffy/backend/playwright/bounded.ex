@@ -31,7 +31,8 @@ defmodule Fluffy.Backend.Playwright.Bounded do
   @doc """
   Like `within/2` for a call returning `{:ok, value}` or `{:error, error}`; returns the value or raises.
 
-  On timeout it runs the `after_timeout:` function, if any, then raises with
+  On timeout it runs the `after_timeout:` function, if any, then raises a
+  `PlaywrightEx.TimeoutError`, like a Playwright call that has a timeout, with
   `message:` or a default naming `operation`.
   """
   def within!(timeout, operation, fun, options \\ []) do
@@ -47,9 +48,11 @@ defmodule Fluffy.Backend.Playwright.Bounded do
       :timeout ->
         options[:after_timeout].()
 
-        raise options[:message] ||
-                "Playwright #{operation} did not finish within #{timeout}ms; " <>
-                  "it may never settle, or a script may be blocking the page's main thread"
+        raise PlaywrightEx.TimeoutError,
+          message:
+            options[:message] ||
+              "Timeout #{timeout}ms exceeded during #{operation}; " <>
+                "it may never settle, or a script may be blocking the page's main thread"
     end
   end
 end

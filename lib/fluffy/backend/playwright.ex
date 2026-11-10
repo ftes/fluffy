@@ -13,6 +13,7 @@ defmodule Fluffy.Backend.Playwright do
   alias Fluffy.FailureArtifact
   alias Fluffy.Internal.Navigation.BrowserCommitted
   alias Fluffy.Internal.Navigation.BrowserPatch
+  alias Fluffy.Internal.OperationFailure
   alias Fluffy.Options
   alias Fluffy.Page
   alias Fluffy.PageLifecycle
@@ -266,16 +267,22 @@ defmodule Fluffy.Backend.Playwright do
   def visit(%Session{} = session, path) do
     state = Session.page_state(session)
     timeout = Session.context(session).timeout
-    _response = navigate!(:goto, [state.page, path, [wait_until: :load, timeout: timeout]])
-    adopt_navigated_document(session, state)
+
+    navigation!(:visit, fn ->
+      _response = navigate!(:goto, [state.page, path, [timeout: timeout]])
+      adopt_navigated_document(session, state)
+    end)
   end
 
   @impl true
   def reload(%Session{} = session, options \\ []) do
     state = Session.page_state(session)
     native = navigation_options(session, options)
-    _response = navigate!(:reload, [state.page, native])
-    adopt_navigated_document(session, state)
+
+    navigation!(:reload, fn ->
+      _response = navigate!(:reload, [state.page, native])
+      adopt_navigated_document(session, state)
+    end)
   end
 
   @impl true
@@ -307,12 +314,15 @@ defmodule Fluffy.Backend.Playwright do
     timeout = Document.bookkeeping_timeout(session)
     previous_url = Session.current_page(session).url
     native = navigation_options(session, options)
-    response = navigate!(direction, [state.page, native])
-    probe = Document.adopted_probe!(state, nil, timeout)
 
-    if is_nil(response) and probe.url == previous_url and probe.document == state.document_identity,
-      do: session,
-      else: adopt_probed_document(session, state, probe, timeout)
+    navigation!(direction, fn ->
+      response = navigate!(direction, [state.page, native])
+      probe = Document.adopted_probe!(state, nil, timeout)
+
+      if is_nil(response) and probe.url == previous_url and probe.document == state.document_identity,
+        do: session,
+        else: adopt_probed_document(session, state, probe, timeout)
+    end)
   end
 
   @impl true
@@ -333,12 +343,18 @@ defmodule Fluffy.Backend.Playwright do
     :ok
   end
 
-  # Like visit/2, reload and history wait for the load event by default.
-  defp navigation_options(session, options),
-    do: Keyword.merge([wait_until: :load], Keyword.put(options, :timeout, Session.timeout(session, options)))
+  # As in Playwright, `wait_until:` defaults to `:load`.
+  defp navigation_options(session, options), do: Keyword.put(options, :timeout, Session.timeout(session, options))
 
-  # Raises PlaywrightEx's own exception, such as `PlaywrightEx.TimeoutError`,
-  # which keeps Playwright's call log.
+  # As for an action, PlaywrightEx's error, which keeps Playwright's call log,
+  # becomes the cause of a `Fluffy.OperationError`.
+  defp navigation!(operation, fun) do
+    fun.()
+  rescue
+    error in [PlaywrightEx.PlaywrightError, PlaywrightEx.TimeoutError, TargetClosedError] ->
+      reraise OperationFailure.playwright(operation, nil, error), __STACKTRACE__
+  end
+
   defp navigate!(operation, arguments) do
     case apply(BrowserPage, operation, arguments) do
       {:ok, response} -> response

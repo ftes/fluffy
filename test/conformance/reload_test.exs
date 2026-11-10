@@ -75,7 +75,8 @@ defmodule Fluffy.Conformance.ReloadTest do
     session = :playwright |> start_test_session() |> visit(TestHTTPFixtures.path(fixture))
 
     try do
-      assert_raise PlaywrightEx.TimeoutError, ~r/reload/, fn -> reload(session, timeout: 500) end
+      error = assert_raise Fluffy.OperationError, ~r/reload/, fn -> reload(session, timeout: 500) end
+      assert %Fluffy.OperationError{operation: :reload, locator: nil, cause: %PlaywrightEx.TimeoutError{}} = error
     after
       receive do
         {:stream, server} -> send(server, :finish)

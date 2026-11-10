@@ -264,7 +264,8 @@ defmodule Fluffy.Conformance.RouteTest do
       route(session, "**/never", fn _route -> :ok end)
 
       started = System.monotonic_time(:millisecond)
-      assert_raise PlaywrightEx.TimeoutError, fn -> visit(session, TestHTTPFixtures.path(fixture, "/never")) end
+      error = assert_raise Fluffy.OperationError, fn -> visit(session, TestHTTPFixtures.path(fixture, "/never")) end
+      assert %PlaywrightEx.TimeoutError{} = error.cause
       assert System.monotonic_time(:millisecond) - started < 5_000
     end
   end
@@ -397,9 +398,8 @@ defmodule Fluffy.Conformance.RouteTest do
       {session, fixture} = session()
       route(session, "**/blocked", fn route -> Route.abort(route) end)
 
-      assert_raise PlaywrightEx.PlaywrightError, fn ->
-        visit(session, TestHTTPFixtures.path(fixture, "/blocked"))
-      end
+      error = assert_raise Fluffy.OperationError, fn -> visit(session, TestHTTPFixtures.path(fixture, "/blocked")) end
+      assert %PlaywrightEx.PlaywrightError{} = error.cause
     end
 
     @tag driver: :playwright

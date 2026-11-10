@@ -30,12 +30,15 @@ defmodule Fluffy.Internal.OperationFailure do
   defp public_operation(:set_checked, [false | _]), do: :uncheck
   defp public_operation(operation, _arguments), do: operation
 
-  def raise_playwright!(operation, locator, cause) do
-    raise Fluffy.OperationError,
+  def raise_playwright!(operation, locator, cause), do: raise(playwright(operation, locator, cause))
+
+  def playwright(operation, locator, cause) do
+    Fluffy.OperationError.exception(
       backend: :playwright,
       driver: :playwright,
       operation: operation,
       locator: locator,
       cause: cause
+    )
   end
 end

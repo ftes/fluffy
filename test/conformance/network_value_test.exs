@@ -165,7 +165,9 @@ defmodule Fluffy.Conformance.NetworkValueTest do
     put_session_timeout(session, 500)
 
     try do
-      assert_raise RuntimeError, ~r/body did not finish within 500ms/, fn -> Response.body(await(pending)) end
+      assert_raise PlaywrightEx.TimeoutError, ~r/Timeout 500ms exceeded during body/, fn ->
+        Response.body(await(pending))
+      end
     after
       send(server, :finish)
     end
