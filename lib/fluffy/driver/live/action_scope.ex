@@ -16,7 +16,7 @@ defmodule Fluffy.Driver.Live.ActionScope do
   #     upload) goes through `delivered/1` or `record_delivery/0`, so a
   #     retry never repeats an action the view already saw. Reads, such as
   #     `render`, record nothing.
-  #   * A view message saying how the view left (a redirect, a watcher event)
+  #   * A view message saying how the view left (a redirect, the view's exit)
   #     stays unread: the driver's `leave_unread/1` puts it back as it is read,
   #     so a call that fails before following it leaves it for the next call.
   #   * A retry on another page runs after the action's scope ended, as an
