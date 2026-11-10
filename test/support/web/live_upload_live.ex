@@ -98,6 +98,15 @@ defmodule Fluffy.TestWeb.LiveUploadLive do
     {:noreply, cancel_upload(socket, :attachment, ref)}
   end
 
+  def handle_event("cancel-all", _params, socket) do
+    socket =
+      Enum.reduce(socket.assigns.uploads.attachment.entries, socket, fn entry, socket ->
+        cancel_upload(socket, :attachment, entry.ref)
+      end)
+
+    {:noreply, socket}
+  end
+
   defp handle_progress(:attachment, entry, socket) do
     socket = assign(socket, :progress, entry.progress)
 
@@ -174,6 +183,7 @@ defmodule Fluffy.TestWeb.LiveUploadLive do
         >
           Cancel upload
         </button>
+        <button type="button" phx-click="cancel-all">Cancel all uploads</button>
         <button>Save</button>
         <button name="intent" value="draft">Draft</button>
         <a href="/chamber?from=upload-link">Leave upload form</a>

@@ -36,6 +36,7 @@
 - `click` on text or another element inside a button or link on Phoenix submits the form or follows the link, as a browser does. Inside a `<.link navigate>` or `<.link patch>`, it navigates or patches even past a closer `phx-click`, as LiveView's client does.
 - `click` and `press` on Phoenix send a form control's current `value`, such as one `fill` left, instead of its server-rendered `value` attribute, and an empty one as `""`, as LiveView's client does.
 - `click` and `press` on Phoenix send a `JS.push` with its own `target:` only to that target, as LiveView's client does, not also to the element's `phx-target`, and no longer fail with LiveViewTest's "to return a single element" for some elements inside the LiveView.
+- On Phoenix, an upload entry the view cancels is no longer uploaded on submit, whatever event cancelled it: as in LiveView's client, entries leave once the input's `data-phx-active-refs` drops them, not only after a click with their `phx-value-ref`.
 
 ## 0.9.0-rc.1 — 2026-11-09
 
