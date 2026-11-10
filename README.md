@@ -145,6 +145,7 @@ backend supports.
   limitations, downloads, navigation, dialogs, and network events
 - [Coming from PhoenixTest](docs/migration-from-phoenix-test.md) — an alternate
   starting point for existing PhoenixTest suites
+- [Upgrading to 0.9](docs/upgrading.md) — what a 0.8 suite must change
 - [Capability matrix](docs/capabilities.md) — backend differences and limitations
 
 See [CONTRIBUTING.md](https://github.com/ftes/fluffy/blob/main/CONTRIBUTING.md) for developing Fluffy itself.

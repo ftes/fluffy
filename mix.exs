@@ -17,7 +17,8 @@ defmodule Fluffy.MixProject do
   ]
 
   @migration [
-    "docs/migration-from-phoenix-test.md"
+    "docs/migration-from-phoenix-test.md",
+    "docs/upgrading.md"
   ]
 
   @reference [

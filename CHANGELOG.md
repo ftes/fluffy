@@ -9,7 +9,7 @@
 ### Changed
 
 - **Breaking:** Playwright actions, locator waits, `reload`, `go_back`, `go_forward`, `wait_for_function`, `wait_for_load_state` and `Fluffy.Route.fetch/2` raise `ArgumentError` for `timeout: 0`, which they cannot check once, instead of timing out after 1ms. Assertions and Phoenix actions still check once. `config :fluffy, timeout:` must be positive.
-- **Breaking:** as in Playwright, calls that have no timeout there no longer end at the session's `timeout:` or accept `timeout:`: page `evaluate` (whose `timeout:` came in 0.9.0-rc.1), `evaluate_all`, `content`, `title`, `local_storage`, `session_storage`, `bring_to_front`, `set_viewport_size`, `emulate_media`, `pdf`, `add_script_tag`, `add_style_tag`, `Keyboard`, `Mouse` and `Clock` calls. Context setters, `close_page`, request, response and download reads, stopping a trace and the facade's link probe lose their limit too, and an unfinished download is no longer canceled; see the installation guide for blocked pages. Locator `evaluate` and `bounding_box` keep `timeout:` for finding the element.
+- **Breaking:** as in Playwright, calls that have no timeout there no longer end at the session's `timeout:` or accept `timeout:`: page `evaluate`, `evaluate_all`, `content`, `title`, `local_storage`, `session_storage`, `bring_to_front`, `set_viewport_size`, `emulate_media`, `pdf`, `add_script_tag`, `add_style_tag`, `Keyboard`, `Mouse` and `Clock` calls. Context setters, `close_page`, request, response and download reads, stopping a trace and the facade's link probe lose their limit too, and an unfinished download is no longer canceled; see the installation guide for blocked pages. Locator `evaluate` and `bounding_box` keep `timeout:` for finding the element.
 - `Fluffy.Playwright.unroute_all/2` takes Playwright's `behavior:` (`:default`, `:wait`, `:ignore_errors`) instead of `timeout:`. As in Playwright, a handler that answers after its last route was removed, or fails on a closed page, now fails the test unless `behavior: :ignore_errors` stopped it.
 - On Playwright, `visit`, `reload`, `go_back`, `go_forward`, clock calls, `open_browser`, download reads and the page handling around an `unwrap` callback raise `Fluffy.OperationError` with PlaywrightEx's exception as `cause`, as actions do.
 - Playwright `check` and `uncheck` again fail, as in Playwright, with "Clicking the checkbox did not change its state" when page code such as a LiveView patch reverts the box first, mostly in Firefox and WebKit.
@@ -76,6 +76,8 @@
 Fluffy now runs on PlaywrightEx 0.17, a port of the official Playwright client with a pinned Playwright 1.65 driver.
 
 ### Upgrading from 0.8
+
+Later release candidates change some of these again; the [upgrade guide](docs/upgrading.md) lists the net changes from 0.8.
 
 - Install the driver and browsers with `MIX_ENV=test mix playwright_ex.install -- chromium`; drop the npm `playwright` package and the `assets_dir` config.
 - Node.js is no longer required, for tests or for developing Fluffy: the driver brings its own.

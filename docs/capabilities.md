@@ -202,11 +202,12 @@ Native reset-button behavior requires Playwright. Static and LiveView clicks do
 not restore form defaults or clear file selections. LiveView reset buttons with
 `phx-click` still dispatch their server event.
 
-A LiveView click on an element with its own `phx-click` sends the event and
-then takes the element's default action, as a browser does: a submit button
-submits its form and a link is followed. Only `href="#"` and LiveView links
-prevent it. The form is submitted as the click found it, before the event's
-render. `Phoenix.LiveViewTest.render_click/2` sends only the event.
+A LiveView click sends the closest `phx-click`, the target's or an ancestor's,
+and then takes the default action of the closest button or link, as a browser
+does: a submit button submits its form and a link is followed. Only `href="#"`
+and LiveView links prevent it. The form is submitted as the click found it,
+before the event's render. `Phoenix.LiveViewTest.render_click/2` sends only the
+event.
 
 On Phoenix, a click or key event sends a form control's current `value` and a
 list item's number; other elements send no `value`, while a browser also sends
