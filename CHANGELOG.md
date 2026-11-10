@@ -8,7 +8,7 @@
 
 ### Changed
 
-- On Playwright, actions, locator waits, `wait_for_function`, `wait_for_load_state` and `Fluffy.Route.fetch/2` raise `ArgumentError` for `timeout: 0` instead of timing out after 1ms. Fluffy's `timeout: 0` checks once, which they cannot do; assertions still accept it, and Phoenix actions still make one attempt.
+- On Playwright, actions, locator waits, `reload`, `go_back`, `go_forward`, `wait_for_function`, `wait_for_load_state` and `Fluffy.Route.fetch/2` raise `ArgumentError` for `timeout: 0` instead of timing out after 1ms. Fluffy's `timeout: 0` checks once, which they cannot do; assertions still accept it, and Phoenix actions still make one attempt.
 - `Fluffy.Playwright.unroute_all/2` takes Playwright's `behavior:` (`:default`, `:wait` or `:ignore_errors`) for route handlers still running, and no `timeout:`. As in Playwright, a handler that answers after `unroute` or `unroute_all` removed the last route fails the test with "Route is already handled!", and one failing on a closed page or context fails it with Playwright's hint unless `behavior: :ignore_errors` stopped it; both used to pass silently.
 - On Firefox, an action that closes its own page, such as a popup's `window.close()`, raises `Fluffy.OperationError` again, as it does in Playwright, which tracks it as a Firefox bug. Other browsers are unchanged.
 - Playwright `check` and `uncheck` behave as in Playwright again: they fail with "Clicking the checkbox did not change its state" when page code, such as a LiveView patch answering the click, reverts the box before Playwright reads it back. That happens mostly in Firefox and WebKit, for a box whose new state the server does not render. Phoenix is unchanged: it has no page code to revert the click, so it still succeeds there.

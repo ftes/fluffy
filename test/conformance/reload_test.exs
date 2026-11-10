@@ -31,6 +31,35 @@ defmodule Fluffy.Conformance.ReloadTest do
     end
   end
 
+  for driver <- [:phoenix, :playwright] do
+    @tag driver: driver
+    test "reload with timeout: 0 reloads on Phoenix and is rejected on Playwright with #{driver}", %{driver: driver} do
+      fixture =
+        TestHTTPFixtures.register_sequence([
+          %{body: html("<h1>First render</h1>")},
+          %{body: html("<h1>Second render</h1>")}
+        ])
+
+      session = driver |> start_test_session() |> visit(TestHTTPFixtures.path(fixture))
+
+      if driver == :phoenix do
+        session
+        |> reload(timeout: 0)
+        |> expect("Second render" |> by_text() |> to_be_visible())
+      else
+        for {operation, call} <- [
+              reload: &reload(&1, timeout: 0),
+              go_back: &Fluffy.Playwright.go_back(&1, timeout: 0),
+              go_forward: &Fluffy.Playwright.go_forward(&1, timeout: 0)
+            ] do
+          assert_raise ArgumentError, ~r/^#{operation}: timeout: 0 means check once/, fn -> call.(session) end
+        end
+
+        assert length(TestHTTPFixtures.requests(fixture)) == 1
+      end
+    end
+  end
+
   @tag driver: :playwright
   test "Playwright reload passes wait_until: through and still adopts the new document" do
     fixture =

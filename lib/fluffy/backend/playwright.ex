@@ -268,7 +268,7 @@ defmodule Fluffy.Backend.Playwright do
   @impl true
   def reload(%Session{} = session, options \\ []) do
     state = Session.page_state(session)
-    native = navigation_options(session, options)
+    native = navigation_options(session, :reload, options)
 
     navigation!(:reload, fn ->
       _response = navigate!(:reload, [state.page, native])
@@ -304,7 +304,7 @@ defmodule Fluffy.Backend.Playwright do
     state = Session.page_state(session)
     timeout = Document.bookkeeping_timeout(session)
     previous_url = Session.current_page(session).url
-    native = navigation_options(session, options)
+    native = navigation_options(session, direction, options)
 
     navigation!(direction, fn ->
       response = navigate!(direction, [state.page, native])
@@ -332,8 +332,12 @@ defmodule Fluffy.Backend.Playwright do
     with {:error, error} <- BrowserPage.close(page.state.page), do: raise(error)
   end
 
-  # As in Playwright, `wait_until:` defaults to `:load`.
-  defp navigation_options(session, options), do: Keyword.put(options, :timeout, Session.timeout(session, options))
+  # As in Playwright, `wait_until:` defaults to `:load`. Like an action, a
+  # navigation can't check once, so it rejects Fluffy's `timeout: 0`.
+  defp navigation_options(session, operation, options) do
+    timeout = Keyword.get(options, :timeout) || Session.context(session).timeout
+    Keyword.put(options, :timeout, Deadline.playwright_operation!(operation, timeout))
+  end
 
   # As for an action, PlaywrightEx's error, which keeps Playwright's call log,
   # becomes the cause of a `Fluffy.OperationError`.
