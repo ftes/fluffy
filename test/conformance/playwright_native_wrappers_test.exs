@@ -796,6 +796,28 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
                TestHTTPFixtures.url(fixture, "/api")
              ) == "201:server"
     end
+
+    test "timeout: 0 gives up at once instead of waiting without limit" do
+      fixture =
+        TestHTTPFixtures.register(fn _request ->
+          Process.sleep(500)
+          %{body: "server"}
+        end)
+
+      session = start_session(:playwright)
+      visit(session, TestHTTPFixtures.path(fixture, "/page"))
+      owner = self()
+
+      Playwright.route(session, "**/api", fn route ->
+        send(owner, {:fetch, catch_error(Route.fetch(route, timeout: 0))})
+        Route.fulfill(route, body: "routed")
+      end)
+
+      assert Playwright.evaluate(session, "url => fetch(url).then(r => r.text())", TestHTTPFixtures.url(fixture, "/api")) ==
+               "routed"
+
+      assert_receive {:fetch, %PlaywrightEx.TimeoutError{}}
+    end
   end
 
   describe "page output" do

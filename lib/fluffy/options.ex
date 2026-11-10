@@ -57,7 +57,7 @@ defmodule Fluffy.Options do
     page_aria_snapshot: {PlaywrightEx.Page, :aria_snapshot, 2, [:boxes, :depth, :mode]},
     wait_for_function: {PlaywrightEx.Page, :wait_for_function, 4, [:polling]},
     wait_for_load_state: {PlaywrightEx.Page, :wait_for_load_state, 3, []},
-    unroute_all: {PlaywrightEx.BrowserContext, :unroute_all, 2, []},
+    unroute_all: {PlaywrightEx.BrowserContext, :unroute_all, 2, [:behavior]},
     locator_screenshot:
       {PlaywrightEx.Locator, :screenshot, 2,
        [:animations, :caret, :mask, :mask_color, :omit_background, :quality, :scale, :style, :type]},
@@ -112,10 +112,17 @@ defmodule Fluffy.Options do
 
   @fluffy_native_keys [:timeout]
   # `path` is the positional argument of an element screenshot.
-  @denied_native_keys [:no_wait_after, :signal, :path, :behavior]
+  @denied_native_keys [:no_wait_after, :signal, :path]
 
   # Upstream docs and types of a passed-through option that Fluffy's behavior completes.
   @native_option_overrides [
+    behavior: [
+      doc:
+        "*Playwright only.* What to do with route handlers already running: `:default` does not wait, and a " <>
+          "handler that fails later, such as by answering a request that went on to the server, fails as usual; " <>
+          "`:wait` waits for them to finish; `:ignore_errors` does not wait and ignores their failures, letting " <>
+          "their requests go on."
+    ],
     wait_until: [
       doc:
         "*Playwright only.* When Playwright considers the navigation done: `:commit`, `:domcontentloaded`, " <>

@@ -9,7 +9,7 @@ defmodule Fluffy.Application do
     validate_playwright_config()
 
     Supervisor.start_link(
-      [{Task.Supervisor, name: Fluffy.TaskSupervisor}] ++
+      [{Task.Supervisor, name: Fluffy.TaskSupervisor}, {Registry, keys: :duplicate, name: Fluffy.Route.Registry}] ++
         children() ++ [{DynamicSupervisor, strategy: :one_for_one, name: Fluffy.SessionRuntime.Supervisor}],
       strategy: :rest_for_one,
       name: Fluffy.Supervisor

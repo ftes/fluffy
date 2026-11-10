@@ -328,7 +328,7 @@ defmodule Fluffy.Conformance.RouteTest do
 
     @tag driver: :playwright
     @tag capture_log: true
-    test "unrouting frees a request at a running handler, whose late answer fails nothing" do
+    test "unrouting the last route frees a request at a running handler, whose late answer fails, as in Playwright" do
       Process.flag(:trap_exit, true)
       {session, fixture} = session()
       owner = self()
@@ -341,17 +341,70 @@ defmodule Fluffy.Conformance.RouteTest do
         end
       end)
 
-      Playwright.evaluate(
-        session,
-        "url => { window.result = fetch(url).then(r => r.text()); return true }",
-        url(fixture, "/api")
-      )
+      start_held_fetch(session, fixture)
 
-      assert_receive {:running, handler}, 5_000
+      assert_receive {:running, pid}, 5_000
       unroute(session, "**/api")
-      send(handler, :release)
-      # Removing the last route releases the request in Chromium; the late answer is ignored.
-      assert Playwright.evaluate(session, "window.result") in ["finished", ~s({"name":"server"})]
+      send(pid, :release)
+
+      assert Playwright.evaluate(session, "window.result") == ~s({"name":"server"})
+      assert_receive {:EXIT, _pid, {%PlaywrightEx.PlaywrightError{message: message}, [_ | _]}}, 5_000
+      assert message =~ "Route is already handled!"
+    end
+
+    @tag driver: :playwright
+    test "unroute_all with behavior: :wait waits for a running handler, whose answer the request gets" do
+      {session, fixture} = session()
+      owner = self()
+
+      route(session, "**/api", fn route ->
+        send(owner, {:running, self()})
+
+        receive do
+          :release -> Route.fulfill(route, body: "finished")
+        end
+
+        # Still waited for after the answer.
+        receive do
+          :finish -> send(owner, :finished)
+        end
+      end)
+
+      start_held_fetch(session, fixture)
+      assert_receive {:running, pid}, 5_000
+      unrouting = Task.async(fn -> Playwright.unroute_all(session, behavior: :wait) end)
+
+      send(pid, :release)
+      assert Playwright.evaluate(session, "window.result") == "finished"
+      refute Task.yield(unrouting, 200)
+
+      send(pid, :finish)
+      assert Task.await(unrouting) == session
+      assert_received :finished
+    end
+
+    @tag driver: :playwright
+    test "unroute_all with behavior: :ignore_errors does not wait, and a running handler's failure fails nothing" do
+      Process.flag(:trap_exit, true)
+      {session, fixture} = session()
+      owner = self()
+
+      route(session, "**/api", fn _route ->
+        send(owner, {:running, self()})
+
+        receive do
+          :release -> raise "late"
+        end
+      end)
+
+      start_held_fetch(session, fixture)
+      assert_receive {:running, pid}, 5_000
+      monitor = Process.monitor(pid)
+      assert Playwright.unroute_all(session, behavior: :ignore_errors) == session
+
+      send(pid, :release)
+      assert_receive {:DOWN, ^monitor, :process, ^pid, _reason}, 5_000
+      assert Playwright.evaluate(session, "window.result") == ~s({"name":"server"})
       refute_receive {:EXIT, _pid, {_exception, [_ | _]}}, 200
     end
   end
@@ -448,6 +501,14 @@ defmodule Fluffy.Conformance.RouteTest do
   defp page_to_have_url_ok(session, url), do: expect(session, page_to_have_url(url))
 
   defp url(fixture, suffix), do: TestHTTPFixtures.url(fixture, suffix)
+
+  defp start_held_fetch(session, fixture) do
+    Playwright.evaluate(
+      session,
+      "url => { window.result = fetch(url).then(r => r.text()); return true }",
+      url(fixture, "/api")
+    )
+  end
 
   defp fetch(session, fixture, suffix \\ "/api") do
     Playwright.evaluate(session, @fetch, url(fixture, suffix))

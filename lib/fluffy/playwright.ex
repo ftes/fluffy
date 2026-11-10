@@ -661,9 +661,10 @@ defmodule Fluffy.Playwright do
   Removes the routes registered for `url` by `route/4`, or only those of `handler`,
   and returns the session.
 
-  `url` must be the matcher given to `route/4`. A request already at a handler may
-  go on without it once its route is removed, like Playwright's `unroute`, and an
-  answer that comes too late fails nothing. Phoenix sessions raise
+  `url` must be the matcher given to `route/4`. As in Playwright, this does not
+  wait for handlers already running. Removing the last route lets their requests go
+  on to the server, so a late answer raises in its handler and fails this call's
+  process; `unroute_all/2` with `behavior:` avoids that. Phoenix sessions raise
   `Fluffy.CapabilityError`.
   """
   @spec unroute(Session.t(), Fluffy.Page.url_expectation(), (Route.t() -> term()) | nil) :: Session.t()
@@ -679,9 +680,9 @@ defmodule Fluffy.Playwright do
   Removes every route on the browser context and returns the session.
 
   As in Playwright, this includes routes set up natively and HAR routers, not only
-  those registered by `route/4`. As with `unroute/3`, a request already at a handler
-  goes on without it. Raises after the session's `timeout:` unless `timeout:` is
-  given. Phoenix sessions raise `Fluffy.CapabilityError`.
+  those registered by `route/4`. `behavior:` decides what happens to handlers
+  already running, as in Playwright. Raises after the session's `timeout:` unless
+  `timeout:` is given. Phoenix sessions raise `Fluffy.CapabilityError`.
 
   ## Options
 
