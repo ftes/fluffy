@@ -489,8 +489,11 @@ defmodule Fluffy.Driver.Live do
 
     try do
       case Document.render(state.document, state.view) do
+        # A server-pushed render can drop upload entries, as an event's can.
         {:ok, document} ->
-          Session.put_page_state(session, %{state | client_dom: ClientDOM.reconcile(state.client_dom, document)})
+          session
+          |> Session.put_page_state(%{state | client_dom: ClientDOM.reconcile(state.client_dom, document)})
+          |> prune_stale_live_uploads()
 
         {:error, redirect} ->
           follow_redirect_result(session, {:error, redirect})
