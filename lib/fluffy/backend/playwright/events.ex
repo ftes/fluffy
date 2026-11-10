@@ -136,7 +136,7 @@ defmodule Fluffy.Backend.Playwright.Events do
   end
 
   # These upstream values do not name their page, which is the event's source.
-  defp source_value(session, :page_error, source, error) when is_exception(error) do
+  defp source_value(session, :page_error, source, error) do
     %PageError{
       name: error.name,
       message: Exception.message(error),
