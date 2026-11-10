@@ -12,12 +12,12 @@ defmodule Fluffy.Conformance.LiveKeyboardActionTest do
       session()
       |> press(input, unquote(key))
       |> expect("Event count: 2" |> by_text(exact: true) |> to_be_visible())
-      |> expect("element-keydown:key=#{unquote(key)};value=none;scope=element" |> by_text(exact: true) |> to_be_visible())
-      |> expect("element-keyup:key=#{unquote(key)};value=none;scope=element" |> by_text(exact: true) |> to_be_visible())
+      |> expect("element-keydown:key=#{unquote(key)};value=;scope=element" |> by_text(exact: true) |> to_be_visible())
+      |> expect("element-keyup:key=#{unquote(key)};value=;scope=element" |> by_text(exact: true) |> to_be_visible())
     end
   end
 
-  test "Backspace sends only the key and the resulting render replaces local text" do
+  test "Backspace sends the key with the filled value and the resulting render replaces local text" do
     input = by_label("Element key", exact: true)
 
     session()
@@ -25,14 +25,14 @@ defmodule Fluffy.Conformance.LiveKeyboardActionTest do
     |> expect(to_have_value(input, "Ada"))
     |> press(input, "Backspace")
     |> expect(to_have_value(input, ""))
-    |> expect("element-keydown:key=Backspace;value=none;scope=element" |> by_text(exact: true) |> to_be_visible())
+    |> expect("element-keydown:key=Backspace;value=Ada;scope=element" |> by_text(exact: true) |> to_be_visible())
   end
 
   test "Enter dispatches a keydown-only binding without submitting the form" do
     session()
     |> press(by_label("Search query", exact: true), "Enter")
     |> expect("Event count: 1" |> by_text(exact: true) |> to_be_visible())
-    |> expect("form-keydown:key=Enter;value=none;scope=form" |> by_text(exact: true) |> to_be_visible())
+    |> expect("form-keydown:key=Enter;value=;scope=form" |> by_text(exact: true) |> to_be_visible())
     |> expect("Submitted: none" |> by_text(exact: true) |> to_be_visible())
   end
 
@@ -44,7 +44,7 @@ defmodule Fluffy.Conformance.LiveKeyboardActionTest do
     |> press(first, "Tab")
     |> press(second, "Tab")
     |> expect("Event count: 2" |> by_text(exact: true) |> to_be_visible())
-    |> expect("tab-keyup:key=Tab;value=none;scope=none" |> by_text(exact: true) |> to_be_visible())
+    |> expect("tab-keyup:key=Tab;value=;scope=none" |> by_text(exact: true) |> to_be_visible())
   end
 
   test "Space dispatches handlers without toggling a checkbox" do
@@ -69,6 +69,29 @@ defmodule Fluffy.Conformance.LiveKeyboardActionTest do
     |> press(by_label("Valued key", exact: true), "Enter")
     |> expect("element-keydown:key=Enter;value=x;scope=none" |> by_text(exact: true) |> to_be_visible())
     |> expect("element-keyup:key=Enter;value=x;scope=none" |> by_text(exact: true) |> to_be_visible())
+  end
+
+  for driver <- [:phoenix, :playwright] do
+    @tag driver: driver
+    test "a key press carries the value a fill left with #{driver}", %{driver: driver} do
+      input = by_label("Valued key", exact: true)
+
+      driver
+      |> session()
+      |> fill(input, "Ada")
+      |> press(input, "Enter")
+      |> expect("Event count: 2" |> by_text(exact: true) |> to_be_visible())
+      |> expect("element-keydown:key=Enter;value=Ada;scope=none" |> by_text(exact: true) |> to_be_visible())
+      |> expect("element-keyup:key=Enter;value=Ada;scope=none" |> by_text(exact: true) |> to_be_visible())
+    end
+
+    @tag driver: driver
+    test "a key press on an empty input carries an empty value with #{driver}", %{driver: driver} do
+      driver
+      |> session()
+      |> press(by_label("Tab first", exact: true), "Tab")
+      |> expect("tab-keydown:key=Tab;value=;scope=none" |> by_text(exact: true) |> to_be_visible())
+    end
   end
 
   test "a keyup-only binding on a disabled element uses LiveViewTest's error" do
@@ -124,8 +147,8 @@ defmodule Fluffy.Conformance.LiveKeyboardActionTest do
     end
   end
 
-  defp session do
-    :phoenix
+  defp session(driver \\ :phoenix) do
+    driver
     |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Fluffy.TestWeb.Endpoint)
     |> visit("/live/keyboard")
   end

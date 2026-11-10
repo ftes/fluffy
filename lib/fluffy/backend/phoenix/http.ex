@@ -38,6 +38,11 @@ end
 defmodule Fluffy.Backend.Phoenix.HTTP do
   @moduledoc false
 
+  # Requests dispatch through Phoenix.ConnTest, but navigate like a browser:
+  # ConnTest follows no redirects, and its recycling carries every response
+  # cookie to the next request whatever its path, domain or expiry, so
+  # redirects are followed here and cookies kept in a CookieJar.
+
   import Phoenix.ConnTest
 
   alias Fluffy.Backend.Phoenix.HTTP.Client

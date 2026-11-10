@@ -8,7 +8,10 @@ defmodule Fluffy.Driver.Live.Event do
 
   import Phoenix.LiveViewTest
 
+  alias Fluffy.ClientDOM
   alias Fluffy.Driver.Live.ActionScope
+  alias Fluffy.HTML.Semantics
+  alias Fluffy.Locator
 
   @bindings %{
     click: ["phx-click"],
@@ -45,9 +48,28 @@ defmodule Fluffy.Driver.Live.Event do
     for {"phx-value-" <> key, value} <- attributes, into: %{}, do: {key, value}
   end
 
-  # A key event also carries the element's value attribute, as LiveViewTest's
-  # element events do.
-  def key_values(attributes) do
+  # Like the LiveView client's extractMeta, a click or key event also carries
+  # a form control's current value, where LiveViewTest sends the
+  # server-rendered attribute and misses a fill. An unchecked checkbox or radio
+  # sends no value, not even its phx-value-value. Other elements send their
+  # value attribute, as LiveViewTest does.
+  def element_values(client_dom, %{tag: tag, attributes: attributes} = target)
+      when tag in ["button", "input", "select", "textarea"] do
+    locator = Locator.by_css(target.selector)
+
+    cond do
+      Semantics.input_type(target) not in ["checkbox", "radio"] ->
+        Map.put(values(attributes), "value", ClientDOM.value(client_dom, locator))
+
+      ClientDOM.checked?(client_dom, locator) ->
+        Map.put(values(attributes), "value", attribute(attributes, "value") || "on")
+
+      true ->
+        attributes |> values() |> Map.delete("value")
+    end
+  end
+
+  def element_values(_client_dom, %{attributes: attributes}) do
     case attribute(attributes, "value") do
       nil -> values(attributes)
       value -> attributes |> values() |> Map.put("value", value)
@@ -57,6 +79,8 @@ defmodule Fluffy.Driver.Live.Event do
   defp commands("[" <> _ = encoded), do: Phoenix.json_library().decode!(encoded)
   defp commands(event), do: [["push", %{"event" => event}]]
 
+  # As in the LiveView client's exec_push, a push's own target replaces the
+  # element's phx-target, where LiveViewTest's element events send to both.
   defp dispatch(["push", %{"event" => event} = options], view, attributes, kind, payload) do
     view = with_target(view, options["target"] || attribute(attributes, "phx-target"))
     value = Map.merge(payload, options["value"] || %{})
