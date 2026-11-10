@@ -27,7 +27,7 @@
 - On Playwright, a session `timeout:` under a second no longer limits Fluffy's own reads of the page around an operation; they get at least a second, so a busy browser is far less likely to fail such a session with a `RuntimeError` naming a blocked script. A page whose main thread is blocked now reports after that second.
 - A page that closes while Fluffy adopts its document now fails the operation with `Fluffy.OperationError`, or an `ExUnit.AssertionError` from an expectation, instead of a `RuntimeError` about the LiveView connection. An operation that succeeded is not failed by its page closing during the bookkeeping after it.
 - `Fluffy.Playwright.wait_for_load_state/3` and `wait_for_function/4` time out with Playwright's own error, even while a script blocks the page, instead of sometimes Fluffy's.
-- `click` on a checkbox or radio on Phoenix sends the form's `phx-change` after the control's `phx-click`, as a browser does. A click on a selected radio sends only `phx-click`.
+- `click` on a checkbox or radio on Phoenix sends the form's `phx-change` after the control's `phx-click`, as a browser does. The change carries the whole form as the click left it, though the `phx-click` render resets it. A click on a selected radio sends only `phx-click`.
 - `click` on Phoenix sends the closest ancestor's `phx-click`, with its `phx-value-*` and `phx-target`, when the target has none, as LiveView's client does, then runs the target's own action, such as submitting its form.
 - Form events on Phoenix send the browser's serialization: an unchecked checkbox or deselected option no longer comes back with its server-rendered value.
 - `select_option` with `[]` deselects every option of a multiple select on Phoenix, as on Playwright.

@@ -219,6 +219,23 @@ defmodule Fluffy.Conformance.LivePatchReconcileTest do
       |> expect(to_be_checked(by_label("Clicked"), checked: false))
     end
 
+    # The change goes before the click's reply, so the patch that unchecks the
+    # box and clears the text doesn't reach it.
+    @tag driver: driver
+    test "a checkbox's phx-change sends the form as the click left it, not as its phx-click patch reset it with #{driver}",
+         %{driver: driver} do
+      driver
+      |> start_test_session()
+      |> visit("/live/patched-checks")
+      |> fill(by_label("Stored note"), "typed")
+      |> check(by_label("Other box"))
+      |> click(by_label("Bumped box"))
+      |> expect("Count: 1" |> by_text() |> to_be_visible())
+      |> expect(to_have_value(by_label("Stored note"), ""))
+      |> click(by_role(:button, name: "Show params"))
+      |> expect("Params: bumped=on, note=typed, other=on" |> by_text() |> to_be_visible())
+    end
+
     @tag driver: driver
     test "a radio's own phx-change patch resets its group to the rendered choice with #{driver}", %{driver: driver} do
       driver

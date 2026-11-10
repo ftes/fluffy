@@ -332,18 +332,16 @@ defmodule Fluffy.Driver.Live do
       %Session{} = session ->
         clicked_dom = Session.page_state(session).client_dom
 
+        # The browser sends the change before the click's patch arrives, so it
+        # serializes the form as the click left it, which that patch may reset.
         # A selector such as :checked stops matching after uncheck. Follow the
         # original control across any click patch instead of resolving it again,
         # and find the view that owns it there, since the click may have moved it.
-        # The browser sends the change before the click's patch arrives, so it
-        # carries the state the click set, which that patch may have reset.
-        case find_by_identity(clicked_dom, identity) do
-          nil ->
-            session
-
-          clicked ->
-            sent_dom = ClientDOM.carry_checked(clicked_dom, clicked, client_dom, target)
-            dispatch_live_change(session, clicked_dom, clicked, sent_dom)
+        with %{} = sent <- ClientDOM.change_event(client_dom, target),
+             %Target{} = clicked <- find_by_identity(clicked_dom, identity) do
+          dispatch_live_change(session, clicked_dom, clicked, sent)
+        else
+          nil -> session
         end
 
       navigation ->
@@ -926,9 +924,17 @@ defmodule Fluffy.Driver.Live do
     end
   end
 
-  defp dispatch_live_change(session, client_dom, %Target{} = target, sent_dom \\ nil) do
+  # `sent`, a change event read earlier, gives the fields and `_target` to send
+  # instead of `client_dom`'s; `client_dom` still locates its dispatcher.
+  defp dispatch_live_change(session, client_dom, %Target{} = target, sent \\ nil) do
     with {:ok, event_context} <- owning_view_context(session, target) do
-      push_change_event(session, client_dom, ClientDOM.change_event(sent_dom || client_dom, target), event_context)
+      event =
+        case {ClientDOM.change_event(client_dom, target), sent} do
+          {%{} = event, %{} = sent} -> %{event | fields: sent.fields, target_name: sent.target_name}
+          {event, _sent} -> event
+        end
+
+      push_change_event(session, client_dom, event, event_context)
     end
   end
 
