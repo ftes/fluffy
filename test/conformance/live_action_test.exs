@@ -189,6 +189,35 @@ defmodule Fluffy.Conformance.LiveActionTest do
       |> check(by_label("Griffin", exact: true))
       |> expect("Selected creature: griffin" |> by_text(exact: true) |> to_be_visible())
     end
+
+    @tag driver: driver
+    test "clicking a checkbox or radio sends its phx-click, then its form's phx-change, with #{driver}", %{
+      driver: driver
+    } do
+      agree = by_label("Agree", exact: true)
+      medium = by_label("Size m", exact: true)
+      notify = by_label("Notify", exact: true)
+      log = by_css("#log")
+
+      driver
+      |> live_session()
+      |> visit("/live/click-checkable")
+      |> click(agree)
+      |> expect(to_have_text(log, "Log: click:yes change:yes/-"))
+      |> expect(to_be_checked(agree))
+      |> click(agree)
+      |> expect(to_have_text(log, "Log: click:yes change:yes/- click:- change:no/-"))
+      |> expect(not_(to_be_checked(agree)))
+      |> click(medium)
+      |> expect(to_have_text(log, ~r/ click:m change:no\/m$/))
+      |> expect(to_be_checked(medium))
+      # A click on a selected radio changes nothing, so only the click is sent.
+      |> click(medium)
+      |> expect(to_have_text(log, ~r/ change:no\/m click:m$/))
+      |> click(notify)
+      |> expect(to_have_text(log, ~r/ click:m click:yes notify-change:yes$/))
+      |> expect(to_be_checked(notify))
+    end
   end
 
   defp live_session(driver) do

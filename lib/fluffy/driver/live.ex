@@ -18,6 +18,7 @@ defmodule Fluffy.Driver.Live do
   alias Fluffy.Expect
   alias Fluffy.Form
   alias Fluffy.HTML.DocumentIndex
+  alias Fluffy.HTML.Semantics
   alias Fluffy.Internal.Navigation
   alias Fluffy.Internal.Navigation.Redirect
   alias Fluffy.LiveViewTest.UploadCompat
@@ -70,10 +71,21 @@ defmodule Fluffy.Driver.Live do
   def click(%Session{} = session, %Locator{} = locator, action_options \\ []) do
     act(session, :click, [locator, action_options], fn session, deadline ->
       case resolve_live_action(session, locator, deadline, &ClientDOM.click(&1, locator)) do
-        {%Session{} = session, {client_dom, target}} -> commit_click(session, client_dom, target)
+        {%Session{} = session, {client_dom, target}} -> commit_user_click(session, client_dom, target)
         navigation -> navigation
       end
     end)
+  end
+
+  # A browser click that toggles a checkbox or selects a radio fires input and
+  # change after the click event, so it sends phx-click and then phx-change,
+  # like check/2.
+  defp commit_user_click(session, client_dom, target) do
+    if Semantics.input_type(target) in ["checkbox", "radio"] and client_dom != Session.page_state(session).client_dom do
+      commit_checked(session, client_dom, target)
+    else
+      commit_click(session, client_dom, target)
+    end
   end
 
   defp commit_click(session, client_dom, target) do
