@@ -10,12 +10,14 @@ defmodule Fluffy.Driver.Live.Retry do
   end
 
   def run(%Session{} = session, deadline, attempt, refresh, wait_for_retry)
-      when is_integer(deadline) and is_function(attempt, 1) and is_function(refresh, 1) and is_function(wait_for_retry, 2) do
+      when (is_integer(deadline) or deadline == :infinity) and is_function(attempt, 1) and is_function(refresh, 1) and
+             is_function(wait_for_retry, 2) do
     do_run(session, deadline, attempt, refresh, wait_for_retry)
   end
 
   def run_current(%Session{} = session, deadline, attempt, refresh, wait_for_retry)
-      when is_integer(deadline) and is_function(attempt, 1) and is_function(refresh, 1) and is_function(wait_for_retry, 2) do
+      when (is_integer(deadline) or deadline == :infinity) and is_function(attempt, 1) and is_function(refresh, 1) and
+             is_function(wait_for_retry, 2) do
     run_attempt(session, deadline, attempt, refresh, wait_for_retry)
   end
 

@@ -5,11 +5,13 @@ defmodule Fluffy.Options do
 
   @timeout_options [
     timeout: [
-      type: :non_neg_integer,
+      type: :timeout,
       doc:
         "Maximum time in milliseconds to wait for the operation. Defaults to the session's `timeout:`. " <>
           "`0` checks once, unlike Playwright, where `0` disables the timeout. Playwright actions and waits " <>
           "reject `0` with an `ArgumentError`, as they cannot check once; Playwright assertions accept it. " <>
+          "`:infinity` disables the timeout: Playwright waits with no timeout, LiveView retries until the test " <>
+          "times out, and Static, where nothing changes, checks once. " <>
           "Playwright browser bookkeeping and navigation synchronization use the session timeout separately, " <>
           "and at least 1 second."
     ]

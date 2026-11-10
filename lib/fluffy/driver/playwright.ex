@@ -48,8 +48,9 @@ defmodule Fluffy.Driver.Playwright do
   def expect(%Session{} = session, %Expect{} = expectation) do
     timeout = Session.timeout(session, expectation.options)
 
-    action = fn remaining ->
-      execute_expectation(session, Expect.Internal.merge_options(expectation, timeout: remaining))
+    # `execute_expectation/2` takes the same timeout from the expectation's options.
+    action = fn _timeout ->
+      execute_expectation(session, expectation)
       {:ok, :expectation}
     end
 
@@ -519,18 +520,9 @@ defmodule Fluffy.Driver.Playwright do
     end
   end
 
-  # Fluffy's `timeout: 0` checks once. An expectation can: Playwright makes one
-  # check before its timeout applies. An action, wait or locator read cannot, and
-  # would time out at 1ms, so it rejects 0 before reaching the browser.
-  defp operation_timeout!(session, operation, options) do
-    if Keyword.get(options, :timeout) == 0 do
-      raise ArgumentError,
-            "#{operation}: timeout: 0 means check once, which Playwright actions and waits can't do; " <>
-              "pass a positive timeout"
-    end
-
-    Session.timeout(session, options)
-  end
+  # Rejects Fluffy's check-once 0; `:infinity` reaches PlaywrightEx as its 0.
+  defp operation_timeout!(session, operation, options),
+    do: Deadline.playwright_operation!(operation, Keyword.get(options, :timeout) || Session.context(session).timeout)
 
   defp result(:ok), do: {:ok, :ok}
   defp result(result), do: result

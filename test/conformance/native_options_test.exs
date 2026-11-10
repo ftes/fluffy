@@ -169,7 +169,7 @@ defmodule Fluffy.Conformance.NativeOptionsTest do
             &Mouse.move(session, 0, 0, &1),
             &Mouse.wheel(session, 0, 0, &1)
           ],
-          option <- [no_wait_after: true, signal: nil, timeout: :infinity] do
+          option <- [no_wait_after: true, signal: nil, timeout: :forever] do
         assert_raise NimbleOptions.ValidationError, fn -> call.([option]) end
       end
     end)
