@@ -1,6 +1,8 @@
 defmodule Fluffy.ClientDOM do
   @moduledoc false
 
+  import Fluffy.HTML.Semantics, only: [attribute: 2, has_attribute?: 2, present_attribute?: 2]
+
   alias Fluffy.Actionability
   alias Fluffy.ClientDOM.Query
   alias Fluffy.HTML.Aria
@@ -810,10 +812,4 @@ defmodule Fluffy.ClientDOM do
   end
 
   defp ensure_target_enabled!(_target, _action, _locator), do: :ok
-
-  defp attribute(attributes, name), do: Semantics.attribute(attributes, name)
-
-  defp present_attribute?(attributes, name), do: Semantics.present_attribute?(attributes, name)
-
-  defp has_attribute?(attributes, name), do: Semantics.has_attribute?(attributes, name)
 end

@@ -1,6 +1,8 @@
 defmodule Fluffy.Driver.Live.Document do
   @moduledoc false
 
+  import Fluffy.HTML.Semantics, only: [attribute: 2]
+
   alias Fluffy.HTML.Semantics
 
   # LiveViewTest renders only the LiveView container element. A browser keeps
@@ -266,11 +268,4 @@ defmodule Fluffy.Driver.Live.Document do
 
   defp element?({tag, _attributes, _children}) when is_binary(tag), do: true
   defp element?(_node), do: false
-
-  defp attribute(attributes, name) do
-    case List.keyfind(attributes, name, 0) do
-      {^name, value} -> value
-      nil -> nil
-    end
-  end
 end

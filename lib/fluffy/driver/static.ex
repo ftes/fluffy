@@ -3,6 +3,8 @@ defmodule Fluffy.Driver.Static do
 
   @behaviour Fluffy.Driver.Contract
 
+  import Fluffy.HTML.Semantics, only: [attribute: 2]
+
   alias Fluffy.ClientDOM
   alias Fluffy.Expect
   alias Fluffy.Expectation
@@ -190,13 +192,6 @@ defmodule Fluffy.Driver.Static do
     |> case do
       nil -> nil
       title -> LazyHTML.text(title)
-    end
-  end
-
-  defp attribute(attributes, name) do
-    case List.keyfind(attributes, name, 0) do
-      {^name, value} -> value
-      nil -> nil
     end
   end
 

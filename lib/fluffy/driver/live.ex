@@ -3,6 +3,7 @@ defmodule Fluffy.Driver.Live do
 
   @behaviour Fluffy.Driver.Contract
 
+  import Fluffy.HTML.Semantics, only: [attribute: 2]
   import Phoenix.LiveViewTest, except: [open_browser: 1, open_browser: 2]
 
   alias Fluffy.Backend.Phoenix.HTTP
@@ -853,13 +854,6 @@ defmodule Fluffy.Driver.Live do
   end
 
   defp phx_click_action(_event), do: :render_click
-
-  defp attribute(attributes, name) do
-    case List.keyfind(attributes, name, 0) do
-      {^name, value} -> value
-      nil -> nil
-    end
-  end
 
   defp commit_render_result(session, client_dom, result, after_render \\ &prune_stale_live_uploads/1)
 
