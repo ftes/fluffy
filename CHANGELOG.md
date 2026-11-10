@@ -39,6 +39,7 @@
 - On Phoenix, an upload entry the view cancels is no longer uploaded on submit, whatever event cancelled it: as in LiveView's client, entries leave once the input's `data-phx-active-refs` drops them, not only after a click with their `phx-value-ref`.
 - On Phoenix, a LiveView render resets local text only in the views and components whose rendering changed, as LiveView's client patches them; before, any change, even to the page title, reset it everywhere.
 - On Phoenix, a LiveView render that changes a select's view or component resets the select to its rendered options, as in the browser after `select_option`; before, the choice survived while the options were unchanged.
+- On Phoenix, a LiveView render that changes a checkbox's or radio's view or component resets it to its rendered `checked` state, even after its own `phx-change`, as LiveView's client does; before, local state survived while the attribute was unchanged. Controls under `phx-update="ignore"` keep their local state and text.
 - `to_have_values` on Phoenix fails on a single select and reads a disabled multiple select, as on Playwright. It passed and failed the other way round.
 
 ## 0.9.0-rc.1 — 2026-11-09
