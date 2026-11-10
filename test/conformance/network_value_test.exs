@@ -130,50 +130,6 @@ defmodule Fluffy.Conformance.NetworkValueTest do
   end
 
   @tag driver: :playwright
-  test "a body that never ends raises after the session's timeout" do
-    owner = self()
-
-    fixture =
-      TestHTTPFixtures.register(fn request ->
-        case request.path do
-          "/start" ->
-            %{body: ~s|<button onclick="fetch('endless')">Fetch</button>|}
-
-          "/endless" ->
-            %{
-              headers: [{"content-type", "text/plain"}],
-              stream: fn conn ->
-                {:ok, conn} = Plug.Conn.chunk(conn, "first")
-                send(owner, {:stream, self()})
-
-                receive do
-                  :finish -> conn
-                end
-              end
-            }
-        end
-      end)
-
-    session =
-      :playwright
-      |> start_session(base_url: Fluffy.TestServer.base_url())
-      |> visit(TestHTTPFixtures.path(fixture, "/start"))
-
-    pending = wait_for(session, Event.response(&String.ends_with?(&1.url, "/endless")))
-    click(session, by_role(:button, name: "Fetch"))
-    assert_receive {:stream, server}, 15_000
-    put_session_timeout(session, 500)
-
-    try do
-      assert_raise PlaywrightEx.TimeoutError, ~r/Timeout 500ms exceeded during body/, fn ->
-        Response.body(await(pending))
-      end
-    after
-      send(server, :finish)
-    end
-  end
-
-  @tag driver: :playwright
   test "readers raise once the session is closed, even for a request without a page" do
     {session, fixture} = session()
     response = response(session, "Save", "/api")

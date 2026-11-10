@@ -17,6 +17,25 @@ defmodule Fluffy.Options do
 
   @action_schema NimbleOptions.new!(@timeout_options)
 
+  # Calls that, as in Playwright, have no timeout: they wait while a script blocks the page.
+  @untimed_schema NimbleOptions.new!([])
+  @untimed_actions [
+    :content,
+    :pdf,
+    :emulate_media,
+    :keyboard_press,
+    :keyboard_type,
+    :mouse_click,
+    :mouse_dblclick,
+    :mouse_down,
+    :mouse_up,
+    :mouse_move,
+    :unroute_all,
+    :install_clock,
+    :add_script_tag,
+    :add_style_tag
+  ]
+
   # The upstream call behind each cross-driver action and its options that pass through
   # on Playwright. Fluffy owns `timeout` (its retry budget); `no_wait_after` and `signal`
   # would bypass its navigation tracking.
@@ -167,15 +186,13 @@ defmodule Fluffy.Options do
                       end
 
                     required = Keyword.get(@required_action_options, action, [])
-                    {action, NimbleOptions.new!(@timeout_options ++ required ++ native)}
+                    timeout = if action in @untimed_actions, do: [], else: @timeout_options
+                    {action, NimbleOptions.new!(timeout ++ required ++ native)}
                   end)
                   |> Map.merge(%{
                     add_script_tag:
-                      NimbleOptions.new!(
-                        @timeout_options ++
-                          @tag_options ++ [type: [type: :string, doc: "Script type, such as `module`."]]
-                      ),
-                    add_style_tag: NimbleOptions.new!(@timeout_options ++ @tag_options)
+                      NimbleOptions.new!(@tag_options ++ [type: [type: :string, doc: "Script type, such as `module`."]]),
+                    add_style_tag: NimbleOptions.new!(@tag_options)
                   })
 
   # The upstream assertion behind each expectation and the options Fluffy mirrors on
@@ -506,6 +523,10 @@ defmodule Fluffy.Options do
 
   @spec validate_action!(atom(), keyword()) :: keyword()
   def validate_action!(action, options), do: NimbleOptions.validate!(options, action_schema(action))
+
+  @doc "Validates the options of a call that, as in Playwright, takes none."
+  @spec validate_untimed!(keyword()) :: keyword()
+  def validate_untimed!(options), do: NimbleOptions.validate!(options, @untimed_schema)
 
   @spec split_action!(atom(), keyword()) :: {keyword(), keyword()}
   def split_action!(action, options), do: Keyword.split(validate_action!(action, options), [:timeout])

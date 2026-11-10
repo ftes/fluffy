@@ -1,18 +1,16 @@
 defmodule Fluffy.Playwright.Trace do
   @moduledoc false
 
-  alias Fluffy.Backend.Playwright.Bounded
   alias Fluffy.TestScope
   alias PlaywrightEx.BrowserContext
   alias PlaywrightEx.Tracing
 
-  @enforce_keys [:open?, :path, :timeout, :tracing]
-  defstruct [:open?, :path, :timeout, :tracing]
+  @enforce_keys [:open?, :path, :tracing]
+  defstruct [:open?, :path, :tracing]
 
   @opaque t :: %__MODULE__{
             open?: boolean(),
             path: String.t(),
-            timeout: timeout(),
             tracing: Tracing.t()
           }
 
@@ -35,18 +33,17 @@ defmodule Fluffy.Playwright.Trace do
     %__MODULE__{
       open?: Keyword.fetch!(options, :open),
       path: trace_path(directory, title),
-      timeout: context.timeout,
       tracing: tracing
     }
   end
 
-  # Stopping has no timeout of its own and runs while the session shuts down.
+  # As in Playwright, stopping has no timeout. It runs while the session shuts down.
   def stop(%__MODULE__{} = trace) do
     saved? =
       try do
-        Bounded.within(trace.timeout, fn -> Tracing.stop_chunk(trace.tracing, path: trace.path) end) == {:ok, :ok}
+        Tracing.stop_chunk(trace.tracing, path: trace.path) == :ok
       after
-        Bounded.within(trace.timeout, fn -> Tracing.stop(trace.tracing) end)
+        Tracing.stop(trace.tracing)
       end
 
     if saved? and trace.open?, do: open(trace)

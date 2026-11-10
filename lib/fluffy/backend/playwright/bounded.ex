@@ -1,58 +1,26 @@
 defmodule Fluffy.Backend.Playwright.Bounded do
   @moduledoc false
 
-  # Some Playwright calls have no timeout of their own (`evaluate`, `content`,
-  # closing): they wait while a script blocks the page's main thread.
+  # Fluffy's own reads around an operation (document probes, failure artifacts,
+  # browser shutdown) must not hang on a page whose main thread a script blocks.
+  # The Playwright calls they use (`evaluate`, `content`, closing) have no timeout
+  # of their own; user-facing calls keep Playwright's behavior and are not bounded.
 
   @doc """
   Runs a Playwright call that has no timeout of its own for at most `timeout` ms.
 
   The call runs unlinked, so a crash does not kill the caller: an exception is
-  raised again in the caller, any other crash exits it with its reason.
-
-  A call still running after `timeout` is killed, or with `on_timeout: :leave`
-  left to finish on its own.
+  raised again in the caller, any other crash exits it with its reason. A call
+  still running after `timeout` is killed.
   """
-  def within(timeout, fun, options \\ []) do
-    on_timeout = Keyword.validate!(options, on_timeout: :kill)[:on_timeout]
+  def within(timeout, fun) do
     task = Task.Supervisor.async_nolink(Fluffy.TaskSupervisor, fun)
 
-    case Task.yield(task, timeout) || stop(task, on_timeout) do
+    case Task.yield(task, timeout) || Task.shutdown(task, :brutal_kill) do
       {:ok, result} -> {:ok, result}
       {:exit, {exception, stacktrace}} when is_exception(exception) -> reraise exception, stacktrace
       {:exit, reason} -> exit(reason)
       nil -> :timeout
-    end
-  end
-
-  defp stop(task, :kill), do: Task.shutdown(task, :brutal_kill)
-  defp stop(task, :leave), do: Task.ignore(task)
-
-  @doc """
-  Like `within/2` for a call returning `{:ok, value}` or `{:error, error}`; returns the value or raises.
-
-  On timeout it runs the `after_timeout:` function, if any, then raises a
-  `PlaywrightEx.TimeoutError`, like a Playwright call that has a timeout, with
-  `message:` or a default naming `operation`.
-  """
-  def within!(timeout, operation, fun, options \\ []) do
-    options = Keyword.validate!(options, [:message, after_timeout: fn -> :ok end])
-
-    case within(timeout, fun) do
-      {:ok, {:ok, value}} ->
-        value
-
-      {:ok, {:error, error}} ->
-        raise error
-
-      :timeout ->
-        options[:after_timeout].()
-
-        raise PlaywrightEx.TimeoutError,
-          message:
-            options[:message] ||
-              "Timeout #{timeout}ms exceeded during #{operation}; " <>
-                "it may never settle, or a script may be blocking the page's main thread"
     end
   end
 end

@@ -10,6 +10,7 @@ defmodule Fluffy.TestCase do
           assert_action_error: 4,
           browser_context_guids: 0,
           check_reverted: 2,
+          freeze_page: 1,
           monitor_running: 1,
           playwright_engine?: 1,
           put_session_timeout: 2
@@ -27,6 +28,14 @@ defmodule Fluffy.TestCase do
   # machine cannot fail it. No public API changes a live session's timeout.
   def put_session_timeout(session, timeout) do
     Fluffy.Session.put_context(session, %{Fluffy.Session.context(session) | timeout: timeout})
+  end
+
+  # Blocks the page's main thread for good. The loop starts in a task after the
+  # evaluate returns, which has no timeout, and well before the next call arrives.
+  def freeze_page(session) do
+    Fluffy.Playwright.evaluate(session, "setTimeout(() => { while (true) {} }, 0); true")
+    Process.sleep(100)
+    session
   end
 
   # Checks a box that the LiveView patch answering the click reverts in some browsers.

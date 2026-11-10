@@ -10,7 +10,6 @@ defmodule Fluffy.Route.Registration do
   # its promise for them: they register under their route's tracker, whose flag
   # tells them to ignore their errors (Playwright's `RouteHandler.stop`).
 
-  alias Fluffy.Backend.Playwright.Bounded
   alias Fluffy.Backend.Playwright.Events
   alias Fluffy.Route
   alias Fluffy.Session
@@ -48,7 +47,7 @@ defmodule Fluffy.Route.Registration do
 
     behavior = Keyword.get(options, :behavior, :default)
 
-    # Released first, as in `remove/3`: a timeout below cannot leave them registered.
+    # Released first, as in `remove/3`: a failure below cannot leave them registered.
     trackers =
       for {:route, _key, _handler, _match, _listener, tracker} = resource <- resources do
         :ok = SessionRuntime.release(session.runtime, resource)
@@ -56,13 +55,11 @@ defmodule Fluffy.Route.Registration do
         tracker
       end
 
-    Bounded.within!(Session.timeout(session, options), :unroute_all, fn ->
-      # PlaywrightEx waits for the answers; a handler process may still run after its own.
-      with :ok <- BrowserContext.unroute_all(browser_context, behavior: behavior) do
-        if behavior == :wait, do: Enum.each(trackers, &await_handlers/1)
-        {:ok, :ok}
-      end
-    end)
+    # PlaywrightEx waits for the answers; a handler process may still run after its own.
+    case BrowserContext.unroute_all(browser_context, behavior: behavior) do
+      :ok -> if behavior == :wait, do: Enum.each(trackers, &await_handlers/1)
+      {:error, error} -> raise error
+    end
   end
 
   defp await_handlers(tracker) do

@@ -6,7 +6,7 @@ defmodule Fluffy.Response do
   Fields follow Playwright's `Response` accessors; `request` is the
   `Fluffy.Request` that received it. Bodies are not retained: `body/1`,
   `text/1` and `json/1` read them from the browser, waiting for the response
-  to end. They raise once the session is closed, after the session's `timeout:`,
+  to end, with no timeout, as in Playwright. They raise once the session is closed,
   and when the browser does not have the body: a redirect has none, and whether
   one is still available after a later navigation depends on the browser.
 
@@ -66,7 +66,7 @@ defmodule Fluffy.Response do
     read!(response, :header_values, &PlaywrightEx.Response.header_values(&1, name))
   end
 
-  defp read!(%__MODULE__{request: request, native: native}, operation, fun) do
-    Request.__bounded__!(request, operation, fn -> fun.(native) end)
+  defp read!(%__MODULE__{request: request, native: native}, _operation, fun) do
+    Request.__read__!(request, fn -> fun.(native) end)
   end
 end

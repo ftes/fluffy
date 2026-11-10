@@ -157,54 +157,6 @@ defmodule Fluffy.Conformance.DownloadEventTest do
   end
 
   @tag driver: :playwright
-  test "waiting for a download that never completes raises after the session timeout" do
-    owner = self()
-
-    fixture =
-      TestHTTPFixtures.register(fn request ->
-        case request.path do
-          "/start" ->
-            %{body: ~s(<a href="endless">Download</a>)}
-
-          "/endless" ->
-            %{
-              headers: [{"content-disposition", "attachment; filename=endless.txt"}],
-              stream: fn conn ->
-                {:ok, conn} = Plug.Conn.chunk(conn, "first" <> TestHTTPFixtures.sniff_padding())
-                send(owner, {:stream, self()})
-
-                receive do
-                  :finish -> conn
-                end
-              end
-            }
-        end
-      end)
-
-    session =
-      :playwright
-      |> start_session(base_url: Fluffy.TestServer.base_url())
-      |> visit(TestHTTPFixtures.path(fixture, "/start"))
-
-    pending = wait_for(session, Event.download())
-    click(session, by_role(:link, name: "Download"))
-    assert_receive {:stream, server}, 15_000
-    put_session_timeout(session, 500)
-
-    try do
-      download = await(pending)
-
-      message = ~r/did not complete within the session's timeout of 500ms for path/
-      assert_raise PlaywrightEx.TimeoutError, message, fn -> Download.path(download) end
-
-      # This read leaves the download running, unlike a timed-out save.
-      assert unwrap_and_return(download, &PlaywrightEx.Download.cancel/1) == :ok
-    after
-      send(server, :finish)
-    end
-  end
-
-  @tag driver: :playwright
   test "a target-blank attachment is a download" do
     :playwright
     |> session()
@@ -262,58 +214,6 @@ defmodule Fluffy.Conformance.DownloadEventTest do
       assert Task.yield(reader, 20) == nil
       send(server, :finish)
       assert Task.await(reader) == first <> "last"
-    after
-      send(server, :finish)
-    end
-  end
-
-  @tag driver: :playwright, tmp_dir: true
-  test "saving a download that never completes cancels it and raises after the session timeout", %{tmp_dir: tmp_dir} do
-    owner = self()
-
-    fixture =
-      TestHTTPFixtures.register(fn request ->
-        case request.path do
-          "/start" ->
-            %{body: ~s(<a href="endless">Download</a>)}
-
-          "/endless" ->
-            %{
-              headers: [{"content-disposition", "attachment; filename=endless.txt"}],
-              stream: fn conn ->
-                {:ok, conn} = Plug.Conn.chunk(conn, "first" <> TestHTTPFixtures.sniff_padding())
-                send(owner, {:stream, self()})
-
-                receive do
-                  :finish -> conn
-                end
-              end
-            }
-        end
-      end)
-
-    session =
-      :playwright
-      |> start_session(base_url: Fluffy.TestServer.base_url())
-      |> visit(TestHTTPFixtures.path(fixture, "/start"))
-
-    pending = wait_for(session, Event.download())
-    click(session, by_role(:link, name: "Download"))
-    assert_receive {:stream, server}, 15_000
-    put_session_timeout(session, 2_000)
-
-    try do
-      download = await(pending)
-      destination = Path.join(tmp_dir, "copy.txt")
-
-      error = assert_raise Fluffy.OperationError, fn -> Download.save_as(download, destination) end
-      assert %PlaywrightEx.TimeoutError{message: message} = error.cause
-      assert message =~ "did not complete within the session's timeout of 2000ms and was canceled"
-
-      send(server, :finish)
-      assert unwrap_and_return(download, &PlaywrightEx.Download.failure/1) == {:ok, "canceled"}
-      refute File.exists?(destination)
-      assert_raise Fluffy.OperationError, ~r/playwright read failed.*canceled/s, fn -> Download.read(download) end
     after
       send(server, :finish)
     end

@@ -5,23 +5,18 @@ defmodule Fluffy.Download do
   `suggested_filename`, `url` and `page` are available to event predicates. Read
   or save the contents separately; those operations wait for completion and raise
   on download failure, on Playwright a `Fluffy.OperationError` with PlaywrightEx's
-  exception as its `cause`. On Playwright, they cancel the download and raise once
-  the session's `timeout:` passes without completion, as for an interrupted
-  download on Firefox, which never completes. Handles belong to their session; saved files
-  outlive it. On Playwright, reach `failure`, `cancel` and the rest of the
-  `PlaywrightEx.Download` with `Fluffy.unwrap_and_return/2`.
+  exception as its `cause`. As in Playwright, they have no timeout: a download that
+  never completes, such as an interrupted one on Firefox, waits until the test times
+  out. Handles belong to their session; saved files outlive it. On Playwright, reach
+  `failure`, `cancel` and the rest of the `PlaywrightEx.Download` with
+  `Fluffy.unwrap_and_return/2`.
 
-  `path/1` also waits for completion, and raises after the session's `timeout:`
-  without canceling the download. A Phoenix download is complete when delivered
+  `path/1` also waits for completion. A Phoenix download is complete when delivered
   and held in memory, so `path/1` raises `Fluffy.CapabilityError`.
   """
 
-  alias Fluffy.Backend.Playwright.Bounded
   alias Fluffy.CapabilityError
   alias Fluffy.Internal.OperationFailure
-
-  @never_completed "its response may never end, or the browser may have stopped it " <>
-                     "(Firefox never completes an interrupted download)"
 
   # A Phoenix download carries its `body`, a Playwright download its `native` handle.
   @enforce_keys [:suggested_filename, :url, :page]
@@ -79,23 +74,10 @@ defmodule Fluffy.Download do
   defp save_source!(%{body: bytes}, destination, _context, _operation) when is_binary(bytes),
     do: File.write!(destination, bytes)
 
-  # Playwright waits for completion without a timeout of its own. A save left
-  # pending would still write the file once the download completes, so a timeout
-  # cancels the download.
   # As for an action, PlaywrightEx's error becomes the cause of a `Fluffy.OperationError`.
-  defp save_source!(%{native: %PlaywrightEx.Download{} = native}, destination, %{timeout: timeout}, operation) do
-    Bounded.within!(
-      timeout,
-      :save_as,
-      fn -> with :ok <- PlaywrightEx.Download.save_as(native, destination), do: {:ok, :ok} end,
-      after_timeout: fn -> Bounded.within(timeout, fn -> PlaywrightEx.Download.cancel(native) end) end,
-      message:
-        "the download did not complete within the session's timeout of #{timeout}ms and was canceled; " <>
-          @never_completed
-    )
-  rescue
-    error in [PlaywrightEx.PlaywrightError, PlaywrightEx.TimeoutError, PlaywrightEx.TargetClosedError] ->
-      reraise OperationFailure.playwright(operation, nil, error), __STACKTRACE__
+  defp save_source!(%{native: %PlaywrightEx.Download{} = native}, destination, _context, operation) do
+    with {:error, error} <- PlaywrightEx.Download.save_as(native, destination),
+         do: OperationFailure.raise_playwright!(operation, nil, error)
   end
 
   defp source_path!(%{body: bytes}, _context) when is_binary(bytes) do
@@ -105,10 +87,11 @@ defmodule Fluffy.Download do
       detail: "a Phoenix download is held in memory and has no file; use read/2 or save_as/2"
   end
 
-  defp source_path!(%{native: native}, %{timeout: timeout}) do
-    Bounded.within!(timeout, :path, fn -> PlaywrightEx.Download.path(native) end,
-      message: "the download did not complete within the session's timeout of #{timeout}ms for path; " <> @never_completed
-    )
+  defp source_path!(%{native: native}, _context) do
+    case PlaywrightEx.Download.path(native) do
+      {:ok, path} -> path
+      {:error, error} -> raise error
+    end
   end
 
   defp check_size!(size, limit) when size > limit do
