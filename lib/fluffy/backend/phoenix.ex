@@ -51,11 +51,22 @@ defmodule Fluffy.Backend.Phoenix do
         request_headers: put_header(Keyword.get(options, :headers, []), sandbox_header)
       },
       resource_scope: resource_scope,
-      timeout: Keyword.get(options, :timeout, Application.get_env(:fluffy, :timeout, 1_000))
+      timeout: Keyword.get_lazy(options, :timeout, &configured_timeout!/0)
     }
 
     page = %Page.State{driver: :unvisited, state: %UnvisitedState{}}
     Session.new(__MODULE__, context, page, runtime)
+  end
+
+  # Positive like a session's `timeout:`; an operation's `timeout: 0` checks once.
+  defp configured_timeout! do
+    case Application.get_env(:fluffy, :timeout, 1_000) do
+      timeout when is_integer(timeout) and timeout > 0 ->
+        timeout
+
+      other ->
+        raise ArgumentError, "expected config :fluffy, timeout: to be a positive integer, got: #{inspect(other)}"
+    end
   end
 
   @doc false
