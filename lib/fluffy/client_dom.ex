@@ -618,7 +618,7 @@ defmodule Fluffy.ClientDOM do
   defp tree_text(_comment), do: ""
 
   # LiveView patches each view's container on its own, teleported content with
-  # the view that owns its portal, and skips the components a patch leaves
+  # the view or component that owns its portal, and skips the components a patch leaves
   # unchanged. It never patches the root layout around them, <title> included.
   # So a control's local values reset only when its owner renders differently.
   defp patched?(_old_renders, _new_renders, :layout), do: false
@@ -632,11 +632,21 @@ defmodule Fluffy.ClientDOM do
   end
 
   defp owner(attributes, parent) do
+    parent = teleported_owner(attributes) || parent
+
     cond do
       has_attribute?(attributes, "data-phx-session") -> {:view, attribute(attributes, "id")}
-      view_id = attribute(attributes, "data-phx-teleported") -> {:view, view_id}
       cid = attribute(attributes, "data-phx-component") -> {:component, owner_view_id(parent), cid}
       true -> parent
+    end
+  end
+
+  # Teleported content belongs to the view, or LiveComponent, rendering its portal.
+  defp teleported_owner(attributes) do
+    case {attribute(attributes, "data-phx-teleported"), attribute(attributes, "data-phx-teleported-cid")} do
+      {nil, _cid} -> nil
+      {view_id, nil} -> {:view, view_id}
+      {view_id, cid} -> {:component, view_id, cid}
     end
   end
 

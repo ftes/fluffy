@@ -113,6 +113,30 @@ defmodule Fluffy.Conformance.LivePatchReconcileTest do
     end
 
     @tag driver: driver
+    test "a view patch keeps typed text in an unchanged component's portal with #{driver}", %{driver: driver} do
+      driver
+      |> start_test_session()
+      |> visit("/live/patched-controls")
+      |> fill(by_label("Portal note"), "typed")
+      |> click(by_role(:button, name: "Bump", exact: true))
+      |> expect("Count: 1" |> by_text() |> to_be_visible())
+      |> expect(to_have_value(by_label("Portal note"), "typed"))
+    end
+
+    @tag driver: driver
+    test "a component patch resets typed text in its portal but not in its view with #{driver}", %{driver: driver} do
+      driver
+      |> start_test_session()
+      |> visit("/live/patched-controls")
+      |> fill(by_label("Note", exact: true), "typed")
+      |> fill(by_label("Portal note"), "typed")
+      |> click(by_role(:button, name: "Bump component"))
+      |> expect("Component count: 1" |> by_text() |> to_be_visible())
+      |> expect(to_have_value(by_label("Note", exact: true), "typed"))
+      |> expect(to_have_value(by_label("Portal note"), ""))
+    end
+
+    @tag driver: driver
     test "a view patch keeps typed text in the root layout but resets it in the view's portal with #{driver}", %{
       driver: driver
     } do
