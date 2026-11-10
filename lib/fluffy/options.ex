@@ -411,7 +411,7 @@ defmodule Fluffy.Options do
                        pool_size: [type: :pos_integer, default: 1],
                        artifact_dir: [type: {:or, [nil, :string]}],
                        trace_dir: [type: :string, default: "traces"],
-                       log_browser_console: [type: :boolean, default: true]
+                       log_browser_console: [type: :boolean, default: false]
                      )
 
   @type setup_option :: unquote(NimbleOptions.option_typespec(@setup_schema))

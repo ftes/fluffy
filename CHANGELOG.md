@@ -8,11 +8,17 @@
 - Playwright `check` and `uncheck` behave as in Playwright again: they fail with "Clicking the checkbox did not change its state" when page code, such as a LiveView patch answering the click, reverts the box before Playwright reads it back. That happens mostly in Firefox and WebKit, for a box whose new state the server does not render. Phoenix is unchanged: it has no page code to revert the click, so it still succeeds there.
 - On Playwright, `visit`, `reload`, `go_back`, `go_forward`, clock calls and the page handling around an `unwrap` callback raise `Fluffy.OperationError` with PlaywrightEx's exception as its `cause`, as actions do. The callback's own errors pass through.
 - On Playwright, a call Fluffy bounds itself, such as `evaluate`, `content`, `close_page` or a download's `path`, raises `PlaywrightEx.TimeoutError` instead of a `RuntimeError` when it runs out of time; clock calls wrap it in `Fluffy.OperationError`.
+- Playwright sessions default to the `en-US` locale, Playwright Test's default, instead of `en`.
+- `log_browser_console:` defaults to `false`: as in Playwright, browser console messages and page errors are no longer logged unless enabled.
+- Browser launch uses Playwright's default timeout of 3 minutes instead of the global `timeout:`; set `launch_options: [timeout: ...]` to change it.
+- `select_option` raises `ArgumentError` for a list that mixes values or labels with option maps, on every driver. Playwright types a list by its first element, so such a list was never valid there.
+- On Playwright, `open_browser` and `Fluffy.Download.read/2` and `save_as/2` raise `Fluffy.OperationError` with PlaywrightEx's exception as its `cause`, as actions do.
 
 ### Fixed
 
 - On Playwright, a session `timeout:` under a second no longer limits Fluffy's own reads of the page around an operation; they get at least a second, so a busy browser is far less likely to fail such a session with a `RuntimeError` naming a blocked script. A page whose main thread is blocked now reports after that second.
 - A page that closes while Fluffy adopts its document now fails the operation with `Fluffy.OperationError`, or an `ExUnit.AssertionError` from an expectation, instead of a `RuntimeError` about the LiveView connection. An operation that succeeded is not failed by its page closing during the bookkeeping after it.
+- `Fluffy.Playwright.wait_for_load_state/3` and `wait_for_function/4` time out with Playwright's own error, even while a script blocks the page, instead of sometimes Fluffy's.
 
 ## 0.9.0-rc.1 — 2026-11-09
 

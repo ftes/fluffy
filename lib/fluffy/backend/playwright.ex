@@ -46,7 +46,8 @@ defmodule Fluffy.Backend.Playwright do
 
     context_options =
       browser_context_options
-      |> Keyword.put_new(:locale, "en")
+      # Playwright Test's default.
+      |> Keyword.put_new(:locale, "en-US")
       |> Keyword.put(:base_url, base_url)
       |> Keyword.put(:extra_http_headers, headers)
 

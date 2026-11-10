@@ -552,7 +552,8 @@ defmodule Fluffy do
   Values and labels accept `String.Chars` and are converted without HTML
   escaping. Indexes remain zero-based integers. A list requests multiple
   options; wrap a charlist in `%{value: charlist}` or `%{label: charlist}`
-  to use it as one option.
+  to use it as one option. As in Playwright, a list is either all values and
+  labels or all option maps; a mixed list raises `ArgumentError`.
 
   ## Options
 
@@ -565,6 +566,14 @@ defmodule Fluffy do
     options = Fluffy.Options.validate_action!(:select_option, options)
     requested = if is_list(requested), do: requested, else: [requested]
     requested = Enum.map(requested, &stringify_option/1)
+
+    # Playwright types the whole list by its first element.
+    if !(Enum.all?(requested, &is_binary/1) or Enum.all?(requested, &is_map/1)) do
+      raise ArgumentError,
+            "select_option/4 takes a list of values and labels or a list of option maps, not both: " <>
+              inspect(requested)
+    end
+
     dispatch_driver(session, :select_option, [locator, requested, options])
   end
 

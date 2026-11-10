@@ -32,7 +32,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
       |> Fluffy.PhoenixTest.fill_in("Final ingredient", with: %Fluffy.TestFormValue{value: "<tag>&"})
       |> then(fn %{session: session} -> session end)
       |> expect("Last last: custom:<tag>&" |> by_text() |> to_be_visible())
-      |> select_option(by_label("Potion colours"), [:blue, %{value: :green}])
+      |> select_option(by_label("Potion colours"), [%{value: :blue}, %{value: :green}])
       |> expect("Potion colours" |> by_label() |> to_have_values(["green", "blue"]))
     end
 

@@ -29,7 +29,15 @@ defmodule Fluffy.Driver.Playwright do
   @impl true
   def open_browser(%Session{} = session, open_fun) do
     frame = Session.page_state(session).frame
-    html = Bounded.within!(Session.timeout(session), :content, fn -> Frame.content(frame) end)
+
+    html =
+      try do
+        Bounded.within!(Session.timeout(session), :content, fn -> Frame.content(frame) end)
+      rescue
+        error in [PlaywrightEx.PlaywrightError, TimeoutError, TargetClosedError] ->
+          reraise OperationFailure.playwright(:open_browser, nil, error), __STACKTRACE__
+      end
+
     url = Session.current_page(session).url
     resolver = fn path -> URI.to_string(URI.merge(url, path)) end
     Fluffy.OpenBrowser.write(LazyHTML.from_document(html), resolver, open_fun)
@@ -345,16 +353,8 @@ defmodule Fluffy.Driver.Playwright do
       :select_option,
       locator,
       options,
-      &BrowserLocator.select_option(&1, uniform_option_values(requested), native(options, &2))
+      &BrowserLocator.select_option(&1, requested, native(options, &2))
     )
-  end
-
-  # Playwright takes either strings (matching value or label) or option maps,
-  # so a mixed list spells its strings as maps.
-  defp uniform_option_values(values) do
-    if Enum.all?(values, &is_binary/1),
-      do: values,
-      else: Enum.map(values, &if(is_binary(&1), do: %{valueOrLabel: &1}, else: &1))
   end
 
   def focus(%Session{} = session, %Locator{} = locator, options \\ []) do
@@ -486,10 +486,13 @@ defmodule Fluffy.Driver.Playwright do
   end
 
   # `fun` gets the native options, with the timeout, and may return a handle.
+  # Playwright's own timeout ends the wait, even while a script blocks the page.
   def page_wait(%Session{} = session, operation, fun, options) do
-    native = Keyword.put(options, :timeout, Session.timeout(session, options))
-    wait = fn page -> with {:ok, handle} <- fun.(page, native), do: Document.release(handle) end
-    page_action(session, operation, wait, options)
+    page = Session.page_state(session).page
+
+    action(session, operation, nil, options, fn remaining ->
+      with {:ok, handle} <- fun.(page, native(options, remaining)), do: Document.release(handle)
+    end)
   end
 
   defp resolve_mask(options, session),

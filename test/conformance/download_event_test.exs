@@ -306,16 +306,14 @@ defmodule Fluffy.Conformance.DownloadEventTest do
       download = await(pending)
       destination = Path.join(tmp_dir, "copy.txt")
 
-      assert_raise PlaywrightEx.TimeoutError,
-                   ~r/did not complete within the session's timeout of 2000ms and was canceled/,
-                   fn ->
-                     Download.save_as(download, destination)
-                   end
+      error = assert_raise Fluffy.OperationError, fn -> Download.save_as(download, destination) end
+      assert %PlaywrightEx.TimeoutError{message: message} = error.cause
+      assert message =~ "did not complete within the session's timeout of 2000ms and was canceled"
 
       send(server, :finish)
       assert unwrap_and_return(download, &PlaywrightEx.Download.failure/1) == {:ok, "canceled"}
       refute File.exists?(destination)
-      assert_raise PlaywrightEx.PlaywrightError, ~r/canceled/, fn -> Download.read(download) end
+      assert_raise Fluffy.OperationError, ~r/playwright read failed.*canceled/s, fn -> Download.read(download) end
     after
       send(server, :finish)
     end
@@ -364,11 +362,13 @@ defmodule Fluffy.Conformance.DownloadEventTest do
     assert download.suggested_filename == "broken.txt"
     send(server, :abort)
 
-    assert_raise PlaywrightEx.PlaywrightError, ~r/download.saveAs/, fn -> Download.read(download) end
+    error = assert_raise Fluffy.OperationError, fn -> Download.read(download) end
+    assert %{operation: :read, cause: %PlaywrightEx.PlaywrightError{}} = error
+    assert error.cause.message =~ "download.saveAs"
 
-    assert_raise PlaywrightEx.PlaywrightError, ~r/download.saveAs/, fn ->
-      Download.save_as(download, Path.join(tmp_dir, "copy.txt"))
-    end
+    error = assert_raise Fluffy.OperationError, fn -> Download.save_as(download, Path.join(tmp_dir, "copy.txt")) end
+    assert %{operation: :save_as, cause: %PlaywrightEx.PlaywrightError{}} = error
+    assert error.cause.message =~ "download.saveAs"
   end
 
   defp session(driver) do

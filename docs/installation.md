@@ -74,8 +74,7 @@ config :fluffy,
     launch_options: [headless: true],
     pool_size: 1,
     artifact_dir: System.get_env("FLUFFY_ARTIFACT_DIR"),
-    trace_dir: System.get_env("FLUFFY_TRACE_DIR", "traces"),
-    log_browser_console: true
+    trace_dir: System.get_env("FLUFFY_TRACE_DIR", "traces")
   ]
 ```
 
@@ -83,8 +82,8 @@ config :fluffy,
 pinned driver is used.
 
 `launch_options` are passed to `PlaywrightEx.BrowserType.launch/2` unchanged. Set
-`launch_options: [timeout: 10_000]` to give browser launch a separate timeout;
-otherwise it uses the global Playwright `timeout`. To use a system browser, set
+`launch_options: [timeout: 10_000]` to limit browser launch; otherwise Playwright's
+default of 3 minutes applies. To use a system browser, set
 `launch_options: [executable_path: System.find_executable("google-chrome-stable")]`.
 `MIX_ENV=test mix playwright_ex.install --no-browsers` installs only the driver for an existing browser.
 
@@ -94,8 +93,8 @@ there when a public browser operation fails. Use a writable per-run directory
 locally and configure CI to upload it when the test job fails; artifact capture
 does not run for successful operations.
 
-Browser `console` messages and uncaught page errors go to Elixir's `Logger`; set
-`log_browser_console: false` to disable this. Trace files are created only when a test
+As in Playwright, browser `console` messages and uncaught page errors are not
+printed; set `log_browser_console: true` to send them to Elixir's `Logger`. Trace files are created only when a test
 calls `Fluffy.Playwright.trace/1` or `Fluffy.Playwright.trace/2`.
 
 Set `engine: :firefox` or `engine: :webkit` after installing the corresponding
