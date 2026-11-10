@@ -149,6 +149,10 @@ The Playwright backend exposes page handles for browser tabs and popup windows.
 All public page-management helpers live in `Fluffy.Playwright` and reject Phoenix
 sessions. Phoenix retains one current document internally; use shared page URL,
 and title assertions to inspect it.
+On Phoenix, a link with `target="_blank"` opens in that one document, so a test can
+still follow it; a click with `modifiers:` raises `Fluffy.CapabilityError`, as other
+Playwright options do. A test that should behave the same on Playwright handles the new
+tab there with `Fluffy.Event.popup/0`.
 `Fluffy.Playwright.new_page/1` returns a handle; `Fluffy.Playwright.switch_page/2` selects it for subsequent actions.
 Use [frame locators](locators.md#frames-playwright) to query iframe contents with
 Playwright. Page switching does not select an iframe, and frame locators do not
