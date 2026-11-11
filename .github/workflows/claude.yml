@@ -14,8 +14,8 @@ env:
   # As in ci.yml.
   MISE_VERSION: "2026.8.14"
   MIX_ENV: test
-  # Added to Claude's system prompt: Bash calls that don't match the allowlist are denied.
-  # Plain text only (no quotes, $ or backslashes): claude.yml quotes it inside claude_args.
+  # Steers Claude off the Bash habits (cd, pipes, heredocs) that miss the allowlist. Plain text
+  # only (no quotes, $ or backslashes): claude.yml passes it in a quoted claude_args argument.
   TOOL_HINT: "Prefer your file tools over Bash to read, search and edit files, and keep any scratch files under tmp/; run each allowed Bash command on its own, without cd, semicolons, &&, pipes or heredocs (you are already in the repository)."
 
 jobs:
@@ -59,7 +59,7 @@ jobs:
           PR: ${{ github.event.pull_request.number || (github.event.issue.pull_request && github.event.issue.number) }}
         run: |
           if [ -z "$PR" ] || [ "$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json isCrossRepository --jq .isCrossRepository)" = false ]; then
-            echo 'mix=,Bash(mix usage_rules.docs:*),Bash(mix usage_rules.search_docs:*)' >> "$GITHUB_OUTPUT"
+            echo 'mix=,Bash(mix format:*),Bash(mix compile:*),Bash(mix credo:*),Bash(mix usage_rules.docs:*),Bash(mix usage_rules.search_docs:*)' >> "$GITHUB_OUTPUT"
           fi
 
       - name: Run Claude Code
@@ -72,12 +72,15 @@ jobs:
           additional_permissions: |
             actions: read
 
-          # Tag mode adds its own tools (comment, CI, commit) and allows edits inside the checkout.
+          # The owner forbids attribution.
+          settings: |
+            {"includeCoAuthoredBy": false, "attribution": {"commit": "", "pr": ""}}
+          # Tag mode adds file, comment, CI and commit tools and allows edits inside the checkout.
           claude_args: |
             --model claude-opus-5-5
-            --max-turns 80
-            --append-system-prompt "${{ env.TOOL_HINT }}"
-            --allowedTools "Read,Grep,Glob,Agent,Task,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh issue view:*)${{ steps.tools.outputs.mix }}"
+            --max-turns 100
+            --append-system-prompt "Tests can't run here: CI runs them on your push. ${{ env.TOOL_HINT }}"
+            --allowedTools "Agent,Task,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh issue view:*)${{ steps.tools.outputs.mix }}"
       - name: Summarize Claude's result
         if: ${{ !cancelled() && steps.claude.outputs.execution_file != '' }}
         env:
