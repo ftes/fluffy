@@ -72,6 +72,10 @@ jobs:
             5. Don't repeat findings already posted on this PR
                (`gh api repos/REPO/pulls/PR/comments`, `gh pr view PR --comments`).
 
+            Read, search and edit files with Read, Grep, Glob, Edit and Write, and write scratch
+            files under tmp/; run each allowed Bash command on its own, without `cd`, `;`, `&&`,
+            pipes or heredocs (you are already in the repository).
+
             Post each verified finding as an inline comment on the relevant line
             (mcp__github_inline_comment__create_inline_comment, confirmed: true), with the failure
             scenario and a suggested fix. Then post or update one summary comment with
