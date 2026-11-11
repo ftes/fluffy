@@ -44,10 +44,13 @@ defmodule Fluffy.Route do
   """
   @spec fetch(t(), PlaywrightEx.Route.fetch_options()) :: PlaywrightEx.APIResponse.t()
   def fetch(%__MODULE__{} = route, options \\ []) do
-    PlaywrightEx.Route.fetch!(
-      route.native,
-      Keyword.replace_lazy(options, :timeout, &Fluffy.Deadline.playwright_operation!(:fetch, &1))
-    )
+    {timeout, native} = Keyword.split(options, [:timeout])
+
+    timeout =
+      for {:timeout, timeout} <- Fluffy.Options.validate_action!(timeout),
+          do: {:timeout, Fluffy.Deadline.playwright_operation!(:fetch, timeout)}
+
+    PlaywrightEx.Route.fetch!(route.native, native ++ timeout)
   end
 
   @doc """

@@ -75,6 +75,8 @@ defmodule Fluffy.Playwright do
   @type select_text_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:select_text)))
   @type locator_screenshot_option ::
           unquote(NimbleOptions.option_typespec(Options.action_schema(:locator_screenshot)))
+  @type page_screenshot_option ::
+          unquote(NimbleOptions.option_typespec(Options.action_schema(:page_screenshot)))
   @type emulate_media_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:emulate_media)))
   @type wait_for_function_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:wait_for_function)))
   @type wait_for_load_state_option ::
@@ -488,7 +490,6 @@ defmodule Fluffy.Playwright do
   def pdf(%Session{} = session, path, options \\ []) when is_binary(path) do
     ensure_playwright_backend!(session, :pdf)
     native = Options.validate_action!(:pdf, options)
-    File.mkdir_p!(Path.dirname(path))
     native = Keyword.put(native, :path, path)
     page_action(session, :pdf, &PlaywrightEx.Page.pdf(&1, native))
   end
@@ -782,18 +783,22 @@ defmodule Fluffy.Playwright do
   @doc """
   Saves a screenshot of the active page and returns the session.
 
-  Accepts the options of `PlaywrightEx.Page.screenshot/2`, such as `full_page:`.
   Pass a locator and a path to capture one element, see `screenshot/4`.
+
+  ## Options
+
+  Playwright-only options pass through to #{Options.native_reference(:page_screenshot)}.
+
+  #{NimbleOptions.docs(Options.action_schema(:page_screenshot))}
   """
-  @spec screenshot(Session.t(), Path.t(), PlaywrightEx.Page.screenshot_options()) :: Session.t()
+  @spec screenshot(Session.t(), Path.t(), [page_screenshot_option()]) :: Session.t()
   @spec screenshot(Session.t(), Fluffy.Locator.t(), Path.t()) :: Session.t()
   def screenshot(session, target, path_or_options \\ [])
 
   def screenshot(session, path, options) when is_binary(path) and is_list(options) do
     ensure_playwright_backend!(session, :screenshot)
-    File.mkdir_p!(Path.dirname(path))
-    PlaywrightEx.Page.screenshot!(Session.page_state(session).page, Keyword.put(options, :path, path))
-    session
+    options = Options.validate_action!(:page_screenshot, options)
+    Fluffy.__dispatch_driver__(session, :page_screenshot, [path, options])
   end
 
   def screenshot(session, %Fluffy.Locator{} = locator, path) when is_binary(path),
@@ -814,7 +819,6 @@ defmodule Fluffy.Playwright do
   def screenshot(%Session{} = session, %Fluffy.Locator{} = locator, path, options) when is_binary(path) do
     ensure_playwright_backend!(session, :screenshot)
     options = Options.validate_action!(:locator_screenshot, options)
-    File.mkdir_p!(Path.dirname(path))
     Fluffy.__dispatch_driver__(session, :screenshot, [locator, path, options])
   end
 

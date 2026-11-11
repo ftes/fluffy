@@ -81,38 +81,58 @@ defmodule Fluffy.Conformance.PlaywrightWrappersTest do
       %{directory: directory}
     end
 
-    test "saves one element and leaves the page form working", %{directory: directory} do
-      html = ~s(<button id="a" style="width:80px;height:40px">Cast</button><p id="m">Mask</p>)
-      element = Path.join([directory, "nested", "element.png"])
-      masked = Path.join(directory, "masked.jpg")
-      page = Path.join(directory, "page.png")
+    @html ~s(<button id="a" style="width:80px;height:40px">Cast</button><p id="m">Mask</p>)
 
-      session =
-        :playwright
-        |> session_for_html(html)
-        |> Playwright.screenshot(by_css("#a"), element)
-        |> Playwright.screenshot(by_css("#a"), masked, type: :jpeg, quality: 50, mask: [by_css("#m")])
-        |> Playwright.screenshot(page)
+    # The page form, screenshot/3, and the element form, screenshot/4.
+    defp shots do
+      [
+        page: {nil, &Playwright.screenshot(&1, &2, &3)},
+        element: {by_css("#a"), &Playwright.screenshot(&1, by_css("#a"), &2, &3)}
+      ]
+    end
 
-      assert <<0x89, "PNG", _rest::binary>> = File.read!(element)
-      assert <<0xFF, 0xD8, _rest::binary>> = File.read!(masked)
-      assert File.stat!(page).size > File.stat!(element).size
+    test "saves the page or one element and leaves the session working", %{directory: directory} do
+      session = session_for_html(:playwright, @html)
+
+      for {form, {_locator, shot}} <- shots() do
+        png = Path.join([directory, "nested", "#{form}.png"])
+        jpeg = Path.join(directory, "#{form}.jpg")
+
+        assert shot.(session, png, []) == session
+        assert shot.(session, jpeg, type: :jpeg, quality: 50, mask: [by_css("#m")]) == session
+        assert <<0x89, "PNG", _rest::binary>> = File.read!(png)
+        assert <<0xFF, 0xD8, _rest::binary>> = File.read!(jpeg)
+      end
+
+      assert File.stat!(Path.join([directory, "nested", "page.png"])).size >
+               File.stat!(Path.join([directory, "nested", "element.png"])).size
+
       expect(session, to_be_visible(by_role(:button)))
     end
 
     test "takes the path as an argument, and fails like an action", %{directory: directory} do
-      session = session_for_html(:playwright, ~s(<input><input>))
+      session = session_for_html(:playwright, @html)
+      path = Path.join(directory, "x.png")
 
-      assert_raise NimbleOptions.ValidationError, ~r/unknown options.*:path/, fn ->
-        Playwright.screenshot(session, by_css("input"), "/tmp/x.png", path: "/tmp/y.png")
+      for {_form, {locator, shot}} <- shots() do
+        assert_raise NimbleOptions.ValidationError, fn -> shot.(session, path, path: "/tmp/y.png") end
+
+        # Playwright rejects quality: for a PNG.
+        error = assert_raise Fluffy.OperationError, fn -> shot.(session, path, quality: 50) end
+        assert %Fluffy.OperationError{operation: :screenshot, locator: ^locator} = error
       end
+    end
 
-      error =
-        assert_raise Fluffy.OperationError, fn ->
-          Playwright.screenshot(session, by_css("input"), Path.join(directory, "x.png"), timeout: 100)
-        end
+    test "rejects timeout: 0, which can't check once, and takes :infinity", %{directory: directory} do
+      session = session_for_html(:playwright, @html)
 
-      assert error.operation == :screenshot
+      for {form, {_locator, shot}} <- shots() do
+        path = Path.join(directory, "#{form}.png")
+        assert_raise ArgumentError, fn -> shot.(session, path, timeout: 0) end
+        refute File.exists?(path)
+        assert shot.(session, path, timeout: :infinity) == session
+        assert File.exists?(path)
+      end
     end
   end
 

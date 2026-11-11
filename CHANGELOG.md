@@ -6,6 +6,9 @@ Upgrading from 0.8? The [upgrade guide](docs/upgrading.md) lists the net changes
 
 ### Changed
 
+- **Breaking:** `Fluffy.Playwright.screenshot/3` of the page runs like the element's `screenshot/4`: its options are validated, `mask:` takes Fluffy locators, failures raise `Fluffy.OperationError`, and `timeout: 0` raises `ArgumentError` instead of disabling the timeout.
+- `Fluffy.Route.fetch/2` validates `timeout:` like other Playwright operations: a negative or non-integer one, such as `1500.0`, raises `NimbleOptions.ValidationError` instead of reaching PlaywrightEx.
+- As in Playwright, an argument error in a Playwright expectation, such as `to_match_aria_snapshot` with both a snapshot and `path:`, raises unchanged instead of as `ExUnit.AssertionError`.
 - Requires PlaywrightEx 0.17.0-rc.5, whose listener removal no longer fails once the driver is lost.
 
 ## 0.9.0-rc.2 — 2026-11-11

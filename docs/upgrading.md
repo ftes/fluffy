@@ -43,8 +43,10 @@ matched once can now match twice.
 - Browser launch gets Playwright's 3-minute default instead of `timeout:`. A
   `launch_options: [timeout: ...]` that raised the limit on 0.8 now shortens it and can
   fail a loaded machine with `browserType.launch: Timeout ... exceeded`, so drop it.
-- `browser_context:`, `launch_options:` and the options of `screenshot`, `storage_state`,
-  cookies and `trace` pass through to PlaywrightEx, which rejects unknown ones.
+- `browser_context:`, `launch_options:` and the options of `storage_state`, cookies and
+  `trace` pass through to PlaywrightEx, which rejects unknown ones. Page `screenshot/3`
+  validates its options as `screenshot/4` does: `mask:` takes Fluffy locators,
+  `timeout: 0` raises, and `path:` is only the argument.
 
 ## Timeouts
 

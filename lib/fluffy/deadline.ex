@@ -25,16 +25,17 @@ defmodule Fluffy.Deadline do
   def send_after(deadline, pid, message), do: Process.send_after(pid, message, remaining(deadline))
 
   # The PlaywrightEx timeout for a Fluffy one. Playwright's `0` is no timeout, so
-  # only `:infinity` becomes `0`; Fluffy's `0`, a single check, becomes 1ms.
-  @spec playwright(timeout()) :: non_neg_integer()
-  def playwright(:infinity), do: 0
-  def playwright(timeout), do: max(timeout, 1)
+  # Fluffy's `0`, a single check, becomes 1ms. PlaywrightEx maps `:infinity` to
+  # Playwright's `0`.
+  @spec playwright(timeout()) :: pos_integer() | :infinity
+  def playwright(0), do: 1
+  def playwright(timeout) when (is_integer(timeout) and timeout > 0) or timeout == :infinity, do: timeout
 
   # The PlaywrightEx timeout of an action or wait. An expectation can check once:
   # Playwright makes one check before its timeout applies. An action, wait or
   # locator read cannot, and would time out at 1ms, so it rejects Fluffy's 0
   # before reaching the browser.
-  @spec playwright_operation!(atom(), timeout()) :: non_neg_integer()
+  @spec playwright_operation!(atom(), timeout()) :: pos_integer() | :infinity
   def playwright_operation!(operation, 0) do
     raise ArgumentError,
           "#{operation}: timeout: 0 means check once, which Playwright actions and waits can't do; " <>

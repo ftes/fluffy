@@ -175,6 +175,7 @@ defmodule Fluffy.Conformance.NativeOptionsTest do
             &Fluffy.Playwright.select_text(session, button, &1),
             &Fluffy.Playwright.scroll_into_view_if_needed(session, button, &1),
             &Fluffy.Playwright.screenshot(session, button, "/tmp/x.png", &1),
+            &Fluffy.Playwright.screenshot(session, "/tmp/x.png", &1),
             &Fluffy.Playwright.set_viewport_size(session, %{width: 1, height: 1}, &1),
             &Fluffy.Playwright.emulate_media(session, &1),
             &Keyboard.press(session, "a", &1),
