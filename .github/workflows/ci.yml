@@ -19,12 +19,12 @@ on:
         type: string
         default: ""
       browsers:
-        description: 'Newest lane browsers: one name or a JSON list (firefox, ["firefox","webkit"]), default: all; the oldest lane stays on chromium'
+        description: 'Test browsers: one name or a JSON list (firefox, ["firefox","webkit"]), default: all'
         required: false
         type: string
         default: ""
       partitions:
-        description: "Partitions per lane and browser (1-8), default: chromium 2, others 3"
+        description: "Partitions per browser (1-8), default: chromium 2, others 3"
         required: false
         type: string
         default: ""
@@ -48,7 +48,9 @@ env:
 
 jobs:
   # Compile, lint and docs per lane; the newest lane also checks formatting, the generated
-  # options and Dialyzer. No browser or database. Saves the deps and _build cache on main.
+  # options and Dialyzer. The oldest lane's compile is the Elixir/OTP floor's only check: the floor
+  # breaks at compile time (missing APIs, compiler differences), so the suite runs on the newest
+  # lane only. No browser or database. Saves the deps and _build cache on main.
   checks:
     name: checks (${{ matrix.lane }})
     # Draft PRs skip CI until marked ready, and in a stack only the top PR runs it: it holds every
@@ -115,11 +117,11 @@ jobs:
             deps
             _build
 
-  # Each lane's suite per browser in `partitions` jobs (`mix test --partitions`: test files
-  # round-robin by sorted path), as PlaywrightEx's CI. Each job has its own Postgres, browser and
-  # FLUFFY_ARTIFACT_DIR.
+  # The suite, newest lane only, per browser in `partitions` jobs (`mix test --partitions`: test
+  # files round-robin by sorted path), as PlaywrightEx's CI. Each job has its own Postgres,
+  # browser and FLUFFY_ARTIFACT_DIR.
   test:
-    name: test (${{ matrix.lane }}, ${{ matrix.browser }}, ${{ matrix.partition }})
+    name: test (${{ matrix.browser }}, ${{ matrix.partition }})
     if: *stack_top
     runs-on: ubuntu-26.04
     # The slowest job took ~3.5 min at 6 partitions (webkit, a retry included), but a cold apt
@@ -128,26 +130,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        lane: [oldest, newest]
         browser: [chromium, firefox, webkit]
         # Without a dispatch's `partitions`: 3 per browser, 2 for chromium (exclude below), as setup
         # is about 45 s of each job. TEST_PARTITIONS has the same counts.
         partition: ${{ fromJSON('{"1":[1],"2":[1,2],"3":[1,2,3],"4":[1,2,3,4],"5":[1,2,3,4,5],"6":[1,2,3,4,5,6],"7":[1,2,3,4,5,6,7],"8":[1,2,3,4,5,6,7,8]}')[inputs.partitions || '3'] }}
-        # The oldest lane checks the Elixir/OTP floor, which the browser doesn't depend on. A
-        # dispatch's `browsers` drops the newest lane's others ('none' excludes nothing).
+        # A dispatch's `browsers` drops the others ('none' excludes nothing).
         exclude:
           - browser: chromium
             partition: ${{ !inputs.partitions && 3 || 'none' }}
-          - lane: oldest
-            browser: firefox
-          - lane: oldest
-            browser: webkit
-          - lane: newest
-            browser: ${{ inputs.browsers && !contains(inputs.browsers, 'chromium') && 'chromium' || 'none' }}
-          - lane: newest
-            browser: ${{ inputs.browsers && !contains(inputs.browsers, 'firefox') && 'firefox' || 'none' }}
-          - lane: newest
-            browser: ${{ inputs.browsers && !contains(inputs.browsers, 'webkit') && 'webkit' || 'none' }}
+          - browser: ${{ inputs.browsers && !contains(inputs.browsers, 'chromium') && 'chromium' || 'none' }}
+          - browser: ${{ inputs.browsers && !contains(inputs.browsers, 'firefox') && 'firefox' || 'none' }}
+          - browser: ${{ inputs.browsers && !contains(inputs.browsers, 'webkit') && 'webkit' || 'none' }}
     services:
       postgres:
         image: postgres:18.6@sha256:e3d24f6906d0760bf4da0dae872415391ededefad23fd471c47dc53b0ddf3c42
@@ -174,12 +167,12 @@ jobs:
         id: setup
         uses: ./.github/actions/setup
         with:
-          lane: ${{ matrix.lane }}
+          lane: newest
       - name: Install Playwright browser
         uses: ./.github/actions/browser
         with:
           browser: ${{ matrix.browser }}
-          save-apt-cache: ${{ matrix.lane == 'newest' && matrix.partition == 1 }}
+          save-apt-cache: ${{ matrix.partition == 1 }}
       - name: Build test assets
         run: mix assets.build
       # Test failures (exit 2) are retried once, only the failed tests (`mix test --failed`);
@@ -193,10 +186,9 @@ jobs:
         env:
           FLUFFY_FAILURES_FILE: ${{ runner.temp }}/first-run-failures.txt
           FLUFFY_MODULE_TIMES_FILE: ${{ runner.temp }}/module-times.txt
-          LANE: ${{ matrix.lane }}
         run: |
           fluffy_test_seed=$RANDOM
-          label="$LANE, $FLUFFY_BROWSER, $MIX_TEST_PARTITION/$TEST_PARTITIONS"
+          label="$FLUFFY_BROWSER, $MIX_TEST_PARTITION/$TEST_PARTITIONS"
           status=0
           FLUFFY_ARTIFACT_DIR="$FLUFFY_ARTIFACT_DIR/first" mix test --warnings-as-errors --seed "$fluffy_test_seed" --partitions "$TEST_PARTITIONS" || status=$?
 
@@ -227,7 +219,7 @@ jobs:
         if: failure() || steps.tests.outputs.retried == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: browser-failures-${{ matrix.lane }}-${{ matrix.browser }}-${{ matrix.partition }}of${{ env.TEST_PARTITIONS }}-elixir-${{ steps.setup.outputs.elixir }}-erlang-${{ steps.setup.outputs.erlang }}
+          name: browser-failures-${{ matrix.browser }}-${{ matrix.partition }}of${{ env.TEST_PARTITIONS }}-elixir-${{ steps.setup.outputs.elixir }}-erlang-${{ steps.setup.outputs.erlang }}
           path: tmp/fluffy-artifacts
           if-no-files-found: ignore
 
