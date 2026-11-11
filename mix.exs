@@ -1,7 +1,7 @@
 defmodule Fluffy.MixProject do
   use Mix.Project
 
-  @version "0.9.0-rc.1"
+  @version "0.9.0-rc.2"
   @description "Phoenix feature tests. Three drivers, one Playwright-shaped API."
   @source_url "https://github.com/ftes/fluffy"
   @hex_url "https://hex.pm/packages/fluffy"
