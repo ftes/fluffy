@@ -9,7 +9,8 @@ mix setup
 mix test
 ```
 
-`mix setup` installs Chromium. To run the suite on Firefox or WebKit, install it with
+`mix setup` installs Chromium and fetches Playwright's source, for reference, into
+`tmp/playwright-<version>`. To run the suite on Firefox or WebKit, install it with
 `mix playwright_ex.install -- firefox` (or `webkit`) and set `FLUFFY_BROWSER=firefox`.
 
 Upstream Playwright's behavior is the reference for Fluffy's, and Phoenix LiveView's the

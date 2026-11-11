@@ -8,6 +8,11 @@ concurrency:
   group: claude-review-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
+env:
+  # As in ci.yml.
+  MISE_VERSION: "2026.8.14"
+  MIX_ENV: test
+
 jobs:
   claude-review:
     # Claude's own PRs are the only bot PRs reviewed, and fork PRs get no secrets.
@@ -15,7 +20,8 @@ jobs:
       !github.event.pull_request.draft &&
       (github.event.pull_request.user.type != 'Bot' || github.event.pull_request.user.login == 'claude[bot]') &&
       github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
+    # The image main saves setup's deps cache from.
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     permissions:
       contents: read
@@ -28,6 +34,15 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
+      # Setup and the dev/ task compile the PR: a PR that doesn't build still gets a Claude run.
+      - name: Set up toolchain and deps
+        continue-on-error: true
+        uses: ./.github/actions/setup
+        with:
+          lane: newest
+      - name: Fetch Playwright source
+        continue-on-error: true
+        run: mix fluffy.playwright_source
 
       - name: Run Claude Code Review
         id: claude
@@ -70,12 +85,7 @@ jobs:
         if: ${{ !cancelled() && steps.claude.outputs.execution_file != '' }}
         env:
           EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
-        # Only the final message and each denied call's command, path or URL: this repo is public,
-        # and the full transcript can contain secrets.
+        # From the run's commit: Claude can edit the checkout.
         run: |
-          jq -r '.[] | select(.type == "result")
-            | (.result // .subtype),
-              (.permission_denials // [] | select(length > 0) | "\n**Denied tool calls (\(length)):**\n",
-                (.[] | (.tool_input | .command // .file_path // .path // .pattern // .url // "" | gsub("\\s+"; " ") | .[:200]) as $arg
-                  | "- \(.tool_name)" + (if $arg == "" then "" else ": `` \($arg) ``" end)))' \
-            "$EXECUTION_FILE" >> "$GITHUB_STEP_SUMMARY"
+          filter=$(git show "$GITHUB_SHA:.github/claude-summary.jq")
+          jq -r "$filter" "$EXECUTION_FILE" >> "$GITHUB_STEP_SUMMARY"
