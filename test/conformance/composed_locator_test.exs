@@ -157,11 +157,11 @@ defmodule Fluffy.Conformance.ComposedLocatorTest do
     @tag driver: driver
     test "chains a child locator within its parent scope with #{driver}", %{driver: driver} do
       html = """
-      <section id="billing"><button>Save</button></section>
-      <section id="profile"><button>Save</button></section>
+      <section id="vault"><button>Save</button></section>
+      <section id="owlery"><button>Save</button></section>
       """
 
-      locator = "#billing" |> by_css() |> by_role(:button, name: "Save")
+      locator = "#vault" |> by_css() |> by_role(:button, name: "Save")
 
       with_html(driver, html, fn session -> expect(session, to_have_count(locator, 1)) end)
     end
@@ -176,8 +176,8 @@ defmodule Fluffy.Conformance.ComposedLocatorTest do
 
     @tag driver: driver
     test "filters candidates by descendant text with #{driver}", %{driver: driver} do
-      html = "<ul><li>Product 1</li><li>Product 2</li></ul>"
-      locator = "li" |> by_css() |> filter(has_text: "Product 2")
+      html = "<ul><li>Potion 1</li><li>Potion 2</li></ul>"
+      locator = "li" |> by_css() |> filter(has_text: "Potion 2")
 
       with_html(driver, html, fn session -> expect(session, to_have_count(locator, 1)) end)
     end
@@ -210,22 +210,22 @@ defmodule Fluffy.Conformance.ComposedLocatorTest do
     @tag driver: driver
     test "scopes repeated rows to one of several tables with #{driver}", %{driver: driver} do
       html = """
-      <table aria-label="Orders">
-        <tbody><tr><td>Shared row</td><td>Order 42</td></tr></tbody>
+      <table aria-label="Vaults">
+        <tbody><tr><td>Shared row</td><td>Vault 713</td></tr></tbody>
       </table>
-      <table aria-label="Invoices">
-        <tbody><tr><td>Shared row</td><td>Invoice 9</td></tr></tbody>
+      <table aria-label="Ledgers">
+        <tbody><tr><td>Shared row</td><td>Ledger 9</td></tr></tbody>
       </table>
       """
 
-      orders = by_role(:table, name: "Orders", exact: true)
-      shared_order_row = orders |> by_role(:row) |> filter(has_text: "Shared row")
+      vaults = by_role(:table, name: "Vaults", exact: true)
+      shared_vault_row = vaults |> by_role(:row) |> filter(has_text: "Shared row")
 
       with_html(driver, html, fn session ->
         session
-        |> expect(to_have_count(shared_order_row, 1))
-        |> expect(shared_order_row |> by_text("Order 42", exact: true) |> to_have_count(1))
-        |> expect(shared_order_row |> by_text("Invoice 9", exact: true) |> to_have_count(0))
+        |> expect(to_have_count(shared_vault_row, 1))
+        |> expect(shared_vault_row |> by_text("Vault 713", exact: true) |> to_have_count(1))
+        |> expect(shared_vault_row |> by_text("Ledger 9", exact: true) |> to_have_count(0))
       end)
     end
   end
@@ -252,8 +252,8 @@ defmodule Fluffy.Conformance.ComposedLocatorTest do
       target = "#email" |> by_css() |> and_(by_label("Email", exact: true))
 
       session
-      |> fill(target, "reader@example.com")
-      |> expect(to_have_value(target, "reader@example.com"))
+      |> fill(target, "luna@hogwarts.example")
+      |> expect(to_have_value(target, "luna@hogwarts.example"))
       |> expect("label" |> by_css() |> and_(by_label("Email")) |> to_have_count(0))
       |> set_html("<label for='other'>Email</label><input id='other'>")
       |> expect(to_have_count(target, 0))

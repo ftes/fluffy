@@ -10,10 +10,10 @@ import Fluffy.Playwright
 alias Fluffy.{Dialog, Download, Event, FileChooser, Frame, Page, Request, Response, Route}
 
 pending = wait_for(session, Event.download())
-click(session, by_role(:button, name: "Download report"))
+click(session, by_role(:button, name: "Download the Marauder's Map"))
 download = await(pending)
-assert download.suggested_filename == "report.csv"
-assert Download.read(download) =~ "customer_id,total"
+assert download.suggested_filename == "marauders_map.csv"
+assert Download.read(download) =~ "student,house"
 ```
 
 Each wait has an independent source, predicate, and deadline. The deadline starts
@@ -36,10 +36,10 @@ session:
 session
 |> assert_event(
   Event.download(),
-  &click(&1, by_role(:button, name: "Download report")),
+  &click(&1, by_role(:button, name: "Download the Marauder's Map")),
   fn download ->
-    assert download.suggested_filename == "report.csv"
-    assert Download.read(download) =~ "customer_id,total"
+    assert download.suggested_filename == "marauders_map.csv"
+    assert Download.read(download) =~ "student,house"
   end
 )
 |> click(by_role(:button, name: "Continue"))
@@ -79,13 +79,13 @@ loading. Subsequent actions and assertions handle readiness.
 ```elixir
 main = current_page(session)
 pending = wait_for(session, Event.popup())
-click(session, by_role(:link, name: "Open report"))
-report = await(pending)
+click(session, by_role(:link, name: "Open the Daily Prophet"))
+prophet = await(pending)
 
 session
-|> switch_page(report)
+|> switch_page(prophet)
 |> assert(page_opener(main))
-|> assert(page_url(path: "/reports/preview"))
+|> assert(page_url(path: "/prophet/preview"))
 |> close_page()
 |> switch_page(main)
 ```
@@ -105,7 +105,7 @@ page's handle once it closes, by its own script or `Fluffy.Playwright.close_page
 
 ```elixir
 popup
-|> assert_event(Event.close(), &click(&1, by_role(:button, name: "Authorize")))
+|> assert_event(Event.close(), &click(&1, by_role(:button, name: "Sign permission slip")))
 |> switch_page(main)
 ```
 
@@ -114,12 +114,12 @@ selection. Pass that handle to `Fluffy.Playwright.switch_page/2` or `Fluffy.Play
 
 ```elixir
 main = current_page(session)
-dashboard = new_page(session)
+common_room = new_page(session)
 
 session
-|> switch_page(dashboard)
-|> visit("/dashboard")
-|> close_page(dashboard)
+|> switch_page(common_room)
+|> visit("/common-room")
+|> close_page(common_room)
 |> switch_page(main)
 ```
 
@@ -171,10 +171,10 @@ blocks the triggering action:
 session
 |> once(Event.dialog(), fn dialog ->
   assert dialog.type == :confirm
-  assert dialog.message == "Delete this item?"
+  assert dialog.message == "Vanish this potion?"
   Dialog.accept(dialog)
 end)
-|> assert_event(Event.dialog(), &click(&1, by_role(:button, name: "Delete")))
+|> assert_event(Event.dialog(), &click(&1, by_role(:button, name: "Vanish")))
 ```
 
 Use `Dialog.accept(dialog, "prompt text")` for prompts or `Dialog.dismiss(dialog)`.
@@ -185,8 +185,8 @@ Types are `:alert`, `:confirm`, `:prompt`, and `:beforeunload`; metadata also in
 accept_dialog = &Dialog.accept/1
 session
 |> on(Event.dialog(), accept_dialog)
-|> click(by_role(:button, name: "Delete first item"))
-|> click(by_role(:button, name: "Delete second item"))
+|> click(by_role(:button, name: "Vanish first potion"))
+|> click(by_role(:button, name: "Vanish second potion"))
 |> off(Event.dialog(), accept_dialog)
 ```
 
@@ -206,7 +206,7 @@ page events always observe the context, while all others bind to the selected pa
 ```elixir
 session
 |> assert_event(
-  Event.response(&String.ends_with?(&1.url, "/api/reports")),
+  Event.response(&String.ends_with?(&1.url, "/api/prophet")),
   &click(&1, by_role(:button, name: "Refresh")),
   fn response -> assert response.status == 200 end,
   scope: :context
@@ -253,7 +253,7 @@ session
 |> assert_event(
   Event.console(&(&1.type == "error")),
   &click(&1, by_role(:button, name: "Refresh")),
-  fn message -> assert message.text =~ "stale report" end
+  fn message -> assert message.text =~ "stale edition" end
 )
 ```
 
@@ -281,7 +281,7 @@ the action that sends the request. The handler receives a `Fluffy.Route` with th
 ```elixir
 session
 |> route("/api/potions", fn route -> Route.fulfill(route, json: [%{name: "Felix Felicis"}]) end)
-|> route(~r{/api/orders$}, fn route -> Route.abort(route) end)
+|> route(~r{/api/owls$}, fn route -> Route.abort(route) end)
 |> visit("/potions")
 ```
 
@@ -318,14 +318,14 @@ process and answer it there:
 
 ```elixir
 test = self()
-route(session, "/api/report", &send(test, {:held, &1}))
+route(session, "/api/prophet", &send(test, {:held, &1}))
 
 session
-|> visit("/report")
+|> visit("/prophet")
 |> assert("Loading" |> by_text() |> visible())
 
 assert_receive {:held, route}
-Route.fulfill(route, json: %{title: "Quarterly"})
+Route.fulfill(route, json: %{title: "Evening Edition"})
 ```
 
 As in Playwright, a request never answered hangs until the action waiting for it

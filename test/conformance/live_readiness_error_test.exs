@@ -15,9 +15,9 @@ defmodule Fluffy.Conformance.LiveReadinessErrorTest do
       :playwright
       |> start_session(base_url: Fluffy.TestServer.base_url(), timeout: 5_000)
       |> visit("/live/nested")
-      |> fill(by_label("Parent email"), "parent@example.com")
+      |> fill(by_label("Parent email"), "parent@hogwarts.example")
       |> click(by_role(:button, name: "Save parent"))
-      |> expect("Parent saved: parent@example.com" |> by_text() |> to_be_visible())
+      |> expect("Parent saved: parent@hogwarts.example" |> by_text() |> to_be_visible())
 
     # Parent patches can strip this class. Keep the regression deterministic if
     # a future LiveView release preserves it, and do not rely on a global socket.

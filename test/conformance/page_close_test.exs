@@ -14,7 +14,7 @@ defmodule Fluffy.Conformance.PageCloseTest do
   test "an action that closes its own page succeeds, except on Firefox, and leaves the opener usable" do
     {session, popup} = popup_session()
     main = current_page(session)
-    authorize = fn -> click(popup, by_role(:button, name: "Authorize")) end
+    authorize = fn -> click(popup, by_role(:button, name: "Sign permission slip")) end
 
     if playwright_engine?(:firefox),
       do: assert_raise(Fluffy.OperationError, ~r/closed/, authorize),
@@ -29,11 +29,11 @@ defmodule Fluffy.Conformance.PageCloseTest do
   test "the next action on a page its own action closed reports the closed page" do
     {_session, popup} = popup_session(:after_click)
     pending = wait_for(popup, Event.close())
-    click(popup, by_role(:button, name: "Authorize"))
+    click(popup, by_role(:button, name: "Sign permission slip"))
     await(pending)
 
     assert_raise ArgumentError, ~r/page #Reference<.*> is closed/, fn ->
-      click(popup, by_role(:button, name: "Authorize"))
+      click(popup, by_role(:button, name: "Sign permission slip"))
     end
   end
 
@@ -42,7 +42,7 @@ defmodule Fluffy.Conformance.PageCloseTest do
     {session, popup} = popup_session(:after_click)
     closed = current_page(popup)
 
-    expect_event(popup, Event.close(), &click(&1, by_role(:button, name: "Authorize")), fn page ->
+    expect_event(popup, Event.close(), &click(&1, by_role(:button, name: "Sign permission slip")), fn page ->
       assert page == closed
     end)
 
@@ -93,7 +93,7 @@ defmodule Fluffy.Conformance.PageCloseTest do
             %{
               body: """
               <!doctype html><html><body>
-              <button onclick="window.opener.postMessage('done', '*'); #{close_script}">Authorize</button>
+              <button onclick="window.opener.postMessage('done', '*'); #{close_script}">Sign permission slip</button>
               </body></html>
               """
             }

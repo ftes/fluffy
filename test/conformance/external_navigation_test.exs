@@ -8,16 +8,16 @@ defmodule Fluffy.Conformance.ExternalNavigationTest do
   alias Fluffy.TestHTTPFixtures
   alias Fluffy.TestWeb.Endpoint
 
-  @guild "https://guild.example/hall"
+  @three_broomsticks "https://hogsmeade.example/three-broomsticks"
 
   # A browser really loads the external page, so Playwright stubs its host.
-  defp guild_session(:phoenix), do: start_test_session(:phoenix)
+  defp hogsmeade_session(:phoenix), do: start_test_session(:phoenix)
 
-  defp guild_session(:playwright) do
+  defp hogsmeade_session(:playwright) do
     session = start_test_session(:playwright)
 
-    Fluffy.Playwright.route(session, "https://guild.example/**", fn route ->
-      Fluffy.Route.fulfill(route, content_type: "text/html", body: "<h1>Guild hall</h1>")
+    Fluffy.Playwright.route(session, "https://hogsmeade.example/**", fn route ->
+      Fluffy.Route.fulfill(route, content_type: "text/html", body: "<h1>The Three Broomsticks</h1>")
     end)
 
     session
@@ -26,78 +26,79 @@ defmodule Fluffy.Conformance.ExternalNavigationTest do
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
     test "an off-origin link ends at its URL from a static page with #{driver}", %{driver: driver} do
-      fixture = TestHTTPFixtures.register(%{body: html(~s(<a href="#{@guild}?from=link">Guild hall</a>))})
+      fixture =
+        TestHTTPFixtures.register(%{body: html(~s(<a href="#{@three_broomsticks}?from=link">The Three Broomsticks</a>))})
 
       driver
-      |> guild_session()
+      |> hogsmeade_session()
       |> visit(TestHTTPFixtures.path(fixture, "/source"))
-      |> click(by_role(:link, name: "Guild hall"))
-      |> expect(page_to_have_url(@guild <> "?from=link"))
+      |> click(by_role(:link, name: "The Three Broomsticks"))
+      |> expect(page_to_have_url(@three_broomsticks <> "?from=link"))
     end
 
     @tag driver: driver
     test "a visit whose response redirects off-origin ends at the redirect's location with #{driver}",
          %{driver: driver} do
-      hall_url = cross_origin_hall("/hall?from=visit")
-      fixture = TestHTTPFixtures.register(%{status: 302, headers: [{"location", hall_url}]})
+      ministry_url = cross_origin_ministry("/floo?from=visit")
+      fixture = TestHTTPFixtures.register(%{status: 302, headers: [{"location", ministry_url}]})
 
       driver
       |> start_test_session()
       |> visit(TestHTTPFixtures.path(fixture, "/auth"))
-      |> expect(page_to_have_url(hall_url))
+      |> expect(page_to_have_url(ministry_url))
     end
 
     @tag driver: driver
     test "a form posting to another origin ends at its action with #{driver}", %{driver: driver} do
-      hall_url = cross_origin_hall("/hall?from=form")
+      ministry_url = cross_origin_ministry("/floo?from=form")
 
       fixture =
         TestHTTPFixtures.register(%{
-          body: html(~s(<form method="post" action="#{hall_url}"><button>Sign in</button></form>))
+          body: html(~s(<form method="post" action="#{ministry_url}"><button>Floo to the Ministry</button></form>))
         })
 
       driver
       |> start_test_session()
       |> visit(TestHTTPFixtures.path(fixture, "/start"))
-      |> click(by_role(:button, name: "Sign in"))
-      |> expect(page_to_have_url(hall_url))
+      |> click(by_role(:button, name: "Floo to the Ministry"))
+      |> expect(page_to_have_url(ministry_url))
     end
 
     @tag driver: driver
     test "a form whose response redirects off-origin ends at the redirect's location with #{driver}",
          %{driver: driver} do
-      hall_url = cross_origin_hall("/hall?from=redirect")
+      ministry_url = cross_origin_ministry("/floo?from=redirect")
 
       fixture =
         TestHTTPFixtures.register_sequence([
-          %{body: html(~s(<form method="post" action="login"><button>Sign in</button></form>))},
-          %{status: 302, headers: [{"location", hall_url}]}
+          %{body: html(~s(<form method="post" action="floo"><button>Floo to the Ministry</button></form>))},
+          %{status: 302, headers: [{"location", ministry_url}]}
         ])
 
       driver
       |> start_test_session()
       |> visit(TestHTTPFixtures.path(fixture, "/start"))
-      |> click(by_role(:button, name: "Sign in"))
-      |> expect(page_to_have_url(hall_url))
+      |> click(by_role(:button, name: "Floo to the Ministry"))
+      |> expect(page_to_have_url(ministry_url))
     end
 
     @tag driver: driver
     test "LiveView links and external redirects end at the external URL with #{driver}", %{driver: driver} do
-      session = guild_session(driver)
+      session = hogsmeade_session(driver)
 
       session
       |> visit("/live/chamber-map")
-      |> click(by_role(:link, name: "Guild hall"))
-      |> expect(page_to_have_url(@guild <> "?from=link"))
+      |> click(by_role(:link, name: "The Three Broomsticks"))
+      |> expect(page_to_have_url(@three_broomsticks <> "?from=link"))
 
       session
       |> visit("/live/chamber-map")
-      |> click(by_role(:button, name: "Visit the guild"))
-      |> expect(page_to_have_url(@guild <> "?from=event"))
+      |> click(by_role(:button, name: "Visit Hogsmeade"))
+      |> expect(page_to_have_url(@three_broomsticks <> "?from=event"))
 
       session
       |> visit("/live/chamber-map?redirect=external")
-      |> expect(page_to_have_url(@guild <> "?from=mount"))
+      |> expect(page_to_have_url(@three_broomsticks <> "?from=mount"))
     end
   end
 
@@ -106,12 +107,12 @@ defmodule Fluffy.Conformance.ExternalNavigationTest do
     test "a LiveView external redirect reads as the browser's URL and keeps its flash for the app with #{driver}",
          %{driver: driver} do
       driver
-      |> guild_session()
+      |> hogsmeade_session()
       |> visit("/live/chamber-map")
-      |> click(by_role(:button, name: "Bring news to the guild"))
-      |> expect(page_to_have_url("https://guild.example/?from=flash"))
+      |> click(by_role(:button, name: "Send news to Hogsmeade"))
+      |> expect(page_to_have_url("https://hogsmeade.example/?from=flash"))
       |> visit("/live/secret-chamber")
-      |> expect("Off to the guild" |> by_text() |> to_be_visible())
+      |> expect("Off to Hogsmeade" |> by_text() |> to_be_visible())
     end
   end
 
@@ -133,8 +134,8 @@ defmodule Fluffy.Conformance.ExternalNavigationTest do
     setup do
       fixture =
         TestHTTPFixtures.register_sequence([
-          %{body: html(~s(<form method="post" action="login"><button>Sign in</button></form>))},
-          %{status: 302, headers: [{"location", @guild <> "?from=redirect"}]},
+          %{body: html(~s(<form method="post" action="floo"><button>Floo to the Ministry</button></form>))},
+          %{status: 302, headers: [{"location", @three_broomsticks <> "?from=redirect"}]},
           %{body: html("<h1>Back home</h1>")}
         ])
 
@@ -142,7 +143,7 @@ defmodule Fluffy.Conformance.ExternalNavigationTest do
         :phoenix
         |> start_test_session()
         |> visit(TestHTTPFixtures.path(fixture, "/start"))
-        |> click(by_role(:button, name: "Sign in"))
+        |> click(by_role(:button, name: "Floo to the Ministry"))
 
       %{fixture: fixture, session: session}
     end
@@ -152,18 +153,18 @@ defmodule Fluffy.Conformance.ExternalNavigationTest do
 
       for operation <- [
             fn -> click(session, heading) end,
-            fn -> fill(session, by_label("Email"), "user@example.com") end,
+            fn -> fill(session, by_label("Email"), "user@hogwarts.example") end,
             fn -> submit(session, by_css("form")) end,
             fn -> press(session, heading, "Enter") end,
             fn -> reload(session) end,
             fn -> open_browser(session, fn _path -> :ok end) end,
-            fn -> expect(session, page_to_have_title("Guild")) end,
+            fn -> expect(session, page_to_have_title("Hogsmeade")) end,
             fn -> expect(session, heading |> to_be_visible() |> not_()) end,
             fn -> Fluffy.Assert.refute_has(session, heading) end,
             fn -> unwrap(session, & &1) end,
             fn -> unwrap_and_return(session, & &1) end
           ] do
-        assert_raise Fluffy.CapabilityError, ~r/external_navigation.*#{Regex.escape(@guild)}/, operation
+        assert_raise Fluffy.CapabilityError, ~r/external_navigation.*#{Regex.escape(@three_broomsticks)}/, operation
       end
     end
 
@@ -177,9 +178,9 @@ defmodule Fluffy.Conformance.ExternalNavigationTest do
   # Playwright routes only a redirect's first URL, so these tests reach the test server under
   # another origin instead, like Playwright's own CROSS_PROCESS_PREFIX: Phoenix stops there and
   # Playwright loads the page.
-  defp cross_origin_hall(suffix) do
-    hall = TestHTTPFixtures.register(%{body: html("<h1>Guild hall</h1>")})
-    url = %{URI.parse(TestHTTPFixtures.url(hall, suffix)) | host: "localhost"}
+  defp cross_origin_ministry(suffix) do
+    ministry = TestHTTPFixtures.register(%{body: html("<h1>Ministry of Magic</h1>")})
+    url = %{URI.parse(TestHTTPFixtures.url(ministry, suffix)) | host: "localhost"}
     assert url.host != URI.parse(Fluffy.TestServer.base_url()).host
     URI.to_string(url)
   end

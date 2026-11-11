@@ -52,7 +52,10 @@ defmodule Fluffy.TestWeb.NavigationLive do
   end
 
   defp mount_redirect(socket, "static"), do: redirect(socket, to: "/chamber")
-  defp mount_redirect(socket, "external"), do: redirect(socket, external: "https://guild.example/hall?from=mount")
+
+  defp mount_redirect(socket, "external"),
+    do: redirect(socket, external: "https://hogsmeade.example/three-broomsticks?from=mount")
+
   defp mount_redirect(socket, "ping"), do: push_navigate(socket, to: "/live/chamber-map?redirect=pong")
   defp mount_redirect(socket, "pong"), do: redirect(socket, to: "/live/chamber-map?redirect=ping")
 
@@ -86,16 +89,16 @@ defmodule Fluffy.TestWeb.NavigationLive do
   end
 
   def handle_event("redirect_external", _params, socket) do
-    {:noreply, redirect(socket, external: "https://guild.example/hall?from=event")}
+    {:noreply, redirect(socket, external: "https://hogsmeade.example/three-broomsticks?from=event")}
   end
 
   def handle_event("redirect_external_with_flash", _params, socket) do
-    socket = put_flash(socket, :info, "Off to the guild")
-    {:noreply, redirect(socket, external: "https://GUILD.example?from=flash")}
+    socket = put_flash(socket, :info, "Off to Hogsmeade")
+    {:noreply, redirect(socket, external: "https://HOGSMEADE.example?from=flash")}
   end
 
-  def handle_event("redirect_report", _params, socket) do
-    {:noreply, redirect(socket, to: "/redirect/report")}
+  def handle_event("redirect_prophet", _params, socket) do
+    {:noreply, redirect(socket, to: "/redirect/prophet")}
   end
 
   def handle_event("redirect_with_flash", _params, socket) do
@@ -166,10 +169,10 @@ defmodule Fluffy.TestWeb.NavigationLive do
       <a href="/chamber">Sleeping chamber</a>
       <a href={"/chamber?from=#{@step}"}>Chamber from here</a>
       <button type="button" phx-click="redirect_static">Lull guardian</button>
-      <button type="button" phx-click="redirect_report">Fetch report</button>
-      <button type="button" phx-click="redirect_external">Visit the guild</button>
-      <button type="button" phx-click="redirect_external_with_flash">Bring news to the guild</button>
-      <a href="https://guild.example/hall?from=link">Guild hall</a>
+      <button type="button" phx-click="redirect_prophet">Fetch the Daily Prophet</button>
+      <button type="button" phx-click="redirect_external">Visit Hogsmeade</button>
+      <button type="button" phx-click="redirect_external_with_flash">Send news to Hogsmeade</button>
+      <a href="https://hogsmeade.example/three-broomsticks?from=link">The Three Broomsticks</a>
       <button type="button" phx-click="redirect_with_flash">Open secret passage</button>
       <button type="button" phx-click="navigate_after_event">Enter chamber after event</button>
       <button type="button" phx-click="patch_now">Patch now</button>

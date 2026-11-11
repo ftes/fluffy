@@ -32,8 +32,8 @@ defmodule Fluffy.Conformance.TimeoutInfinityTest do
       :static
       |> session_for_html(~s|<main><p>Here</p><label>Name <input name="name"></label></main>|)
       |> expect("Here" |> by_text() |> to_be_visible(), timeout: :infinity)
-      |> fill(by_label("Name"), "Ada", timeout: :infinity)
-      |> expect(to_have_value(by_label("Name"), "Ada", timeout: :infinity))
+      |> fill(by_label("Name"), "Hermione", timeout: :infinity)
+      |> expect(to_have_value(by_label("Name"), "Hermione", timeout: :infinity))
 
     assert_raise ExUnit.AssertionError, fn ->
       expect(session, "Missing" |> by_text() |> to_be_visible(), timeout: :infinity)

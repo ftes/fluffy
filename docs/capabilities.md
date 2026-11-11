@@ -180,8 +180,8 @@ so a test can assert where the app sent it, as with `Phoenix.ConnTest.redirected
 
 ```elixir
 session
-|> click(by_role(:button, name: "Sign in"))
-|> expect(page_to_have_url(~r"^https://idp\.example/authorize\?"))
+|> click(by_role(:button, name: "Floo to the Ministry"))
+|> expect(page_to_have_url(~r"^https://ministry\.example/floo\?"))
 ```
 
 Only URL expectations and `visit` back into the app work on that page; everything else raises

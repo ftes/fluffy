@@ -205,7 +205,7 @@ payload = %Fluffy.FilePayload{
 }
 
 session
-|> set_input_files(by_label("Report"), payload)
+|> set_input_files(by_label("Potion ledger"), payload)
 |> click(by_role(:button, name: "Upload"))
 ```
 

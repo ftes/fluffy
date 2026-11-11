@@ -20,7 +20,7 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
             body:
               html("""
               <a data-method="delete" data-to="delete?from=link#done" data-csrf="csrf-token">
-                <span>Delete order</span>
+                <span>Delete potion</span>
               </a>
               """)
           },
@@ -30,7 +30,7 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
       driver
       |> start_test_session()
       |> visit(TestHTTPFixtures.path(fixture, "/links/start"))
-      |> click(by_text("Delete order", exact: true))
+      |> click(by_text("Delete potion", exact: true))
       |> expect(:heading |> by_role(name: "Deleted", exact: true) |> to_be_visible())
       |> expect(Fluffy.Expect.page_to_have_url(TestHTTPFixtures.url(fixture, "/links/delete?from=link#done")))
 

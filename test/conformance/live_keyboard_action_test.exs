@@ -67,11 +67,11 @@ defmodule Fluffy.Conformance.LiveKeyboardActionTest do
 
       driver
       |> session()
-      |> fill(input, "Ada")
+      |> fill(input, "Hermione")
       |> press(input, "Enter")
       |> expect("Event count: 2" |> by_text(exact: true) |> to_be_visible())
-      |> expect("element-keydown:key=Enter;value=Ada;scope=none" |> by_text(exact: true) |> to_be_visible())
-      |> expect("element-keyup:key=Enter;value=Ada;scope=none" |> by_text(exact: true) |> to_be_visible())
+      |> expect("element-keydown:key=Enter;value=Hermione;scope=none" |> by_text(exact: true) |> to_be_visible())
+      |> expect("element-keyup:key=Enter;value=Hermione;scope=none" |> by_text(exact: true) |> to_be_visible())
     end
 
     @tag driver: driver

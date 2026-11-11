@@ -41,10 +41,10 @@ defmodule Fluffy.Conformance.LiveFormTest do
       driver
       |> start_test_session()
       |> visit("/live/potions?sticky=true")
-      |> fill(by_label("Uncontrolled email"), "ada@example.test")
-      |> fill(by_label("Uncontrolled name"), "Ada")
-      |> expect("Uncontrolled email" |> by_label() |> to_have_value("ada@example.test"))
-      |> expect("Uncontrolled name" |> by_label() |> to_have_value("Ada"))
+      |> fill(by_label("Uncontrolled email"), "hermione@hogwarts.example")
+      |> fill(by_label("Uncontrolled name"), "Hermione")
+      |> expect("Uncontrolled email" |> by_label() |> to_have_value("hermione@hogwarts.example"))
+      |> expect("Uncontrolled name" |> by_label() |> to_have_value("Hermione"))
     end
 
     @tag driver: driver
@@ -62,13 +62,13 @@ defmodule Fluffy.Conformance.LiveFormTest do
       |> fill(first, "moonstone")
       |> expect(to_have_value(first, "moonstone"))
       |> expect("#hidden-version" |> by_css() |> to_have_value("version-2"))
-      |> expect("Last target: profile/first" |> by_text() |> to_be_visible())
+      |> expect("Last target: wizard/first" |> by_text() |> to_be_visible())
       |> expect("Unused first: false" |> by_text() |> to_be_visible())
       |> expect("Unused last: true" |> by_text() |> to_be_visible())
       |> fill(last, "phoenix feather")
       |> expect(to_have_value(last, "phoenix feather"))
       |> expect("#hidden-version" |> by_css() |> to_have_value("version-3"))
-      |> expect("Last target: profile/last" |> by_text() |> to_be_visible())
+      |> expect("Last target: wizard/last" |> by_text() |> to_be_visible())
       |> expect("Unused first: false" |> by_text() |> to_be_visible())
       |> expect("Unused last: false" |> by_text() |> to_be_visible())
       |> fill(stubborn, "silver dust")
@@ -100,13 +100,13 @@ defmodule Fluffy.Conformance.LiveFormTest do
       driver
       |> start_test_session()
       |> visit("/live/submit-used")
-      |> fill(by_label("Name"), "Ada")
+      |> fill(by_label("Name"), "Hermione")
       |> expect("Email is required" |> by_text() |> to_have_count(0))
       |> click(by_role(:button, name: "Save"))
       |> expect("Submits: 1" |> by_text() |> to_be_visible())
       |> expect("Email is required" |> by_text() |> to_be_visible())
-      |> fill(by_label("Name"), "Ada Lovelace")
-      |> expect(to_have_value(by_label("Name"), "Ada Lovelace"))
+      |> fill(by_label("Name"), "Hermione Granger")
+      |> expect(to_have_value(by_label("Name"), "Hermione Granger"))
       |> expect("Email is required" |> by_text() |> to_be_visible())
     end
 
@@ -115,13 +115,13 @@ defmodule Fluffy.Conformance.LiveFormTest do
       driver
       |> start_test_session()
       |> visit("/live/submit-used?upload=oversized")
-      |> fill(by_label("Name"), "Ada")
+      |> fill(by_label("Name"), "Hermione")
       |> set_input_files(by_label("Attachment"), Path.expand("../support/fixtures/fluffy-upload.txt", __DIR__))
       |> expect("Upload errors: 1" |> by_text() |> to_be_visible())
       |> click(by_role(:button, name: "Save"))
       |> expect("Submits: 0" |> by_text() |> to_be_visible())
-      |> fill(by_label("Name"), "Ada Lovelace")
-      |> expect(to_have_value(by_label("Name"), "Ada Lovelace"))
+      |> fill(by_label("Name"), "Hermione Granger")
+      |> expect(to_have_value(by_label("Name"), "Hermione Granger"))
       |> expect("Email is required" |> by_text() |> to_be_visible())
     end
 
@@ -132,7 +132,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
       |> start_test_session()
       |> visit("/live/potions")
       |> fill(by_label("Row 0"), "aconite")
-      |> submit(by_css("#profile-form"), timeout: 2_000)
+      |> submit(by_css("#wizard-form"), timeout: 2_000)
       |> expect("Saved rows: aconite, belladonna, cinder" |> by_text() |> to_be_visible())
       |> expect(page_to_have_url(&(&1.path == "/live/potions")))
     end
@@ -212,12 +212,12 @@ defmodule Fluffy.Conformance.LiveFormTest do
       |> visit("/live/potions")
       |> check(checkbox)
       |> expect("Checkbox clicks: 1" |> by_text() |> to_be_visible())
-      |> expect("Event targets: profile/enabled" |> by_text() |> to_be_visible())
+      |> expect("Event targets: wizard/enabled" |> by_text() |> to_be_visible())
       |> check(checkbox)
       |> expect("Checkbox clicks: 1" |> by_text() |> to_be_visible())
       |> uncheck(checkbox)
       |> expect("Checkbox clicks: 2" |> by_text() |> to_be_visible())
-      |> expect("Event targets: profile/enabled, profile/enabled" |> by_text() |> to_be_visible())
+      |> expect("Event targets: wizard/enabled, wizard/enabled" |> by_text() |> to_be_visible())
     end
 
     @tag driver: driver
@@ -288,7 +288,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
       |> fill(by_label("Direct"), "only me")
       |> expect("Input event direct: only me" |> by_text() |> to_be_visible())
       |> expect("Input event has first: false" |> by_text() |> to_be_visible())
-      |> expect("Input event target: profile/direct" |> by_text() |> to_be_visible())
+      |> expect("Input event target: wizard/direct" |> by_text() |> to_be_visible())
     end
 
     @tag driver: driver
@@ -298,7 +298,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
       session
       |> visit("/live/potions")
       |> fill(by_label("Encoded target"), "value")
-      |> expect("Last target: profile/target key" |> by_text() |> to_be_visible())
+      |> expect("Last target: wizard/target key" |> by_text() |> to_be_visible())
     end
 
     @tag driver: driver
@@ -354,7 +354,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
       |> expect(
         Fluffy.Expect.page_to_have_url(
-          query: %{"profile[stubborn]" => if(driver == :playwright, do: "silver dust", else: "server-2")},
+          query: %{"wizard[stubborn]" => if(driver == :playwright, do: "silver dust", else: "server-2")},
           query_mode: :subset
         )
       )
@@ -431,7 +431,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
     |> visit("/live/potions")
     |> fill(debounced, "sent by fill")
     |> expect("Last debounced: sent by fill" |> by_text() |> to_be_visible())
-    |> expect("Event targets: profile/debounced" |> by_text(exact: true) |> to_be_visible())
+    |> expect("Event targets: wizard/debounced" |> by_text(exact: true) |> to_be_visible())
   end
 
   test "the Phoenix driver eagerly synchronizes a numeric-debounced form mutation" do
@@ -439,8 +439,8 @@ defmodule Fluffy.Conformance.LiveFormTest do
     |> start_test_session()
     |> visit("/live/potions")
     |> fill(by_label("Timed", exact: true), "sent by fill")
-    |> expect("Last target: profile/timed" |> by_text() |> to_be_visible(), timeout: 0)
-    |> expect("Event targets: profile/timed" |> by_text() |> to_be_visible(), timeout: 0)
+    |> expect("Last target: wizard/timed" |> by_text() |> to_be_visible(), timeout: 0)
+    |> expect("Event targets: wizard/timed" |> by_text() |> to_be_visible(), timeout: 0)
   end
 
   @tag driver: :playwright

@@ -38,8 +38,8 @@ defmodule Fluffy.Conformance.ActionabilityCapabilityTest do
       )
 
     session
-    |> fill(by_label("Name"), "Ada")
-    |> expect("Name" |> by_label() |> to_have_value("Ada"))
+    |> fill(by_label("Name"), "Hermione")
+    |> expect("Name" |> by_label() |> to_have_value("Hermione"))
   end
 
   test "Static ignores matching stylesheet rules when clicking structurally" do
@@ -83,7 +83,7 @@ defmodule Fluffy.Conformance.ActionabilityCapabilityTest do
 
     @tag driver: driver
     test "checking survives minimum-dimension ancestors in a LiveView with #{driver}" do
-      checkbox = by_label("Accounts", exact: true)
+      checkbox = by_label("Vaults", exact: true)
 
       session =
         start_session(unquote(driver),
@@ -95,17 +95,17 @@ defmodule Fluffy.Conformance.ActionabilityCapabilityTest do
       |> visit("/live/mystic-creatures")
       |> check(checkbox)
       |> expect(to_be_checked(checkbox))
-      |> expect("Accounts: checked" |> by_text(exact: true) |> to_be_visible())
+      |> expect("Vaults: checked" |> by_text(exact: true) |> to_be_visible())
     end
   end
 
   for driver <- [:static, :playwright] do
     @tag driver: driver
     test "checking survives minimum-dimension ancestors with #{driver}" do
-      checkbox = by_label("Accounts", exact: true)
+      checkbox = by_label("Vaults", exact: true)
 
       html =
-        ~s(<div style="min-width: 100%; min-height: 1px"><label>Accounts <input type="checkbox"></label></div>)
+        ~s(<div style="min-width: 100%; min-height: 1px"><label>Vaults <input type="checkbox"></label></div>)
 
       with_html(unquote(driver), html, fn session ->
         session

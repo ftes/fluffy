@@ -45,10 +45,10 @@ defmodule Fluffy.Conformance.LiveActionTest do
 
       session
       |> visit("/live/nested")
-      |> fill(child_email, "child@example.test")
-      |> expect(child |> by_text("Child current: child@example.test", exact: true) |> to_be_visible())
+      |> fill(child_email, "child@hogwarts.example")
+      |> expect(child |> by_text("Child current: child@hogwarts.example", exact: true) |> to_be_visible())
       |> click(save_child)
-      |> expect(child |> by_text("Child saved: child@example.test", exact: true) |> to_be_visible())
+      |> expect(child |> by_text("Child saved: child@hogwarts.example", exact: true) |> to_be_visible())
       |> expect("Parent saved: none" |> by_text(exact: true) |> to_be_visible())
     end
 

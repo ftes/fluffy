@@ -35,6 +35,7 @@ release-sensitive changes.
   firefox or webkit.
 - Tests in `test/conformance/` run the same behavior against several drivers. The matrix in
   `docs/capabilities.md` is rendered from `Fluffy.Capability`, and a test keeps them in sync.
+- Docs, doc examples and test fixtures follow the Fluffy / Harry Potter theme; keep new examples on theme.
 - The block marked `usage_rules` below is generated: after updating deps run
   `mix usage_rules.sync --yes`; `mix check` fails when it's stale. On Renovate's PRs a workflow
   commits it.

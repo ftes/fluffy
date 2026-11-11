@@ -7,27 +7,27 @@ defmodule Fluffy.Conformance.RoleLocatorTest do
 
   cases = [
     {"button contents", "<button>Save changes</button>", :button, [name: "Save"], 1},
-    {"button input value", ~s(<input type="submit" value="Create account">), :button, [name: "Create"], 1},
+    {"button input value", ~s(<input type="submit" value="Open a vault">), :button, [name: "Open"], 1},
     {"link with href", ~s(<a href="/docs">Docs</a><a>Draft</a>), :link, [name: "Docs"], 1},
     {"link after inert template contents",
      ~s(<template><a href="/wrong">Wrong</a></template><a href="/poll/form" type="button">Start the survey</a>), :link,
      [name: "Start the survey", exact: true], 1},
-    {"heading", "<h2>Account overview</h2>", :heading, [name: "overview"], 1},
+    {"heading", "<h2>Vault overview</h2>", :heading, [name: "overview"], 1},
     {"presentational exclusion", ~s(<h2 role="presentation">Decorative</h2>), :heading, [], 0},
     {"labelled checkbox", ~s(<label for="terms">Accept terms</label><input id="terms" type="checkbox">), :checkbox,
      [name: "Accept terms", exact: true], 1},
     {"aria-labelled radio", ~s(<input type="radio" aria-label="Express delivery">), :radio, [name: "Express"], 1},
     {"wrapping-label textbox", "<label>Display name <input></label>", :textbox, [name: "Display name", exact: true], 1},
     {"textarea", "<textarea>Draft content</textarea>", :textbox, [], 1},
-    {"labelled combobox", ~s(<label for="country">Country</label><select id="country"><option>DE</option></select>),
-     :combobox, [name: "Country", exact: true], 1},
+    {"labelled combobox", ~s(<label for="house">House</label><select id="house"><option>Gryffindor</option></select>),
+     :combobox, [name: "House", exact: true], 1},
     {"image alt text", ~s(<img alt="Fluffy logo">), :img, [name: "logo"], 1},
     {"list and list items", "<ul><li>First</li><li>Second</li></ul>", :listitem, [], 2},
     {"explicit role override", ~s(<button role="switch" aria-label="Power">off</button>), :switch,
      [name: "Power", exact: true], 1},
     {"combined aria-labelledby name",
-     ~s(<span id="first">Billing</span><span id="second">address</span><input aria-labelledby="first second">), :textbox,
-     [name: "Billing address", exact: true], 1},
+     ~s(<span id="first">Vault</span><span id="second">address</span><input aria-labelledby="first second">), :textbox,
+     [name: "Vault address", exact: true], 1},
     {"aria-label precedence", ~s(<button aria-label="Remove item">Delete</button>), :button,
      [name: "Remove", exact: false], 1},
     {"case-sensitive exact name", "<button>Save</button>", :button, [name: "save", exact: true], 0},
@@ -57,7 +57,7 @@ defmodule Fluffy.Conformance.RoleLocatorTest do
     {"section with aria-labelledby", ~s(<section aria-labelledby="t"><h2 id="t">Details</h2></section>), :region,
      [name: "Details", exact: true], 1},
     {"form without a name", "<form></form>", :form, [], 0},
-    {"form with aria-label", ~s(<form aria-label="Sign in"></form>), :form, [name: "Sign in", exact: true], 1},
+    {"form with aria-label", ~s(<form aria-label="Floo in"></form>), :form, [name: "Floo in", exact: true], 1},
     {"landmark not named by its content", "<nav>Menu</nav>", :navigation, [name: "Menu"], 0},
     {"explicit landmark not named by its content", ~s(<div role="navigation">Menu</div>), :navigation, [name: "Menu"], 0},
     {"landmark named by its title", ~s(<nav title="Site">Menu</nav>), :navigation, [name: "Site", exact: true], 1},
@@ -338,8 +338,9 @@ defmodule Fluffy.Conformance.RoleLocatorTest do
 
   scoped_cases = [
     {"a header's sectioning ancestor", ~s(<article><div id="inner"><header>Top</header></div></article>), :banner, [], 0},
-    {"an aria-labelledby target", ~s(<span id="t">Pay</span><div id="inner"><button aria-labelledby="t"></button></div>),
-     :button, [name: "Pay", exact: true], 1},
+    {"an aria-labelledby target",
+     ~s(<span id="t">Withdraw</span><div id="inner"><button aria-labelledby="t"></button></div>), :button,
+     [name: "Withdraw", exact: true], 1},
     {"an aria-labelledby target of a landmark",
      ~s(<h2 id="t">Details</h2><div id="inner"><section aria-labelledby="t"></section></div>), :region,
      [name: "Details", exact: true], 1},
@@ -453,9 +454,11 @@ defmodule Fluffy.Conformance.RoleLocatorTest do
 
     @tag driver: driver
     test "a role filter sees names outside the candidate with #{driver}" do
-      html = ~s(<span id="t">Pay</span><div class="c"><button aria-labelledby="t"></button></div><div class="c"></div>)
+      html =
+        ~s(<span id="t">Withdraw</span><div class="c"><button aria-labelledby="t"></button></div><div class="c"></div>)
+
       session = session_for_html(unquote(driver), html, base_url: Fluffy.TestServer.base_url())
-      button = by_role(:button, name: "Pay", exact: true)
+      button = by_role(:button, name: "Withdraw", exact: true)
 
       expect(session, ".c" |> by_css() |> filter(has: button) |> to_have_count(1))
     end

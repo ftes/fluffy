@@ -451,7 +451,7 @@ defmodule Fluffy do
 
       session
       |> click(by_role(:button, name: "Upload"))
-      |> set_input_files(await(pending), "test/fixtures/report.pdf")
+      |> set_input_files(await(pending), "test/fixtures/homework.pdf")
       |> click(by_role(:button, name: "Save"))
 
   Register the wait before clicking the button. `await/1` returns the chooser;

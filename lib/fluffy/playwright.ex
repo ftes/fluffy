@@ -155,7 +155,7 @@ defmodule Fluffy.Playwright do
 
       session
       |> switch_page(other)
-      |> visit("/dashboard")
+      |> visit("/common-room")
       |> switch_page(main)
   """
   @spec new_page(Session.t()) :: Fluffy.Page.t()

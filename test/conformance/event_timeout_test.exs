@@ -18,7 +18,7 @@ defmodule Fluffy.Conformance.EventTimeoutTest do
               <!doctype html><html><body>
               <a href="destination">Continue</a>
               <a href="noise">Noise</a>
-              <a href="report">Download</a>
+              <a href="marauders-map">Download</a>
               </body></html>
               """
             }
@@ -27,7 +27,7 @@ defmodule Fluffy.Conformance.EventTimeoutTest do
             %{status: 201, body: "<!doctype html><html><body>Arrived</body></html>"}
 
           path ->
-            filename = if path == "/noise", do: "noise.txt", else: "report.csv"
+            filename = if path == "/noise", do: "noise.txt", else: "marauders_map.csv"
 
             %{
               headers: [{"content-disposition", "attachment; filename=#{filename}"}],
@@ -50,7 +50,7 @@ defmodule Fluffy.Conformance.EventTimeoutTest do
       assert_raise ExUnit.AssertionError, ~r/no matching download event/, fn ->
         expect_event(
           session,
-          Event.download(&(&1.suggested_filename == "report.csv")),
+          Event.download(&(&1.suggested_filename == "marauders_map.csv")),
           fn session ->
             Process.sleep(unquote(timeout))
             click(session, by_role(:link, name: "Download"))
@@ -73,15 +73,15 @@ defmodule Fluffy.Conformance.EventTimeoutTest do
       driver
       |> start_test_session(fixture)
       |> expect_event(
-        Event.download(&(&1.suggested_filename == "report.csv")),
+        Event.download(&(&1.suggested_filename == "marauders_map.csv")),
         fn session ->
           click(session, by_role(:link, name: "Download"))
           Process.sleep(3_000)
         end,
         fn download ->
-          assert download.suggested_filename == "report.csv"
+          assert download.suggested_filename == "marauders_map.csv"
           assert Fluffy.Download.read(download) == "download bytes"
-          assert download.url == TestHTTPFixtures.url(fixture, "/report")
+          assert download.url == TestHTTPFixtures.url(fixture, "/marauders-map")
         end,
         timeout: 3_000
       )
@@ -95,7 +95,7 @@ defmodule Fluffy.Conformance.EventTimeoutTest do
       assert_raise ExUnit.AssertionError, ~r/no matching download event/, fn ->
         expect_event(
           session,
-          Event.download(&(&1.suggested_filename == "report.csv")),
+          Event.download(&(&1.suggested_filename == "marauders_map.csv")),
           fn session ->
             Process.sleep(600)
             session = click(session, by_role(:link, name: "Noise"))
@@ -115,12 +115,12 @@ defmodule Fluffy.Conformance.EventTimeoutTest do
       |> start_test_session(fixture)
       |> put_session_timeout(50)
       |> expect_event(
-        Event.download(&(&1.suggested_filename == "report.csv")),
+        Event.download(&(&1.suggested_filename == "marauders_map.csv")),
         fn session ->
           Process.sleep(150)
           click(session, by_role(:link, name: "Download"), timeout: 5_000)
         end,
-        &assert(&1.suggested_filename == "report.csv"),
+        &assert(&1.suggested_filename == "marauders_map.csv"),
         timeout: :infinity
       )
     end

@@ -81,10 +81,10 @@ defmodule Fluffy.Conformance.UnwrapTest do
         :phoenix
         |> start_test_session()
         |> visit(TestHTTPFixtures.path(fixture))
-        |> fill(by_label("Name"), "Ada")
+        |> fill(by_label("Name"), "Hermione")
 
       assert unwrap_and_return(session, fn _conn -> :read end) == :read
-      expect(session, "Name" |> by_label() |> to_have_value("Ada"))
+      expect(session, "Name" |> by_label() |> to_have_value("Hermione"))
     end
 
     @tag driver: :live
@@ -93,10 +93,10 @@ defmodule Fluffy.Conformance.UnwrapTest do
         :phoenix
         |> start_test_session()
         |> visit("/live/facade-locators/tracked")
-        |> fill(by_label("One"), "Ada")
+        |> fill(by_label("One"), "Hermione")
 
       assert unwrap_and_return(session, fn %View{} -> :read end) == :read
-      expect(session, "One" |> by_label() |> to_have_value("Ada"))
+      expect(session, "One" |> by_label() |> to_have_value("Hermione"))
     end
 
     @tag driver: :live

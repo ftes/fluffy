@@ -9,7 +9,7 @@ defmodule Fluffy.TestWeb.ActionabilityLive do
       {:ok,
        assign(socket,
          search: "",
-         accounts_checked?: false,
+         vaults_checked?: false,
          checked_keys: %{"attrs" => false, "js" => false},
          selected_creature: "none",
          confirmed?: false,
@@ -21,8 +21,8 @@ defmodule Fluffy.TestWeb.ActionabilityLive do
     {:noreply, assign(socket, :search, search)}
   end
 
-  def handle_event("toggle-accounts", _params, socket) do
-    {:noreply, assign(socket, accounts_checked?: true)}
+  def handle_event("toggle-vaults", _params, socket) do
+    {:noreply, assign(socket, vaults_checked?: true)}
   end
 
   def handle_event("toggle-payload-checkbox", %{"id" => id} = params, socket) do
@@ -61,11 +61,10 @@ defmodule Fluffy.TestWeb.ActionabilityLive do
       <p id="search-result">Bestiary search: {@search}</p>
 
       <div style="min-width: 100%; min-height: 1px;">
-        <label>Accounts
-        <input type="checkbox" checked={@accounts_checked?} phx-click="toggle-accounts" /></label>
+        <label>Vaults <input type="checkbox" checked={@vaults_checked?} phx-click="toggle-vaults" /></label>
       </div>
 
-      <p id="accounts-result">Accounts: {if @accounts_checked?, do: "checked", else: "unchecked"}</p>
+      <p id="vaults-result">Vaults: {if @vaults_checked?, do: "checked", else: "unchecked"}</p>
 
       <label>
         Attribute payload

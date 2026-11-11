@@ -8,7 +8,7 @@ defmodule Fluffy.Conformance.ClearSetCheckedTest do
   for driver <- [:static, :playwright] do
     @tag driver: driver
     test "clear empties text inputs and textareas with #{driver}" do
-      html = ~s(<input aria-label="Name" value="Ron"><textarea aria-label="Notes">Hello</textarea>)
+      html = ~s(<input aria-label="Name" value="Ron"><textarea aria-label="Notes">Lumos</textarea>)
 
       with_html(unquote(driver), html, fn session ->
         session

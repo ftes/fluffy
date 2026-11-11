@@ -266,12 +266,12 @@ defmodule Fluffy.EventTest do
     session = Fluffy.Backend.static_html_session("<input aria-label='Name'>")
 
     expect_event(session, Event.download(), fn input ->
-      Fluffy.fill(input, Fluffy.Locator.by_label("Name"), "Ada")
+      Fluffy.fill(input, Fluffy.Locator.by_label("Name"), "Hermione")
       emit(input, :value)
       :ignored
     end)
 
-    expect(session, "Name" |> Fluffy.Locator.by_label() |> to_have_value("Ada"))
+    expect(session, "Name" |> Fluffy.Locator.by_label() |> to_have_value("Hermione"))
   end
 
   defp emit(session, value), do: SessionRuntime.emit_event(session.runtime, session.active_page, :download, value)

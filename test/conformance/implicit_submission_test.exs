@@ -31,7 +31,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
     session =
       session
       |> visit(TestHTTPFixtures.path(fixture, "/start"))
-      |> fill(by_label("Name"), "Ada")
+      |> fill(by_label("Name"), "Hermione")
       |> press(by_label("Name"), "Enter")
       |> expect("Submitted" |> by_text() |> to_be_visible())
 
@@ -40,7 +40,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
     [_source, submission] = TestHTTPFixtures.requests(fixture)
     assert submission.method == "POST"
     assert submission.path == "/submit"
-    assert submission.body == "name=Ada&commit=first"
+    assert submission.body == "name=Hermione&commit=first"
   end
 
   @tag driver: :playwright
@@ -51,7 +51,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
           body:
             html("""
             <form method="post" action="submit">
-              <label>Name <input type="invented" name="name" value="Ada"></label>
+              <label>Name <input type="invented" name="name" value="Hermione"></label>
             </form>
             """)
         },
@@ -65,7 +65,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
     |> expect("Submitted invalid type" |> by_text() |> to_be_visible())
 
     [_source, submission] = TestHTTPFixtures.requests(fixture)
-    assert submission.body == "name=Ada"
+    assert submission.body == "name=Hermione"
   end
 
   @tag driver: :playwright
@@ -74,10 +74,10 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
 
     session
     |> visit("/live/potions")
-    |> fill(by_label("First"), "Ada")
+    |> fill(by_label("First"), "Hermione")
     |> press(by_label("First"), "Enter")
     |> expect("Saved commit: save" |> by_text() |> to_be_visible())
-    |> expect("Last first: Ada" |> by_text() |> to_be_visible())
+    |> expect("Last first: Hermione" |> by_text() |> to_be_visible())
   end
 
   @tag driver: :playwright
@@ -89,7 +89,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
     |> fill(by_label("Debounced", exact: true), "before Enter")
     |> press(by_label("First"), "Enter")
     |> expect("Last debounced: before Enter" |> by_text() |> to_be_visible())
-    |> expect("Event targets: profile/debounced" |> by_text() |> to_be_visible())
+    |> expect("Event targets: wizard/debounced" |> by_text() |> to_be_visible())
     |> expect("Saved commit: save" |> by_text() |> to_be_visible())
   end
 
@@ -114,12 +114,12 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
 
     session
     |> visit(TestHTTPFixtures.path(fixture, "/start"))
-    |> fill(by_label("Name"), "Ada")
+    |> fill(by_label("Name"), "Hermione")
     |> press(by_label("Name"), "Enter")
     |> expect("Submitted" |> by_text() |> to_be_visible())
 
     [_source, submission] = TestHTTPFixtures.requests(fixture)
-    assert submission.body == "name=Ada"
+    assert submission.body == "name=Hermione"
   end
 
   @tag driver: :playwright
@@ -172,12 +172,12 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
 
     session
     |> visit(TestHTTPFixtures.path(fixture, "/start"))
-    |> fill(by_label("Name"), "Ada")
+    |> fill(by_label("Name"), "Hermione")
     |> press(by_label("Name"), "Enter")
     |> expect("Submitted" |> by_text() |> to_be_visible())
 
     [_source, submission] = TestHTTPFixtures.requests(fixture)
-    assert submission.body == "commit=external&name=Ada"
+    assert submission.body == "commit=external&name=Hermione"
   end
 
   @tag driver: :playwright

@@ -86,7 +86,7 @@ third_cells = by_css("td") |> nth(2) |> within(by_css("tr"))
 
 CSS `:checked` matches current checkbox, radio, and option state, including
 changes made by `check`, `uncheck`, and `select_option`. For example,
-`by_label("Country") |> by_css("option:checked")` locates the current selection.
+`by_label("House") |> by_css("option:checked")` locates the current selection.
 Attribute selectors such as `[checked]` and `[selected]` still match the
 rendered HTML attributes, which can differ from the user's input.
 
@@ -107,13 +107,13 @@ Playwright resolves the frame and target when an action or assertion runs. See
 for the underlying browser behavior.
 
 ```elixir
-checkout = frame_locator("#checkout")
-email = by_label(checkout, "Email")
+gringotts = frame_locator("#gringotts")
+email = by_label(gringotts, "Email")
 
 session
-|> fill(email, "buyer@example.com")
-|> assert(value(email, "buyer@example.com"))
-|> click(by_role(checkout, :button, name: "Pay"))
+|> fill(email, "griphook@gringotts.example")
+|> assert(value(email, "griphook@gringotts.example"))
+|> click(by_role(gringotts, :button, name: "Withdraw"))
 ```
 
 Each frame boundary is strict: if multiple iframes match, an action or assertion inside
@@ -122,10 +122,10 @@ particular match with `Fluffy.Locator.first/1` or `Fluffy.Locator.nth/2` before
 converting it with `Fluffy.Locator.content_frame/1`:
 
 ```elixir
-checkout = by_title("Checkout") |> first() |> content_frame()
-payment = frame_locator(checkout, "#payment")
-pay_button = by_role(payment, :button, name: "Pay")
-iframe_element = Fluffy.FrameLocator.owner(checkout)
+gringotts = by_title("Gringotts") |> first() |> content_frame()
+vault = frame_locator(gringotts, "#vault")
+withdraw_button = by_role(vault, :button, name: "Withdraw")
+iframe_element = Fluffy.FrameLocator.owner(gringotts)
 ```
 
 The `by_*` builders return ordinary element locators that support existing actions,

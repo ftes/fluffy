@@ -289,7 +289,7 @@ defmodule Fluffy.Locator do
   or use the same frame prefix. Playwright validates frame compatibility when
   the locator resolves; intersections across different frames are unsupported.
 
-      frame = frame_locator("#checkout")
+      frame = frame_locator("#gringotts")
       by_css(frame, "input") |> and_(by_label(frame, "Email"))
 
   Like other locators, intersections are lazy and retain normal action strictness.

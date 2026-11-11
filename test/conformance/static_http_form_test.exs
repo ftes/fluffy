@@ -206,7 +206,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
         TestHTTPFixtures.register_sequence([
           %{body: html(~s(<h1>Exports</h1><form id="export" method="post" action="export"></form>))},
           %{
-            headers: [{"content-type", "text/csv"}, {"content-disposition", ~s(attachment; filename="report.csv")}],
+            headers: [{"content-type", "text/csv"}, {"content-disposition", ~s(attachment; filename="marauders_map.csv")}],
             body: "id\n1\n"
           }
         ])
@@ -233,11 +233,11 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
               <form method="post" action="submit?source=form#receipt">
                 <label>First <input name="first" value="one"></label>
                 <label>Notes <textarea name="notes">initial</textarea></label>
-                <button name="commit" value="Save">Save order</button>
+                <button name="commit" value="Save">Send owl</button>
               </form>
               """)
           },
-          %{body: html("<h1>Order saved</h1>")}
+          %{body: html("<h1>Owl sent</h1>")}
         ])
 
       session = start_test_session(driver)
@@ -246,8 +246,8 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
       |> fill(by_label("First"), "updated")
       |> fill(by_label("Notes"), "line one")
-      |> click(by_role(:button, name: "Save order"))
-      |> expect("Order saved" |> by_text() |> to_be_visible())
+      |> click(by_role(:button, name: "Send owl"))
+      |> expect("Owl sent" |> by_text() |> to_be_visible())
       |> expect(Fluffy.Expect.page_to_have_url(TestHTTPFixtures.url(fixture, "/forms/submit?source=form#receipt")))
 
       [_source, submission] = TestHTTPFixtures.requests(fixture)
@@ -274,11 +274,11 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
               <form method="post" action="submit" enctype="multipart/form-data">
                 <label>First <input name="first" value="one"></label>
                 <label>Attachment <input type="file" name="attachment"></label>
-                <button name="commit" value="Save">Save order</button>
+                <button name="commit" value="Save">Send owl</button>
               </form>
               """)
           },
-          %{body: html("<h1>Order saved</h1>")}
+          %{body: html("<h1>Owl sent</h1>")}
         ])
 
       session = start_test_session(driver)
@@ -286,8 +286,8 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       session
       |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
       |> fill(by_label("First"), "updated")
-      |> click(by_role(:button, name: "Save order"))
-      |> expect("Order saved" |> by_text() |> to_be_visible())
+      |> click(by_role(:button, name: "Send owl"))
+      |> expect("Owl sent" |> by_text() |> to_be_visible())
 
       [_source, submission] = TestHTTPFixtures.requests(fixture)
 

@@ -117,7 +117,7 @@ defmodule Fluffy.Conformance.ClickActionTest do
     test "a label takes its control's state and activation only on Playwright with #{driver}" do
       html = """
       <label><input type="checkbox" disabled> Accept</label>
-      <label for="terms">Terms</label><input id="terms" type="checkbox">
+      <label for="permission">Hogsmeade permission</label><input id="permission" type="checkbox">
       """
 
       playwright? = unquote(driver) == :playwright
@@ -127,8 +127,8 @@ defmodule Fluffy.Conformance.ClickActionTest do
 
         session
         |> expect(if(playwright?, do: to_be_disabled(accept), else: to_be_enabled(accept)))
-        |> click(by_text("Terms", exact: true))
-        |> expect(:checkbox |> by_role(name: "Terms") |> to_be_checked(checked: playwright?))
+        |> click(by_text("Hogsmeade permission", exact: true))
+        |> expect(:checkbox |> by_role(name: "Hogsmeade permission") |> to_be_checked(checked: playwright?))
       end)
     end
 

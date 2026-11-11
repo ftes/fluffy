@@ -28,7 +28,7 @@ defmodule Fluffy.PlaywrightTraceTest do
 
     :playwright
     |> start_session(base_url: Fluffy.TestServer.base_url())
-    |> Playwright.trace(directory: directory, name: "checkout trace", open: false)
+    |> Playwright.trace(directory: directory, name: "gringotts trace", open: false)
     |> visit(TestHTTPFixtures.path(fixture, "/start"))
     |> then(fn session ->
       pending = wait_for(session, Event.popup())
@@ -39,7 +39,7 @@ defmodule Fluffy.PlaywrightTraceTest do
 
     :ok = GenServer.stop(TestScope.current())
 
-    assert [path] = Path.wildcard(Path.join(directory, "checkout-trace-*.zip"))
+    assert [path] = Path.wildcard(Path.join(directory, "gringotts-trace-*.zip"))
     assert File.stat!(path).size > 0
     assert {:ok, entries} = :zip.extract(String.to_charlist(path), [:memory])
     {~c"trace.trace", trace} = List.keyfind(entries, ~c"trace.trace", 0)

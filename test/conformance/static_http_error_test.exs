@@ -13,14 +13,14 @@ defmodule Fluffy.Conformance.StaticHTTPErrorTest do
       fixture =
         TestHTTPFixtures.register(%{
           status: 404,
-          body: "<!doctype html><html><body><h1>Order not found</h1></body></html>"
+          body: "<!doctype html><html><body><h1>Owl not found</h1></body></html>"
         })
 
       session = start_test_session(driver)
 
       session
       |> visit(TestHTTPFixtures.path(fixture, "/missing"))
-      |> expect("Order not found" |> by_text() |> to_be_visible())
+      |> expect("Owl not found" |> by_text() |> to_be_visible())
       |> expect(Fluffy.Expect.page_to_have_url(TestHTTPFixtures.url(fixture, "/missing")))
     end
 
@@ -45,7 +45,7 @@ defmodule Fluffy.Conformance.StaticHTTPErrorTest do
     session = start_test_session(:phoenix)
 
     assert_raise Fluffy.CapabilityError, ~r/navigation_scheme.*mailto/s, fn ->
-      visit(session, "mailto:orders@example.com")
+      visit(session, "mailto:owlery@hogwarts.example")
     end
   end
 
@@ -53,7 +53,7 @@ defmodule Fluffy.Conformance.StaticHTTPErrorTest do
     session = start_test_session(:phoenix)
 
     assert_raise Fluffy.CapabilityError, ~r/external_navigation/, fn ->
-      visit(session, "http://example.com/orders")
+      visit(session, "http://hogwarts.example/owls")
     end
   end
 

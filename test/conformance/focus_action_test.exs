@@ -114,7 +114,7 @@ defmodule Fluffy.Conformance.FocusActionTest do
   test "browser fill updates focus" do
     with_html(:playwright, ~s(<input aria-label="Name">), fn session ->
       session
-      |> fill(by_label("Name"), "Ada")
+      |> fill(by_label("Name"), "Hermione")
       |> expect(to_be_focused(by_label("Name")))
     end)
   end

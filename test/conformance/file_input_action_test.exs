@@ -147,7 +147,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       fixture = upload_fixture()
 
       payload = %FilePayload{
-        name: "report\"\r\nnext.txt",
+        name: "homework\"\r\nnext.txt",
         bytes: "generated",
         content_type: "text/plain"
       }
@@ -160,7 +160,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       |> expect("Uploaded" |> by_text() |> to_be_visible())
 
       [_source, submission] = TestHTTPFixtures.requests(fixture)
-      assert submission.body =~ ~s(filename="report%22%0D%0Anext.txt")
+      assert submission.body =~ ~s(filename="homework%22%0D%0Anext.txt")
       refute submission.body =~ "\r\nnext.txt"
     end
 
