@@ -7,13 +7,30 @@ defmodule Fluffy.Application do
   def start(_type, _args) do
     Fluffy.Sandbox.config()
     validate_playwright_config()
+    browser_children = children()
+
+    # `mix test` and scripts halt the VM without stopping applications, so the
+    # driver would outlive them. Exiting late, it restores the terminal settings it
+    # saw at start over the shell's line editor (#213). At-exit hooks run before
+    # the halt, after ExUnit's after-suite callbacks.
+    if browser_children != [], do: System.at_exit(fn _status -> close_drivers() end)
 
     Supervisor.start_link(
       [{Task.Supervisor, name: Fluffy.TaskSupervisor}, {Registry, keys: :duplicate, name: Fluffy.Route.Registry}] ++
-        children() ++ [{DynamicSupervisor, strategy: :one_for_one, name: Fluffy.SessionRuntime.Supervisor}],
+        browser_children ++ [{DynamicSupervisor, strategy: :one_for_one, name: Fluffy.SessionRuntime.Supervisor}],
       strategy: :rest_for_one,
       name: Fluffy.Supervisor
     )
+  end
+
+  # A driver whose pipe closes closes its browsers, and its close returns once it
+  # has exited (ftes/playwright_ex#191).
+  @doc false
+  def close_drivers do
+    Supervisor.terminate_child(Fluffy.Supervisor, Fluffy.BrowserRuntime.Supervisor)
+  catch
+    # The application has stopped already.
+    :exit, {:noproc, _} -> {:error, :not_found}
   end
 
   defp children do
