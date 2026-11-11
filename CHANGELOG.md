@@ -13,6 +13,10 @@ Upgrading from 0.8? The [upgrade guide](docs/upgrading.md) lists the net changes
 - Phoenix ends a link, form or redirect to another origin, including a LiveView external redirect, at a page with that URL instead of raising `Fluffy.CapabilityError`, so a test can assert where the app sent it, such as an OAuth hand-off. Everything else there, `unwrap` included, still raises `:external_navigation`.
 - **Breaking:** `filter/2` drops `exact:`, which Playwright's `filter` does not have. Use a regex instead, such as `has_text: ~r/^Pro$/`. The facade's `exact: true` keeps its meaning, except that soft hyphens and zero-width spaces in the page text are no longer ignored.
 
+### Fixed
+
+- On Phoenix, a form a LiveView renders with `phx-trigger-action` as it connects, such as from `connected?(socket)` in `mount`, is submitted as LiveView's client does, instead of leaving the page on the LiveView. The submission counts toward the redirect limit like a mount redirect.
+
 ## 0.9.0-rc.2 — 2026-11-11
 
 ### Added
