@@ -530,6 +530,10 @@ defmodule Fluffy.Options do
   @spec validate_expectation!(atom(), keyword()) :: keyword()
   def validate_expectation!(matcher, options), do: NimbleOptions.validate!(options, expectation_schema(matcher))
 
+  @doc "Splits an expectation's validated `timeout:` from the options that select how it matches."
+  @spec split_expectation!(atom(), keyword()) :: {keyword(), keyword()}
+  def split_expectation!(matcher, options), do: Keyword.split(validate_expectation!(matcher, options), [:timeout])
+
   @spec validate_url_matcher!(keyword()) :: keyword()
   def validate_url_matcher!(options), do: NimbleOptions.validate!(options, @url_matcher_schema)
 
