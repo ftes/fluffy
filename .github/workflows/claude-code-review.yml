@@ -12,6 +12,8 @@ env:
   # As in ci.yml.
   MISE_VERSION: "2026.8.14"
   MIX_ENV: test
+  # Added to each Claude prompt: Bash calls that don't match the allowlist are denied.
+  TOOL_HINT: "Use your file tools, not Bash, to read and search files, and keep any scratch files under tmp/; run each allowed Bash command on its own, without cd, ;, &&, pipes or heredocs (you are already in the repository)."
 
 jobs:
   claude-review:
@@ -72,9 +74,7 @@ jobs:
             5. Don't repeat findings already posted on this PR
                (`gh api repos/REPO/pulls/PR/comments`, `gh pr view PR --comments`).
 
-            Use your file tools, not Bash, to read, search and edit files; run each allowed Bash
-            command on its own, without `cd`, `;`, `&&`, pipes or heredocs (you are already in the
-            repository).
+            ${{ env.TOOL_HINT }}
 
             Post each verified finding as an inline comment on the relevant line
             (mcp__github_inline_comment__create_inline_comment, confirmed: true), with the failure
