@@ -79,7 +79,9 @@ jobs:
         if: ${{ !cancelled() && steps.claude.outputs.execution_file != '' }}
         env:
           EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
-        run: jq -r -f <(git show "$GITHUB_SHA:.github/claude-summary.jq") "$EXECUTION_FILE" >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          filter=$(git show "$GITHUB_SHA:.github/claude-summary.jq")
+          jq -r "$filter" "$EXECUTION_FILE" >> "$GITHUB_STEP_SUMMARY"
 
   # After triage, so only PRs worth keeping are looked at. A PR with a human comment or review is
   # left to that human.
@@ -201,7 +203,9 @@ jobs:
         if: ${{ !cancelled() && steps.claude.outputs.execution_file != '' }}
         env:
           EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
-        run: jq -r -f <(git show "$GITHUB_SHA:.github/claude-summary.jq") "$EXECUTION_FILE" >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          filter=$(git show "$GITHUB_SHA:.github/claude-summary.jq")
+          jq -r "$filter" "$EXECUTION_FILE" >> "$GITHUB_STEP_SUMMARY"
 
   # CI is the test run for nightly PRs: a fix lands on the branch and the next night sees the result.
   fix:
@@ -429,4 +433,6 @@ jobs:
         if: ${{ !cancelled() && steps.claude.outputs.execution_file != '' }}
         env:
           EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
-        run: jq -r -f <(git show "$GITHUB_SHA:.github/claude-summary.jq") "$EXECUTION_FILE" >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          filter=$(git show "$GITHUB_SHA:.github/claude-summary.jq")
+          jq -r "$filter" "$EXECUTION_FILE" >> "$GITHUB_STEP_SUMMARY"
