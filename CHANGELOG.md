@@ -2,15 +2,6 @@
 
 Upgrading from 0.8? The [upgrade guide](docs/upgrading.md) lists the net changes.
 
-## Unreleased
-
-### Changed
-
-- **Breaking:** `Fluffy.Playwright.screenshot/3` of the page runs like the element's `screenshot/4`: its options are validated, `mask:` takes Fluffy locators, failures raise `Fluffy.OperationError`, and `timeout: 0` raises `ArgumentError` instead of disabling the timeout.
-- `Fluffy.Route.fetch/2` validates `timeout:` like other Playwright operations: a negative or non-integer one, such as `1500.0`, raises `NimbleOptions.ValidationError` instead of reaching PlaywrightEx.
-- As in Playwright, an argument error in a Playwright expectation, such as `to_match_aria_snapshot` with both a snapshot and `path:`, raises unchanged instead of as `ExUnit.AssertionError`.
-- Requires PlaywrightEx 0.17.0-rc.5, whose listener removal no longer fails once the driver is lost.
-
 ## 0.9.0-rc.2 — 2026-11-11
 
 ### Added
@@ -21,6 +12,7 @@ Upgrading from 0.8? The [upgrade guide](docs/upgrading.md) lists the net changes
 
 - **Breaking:** Playwright actions, locator waits, `reload`, `go_back`, `go_forward`, `wait_for_function`, `wait_for_load_state` and `Fluffy.Route.fetch/2` raise `ArgumentError` for `timeout: 0`, which they cannot check once, instead of timing out after 1ms. Assertions and Phoenix actions still check once. `config :fluffy, timeout:` must be positive.
 - **Breaking:** as in Playwright, calls that have no timeout there no longer end at the session's `timeout:` or accept `timeout:`: page `evaluate`, `evaluate_all`, `content`, `title`, `local_storage`, `session_storage`, `bring_to_front`, `set_viewport_size`, `emulate_media`, `pdf`, `add_script_tag`, `add_style_tag`, `Keyboard`, `Mouse` and `Clock` calls. Context setters, `close_page`, request, response and download reads, stopping a trace and the facade's link probe lose their limit too, and an unfinished download is no longer canceled; see the installation guide for blocked pages. Locator `evaluate` and `bounding_box` keep `timeout:` for finding the element.
+- **Breaking:** `Fluffy.Playwright.screenshot/3` of the page runs like the element's `screenshot/4`: its options are validated, `mask:` takes Fluffy locators, failures raise `Fluffy.OperationError`, and `timeout: 0` raises `ArgumentError` instead of disabling the timeout.
 - `Fluffy.Playwright.unroute_all/2` takes Playwright's `behavior:` (`:default`, `:wait`, `:ignore_errors`) instead of `timeout:`. As in Playwright, a handler that answers after its last route was removed, or fails on a closed page, now fails the test unless `behavior: :ignore_errors` stopped it.
 - On Playwright, `visit`, `reload`, `go_back`, `go_forward`, clock calls, `open_browser`, download reads and the page handling around an `unwrap` callback raise `Fluffy.OperationError` with PlaywrightEx's exception as `cause`, as actions do.
 - Playwright `check` and `uncheck` again fail, as in Playwright, with "Clicking the checkbox did not change its state" when page code such as a LiveView patch reverts the box first, mostly in Firefox and WebKit.
@@ -30,6 +22,9 @@ Upgrading from 0.8? The [upgrade guide](docs/upgrading.md) lists the net changes
 - `select_option` raises `ArgumentError` for a list mixing values or labels with option maps, on every driver; Playwright never accepted one.
 - `click` on Phoenix acts like a browser click with LiveView's client: it sends the closest `phx-click`, the target's or an ancestor's, then takes the default action of the closest button or link, submitting the form as the click found it or following the link. Only `href="#"` and LiveView links prevent it, and a click inside a LiveView link patches or navigates even past a closer `phx-click`. Before, it sent only the target's own `phx-click`, like `render_click`, and a click on text inside a button or link did nothing. As in Playwright, text inside a disabled button is disabled, so clicking it fails, while a `disabled` attribute or fieldset no longer disables anything but a native form control.
 - `press` on Phoenix raises for an element without keyboard bindings in root layout or portal content too, as inside the LiveView.
+- `Fluffy.Route.fetch/2` validates `timeout:` like other Playwright operations: a negative or non-integer one, such as `1500.0`, raises `NimbleOptions.ValidationError` instead of reaching PlaywrightEx.
+- As in Playwright, an argument error in a Playwright expectation, such as `to_match_aria_snapshot` with both a snapshot and `path:`, raises unchanged instead of as `ExUnit.AssertionError`.
+- Requires PlaywrightEx 0.17.0-rc.5, whose listener removal no longer fails once the driver is lost.
 
 ### Fixed
 
