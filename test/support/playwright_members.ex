@@ -266,8 +266,7 @@ defmodule Fluffy.PlaywrightMembers do
   def unclassified_options do
     %{
       {PlaywrightEx.Page, :goto} => "Fluffy.visit/2 navigates by path and takes no options",
-      {PlaywrightEx.Page, :screenshot} => "options pass through to PlaywrightEx, which validates them",
-      {PlaywrightEx.Route, :fetch} => "options pass through to PlaywrightEx, which validates them",
+      {PlaywrightEx.Route, :fetch} => "Fluffy validates timeout:; the other options pass through to PlaywrightEx",
       {PlaywrightEx.Page, :wait_for_event} => "Fluffy.Event waits take timeout: and scope:",
       {PlaywrightEx.Page, :expect_event} => "Fluffy.Event waits take timeout: and scope:",
       {PlaywrightEx.Page, :expect_download} => "Fluffy.Event waits take timeout: and scope:",

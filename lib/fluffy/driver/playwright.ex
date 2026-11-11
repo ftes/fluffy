@@ -16,8 +16,10 @@ defmodule Fluffy.Driver.Playwright do
   alias Fluffy.URLMatcher
   alias PlaywrightEx.AbortController
   alias PlaywrightEx.BrowserContext
+  alias PlaywrightEx.Client.Errors
   alias PlaywrightEx.Dialog
   alias PlaywrightEx.Expect, as: BrowserExpect
+  alias PlaywrightEx.ExpectError
   alias PlaywrightEx.Frame
   alias PlaywrightEx.Locator, as: BrowserLocator
   alias PlaywrightEx.Page, as: BrowserPage
@@ -53,7 +55,7 @@ defmodule Fluffy.Driver.Playwright do
 
     case navigation_aware_action(session, action) do
       {:ok, :expectation, outcome} -> outcome
-      {:error, error} -> expectation_failed!(expectation, error)
+      {:error, error} -> expectation_failed!(expectation, error, "")
     end
   end
 
@@ -67,10 +69,7 @@ defmodule Fluffy.Driver.Playwright do
         :ok
 
       {:error, error} ->
-        raise ExUnit.AssertionError,
-          message:
-            "Expected #{Expect.Internal.describe(expectation)}, got #{inspect(BrowserPage.url(page))}\n" <>
-              Exception.message(error)
+        expectation_failed!(expectation, error, ", got #{inspect(BrowserPage.url(page))}")
     end
   end
 
@@ -85,13 +84,22 @@ defmodule Fluffy.Driver.Playwright do
         :ok
 
       {:error, error} ->
-        expectation_failed!(expectation, error)
+        expectation_failed!(expectation, error, "")
     end
   end
 
-  defp expectation_failed!(expectation, error) do
-    raise ExUnit.AssertionError,
-      message: "Expected #{Expect.Internal.describe(expectation)}\n" <> Exception.message(error)
+  # As in Playwright, where the client's `_expect` turns every `PlaywrightError`
+  # (timeouts, closed targets and aborts included) into a failed matcher, any
+  # PlaywrightEx error fails the expectation, a close while Fluffy adopts the page
+  # too. Other errors, such as a bad argument, pass through.
+  @spec expectation_failed!(Expect.t(), Exception.t(), String.t()) :: no_return()
+  defp expectation_failed!(expectation, error, received) do
+    if is_struct(error, ExpectError) or Errors.is_playwright_error(error) do
+      raise ExUnit.AssertionError,
+        message: "Expected #{Expect.Internal.describe(expectation)}#{received}\n" <> Exception.message(error)
+    else
+      raise error
+    end
   end
 
   defp native_expectation(session, %Expect{target: :page, kind: :title, expected: expected}),
@@ -406,13 +414,17 @@ defmodule Fluffy.Driver.Playwright do
   end
 
   def screenshot(session, locator, path, options) do
-    options =
-      options
-      |> Keyword.put(:path, path)
-      |> resolve_mask(session)
-
+    options = screenshot_options(session, path, options)
     locator_action(session, :screenshot, locator, options, &BrowserLocator.screenshot(&1, native(options, &2)))
   end
+
+  def page_screenshot(session, path, options) do
+    page = Session.page_state(session).page
+    options = screenshot_options(session, path, options)
+    action(session, :screenshot, nil, options, &BrowserPage.screenshot(page, native(options, &1)))
+  end
+
+  defp screenshot_options(session, path, options), do: options |> Keyword.put(:path, path) |> resolve_mask(session)
 
   # As in Playwright, page-wide input and emulation have no timeout and wait while
   # a script blocks the page. Unlike a locator action, Playwright does not wait for

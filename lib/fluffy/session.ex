@@ -42,7 +42,7 @@ defmodule Fluffy.Session do
   end
 
   # An operation's `timeout:`, else the session's, for PlaywrightEx: Fluffy's 0
-  # checks once and `:infinity` is Playwright's 0 (`Fluffy.Deadline.playwright/1`).
+  # checks once (`Fluffy.Deadline.playwright/1`).
   @doc false
   def timeout(session, options \\ []),
     do: Fluffy.Deadline.playwright(Keyword.get(options, :timeout) || context(session).timeout)

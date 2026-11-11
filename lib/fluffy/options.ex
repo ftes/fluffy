@@ -80,6 +80,9 @@ defmodule Fluffy.Options do
     locator_screenshot:
       {PlaywrightEx.Locator, :screenshot, 2,
        [:animations, :caret, :mask, :mask_color, :omit_background, :quality, :scale, :style, :type]},
+    page_screenshot:
+      {PlaywrightEx.Page, :screenshot, 2,
+       [:animations, :caret, :clip, :full_page, :mask, :mask_color, :omit_background, :quality, :scale, :style, :type]},
     to_have_screenshot:
       {PlaywrightEx.Expect, :to_have_screenshot, 2,
        [
@@ -130,7 +133,7 @@ defmodule Fluffy.Options do
   ]
 
   @fluffy_native_keys [:timeout]
-  # `path` is the positional argument of an element screenshot.
+  # `path` is the positional argument of a screenshot.
   @denied_native_keys [:no_wait_after, :signal, :path]
 
   # Upstream docs and types of a passed-through option that Fluffy's behavior completes.

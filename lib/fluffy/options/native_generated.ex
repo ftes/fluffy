@@ -316,6 +316,49 @@ defmodule Fluffy.Options.NativeGenerated do
       type:
         {"`:png` | `:jpeg` | `:webp`", "Specify screenshot type, defaults to `:png`.", quote(do: :png | :jpeg | :webp)}
     ],
+    {PlaywrightEx.Page, :screenshot, 2} => [
+      animations:
+        {"`:disabled` | `:allow`",
+         "When set to `:disabled`, stops CSS animations, CSS transitions and Web Animations. Animations get different treatment depending on their duration:",
+         quote(do: :disabled | :allow)},
+      caret:
+        {"`:hide` | `:initial`",
+         "When set to `:hide`, screenshot will hide text caret. When set to `:initial`, text caret behavior will not be changed.  Defaults to `:hide`.",
+         quote(do: :hide | :initial)},
+      clip:
+        {"`t:map/0`", "An object which specifies clipping of the resulting image.",
+         quote(do: %{x: number(), y: number(), width: number(), height: number()})},
+      full_page:
+        {"`t:boolean/0`",
+         "When true, takes a screenshot of the full scrollable page, instead of the currently visible viewport. Defaults to `false`.",
+         quote(do: boolean())},
+      mask:
+        {"list of `t:PlaywrightEx.Locator.t/0`",
+         "Specify locators that should be masked when the screenshot is taken. Masked elements will be overlaid with a pink box `#FF00FF` (customized by `:mask_color`) that completely covers its bounding box. The mask is also applied to invisible elements, see [Matching only visible elements](https://playwright.dev/docs/locators#matching-only-visible-elements) to disable that.",
+         quote(do: [PlaywrightEx.Locator.t()])},
+      mask_color:
+        {"`t:String.t/0`",
+         "Specify the color of the overlay box for masked elements, in [CSS color format](https://developer.mozilla.org/en-US/docs/Web/CSS/color_value). Default color is pink `#FF00FF`.",
+         quote(do: String.t())},
+      omit_background:
+        {"`t:boolean/0`",
+         "Hides default white background and allows capturing screenshots with transparency. Not applicable to `jpeg` images. Defaults to `false`.",
+         quote(do: boolean())},
+      quality:
+        {"`t:integer/0`",
+         "The quality of the image, between 0-100. Not applicable to `png` images. For `jpeg` the default is `80`. For `webp`, a quality of `100` (the default) produces a lossless image, while lower values use lossy compression.",
+         quote(do: integer())},
+      scale:
+        {"`:css` | `:device`",
+         "When set to `:css`, screenshot will have a single pixel per each css pixel on the page. For high-dpi devices, this will keep screenshots small. Using `:device` option will produce a single pixel per each device pixel, so screenshots of high-dpi devices will be twice as large or even larger.",
+         quote(do: :css | :device)},
+      style:
+        {"`t:String.t/0`",
+         "Text of the stylesheet to apply while making the screenshot. This is where you can hide dynamic elements, make elements invisible or change their properties to help you creating repeatable screenshots. This stylesheet pierces the Shadow DOM and applies to the inner frames.",
+         quote(do: String.t())},
+      type:
+        {"`:png` | `:jpeg` | `:webp`", "Specify screenshot type, defaults to `:png`.", quote(do: :png | :jpeg | :webp)}
+    ],
     {PlaywrightEx.Expect, :to_have_screenshot, 2} => [
       animations:
         {"`:disabled` | `:allow`",

@@ -4,19 +4,10 @@ defmodule Fluffy.Backend.Playwright.Listeners do
   # Native listeners as `{module, target, event, listener}`, such as
   # `{PlaywrightEx.Page, page, :close, fun}`.
 
-  @doc "Registers listeners; a failed registration releases those registered before it."
+  @doc "Registers listeners and returns them."
   def register(listeners) do
-    Enum.reduce(listeners, [], fn {module, target, event, listener} = entry, registered ->
-      try do
-        module.on(target, event, listener)
-      catch
-        kind, reason ->
-          release(registered)
-          :erlang.raise(kind, reason, __STACKTRACE__)
-      end
-
-      [entry | registered]
-    end)
+    for {module, target, event, listener} <- listeners, do: module.on(target, event, listener)
+    listeners
   end
 
   @doc "Removes listeners; as in Playwright, this never fails, even once the driver is lost."

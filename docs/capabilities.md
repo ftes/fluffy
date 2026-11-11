@@ -72,6 +72,9 @@ them; on Playwright they must be opened first. A `refute` on that
 content fails on Phoenix. Accessible names built from such content can differ
 the same way.
 
+Phoenix does not model `inert` either. On Playwright, actions wait while the
+target or an ancestor is `inert`; on Phoenix they act on it.
+
 ### LiveView timing and keyboard events
 
 LiveView eagerly dispatches each applicable form-control `phx-change` and

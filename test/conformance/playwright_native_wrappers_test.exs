@@ -175,8 +175,8 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
       box = by_css("#box")
       session = session_for_html(:playwright, @html)
 
-      expect(session, to_have_screenshot(box, path: path))
-      assert File.exists?(path)
+      notice = ExUnit.CaptureIO.capture_io(fn -> expect(session, to_have_screenshot(box, path: path)) end)
+      assert notice =~ "A snapshot doesn't exist at #{path}, writing actual."
       baseline = File.read!(path)
 
       expect(session, to_have_screenshot(box, path: path))
@@ -205,7 +205,7 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
       end
 
       refute File.exists?(path)
-      expect(session, to_have_screenshot(box, path: path))
+      ExUnit.CaptureIO.capture_io(fn -> expect(session, to_have_screenshot(box, path: path)) end)
       paint(session, "rgb(200, 0, 0)")
       expect(session, not_(to_have_screenshot(box, path: path, timeout: 2_000)))
     end
@@ -215,9 +215,8 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
       path = Path.join(tmp_dir, "page.webp")
       session = session_for_html(:playwright, @html)
 
-      session
-      |> expect(page_to_have_screenshot(path: path))
-      |> expect(page_to_have_screenshot(path: path, full_page: false, max_diff_pixels: 0))
+      ExUnit.CaptureIO.capture_io(fn -> expect(session, page_to_have_screenshot(path: path)) end)
+      expect(session, page_to_have_screenshot(path: path, full_page: false, max_diff_pixels: 0))
 
       assert File.exists?(path)
       paint(session, "rgb(200, 0, 0)")
@@ -233,7 +232,7 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
       box = by_css("#box")
       session = session_for_html(:playwright, @html)
 
-      expect(session, to_have_screenshot(box, path: path, mask: [box]))
+      ExUnit.CaptureIO.capture_io(fn -> expect(session, to_have_screenshot(box, path: path, mask: [box])) end)
       paint(session, "rgb(200, 0, 0)")
       expect(session, to_have_screenshot(box, path: path, mask: [box]))
     end
@@ -332,7 +331,8 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
         expect(changed, page_to_match_aria_snapshot(path: page_file, timeout: 100))
       end
 
-      assert_raise ExUnit.AssertionError, ~r/not both/, fn ->
+      # As in Playwright, an argument error is no failed assertion.
+      assert_raise RuntimeError, ~r/not both/, fn ->
         expect(session, to_match_aria_snapshot(by_css("#panel"), "- button", path: file))
       end
     end
@@ -673,11 +673,24 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
       end
     end
 
+    # As Playwright's frame.expect, a close fails the assertion, whenever it happens.
     test "a page closing while Fluffy adopts it fails an expectation" do
-      popup = popup_showing(@closes_on_adoption)
+      for expectation <- [to_be_visible(by_css("#never")), page_to_have_url("/never")] do
+        popup = popup_showing(@closes_on_adoption)
 
-      assert_raise ExUnit.AssertionError, ~r/closed/i, fn ->
-        expect(popup, to_be_visible(by_css("#never")), timeout: 10_000)
+        assert_raise ExUnit.AssertionError, ~r/Expected .*closed/is, fn ->
+          expect(popup, expectation, timeout: 10_000)
+        end
+      end
+    end
+
+    test "a page closing while an expectation waits fails it" do
+      for expectation <- [to_be_visible(by_css("#never")), page_to_have_url("/never")] do
+        popup = closing_popup("<p>Harness</p>")
+
+        assert_raise ExUnit.AssertionError, ~r/Expected .*closed/is, fn ->
+          expect(popup, expectation, timeout: 10_000)
+        end
       end
     end
 
@@ -749,7 +762,7 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
              ) == "201:server"
     end
 
-    test "timeout: 0 raises, as for actions, and timeout: :infinity waits without limit" do
+    test "timeout: 0 raises, as for actions, an invalid timeout fails validation, and :infinity waits without limit" do
       fixture =
         TestHTTPFixtures.register(fn _request ->
           Process.sleep(100)
@@ -762,6 +775,7 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
 
       Playwright.route(session, "**/api", fn route ->
         send(owner, {:fetch, catch_error(Route.fetch(route, timeout: 0))})
+        for invalid <- [-1, 1500.0], do: send(owner, {:fetch, catch_error(Route.fetch(route, timeout: invalid))})
         response = Route.fetch(route, timeout: :infinity, headers: %{"accept-encoding" => "identity"})
         Route.fulfill(route, response: response)
       end)
@@ -770,6 +784,8 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
                "server"
 
       assert_receive {:fetch, %ArgumentError{message: "fetch: timeout: 0 means check once" <> _}}
+      assert_receive {:fetch, %NimbleOptions.ValidationError{key: :timeout, value: -1}}
+      assert_receive {:fetch, %NimbleOptions.ValidationError{key: :timeout, value: 1500.0}}
     end
   end
 

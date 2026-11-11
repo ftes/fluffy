@@ -10,17 +10,20 @@ Upstream Playwright is the reference. Fluffy is modeled on Playwright and adds o
 LiveView needs (waiting for LiveViews to connect, following their navigations, form state). Before
 adding a timeout budget, retry, extra check or browser workaround, check what Playwright does and
 match it; the pinned source is in PlaywrightEx's download cache (`<cache_dir>/<version>/upstream`,
-see `PlaywrightEx.Driver.cache_dir/1`). Don't work around Playwright or browser bugs (upstream
-`fixme` tests mark the known ones); let Playwright's behavior show through. Only as a last
-resort, when LiveView support can't work without it, add a workaround, and say why in a comment.
+see `PlaywrightEx.Driver.cache_dir/1`). Don't work around Playwright, PlaywrightEx or browser
+bugs (upstream `fixme` tests mark the known ones); let Playwright's behavior show through. Only as
+a last resort, when LiveView support can't work without it, add a workaround, and say why in a
+comment.
 Timeouts follow Elixir: `0` means check once and `:infinity` means no limit;
-`Fluffy.Deadline.playwright/1` maps them to Playwright's values, where 0 means no limit.
+`Fluffy.Deadline.playwright/1` maps `0` to 1ms, since Playwright's 0 means no limit.
 
 Phoenix upstream is the secondary reference, for the Phoenix drivers. Playwright decides what
 behavior is correct; LiveView's client JS and `Phoenix.LiveViewTest` decide how the Phoenix drivers
-get there. Build on LiveViewTest rather than reimplementing it, and don't work around its
-limitations unless a test would see the browser behave differently; then match the browser,
-mirroring LiveView's JS. Document the differences you leave.
+get there. Build on LiveViewTest rather than reimplementing it. Work around its limitations when a
+test would see the browser behave differently, matching the browser and mirroring LiveView's JS.
+A difference may stay when it's an edge case most users won't hit, or when closing it is very
+complicated; document the differences you leave. Ask the maintainer before building a complex
+workaround.
 
 Run `mix check` before handing off code changes; use `mix quality` for
 release-sensitive changes.

@@ -297,8 +297,9 @@ defmodule Fluffy.Expect do
   Give each baseline its own path and commit it, one per browser if you run several,
   since renderings differ.
 
-  A missing baseline is written and the assertion passes; negated, it fails. A mismatch
-  writes `-actual`, `-diff`, `-previous` and `-expected` images next to the baseline.
+  A missing baseline is written, with a notice on stdout, and the assertion passes;
+  negated, it fails. A mismatch writes `-actual`, `-diff`, `-previous` and `-expected`
+  images next to the baseline.
   `config :playwright_ex, :expect` sets `update_snapshots:`, where `:none` fails on a
   missing baseline and `:changed` or `:all` rewrite a mismatching one, and comparison
   defaults such as `to_have_screenshot: %{maxDiffPixels: 10}`.
@@ -392,9 +393,10 @@ defmodule Fluffy.Expect do
 
   A relative `path:` resolves against the current working directory, as screenshot
   baselines do, and Fluffy does not derive one from the test name. A missing file is
-  written and the assertion passes; negated, it fails. `config :playwright_ex, :expect`
-  sets `update_snapshots:`. Under `:none` a missing file fails, comparing against an
-  empty snapshot. Negated, a missing file passes under `:none`, `:all` or `:changed`.
+  written, with a notice on stdout, and the assertion passes; negated, it fails.
+  `config :playwright_ex, :expect` sets `update_snapshots:`. Under `:none` a missing
+  file fails, comparing against an empty snapshot. Negated, a missing file passes under
+  `:none`, `:all` or `:changed`.
 
   ## Options
 
