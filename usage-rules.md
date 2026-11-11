@@ -1,12 +1,12 @@
 # Fluffy usage rules
 
-Fluffy runs Phoenix feature tests through one Playwright-shaped API, in-process or in a real browser. It is a test-only dependency.
+Fluffy runs Phoenix feature tests through one Playwright-shaped API, in-process or in a real browser. It is a dev and test dependency (`only: [:dev, :test]`), never in production; a `lazy_html` the app lists `only: :test` must widen to match.
 
 ## Setup
 
-- `config :fluffy, endpoint: MyAppWeb.Endpoint` in `config/test.exs`. With Ecto, also `config :fluffy, ecto_repos: [MyApp.Repo]` and the sandbox plug and mount hook from `docs/installation.md`, behind an `Application.compile_env` flag because Fluffy exists only in the test environment.
+- `config :fluffy, endpoint: MyAppWeb.Endpoint` in `config/test.exs`. With Ecto, also `config :fluffy, ecto_repos: [MyApp.Repo]` and the sandbox plug and mount hook from `docs/installation.md`, behind an `Application.compile_env` flag set in `config/test.exs` because Fluffy is not in production.
 - Call `Fluffy.Test.setup(context)` exactly once per test, with or without Ecto, ideally in a shared case module.
-- Browser tests need `server: true` on the endpoint, a `config :fluffy, playwright: [...]` block and `MIX_ENV=test mix playwright_ex.install -- chromium`. `MIX_ENV=test` is required because the driver arrives through a test-only dependency. For a system browser, install with `--no-browsers` and set `launch_options: [executable_path: ...]`.
+- Browser tests need `server: true` on the endpoint, a `config :fluffy, playwright: [...]` block and `mix playwright_ex.install -- chromium`. For a system browser, install with `--no-browsers` and set `launch_options: [executable_path: ...]`.
 - The browser opens the endpoint listener's address, such as `127.0.0.1`. Set `check_origin: false` on the endpoint only when its `url` host differs from that address, as a stock `localhost` does.
 
 ## Choosing an API and a backend
