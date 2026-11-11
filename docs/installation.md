@@ -112,11 +112,6 @@ config :playwright_ex, :test,
 config :fluffy, playwright: [timeout: 15_000]
 ```
 
-```elixir
-# test/test_helper.exs
-ExUnit.start(formatters: [ExUnit.CLIFormatter, PlaywrightEx.Test.Formatter])
-```
-
 `driver: [executable: ...]` optionally points at a Playwright 1.65 CLI such as
 `node_modules/.bin/playwright`, not `cli.js`; by default the pinned driver is used.
 
@@ -126,10 +121,11 @@ default of 3 minutes applies. To use a system browser, set
 `launch_options: [executable_path: System.find_executable("google-chrome-stable")]`.
 `mix playwright_ex.install --no-browsers` installs only the driver for an existing browser.
 
-`Fluffy.Test.setup/2` records every Playwright session of the test with
-`PlaywrightEx.Test.record_artifacts/2`: one `trace.zip` of all its sessions, a
-screenshot of each page as its session closes, and videos, each `:off` by default.
-The `*_on_failure` modes record every test and `PlaywrightEx.Test.Formatter` deletes
+A module that starts Playwright sessions needs `use PlaywrightEx.Test` after
+`use ExUnit.Case` (or in your case template's `using`). There `Fluffy.Test.setup/2`
+records every Playwright session of the test with `PlaywrightEx.Test.record_artifacts/2`:
+one `trace.zip` of all its sessions, a screenshot of each page as its session closes,
+and videos, each `:off` by default. The `*_on_failure` modes record every test and drop
 the files of passing ones. Each test writes to its own dir under `output_dir`
 (`test-results`); configure CI to upload it when the test job fails. Pass `trace:`,
 `screenshot:` or `video:` to `Fluffy.Test.setup/2` to override the config for a test.

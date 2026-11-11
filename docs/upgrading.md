@@ -86,7 +86,8 @@ Timeouts follow Elixir: `0` checks once and `:infinity` means no limit; see
 - `Fluffy.Playwright.trace/2`, `artifact_dir` and `trace_dir` are removed. Traces,
   screenshots and videos come from `PlaywrightEx.Test`: set
   `config :playwright_ex, :test, trace: :retain_on_failure, screenshot: :only_on_failure`
-  and add `PlaywrightEx.Test.Formatter` to `ExUnit.start/1`. Files go to
+  and add `use PlaywrightEx.Test` to modules (or case templates) with Playwright
+  sessions, which they now need. Files go to
   `test-results/<test>/`; a failed operation no longer writes HTML or the error text.
 - `filter/2` takes no `exact:`, as in Playwright. Match a whole text with a regex, such as
   `filter(has_text: ~r/^Pro$/)`, which works on every driver.

@@ -17,7 +17,7 @@ ExUnit.start(
   # Added to, so `mix test --formatter` still applies.
   formatters:
     ExUnit.configuration()[:formatters] ++
-      [PlaywrightEx.Test.Formatter, Fluffy.FailuresFormatter, Fluffy.ModuleTimesFormatter]
+      [Fluffy.FailuresFormatter, Fluffy.ModuleTimesFormatter]
 )
 
 {:ok, _test_server} = Fluffy.TestServer.start_link()

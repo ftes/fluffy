@@ -1,5 +1,6 @@
 defmodule FluffyConsumer.AdoptionTest do
   use ExUnit.Case, async: true
+  use PlaywrightEx.Test
   use Fluffy.Assert
 
   import Fluffy

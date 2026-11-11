@@ -3,6 +3,7 @@ defmodule Fluffy.PlaywrightArtifactsTest do
   # runtime processes are the test's, and steps are trace groups. PlaywrightEx.Test merges
   # `trace.zip` in its own `on_exit`, so the assertions run in one registered before it.
   use ExUnit.Case, async: true
+  use PlaywrightEx.Test
 
   import Fluffy
   import Fluffy.Expect
@@ -18,8 +19,7 @@ defmodule Fluffy.PlaywrightArtifactsTest do
   @secret "FLUFFY-" <> Base.encode16("upload secret of gringotts")
 
   setup context do
-    # Until PlaywrightEx.Test has a public `output_path/2`.
-    path = Path.join(PlaywrightEx.Test.Recorder.output_dir(context), "trace.zip")
+    path = output_path(context, "trace.zip")
 
     on_exit(fn ->
       trace = read_trace(path)

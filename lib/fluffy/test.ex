@@ -11,8 +11,9 @@ defmodule Fluffy.Test do
   sandbox ownership. Pass `sandbox: false` to establish lifecycle management
   without database ownership.
 
-  It also calls `PlaywrightEx.Test.record_artifacts/2`, which records the traces,
-  screenshots and videos of the test's Playwright sessions. Its modes come from
+  In a module with `use PlaywrightEx.Test`, which Playwright sessions need, it also
+  calls `PlaywrightEx.Test.record_artifacts/2`: that records the traces, screenshots and
+  videos of the test's Playwright sessions. Its modes come from
   `config :playwright_ex, :test`, overridden by `trace:`, `screenshot:` and `video:`.
 
   ## Options
@@ -37,6 +38,12 @@ defmodule Fluffy.Test do
         sandbox: if(sandbox?, do: {Fluffy.Sandbox, :acquire, [context, repos]}, else: false)
       )
 
-    PlaywrightEx.Test.record_artifacts(context, Keyword.take(options, [:trace, :screenshot, :video]))
+    if playwright_ex_test?(context[:module]) do
+      PlaywrightEx.Test.record_artifacts(context, Keyword.take(options, [:trace, :screenshot, :video]))
+    else
+      :ok
+    end
   end
+
+  defp playwright_ex_test?(module), do: is_atom(module) and function_exported?(module, :__playwright_ex_test__, 0)
 end

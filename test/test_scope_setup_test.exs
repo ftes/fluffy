@@ -1,5 +1,6 @@
 defmodule Fluffy.TestScopeSetupTest do
   use ExUnit.Case, async: false
+  use PlaywrightEx.Test
 
   alias Fluffy.TestScope
   alias Fluffy.TestWeb.Endpoint
