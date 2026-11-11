@@ -79,8 +79,15 @@ jobs:
         if: ${{ !cancelled() && steps.claude.outputs.execution_file != '' }}
         env:
           EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
-        # Only the final message: this repo is public, and the full transcript can contain secrets.
-        run: jq -r '.[] | select(.type == "result") | .result // .subtype' "$EXECUTION_FILE" >> "$GITHUB_STEP_SUMMARY"
+        # Only the final message and each denied call's command, path or URL: this repo is public,
+        # and the full transcript can contain secrets.
+        run: |
+          jq -r '.[] | select(.type == "result")
+            | (.result // .subtype),
+              (.permission_denials // [] | select(length > 0) | "\n**Denied tool calls (\(length)):**\n",
+                (.[] | (.tool_input | .command // .file_path // .path // .pattern // .url // "" | gsub("\\s+"; " ") | .[:200]) as $arg
+                  | "- \(.tool_name)" + (if $arg == "" then "" else ": `` \($arg) ``" end)))' \
+            "$EXECUTION_FILE" >> "$GITHUB_STEP_SUMMARY"
 
   # After triage, so only PRs worth keeping are looked at. A PR with a human comment or review is
   # left to that human.
@@ -200,7 +207,13 @@ jobs:
         if: ${{ !cancelled() && steps.claude.outputs.execution_file != '' }}
         env:
           EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
-        run: jq -r '.[] | select(.type == "result") | .result // .subtype' "$EXECUTION_FILE" >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          jq -r '.[] | select(.type == "result")
+            | (.result // .subtype),
+              (.permission_denials // [] | select(length > 0) | "\n**Denied tool calls (\(length)):**\n",
+                (.[] | (.tool_input | .command // .file_path // .path // .pattern // .url // "" | gsub("\\s+"; " ") | .[:200]) as $arg
+                  | "- \(.tool_name)" + (if $arg == "" then "" else ": `` \($arg) ``" end)))' \
+            "$EXECUTION_FILE" >> "$GITHUB_STEP_SUMMARY"
 
   # CI is the test run for nightly PRs: a fix lands on the branch and the next night sees the result.
   fix:
@@ -275,7 +288,13 @@ jobs:
         if: ${{ !cancelled() && steps.claude.outputs.execution_file != '' }}
         env:
           EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
-        run: jq -r '.[] | select(.type == "result") | .result // .subtype' "$EXECUTION_FILE" >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          jq -r '.[] | select(.type == "result")
+            | (.result // .subtype),
+              (.permission_denials // [] | select(length > 0) | "\n**Denied tool calls (\(length)):**\n",
+                (.[] | (.tool_input | .command // .file_path // .path // .pattern // .url // "" | gsub("\\s+"; " ") | .[:200]) as $arg
+                  | "- \(.tool_name)" + (if $arg == "" then "" else ": `` \($arg) ``" end)))' \
+            "$EXECUTION_FILE" >> "$GITHUB_STEP_SUMMARY"
 
   # Enforces the cap before any toolchain is set up. Runs even if an earlier job failed: the
   # count is still right, it just finds fewer slots.
@@ -298,14 +317,24 @@ jobs:
           MAX_OPEN_PRS: 3
         # Same-repo branches only: a fork can pick any branch name, and this repo is public.
         run: |
-          prs=$(gh pr list --state all --limit 1000 --json title,state,headRefName,isCrossRepository \
-            --jq '[.[] | select((.isCrossRepository | not) and (.headRefName | startswith("claude/nightly-"))) | {title, state}]')
+          prs=$(gh pr list --state all --limit 1000 --json number,title,state,headRefName,isCrossRepository \
+            --jq '[.[] | select((.isCrossRepository | not) and (.headRefName | startswith("claude/nightly-"))) | {number, title, state}]')
           open=$(jq '[.[] | select(.state == "OPEN")] | length' <<< "$prs")
           echo "::notice::$open of $MAX_OPEN_PRS nightly PRs open"
           if [ "$open" -lt "$MAX_OPEN_PRS" ]; then has_slot=true; else has_slot=false; fi
+          # Why each closed PR was declined: its maintainers' comments and reviews, and the bots'
+          # closing comment. No one else's, as anyone can comment on a PR and this reaches the prompt.
+          recent=$(jq -c '.[:30]' <<< "$prs")
+          for number in $(jq -r '.[] | select(.state == "CLOSED") | .number' <<< "$recent"); do
+            why=$(gh pr view "$number" --json closedAt,comments,reviews --jq '(.closedAt | fromdate) as $closed
+              | [.comments[], .reviews[] | select(.authorAssociation | IN("OWNER", "MEMBER", "COLLABORATOR"))]
+                + [.comments[] | select((.author.login | IN("claude", "github-actions")) and (.createdAt | fromdate) >= $closed - 120)]
+              | map(.body | gsub("\\s+"; " ") | .[:300] | select(. != ""))') || why='[]'
+            recent=$(jq -c --argjson n "$number" --argjson why "$why" 'map(if .number == $n then . + {why: $why} else . end)' <<< "$recent")
+          done
           {
             echo "has-slot=$has_slot"
-            echo "prs=$(jq -c '.[:30]' <<< "$prs")"
+            echo "prs=$recent"
           } >> "$GITHUB_OUTPUT"
 
   improve:
@@ -334,6 +363,21 @@ jobs:
         with:
           lane: newest
       - run: git switch -c "$NIGHTLY_BRANCH"
+      - name: Pick tonight's focus area
+        id: focus
+        # By day of the year, so successive nights look at different parts of the code.
+        run: |
+          areas=(
+            "the Static and LiveView drivers: lib/fluffy/driver/static*, lib/fluffy/driver/live*, lib/fluffy/driver/phoenix_validation.ex"
+            "the Playwright driver and backend: lib/fluffy/driver/playwright*, lib/fluffy/backend/playwright*, lib/fluffy/playwright/"
+            "HTML semantics, locators and actionability: lib/fluffy/html/, lib/fluffy/locator*, lib/fluffy/client_dom*, lib/fluffy/actionability.ex"
+            "the public API: lib/fluffy.ex, lib/fluffy/page*, frame*, expect*, options*, phoenix_test* and the error modules"
+            "sessions and runtime: lib/fluffy/session*, browser_runtime*, backend.ex, backend/contract.ex, backend/phoenix*, event*, route*, sandbox.ex, worker.ex"
+            "test/ and its support code, without weakening what a test checks"
+          )
+          area=${areas[$((10#$(date -u +%j) % ${#areas[@]}))]}
+          echo "::notice::Focus: $area"
+          echo "area=$area" >> "$GITHUB_OUTPUT"
 
       - name: Run Claude
         id: claude
@@ -344,9 +388,11 @@ jobs:
             REPO: ${{ github.repository }}
             BRANCH: ${{ env.NIGHTLY_BRANCH }} (already checked out)
             PREVIOUS NIGHTLY PRS, newest first: ${{ needs.capacity.outputs.prs }}
+            FOCUS: ${{ steps.focus.outputs.area }}
 
             Find the single most valuable improvement to this codebase's simplicity or consistency
             and open one pull request for it, the kind a senior maintainer would be glad to merge.
+            Pick it in or touching FOCUS: each night looks at a different part of the codebase.
 
             1. Read AGENTS.md and enough of lib/ and test/ to know the prevailing patterns. Use
                subagents to survey separate areas in parallel.
@@ -355,7 +401,7 @@ jobs:
             3. Rank the candidates by how much simpler or more uniform the code becomes for how
                little it changes. Read the callers and tests of the best one before committing to
                it. Skip anything overlapping an OPEN PR above or repeating a CLOSED one: those were
-               declined.
+               declined, and `why` holds the reasons people gave.
             4. Implement that one idea, matching the surrounding code. Prefer a diff that removes
                more than it adds.
 
@@ -389,4 +435,10 @@ jobs:
         if: ${{ !cancelled() && steps.claude.outputs.execution_file != '' }}
         env:
           EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
-        run: jq -r '.[] | select(.type == "result") | .result // .subtype' "$EXECUTION_FILE" >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          jq -r '.[] | select(.type == "result")
+            | (.result // .subtype),
+              (.permission_denials // [] | select(length > 0) | "\n**Denied tool calls (\(length)):**\n",
+                (.[] | (.tool_input | .command // .file_path // .path // .pattern // .url // "" | gsub("\\s+"; " ") | .[:200]) as $arg
+                  | "- \(.tool_name)" + (if $arg == "" then "" else ": `` \($arg) ``" end)))' \
+            "$EXECUTION_FILE" >> "$GITHUB_STEP_SUMMARY"
