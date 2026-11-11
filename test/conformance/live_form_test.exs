@@ -432,6 +432,22 @@ defmodule Fluffy.Conformance.LiveFormTest do
     end
 
     @tag driver: driver
+    test "a form triggered on the connected render can leave for another origin with #{driver}", %{driver: driver} do
+      session = start_test_session(driver)
+
+      # A browser really loads the external page, so Playwright stubs its host.
+      if driver == :playwright do
+        Fluffy.Playwright.route(session, "https://ministry.example/**", fn route ->
+          Fluffy.Route.fulfill(route, content_type: "text/html", body: "<h1>Floo to the Ministry</h1>")
+        end)
+      end
+
+      session
+      |> visit("/live/trigger-on-connect?identity=hermione&trigger=ministry")
+      |> expect(Fluffy.Expect.page_to_have_url("https://ministry.example/floo"))
+    end
+
+    @tag driver: driver
     test "a form triggered on the dead render only is not submitted with #{driver}", %{driver: driver} do
       driver
       |> start_test_session()

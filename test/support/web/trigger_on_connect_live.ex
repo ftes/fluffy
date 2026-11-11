@@ -5,8 +5,9 @@ defmodule Fluffy.TestWeb.TriggerOnConnectLive do
 
   # Hands the visitor to a controller as soon as the view connects, like a
   # login page continuing a redirect: only a controller can write the session.
-  # `trigger=dead` sets the trigger on the dead render only, and `trigger=loop`
-  # triggers a form that comes back here.
+  # `trigger=dead` sets the trigger on the dead render only, `trigger=loop`
+  # triggers a form that comes back here, and `trigger=ministry` one that leaves
+  # for another origin, like a sign-in at an identity provider.
   @impl true
   def mount(params, _session, socket) do
     trigger? =
@@ -17,6 +18,7 @@ defmodule Fluffy.TestWeb.TriggerOnConnectLive do
 
     {:ok,
      assign(socket,
+       action: if(params["trigger"] == "ministry", do: "https://ministry.example/floo", else: "/session/hand-off"),
        identity: params["identity"] || "anonymous",
        loop?: params["trigger"] == "loop",
        pinged?: false,
@@ -47,7 +49,7 @@ defmodule Fluffy.TestWeb.TriggerOnConnectLive do
         :if={!@loop?}
         for={%{}}
         id="hand-off-form"
-        action="/session/hand-off"
+        action={@action}
         phx-trigger-action={@trigger?}
       >
         <input type="hidden" name="identity" value={@identity} />
