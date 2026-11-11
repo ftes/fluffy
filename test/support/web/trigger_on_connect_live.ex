@@ -52,7 +52,7 @@ defmodule Fluffy.TestWeb.TriggerOnConnectLive do
       <p :if={@lit?}>Wand lit</p>
       <.form
         for={%{}}
-        id="hand-off-form"
+        id="trigger-form"
         method={@method}
         action={@action}
         phx-trigger-action={@trigger?}
