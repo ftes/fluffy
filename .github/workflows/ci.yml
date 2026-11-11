@@ -187,7 +187,8 @@ jobs:
         uses: ./.github/actions/browser
         with:
           browser: ${{ matrix.browser }}
-          save-apt-cache: ${{ matrix.lane == 'newest' && matrix.partition == 1 }}
+          # On main only: a PR's cache is visible to that PR alone.
+          save-apt-cache: ${{ github.ref == 'refs/heads/main' && matrix.lane == 'newest' && matrix.partition == 1 }}
       - name: Build test assets
         run: mix assets.build
       # Test failures (exit 2) are retried once, only the failed tests (`mix test --failed`);

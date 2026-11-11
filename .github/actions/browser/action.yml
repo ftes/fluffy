@@ -15,7 +15,9 @@ runs:
     - name: Get runner image
       id: image
       shell: bash
-      run: echo "os=$ImageOS" >> "$GITHUB_OUTPUT"
+      run: |
+        echo "os=$ImageOS" >> "$GITHUB_OUTPUT"
+        echo "day=$(date -u +%F)" >> "$GITHUB_OUTPUT"
     # The driver (with its Node.js) is the same for every browser, so it is cached once.
     - name: Restore Playwright driver
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
@@ -32,12 +34,14 @@ runs:
     # can stall. The .debs are cached per browser and driver version, so a warm run installs
     # offline; archive.ubuntu.com is a fallback mirror, apt times out stalled fetches, and each
     # attempt is capped (a killed attempt's apt-get, out of timeout's reach under sudo, is killed
-    # before the next).
+    # before the next). The key's day makes main save a fresh cache daily, so Ubuntu's package
+    # updates are picked up; restores take the newest. autoclean drops the superseded .debs.
     - name: Restore browser system packages
       id: apt-cache
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
       with:
-        key: apt-${{ inputs.browser }}-${{ hashFiles('deps/playwright_ex/DRIVER_VERSION') }}-${{ steps.image.outputs.os }}
+        key: apt-${{ inputs.browser }}-${{ hashFiles('deps/playwright_ex/DRIVER_VERSION') }}-${{ steps.image.outputs.os }}-${{ steps.image.outputs.day }}
+        restore-keys: apt-${{ inputs.browser }}-${{ hashFiles('deps/playwright_ex/DRIVER_VERSION') }}-${{ steps.image.outputs.os }}
         path: ~/apt-cache
     - name: Install driver, browser and system packages
       shell: bash
@@ -49,7 +53,8 @@ runs:
         if compgen -G ~/apt-cache/'*.deb' > /dev/null; then sudo cp ~/apt-cache/*.deb /var/cache/apt/archives/; fi
         for attempt in 1 2 3; do
           if timeout 300 mix playwright_ex.install -- --with-deps "$BROWSER"; then
-            mkdir -p ~/apt-cache && cp /var/cache/apt/archives/*.deb ~/apt-cache/ 2>/dev/null || true
+            sudo apt-get autoclean -qq
+            rm -rf ~/apt-cache && mkdir -p ~/apt-cache && cp /var/cache/apt/archives/*.deb ~/apt-cache/ 2>/dev/null || true
             exit 0
           fi
           echo "::warning::browser install attempt $attempt failed or timed out"
