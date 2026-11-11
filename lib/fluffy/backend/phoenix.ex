@@ -165,7 +165,7 @@ defmodule Fluffy.Backend.Phoenix do
   end
 
   def navigate(%Session{} = session, %Submission{} = navigation) do
-    submit(session, navigation.submission)
+    submit(session, navigation.submission, navigation.redirects)
   end
 
   def navigate(%Session{} = session, %Redirect{} = navigation) do
@@ -247,8 +247,7 @@ defmodule Fluffy.Backend.Phoenix do
       detail: "multiple pages, new tabs, and page lifecycle operations require Playwright"
   end
 
-  # `redirects` counts the hops that led to the submitting page.
-  defp submit(%Session{} = session, submission, redirects \\ 0) do
+  defp submit(%Session{} = session, submission, redirects) do
     current_url = Session.current_page(session).url
     url = URI.merge(current_url, submission.action)
 
@@ -318,18 +317,30 @@ defmodule Fluffy.Backend.Phoenix do
 
     session = PageLifecycle.replace_document(session, :live, state, URI.to_string(url), [], &release_page/3)
 
-    # The LiveView client patches the join render like any other, so a form the
-    # view renders with phx-trigger-action is submitted, as after an event.
-    case {redirect, ClientDOM.triggered_submission(client_dom)} do
-      {nil, nil} -> session
-      {nil, submission} -> submit(session, submission, HTTP.count_redirect!(redirects, url))
-      {redirect, _submission} -> follow_mount_redirect(session, redirect, url, redirects)
+    # A mount redirect wins. Otherwise the LiveView client patches the join
+    # render like any other, so a form the view renders with phx-trigger-action
+    # is submitted, as after an event. Unlike a browser, which starts a fresh
+    # redirect count for the submission, Fluffy counts it toward the redirects
+    # that led here: following the navigations synchronously, it would otherwise
+    # never return from a view whose form leads back to it.
+    case redirect do
+      nil -> follow_mount_trigger(session, client_dom, url, redirects)
+      redirect -> follow_mount_redirect(session, redirect, url, redirects)
+    end
+  end
+
+  defp follow_mount_trigger(session, client_dom, url, redirects) do
+    case ClientDOM.triggered_submission(client_dom) do
+      nil ->
+        session
+
+      submission ->
+        navigate(session, %Submission{submission: submission, redirects: HTTP.count_redirect!(redirects, url)})
     end
   end
 
   # A browser follows a redirect from a view's mount like an HTTP redirect, so
-  # it counts toward the same redirect limit, as does a form the view triggers
-  # on mount: either can send the browser back to the view.
+  # it counts toward the same redirect limit.
   defp follow_mount_redirect(session, {_kind, %{to: destination} = options}, url, redirects) do
     follow_redirect(session, destination, options[:flash], HTTP.count_redirect!(redirects, url))
   end

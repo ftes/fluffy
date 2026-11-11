@@ -16,14 +16,24 @@ defmodule Fluffy.TestWeb.TriggerOnConnectLive do
       end
 
     {:ok,
-     assign(socket, identity: params["identity"] || "anonymous", loop?: params["trigger"] == "loop", trigger?: trigger?)}
+     assign(socket,
+       identity: params["identity"] || "anonymous",
+       loop?: params["trigger"] == "loop",
+       pinged?: false,
+       trigger?: trigger?
+     )}
   end
+
+  @impl true
+  def handle_event("ping", _params, socket), do: {:noreply, assign(socket, :pinged?, true)}
 
   @impl true
   def render(assigns) do
     ~H"""
     <main>
       <p>Handing off {@identity}</p>
+      <button type="button" phx-click="ping">Ping</button>
+      <p :if={@pinged?}>Pinged</p>
       <form
         :if={@loop?}
         id="loop-form"
