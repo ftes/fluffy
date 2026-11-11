@@ -27,7 +27,7 @@ dependency you list to cover every environment Fluffy needs it in, so widen the
 PlaywrightEx comes with Fluffy in the same environments, so `mix playwright_ex.install`
 works without listing it. List it only to sync its usage rules, since `usage_rules.sync`
 reads only the dependencies `mix.exs` lists:
-`{:playwright_ex, "~> 0.17.0-rc.4", only: [:dev, :test]}`.
+`{:playwright_ex, "~> 0.17.0-rc.5", only: [:dev, :test]}`.
 
 ## Phoenix endpoint
 

@@ -2,6 +2,12 @@
 
 Upgrading from 0.8? The [upgrade guide](docs/upgrading.md) lists the net changes.
 
+## Unreleased
+
+### Changed
+
+- Requires PlaywrightEx 0.17.0-rc.5, whose listener removal no longer fails once the driver is lost.
+
 ## 0.9.0-rc.2 — 2026-11-11
 
 ### Added
