@@ -4,7 +4,7 @@ defmodule Fluffy.EctoSandboxStressCase do
 
   using do
     quote do
-      use PlaywrightEx.Test
+      use Fluffy.Test
 
       import Fluffy
       import Fluffy.Expect

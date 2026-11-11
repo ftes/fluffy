@@ -95,7 +95,7 @@ To choose a backend, start a session explicitly. The same facade calls work with
 ```elixir
 defmodule MyAppWeb.PotionTest do
   use ExUnit.Case, async: true
-  use PlaywrightEx.Test
+  use Fluffy.Test
   import Fluffy.PhoenixTest
 
   setup context do

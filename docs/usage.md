@@ -108,7 +108,7 @@ defmodule MyAppWeb.FluffyCase do
   using do
     quote do
       use MyAppWeb.ConnCase
-      use PlaywrightEx.Test
+      use Fluffy.Test
       use Fluffy.Assert
 
       import Fluffy

@@ -121,8 +121,8 @@ default of 3 minutes applies. To use a system browser, set
 `launch_options: [executable_path: System.find_executable("google-chrome-stable")]`.
 `mix playwright_ex.install --no-browsers` installs only the driver for an existing browser.
 
-A module that starts Playwright sessions needs `use PlaywrightEx.Test` after
-`use ExUnit.Case` (or in your case template's `using`). There `Fluffy.Test.setup/2`
+A module that starts Playwright sessions needs `use Fluffy.Test` after
+`use ExUnit.Case` (or in your case template's `using`), which uses `PlaywrightEx.Test`. There `Fluffy.Test.setup/2`
 records every Playwright session of the test with `PlaywrightEx.Test.record_artifacts/2`:
 one `trace.zip` of all its sessions, a screenshot of each page as its session closes,
 and videos, each `:off` by default. The `*_on_failure` modes record every test and drop

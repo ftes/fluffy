@@ -1,6 +1,6 @@
 defmodule Fluffy.TestScopeSetupTest do
   use ExUnit.Case, async: false
-  use PlaywrightEx.Test
+  use Fluffy.Test
 
   alias Fluffy.TestScope
   alias Fluffy.TestWeb.Endpoint
@@ -96,5 +96,22 @@ defmodule Fluffy.TestScopeSetupTest do
                  fn ->
                    Fluffy.Test.setup(context, repos: :not_a_list)
                  end
+  end
+end
+
+defmodule Fluffy.TestScopeWithoutPlaywrightTest do
+  # A module without `use Fluffy.Test`: Phoenix sessions work, Playwright sessions need it.
+  use ExUnit.Case, async: true
+
+  setup context do
+    Fluffy.Test.setup(context, sandbox: false)
+  end
+
+  test "runs Phoenix sessions and rejects Playwright ones" do
+    Fluffy.start_session(:phoenix, endpoint: Fluffy.TestWeb.Endpoint)
+
+    assert_raise ArgumentError, ~r/use PlaywrightEx.Test/, fn ->
+      Fluffy.start_session(:playwright, base_url: Fluffy.TestServer.base_url())
+    end
   end
 end

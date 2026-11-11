@@ -5,7 +5,7 @@ defmodule Fluffy.TestCase do
 
   using do
     quote do
-      use PlaywrightEx.Test
+      use Fluffy.Test
 
       import Fluffy.TestCase,
         only: [
@@ -16,9 +16,6 @@ defmodule Fluffy.TestCase do
           playwright_engine?: 1,
           put_session_timeout: 2
         ]
-
-      # Only its `test`: the fragments' names clash with Fluffy.Playwright's (`new_page/1`).
-      import PlaywrightEx.Test, only: [test: 1, test: 2, test: 3]
     end
   end
 

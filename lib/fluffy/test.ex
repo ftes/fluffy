@@ -1,7 +1,22 @@
 defmodule Fluffy.Test do
   @moduledoc """
   ExUnit lifecycle setup for Fluffy tests.
+
+  A module that starts Playwright sessions adds `use Fluffy.Test` after `use ExUnit.Case`
+  (or in a case template's `using`). It uses `PlaywrightEx.Test`, which marks the test's
+  result for its artifacts and pool, and imports only its `test` macros, whose fragment
+  names would clash with `Fluffy.Playwright`'s.
   """
+
+  defmacro __using__(_options) do
+    quote do
+      use PlaywrightEx.Test
+
+      import PlaywrightEx.Test, only: [test: 1, test: 2, test: 3]
+
+      @moduletag fluffy_playwright: true
+    end
+  end
 
   @doc """
   Establishes Fluffy lifecycle management for the current ExUnit test.
@@ -11,7 +26,7 @@ defmodule Fluffy.Test do
   sandbox ownership. Pass `sandbox: false` to establish lifecycle management
   without database ownership.
 
-  In a module with `use PlaywrightEx.Test`, which Playwright sessions need, it also
+  In a module with `use Fluffy.Test`, which Playwright sessions need, it also
   calls `PlaywrightEx.Test.record_artifacts/2`: that records the traces, screenshots and
   videos of the test's Playwright sessions. Its modes come from
   `config :playwright_ex, :test`, overridden by `trace:`, `screenshot:` and `video:`.
@@ -38,12 +53,10 @@ defmodule Fluffy.Test do
         sandbox: if(sandbox?, do: {Fluffy.Sandbox, :acquire, [context, repos]}, else: false)
       )
 
-    if playwright_ex_test?(context[:module]) do
+    if context[:fluffy_playwright] do
       PlaywrightEx.Test.record_artifacts(context, Keyword.take(options, [:trace, :screenshot, :video]))
     else
       :ok
     end
   end
-
-  defp playwright_ex_test?(module), do: is_atom(module) and function_exported?(module, :__playwright_ex_test__, 0)
 end
