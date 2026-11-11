@@ -44,6 +44,8 @@ defmodule Fluffy.TestWeb.Router do
   scope "/live", Fluffy.TestWeb do
     pipe_through(:browser)
 
+    post("/trigger-on-connect/hand-off", PageController, :session_hand_off)
+
     live_session :fluffy_sandbox, on_mount: Fluffy.Sandbox do
       live("/three-heads", CounterLive)
       live("/fluffy", SmokeLive)
@@ -55,6 +57,7 @@ defmodule Fluffy.TestWeb.Router do
       live("/database", DatabaseLive)
       live("/potions", FormLive)
       live("/trigger-on-connect", TriggerOnConnectLive)
+      live("/trigger-on-connect/patched", TriggerOnConnectLive)
       live("/file-navigation", FileNavigationLive)
       live("/scrolls", LiveUploadLive)
       live("/scrolls/:mode", LiveUploadLive)
@@ -99,6 +102,7 @@ defmodule Fluffy.TestWeb.Router do
     get("/start", PageController, :session_start)
     get("/show", PageController, :session_show)
     post("/hand-off", PageController, :session_hand_off)
+    post("/marauders-map", PageController, :marauders_map)
   end
 
   scope "/initial-connection", Fluffy.TestWeb do

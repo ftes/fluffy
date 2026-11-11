@@ -172,6 +172,13 @@ defmodule Fluffy.TestWeb.PageController do
     |> redirect(to: "/session/show")
   end
 
+  def marauders_map(conn, params) do
+    conn
+    |> Plug.Conn.put_resp_header("content-disposition", ~s(attachment; filename="marauders_map.csv"))
+    |> Plug.Conn.put_resp_content_type("text/csv")
+    |> Plug.Conn.send_resp(200, "student\n#{params["identity"]}\n")
+  end
+
   def session_show(conn, _params) do
     send_html(conn, """
     <!doctype html>
