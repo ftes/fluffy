@@ -1,7 +1,7 @@
 defmodule Fluffy.Actionability do
   @moduledoc false
 
-  import Fluffy.HTML.Semantics, only: [attribute: 2]
+  import Fluffy.HTML.Semantics, only: [attribute: 2, input_type: 1]
 
   @fillable_input_types [
     "color",
@@ -82,7 +82,7 @@ defmodule Fluffy.Actionability do
   def ensure_checkable!(element, action, locator) do
     {tag, attributes} = element_info(element)
 
-    if !(tag == "input" and input_type(attributes) in ["checkbox", "radio"]) do
+    if input_type(%{tag: tag, attributes: attributes}) not in ["checkbox", "radio"] do
       raise_error(action, :not_checkable, locator)
     end
 
@@ -102,7 +102,7 @@ defmodule Fluffy.Actionability do
   def ensure_file_input_type!(element, action, locator) do
     {tag, attributes} = element_info(element)
 
-    if !(tag == "input" and input_type(attributes) == "file") do
+    if input_type(%{tag: tag, attributes: attributes}) != "file" do
       raise_error(action, :not_file_input, locator)
     end
   end
@@ -135,7 +135,8 @@ defmodule Fluffy.Actionability do
 
   defp text_control?("textarea", _attributes), do: true
 
-  defp text_control?("input", attributes), do: input_type(attributes) in @fillable_input_types
+  defp text_control?("input", attributes),
+    do: input_type(%{tag: "input", attributes: attributes}) in @fillable_input_types
 
   defp text_control?(_tag, _attributes), do: false
 
@@ -146,40 +147,6 @@ defmodule Fluffy.Actionability do
   defp contenteditable_value?(nil), do: false
   defp contenteditable_value?(""), do: true
   defp contenteditable_value?(value), do: String.downcase(value) in ["true", "plaintext-only"]
-
-  defp input_type(attributes) do
-    case attributes |> attribute("type") |> Kernel.||("text") |> String.downcase() do
-      type
-      when type in [
-             "button",
-             "checkbox",
-             "color",
-             "date",
-             "datetime-local",
-             "email",
-             "file",
-             "hidden",
-             "image",
-             "month",
-             "number",
-             "password",
-             "radio",
-             "range",
-             "reset",
-             "search",
-             "submit",
-             "tel",
-             "text",
-             "time",
-             "url",
-             "week"
-           ] ->
-        type
-
-      _invalid ->
-        "text"
-    end
-  end
 
   defp raise_error(action, reason, locator) do
     raise Fluffy.ActionabilityError,
