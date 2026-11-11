@@ -34,6 +34,27 @@ defmodule Fluffy.Conformance.ExternalNavigationTest do
       |> expect(page_to_have_url(@guild <> "?from=link"))
     end
 
+    # Playwright routes only a redirect's first URL, so the redirect goes to the test server
+    # under another origin instead, like Playwright's own CROSS_PROCESS_PREFIX.
+    @tag driver: driver
+    test "a form whose response redirects off-origin ends at the redirect's location with #{driver}",
+         %{driver: driver} do
+      hall = TestHTTPFixtures.register(%{body: html("<h1>Guild hall</h1>")})
+      hall_url = hall |> TestHTTPFixtures.url("/hall?from=redirect") |> String.replace("//127.0.0.1:", "//localhost:")
+
+      fixture =
+        TestHTTPFixtures.register_sequence([
+          %{body: html(~s(<form method="post" action="login"><button>Sign in</button></form>))},
+          %{status: 302, headers: [{"location", hall_url}]}
+        ])
+
+      driver
+      |> start_test_session()
+      |> visit(TestHTTPFixtures.path(fixture, "/start"))
+      |> click(by_role(:button, name: "Sign in"))
+      |> expect(page_to_have_url(hall_url))
+    end
+
     @tag driver: driver
     test "LiveView links and external redirects end at the external URL with #{driver}", %{driver: driver} do
       session = guild_session(driver)
@@ -52,21 +73,6 @@ defmodule Fluffy.Conformance.ExternalNavigationTest do
       |> visit("/live/chamber-map?redirect=external")
       |> expect(page_to_have_url(@guild <> "?from=mount"))
     end
-  end
-
-  # Playwright routes only a redirect's first URL, so a browser test can't stub its off-origin target.
-  test "a form whose response redirects off-origin ends at the redirect's location on Phoenix" do
-    fixture =
-      TestHTTPFixtures.register_sequence([
-        %{body: html(~s(<form method="post" action="login"><button>Sign in</button></form>))},
-        %{status: 302, headers: [{"location", @guild <> "?from=redirect"}]}
-      ])
-
-    :phoenix
-    |> start_test_session()
-    |> visit(TestHTTPFixtures.path(fixture, "/start"))
-    |> click(by_role(:button, name: "Sign in"))
-    |> expect(page_to_have_url(fn %URI{} = uri -> uri.host == "guild.example" and uri.query == "from=redirect" end))
   end
 
   describe "on Phoenix, the external page" do

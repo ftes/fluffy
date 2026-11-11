@@ -23,6 +23,7 @@ boundaries described below.
 | Focus, blur, and focus assertions | - | equivalent |
 | Structural element actions | structural subset | equivalent |
 | Visits, reloads, links, redirects, cookies, and HTTP forms | equivalent | equivalent |
+| Off-origin redirects and links | structural subset | equivalent |
 | Phoenix.HTML data-method/data-to actions | structural subset | equivalent |
 | LiveView events, patches, navigation, and structural action retry | equivalent | equivalent |
 | LiveView root layout, title updates, and portals | structural subset | equivalent |
