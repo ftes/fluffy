@@ -16,6 +16,7 @@ Upgrading from 0.8? The [upgrade guide](docs/upgrading.md) lists the net changes
 ### Fixed
 
 - On Phoenix, a form a LiveView renders with `phx-trigger-action` as it connects, such as from `connected?(socket)` in `mount`, is submitted as LiveView's client does, instead of leaving the page on the LiveView. The submission counts toward the redirect limit like a mount redirect.
+- On Phoenix, a `phx-trigger-action` form is also submitted from a render the server pushes, such as from `handle_info` or after `push_patch`, as LiveView's client does; a triggered form that downloads leaves the page inert.
 
 ## 0.9.0-rc.2 — 2026-11-11
 

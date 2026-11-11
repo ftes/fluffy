@@ -165,16 +165,18 @@ defmodule Fluffy.Backend.Phoenix do
     follow_link(session, navigation.destination, navigation.download)
   end
 
-  def navigate(%Session{} = session, %Submission{} = navigation) do
+  def navigate(%Session{} = session, %Submission{triggered: false} = navigation) do
     submit(session, navigation.submission, navigation.redirects)
   end
 
-  def navigate(%Session{} = session, %Redirect{} = navigation) do
-    document_id = Session.current_page(session).document_id
-    session = follow_redirect(session, navigation.destination, navigation.flash, navigation.redirects)
+  # LiveView's client unloads its socket before it submits a triggered form.
+  def navigate(%Session{} = session, %Submission{triggered: true} = navigation) do
+    inert_if_kept(session, &submit(&1, navigation.submission, navigation.redirects))
+  end
 
-    # A download keeps the document, but the view that redirected to it is gone.
-    if Session.current_page(session).document_id == document_id, do: keep_document(session, nil), else: session
+  # The view that redirected is gone.
+  def navigate(%Session{} = session, %Redirect{} = navigation) do
+    inert_if_kept(session, &follow_redirect(&1, navigation.destination, navigation.flash, navigation.redirects))
   end
 
   def navigate(%Session{} = session, %Patch{} = navigation) do
@@ -239,6 +241,15 @@ defmodule Fluffy.Backend.Phoenix do
     else
       request(session, url, :get, nil, download_name, 0)
     end
+  end
+
+  # Navigates away from a LiveView that is gone. A response that keeps the
+  # document, such as a download, leaves it as inert markup.
+  defp inert_if_kept(session, navigate) do
+    document_id = Session.current_page(session).document_id
+    session = navigate.(session)
+
+    if Session.current_page(session).document_id == document_id, do: keep_document(session, nil), else: session
   end
 
   defp require_browser_pages!(session) do
@@ -329,7 +340,10 @@ defmodule Fluffy.Backend.Phoenix do
         follow_mount_redirect(session, redirect, url, redirects)
 
       {submission, _later_redirect} ->
-        navigate(session, Navigation.submission(submission, redirects: HTTP.count_redirect!(redirects, url)))
+        navigate(
+          session,
+          Navigation.submission(submission, redirects: HTTP.count_redirect!(redirects, url), triggered: true)
+        )
     end
   end
 

@@ -23,6 +23,7 @@ defmodule Fluffy.Driver.Live do
   alias Fluffy.HTML.Target
   alias Fluffy.Internal.Navigation
   alias Fluffy.Internal.Navigation.Redirect
+  alias Fluffy.Internal.Navigation.Submission
   alias Fluffy.LiveViewTest.UploadCompat
   alias Fluffy.Locator
   alias Fluffy.Page
@@ -490,23 +491,11 @@ defmodule Fluffy.Driver.Live do
     Retry.run(session, deadline, attempt, &refresh/1, &wait_for_retry/2)
   end
 
+  # A server-pushed render can drop upload entries, as an event's can.
   defp refresh(session) do
-    state = Session.page_state(session)
-
-    try do
-      case Document.render(state.document, state.view) do
-        # A server-pushed render can drop upload entries, as an event's can.
-        {:ok, document} ->
-          session
-          |> Session.put_page_state(%{state | client_dom: ClientDOM.reconcile(state.client_dom, document)})
-          |> prune_stale_live_uploads()
-
-        {:error, redirect} ->
-          follow_redirect_result(session, {:error, redirect})
-      end
-    catch
-      :exit, reason -> follow_exit_redirect(session, reason)
-    end
+    render_view(session, Session.page_state(session).client_dom, &prune_stale_live_uploads/1)
+  catch
+    :exit, reason -> follow_exit_redirect(session, reason)
   end
 
   defp reconcile_unwrapped(session, client_dom) do
@@ -691,10 +680,11 @@ defmodule Fluffy.Driver.Live do
   end
 
   # Follows a navigation an action or expectation found before reaching the
-  # view, for a retry on the new page. The navigation counts toward the retry's
-  # timeout, and its redirect toward the redirect limit of the retries and of
-  # the redirects it leads to.
-  defp follow_for_retry(session, %Redirect{} = navigation) do
+  # view, for a retry on the new page: a redirect the view left, or a form it
+  # triggered. The navigation counts toward the retry's timeout, and toward the
+  # redirect limit of the retries and of the redirects it leads to (see
+  # docs/capabilities.md).
+  defp follow_for_retry(session, %struct{} = navigation) when struct in [Redirect, Submission] do
     redirects = HTTP.count_redirect!(ActionScope.redirects(), URI.parse(Session.current_page(session).url))
     {Fluffy.Backend.navigate(session, %{navigation | redirects: redirects}), redirects}
   end
@@ -867,10 +857,17 @@ defmodule Fluffy.Driver.Live do
     redirected
   end
 
-  # Patches are committed before the render, so it shows the last of them.
   # LiveViewTest answers nil when the event's nested view was removed before its
   # reply; the page is still whatever the root view renders now.
   defp commit_render_result(session, client_dom, result, after_render) when is_binary(result) or is_nil(result) do
+    render_view(session, client_dom, after_render)
+  end
+
+  # Renders the view, after an event or for a render the server pushed, and
+  # commits the render. LiveView's client submits a form with phx-trigger-action
+  # after any patch, so a triggered form navigates like a redirect the view left.
+  # A patch arriving just after the render can put the URL a patch ahead.
+  defp render_view(session, client_dom, after_render) do
     session = apply_last_patch(session)
     state = Session.page_state(session)
 
@@ -883,15 +880,13 @@ defmodule Fluffy.Driver.Live do
 
     case rendered do
       {:ok, document} ->
-        state = %{state | client_dom: ClientDOM.reconcile(client_dom, document)}
+        session = apply_last_patch(session)
+        state = %{Session.page_state(session) | client_dom: ClientDOM.reconcile(client_dom, document)}
         session = session |> Session.put_page_state(state) |> after_render.()
 
         case ClientDOM.triggered_submission(state.client_dom) do
-          nil ->
-            session
-
-          submission ->
-            {:navigate, session, Navigation.submission(submission)}
+          nil -> session
+          submission -> {:navigate, session, Navigation.submission(submission, triggered: true)}
         end
 
       {:error, redirect} ->

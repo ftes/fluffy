@@ -469,6 +469,55 @@ defmodule Fluffy.Conformance.LiveFormTest do
       |> expect("Wand lit" |> by_text() |> to_be_visible())
       |> expect(Fluffy.Expect.page_to_have_url(~r|/live/trigger-on-connect\?|))
     end
+
+    # An action waits for its target through the form's navigation.
+    @tag driver: driver
+    test "a form triggered from handle_info is submitted with #{driver}", %{driver: driver} do
+      driver
+      |> start_test_session()
+      |> visit("/live/trigger-on-connect?identity=hermione&trigger=later")
+      |> click(by_role(:button, name: "Trigger later"))
+      |> click(by_text("Static identity: hermione"))
+      |> expect(Fluffy.Expect.page_to_have_url(Fluffy.TestServer.base_url() <> "/session/show"))
+    end
+
+    # The form's relative action resolves from the patched URL.
+    @tag driver: driver
+    test "a form triggered in handle_params after a server push_patch is submitted with #{driver}", %{driver: driver} do
+      driver
+      |> start_test_session()
+      |> visit("/live/trigger-on-connect?identity=hermione&trigger=later&form=relative")
+      |> click(by_role(:button, name: "Patch later"))
+      |> expect(Fluffy.Expect.page_to_have_url(Fluffy.TestServer.base_url() <> "/session/show"))
+      |> expect("Static identity: hermione" |> by_text() |> to_be_visible())
+    end
+
+    # LiveView's client unloads before it submits a triggered form, so a
+    # download leaves an inert page that does not submit the form again.
+    @tag driver: driver
+    test "a triggered form that downloads leaves the page inert with #{driver}", %{driver: driver} do
+      session = start_test_session(driver)
+      pending = wait_for(session, Fluffy.Event.download())
+
+      session =
+        session
+        |> visit("/live/trigger-on-connect?identity=hermione&trigger=later&form=map")
+        |> click(by_role(:button, name: "Trigger later"))
+        # Phoenix reads the pushed render as the expectation waits for it.
+        |> expect("I solemnly swear that I am up to no good" |> by_text() |> to_be_visible())
+
+      download = await(pending)
+      assert download.suggested_filename == "marauders_map.csv"
+      assert Fluffy.Download.read(download) == "student\nhermione\n"
+
+      session = expect(session, "Floo powder for hermione" |> by_text() |> to_be_visible())
+
+      if driver == :phoenix do
+        session
+        |> click(by_role(:button, name: "Lumos"))
+        |> expect("Wand lit" |> by_text() |> to_have_count(0))
+      end
+    end
   end
 
   test "a form triggered on every connected render fails at the redirect limit" do
@@ -477,6 +526,17 @@ defmodule Fluffy.Conformance.LiveFormTest do
     assert_raise RuntimeError, ~r/exceeded 20 redirects/, fn ->
       visit(session, "/live/trigger-on-connect?trigger=loop")
     end
+  end
+
+  # In a browser the form is already submitted, whatever the test's timeout.
+  test "an expectation without timeout budget follows a form the view triggered" do
+    session = :phoenix |> start_test_session() |> visit("/live/trigger-on-connect?identity=hermione&trigger=later")
+    view = Fluffy.Session.page_state(session).view.pid
+    send(view, :trigger)
+    # Returns once the view handled the message.
+    :sys.get_state(view)
+
+    expect(session, Fluffy.Expect.page_to_have_url(Fluffy.TestServer.base_url() <> "/session/show"), timeout: 0)
   end
 
   test "the Phoenix driver eagerly synchronizes a blur-debounced form mutation" do

@@ -12,10 +12,12 @@ end
 defmodule Fluffy.Internal.Navigation.Submission do
   @moduledoc false
   # `redirects` counts the redirects that led to this submission, which the
-  # redirects following it count on from.
+  # redirects following it count on from. `triggered` marks a form a LiveView
+  # rendered with phx-trigger-action, which LiveView's client submits only after
+  # disconnecting for good.
   @enforce_keys [:submission]
-  defstruct [:submission, redirects: 0]
-  @type t :: %__MODULE__{submission: map(), redirects: non_neg_integer()}
+  defstruct [:submission, redirects: 0, triggered: false]
+  @type t :: %__MODULE__{submission: map(), redirects: non_neg_integer(), triggered: boolean()}
 end
 
 defmodule Fluffy.Internal.Navigation.Redirect do
@@ -91,8 +93,8 @@ defmodule Fluffy.Internal.Navigation do
   end
 
   def submission(submission, options \\ []) do
-    options = Keyword.validate!(options, redirects: 0)
-    %Submission{submission: submission, redirects: options[:redirects]}
+    options = Keyword.validate!(options, redirects: 0, triggered: false)
+    %Submission{submission: submission, redirects: options[:redirects], triggered: options[:triggered]}
   end
 
   def redirect(destination, options \\ []) do
