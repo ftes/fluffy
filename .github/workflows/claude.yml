@@ -15,7 +15,8 @@ env:
   MISE_VERSION: "2026.8.14"
   MIX_ENV: test
   # Added to Claude's system prompt: Bash calls that don't match the allowlist are denied.
-  TOOL_HINT: "Use your file tools, not Bash, to read and search files, and keep any scratch files under tmp/; run each allowed Bash command on its own, without cd, ;, &&, pipes or heredocs (you are already in the repository)."
+  # Plain text only (no quotes, $ or backslashes): claude.yml quotes it inside claude_args.
+  TOOL_HINT: "Prefer your file tools over Bash to read, search and edit files, and keep any scratch files under tmp/; run each allowed Bash command on its own, without cd, semicolons, &&, pipes or heredocs (you are already in the repository)."
 
 jobs:
   claude:
