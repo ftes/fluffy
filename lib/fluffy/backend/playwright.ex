@@ -123,13 +123,15 @@ defmodule Fluffy.Backend.Playwright do
 
   # Actions adopt the document they find. One that page code navigated to
   # since is read from the page; a closed or unresponsive page keeps the
-  # adopted identity.
+  # adopted identity. The probe raises a `RuntimeError` when the page does not
+  # respond and PlaywrightEx's error when the page is closed or the read fails.
   defp document_identity(state) do
     if Document.navigated?(state),
       do: Document.probe!(state.frame, nil, @snapshot_probe_timeout).document,
       else: state.document_identity
   rescue
-    _error -> state.document_identity
+    _error in [RuntimeError, PlaywrightEx.PlaywrightError, PlaywrightEx.TimeoutError, TargetClosedError] ->
+      state.document_identity
   end
 
   @impl true
