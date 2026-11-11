@@ -421,6 +421,33 @@ defmodule Fluffy.Conformance.LiveFormTest do
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
       |> expect(Fluffy.Expect.page_to_have_url(Fluffy.TestServer.base_url() <> "/chamber?from=dynamic-trigger"))
     end
+
+    @tag driver: driver
+    test "a form triggered on the connected render is submitted with #{driver}", %{driver: driver} do
+      driver
+      |> start_test_session()
+      |> visit("/live/trigger-on-connect?identity=ada")
+      |> expect(Fluffy.Expect.page_to_have_url(Fluffy.TestServer.base_url() <> "/session/show"))
+      |> expect("Static identity: ada" |> by_text() |> to_be_visible())
+    end
+
+    @tag driver: driver
+    test "a form triggered on the dead render only is not submitted with #{driver}", %{driver: driver} do
+      driver
+      |> start_test_session()
+      |> visit("/live/trigger-on-connect?identity=ada&trigger=dead")
+      |> expect("#hand-off-form" |> by_css() |> to_be_attached())
+      |> expect("Handing off ada" |> by_text() |> to_be_visible())
+      |> expect(Fluffy.Expect.page_to_have_url(~r|/live/trigger-on-connect\?|))
+    end
+  end
+
+  test "a form triggered on every connected render fails at the redirect limit" do
+    session = start_test_session(:phoenix)
+
+    assert_raise RuntimeError, ~r/exceeded 20 redirects/, fn ->
+      visit(session, "/live/trigger-on-connect?trigger=loop")
+    end
   end
 
   test "the Phoenix driver eagerly synchronizes a blur-debounced form mutation" do

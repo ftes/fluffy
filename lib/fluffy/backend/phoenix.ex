@@ -236,7 +236,7 @@ defmodule Fluffy.Backend.Phoenix do
         same_document: true
       )
     else
-      request(session, url, :get, nil, download_name)
+      request(session, url, :get, nil, download_name, 0)
     end
   end
 
@@ -247,17 +247,18 @@ defmodule Fluffy.Backend.Phoenix do
       detail: "multiple pages, new tabs, and page lifecycle operations require Playwright"
   end
 
-  defp submit(%Session{} = session, submission) do
+  # `redirects` counts the hops that led to the submitting page.
+  defp submit(%Session{} = session, submission, redirects \\ 0) do
     current_url = Session.current_page(session).url
     url = URI.merge(current_url, submission.action)
 
     case submission.method do
       :get ->
         encoded_fields = Fluffy.Form.url_encode(submission.fields)
-        request(session, %{url | query: encoded_fields}, :get, nil)
+        request(session, %{url | query: encoded_fields}, :get, nil, nil, redirects)
 
       :post ->
-        request(session, url, :post, encode_post_submission(submission))
+        request(session, url, :post, encode_post_submission(submission), nil, redirects)
     end
   end
 
@@ -317,14 +318,18 @@ defmodule Fluffy.Backend.Phoenix do
 
     session = PageLifecycle.replace_document(session, :live, state, URI.to_string(url), [], &release_page/3)
 
-    case redirect do
-      nil -> session
-      redirect -> follow_mount_redirect(session, redirect, url, redirects)
+    # The LiveView client patches the join render like any other, so a form the
+    # view renders with phx-trigger-action is submitted, as after an event.
+    case {redirect, ClientDOM.triggered_submission(client_dom)} do
+      {nil, nil} -> session
+      {nil, submission} -> submit(session, submission, HTTP.count_redirect!(redirects, url))
+      {redirect, _submission} -> follow_mount_redirect(session, redirect, url, redirects)
     end
   end
 
   # A browser follows a redirect from a view's mount like an HTTP redirect, so
-  # it counts toward the same redirect limit.
+  # it counts toward the same redirect limit, as does a form the view triggers
+  # on mount: either can send the browser back to the view.
   defp follow_mount_redirect(session, {_kind, %{to: destination} = options}, url, redirects) do
     follow_redirect(session, destination, options[:flash], HTTP.count_redirect!(redirects, url))
   end
@@ -350,7 +355,7 @@ defmodule Fluffy.Backend.Phoenix do
     session |> put_http(http) |> finish_response(response, nil)
   end
 
-  defp request(session, url, method, body, download_name \\ nil, redirects \\ 0) do
+  defp request(session, url, method, body, download_name, redirects) do
     {http, response} = HTTP.request(Session.context(session).http, url, method, body, redirects)
     session |> put_http(http) |> finish_response(response, download_name)
   end
