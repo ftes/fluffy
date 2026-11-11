@@ -166,6 +166,12 @@ defmodule Fluffy.TestWeb.PageController do
     |> redirect(to: "/live/session")
   end
 
+  def session_hand_off(conn, params) do
+    conn
+    |> put_session(:identity, params["identity"])
+    |> redirect(to: "/session/show")
+  end
+
   def session_show(conn, _params) do
     send_html(conn, """
     <!doctype html>

@@ -235,6 +235,14 @@ On Phoenix, a click or key event sends a form control's current `value` and a
 list item's number; other elements send no `value`, while a browser also sends
 one for `meter`, `progress`, `output`, `data` and `param`.
 
+As in LiveView's client, the LiveView driver submits a form the view renders with
+`phx-trigger-action`, after an event or as the view connects. It looks for the
+form in the whole document, root layout included, while the client only submits
+forms in the LiveView it patches. A form triggered as the view connects counts toward
+the 20-redirect limit of the redirects that led to the view, where a browser
+starts a fresh count, so a view whose triggered form leads back to it fails
+instead of looping.
+
 File selection supports bounded local paths and typed in-memory payloads,
 ordered multiple selection, clearing, and ordinary multipart forms, including
 empty-file entries. Managed LiveView uploads support validation, progress,

@@ -11,9 +11,11 @@ end
 
 defmodule Fluffy.Internal.Navigation.Submission do
   @moduledoc false
+  # `redirects` counts the redirects that led to this submission, which the
+  # redirects following it count on from.
   @enforce_keys [:submission]
-  defstruct [:submission]
-  @type t :: %__MODULE__{submission: map()}
+  defstruct [:submission, redirects: 0]
+  @type t :: %__MODULE__{submission: map(), redirects: non_neg_integer()}
 end
 
 defmodule Fluffy.Internal.Navigation.Redirect do
@@ -88,7 +90,10 @@ defmodule Fluffy.Internal.Navigation do
     %Link{destination: destination, download: options[:download]}
   end
 
-  def submission(submission), do: %Submission{submission: submission}
+  def submission(submission, options \\ []) do
+    options = Keyword.validate!(options, redirects: 0)
+    %Submission{submission: submission, redirects: options[:redirects]}
+  end
 
   def redirect(destination, options \\ []) do
     options = Keyword.validate!(options, [:flash])

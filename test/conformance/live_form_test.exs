@@ -421,6 +421,62 @@ defmodule Fluffy.Conformance.LiveFormTest do
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
       |> expect(Fluffy.Expect.page_to_have_url(Fluffy.TestServer.base_url() <> "/chamber?from=dynamic-trigger"))
     end
+
+    @tag driver: driver
+    test "a form triggered on the connected render is submitted with #{driver}", %{driver: driver} do
+      driver
+      |> start_test_session()
+      |> visit("/live/trigger-on-connect?identity=hermione")
+      |> expect(Fluffy.Expect.page_to_have_url(Fluffy.TestServer.base_url() <> "/session/show"))
+      |> expect("Static identity: hermione" |> by_text() |> to_be_visible())
+    end
+
+    @tag driver: driver
+    test "a form triggered on the connected render beats a navigation sent after the join with #{driver}",
+         %{driver: driver} do
+      driver
+      |> start_test_session()
+      |> visit("/live/trigger-on-connect?identity=hermione&then=navigate")
+      |> expect(Fluffy.Expect.page_to_have_url(Fluffy.TestServer.base_url() <> "/session/show"))
+      |> expect("Static identity: hermione" |> by_text() |> to_be_visible())
+    end
+
+    @tag driver: driver
+    test "a form triggered on the connected render can leave for another origin with #{driver}", %{driver: driver} do
+      session = start_test_session(driver)
+
+      # A browser really loads the external page, so Playwright stubs its host.
+      if driver == :playwright do
+        Fluffy.Playwright.route(session, "https://ministry.example/**", fn route ->
+          Fluffy.Route.fulfill(route, content_type: "text/html", body: "<h1>Floo to the Ministry</h1>")
+        end)
+      end
+
+      session
+      |> visit("/live/trigger-on-connect?identity=hermione&trigger=ministry")
+      |> expect(Fluffy.Expect.page_to_have_url("https://ministry.example/floo"))
+    end
+
+    @tag driver: driver
+    test "a form triggered on the dead render only is not submitted with #{driver}", %{driver: driver} do
+      driver
+      |> start_test_session()
+      |> visit("/live/trigger-on-connect?identity=hermione&trigger=dead")
+      |> expect("Floo powder for hermione" |> by_text() |> to_be_visible())
+      # The LiveView client disconnects before it submits a triggered form, so
+      # the view only answers if it was not submitted.
+      |> click(by_role(:button, name: "Lumos"))
+      |> expect("Wand lit" |> by_text() |> to_be_visible())
+      |> expect(Fluffy.Expect.page_to_have_url(~r|/live/trigger-on-connect\?|))
+    end
+  end
+
+  test "a form triggered on every connected render fails at the redirect limit" do
+    session = start_test_session(:phoenix)
+
+    assert_raise RuntimeError, ~r/exceeded 20 redirects/, fn ->
+      visit(session, "/live/trigger-on-connect?trigger=loop")
+    end
   end
 
   test "the Phoenix driver eagerly synchronizes a blur-debounced form mutation" do

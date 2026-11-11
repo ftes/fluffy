@@ -54,6 +54,7 @@ defmodule Fluffy.TestWeb.Router do
       live("/session", SessionLive)
       live("/database", DatabaseLive)
       live("/potions", FormLive)
+      live("/trigger-on-connect", TriggerOnConnectLive)
       live("/file-navigation", FileNavigationLive)
       live("/scrolls", LiveUploadLive)
       live("/scrolls/:mode", LiveUploadLive)
@@ -97,6 +98,7 @@ defmodule Fluffy.TestWeb.Router do
 
     get("/start", PageController, :session_start)
     get("/show", PageController, :session_show)
+    post("/hand-off", PageController, :session_hand_off)
   end
 
   scope "/initial-connection", Fluffy.TestWeb do

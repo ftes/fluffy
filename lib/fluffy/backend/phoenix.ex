@@ -20,6 +20,7 @@ defmodule Fluffy.Backend.Phoenix do
   alias Fluffy.Driver.Live.UploadState
   alias Fluffy.Driver.Static.State, as: StaticState
   alias Fluffy.Driver.Unvisited.State, as: UnvisitedState
+  alias Fluffy.Internal.Navigation
   alias Fluffy.Internal.Navigation.Link
   alias Fluffy.Internal.Navigation.Patch
   alias Fluffy.Internal.Navigation.Redirect
@@ -165,7 +166,7 @@ defmodule Fluffy.Backend.Phoenix do
   end
 
   def navigate(%Session{} = session, %Submission{} = navigation) do
-    submit(session, navigation.submission)
+    submit(session, navigation.submission, navigation.redirects)
   end
 
   def navigate(%Session{} = session, %Redirect{} = navigation) do
@@ -236,7 +237,7 @@ defmodule Fluffy.Backend.Phoenix do
         same_document: true
       )
     else
-      request(session, url, :get, nil, download_name)
+      request(session, url, :get, nil, download_name, 0)
     end
   end
 
@@ -247,17 +248,17 @@ defmodule Fluffy.Backend.Phoenix do
       detail: "multiple pages, new tabs, and page lifecycle operations require Playwright"
   end
 
-  defp submit(%Session{} = session, submission) do
+  defp submit(%Session{} = session, submission, redirects) do
     current_url = Session.current_page(session).url
     url = URI.merge(current_url, submission.action)
 
     case submission.method do
       :get ->
         encoded_fields = Fluffy.Form.url_encode(submission.fields)
-        request(session, %{url | query: encoded_fields}, :get, nil)
+        request(session, %{url | query: encoded_fields}, :get, nil, nil, redirects)
 
       :post ->
-        request(session, url, :post, encode_post_submission(submission))
+        request(session, url, :post, encode_post_submission(submission), nil, redirects)
     end
   end
 
@@ -317,9 +318,18 @@ defmodule Fluffy.Backend.Phoenix do
 
     session = PageLifecycle.replace_document(session, :live, state, URI.to_string(url), [], &release_page/3)
 
-    case redirect do
-      nil -> session
-      redirect -> follow_mount_redirect(session, redirect, url, redirects)
+    # The client patches the join render before anything the view sends later, so
+    # a form that render triggers wins over a redirect reported after the join. It
+    # counts toward the redirects that led here (see docs/capabilities.md).
+    case {ClientDOM.triggered_submission(client_dom), redirect} do
+      {nil, nil} ->
+        session
+
+      {nil, redirect} ->
+        follow_mount_redirect(session, redirect, url, redirects)
+
+      {submission, _later_redirect} ->
+        navigate(session, Navigation.submission(submission, redirects: HTTP.count_redirect!(redirects, url)))
     end
   end
 
@@ -350,7 +360,7 @@ defmodule Fluffy.Backend.Phoenix do
     session |> put_http(http) |> finish_response(response, nil)
   end
 
-  defp request(session, url, method, body, download_name \\ nil, redirects \\ 0) do
+  defp request(session, url, method, body, download_name, redirects) do
     {http, response} = HTTP.request(Session.context(session).http, url, method, body, redirects)
     session |> put_http(http) |> finish_response(response, download_name)
   end
