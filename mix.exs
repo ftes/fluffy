@@ -177,9 +177,9 @@ defmodule Fluffy.MixProject do
     [
       setup: [
         "deps.get",
-        "fluffy.playwright_source",
         "assets.build",
-        "playwright_ex.install -- chromium"
+        "playwright_ex.install -- chromium",
+        "fluffy.playwright_source"
       ],
       "consumer.regenerate": "run --no-start integration/regenerate_consumer.exs",
       "assets.build": ["esbuild.install --if-missing", "esbuild test_browser"],

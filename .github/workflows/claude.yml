@@ -40,6 +40,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
       - name: Set up toolchain and deps
+        continue-on-error: true
         uses: ./.github/actions/setup
         with:
           lane: newest
