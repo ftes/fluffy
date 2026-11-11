@@ -99,7 +99,12 @@ defmodule Fluffy.PhoenixTest do
   def click_link(session, selector, text, options) do
     string!(text, :text)
     options = options!(options, [:exact])
-    text_locator = session |> css_locator(selector) |> Locator.filter(Keyword.put(options, :has_text, text))
+
+    text_locator =
+      session
+      |> css_locator(selector)
+      |> Locator.filter(has_text: text_matcher(text, Keyword.get(options, :exact, false)))
+
     label_locator = field_locator(session, selector, text, exact: Keyword.get(options, :exact, false))
 
     map_session(session, fn native ->
@@ -374,7 +379,12 @@ defmodule Fluffy.PhoenixTest do
   defp click_text(session, selector, text, options) do
     string!(text, :text)
     options = options!(options, [:exact])
-    text_locator = session |> css_locator(selector) |> Locator.filter(Keyword.put(options, :has_text, text))
+
+    text_locator =
+      session
+      |> css_locator(selector)
+      |> Locator.filter(has_text: text_matcher(text, Keyword.get(options, :exact, false)))
+
     label_locator = field_locator(session, selector, text, exact: Keyword.get(options, :exact, false))
     locator = Locator.or_(text_locator, label_locator)
     map_session(session, &Fluffy.click(&1, locator))
@@ -483,7 +493,7 @@ defmodule Fluffy.PhoenixTest do
 
     locator =
       if Keyword.has_key?(options, :text),
-        do: Locator.filter(locator, has_text: options[:text], exact: Keyword.get(options, :exact, false)),
+        do: Locator.filter(locator, has_text: text_matcher(options[:text], Keyword.get(options, :exact, false))),
         else: locator
 
     element_expectation(locator, options)
@@ -496,7 +506,7 @@ defmodule Fluffy.PhoenixTest do
       Keyword.has_key?(options, :selected) ->
         locator
         |> Locator.by_css("option:checked")
-        |> Locator.filter(has_text: options[:selected], exact: true)
+        |> Locator.filter(has_text: text_matcher(options[:selected], true))
         |> Expect.to_have_count(0, timeout)
         |> Expect.not_()
 
@@ -512,6 +522,15 @@ defmodule Fluffy.PhoenixTest do
       true ->
         locator |> Locator.filter(visible: true) |> Locator.first() |> Expect.to_be_visible(timeout)
     end
+  end
+
+  # `exact: true` matches the whole whitespace-normalized text, case-sensitively. Only JS
+  # syntax characters are escaped: under the `u` flag JS rejects escapes such as `\-`.
+  defp text_matcher(text, false), do: text
+
+  defp text_matcher(text, true) do
+    words = text |> String.split() |> Enum.map_join("\\s+", &Regex.replace(~r/[\\^$.*+?()[\]{}|]/, &1, "\\\\\\0"))
+    Regex.compile!("^\\s*#{words}\\s*$", "u")
   end
 
   defp path_expectation(path, options) do

@@ -8,6 +8,10 @@ Upgrading from 0.8? The [upgrade guide](docs/upgrading.md) lists the net changes
 
 - Static and LiveView match a regex in a locator's `name:`, `has_text:` and `has_not_text:`, as Playwright does, instead of raising `Fluffy.CapabilityError`. It runs as PCRE there, so edge cases can differ from the browser's JavaScript.
 
+### Changed
+
+- **Breaking:** `filter/2` drops `exact:`, which Playwright's `filter` does not have. Use a regex instead, such as `has_text: ~r/^Pro$/`. The facade's `exact: true` keeps its meaning.
+
 ## 0.9.0-rc.2 — 2026-11-11
 
 ### Added

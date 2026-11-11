@@ -99,10 +99,9 @@ defmodule Fluffy.Locator.Static do
   defp filter_candidates(candidates, aria, options) do
     Enum.filter(candidates, fn candidate ->
       Enum.all?(options, fn
-        {:has_text, text} -> text_matches?(text(aria, candidate), text, Keyword.get(options, :exact, false))
-        {:has_not_text, text} -> not text_matches?(text(aria, candidate), text, Keyword.get(options, :exact, false))
+        {:has_text, text} -> text_matches?(text(aria, candidate), text, false)
+        {:has_not_text, text} -> not text_matches?(text(aria, candidate), text, false)
         {:visible, visible?} -> structurally_visible?(aria, candidate) == visible?
-        {:exact, _exact?} -> true
         {:has, %Locator{} = child} -> resolve(aria, candidate, child) != []
         {:has_not, %Locator{} = child} -> resolve(aria, candidate, child) == []
       end)

@@ -75,14 +75,10 @@ defmodule Fluffy.Locator.Playwright do
   defp apply_operation({:filter, options}, selector) do
     Enum.reduce(options, selector, fn
       {:has_text, text}, current ->
-        has_text = text_selector("internal:has-text", text, Keyword.get(options, :exact, false))
-
-        concat(current, has_text)
+        concat(current, text_selector("internal:has-text", text))
 
       {:has_not_text, text}, current ->
-        has_not_text = text_selector("internal:has-not-text", text, Keyword.get(options, :exact, false))
-
-        concat(current, has_not_text)
+        concat(current, text_selector("internal:has-not-text", text))
 
       {:has, %Locator{} = child}, current ->
         concat(current, "internal:has=#{JSON.encode!(selector(child))}")
@@ -92,9 +88,6 @@ defmodule Fluffy.Locator.Playwright do
 
       {:visible, visible?}, current ->
         concat(current, "visible=#{visible?}")
-
-      {:exact, _exact?}, current ->
-        current
     end)
   end
 
@@ -110,6 +103,5 @@ defmodule Fluffy.Locator.Playwright do
   defp concat(:none, right), do: right
   defp concat(left, right), do: "#{left} >> #{right}"
 
-  # A regular expression ignores `exact?`, as upstream.
-  defp text_selector(engine, value, exact?), do: "#{engine}=#{StringUtils.escape_for_text_selector(value, exact?)}"
+  defp text_selector(engine, value), do: "#{engine}=#{StringUtils.escape_for_text_selector(value, false)}"
 end

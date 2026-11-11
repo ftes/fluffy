@@ -111,7 +111,7 @@ defmodule Fluffy.Conformance.ComposedLocatorTest do
         "option"
         |> by_css()
         |> and_(by_css(":checked"))
-        |> filter(has_text: "Pro", exact: true)
+        |> filter(has_text: ~r/^Pro$/)
         |> to_have_count(1)
       )
       |> uncheck(and_(by_label("Enabled"), by_css(":checked")))
@@ -119,7 +119,7 @@ defmodule Fluffy.Conformance.ComposedLocatorTest do
     end
 
     @tag driver: driver
-    test "exact text filters retain the candidate and normalize its complete text with #{driver}" do
+    test "anchored regex text filters retain the candidate and see its complete text with #{driver}" do
       session =
         session_for_html(unquote(driver), """
         <div data-candidate>Day</div>
@@ -130,10 +130,10 @@ defmodule Fluffy.Conformance.ComposedLocatorTest do
         """)
 
       session
-      |> expect(to_have_count(filter(by_css("[data-candidate]"), has_text: " Day ", exact: true), 2))
-      |> expect(to_have_count(filter(by_css("[data-candidate]"), has_not_text: "Day", exact: true), 3))
+      |> expect(to_have_count(filter(by_css("[data-candidate]"), has_text: ~r/^\s*Day\s*$/), 2))
+      |> expect(to_have_count(filter(by_css("[data-candidate]"), has_not_text: ~r/^\s*Day\s*$/), 3))
       |> expect(to_have_count(filter(by_css("[data-candidate]"), has_text: "Day"), 5))
-      |> expect(to_have_count(filter(by_css("[data-candidate]"), exact: true, has_text: "Day type"), 1))
+      |> expect(to_have_count(filter(by_css("[data-candidate]"), has_text: ~r/^Day type$/), 1))
     end
 
     @tag driver: driver
@@ -147,7 +147,7 @@ defmodule Fluffy.Conformance.ComposedLocatorTest do
       |> expect(to_have_count(by_role(:button, name: ~r/^save/), 0))
       |> expect(to_have_count(by_role(:button, name: ~r/^Save draft$/), 1))
       |> expect("li" |> by_css() |> filter(has_text: ~r/^Apple/) |> to_have_count(2))
-      |> expect("li" |> by_css() |> filter(has_text: ~r/pie$/, exact: true) |> to_have_count(1))
+      |> expect("li" |> by_css() |> filter(has_text: ~r/pie$/) |> to_have_count(1))
       |> expect("li" |> by_css() |> filter(has_not_text: ~r/^Apple/) |> to_have_count(2))
       |> expect("li" |> by_css() |> filter(has_text: ~r/^Pro$/) |> to_have_count(0))
       |> expect("li" |> by_css() |> filter(has_text: ~r/^ Pro $/) |> to_have_count(1))
@@ -328,6 +328,10 @@ defmodule Fluffy.Conformance.ComposedLocatorTest do
       |> click(by_role(:button, name: ~r/^Increment/))
       |> expect("p" |> by_css() |> filter(has_text: ~r/^Child count: 1$/) |> to_be_visible())
     end
+  end
+
+  test "filter takes no exact: option" do
+    assert_raise NimbleOptions.ValidationError, ~r/:exact/, fn -> filter(by_css("li"), has_text: "Pro", exact: true) end
   end
 
   test "intersections remain serializable and describe both operands" do

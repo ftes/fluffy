@@ -140,8 +140,13 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
       |> Fluffy.session_for_html("""
       <table><tr><th>Day type</th><th> Day </th><th hidden><span>Day</span></th><th>day</th></tr></table>
       <div><span>Day</span> type</div>
+      <p>
+        a-b (c) #1 $2.50 x|y [z]
+      </p>
       """)
       |> assert_has("th", text: "Day", exact: true, count: 2)
+      |> assert_has("p", text: "a-b  (c) #1 $2.50 x|y [z]", exact: true)
+      |> refute_has("p", text: "a-b (c) #1 $2.50 x|y", exact: true)
       |> assert_has("th", "Day", exact: true, at: 2)
       |> refute_has("th", "Day", exact: true, at: 1)
       |> refute_has("div", text: "Day", exact: true)
