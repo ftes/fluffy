@@ -411,7 +411,10 @@ defmodule Fluffy.Options do
 
   @setup_schema NimbleOptions.new!(
                   repos: [type: {:list, :atom}],
-                  sandbox: [type: :boolean]
+                  sandbox: [type: :boolean],
+                  trace: [type: :atom, doc: "`PlaywrightEx.Test.record_artifacts/2`'s `trace:`."],
+                  screenshot: [type: :atom, doc: "`PlaywrightEx.Test.record_artifacts/2`'s `screenshot:`."],
+                  video: [type: :atom, doc: "`PlaywrightEx.Test.record_artifacts/2`'s `video:`."]
                 )
 
   @session_schema NimbleOptions.new!(
@@ -430,8 +433,6 @@ defmodule Fluffy.Options do
                        timeout: [type: :pos_integer, default: 15_000],
                        launch_options: [type: :keyword_list, default: []],
                        pool_size: [type: :pos_integer, default: 1],
-                       artifact_dir: [type: {:or, [nil, :string]}],
-                       trace_dir: [type: :string, default: "traces"],
                        log_browser_console: [type: :boolean, default: false]
                      )
 

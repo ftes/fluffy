@@ -11,6 +11,10 @@ defmodule Fluffy.Test do
   sandbox ownership. Pass `sandbox: false` to establish lifecycle management
   without database ownership.
 
+  It also calls `PlaywrightEx.Test.record_artifacts/2`, which records the traces,
+  screenshots and videos of the test's Playwright sessions. Its modes come from
+  `config :playwright_ex, :test`, overridden by `trace:`, `screenshot:` and `video:`.
+
   ## Options
 
   #{NimbleOptions.docs(Fluffy.Options.setup_schema())}
@@ -28,8 +32,11 @@ defmodule Fluffy.Test do
             "Fluffy test setup requested sandbox ownership but no Ecto repositories are configured"
     end
 
-    Fluffy.TestScope.setup(context,
-      sandbox: if(sandbox?, do: {Fluffy.Sandbox, :acquire, [context, repos]}, else: false)
-    )
+    :ok =
+      Fluffy.TestScope.setup(context,
+        sandbox: if(sandbox?, do: {Fluffy.Sandbox, :acquire, [context, repos]}, else: false)
+      )
+
+    PlaywrightEx.Test.record_artifacts(context, Keyword.take(options, [:trace, :screenshot, :video]))
   end
 end

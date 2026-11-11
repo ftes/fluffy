@@ -17,7 +17,6 @@ defmodule Fluffy.Backend.Contract do
   @callback subscribe_event(Session.t(), atom(), :context | reference(), pid()) ::
               {(term() -> {:ok, term()} | {:error, String.t()} | :ignore), (-> :ok)}
   @callback run_step(Session.t(), String.t(), keyword(), (-> term())) :: term()
-  @callback capture_failure(Session.t(), atom(), Exception.t(), Exception.stacktrace()) :: term()
   @callback normalize_error(Session.t(), atom(), list(), Exception.t()) :: Exception.t()
   @callback absolute_url(Session.t(), String.t()) :: String.t()
 

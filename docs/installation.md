@@ -107,10 +107,16 @@ config :fluffy,
     engine: :chromium,
     timeout: 15_000,
     launch_options: [headless: true],
-    pool_size: 1,
-    artifact_dir: System.get_env("FLUFFY_ARTIFACT_DIR"),
-    trace_dir: System.get_env("FLUFFY_TRACE_DIR", "traces")
+    pool_size: 1
   ]
+
+# Traces, screenshots and videos of failed tests, under test-results/.
+config :playwright_ex, :test, trace: :retain_on_failure, screenshot: :only_on_failure
+```
+
+```elixir
+# test/test_helper.exs
+ExUnit.start(formatters: [ExUnit.CLIFormatter, PlaywrightEx.Test.Formatter])
 ```
 
 `executable` optionally points at a Playwright 1.65 CLI such as
@@ -122,15 +128,17 @@ default of 3 minutes applies. To use a system browser, set
 `launch_options: [executable_path: System.find_executable("google-chrome-stable")]`.
 `mix playwright_ex.install --no-browsers` installs only the driver for an existing browser.
 
-Setting `artifact_dir` is recommended for every project that runs Playwright
-tests. Fluffy writes HTML, a full-page screenshot, and the formatted error
-there when a public browser operation fails. Use a writable per-run directory
-locally and configure CI to upload it when the test job fails; artifact capture
-does not run for successful operations.
+`Fluffy.Test.setup/2` records every Playwright session of the test with
+`PlaywrightEx.Test.record_artifacts/2`: one `trace.zip` of all its sessions, a
+screenshot of each page as its session closes, and videos, each `:off` by default.
+The `*_on_failure` modes record every test and `PlaywrightEx.Test.Formatter` deletes
+the files of passing ones. Each test writes to its own dir under `output_dir`
+(`test-results`); configure CI to upload it when the test job fails. Pass `trace:`,
+`screenshot:` or `video:` to `Fluffy.Test.setup/2` to override the config for a test.
+See `PlaywrightEx.Test` for the modes and file names.
 
 As in Playwright, browser `console` messages and uncaught page errors are not
-printed; set `log_browser_console: true` to send them to Elixir's `Logger`. Trace files are created only when a test
-calls `Fluffy.Playwright.trace/1` or `Fluffy.Playwright.trace/2`.
+printed; set `log_browser_console: true` to send them to Elixir's `Logger`.
 
 Set `engine: :firefox` or `engine: :webkit` after installing the corresponding
 browser (`mix playwright_ex.install -- firefox`).

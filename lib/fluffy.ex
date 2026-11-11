@@ -105,9 +105,9 @@ defmodule Fluffy do
   @doc """
   Groups the operations in `fun` under a named diagnostic step.
 
-  Playwright sessions with tracing enabled record a nested trace group at the
-  call site's source location. Phoenix sessions and untraced Playwright
-  sessions simply run the callback. The callback must return the updated
+  A traced Playwright session (`trace:` of `PlaywrightEx.Test.record_artifacts/2`)
+  records a nested trace group at the call site's source location. Phoenix
+  sessions and untraced Playwright sessions simply run the callback. The callback must return the updated
   session, which is also returned by `step/3`.
   """
   defmacro step(session, name, fun) do
@@ -629,13 +629,7 @@ defmodule Fluffy do
 
     resolve_driver_result(result)
   rescue
-    error ->
-      stacktrace = __STACKTRACE__
-      error = Backend.normalize_error(session, operation, arguments, error)
-
-      Backend.capture_failure(session, operation, error, stacktrace)
-
-      reraise(error, stacktrace)
+    error -> reraise(Backend.normalize_error(session, operation, arguments, error), __STACKTRACE__)
   end
 
   defp resolve_driver_result(%Session{} = session), do: session

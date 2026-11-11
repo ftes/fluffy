@@ -7,8 +7,7 @@ config :fluffy,
     enabled: true,
     engine: :chromium,
     timeout: 15_000,
-    launch_options: [headless: true],
-    artifact_dir: System.get_env("FLUFFY_ARTIFACT_DIR")
+    launch_options: [headless: true]
   ]
 
 # We don't run a server during test. If one is required,

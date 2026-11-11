@@ -71,8 +71,8 @@ defmodule Fluffy.MixProject do
       {:lazy_html, ">= 0.1.0 and < 1.0.0"},
       {:phoenix, "~> 1.7"},
       {:phoenix_live_view, "~> 1.0"},
-      # Until a release includes ftes/playwright_ex#191.
-      {:playwright_ex, github: "ftes/playwright_ex", branch: "main"},
+      # Prototype on the unreleased PlaywrightEx.Test.
+      {:playwright_ex, github: "ftes/playwright_ex", branch: "test-runner", override: true},
       {:phoenix_ecto, "~> 4.7", optional: true},
       {:ecto_sql, "~> 3.10", optional: true},
       {:ex_doc, "~> 0.40.3", only: :dev, runtime: false},

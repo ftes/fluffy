@@ -23,27 +23,27 @@ Failed assertions remain `ExUnit.AssertionError`. Browser assertion messages
 include the expected condition and Playwright's received values, timeout details,
 and call log. No candidate markup is reconstructed after browser failure.
 
-Start a context-wide trace explicitly when debugging a Playwright scenario:
+Trace a Playwright test with `trace: :on` (or `:retain_on_failure` in the config, see
+[Playwright setup](installation.md#playwright-setup)), and name groups of steps in it:
 
 ```elixir
-alias Fluffy.Playwright
+setup context, do: Fluffy.Test.setup(context, trace: :on)
 
-start_session(:playwright)
-|> Playwright.trace(open: false)
-|> visit("/potions/polyjuice")
-|> step("Brew Polyjuice Potion", fn session ->
-  session
-  |> fill(by_label("Boomslang skin"), "3")
-  |> click(by_role(:button, name: "Brew"))
-end)
+test "brews Polyjuice" do
+  start_session(:playwright)
+  |> visit("/potions/polyjuice")
+  |> step("Brew Polyjuice Potion", fn session ->
+    session
+    |> fill(by_label("Boomslang skin"), "3")
+    |> click(by_role(:button, name: "Brew"))
+  end)
+end
 ```
 
-Fluffy saves the trace before closing its BrowserContext. A trace covers all pages in
-the session; different sessions produce different archives. Explicit tracing opens Trace
-Viewer by default for local debugging, while `open: false` is appropriate in CI.
-`Fluffy.step/3` remains portable: it adds nested, source-linked trace groups when
-tracing is active and simply runs the callback on Phoenix or an untraced Playwright
-session.
+The test's one `trace.zip` covers every page of all its sessions; open it with
+`mix playwright_ex.cli show-trace test-results/<test>/trace.zip`. `Fluffy.step/3`
+remains portable: it adds nested, source-linked trace groups when tracing is active
+and simply runs the callback on Phoenix or an untraced Playwright session.
 
 Save an explicit PNG while retaining the pipeline with:
 
@@ -64,7 +64,7 @@ session
 ```
 
 See [Playwright setup](installation.md#playwright-setup) for console logging,
-failure artifacts, and their configuration. See [Events and pages](advanced-events.md)
+traces, screenshots and videos. See [Events and pages](advanced-events.md)
 for downloads, popups, dialogs, and network events.
 
 ## Native escape hatch

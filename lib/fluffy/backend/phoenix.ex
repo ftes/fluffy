@@ -118,9 +118,6 @@ defmodule Fluffy.Backend.Phoenix do
   def run_step(%Session{} = _session, _name, _location, fun), do: fun.()
 
   @impl true
-  def capture_failure(%Session{}, _operation, _error, _stacktrace), do: :ok
-
-  @impl true
   def normalize_error(session, operation, arguments, error),
     do: Fluffy.Internal.OperationFailure.normalize(session, operation, arguments, error)
 

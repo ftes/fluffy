@@ -8,8 +8,7 @@ playwright_config =
      enabled: true,
      engine: :chromium,
      timeout: 15_000,
-     launch_options: [headless: true],
-     artifact_dir: System.get_env("FLUFFY_ARTIFACT_DIR")
+     launch_options: [headless: true]
    ]
    """)}
 

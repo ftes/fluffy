@@ -335,21 +335,18 @@ defmodule Fluffy.BrowserRuntimeTest do
         engine: :firefox,
         executable: "playwright",
         timeout: 2_000,
-        launch_options: [headless: false, slow_mo: 25],
-        artifact_dir: nil
+        launch_options: [headless: false, slow_mo: 25]
       )
 
     assert Enum.sort(config) ==
              Enum.sort(
-               trace_dir: "traces",
                log_browser_console: false,
                enabled: true,
                pool_size: 1,
                engine: :firefox,
                executable: "playwright",
                timeout: 2_000,
-               launch_options: [headless: false, slow_mo: 25],
-               artifact_dir: nil
+               launch_options: [headless: false, slow_mo: 25]
              )
 
     assert Options.validate_playwright!(log_browser_console: true)[:log_browser_console]

@@ -23,29 +23,10 @@ defmodule Fluffy.Playwright do
   alias Fluffy.Backend.Playwright.Document
   alias Fluffy.CapabilityError
   alias Fluffy.Options
-  alias Fluffy.Playwright.Trace
   alias Fluffy.Route
   alias Fluffy.Session
   alias PlaywrightEx.BrowserContext
   alias PlaywrightEx.WebStorage
-
-  @trace_schema NimbleOptions.new!(
-                  directory: [
-                    type: :string,
-                    doc: "Directory in which to save the trace archive."
-                  ],
-                  name: [
-                    type: :string,
-                    doc: "Human-readable trace name and artifact filename prefix."
-                  ],
-                  open: [
-                    type: :boolean,
-                    default: true,
-                    doc: "Open Playwright Trace Viewer after saving the trace."
-                  ]
-                )
-
-  @trace_capture [screenshots: true, snapshots: true, sources: true]
 
   @route_schema NimbleOptions.new!(
                   times: [
@@ -53,14 +34,6 @@ defmodule Fluffy.Playwright do
                     doc: "How many requests the route handles before it expires. By default it never expires."
                   ]
                 )
-
-  @typedoc "Fluffy's trace options, and the capture options of `PlaywrightEx.Tracing.start/2`."
-  @type trace_option ::
-          unquote(NimbleOptions.option_typespec(@trace_schema))
-          | {:screenshots, boolean()}
-          | {:snapshots, boolean() | map()}
-          | {:sources, boolean()}
-          | {:live, boolean()}
 
   @type route_option :: unquote(NimbleOptions.option_typespec(@route_schema))
 
@@ -741,41 +714,6 @@ defmodule Fluffy.Playwright do
   def unwrap_and_return(%Session{} = session, %Fluffy.Locator{} = locator, fun) when is_function(fun, 1) do
     ensure_playwright_backend!(session, :native_locator)
     Fluffy.__dispatch_driver__(session, :unwrap_and_return_locator, [locator, fun])
-  end
-
-  @doc group: "Diagnostics and native access"
-  @doc playwright_only: true
-  @doc """
-  Starts a Playwright trace for this session's BrowserContext.
-
-  The trace includes every page in the session and is saved when the test's
-  lifecycle scope shuts down. Because an explicit trace is primarily a local
-  debugging request, its viewer opens by default; pass `open: false` in CI. A
-  session may start one trace.
-
-  ## Options
-
-  #{NimbleOptions.docs(@trace_schema)}
-
-  Other options go to `PlaywrightEx.Tracing.start/2`. Fluffy defaults
-  `screenshots:`, `snapshots:` and `sources:` to `true`.
-  """
-  @spec trace(Session.t(), [trace_option()]) :: Session.t()
-  def trace(session, options \\ []) when is_list(options) do
-    ensure_playwright_backend!(session, :tracing)
-    {fluffy_options, capture_options} = Keyword.split(options, Keyword.keys(@trace_schema.schema))
-    fluffy_options = NimbleOptions.validate!(fluffy_options, @trace_schema)
-    context = Session.context(session)
-
-    if context.trace do
-      raise ArgumentError, "this Playwright session is already tracing"
-    end
-
-    trace = Trace.start(context, fluffy_options, Keyword.merge(@trace_capture, capture_options))
-
-    :ok = Fluffy.SessionRuntime.register(session.runtime, {:trace, trace}, fn -> Trace.stop(trace) end)
-
-    Session.put_context(session, Map.put(context, :trace, Trace.public_state(trace)))
   end
 
   @doc group: "Diagnostics and native access"

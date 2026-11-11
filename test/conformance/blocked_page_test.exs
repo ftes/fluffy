@@ -6,7 +6,6 @@ defmodule Fluffy.Conformance.BlockedPageTest do
 
   alias Fluffy.Playwright
 
-  @moduletag :tmp_dir
   @moduletag driver: :playwright
 
   @html "<button>Other</button>"
@@ -24,8 +23,7 @@ defmodule Fluffy.Conformance.BlockedPageTest do
       click(session, by_role(:button, name: "Other"))
     end
 
-    # The session timeout bounds the failure. Failure artifacts (captured when
-    # an artifact dir is configured, as in CI) add up to 4s of bounded waits.
+    # The session timeout bounds the failure.
     assert System.monotonic_time(:millisecond) - started < 10_000
 
     # The abandoned call leaves the driver connection usable.
@@ -58,15 +56,6 @@ defmodule Fluffy.Conformance.BlockedPageTest do
     # Waiting for the page under this timeout would outlast the test's own.
     session = put_session_timeout(session, 600_000)
     assert session |> Playwright.current_page() |> Fluffy.Page.url() |> String.ends_with?("/pushed")
-  end
-
-  test "failure artifacts of a blocked page are captured without waiting for it", %{tmp_dir: tmp_dir} do
-    session = frozen_session()
-    started = System.monotonic_time(:millisecond)
-
-    assert Fluffy.FailureArtifact.capture(session, :click, RuntimeError.exception("boom"), [], tmp_dir) == :ok
-    assert [_report] = Path.wildcard(Path.join(tmp_dir, "*.txt"))
-    assert System.monotonic_time(:millisecond) - started < 10_000
   end
 
   defp frozen_session do

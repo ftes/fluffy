@@ -82,5 +82,4 @@ Prefer the shared API. For what it does not cover:
 ## Debugging
 
 - Element actions fail with `Fluffy.OperationError`, whose `cause` holds the driver's error. Failed assertions are `ExUnit.AssertionError`.
-- Set `artifact_dir` in the Playwright config to keep HTML and a screenshot of failures.
-- `Fluffy.Playwright.trace(session, open: false)` records a trace, and `Fluffy.step/3` names a group of steps in it. `Fluffy.open_browser/1` opens the current page on any driver.
+- Traces, screenshots and videos are PlaywrightEx.Test's: `config :playwright_ex, :test, trace: :retain_on_failure, screenshot: :only_on_failure`, with `PlaywrightEx.Test.Formatter` in `ExUnit.start/1`. `Fluffy.step/3` names a group of steps in the trace. `Fluffy.open_browser/1` opens the current page on any driver.

@@ -9,7 +9,6 @@ defmodule Fluffy.Backend.Playwright do
   alias Fluffy.BrowserRuntime
   alias Fluffy.Deadline
   alias Fluffy.Driver.Playwright.State
-  alias Fluffy.FailureArtifact
   alias Fluffy.Internal.Navigation.BrowserCommitted
   alias Fluffy.Internal.Navigation.BrowserPatch
   alias Fluffy.Internal.OperationFailure
@@ -18,7 +17,7 @@ defmodule Fluffy.Backend.Playwright do
   alias Fluffy.PageLifecycle
   alias Fluffy.Session
   alias Fluffy.SessionRuntime
-  alias PlaywrightEx.Browser
+  alias Fluffy.TestScope
   alias PlaywrightEx.BrowserContext
   alias PlaywrightEx.ConsoleMessage
   alias PlaywrightEx.Page, as: BrowserPage
@@ -31,6 +30,8 @@ defmodule Fluffy.Backend.Playwright do
   @impl true
   def start_session(options, attachment) do
     {resource_scope, runtime, sandbox_header} = attachment
+    # An unmanaged session (no scope) is no test's: PlaywrightEx.Test records nothing of it.
+    test_pid = resource_scope && TestScope.metadata(resource_scope).test_pid
     base_url = Keyword.fetch!(options, :base_url)
     config = Options.playwright_config()
     timeout = Keyword.get_lazy(options, :timeout, fn -> Keyword.fetch!(config, :timeout) end)
@@ -55,7 +56,7 @@ defmodule Fluffy.Backend.Playwright do
     # the same runtime call, before any further setup can fail.
     browser_context =
       SessionRuntime.run_registered(runtime, fn ->
-        browser_context = new_context!(context_options)
+        browser_context = new_context!(context_options, test_pid)
 
         # As in Playwright, closing the context has no timeout.
         close = fn ->
@@ -85,15 +86,17 @@ defmodule Fluffy.Backend.Playwright do
     Session.new(__MODULE__, context, page_record(browser_page), runtime)
   end
 
-  # A lost driver closes its contexts before its browser, so a session can start
+  # PlaywrightEx.Test records the context for the test `test_pid` (traces, screenshots,
+  # videos). A lost driver closes its contexts before its browser, so a session can start
   # before the browser runtime learns of the loss. That browser refuses contexts.
-  defp new_context!(options) do
+  defp new_context!(options, test_pid) do
     browser = BrowserRuntime.browser()
+    new_context = &PlaywrightEx.Test.new_context(%{browser: &1, test_pid: test_pid}, context_options: options).context
 
-    case Browser.new_context(browser, options) do
-      {:ok, browser_context} -> browser_context
-      {:error, %TargetClosedError{}} -> Browser.new_context!(BrowserRuntime.replace(browser), options)
-      {:error, error} -> raise error
+    try do
+      new_context.(browser)
+    rescue
+      TargetClosedError -> new_context.(BrowserRuntime.replace(browser))
     end
   end
 
@@ -226,26 +229,16 @@ defmodule Fluffy.Backend.Playwright do
   defp append_location(text, _location), do: text
 
   @impl true
+  # A group is a no-op unless the context is traced (`record_artifacts`, `trace:`).
   def run_step(session, name, location, fun) do
-    context = Session.context(session)
+    tracing = BrowserContext.tracing(Session.context(session).browser_context)
+    Tracing.group!(tracing, name, location: Map.new(location))
 
-    if context.trace do
-      tracing = BrowserContext.tracing(context.browser_context)
-      Tracing.group!(tracing, name, location: Map.new(location))
-
-      try do
-        fun.()
-      after
-        Tracing.group_end(tracing)
-      end
-    else
+    try do
       fun.()
+    after
+      Tracing.group_end(tracing)
     end
-  end
-
-  @impl true
-  def capture_failure(%Session{} = session, operation, error, stacktrace) do
-    FailureArtifact.capture(session, operation, error, stacktrace)
   end
 
   @impl true

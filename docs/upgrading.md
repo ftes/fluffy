@@ -43,8 +43,8 @@ matched once can now match twice.
 - Browser launch gets Playwright's 3-minute default instead of `timeout:`. A
   `launch_options: [timeout: ...]` that raised the limit on 0.8 now shortens it and can
   fail a loaded machine with `browserType.launch: Timeout ... exceeded`, so drop it.
-- `browser_context:`, `launch_options:` and the options of `storage_state`, cookies and
-  `trace` pass through to PlaywrightEx, which rejects unknown ones. Page `screenshot/3`
+- `browser_context:`, `launch_options:` and the options of `storage_state` and cookies
+  pass through to PlaywrightEx, which rejects unknown ones. Page `screenshot/3`
   validates its options as `screenshot/4` does: `mask:` takes Fluffy locators,
   `timeout: 0` raises, and `path:` is only the argument.
 
@@ -79,7 +79,11 @@ Timeouts follow Elixir: `0` checks once and `:infinity` means no limit; see
   documented fields of `Fluffy.Download` and `Fluffy.Dialog` remain public.
 - `page_status`, `page_to_have_status` and `Fluffy.Page.status` are removed, as in
   Playwright; on Playwright, assert on `Fluffy.Event.response/1` instead.
-- `trace(coverage:)` is removed.
+- `Fluffy.Playwright.trace/2`, `artifact_dir` and `trace_dir` are removed. Traces,
+  screenshots and videos come from `PlaywrightEx.Test`: set
+  `config :playwright_ex, :test, trace: :retain_on_failure, screenshot: :only_on_failure`
+  and add `PlaywrightEx.Test.Formatter` to `ExUnit.start/1`. Files go to
+  `test-results/<test>/`; a failed operation no longer writes HTML or the error text.
 - `filter/2` takes no `exact:`, as in Playwright. Match a whole text with a regex, such as
   `filter(has_text: ~r/^Pro$/)`, which works on every driver.
 - The `Fluffy.Expect.checked_option` type is `to_be_checked_option`.

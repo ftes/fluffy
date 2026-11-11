@@ -48,16 +48,6 @@ defmodule Fluffy.Backend do
     Session.backend(session).run_step(session, name, location, fun)
   end
 
-  def capture_failure(session, operation, error, stacktrace) do
-    Session.backend(session).capture_failure(session, operation, error, stacktrace)
-  rescue
-    # A failed native callback may have closed the session. Diagnostics must
-    # never replace the original action error with a runtime lookup error.
-    _artifact_error -> :error
-  catch
-    :exit, _reason -> :error
-  end
-
   def absolute_url(session, path), do: Session.backend(session).absolute_url(session, path)
 
   def normalize_error(session, operation, arguments, error)
