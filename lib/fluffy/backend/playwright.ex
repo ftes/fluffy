@@ -6,7 +6,6 @@ defmodule Fluffy.Backend.Playwright do
   alias Fluffy.Backend.Playwright.Context
   alias Fluffy.Backend.Playwright.Document
   alias Fluffy.Backend.Playwright.Events
-  alias Fluffy.BrowserRuntime
   alias Fluffy.Deadline
   alias Fluffy.Driver.Playwright.State
   alias Fluffy.Internal.Navigation.BrowserCommitted
@@ -31,7 +30,7 @@ defmodule Fluffy.Backend.Playwright do
   def start_session(options, attachment) do
     {resource_scope, runtime, sandbox_header} = attachment
     # An unmanaged session (no scope) is no test's: PlaywrightEx.Test records nothing of it.
-    test_pid = resource_scope && TestScope.metadata(resource_scope).test_pid
+    test_context = if resource_scope, do: TestScope.metadata(resource_scope), else: %{}
     base_url = Keyword.fetch!(options, :base_url)
     config = Options.playwright_config()
     timeout = Keyword.get_lazy(options, :timeout, fn -> Keyword.fetch!(config, :timeout) end)
@@ -56,13 +55,10 @@ defmodule Fluffy.Backend.Playwright do
     # the same runtime call, before any further setup can fail.
     browser_context =
       SessionRuntime.run_registered(runtime, fn ->
-        browser_context = new_context!(context_options, test_pid)
+        browser_context = new_context!(context_options, test_context)
 
         # As in Playwright, closing the context has no timeout.
-        close = fn ->
-          BrowserContext.close(browser_context)
-          BrowserRuntime.release()
-        end
+        close = fn -> BrowserContext.close(browser_context) end
 
         {browser_context, {:browser_context, browser_context.guid}, close}
       end)
@@ -86,18 +82,24 @@ defmodule Fluffy.Backend.Playwright do
     Session.new(__MODULE__, context, page_record(browser_page), runtime)
   end
 
-  # PlaywrightEx.Test records the context for the test `test_pid` (traces, screenshots,
-  # videos). A lost driver closes its contexts before its browser, so a session can start
-  # before the browser runtime learns of the loss. That browser refuses contexts.
-  defp new_context!(options, test_pid) do
-    browser = BrowserRuntime.browser()
-    new_context = &PlaywrightEx.Test.new_context(%{browser: &1, test_pid: test_pid}, context_options: options).context
+  # PlaywrightEx.Test records the context for the test's `test_pid` (traces, screenshots,
+  # videos). A browser lost to a dead driver still refuses contexts until its disconnect
+  # arrives; as in Playwright Test, that session fails.
+  defp new_context!(options, test_context) do
+    test_context
+    |> Map.put(:browser, browser(test_context).browser)
+    |> PlaywrightEx.Test.new_context(context_options: options)
+    |> Map.fetch!(:context)
+  end
 
-    try do
-      new_context.(browser)
-    rescue
-      TargetClosedError -> new_context.(BrowserRuntime.replace(browser))
-    end
+  @doc false
+  # The test's browser from PlaywrightEx.Test's pool, set up by `config :playwright_ex,
+  # :test`: shared, or with `isolate: true` the module's own driver and browser, checked
+  # out at its first session. An unmanaged session has no module: it shares.
+  def browser(test_context) do
+    if Keyword.fetch!(Options.playwright_config(), :isolate) and is_map_key(test_context, :module),
+      do: PlaywrightEx.Test.browser(test_context, isolate: true),
+      else: PlaywrightEx.Test.browser([])
   end
 
   # Listeners only forward. The runtime does the work, and receives each

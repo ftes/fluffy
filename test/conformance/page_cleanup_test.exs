@@ -35,9 +35,10 @@ defmodule Fluffy.Conformance.PageCleanupTest do
 
     assert map_size(Session.pages(session)) == 2
     browser_context = Session.context(session).browser_context
+    browser = PlaywrightEx.BrowserContext.browser(browser_context)
     :ok = GenServer.stop(TestScope.current())
 
-    refute browser_context.guid in browser_context_guids()
+    refute browser_context.guid in browser_context_guids(browser)
   end
 
   @tag driver: :playwright

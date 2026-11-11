@@ -47,14 +47,13 @@ config :fluffy,
   ecto_repos: [Fluffy.TestRepo, Fluffy.TestRepoTwo],
   endpoint: Endpoint,
   playwright: [
-    enabled: true,
-    engine: browser_engine,
-    # Firefox dispatches input for all of a browser's pages in one queue; a second browser
-    # measurably shortens its latency tail.
-    pool_size: if(browser_engine == :firefox, do: 2, else: 1),
     timeout: 15_000,
-    launch_options: [headless: true]
+    # Firefox dispatches input for all of a browser's pages in one queue: a browser per
+    # module, as Playwright Test's workers have.
+    isolate: browser_engine == :firefox
   ]
+
+config :playwright_ex, :test, browser_name: browser_engine, launch_options: [headless: true]
 
 # CI keeps a screenshot of each failed test's pages in FLUFFY_ARTIFACT_DIR.
 if artifact_dir = System.get_env("FLUFFY_ARTIFACT_DIR") do

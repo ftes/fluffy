@@ -98,20 +98,18 @@ mix playwright_ex.install -- chromium
 On Linux CI runners, add `--with-deps` to install the browser's system packages too:
 `mix playwright_ex.install -- chromium --with-deps`.
 
-Configure the backend in `config/test.exs`:
+Configure the backend in `config/test.exs`. The browser and its driver are
+`PlaywrightEx.Test`'s, Fluffy's config is the session's:
 
 ```elixir
-config :fluffy,
-  playwright: [
-    enabled: true,
-    engine: :chromium,
-    timeout: 15_000,
-    launch_options: [headless: true],
-    pool_size: 1
-  ]
+config :playwright_ex, :test,
+  browser_name: :chromium,
+  launch_options: [headless: true],
+  # Traces, screenshots and videos of failed tests, under test-results/.
+  trace: :retain_on_failure,
+  screenshot: :only_on_failure
 
-# Traces, screenshots and videos of failed tests, under test-results/.
-config :playwright_ex, :test, trace: :retain_on_failure, screenshot: :only_on_failure
+config :fluffy, playwright: [timeout: 15_000]
 ```
 
 ```elixir
@@ -119,7 +117,7 @@ config :playwright_ex, :test, trace: :retain_on_failure, screenshot: :only_on_fa
 ExUnit.start(formatters: [ExUnit.CLIFormatter, PlaywrightEx.Test.Formatter])
 ```
 
-`executable` optionally points at a Playwright 1.65 CLI such as
+`driver: [executable: ...]` optionally points at a Playwright 1.65 CLI such as
 `node_modules/.bin/playwright`, not `cli.js`; by default the pinned driver is used.
 
 `launch_options` are passed to `PlaywrightEx.BrowserType.launch/2` unchanged. Set
@@ -140,18 +138,17 @@ See `PlaywrightEx.Test` for the modes and file names.
 As in Playwright, browser `console` messages and uncaught page errors are not
 printed; set `log_browser_console: true` to send them to Elixir's `Logger`.
 
-Set `engine: :firefox` or `engine: :webkit` after installing the corresponding
-browser (`mix playwright_ex.install -- firefox`).
+Set `browser_name: :firefox` or `browser_name: :webkit` after installing the
+corresponding browser (`mix playwright_ex.install -- firefox`).
 See [Browser baseline](capabilities.md#browser-baseline) for conformance coverage.
-Fluffy creates a fresh isolated `BrowserContext` for each session, in a pool of
-`pool_size` browsers (default `1`). No driver or browser starts until a session
-needs one. Sessions go to the least-loaded browser, ties to the lowest slot, so
-sequential sessions reuse one browser and only concurrent sessions launch more.
-A lost browser is launched again for the next session that needs it, and the
-others keep running. ExUnit `max_cases` remains the concurrency bound; lower it
-when browser startup or the host becomes resource-constrained. Firefox dispatches
-input for all of a browser's pages in one queue and times out under load, so set
-`pool_size` to about half the logical cores for Firefox suites.
+Fluffy creates a fresh isolated `BrowserContext` for each session, in the browser
+`PlaywrightEx.Test.browser/1` shares between modules. No driver or browser starts until
+a session needs one, a lost browser is launched again for the next session, and the
+drivers stop after the suite. Firefox dispatches input for all of a browser's pages in
+one queue and times out under load, so for Firefox suites set
+`config :fluffy, playwright: [isolate: true]`: each module gets a driver and browser of
+its own at its first session, at most `max_isolated` at once (half the schedulers), as
+Playwright Test's workers do.
 
 ## Ecto sandbox
 

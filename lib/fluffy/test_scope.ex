@@ -153,8 +153,7 @@ defmodule Fluffy.TestScope do
     apply(module, function, arguments)
   end
 
+  # The whole map, for PlaywrightEx.Test (a `parameterize:` module's values pick its owner).
   # Setup runs in the test process: PlaywrightEx.Test finds the test's recording by its pid.
-  defp test_context(context) do
-    context |> Map.take([:async, :file, :line, :module, :test]) |> Map.put(:test_pid, self())
-  end
+  defp test_context(context), do: Map.put(context, :test_pid, self())
 end

@@ -1,7 +1,4 @@
-Application.put_env(:fluffy, :playwright_boot_state, %{
-  runtime: Fluffy.BrowserRuntime.status(),
-  transport: Process.whereis(Fluffy.PlaywrightDriver)
-})
+Application.put_env(:fluffy, :playwright_boot_state, %{pool: Process.whereis(PlaywrightEx.Test.Pool)})
 
 # As many modules at once as Playwright runs workers (half the logical cores), not ExUnit's
 # twice the cores: sessions share one browser (two on Firefox), and Firefox dispatches input

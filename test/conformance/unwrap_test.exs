@@ -605,9 +605,10 @@ defmodule Fluffy.Conformance.UnwrapTest do
       assert current_page(switch_page(session, child)) == child
 
       browser_context = BrowserPage.context(untracked)
+      browser = BrowserContext.browser(browser_context)
       :ok = GenServer.stop(Fluffy.TestScope.current())
 
-      refute browser_context.guid in browser_context_guids()
+      refute browser_context.guid in browser_context_guids(browser)
     end
 
     @tag driver: :playwright

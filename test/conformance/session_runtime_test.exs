@@ -206,11 +206,12 @@ defmodule Fluffy.Conformance.SessionRuntimeTest do
         end)
 
       assert_receive {:started, runtime, browser_context}, 5_000
-      assert browser_context.guid in browser_context_guids()
+      browser = PlaywrightEx.BrowserContext.browser(browser_context)
+      assert browser_context.guid in browser_context_guids(browser)
       monitor = monitor_running(runtime)
       send(owner, unquote(exit))
       assert_receive {:DOWN, ^monitor, :process, ^runtime, :normal}, 5_000
-      refute browser_context.guid in browser_context_guids()
+      refute browser_context.guid in browser_context_guids(browser)
     end
   end
 

@@ -8,7 +8,7 @@ defmodule Fluffy.TestCase do
       import Fluffy.TestCase,
         only: [
           assert_action_error: 4,
-          browser_context_guids: 0,
+          browser_context_guids: 1,
           freeze_page: 1,
           monitor_running: 1,
           playwright_engine?: 1,
@@ -18,10 +18,9 @@ defmodule Fluffy.TestCase do
   end
 
   # A plain function, compiled before the tests, so `@tag skip:` can call it at compile time.
-  # Read at call time: compile_env would record the whole :playwright config in the app and
-  # fail at boot whenever it differs.
+  # Read at call time, as the config can differ between runs (FLUFFY_BROWSER).
   def playwright_engine?(engine),
-    do: engine == Keyword.get(Application.fetch_env!(:fluffy, :playwright), :engine, :chromium)
+    do: engine == Keyword.get(Application.get_env(:playwright_ex, :test, []), :browser_name, :chromium)
 
   # Sets the session's timeout after its setup, which runs under the default so a loaded
   # machine cannot fail it. No public API changes a live session's timeout.
@@ -46,11 +45,10 @@ defmodule Fluffy.TestCase do
     monitor
   end
 
-  # Every context open across the pool: a session's context may be in any of its browsers.
-  def browser_context_guids do
-    for %{browser: %{} = browser} <- Fluffy.BrowserRuntime.status().slots,
-        browser_context <- PlaywrightEx.Browser.contexts(browser),
-        do: browser_context.guid
+  # The contexts open in `browser`, which a test reads from a context while it's open
+  # (`PlaywrightEx.BrowserContext.browser/1`).
+  def browser_context_guids(browser) do
+    for browser_context <- PlaywrightEx.Browser.contexts(browser), do: browser_context.guid
   end
 
   def assert_action_error(session, structural_exception, structural_message, action) do

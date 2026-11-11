@@ -8,12 +8,12 @@ defmodule Fluffy.PlaywrightDriverLossTest do
 
   @moduletag driver: :playwright, capture_log: true
 
-  test "a lost driver stops running sessions and a new session relaunches the browser" do
+  test "a lost driver stops running sessions and a new session relaunches the browser", context do
     session = session_for_html(:playwright, "<button>Save</button>")
     runtime = session.runtime
     monitor = monitor_running(runtime)
 
-    kill_driver()
+    kill_driver(context)
 
     # The driver's loss closes the browser context, which stops the session.
     assert_receive {:DOWN, ^monitor, :process, ^runtime, :normal}, 5_000
@@ -29,13 +29,13 @@ defmodule Fluffy.PlaywrightDriverLossTest do
   end
 
   # The lost driver closes the action's page too; that is no page closing itself.
-  test "a driver lost during an action fails the action" do
+  test "a driver lost during an action fails the action", context do
     session = session_for_html(:playwright, "<button disabled>Save</button>")
 
     {:ok, _killer} =
       Task.start(fn ->
         Process.sleep(200)
-        kill_driver()
+        kill_driver(context)
       end)
 
     assert_raise Fluffy.OperationError, ~r/closed/, fn ->
@@ -43,8 +43,10 @@ defmodule Fluffy.PlaywrightDriverLossTest do
     end
   end
 
-  defp kill_driver do
-    driver = PlaywrightEx.Runtime.Heap.get(PlaywrightEx.playwright(Fluffy.PlaywrightDriver), :driverProcess)
+  # The driver of the test's browser in PlaywrightEx.Test's pool.
+  defp kill_driver(context) do
+    %{playwright: playwright} = Fluffy.Backend.Playwright.browser(context)
+    driver = PlaywrightEx.Runtime.Heap.get(playwright, :driverProcess)
     %{port: port} = :sys.get_state(driver)
     {:os_pid, os_pid} = Port.info(port, :os_pid)
     {_, 0} = System.cmd("kill", ["-9", to_string(os_pid)])

@@ -427,12 +427,8 @@ defmodule Fluffy.Options do
                   )
 
   @playwright_schema NimbleOptions.new!(
-                       enabled: [type: :boolean, default: true],
-                       engine: [type: {:in, [:chromium, :firefox, :webkit]}, default: :chromium],
-                       executable: [type: :string],
                        timeout: [type: :pos_integer, default: 15_000],
-                       launch_options: [type: :keyword_list, default: []],
-                       pool_size: [type: :pos_integer, default: 1],
+                       isolate: [type: :boolean, default: false],
                        log_browser_console: [type: :boolean, default: false]
                      )
 

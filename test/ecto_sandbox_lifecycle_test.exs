@@ -50,10 +50,11 @@ defmodule Fluffy.EctoSandboxLifecycleTest do
       |> visit("/live/database?delay=250")
 
     browser_context = Fluffy.Session.context(session).browser_context
+    browser = PlaywrightEx.BrowserContext.browser(browser_context)
     GenServer.stop(scope)
 
     refute Process.alive?(owner)
-    refute browser_context.guid in Fluffy.TestCase.browser_context_guids()
+    refute browser_context.guid in Fluffy.TestCase.browser_context_guids(browser)
   end
 
   @tag :capture_log
@@ -69,6 +70,7 @@ defmodule Fluffy.EctoSandboxLifecycleTest do
       )
 
     %{browser_context: browser_context, timeout: timeout} = Fluffy.Session.context(session)
+    browser = PlaywrightEx.BrowserContext.browser(browser_context)
     scope_reference = monitor_running(scope)
     Process.exit(owner, :kill)
 
@@ -76,7 +78,7 @@ defmodule Fluffy.EctoSandboxLifecycleTest do
     assert_receive {:DOWN, ^scope_reference, :process, ^scope, {:shutdown, {:sandbox_owner_down, :killed}}},
                    timeout + 1_000
 
-    refute browser_context.guid in Fluffy.TestCase.browser_context_guids()
+    refute browser_context.guid in Fluffy.TestCase.browser_context_guids(browser)
   end
 
   test "supervisor shutdown drains Live resources before stopping sandbox ownership" do

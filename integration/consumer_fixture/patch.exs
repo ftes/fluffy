@@ -1,16 +1,7 @@
 alias Igniter.Project.Config
 alias Igniter.Project.Deps
 
-playwright_config =
-  {:code,
-   Sourceror.parse_string!("""
-   [
-     enabled: true,
-     engine: :chromium,
-     timeout: 15_000,
-     launch_options: [headless: true]
-   ]
-   """)}
+playwright_config = {:code, Sourceror.parse_string!("[timeout: 15_000]")}
 
 fixture_dir = __DIR__
 
@@ -52,6 +43,7 @@ Igniter.new()
   FluffyConsumerWeb.Endpoint
 )
 |> Config.configure("test.exs", :fluffy, [:playwright], playwright_config)
+|> Config.configure("test.exs", :playwright_ex, [:test, :launch_options], headless: true)
 |> Igniter.Libs.Phoenix.append_to_scope(
   "/",
   """
