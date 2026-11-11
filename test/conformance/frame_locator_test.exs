@@ -19,8 +19,16 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
     assert %Fluffy.Locator{} = nested
     assert nested |> :erlang.term_to_binary() |> :erlang.binary_to_term() == nested
 
-    assert Fluffy.Locator.Playwright.selector(nested) ==
-             ~s(css=section >> internal:attr=[title="Checkout"i] >> nth=1 >> internal:control=enter-frame >> css=#payment >> internal:control=enter-frame >> internal:role=button[name="Pay"i])
+    playwright_frame = %PlaywrightEx.Frame{guid: "frame"}
+
+    assert Fluffy.Locator.Playwright.locator(playwright_frame, nested) ==
+             playwright_frame
+             |> PlaywrightEx.Frame.locator("css=section")
+             |> PlaywrightEx.Locator.get_by_title("Checkout")
+             |> PlaywrightEx.Locator.nth(1)
+             |> PlaywrightEx.Locator.content_frame()
+             |> PlaywrightEx.FrameLocator.frame_locator("css=#payment")
+             |> PlaywrightEx.FrameLocator.get_by_role(:button, name: "Pay")
 
     for locator <- [
           by_css(frame, "input"),

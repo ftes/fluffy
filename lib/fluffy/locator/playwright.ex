@@ -1,107 +1,88 @@
 defmodule Fluffy.Locator.Playwright do
   @moduledoc false
+  # Builds a PlaywrightEx locator from a `Fluffy.Locator`, one PlaywrightEx call per operation.
 
   alias Fluffy.Locator
   alias Fluffy.Locator.Internal
+  alias PlaywrightEx.FrameLocator
   alias PlaywrightEx.Isomorphic.LocatorUtils
-  alias PlaywrightEx.Isomorphic.StringUtils
+  alias PlaywrightEx.Locator, as: Native
 
-  def selector(%Locator{} = locator) do
-    case Enum.reduce(locator.operations, :none, &apply_operation/2) do
-      :none -> "*"
-      selector -> selector
-    end
+  # Nested locators (`has:`, `and_/2`, `or_/2`, `within/2`) are built from `frame` too, as
+  # PlaywrightEx requires them to belong to the same frame.
+  def locator(frame, %Locator{} = locator) do
+    locator.operations
+    |> Enum.reduce({:root, frame}, &apply_operation(frame, &1, &2))
+    |> native()
   end
 
-  def locator(frame, %Locator{} = locator), do: PlaywrightEx.Frame.locator(frame, selector(locator))
+  defp apply_operation(_frame, :enter_frame, scope), do: scope |> native() |> Native.content_frame()
 
-  defp apply_operation(:enter_frame, selector), do: concat(selector, "internal:control=enter-frame")
+  # `css=` keeps `by_css/1` to CSS, where a bare selector could also be XPath or another engine.
+  defp apply_operation(_frame, {:css, css}, scope), do: call(scope, :locator, ["css=#{css}"])
 
-  defp apply_operation({:css, css}, selector) do
-    concat(selector, "css=#{css}")
-  end
-
-  # Upstream builds role selectors with its options in a fixed order, including
-  # Playwright-only states such as `[pressed=true]`.
-  defp apply_operation({:role, role, options}, selector) do
+  # `get_by_role` takes only the roles of Playwright's `AriaRole` type, which lacks some that
+  # the browser matches, such as `mark`. PlaywrightEx's selector builder takes any role.
+  defp apply_operation(_frame, {:role, role, options}, scope) do
     options =
       Map.new(options, fn
         {:include_hidden, include_hidden} -> {:includeHidden, include_hidden}
         option -> option
       end)
 
-    concat(selector, LocatorUtils.get_by_role_selector(role, options))
+    call(scope, :locator, [LocatorUtils.get_by_role_selector(role, options)])
   end
 
-  # Their options, only `exact:`, are upstream's.
-  defp apply_operation({:text, text, options}, selector),
-    do: concat(selector, LocatorUtils.get_by_text_selector(text, Map.new(options)))
+  defp apply_operation(_frame, {:text, text, options}, scope), do: call(scope, :get_by_text, [text, options])
+  defp apply_operation(_frame, {:label, text, options}, scope), do: call(scope, :get_by_label, [text, options])
 
-  defp apply_operation({:label, text, options}, selector),
-    do: concat(selector, LocatorUtils.get_by_label_selector(text, Map.new(options)))
+  defp apply_operation(_frame, {:attribute, "placeholder", text, options}, scope),
+    do: call(scope, :get_by_placeholder, [text, options])
 
-  defp apply_operation({:attribute, "placeholder", text, options}, selector),
-    do: concat(selector, LocatorUtils.get_by_placeholder_selector(text, Map.new(options)))
+  defp apply_operation(_frame, {:attribute, "alt", text, options}, scope),
+    do: call(scope, :get_by_alt_text, [text, options])
 
-  defp apply_operation({:attribute, "alt", text, options}, selector),
-    do: concat(selector, LocatorUtils.get_by_alt_text_selector(text, Map.new(options)))
+  defp apply_operation(_frame, {:attribute, "title", text, options}, scope),
+    do: call(scope, :get_by_title, [text, options])
 
-  defp apply_operation({:attribute, "title", text, options}, selector),
-    do: concat(selector, LocatorUtils.get_by_title_selector(text, Map.new(options)))
+  # `get_by_test_id` reads one attribute for all locators (`set_test_id_attribute`), while
+  # `by_test_id(attribute:)` picks it per locator, so this passes it to PlaywrightEx's builder.
+  defp apply_operation(_frame, {:test_id, attribute_name, test_id}, scope),
+    do: call(scope, :locator, [LocatorUtils.get_by_test_id_selector(attribute_name, test_id)])
 
-  defp apply_operation({:test_id, attribute_name, test_id}, selector),
-    do: concat(selector, LocatorUtils.get_by_test_id_selector(attribute_name, test_id))
-
-  defp apply_operation({:and, right}, selector) do
-    concat(selector, "internal:and=#{JSON.encode!(selector(right))}")
-  end
-
-  defp apply_operation({:or, right}, selector) do
-    concat(selector, "internal:or=#{JSON.encode!(selector(right))}")
-  end
+  defp apply_operation(frame, {:and, right}, scope), do: scope |> native() |> Native.and_(locator(frame, right))
+  defp apply_operation(frame, {:or, right}, scope), do: scope |> native() |> Native.or_(locator(frame, right))
 
   # A chained selector cannot enter a frame; only a parent starting the selector is not chained.
-  defp apply_operation({:within, parent, child}, selector) do
-    if Internal.crosses_frame?(child) or (selector != :none and Internal.crosses_frame?(parent)) do
+  defp apply_operation(frame, {:within, parent, child}, scope) do
+    if Internal.crosses_frame?(child) or (not root?(scope) and Internal.crosses_frame?(parent)) do
       raise ArgumentError,
             "within/2 cannot enter a frame inside a chained locator, got: " <>
               "within(#{Internal.describe(child)}, #{Internal.describe(parent)}); " <>
               "start the locator from the frame instead"
     end
 
-    selector |> chain(selector(parent)) |> chain(selector(child))
+    parent = if root?(scope), do: locator(frame, parent), else: call(scope, :locator, [locator(frame, parent)])
+    Native.within(locator(frame, child), parent)
   end
 
-  defp apply_operation({:filter, options}, selector) do
-    Enum.reduce(options, selector, fn
-      {:has_text, text}, current ->
-        concat(current, text_selector("internal:has-text", text))
-
-      {:has_not_text, text}, current ->
-        concat(current, text_selector("internal:has-not-text", text))
-
-      {:has, %Locator{} = child}, current ->
-        concat(current, "internal:has=#{JSON.encode!(selector(child))}")
-
-      {:has_not, %Locator{} = child}, current ->
-        concat(current, "internal:has-not=#{JSON.encode!(selector(child))}")
-
-      {:visible, visible?}, current ->
-        concat(current, "visible=#{visible?}")
+  # One `filter` per option keeps the options in the caller's order.
+  defp apply_operation(frame, {:filter, options}, scope) do
+    Enum.reduce(options, native(scope), fn
+      {key, %Locator{} = child}, current -> Native.filter(current, [{key, locator(frame, child)}])
+      option, current -> Native.filter(current, [option])
     end)
   end
 
-  defp apply_operation({:nth, index}, selector) do
-    concat(selector, "nth=#{index}")
-  end
+  defp apply_operation(_frame, {:nth, index}, scope), do: scope |> native() |> Native.nth(index)
 
-  # Nesting makes the operands of `and_/2` and `or_/2` in `nested` resolve from each match
-  # of `selector`. Playwright rejects a chain with nothing before it.
-  defp chain(:none, nested), do: nested
-  defp chain(selector, nested), do: concat(selector, "internal:chain=#{JSON.encode!(nested)}")
+  defp call({:root, frame}, function, arguments), do: apply(PlaywrightEx.Frame, function, [frame | arguments])
+  defp call(%FrameLocator{} = scope, function, arguments), do: apply(FrameLocator, function, [scope | arguments])
+  defp call(%Native{} = scope, function, arguments), do: apply(Native, function, [scope | arguments])
 
-  defp concat(:none, right), do: right
-  defp concat(left, right), do: "#{left} >> #{right}"
+  defp root?(scope), do: match?({:root, _frame}, scope)
 
-  defp text_selector(engine, value), do: "#{engine}=#{StringUtils.escape_for_text_selector(value, false)}"
+  # Refining nothing, at the start of a locator or of a frame, refines every element there.
+  defp native(%Native{} = native), do: native
+  defp native(scope), do: call(scope, :locator, ["*"])
 end
