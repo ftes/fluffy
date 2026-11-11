@@ -99,10 +99,9 @@ defmodule Fluffy.Locator.Static do
   defp filter_candidates(candidates, aria, options) do
     Enum.filter(candidates, fn candidate ->
       Enum.all?(options, fn
-        {:has_text, text} -> text_matches?(text(aria, candidate), text, Keyword.get(options, :exact, false))
-        {:has_not_text, text} -> not text_matches?(text(aria, candidate), text, Keyword.get(options, :exact, false))
+        {:has_text, text} -> contains_text?(text(aria, candidate), text)
+        {:has_not_text, text} -> not contains_text?(text(aria, candidate), text)
         {:visible, visible?} -> structurally_visible?(aria, candidate) == visible?
-        {:exact, _exact?} -> true
         {:has, %Locator{} = child} -> resolve(aria, candidate, child) != []
         {:has_not, %Locator{} = child} -> resolve(aria, candidate, child) == []
       end)
@@ -164,6 +163,10 @@ defmodule Fluffy.Locator.Static do
   end
 
   defp accessible_name_matches?(_aria, _node, nil, _exact?), do: true
+
+  # As upstream, a regular expression sees the normalized accessible name.
+  defp accessible_name_matches?(aria, node, %Regex{} = expected, _exact?),
+    do: Regex.match?(expected, aria |> Aria.name(node) |> normalize())
 
   defp accessible_name_matches?(aria, node, expected, exact?) do
     aria |> Aria.name(node) |> text_matches?(expected, exact?)
@@ -257,7 +260,13 @@ defmodule Fluffy.Locator.Static do
     end
   end
 
+  # `filter/2`'s `has_text:` is a case-insensitive substring or a regex, as in Playwright.
+  defp contains_text?(actual, expected), do: text_matches?(actual, expected, false)
+
   defp text_matches?(nil, _expected, _exact?), do: false
+
+  # As upstream, a regular expression ignores `exact?` and sees the text as is.
+  defp text_matches?(actual, %Regex{} = expected, _exact?), do: Regex.match?(expected, actual)
 
   defp text_matches?(actual, expected, true), do: normalize(actual) == normalize(expected)
 

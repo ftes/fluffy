@@ -285,9 +285,6 @@ defmodule Fluffy.Options do
     filter: {PlaywrightEx.Locator, :filter, 2, fluffy: [:has, :has_not, :has_not_text, :has_text, :visible]}
   ]
 
-  # Fluffy-owned locator options whose regular-expression form only Playwright matches.
-  @playwright_regex_locator_keys [:name, :has_text, :has_not_text]
-
   @text_or_regex [
     type: {:or, [:string, {:struct, Regex}]},
     type_spec: quote(do: String.t() | Regex.t()),
@@ -364,7 +361,7 @@ defmodule Fluffy.Options do
                                [
                                  doc:
                                    "Restrict the role locator by accessible name. " <>
-                                     "A regular expression is *Playwright only.*"
+                                     "A regular expression is tested against the normalized name."
                                ],
                            exact: [
                              type: :boolean,
@@ -386,10 +383,6 @@ defmodule Fluffy.Options do
                              type: :boolean,
                              doc: "Filter by structural visibility in Static/Live and rendered visibility in Playwright."
                            ],
-                           exact: [
-                             type: :boolean,
-                             doc: "Match the whole normalized text, case-sensitively, for has_text and has_not_text."
-                           ],
                            has: [
                              type: {:struct, Fluffy.Locator},
                              type_spec: quote(do: Fluffy.Locator.t()),
@@ -400,7 +393,7 @@ defmodule Fluffy.Options do
                                [
                                  doc:
                                    "Keep elements containing this normalized text. " <>
-                                     "A regular expression is *Playwright only.*"
+                                     "A regular expression is tested against the raw text."
                                ],
                            has_not: [
                              type: {:struct, Fluffy.Locator},
@@ -412,7 +405,7 @@ defmodule Fluffy.Options do
                                [
                                  doc:
                                    "Keep elements that do not contain this normalized text. " <>
-                                     "A regular expression is *Playwright only.*"
+                                     "A regular expression is tested against the raw text."
                                ]
                          )
 
@@ -472,9 +465,6 @@ defmodule Fluffy.Options do
 
   @doc "Locator options that only a browser can honor."
   def playwright_locator_keys, do: @playwright_locator_keys
-
-  @doc "Locator options whose regular-expression form only a browser can honor."
-  def playwright_regex_locator_keys, do: @playwright_regex_locator_keys
 
   @doc false
   def native_expectations, do: @native_expectations

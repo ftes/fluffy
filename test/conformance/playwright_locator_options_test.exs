@@ -25,7 +25,6 @@ defmodule Fluffy.Conformance.PlaywrightLocatorOptionsTest do
 
   @text """
   <ul><li>Apple pie</li><li>Apple tart</li><li>Banana bread</li></ul>
-  <section><button onclick="this.textContent = 'Saved'">Save draft</button></section>
   """
 
   @tag driver: :playwright
@@ -49,20 +48,6 @@ defmodule Fluffy.Conformance.PlaywrightLocatorOptionsTest do
     |> expect(to_be_visible(by_role(:option, name: "Small", selected: true)))
   end
 
-  @tag driver: :playwright
-  test "regular expressions match names and filter text on Playwright" do
-    :playwright
-    |> session_for_html(@text, base_url: Fluffy.TestServer.base_url())
-    |> expect(to_have_count(by_role(:button, name: ~r/^save/i), 1))
-    |> expect(to_have_count(by_role(:button, name: ~r/^save/), 0))
-    |> expect("li" |> by_css() |> filter(has_text: ~r/^Apple/) |> to_have_count(2))
-    |> expect("li" |> by_css() |> filter(has_text: ~r/pie$/, exact: true) |> to_have_count(1))
-    |> expect("li" |> by_css() |> filter(has_not_text: ~r/^Apple/) |> to_have_count(1))
-    |> expect("section" |> by_css() |> filter(has: by_role(:button, name: ~r/draft$/)) |> to_have_count(1))
-    |> click(by_role(:button, name: ~r/^Save/))
-    |> expect(to_be_visible(by_role(:button, name: "Saved", exact: true)))
-  end
-
   test "Playwright-only options are validated when the locator is built" do
     assert_raise NimbleOptions.ValidationError, ~r/:pressed/, fn -> by_role(:button, pressed: "yes") end
     assert_raise NimbleOptions.ValidationError, ~r/:level/, fn -> by_role(:heading, level: "2") end
@@ -84,14 +69,10 @@ defmodule Fluffy.Conformance.PlaywrightLocatorOptionsTest do
 
       # Building and composing the locators does not raise.
       pressed = by_role(:button, pressed: true)
-      name = by_role(:button, name: ~r/Save/)
-      has_text = "li" |> by_css() |> filter(has_text: ~r/Apple/)
       nested = "ul" |> by_css() |> filter(has: by_role(:listitem, level: 1)) |> and_(by_css("ul"))
 
       for {operation, message} <- [
             {fn -> click(session, pressed) end, ~r/:pressed is a Playwright locator option/},
-            {fn -> click(session, name) end, ~r/a regular expression :name is a Playwright locator option/},
-            {fn -> expect(session, to_have_count(has_text, 1)) end, ~r/regular expression :has_text/},
             {fn -> expect(session, "p" |> by_css() |> or_(nested) |> to_be_visible()) end, ~r/:level/}
           ] do
         error = assert_raise Fluffy.CapabilityError, message, operation

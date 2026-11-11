@@ -48,10 +48,10 @@ defmodule Fluffy.Capability do
     },
     %{
       id: :playwright_locator_options,
-      feature: "Role-state and regular-expression locator options",
+      feature: "Role-state locator options",
       drivers: %{static: :browser_only, live: :browser_only, playwright: :equivalent},
       detail:
-        "Options such as `pressed:` and `level:`, and regular expressions for `name:` and `has_text:`, compile into the Playwright selector. Static and LiveView raise when they resolve such a locator."
+        "Options such as `pressed:` and `level:` compile into the Playwright selector. Static and LiveView raise when they resolve such a locator."
     },
     %{
       id: :playwright_action_options,

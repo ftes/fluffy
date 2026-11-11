@@ -21,6 +21,15 @@ defmodule Fluffy.TestWeb.FacadeLocatorsLive do
     "tracked" => """
     <section id="one"><form id="form-one" phx-submit="save"><input name="choice" aria-label="One"></form></section>
     <section id="two"></section>
+    """,
+    "quotes" => """
+    <p id="apostrophe">Don't</p><p id="double">Say "hi"</p><p id="backtick">Run `mix`</p>
+    <p id="nbsp">a&nbsp;b</p><p id="space">c d</p>
+    <a href="?choice=next">Next &gt;&gt;</a><a href="?choice=later">Next &gt;&gt; later</a>
+    <form method="get">
+      <button name="choice" value="next">Next &gt;&gt;</button><button name="choice" value="later">Next &gt;&gt; later</button>
+    </form>
+    <select aria-label="Quote"><option>Don't</option><option selected>Say "hi"</option></select>
     """
   }
 

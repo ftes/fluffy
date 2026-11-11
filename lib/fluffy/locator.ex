@@ -11,6 +11,10 @@ defmodule Fluffy.Locator do
   LiveView sessions raise `Fluffy.CapabilityError` when they resolve a locator that
   uses one.
 
+  A regular expression in `name:`, `has_text:` or `has_not_text:` runs as PCRE on
+  Static and LiveView and as JavaScript in the browser, so edge cases differ: `$`
+  also matches before a final newline on Phoenix.
+
   Role locators accept these options:
 
   #{NimbleOptions.docs(Fluffy.Options.role_locator_schema())}

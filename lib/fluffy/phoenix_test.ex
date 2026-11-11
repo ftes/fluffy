@@ -9,7 +9,8 @@ defmodule Fluffy.PhoenixTest do
   Actions and assertions return a `Fluffy.PhoenixTest.Session`. Native Fluffy
   APIs accept its contained `session` field. The function documentation below
   defines the supported overloads and options; unsupported options raise
-  `ArgumentError`.
+  `ArgumentError`. Exact text (`exact: true`) normalizes whitespace but, unlike native
+  exact matching, does not ignore soft hyphens or zero-width spaces in the page text.
 
       conn
       |> visit("/creatures/new")
@@ -97,10 +98,7 @@ defmodule Fluffy.PhoenixTest do
   @doc "Like `click_link/3`, with `exact:` for matching `text`."
   @spec click_link(session(), String.t(), String.t(), keyword()) :: session()
   def click_link(session, selector, text, options) do
-    string!(text, :text)
-    options = options!(options, [:exact])
-    text_locator = session |> css_locator(selector) |> Locator.filter(Keyword.put(options, :has_text, text))
-    label_locator = field_locator(session, selector, text, exact: Keyword.get(options, :exact, false))
+    {text_locator, label_locator} = text_and_label_locators(session, selector, text, options)
 
     map_session(session, fn native ->
       locator = if Fluffy.PhoenixTest.Query.matches?(native, text_locator), do: text_locator, else: label_locator
@@ -372,12 +370,17 @@ defmodule Fluffy.PhoenixTest do
   defp click_locator(session, locator), do: map_session(session, &Fluffy.click(&1, locator))
 
   defp click_text(session, selector, text, options) do
-    string!(text, :text)
-    options = options!(options, [:exact])
-    text_locator = session |> css_locator(selector) |> Locator.filter(Keyword.put(options, :has_text, text))
-    label_locator = field_locator(session, selector, text, exact: Keyword.get(options, :exact, false))
+    {text_locator, label_locator} = text_and_label_locators(session, selector, text, options)
     locator = Locator.or_(text_locator, label_locator)
     map_session(session, &Fluffy.click(&1, locator))
+  end
+
+  # A CSS click target matched by its text, and the fallback matched by its label.
+  defp text_and_label_locators(session, selector, text, options) do
+    string!(text, :text)
+    exact? = options |> options!([:exact]) |> Keyword.get(:exact, false)
+    text_locator = session |> css_locator(selector) |> Locator.filter(has_text: text_matcher(text, exact?))
+    {text_locator, field_locator(session, selector, text, exact: exact?)}
   end
 
   defp field_locator(session, selector, label, options) do
@@ -483,7 +486,7 @@ defmodule Fluffy.PhoenixTest do
 
     locator =
       if Keyword.has_key?(options, :text),
-        do: Locator.filter(locator, has_text: options[:text], exact: Keyword.get(options, :exact, false)),
+        do: Locator.filter(locator, has_text: text_matcher(options[:text], Keyword.get(options, :exact, false))),
         else: locator
 
     element_expectation(locator, options)
@@ -496,7 +499,7 @@ defmodule Fluffy.PhoenixTest do
       Keyword.has_key?(options, :selected) ->
         locator
         |> Locator.by_css("option:checked")
-        |> Locator.filter(has_text: options[:selected], exact: true)
+        |> Locator.filter(has_text: text_matcher(options[:selected], true))
         |> Expect.to_have_count(0, timeout)
         |> Expect.not_()
 
@@ -512,6 +515,23 @@ defmodule Fluffy.PhoenixTest do
       true ->
         locator |> Locator.filter(visible: true) |> Locator.first() |> Expect.to_be_visible(timeout)
     end
+  end
+
+  # `exact: true` matches the whole whitespace-normalized text, case-sensitively. Only JS
+  # syntax characters are escaped: under the `u` flag JS rejects escapes such as `\-`.
+  # Under `u`, Playwright also leaves quotes and `>>` unescaped in the selector, which
+  # breaks it, so those characters are written as `\xNN` (valid in both JS and PCRE).
+  defp text_matcher(text, false), do: text
+
+  defp text_matcher(text, true) do
+    words = text |> String.split(~r/\s+/u, trim: true) |> Enum.map_join("\\s+", &escape_regex/1)
+    Regex.compile!("^\\s*#{words}\\s*$", "u")
+  end
+
+  defp escape_regex(text) do
+    text
+    |> String.replace(~r/[\\^$.*+?()[\]{}|]/, "\\\\\\0")
+    |> String.replace(["'", "\"", "`", ">"], &("\\x" <> Base.encode16(&1)))
   end
 
   defp path_expectation(path, options) do

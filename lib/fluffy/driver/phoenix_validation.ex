@@ -6,7 +6,6 @@ defmodule Fluffy.Driver.PhoenixValidation do
   alias Fluffy.Locator
   alias Fluffy.Session
 
-  @playwright_locator_keys Fluffy.Options.playwright_locator_keys()
   @browser_only_kinds [
     :accessible_description,
     :accessible_error_message,
@@ -71,12 +70,6 @@ defmodule Fluffy.Driver.PhoenixValidation do
     case Locator.Internal.playwright_option(locator) do
       nil ->
         :ok
-
-      {key, %Regex{}} when key not in @playwright_locator_keys ->
-        raise CapabilityError,
-          capability: :playwright_locator_options,
-          driver: driver,
-          detail: "a regular expression #{inspect(key)} is a Playwright locator option"
 
       {key, _value} ->
         raise CapabilityError,

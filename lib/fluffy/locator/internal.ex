@@ -81,10 +81,8 @@ defmodule Fluffy.Locator.Internal do
       {key, %Locator{} = inner} when key in [:has, :has_not] ->
         playwright_option(inner)
 
-      {key, value} = option ->
-        if key in Options.playwright_locator_keys() or
-             (is_struct(value, Regex) and key in Options.playwright_regex_locator_keys()),
-           do: option
+      {key, _value} = option ->
+        if key in Options.playwright_locator_keys(), do: option
     end)
   end
 

@@ -42,9 +42,17 @@ computed CSS and live input state stay browser-only. CSS must be valid browser
 CSS; escape special characters in IDs or use a semantic/test-id locator.
 
 Options marked *Playwright only.* in `Fluffy.Locator`, such as
-`by_role(:button, pressed: true)`, `by_role(:heading, level: 2)` or a regex
-`name:` or `has_text:`, compile into the browser's selector. Static and LiveView
-sessions raise `Fluffy.CapabilityError` when they resolve such a locator.
+`by_role(:button, pressed: true)` or `by_role(:heading, level: 2)`, compile into
+the browser's selector. Static and LiveView sessions raise `Fluffy.CapabilityError`
+when they resolve such a locator.
+
+`name:`, `has_text:` and `has_not_text:` also take a regular expression, as in
+Playwright: `name:` tests it against the normalized accessible name, and the text
+filters against the element's raw text, so `~r/^Pro$/` does not match
+`<li> Pro </li>`. On Static and LiveView it runs as PCRE, and in the browser as
+JavaScript, so edge cases differ: `$` also matches before a final newline on
+Phoenix, and without the `u` flag `.` matches one byte there rather than one
+character.
 
 Refine a locator with `filter`, `first`, `last`, or zero-based `nth`.
 Use `and_` to require both locators to match the same element:

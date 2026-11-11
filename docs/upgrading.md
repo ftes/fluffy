@@ -80,6 +80,8 @@ Timeouts follow Elixir: `0` checks once and `:infinity` means no limit; see
 - `page_status`, `page_to_have_status` and `Fluffy.Page.status` are removed, as in
   Playwright; on Playwright, assert on `Fluffy.Event.response/1` instead.
 - `trace(coverage:)` is removed.
+- `filter/2` takes no `exact:`, as in Playwright. Match a whole text with a regex, such as
+  `filter(has_text: ~r/^Pro$/)`, which works on every driver.
 - The `Fluffy.Expect.checked_option` type is `to_be_checked_option`.
   `Fluffy.Locator.describe`, `new` and `append` are internal; `inspect/1` renders a locator.
 - On Playwright, a failed `visit`, `reload`, `go_back` or `go_forward` raises
