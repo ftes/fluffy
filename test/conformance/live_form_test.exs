@@ -426,9 +426,9 @@ defmodule Fluffy.Conformance.LiveFormTest do
     test "a form triggered on the connected render is submitted with #{driver}", %{driver: driver} do
       driver
       |> start_test_session()
-      |> visit("/live/trigger-on-connect?identity=ada")
+      |> visit("/live/trigger-on-connect?identity=hermione")
       |> expect(Fluffy.Expect.page_to_have_url(Fluffy.TestServer.base_url() <> "/session/show"))
-      |> expect("Static identity: ada" |> by_text() |> to_be_visible())
+      |> expect("Static identity: hermione" |> by_text() |> to_be_visible())
     end
 
     @tag driver: driver
@@ -451,12 +451,12 @@ defmodule Fluffy.Conformance.LiveFormTest do
     test "a form triggered on the dead render only is not submitted with #{driver}", %{driver: driver} do
       driver
       |> start_test_session()
-      |> visit("/live/trigger-on-connect?identity=ada&trigger=dead")
+      |> visit("/live/trigger-on-connect?identity=hermione&trigger=dead")
+      |> expect("Floo powder for hermione" |> by_text() |> to_be_visible())
       # The LiveView client disconnects before it submits a triggered form, so
       # the view only answers if it was not submitted.
-      |> expect("Handing off ada" |> by_text() |> to_be_visible())
-      |> click(by_role(:button, name: "Ping"))
-      |> expect("Pinged" |> by_text() |> to_be_visible())
+      |> click(by_role(:button, name: "Lumos"))
+      |> expect("Wand lit" |> by_text() |> to_be_visible())
       |> expect(Fluffy.Expect.page_to_have_url(~r|/live/trigger-on-connect\?|))
     end
   end
