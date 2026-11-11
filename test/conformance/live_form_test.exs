@@ -438,6 +438,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
       |> visit("/live/trigger-on-connect?identity=ada&trigger=dead")
       # The LiveView client disconnects before it submits a triggered form, so
       # the view only answers if it was not submitted.
+      |> expect("Handing off ada" |> by_text() |> to_be_visible())
       |> click(by_role(:button, name: "Ping"))
       |> expect("Pinged" |> by_text() |> to_be_visible())
       |> expect(Fluffy.Expect.page_to_have_url(~r|/live/trigger-on-connect\?|))

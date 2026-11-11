@@ -20,6 +20,7 @@ defmodule Fluffy.Backend.Phoenix do
   alias Fluffy.Driver.Live.UploadState
   alias Fluffy.Driver.Static.State, as: StaticState
   alias Fluffy.Driver.Unvisited.State, as: UnvisitedState
+  alias Fluffy.Internal.Navigation
   alias Fluffy.Internal.Navigation.Link
   alias Fluffy.Internal.Navigation.Patch
   alias Fluffy.Internal.Navigation.Redirect
@@ -335,7 +336,7 @@ defmodule Fluffy.Backend.Phoenix do
         session
 
       submission ->
-        navigate(session, %Submission{submission: submission, redirects: HTTP.count_redirect!(redirects, url)})
+        navigate(session, Navigation.submission(submission, redirects: HTTP.count_redirect!(redirects, url)))
     end
   end
 

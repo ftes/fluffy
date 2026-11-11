@@ -90,7 +90,10 @@ defmodule Fluffy.Internal.Navigation do
     %Link{destination: destination, download: options[:download]}
   end
 
-  def submission(submission), do: %Submission{submission: submission}
+  def submission(submission, options \\ []) do
+    options = Keyword.validate!(options, redirects: 0)
+    %Submission{submission: submission, redirects: options[:redirects]}
+  end
 
   def redirect(destination, options \\ []) do
     options = Keyword.validate!(options, [:flash])
