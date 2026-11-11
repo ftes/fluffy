@@ -9,13 +9,14 @@ boundaries explicit and cover behavior changes with focused conformance tests.
 Upstream Playwright is the reference. Fluffy is modeled on Playwright and adds only what Phoenix
 LiveView needs (waiting for LiveViews to connect, following their navigations, form state). Before
 adding a timeout budget, retry, extra check or browser workaround, check what Playwright does and
-match it; the pinned source is in PlaywrightEx's download cache (`<cache_dir>/<version>/upstream`,
-see `PlaywrightEx.Driver.cache_dir/1`). Don't work around Playwright, PlaywrightEx or browser bugs
-(upstream `fixme` tests mark the known ones); let Playwright's behavior show through. Only as a
-last resort, when LiveView support can't work without it, add a workaround, and say why in a
-comment. Build Playwright selectors through PlaywrightEx (its `Frame`/`Locator`/`FrameLocator`
-API, `Isomorphic.LocatorUtils` and `SelectorParser`); don't write selector strings in Fluffy,
-since `internal:*` engine syntax changes between Playwright versions.
+match it; the pinned source is in `tmp/playwright-<version>` (`mix setup` or
+`mix fluffy.playwright_source` fetches it), and dependency code is in `deps/`. Don't work around
+Playwright, PlaywrightEx or browser bugs (upstream `fixme` tests mark the known ones); let
+Playwright's behavior show through. Only as a last resort, when LiveView support can't work
+without it, add a workaround, and say why in a comment. Build Playwright selectors through
+PlaywrightEx (its `Frame`/`Locator`/`FrameLocator` API, `Isomorphic.LocatorUtils` and
+`SelectorParser`); don't write selector strings in Fluffy, since `internal:*` engine syntax
+changes between Playwright versions.
 Timeouts follow Elixir: `0` means check once and `:infinity` means no limit;
 `Fluffy.Deadline.playwright/1` maps `0` to 1ms, since Playwright's 0 means no limit.
 

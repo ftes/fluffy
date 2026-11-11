@@ -90,7 +90,9 @@ defmodule Fluffy.MixProject do
     [
       main: "readme",
       # Maintainer tasks in `dev/` are not part of the package.
-      filter_modules: fn module, _metadata -> module != Mix.Tasks.Fluffy.Gen.NativeOptions end,
+      filter_modules: fn module, _metadata ->
+        module not in [Mix.Tasks.Fluffy.Gen.NativeOptions, Mix.Tasks.Fluffy.PlaywrightSource]
+      end,
       annotations_for_docs: fn metadata ->
         if metadata[:playwright_only], do: ["Playwright only"], else: []
       end,
@@ -175,6 +177,7 @@ defmodule Fluffy.MixProject do
     [
       setup: [
         "deps.get",
+        "fluffy.playwright_source",
         "assets.build",
         "playwright_ex.install -- chromium"
       ],
