@@ -49,8 +49,9 @@ env:
 jobs:
   # The newest lane compiles strictly and runs the linters, generators, Dialyzer and docs. The
   # oldest lane (the Elixir/OTP floor) only compiles, warnings allowed: newer, backwards-compatible
-  # features may warn there, and its tests guard the floor. No browser or database. Saves the deps
-  # and _build cache on main.
+  # features may warn there. Its Chromium tests guard the floor, so a call to a function the floor
+  # lacks, only a warning there, fails CI only where they run it. No browser or database. Saves the
+  # deps and _build cache on main.
   checks:
     name: checks (${{ matrix.lane }})
     # Draft PRs skip CI until marked ready, and in a stack only the top PR runs it: it holds every
