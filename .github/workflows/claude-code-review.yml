@@ -84,4 +84,5 @@ jobs:
         if: ${{ !cancelled() && steps.claude.outputs.execution_file != '' }}
         env:
           EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
-        run: jq -rf .github/claude-summary.jq "$EXECUTION_FILE" >> "$GITHUB_STEP_SUMMARY"
+        # From the run's commit: Claude can edit the checkout.
+        run: jq -r -f <(git show "$GITHUB_SHA:.github/claude-summary.jq") "$EXECUTION_FILE" >> "$GITHUB_STEP_SUMMARY"
