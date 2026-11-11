@@ -288,9 +288,8 @@ fails when PlaywrightEx adds or removes one.
   `Fluffy.Playwright.Clock`, keyboard and mouse input in `Fluffy.Playwright.Keyboard`
   and `Fluffy.Playwright.Mouse`, the events in `Fluffy.Event`, and the values they
   deliver, including response bodies. Their options pass through as documented.
-  `to_have_screenshot` needs an explicit `path:` for its baseline, which Fluffy does
-  not derive from the test name; `to_match_aria_snapshot` compares an inline snapshot
-  or, with `path:`, a file written when missing.
+  `to_have_screenshot` and `to_match_aria_snapshot` (without an inline snapshot) find
+  their file by `name:` or the test's name, through `PlaywrightEx.Test`, or at `path:`.
 - **Unwrap:** everything else page-, locator-, or value-local, such as
   `aria_snapshot_json`, HAR routing, and response timing. For reads like
   `text_content`, `Fluffy.unwrap_and_return/2` and

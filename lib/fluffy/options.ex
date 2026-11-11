@@ -94,6 +94,7 @@ defmodule Fluffy.Options do
          :mask_color,
          :max_diff_pixel_ratio,
          :max_diff_pixels,
+         :name,
          :omit_background,
          :scale,
          :style_path,
@@ -158,16 +159,15 @@ defmodule Fluffy.Options do
     ]
   ]
 
-  # PlaywrightEx has no test runner to name a baseline, so its `path:` is required, and
-  # nothing derives one here.
+  # A screenshot's positional `path` is denied above; a baseline's `path:` is upstream's
+  # option, which PlaywrightEx requires outside a `PlaywrightEx.Test` test.
   @required_action_options [
     to_have_screenshot: [
       path: [
         type: :string,
-        required: true,
         doc:
-          "The baseline image, a `.png` or `.webp` file, resolved against the current working directory. " <>
-            "Required: Fluffy does not derive a path from the test name."
+          "*Playwright only.* The baseline image, a `.png` or `.webp` file, resolved against the current " <>
+            "working directory, in place of `:name`. Required in a module without `use Fluffy.Test`."
       ]
     ]
   ]
@@ -214,7 +214,7 @@ defmodule Fluffy.Options do
     to_have_accessible_name: {PlaywrightEx.Expect, :to_have_accessible_name, 3, [:ignore_case]},
     to_have_accessible_description: {PlaywrightEx.Expect, :to_have_accessible_description, 3, [:ignore_case]},
     to_have_accessible_error_message: {PlaywrightEx.Expect, :to_have_accessible_error_message, 3, [:ignore_case]},
-    to_match_aria_snapshot: {PlaywrightEx.Expect, :to_match_aria_snapshot, 3, [:path]},
+    to_match_aria_snapshot: {PlaywrightEx.Expect, :to_match_aria_snapshot, 3, [:name, :path]},
     to_be_checked: {PlaywrightEx.Expect, :to_be_checked, 2, [:checked, :indeterminate]},
     to_have_value: {PlaywrightEx.Expect, :to_have_value, 3, []},
     to_have_values: {PlaywrightEx.Expect, :to_have_values, 3, []},
@@ -412,9 +412,12 @@ defmodule Fluffy.Options do
   @setup_schema NimbleOptions.new!(
                   repos: [type: {:list, :atom}],
                   sandbox: [type: :boolean],
-                  trace: [type: :atom, doc: "`PlaywrightEx.Test.record_artifacts/2`'s `trace:`."],
-                  screenshot: [type: :atom, doc: "`PlaywrightEx.Test.record_artifacts/2`'s `screenshot:`."],
-                  video: [type: :atom, doc: "`PlaywrightEx.Test.record_artifacts/2`'s `video:`."]
+                  trace: [type: :any, doc: "`PlaywrightEx.Test.record_artifacts/2`'s `trace:`, a mode or options."],
+                  screenshot: [
+                    type: :any,
+                    doc: "`PlaywrightEx.Test.record_artifacts/2`'s `screenshot:`, a mode or options."
+                  ],
+                  video: [type: :any, doc: "`PlaywrightEx.Test.record_artifacts/2`'s `video:`, a mode or options."]
                 )
 
   @session_schema NimbleOptions.new!(

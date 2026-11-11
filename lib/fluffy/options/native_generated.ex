@@ -360,6 +360,10 @@ defmodule Fluffy.Options.NativeGenerated do
         {"`:png` | `:jpeg` | `:webp`", "Specify screenshot type, defaults to `:png`.", quote(do: :png | :jpeg | :webp)}
     ],
     {PlaywrightEx.Expect, :to_have_screenshot, 2} => [
+      name:
+        {"`t:String.t/0` | list of `t:String.t/0`",
+         "Snapshot name. Must have a `.png` or `.webp` extension, the screenshot is captured in the corresponding format. Both formats are lossless.",
+         quote(do: String.t() | [String.t()])},
       animations:
         {"`:disabled` | `:allow`",
          "When set to `:disabled`, stops CSS animations, CSS transitions and Web Animations. Animations get different treatment depending on their duration:",

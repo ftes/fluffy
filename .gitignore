@@ -17,3 +17,6 @@ erl_crash.dump
 # Left over in checkouts from before test assets were built with the Hex esbuild package.
 /node_modules/
 /.pnpm-store/
+
+# PlaywrightEx.Test output_dir
+/test-results/

@@ -284,23 +284,21 @@ defmodule Fluffy.Expect do
   @doc group: "Locator assertions"
   @doc playwright_only: true
   @doc """
-  Asserts that a screenshot of the target matches the baseline image at the required
-  `path:`, a `.png` or `.webp` file. Requires Playwright, including when negated.
+  Asserts that a screenshot of the target matches a baseline image, a `.png` or `.webp`
+  file. Requires Playwright, including when negated.
 
-      expect(session, to_have_screenshot(by_role(:main), path: "test/screenshots/main-chromium.png"))
+      expect(session, to_have_screenshot(by_role(:main), name: "main.png"))
 
-  The baseline lives at `path:` itself; a relative path resolves against the current
-  working directory, under `mix test` the project root. Fluffy does not derive a path
-  from the test name, and leaving out `path:` raises `NimbleOptions.ValidationError`.
-  Give each baseline its own path and commit it, one per browser if you run several,
-  since renderings differ.
+  In a module with `use Fluffy.Test`, `PlaywrightEx.Test` resolves `name:` (or, without
+  one, the test's name) to a file, as Playwright does; see "Snapshots" in its docs. A
+  missing baseline is written there and fails the test at the end of its body, as in
+  Playwright. A mismatch writes `-actual`, `-diff` and `-previous` images to the test's
+  output dir. `path:` names the file itself instead, relative to the current working
+  directory; elsewhere it is required. Commit the baselines.
 
-  A missing baseline is written, with a notice on stdout, and the assertion passes;
-  negated, it fails. A mismatch writes `-actual`, `-diff`, `-previous` and `-expected`
-  images next to the baseline.
   `config :playwright_ex, :expect` sets `update_snapshots:`, where `:none` fails on a
-  missing baseline and `:changed` or `:all` rewrite a mismatching one, and comparison
-  defaults such as `to_have_screenshot: %{maxDiffPixels: 10}`.
+  missing baseline, `:missing` writes it and passes, and `:changed` or `:all` rewrite a
+  mismatching one, and comparison defaults such as `to_have_screenshot: %{maxDiffPixels: 10}`.
 
   ## Options
 
@@ -383,18 +381,18 @@ defmodule Fluffy.Expect do
   @doc playwright_only: true
   @doc """
   Asserts the target's ARIA snapshot against `expected`, the snapshot as YAML text, or
-  against the file at `path:` in its place. Requires Playwright, including when negated.
+  against a snapshot file in its place. Requires Playwright, including when negated.
 
-      expect(session, to_match_aria_snapshot(by_css("body"), path: "test/snapshots/body.aria.yml"))
+      expect(session, to_match_aria_snapshot(by_css("body"), name: "body.aria.yml"))
 
   An empty `expected` fails with the current snapshot in its message, to paste in.
 
-  A relative `path:` resolves against the current working directory, as screenshot
-  baselines do, and Fluffy does not derive one from the test name. A missing file is
-  written, with a notice on stdout, and the assertion passes; negated, it fails.
-  `config :playwright_ex, :expect` sets `update_snapshots:`. Under `:none` a missing
-  file fails, comparing against an empty snapshot. Negated, a missing file passes under
-  `:none`, `:all` or `:changed`.
+  The file is found as a screenshot baseline is (see `to_have_screenshot/2`): `name:`, or
+  the test's name, resolved by `PlaywrightEx.Test` in a module with `use Fluffy.Test`, or
+  `path:`, relative to the current working directory. A missing file is written and fails
+  the test at its end, or passes under `update_snapshots: :missing`; negated, it fails.
+  Under `:none` a missing file fails, comparing against an empty snapshot. Negated, a
+  missing file passes under `:none`, `:all` or `:changed`.
 
   ## Options
 
@@ -740,8 +738,8 @@ defmodule Fluffy.Expect do
   @doc group: "Page assertions"
   @doc playwright_only: true
   @doc """
-  Asserts that a screenshot of the active page matches the baseline image at the required
-  `path:`, like `to_have_screenshot/2`, which also says where baselines go.
+  Asserts that a screenshot of the active page matches a baseline image, like
+  `to_have_screenshot/2`, which also says where baselines go.
 
   ## Options
 
@@ -755,8 +753,8 @@ defmodule Fluffy.Expect do
   @doc group: "Page assertions"
   @doc playwright_only: true
   @doc """
-  Asserts the active page's ARIA snapshot against `expected`, or the file at `path:` in
-  its place, like `to_match_aria_snapshot/3`, which also says how a missing file behaves.
+  Asserts the active page's ARIA snapshot against `expected`, or a snapshot file in its
+  place, like `to_match_aria_snapshot/3`, which also says how a missing file behaves.
 
   ## Options
 

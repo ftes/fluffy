@@ -121,15 +121,16 @@ default of 3 minutes applies. To use a system browser, set
 `launch_options: [executable_path: System.find_executable("google-chrome-stable")]`.
 `mix playwright_ex.install --no-browsers` installs only the driver for an existing browser.
 
-A module that starts Playwright sessions needs `use Fluffy.Test` after
-`use ExUnit.Case` (or in your case template's `using`), which uses `PlaywrightEx.Test`. There `Fluffy.Test.setup/2`
-records every Playwright session of the test with `PlaywrightEx.Test.record_artifacts/2`:
-one `trace.zip` of all its sessions, a screenshot of each page as its session closes,
-and videos, each `:off` by default. The `*_on_failure` modes record every test and drop
-the files of passing ones. Each test writes to its own dir under `output_dir`
-(`test-results`); configure CI to upload it when the test job fails. Pass `trace:`,
-`screenshot:` or `video:` to `Fluffy.Test.setup/2` to override the config for a test.
-See `PlaywrightEx.Test` for the modes and file names.
+A module that starts Playwright sessions needs `use Fluffy.Test` after `use ExUnit.Case`
+(or in your case template's `using`), which uses `PlaywrightEx.Test`. There
+`Fluffy.Test.setup/2` records every Playwright session of the test with
+`PlaywrightEx.Test.record_artifacts/2`: one `trace.zip` of all its sessions, a screenshot
+of each page as its session closes, and videos, each `:off` by default. The
+`*_on_failure` modes record every test and drop the files of passing ones. Each test
+writes to its own dir under `output_dir` (`test-results`); ignore it in git and
+configure CI to upload it when the test job fails. Pass `trace:`, `screenshot:` or
+`video:` (a mode or its options) to `Fluffy.Test.setup/2` to override the config for a
+test. See `PlaywrightEx.Test` for the modes and file names.
 
 As in Playwright, browser `console` messages and uncaught page errors are not
 printed; set `log_browser_console: true` to send them to Elixir's `Logger`.
@@ -143,8 +144,9 @@ a session needs one, a lost browser is launched again for the next session, and 
 drivers stop after the suite. Firefox dispatches input for all of a browser's pages in
 one queue and times out under load, so for Firefox suites set
 `config :fluffy, playwright: [isolate: true]`: each module gets a driver and browser of
-its own at its first session, at most `max_isolated` at once (half the schedulers), as
-Playwright Test's workers do.
+its own at its first session, at most `workers` at once (`config :playwright_ex, :test`,
+half the schedulers), as Playwright Test's workers do. A module beyond them waits at its
+first session, within the test's timeout, so keep ExUnit's `max_cases` at most `workers`.
 
 ## Ecto sandbox
 

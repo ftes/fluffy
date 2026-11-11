@@ -53,6 +53,8 @@ config :fluffy,
     isolate: browser_engine == :firefox
   ]
 
+# The tests write their baselines on first use: written and passed, not failed at the test's end.
+config :playwright_ex, :expect, update_snapshots: :missing
 config :playwright_ex, :test, browser_name: browser_engine, launch_options: [headless: true]
 
 # CI keeps a screenshot of each failed test's pages in FLUFFY_ARTIFACT_DIR.
