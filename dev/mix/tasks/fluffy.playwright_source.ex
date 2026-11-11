@@ -3,8 +3,7 @@ defmodule Mix.Tasks.Fluffy.PlaywrightSource do
   @moduledoc """
   Clones Playwright's source at the tag of the pinned driver (`v<version>`, see
   `PlaywrightEx.Driver.version/0`) into `tmp/playwright-<version>`, unless that exists. The
-  clone is shallow, blobless and sparse: the client, server, injected and test runner sources
-  (with the `expect` matchers), the protocol, the page and library tests and the API docs.
+  clone is shallow, blobless and sparse, checking out only `@paths`.
 
       mix fluffy.playwright_source
   """
