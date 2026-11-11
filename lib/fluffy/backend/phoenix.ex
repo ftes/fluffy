@@ -13,6 +13,7 @@ defmodule Fluffy.Backend.Phoenix do
   alias Fluffy.Backend.Phoenix.HTTP.Response, as: HTTPResponse
   alias Fluffy.ClientDOM
   alias Fluffy.Download
+  alias Fluffy.Driver.External.State, as: ExternalState
   alias Fluffy.Driver.Live, as: LiveDriver
   alias Fluffy.Driver.Live.Document, as: LiveDocument
   alias Fluffy.Driver.Live.State, as: LiveState
@@ -129,13 +130,15 @@ defmodule Fluffy.Backend.Phoenix do
 
   @impl true
   def visit(%Session{} = session, path) do
-    url = resolve_url(Session.context(session).http.base_url, path, session)
-    {http, response} = HTTP.request(Session.context(session).http, url)
+    http = Session.context(session).http
+    # A test that visits another origin has nothing in the app to check.
+    url = HTTP.validate_url!(http, URI.merge(http.base_url, path))
+    {http, response} = HTTP.request(http, url)
     session = put_http(session, http)
 
     # Playwright's goto fails when the browser aborts the navigation; the
     # browser keeps the cookies the response set.
-    if response.conn.status in @no_content_statuses do
+    if match?(%{conn: %{status: status}} when status in @no_content_statuses, response) do
       raise "Phoenix visit to #{URI.to_string(response.request.url)} was aborted by HTTP #{response.conn.status}"
     end
 
@@ -175,7 +178,7 @@ defmodule Fluffy.Backend.Phoenix do
 
   def navigate(%Session{} = session, %Patch{} = navigation) do
     previous_url = Session.current_page(session).url
-    url = resolve_url(previous_url, navigation.destination, session)
+    url = URI.merge(previous_url, navigation.destination)
 
     Session.commit_page(session, :live, navigation.state, URI.to_string(url), same_document: true)
   end
@@ -226,7 +229,7 @@ defmodule Fluffy.Backend.Phoenix do
 
   defp follow_link(%Session{} = session, href, download_name) do
     current_url = Session.current_page(session).url
-    url = resolve_url(current_url || Session.context(session).http.base_url, href, session)
+    url = URI.merge(current_url || Session.context(session).http.base_url, href)
 
     if same_document_navigation?(current_url, url) do
       Session.commit_page(session, Session.current_driver(session), Session.page_state(session), URI.to_string(url),
@@ -246,7 +249,7 @@ defmodule Fluffy.Backend.Phoenix do
 
   defp submit(%Session{} = session, submission) do
     current_url = Session.current_page(session).url
-    url = resolve_url(current_url, submission.action, session)
+    url = URI.merge(current_url, submission.action)
 
     case submission.method do
       :get ->
@@ -278,11 +281,7 @@ defmodule Fluffy.Backend.Phoenix do
     Process.unlink(proxy_pid)
 
     url =
-      resolve_url(
-        Session.current_page(session).url || Session.context(session).http.base_url,
-        destination,
-        session
-      )
+      URI.merge(Session.current_page(session).url || Session.context(session).http.base_url, destination)
 
     # The Live driver reads how the view left from this monitor's message.
     monitor = LiveState.monitor_view(view.pid)
@@ -333,10 +332,10 @@ defmodule Fluffy.Backend.Phoenix do
   # Requests a view's redirect destination, after `redirects` redirects so far,
   # with the flash it carries.
   defp follow_redirect(session, destination, flash, redirects) do
-    url = resolve_url(Session.context(session).http.base_url, destination, session)
+    url = URI.merge(Session.context(session).http.base_url, destination)
 
     session
-    |> put_live_redirect_flash(url, flash)
+    |> put_live_redirect_flash(flash)
     |> request(url, :get, nil, nil, redirects)
   end
 
@@ -345,11 +344,7 @@ defmodule Fluffy.Backend.Phoenix do
   @doc false
   def commit_conn(%Session{} = session, conn, destination) do
     url =
-      resolve_url(
-        Session.current_page(session).url || Session.context(session).http.base_url,
-        destination,
-        session
-      )
+      URI.merge(Session.current_page(session).url || Session.context(session).http.base_url, destination)
 
     {http, response} = HTTP.follow(Session.context(session).http, conn, url)
     session |> put_http(http) |> finish_response(response, nil)
@@ -362,10 +357,11 @@ defmodule Fluffy.Backend.Phoenix do
 
   # Like the LiveView client's Browser.redirect, a redirect's flash travels to
   # the next page in a 60-second __phoenix_flash__ cookie, signed as
-  # LiveViewTest's follow_redirect signs a flash that is still a map.
-  defp put_live_redirect_flash(session, _url, nil), do: session
+  # LiveViewTest's follow_redirect signs a flash that is still a map. The
+  # client sets it on the app's own origin, even before leaving it.
+  defp put_live_redirect_flash(session, nil), do: session
 
-  defp put_live_redirect_flash(session, url, flash) do
+  defp put_live_redirect_flash(session, flash) do
     token =
       if is_map(flash),
         do: Phoenix.LiveView.Utils.sign_flash(Session.context(session).http.endpoint, flash),
@@ -374,12 +370,15 @@ defmodule Fluffy.Backend.Phoenix do
     http =
       HTTP.store_cookie_header(
         Session.context(session).http,
-        url,
+        URI.parse(Session.context(session).http.base_url),
         "#{@live_flash_cookie}=#{token}; Path=/; Max-Age=60"
       )
 
     put_http(session, http)
   end
+
+  defp finish_response(session, %HTTPResponse{conn: nil, request: %{url: url}}, _download_name),
+    do: commit_external(session, url)
 
   defp finish_response(session, %HTTPResponse{conn: %{status: status} = conn}, _download_name)
        when status in @no_content_statuses, do: keep_document(session, conn)
@@ -434,10 +433,6 @@ defmodule Fluffy.Backend.Phoenix do
 
   defp commit_response(conn, _session, url, _redirects) do
     raise "Phoenix navigation failed with HTTP #{conn.status} for #{URI.to_string(url)}"
-  end
-
-  defp resolve_url(base_url, path, session) do
-    HTTP.resolve(Session.context(session).http, base_url, path)
   end
 
   defp put_http(%Session{} = session, %HTTPClient{} = http) do
@@ -554,6 +549,14 @@ defmodule Fluffy.Backend.Phoenix do
     }
 
     PageLifecycle.replace_document(session, :static, state, URI.to_string(url), [], &release_page/3)
+  end
+
+  # A browser leaves the app for an off-origin request. The test can still
+  # check where it went, so commit a page with that URL and no document.
+  # Its URL reads as a browser reports it, with a lowercase host and at least a `/` path.
+  defp commit_external(session, url) do
+    url = %{url | host: String.downcase(url.host), path: if(url.path in [nil, ""], do: "/", else: url.path)}
+    PageLifecycle.replace_document(session, :external, %ExternalState{}, URI.to_string(url), [], &release_page/3)
   end
 
   defp release_page(session, %Page.State{driver: :live} = page, _reason) do

@@ -23,6 +23,7 @@ boundaries described below.
 | Focus, blur, and focus assertions | - | equivalent |
 | Structural element actions | structural subset | equivalent |
 | Visits, reloads, links, redirects, cookies, and HTTP forms | equivalent | equivalent |
+| Off-origin links, forms, and redirects | structural subset | equivalent |
 | Phoenix.HTML data-method/data-to actions | structural subset | equivalent |
 | LiveView events, patches, navigation, and structural action retry | equivalent | equivalent |
 | LiveView root layout, title updates, and portals | structural subset | equivalent |
@@ -170,6 +171,24 @@ to test the embedding behavior, including interactions between the parent page a
 iframe. See
 [Pages, popups, and frames](advanced-events.md#pages-popups-and-frames)
 for how pages, browser contexts, and frames relate.
+
+### Leaving the app
+
+Phoenix stays in the app. A link, form or redirect to another origin, including a LiveView
+`redirect(socket, external: url)`, ends at a page with only that URL, without requesting it,
+so a test can assert where the app sent it, as with `Phoenix.ConnTest.redirected_to/1`:
+
+```elixir
+session
+|> click(by_role(:button, name: "Sign in"))
+|> expect(page_to_have_url(~r"^https://idp\.example/authorize\?"))
+```
+
+Only URL expectations and `visit` back into the app work on that page; everything else raises
+`Fluffy.CapabilityError` (`:external_navigation`), as does `visit` to another origin. Use
+the string, regex or function form of `page_to_have_url`: `assert_path` and the keyword
+form ignore the host. On Playwright the browser loads the external page; stub it with
+`Fluffy.Playwright.route/4`, which catches a link's or form's target but not a redirect's.
 
 ### Browser baseline
 

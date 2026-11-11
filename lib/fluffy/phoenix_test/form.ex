@@ -13,6 +13,7 @@ defmodule Fluffy.PhoenixTest.Form do
 
   defp owner(%Driver.Static.State{client_dom: client_dom}, _context, locator), do: structural_owner(client_dom, locator)
   defp owner(%Driver.Live.State{client_dom: client_dom}, _context, locator), do: structural_owner(client_dom, locator)
+  defp owner(%Driver.External.State{}, _context, _locator), do: nil
 
   defp owner(%Driver.Playwright.State{frame: frame}, context, locator) do
     case frame

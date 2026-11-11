@@ -106,21 +106,6 @@ defmodule Fluffy.Conformance.StaticHTTPLinkTest do
     end
   end
 
-  test "Phoenix rejects external link navigation explicitly" do
-    fixture =
-      TestHTTPFixtures.register(%{
-        body: html(~s(<a href="https://example.com/orders">External</a>))
-      })
-
-    session = start_test_session(:phoenix)
-
-    session = visit(session, TestHTTPFixtures.path(fixture, "/source"))
-
-    assert_raise Fluffy.CapabilityError, ~r/external_navigation/, fn ->
-      click(session, by_role(:link, name: "External"))
-    end
-  end
-
   test "a Phoenix session reclassifies a linked LiveView destination" do
     fixture =
       TestHTTPFixtures.register(%{

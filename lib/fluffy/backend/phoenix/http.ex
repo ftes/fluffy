@@ -28,8 +28,9 @@ defmodule Fluffy.Backend.Phoenix.HTTP.Response do
   @enforce_keys [:conn, :redirects, :request]
   defstruct [:conn, :redirects, :request]
 
+  # `conn` is nil for an off-origin request, which is not sent.
   @type t :: %__MODULE__{
-          conn: Plug.Conn.t(),
+          conn: Plug.Conn.t() | nil,
           redirects: non_neg_integer(),
           request: Fluffy.Backend.Phoenix.HTTP.Request.t()
         }
@@ -55,10 +56,18 @@ defmodule Fluffy.Backend.Phoenix.HTTP do
 
   # `redirects` counts the hops that led here, including LiveView mount
   # redirects, so a redirect loop through either fails at the same limit.
+  # A browser leaves the app for an off-origin request, whether a link, a form
+  # or a redirect hop, so it isn't sent: the response reports where it went.
   def request(%Client{} = client, %URI{} = url, method \\ :get, body \\ nil, redirects \\ 0) do
-    client
-    |> dispatch_request(%Request{body: body, method: method, url: validate_url!(client, url)})
-    |> follow_redirects(redirects)
+    request = %Request{body: body, method: method, url: url}
+
+    if external?(client, url) do
+      {client, %Response{conn: nil, redirects: redirects, request: request}}
+    else
+      client
+      |> dispatch_request(%{request | url: validate_url!(client, url)})
+      |> follow_redirects(redirects)
+    end
   end
 
   def count_redirect!(redirects, %URI{} = url) when redirects >= @max_redirects do
@@ -73,8 +82,23 @@ defmodule Fluffy.Backend.Phoenix.HTTP do
     follow_redirects({client, %Response{conn: conn, redirects: 0, request: request}}, 0)
   end
 
-  def resolve(%Client{} = client, base_url, path) do
-    base_url |> URI.merge(path) |> validate_url!(client)
+  def validate_url!(%Client{} = client, %URI{} = url) do
+    cond do
+      url.scheme not in ["http", "https"] ->
+        raise Fluffy.CapabilityError,
+          capability: :navigation_scheme,
+          driver: :static,
+          detail: "in-process navigation cannot dispatch the #{inspect(url.scheme)} scheme"
+
+      external?(client, url) ->
+        raise Fluffy.CapabilityError,
+          capability: :external_navigation,
+          driver: :static,
+          detail: "cannot request #{URI.to_string(url)}; in-process navigation is limited to #{client.base_url}"
+
+      true ->
+        url
+    end
   end
 
   def store_cookie_header(%Client{} = client, %URI{} = url, header) do
@@ -91,14 +115,11 @@ defmodule Fluffy.Backend.Phoenix.HTTP do
 
         [location | _rest] ->
           redirects = count_redirect!(redirects, response.request.url)
-          url = response.request.url |> redirect_url(location) |> validate_url!(client)
 
           {method, body} =
             redirected_request(conn.status, response.request.method, response.request.body)
 
-          client
-          |> dispatch_request(%Request{body: body, method: method, url: url})
-          |> follow_redirects(redirects)
+          request(client, redirect_url(response.request.url, location), method, body, redirects)
       end
     else
       {client, %{response | redirects: redirects}}
@@ -163,29 +184,13 @@ defmodule Fluffy.Backend.Phoenix.HTTP do
     %{client | cookie_jar: cookie_jar}
   end
 
-  defp validate_url!(%URI{} = url, %Client{} = client), do: validate_url!(client, url)
+  defp external?(%Client{} = client, %URI{scheme: scheme} = url) when scheme in ["http", "https"],
+    do: origin(url) != origin(URI.parse(client.base_url))
 
-  defp validate_url!(%Client{} = client, %URI{} = url) do
-    base = URI.parse(client.base_url)
+  defp external?(%Client{}, %URI{}), do: false
 
-    cond do
-      url.scheme not in ["http", "https"] ->
-        raise Fluffy.CapabilityError,
-          capability: :navigation_scheme,
-          driver: :static,
-          detail: "in-process navigation cannot dispatch the #{inspect(url.scheme)} scheme"
-
-      {url.scheme, url.host, effective_port(url)} ==
-          {base.scheme, base.host, effective_port(base)} ->
-        url
-
-      true ->
-        raise Fluffy.CapabilityError,
-          capability: :external_navigation,
-          driver: :static,
-          detail: "in-process navigation is limited to #{URI.to_string(base)}"
-    end
-  end
+  # Hosts are case-insensitive, as in a browser.
+  defp origin(%URI{} = url), do: {url.scheme, url.host && String.downcase(url.host), effective_port(url)}
 
   defp redirect_url(url, location) do
     redirect_url = URI.merge(url, location)

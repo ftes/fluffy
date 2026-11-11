@@ -107,6 +107,13 @@ defmodule Fluffy.Capability do
         "LiveView classifies each document transition afresh, so ordinary HTTP navigation uses this same contract. WebKit 26.5 does not send a Secure cookie to the HTTP loopback fixture; that engine-specific assertion is excluded from its scheduled job."
     },
     %{
+      id: :external_navigation,
+      feature: "Off-origin links, forms, and redirects",
+      drivers: %{static: :structural_subset, live: :structural_subset, playwright: :equivalent},
+      detail:
+        "Static and LiveView end at a page with only the off-origin URL, without requesting it, so URL expectations can check where the app sent the test. Everything else there raises, as does a `visit` to another origin."
+    },
+    %{
       id: :phoenix_html_actions,
       feature: "Phoenix.HTML data-method/data-to actions",
       drivers: %{static: :structural_subset, live: :structural_subset, playwright: :equivalent},
