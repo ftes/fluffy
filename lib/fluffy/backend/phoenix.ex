@@ -13,6 +13,7 @@ defmodule Fluffy.Backend.Phoenix do
   alias Fluffy.Backend.Phoenix.HTTP.Response, as: HTTPResponse
   alias Fluffy.ClientDOM
   alias Fluffy.Download
+  alias Fluffy.Driver.External.State, as: ExternalState
   alias Fluffy.Driver.Live, as: LiveDriver
   alias Fluffy.Driver.Live.Document, as: LiveDocument
   alias Fluffy.Driver.Live.State, as: LiveState
@@ -226,14 +227,19 @@ defmodule Fluffy.Backend.Phoenix do
 
   defp follow_link(%Session{} = session, href, download_name) do
     current_url = Session.current_page(session).url
-    url = resolve_url(current_url || Session.context(session).http.base_url, href, session)
+    url = resolve_url(current_url || Session.context(session).http.base_url, href, session, external: true)
 
-    if same_document_navigation?(current_url, url) do
-      Session.commit_page(session, Session.current_driver(session), Session.page_state(session), URI.to_string(url),
-        same_document: true
-      )
-    else
-      request(session, url, :get, nil, download_name)
+    cond do
+      HTTP.external?(Session.context(session).http, url) ->
+        commit_external(session, url, Map.get(Session.page_state(session), :conn))
+
+      same_document_navigation?(current_url, url) ->
+        Session.commit_page(session, Session.current_driver(session), Session.page_state(session), URI.to_string(url),
+          same_document: true
+        )
+
+      true ->
+        request(session, url, :get, nil, download_name)
     end
   end
 
@@ -333,11 +339,15 @@ defmodule Fluffy.Backend.Phoenix do
   # Requests a view's redirect destination, after `redirects` redirects so far,
   # with the flash it carries.
   defp follow_redirect(session, destination, flash, redirects) do
-    url = resolve_url(Session.context(session).http.base_url, destination, session)
+    url = resolve_url(Session.context(session).http.base_url, destination, session, external: true)
 
-    session
-    |> put_live_redirect_flash(url, flash)
-    |> request(url, :get, nil, nil, redirects)
+    if HTTP.external?(Session.context(session).http, url) do
+      commit_external(session, url, nil)
+    else
+      session
+      |> put_live_redirect_flash(url, flash)
+      |> request(url, :get, nil, nil, redirects)
+    end
   end
 
   defp mounted_client_dom(html), do: html |> LazyHTML.from_document() |> ClientDOM.from_document()
@@ -380,6 +390,9 @@ defmodule Fluffy.Backend.Phoenix do
 
     put_http(session, http)
   end
+
+  defp finish_response(session, %HTTPResponse{external_url: %URI{} = url, conn: conn}, _download_name),
+    do: commit_external(session, url, conn)
 
   defp finish_response(session, %HTTPResponse{conn: %{status: status} = conn}, _download_name)
        when status in @no_content_statuses, do: keep_document(session, conn)
@@ -436,8 +449,8 @@ defmodule Fluffy.Backend.Phoenix do
     raise "Phoenix navigation failed with HTTP #{conn.status} for #{URI.to_string(url)}"
   end
 
-  defp resolve_url(base_url, path, session) do
-    HTTP.resolve(Session.context(session).http, base_url, path)
+  defp resolve_url(base_url, path, session, options \\ []) do
+    HTTP.resolve(Session.context(session).http, base_url, path, options)
   end
 
   defp put_http(%Session{} = session, %HTTPClient{} = http) do
@@ -554,6 +567,14 @@ defmodule Fluffy.Backend.Phoenix do
     }
 
     PageLifecycle.replace_document(session, :static, state, URI.to_string(url), [], &release_page/3)
+  end
+
+  # A browser leaves the app for an off-origin redirect or link. The test can
+  # still check where it went, so commit a page with that URL and no document.
+  # `conn` is the redirect's, or the previous page's after a link click.
+  defp commit_external(session, url, conn) do
+    state = %ExternalState{conn: conn}
+    PageLifecycle.replace_document(session, :external, state, URI.to_string(url), [], &release_page/3)
   end
 
   defp release_page(session, %Page.State{driver: :live} = page, _reason) do

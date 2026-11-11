@@ -13,6 +13,9 @@ defmodule Fluffy.PhoenixTest.Query do
 
   defp page_matches?(%Driver.Live.State{client_dom: dom}, locator), do: ClientDOM.resolve(dom, locator) != []
 
+  # The click that follows raises for the missing document.
+  defp page_matches?(%Driver.External.State{}, _locator), do: false
+
   # As in Playwright, `count` has no timeout and waits while a script blocks the page.
   defp page_matches?(%Driver.Playwright.State{frame: frame}, locator) do
     # Probe presence only. The selected click retains native waiting and strictness.

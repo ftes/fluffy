@@ -26,12 +26,14 @@ defmodule Fluffy.Backend.Phoenix.HTTP.Response do
   @moduledoc false
 
   @enforce_keys [:conn, :redirects, :request]
-  defstruct [:conn, :redirects, :request]
+  defstruct [:conn, :redirects, :request, :external_url]
 
+  # `external_url` is set when `conn` redirects off-origin: the redirect is not followed.
   @type t :: %__MODULE__{
           conn: Plug.Conn.t(),
           redirects: non_neg_integer(),
-          request: Fluffy.Backend.Phoenix.HTTP.Request.t()
+          request: Fluffy.Backend.Phoenix.HTTP.Request.t(),
+          external_url: URI.t() | nil
         }
 end
 
@@ -73,9 +75,20 @@ defmodule Fluffy.Backend.Phoenix.HTTP do
     follow_redirects({client, %Response{conn: conn, redirects: 0, request: request}}, 0)
   end
 
-  def resolve(%Client{} = client, base_url, path) do
-    base_url |> URI.merge(path) |> validate_url!(client)
+  # `external: true` lets an off-origin http(s) URL through for the caller to
+  # commit as an external page; check it with `external?/2`.
+  def resolve(%Client{} = client, base_url, path, options \\ []) do
+    url = URI.merge(base_url, path)
+
+    if Keyword.get(options, :external, false) and external?(client, url),
+      do: url,
+      else: validate_url!(client, url)
   end
+
+  def external?(%Client{} = client, %URI{scheme: scheme} = url) when scheme in ["http", "https"],
+    do: origin(url) != origin(URI.parse(client.base_url))
+
+  def external?(%Client{}, %URI{}), do: false
 
   def store_cookie_header(%Client{} = client, %URI{} = url, header) do
     %{client | cookie_jar: CookieJar.store_response(client.cookie_jar, url, [header])}
@@ -91,14 +104,19 @@ defmodule Fluffy.Backend.Phoenix.HTTP do
 
         [location | _rest] ->
           redirects = count_redirect!(redirects, response.request.url)
-          url = response.request.url |> redirect_url(location) |> validate_url!(client)
+          url = redirect_url(response.request.url, location)
 
-          {method, body} =
-            redirected_request(conn.status, response.request.method, response.request.body)
+          # A browser leaves the app here; stop and report where it went.
+          if external?(client, url) do
+            {client, %{response | redirects: redirects, external_url: url}}
+          else
+            {method, body} =
+              redirected_request(conn.status, response.request.method, response.request.body)
 
-          client
-          |> dispatch_request(%Request{body: body, method: method, url: url})
-          |> follow_redirects(redirects)
+            client
+            |> dispatch_request(%Request{body: body, method: method, url: validate_url!(client, url)})
+            |> follow_redirects(redirects)
+          end
       end
     else
       {client, %{response | redirects: redirects}}
@@ -163,11 +181,7 @@ defmodule Fluffy.Backend.Phoenix.HTTP do
     %{client | cookie_jar: cookie_jar}
   end
 
-  defp validate_url!(%URI{} = url, %Client{} = client), do: validate_url!(client, url)
-
   defp validate_url!(%Client{} = client, %URI{} = url) do
-    base = URI.parse(client.base_url)
-
     cond do
       url.scheme not in ["http", "https"] ->
         raise Fluffy.CapabilityError,
@@ -175,17 +189,18 @@ defmodule Fluffy.Backend.Phoenix.HTTP do
           driver: :static,
           detail: "in-process navigation cannot dispatch the #{inspect(url.scheme)} scheme"
 
-      {url.scheme, url.host, effective_port(url)} ==
-          {base.scheme, base.host, effective_port(base)} ->
-        url
-
-      true ->
+      external?(client, url) ->
         raise Fluffy.CapabilityError,
           capability: :external_navigation,
           driver: :static,
-          detail: "in-process navigation is limited to #{URI.to_string(base)}"
+          detail: "cannot request #{URI.to_string(url)}; in-process navigation is limited to #{client.base_url}"
+
+      true ->
+        url
     end
   end
+
+  defp origin(%URI{} = url), do: {url.scheme, url.host, effective_port(url)}
 
   defp redirect_url(url, location) do
     redirect_url = URI.merge(url, location)

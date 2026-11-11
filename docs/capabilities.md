@@ -171,6 +171,20 @@ iframe. See
 [Pages, popups, and frames](advanced-events.md#pages-popups-and-frames)
 for how pages, browser contexts, and frames relate.
 
+### Leaving the app
+
+A browser leaves the app for an off-origin redirect, a LiveView
+`redirect(socket, external: url)` or a link to another origin. Phoenix stops there, as
+`Phoenix.ConnTest.redirected_to/1` does, and the page has only that URL: URL expectations
+pass or fail, `visit` returns to the app, and `Fluffy.unwrap/2` receives the redirect's
+`Plug.Conn` (the previous page's after a link click; none after a LiveView redirect).
+Everything that needs a document, such as actions, `reload`, title and locator
+expectations, raises `Fluffy.CapabilityError` (`:external_navigation`). `visit` to another
+origin raises too. `assert_path` and the keyword form of `page_to_have_url` ignore the
+host, so check an external URL with the string, regex or function form of
+`page_to_have_url`. On Playwright the browser loads the external page; stub it with
+`Fluffy.Playwright.route/4`, which catches a link's target but not a redirect's.
+
 ### Browser baseline
 
 Fluffy's conformance suite runs against Playwright's pinned Chromium, Firefox,
