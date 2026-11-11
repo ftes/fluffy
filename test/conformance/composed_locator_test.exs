@@ -5,6 +5,8 @@ defmodule Fluffy.Conformance.ComposedLocatorTest do
   import Fluffy.Expect
   import Fluffy.Locator
 
+  alias Fluffy.TestWeb.Endpoint
+
   @tag driver: :playwright
   test "within/2 rejects a frame inside a chained locator" do
     session = session_for_html(:playwright, ~s(<section><iframe srcdoc="<p>In</p>"></iframe></section>))
@@ -132,6 +134,24 @@ defmodule Fluffy.Conformance.ComposedLocatorTest do
       |> expect(to_have_count(filter(by_css("[data-candidate]"), has_not_text: "Day", exact: true), 3))
       |> expect(to_have_count(filter(by_css("[data-candidate]"), has_text: "Day"), 5))
       |> expect(to_have_count(filter(by_css("[data-candidate]"), exact: true, has_text: "Day type"), 1))
+    end
+
+    @tag driver: driver
+    test "regular expressions match names and filter text with #{driver}" do
+      unquote(driver)
+      |> session_for_html("""
+      <ul><li>Apple pie</li><li>Apple tart</li><li>Banana bread</li><li> Pro </li></ul>
+      <section><button>  Save   draft </button></section>
+      """)
+      |> expect(to_have_count(by_role(:button, name: ~r/^save/i), 1))
+      |> expect(to_have_count(by_role(:button, name: ~r/^save/), 0))
+      |> expect(to_have_count(by_role(:button, name: ~r/^Save draft$/), 1))
+      |> expect("li" |> by_css() |> filter(has_text: ~r/^Apple/) |> to_have_count(2))
+      |> expect("li" |> by_css() |> filter(has_text: ~r/pie$/, exact: true) |> to_have_count(1))
+      |> expect("li" |> by_css() |> filter(has_not_text: ~r/^Apple/) |> to_have_count(2))
+      |> expect("li" |> by_css() |> filter(has_text: ~r/^Pro$/) |> to_have_count(0))
+      |> expect("li" |> by_css() |> filter(has_text: ~r/^ Pro $/) |> to_have_count(1))
+      |> expect("section" |> by_css() |> filter(has: by_role(:button, name: ~r/draft$/)) |> to_have_count(1))
     end
 
     @tag driver: driver
@@ -287,7 +307,7 @@ defmodule Fluffy.Conformance.ComposedLocatorTest do
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
     test "intersections act on and re-resolve LiveView renders with #{driver}", %{driver: driver} do
-      session = start_session(driver, base_url: Fluffy.TestServer.base_url(), endpoint: Fluffy.TestWeb.Endpoint)
+      session = start_session(driver, base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
       flute = "button" |> by_css() |> and_(by_role(:button, name: "Play the flute"))
 
       session
@@ -296,6 +316,17 @@ defmodule Fluffy.Conformance.ComposedLocatorTest do
       |> expect(to_be_visible(by_text("Sleeping heads: 1")))
       |> click(flute)
       |> expect(to_be_visible(by_text("Sleeping heads: 2")))
+    end
+  end
+
+  for driver <- [:phoenix, :playwright] do
+    @tag driver: driver
+    test "regular expressions act on LiveView renders with #{driver}", %{driver: driver} do
+      driver
+      |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+      |> visit("/live/nested")
+      |> click(by_role(:button, name: ~r/^Increment/))
+      |> expect("p" |> by_css() |> filter(has_text: ~r/^Child count: 1$/) |> to_be_visible())
     end
   end
 

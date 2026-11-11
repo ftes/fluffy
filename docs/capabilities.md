@@ -15,7 +15,7 @@ boundaries described below.
 | Conformance-tested CSS locators | equivalent | equivalent |
 | Text, label, and attribute locators | equivalent | equivalent |
 | Structural role and accessible-name subset | structural subset | equivalent |
-| Role-state and regular-expression locator options | - | equivalent |
+| Role-state locator options | - | equivalent |
 | Playwright action options | - | equivalent |
 | DOM assertions and strictness | equivalent | equivalent |
 | Page title assertions | equivalent | equivalent |

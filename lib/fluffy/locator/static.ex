@@ -165,6 +165,10 @@ defmodule Fluffy.Locator.Static do
 
   defp accessible_name_matches?(_aria, _node, nil, _exact?), do: true
 
+  # As upstream, a regular expression sees the normalized accessible name.
+  defp accessible_name_matches?(aria, node, %Regex{} = expected, _exact?),
+    do: Regex.match?(expected, aria |> Aria.name(node) |> normalize())
+
   defp accessible_name_matches?(aria, node, expected, exact?) do
     aria |> Aria.name(node) |> text_matches?(expected, exact?)
   end
@@ -258,6 +262,9 @@ defmodule Fluffy.Locator.Static do
   end
 
   defp text_matches?(nil, _expected, _exact?), do: false
+
+  # As upstream, a regular expression ignores `exact?` and sees the text as is.
+  defp text_matches?(actual, %Regex{} = expected, _exact?), do: Regex.match?(expected, actual)
 
   defp text_matches?(actual, expected, true), do: normalize(actual) == normalize(expected)
 
