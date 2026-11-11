@@ -76,7 +76,10 @@ defmodule Fluffy.Backend.Playwright.Document do
 
   def init_script, do: @state
 
-  def bookkeeping_timeout(session), do: max(Session.context(session).timeout, @min_bookkeeping_timeout)
+  def bookkeeping_timeout(session) do
+    timeout = Session.context(session).timeout
+    if timeout == :infinity, do: :infinity, else: max(timeout, @min_bookkeeping_timeout)
+  end
 
   @doc "A page listener that flags the state when its main frame navigates."
   def navigation_listener(state) do
@@ -122,7 +125,10 @@ defmodule Fluffy.Backend.Playwright.Document do
       # A redirect chain (a page that navigates on load) replaces several, so
       # back off rather than call the driver in a busy loop.
       {:ok, {:error, error}} ->
-        if context_destroyed?(error), do: Process.sleep(min(backoff, Deadline.remaining(deadline)))
+        if context_destroyed?(error) do
+          remaining = Deadline.remaining(deadline)
+          Process.sleep(if remaining == :infinity, do: backoff, else: min(backoff, remaining))
+        end
 
         if context_destroyed?(error) and not Deadline.expired?(deadline),
           do: probe!(frame, cursor, timeout, deadline, min(backoff * 2, 50)),
