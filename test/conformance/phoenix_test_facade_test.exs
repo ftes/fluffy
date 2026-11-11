@@ -30,6 +30,36 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
     end
 
     @tag driver: driver
+    test "exact text with quotes, backticks and NBSP stays a valid selector with #{driver}" do
+      unquote(driver)
+      |> locators_session("quotes")
+      |> assert_has("#apostrophe", text: "Don't", exact: true)
+      |> refute_has("#apostrophe", text: "Don", exact: true)
+      |> refute_has("p", text: "Don't stop", exact: true)
+      |> assert_has("#double", text: ~s(Say "hi"), exact: true)
+      |> refute_has("p", text: ~s("hi"), exact: true)
+      |> assert_has("#backtick", text: "Run `mix`", exact: true)
+      |> refute_has("p", text: "`mix`", exact: true)
+      |> assert_has("#nbsp", text: "a b", exact: true)
+      |> assert_has("#space", text: "c d", exact: true)
+      |> assert_has("select", label: "Quote", selected: ~s(Say "hi"))
+      |> refute_has("select", selected: "Don't")
+    end
+
+    @tag driver: driver
+    test "exact CSS clicks match text with >> with #{driver}" do
+      {session, path} = quotes_page(unquote(driver))
+
+      session
+      |> click_link("a", "Next >>", exact: true)
+      |> assert_path(path, query_params: %{choice: "next"})
+      |> click_link("a", "Next >> later", exact: true)
+      |> assert_path(path, query_params: %{choice: "later"})
+      |> click_button("button", "Next >>", exact: true)
+      |> assert_path(path, query_params: %{choice: "next"})
+    end
+
+    @tag driver: driver
     test "assert_has and refute_has resolve a locator inside a within scope with #{driver}" do
       session = locators_session(unquote(driver), "scopes")
 
@@ -1126,4 +1156,17 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
   end
 
   defp locators_session(driver, markup), do: Fluffy.session_for_html(driver, FacadeLocatorsLive.markup(markup))
+
+  # Static serves the markup as a plain page; Live and Playwright visit the LiveView.
+  defp quotes_page(:static) do
+    fixture = Fluffy.TestHTTPFixtures.register(%{body: FacadeLocatorsLive.markup("quotes")})
+    path = Fluffy.TestHTTPFixtures.path(fixture)
+    {:phoenix |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint) |> visit(path), path}
+  end
+
+  defp quotes_page(driver) do
+    path = "/live/facade-locators/quotes"
+    driver = if driver == :live, do: :phoenix, else: driver
+    {driver |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint) |> visit(path), path}
+  end
 end

@@ -142,6 +142,8 @@ The facade uses Fluffy's execution engine, so it is not an exact compatibility
 implementation. Check these differences when migrating:
 
 - **Strict matching:** actions reject ambiguous matches; see [Locators](locators.md#locators).
+- **Exact text:** `exact: true` normalizes whitespace but does not ignore soft hyphens or
+  zero-width spaces in the page text.
 - **CSS links:** text matches take precedence over labels. Label matching is a
   fallback only when no text match exists when the action starts.
 - **Form behavior:** submissions use current DOM ownership and control state.

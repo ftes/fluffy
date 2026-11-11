@@ -10,7 +10,7 @@ Upgrading from 0.8? The [upgrade guide](docs/upgrading.md) lists the net changes
 
 ### Changed
 
-- **Breaking:** `filter/2` drops `exact:`, which Playwright's `filter` does not have. Use a regex instead, such as `has_text: ~r/^Pro$/`. The facade's `exact: true` keeps its meaning.
+- **Breaking:** `filter/2` drops `exact:`, which Playwright's `filter` does not have. Use a regex instead, such as `has_text: ~r/^Pro$/`. The facade's `exact: true` keeps its meaning, except that soft hyphens and zero-width spaces in the page text are no longer ignored.
 
 ## 0.9.0-rc.2 — 2026-11-11
 
