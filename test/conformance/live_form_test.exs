@@ -432,6 +432,16 @@ defmodule Fluffy.Conformance.LiveFormTest do
     end
 
     @tag driver: driver
+    test "a form triggered on the connected render beats a navigation sent after the join with #{driver}",
+         %{driver: driver} do
+      driver
+      |> start_test_session()
+      |> visit("/live/trigger-on-connect?identity=hermione&then=navigate")
+      |> expect(Fluffy.Expect.page_to_have_url(Fluffy.TestServer.base_url() <> "/session/show"))
+      |> expect("Static identity: hermione" |> by_text() |> to_be_visible())
+    end
+
+    @tag driver: driver
     test "a form triggered on the connected render can leave for another origin with #{driver}", %{driver: driver} do
       session = start_test_session(driver)
 
