@@ -46,6 +46,14 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
   end
 
   @tag driver: :playwright
+  test "a refinement without a by_* locator before it raises" do
+    session = browser_html("<p>Text</p>")
+    bare = filter(%Fluffy.Locator{operations: []}, has_text: "Text")
+
+    assert_raise ArgumentError, ~r/must start from a by_\* locator/, fn -> click(session, bare) end
+  end
+
+  @tag driver: :playwright
   test "existing actions, assertions, and submit resolve inside nested frames" do
     form = """
     <form onsubmit="event.preventDefault(); document.querySelector('#status').textContent = 'Submitted'">

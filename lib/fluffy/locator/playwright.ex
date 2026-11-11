@@ -1,11 +1,12 @@
 defmodule Fluffy.Locator.Playwright do
   @moduledoc false
-  # Builds a PlaywrightEx locator from a `Fluffy.Locator`, one PlaywrightEx call per operation.
+  # Builds a PlaywrightEx locator from a `Fluffy.Locator`, one call per operation; it never writes selector strings.
 
   alias Fluffy.Locator
   alias Fluffy.Locator.Internal
   alias PlaywrightEx.FrameLocator
   alias PlaywrightEx.Isomorphic.LocatorUtils
+  alias PlaywrightEx.Isomorphic.SelectorParser
   alias PlaywrightEx.Locator, as: Native
 
   # Nested locators (`has:`, `and_/2`, `or_/2`, `within/2`) are built from `frame` too, as
@@ -18,8 +19,12 @@ defmodule Fluffy.Locator.Playwright do
 
   defp apply_operation(_frame, :enter_frame, scope), do: scope |> native() |> Native.content_frame()
 
-  # `css=` keeps `by_css/1` to CSS, where a bare selector could also be XPath or another engine.
-  defp apply_operation(_frame, {:css, css}, scope), do: call(scope, :locator, ["css=#{css}"])
+  # Forces the CSS engine, as upstream's `stringifySelector(…, forceEngineName)` does, since a
+  # bare selector could also be XPath or another engine.
+  defp apply_operation(_frame, {:css, css}, scope) do
+    selector = SelectorParser.stringify_selector(%{parts: [%{name: "css", body: css, source: css}]}, true)
+    call(scope, :locator, [selector])
+  end
 
   # `get_by_role` takes only the roles of Playwright's `AriaRole` type, which lacks some that
   # the browser matches, such as `mark`. PlaywrightEx's selector builder takes any role.
@@ -82,7 +87,8 @@ defmodule Fluffy.Locator.Playwright do
 
   defp root?(scope), do: match?({:root, _frame}, scope)
 
-  # Refining nothing, at the start of a locator or of a frame, refines every element there.
+  # The public API starts every locator, and every frame scope, with a `by_*` locator.
   defp native(%Native{} = native), do: native
-  defp native(scope), do: call(scope, :locator, ["*"])
+
+  defp native(_scope), do: raise(ArgumentError, "a locator and a frame scope must start from a by_* locator")
 end
