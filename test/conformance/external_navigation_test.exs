@@ -6,6 +6,7 @@ defmodule Fluffy.Conformance.ExternalNavigationTest do
   import Fluffy.Locator
 
   alias Fluffy.TestHTTPFixtures
+  alias Fluffy.TestWeb.Endpoint
 
   @guild "https://guild.example/hall"
 
@@ -32,6 +33,18 @@ defmodule Fluffy.Conformance.ExternalNavigationTest do
       |> visit(TestHTTPFixtures.path(fixture, "/source"))
       |> click(by_role(:link, name: "Guild hall"))
       |> expect(page_to_have_url(@guild <> "?from=link"))
+    end
+
+    @tag driver: driver
+    test "a visit whose response redirects off-origin ends at the redirect's location with #{driver}",
+         %{driver: driver} do
+      hall_url = cross_origin_hall("/hall?from=visit")
+      fixture = TestHTTPFixtures.register(%{status: 302, headers: [{"location", hall_url}]})
+
+      driver
+      |> start_test_session()
+      |> visit(TestHTTPFixtures.path(fixture, "/auth"))
+      |> expect(page_to_have_url(hall_url))
     end
 
     @tag driver: driver
@@ -86,6 +99,34 @@ defmodule Fluffy.Conformance.ExternalNavigationTest do
       |> visit("/live/chamber-map?redirect=external")
       |> expect(page_to_have_url(@guild <> "?from=mount"))
     end
+  end
+
+  for driver <- [:phoenix, :playwright] do
+    @tag driver: driver
+    test "a LiveView external redirect reads as the browser's URL and keeps its flash for the app with #{driver}",
+         %{driver: driver} do
+      driver
+      |> guild_session()
+      |> visit("/live/chamber-map")
+      |> click(by_role(:button, name: "Bring news to the guild"))
+      |> expect(page_to_have_url("https://guild.example/?from=flash"))
+      |> visit("/live/secret-chamber")
+      |> expect("Off to the guild" |> by_text() |> to_be_visible())
+    end
+  end
+
+  # Hosts are case-insensitive. The test server's 127.0.0.1 has no case, so the session names it localhost.
+  test "a Phoenix link to the app's host in another case stays in the app" do
+    base_url = %{URI.parse(Fluffy.TestServer.base_url()) | host: "localhost"}
+    next = TestHTTPFixtures.register(%{body: html("<h1>Next page</h1>")})
+    next_url = URI.to_string(%{base_url | host: "LOCALHOST", path: TestHTTPFixtures.path(next)})
+    source = TestHTTPFixtures.register(%{body: html(~s(<a href="#{next_url}">Next</a>))})
+
+    :phoenix
+    |> start_session(base_url: URI.to_string(base_url), endpoint: Endpoint)
+    |> visit(TestHTTPFixtures.path(source))
+    |> click(by_role(:link, name: "Next"))
+    |> expect("Next page" |> by_text() |> to_be_visible())
   end
 
   describe "on Phoenix, the external page" do
@@ -146,7 +187,7 @@ defmodule Fluffy.Conformance.ExternalNavigationTest do
   defp start_test_session(driver) do
     start_session(driver,
       base_url: Fluffy.TestServer.base_url(),
-      endpoint: Fluffy.TestWeb.Endpoint
+      endpoint: Endpoint
     )
   end
 

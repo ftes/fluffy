@@ -26,14 +26,13 @@ defmodule Fluffy.Backend.Phoenix.HTTP.Response do
   @moduledoc false
 
   @enforce_keys [:conn, :redirects, :request]
-  defstruct [:conn, :redirects, :request, :external_url]
+  defstruct [:conn, :redirects, :request]
 
-  # An off-origin request is not sent: `external_url` is its URL, and `conn` is nil.
+  # `conn` is nil for an off-origin request, which is not sent.
   @type t :: %__MODULE__{
           conn: Plug.Conn.t() | nil,
           redirects: non_neg_integer(),
-          request: Fluffy.Backend.Phoenix.HTTP.Request.t(),
-          external_url: URI.t() | nil
+          request: Fluffy.Backend.Phoenix.HTTP.Request.t()
         }
 end
 
@@ -63,7 +62,7 @@ defmodule Fluffy.Backend.Phoenix.HTTP do
     request = %Request{body: body, method: method, url: url}
 
     if external?(client, url) do
-      {client, %Response{conn: nil, redirects: redirects, request: request, external_url: url}}
+      {client, %Response{conn: nil, redirects: redirects, request: request}}
     else
       client
       |> dispatch_request(%{request | url: validate_url!(client, url)})
@@ -190,7 +189,8 @@ defmodule Fluffy.Backend.Phoenix.HTTP do
 
   defp external?(%Client{}, %URI{}), do: false
 
-  defp origin(%URI{} = url), do: {url.scheme, url.host, effective_port(url)}
+  # Hosts are case-insensitive, as in a browser.
+  defp origin(%URI{} = url), do: {url.scheme, url.host && String.downcase(url.host), effective_port(url)}
 
   defp redirect_url(url, location) do
     redirect_url = URI.merge(url, location)

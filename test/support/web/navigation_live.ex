@@ -89,6 +89,11 @@ defmodule Fluffy.TestWeb.NavigationLive do
     {:noreply, redirect(socket, external: "https://guild.example/hall?from=event")}
   end
 
+  def handle_event("redirect_external_with_flash", _params, socket) do
+    socket = put_flash(socket, :info, "Off to the guild")
+    {:noreply, redirect(socket, external: "https://GUILD.example?from=flash")}
+  end
+
   def handle_event("redirect_report", _params, socket) do
     {:noreply, redirect(socket, to: "/redirect/report")}
   end
@@ -163,6 +168,7 @@ defmodule Fluffy.TestWeb.NavigationLive do
       <button type="button" phx-click="redirect_static">Lull guardian</button>
       <button type="button" phx-click="redirect_report">Fetch report</button>
       <button type="button" phx-click="redirect_external">Visit the guild</button>
+      <button type="button" phx-click="redirect_external_with_flash">Bring news to the guild</button>
       <a href="https://guild.example/hall?from=link">Guild hall</a>
       <button type="button" phx-click="redirect_with_flash">Open secret passage</button>
       <button type="button" phx-click="navigate_after_event">Enter chamber after event</button>
