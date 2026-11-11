@@ -113,7 +113,7 @@ jobs:
         run: |
           list() {
             gh pr list --state open --limit 40 --json number,headRefName,isCrossRepository,mergeable,comments,reviews,commits,statusCheckRollup \
-              --jq '[.[] | select((.isCrossRepository | not) and (.headRefName | startswith("claude/nightly-")) and ([.comments[], .reviews[]] | all(.author.login == "claude"))) | {number, branch: .headRefName, mergeable, commits: (.commits | length), failing: ([.statusCheckRollup[] | select((.name // "") | startswith("quality ("))] | group_by(.name) | map(max_by(.startedAt)) | any(.conclusion == "FAILURE"))}]'
+              --jq '[.[] | select((.isCrossRepository | not) and (.headRefName | startswith("claude/nightly-")) and ([.comments[], .reviews[]] | all(.author.login == "claude"))) | {number, branch: .headRefName, mergeable, commits: (.commits | length), failing: ([.statusCheckRollup[] | select(.name == "quality")] | group_by(.name) | map(max_by(.startedAt)) | any(.conclusion == "FAILURE"))}]'
           }
           list > /dev/null
           sleep 30

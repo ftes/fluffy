@@ -283,21 +283,15 @@ jobs:
             integration/consumer/deps
             integration/consumer/_build
 
-  # The required status checks are `quality (oldest)` and `quality (newest)`, the names of the
-  # jobs before the split. Each is green when every job above is.
+  # The one check to require: green when every job above is.
   quality:
-    name: quality (${{ matrix.lane }})
+    name: quality
     if: always()
     needs: [checks, test, consumer]
     runs-on: ubuntu-slim
-    strategy:
-      # Both report the failure instead of one showing as cancelled.
-      fail-fast: false
-      matrix:
-        lane: [oldest, newest]
     steps:
-      # On the step: a matrix job skipped whole reports its name unexpanded, which would leave the
-      # required checks pending on a draft or a PR below the top of its stack.
+      # On the step, so a draft or a PR below the top of its stack, whose jobs above are skipped,
+      # reports it green rather than skipped.
       - if: *stack_top
         env:
           RESULTS: ${{ join(needs.*.result, ' ') }}
