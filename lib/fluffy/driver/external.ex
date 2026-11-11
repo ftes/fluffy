@@ -2,9 +2,9 @@ defmodule Fluffy.Driver.External do
   @moduledoc false
 
   # The page a Phoenix session ends on when the app sends it off-origin, by a
-  # redirect or a link. Like `Phoenix.ConnTest.redirected_to/1`, it has a URL
-  # but no document: URL expectations and `unwrap` work, and everything that
-  # reads the document raises instead of passing or failing vacuously.
+  # link, form or redirect. Like `Phoenix.ConnTest.redirected_to/1`, it has a
+  # URL but no document: URL expectations work, and everything else raises
+  # instead of passing or failing vacuously.
 
   @behaviour Fluffy.Driver.Contract
 
@@ -15,17 +15,10 @@ defmodule Fluffy.Driver.External do
 
   @impl true
   def validate_operation!(_session, :expect, [%Expect{target: :page, kind: :url}]), do: :ok
-  def validate_operation!(_session, operation, _arguments) when operation in [:unwrap, :unwrap_and_return], do: :ok
   def validate_operation!(session, operation, _arguments), do: unsupported!(session, operation)
 
   @impl true
   def expect(session, %Expect{} = expectation), do: Static.expect(session, expectation)
-
-  @impl true
-  def unwrap(session, fun), do: session |> require_conn!() |> Static.unwrap(fun)
-
-  @impl true
-  def unwrap_and_return(session, fun), do: session |> require_conn!() |> Static.unwrap_and_return(fun)
 
   # validate_operation!/3 rejects these first.
   @impl true
@@ -64,10 +57,13 @@ defmodule Fluffy.Driver.External do
   @spec open_browser(Session.t(), (String.t() -> term())) :: no_return()
   def open_browser(session, _open_fun), do: unsupported!(session, :open_browser)
 
-  defp require_conn!(session) do
-    if is_nil(Session.page_state(session).conn), do: unsupported!(session, :unwrap)
-    session
-  end
+  @impl true
+  @spec unwrap(Session.t(), (term() -> term())) :: no_return()
+  def unwrap(session, _fun), do: unsupported!(session, :unwrap)
+
+  @impl true
+  @spec unwrap_and_return(Session.t(), (term() -> term())) :: no_return()
+  def unwrap_and_return(session, _fun), do: unsupported!(session, :unwrap_and_return)
 
   @spec unsupported!(Session.t(), atom()) :: no_return()
   defp unsupported!(session, operation) do
@@ -75,7 +71,7 @@ defmodule Fluffy.Driver.External do
       capability: :external_navigation,
       driver: :external,
       detail:
-        "the app navigated away to #{Session.current_page(session).url}, which has no document or " <>
-          "Plug.Conn for #{inspect(operation)}; only URL expectations work there"
+        "the app navigated away to #{Session.current_page(session).url}, which has nothing to " <>
+          "#{inspect(operation)}; only URL expectations work there"
   end
 end

@@ -34,13 +34,26 @@ defmodule Fluffy.Conformance.ExternalNavigationTest do
       |> expect(page_to_have_url(@guild <> "?from=link"))
     end
 
-    # Playwright routes only a redirect's first URL, so the redirect goes to the test server
-    # under another origin instead, like Playwright's own CROSS_PROCESS_PREFIX.
+    @tag driver: driver
+    test "a form posting to another origin ends at its action with #{driver}", %{driver: driver} do
+      hall_url = cross_origin_hall("/hall?from=form")
+
+      fixture =
+        TestHTTPFixtures.register(%{
+          body: html(~s(<form method="post" action="#{hall_url}"><button>Sign in</button></form>))
+        })
+
+      driver
+      |> start_test_session()
+      |> visit(TestHTTPFixtures.path(fixture, "/start"))
+      |> click(by_role(:button, name: "Sign in"))
+      |> expect(page_to_have_url(hall_url))
+    end
+
     @tag driver: driver
     test "a form whose response redirects off-origin ends at the redirect's location with #{driver}",
          %{driver: driver} do
-      hall = TestHTTPFixtures.register(%{body: html("<h1>Guild hall</h1>")})
-      hall_url = hall |> TestHTTPFixtures.url("/hall?from=redirect") |> String.replace("//127.0.0.1:", "//localhost:")
+      hall_url = cross_origin_hall("/hall?from=redirect")
 
       fixture =
         TestHTTPFixtures.register_sequence([
@@ -93,10 +106,6 @@ defmodule Fluffy.Conformance.ExternalNavigationTest do
       %{fixture: fixture, session: session}
     end
 
-    test "unwraps to the redirect conn", %{session: session} do
-      assert unwrap_and_return(session, &Phoenix.ConnTest.redirected_to(&1, 302)) == @guild <> "?from=redirect"
-    end
-
     test "raises :external_navigation for anything that needs a document", %{session: session} do
       heading = by_role(:heading)
 
@@ -109,7 +118,9 @@ defmodule Fluffy.Conformance.ExternalNavigationTest do
             fn -> open_browser(session, fn _path -> :ok end) end,
             fn -> expect(session, page_to_have_title("Guild")) end,
             fn -> expect(session, heading |> to_be_visible() |> not_()) end,
-            fn -> Fluffy.Assert.refute_has(session, heading) end
+            fn -> Fluffy.Assert.refute_has(session, heading) end,
+            fn -> unwrap(session, & &1) end,
+            fn -> unwrap_and_return(session, & &1) end
           ] do
         assert_raise Fluffy.CapabilityError, ~r/external_navigation.*#{Regex.escape(@guild)}/, operation
       end
@@ -122,13 +133,14 @@ defmodule Fluffy.Conformance.ExternalNavigationTest do
     end
   end
 
-  test "a LiveView external redirect has no conn to unwrap" do
-    session =
-      :phoenix
-      |> start_test_session()
-      |> visit("/live/chamber-map?redirect=external")
-
-    assert_raise Fluffy.CapabilityError, ~r/external_navigation/, fn -> unwrap(session, & &1) end
+  # Playwright routes only a redirect's first URL, so these tests reach the test server under
+  # another origin instead, like Playwright's own CROSS_PROCESS_PREFIX: Phoenix stops there and
+  # Playwright loads the page.
+  defp cross_origin_hall(suffix) do
+    hall = TestHTTPFixtures.register(%{body: html("<h1>Guild hall</h1>")})
+    url = %{URI.parse(TestHTTPFixtures.url(hall, suffix)) | host: "localhost"}
+    assert url.host != URI.parse(Fluffy.TestServer.base_url()).host
+    URI.to_string(url)
   end
 
   defp start_test_session(driver) do

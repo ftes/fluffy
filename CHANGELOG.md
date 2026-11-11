@@ -6,11 +6,11 @@ Upgrading from 0.8? The [upgrade guide](docs/upgrading.md) lists the net changes
 
 ### Added
 
-- Phoenix ends an off-origin redirect, LiveView external redirect or link click at a page with that URL instead of raising `Fluffy.CapabilityError`, so a test can assert where the app sent it, such as an OAuth hand-off. Actions and document expectations there still raise `:external_navigation`.
 - Static and LiveView match a regex in a locator's `name:`, `has_text:` and `has_not_text:`, as Playwright does, instead of raising `Fluffy.CapabilityError`. It runs as PCRE there, so edge cases can differ from the browser's JavaScript.
 
 ### Changed
 
+- Phoenix ends a link, form or redirect to another origin, including a LiveView external redirect, at a page with that URL instead of raising `Fluffy.CapabilityError`, so a test can assert where the app sent it, such as an OAuth hand-off. Everything else there, `unwrap` included, still raises `:external_navigation`.
 - **Breaking:** `filter/2` drops `exact:`, which Playwright's `filter` does not have. Use a regex instead, such as `has_text: ~r/^Pro$/`. The facade's `exact: true` keeps its meaning, except that soft hyphens and zero-width spaces in the page text are no longer ignored.
 
 ## 0.9.0-rc.2 — 2026-11-11

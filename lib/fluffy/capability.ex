@@ -108,10 +108,10 @@ defmodule Fluffy.Capability do
     },
     %{
       id: :external_navigation,
-      feature: "Off-origin redirects and links",
+      feature: "Off-origin links, forms, and redirects",
       drivers: %{static: :structural_subset, live: :structural_subset, playwright: :equivalent},
       detail:
-        "Static and LiveView end at the off-origin URL without loading it: URL expectations, `visit` and `unwrap` work there, and anything that needs the document raises. A `visit` to another origin raises."
+        "Static and LiveView end at a page with only the off-origin URL, without requesting it, so URL expectations can check where the app sent the test. Everything else there raises, as does a `visit` to another origin."
     },
     %{
       id: :phoenix_html_actions,
