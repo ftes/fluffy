@@ -2,7 +2,7 @@ defmodule Fluffy.Deadline do
   @moduledoc false
 
   # `timeout: :infinity` sets no deadline: it never expires and its remaining
-  # time stays `:infinity`, which sorts after every number in `min/2`.
+  # time stays `:infinity`.
   @type t :: integer() | :infinity
 
   @spec new(timeout()) :: t()

@@ -49,7 +49,9 @@ defmodule Fluffy.Driver.Live.Retry do
   end
 
   defp wait_and_retry(session, deadline, attempt, refresh, wait_for_retry, remaining) do
-    case wait_for_retry.(session, min(remaining, 10)) do
+    wait = if remaining == :infinity, do: 10, else: min(remaining, 10)
+
+    case wait_for_retry.(session, wait) do
       {:navigate, session, navigation} ->
         {:redirected, session, navigation}
 

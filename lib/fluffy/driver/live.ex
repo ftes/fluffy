@@ -554,7 +554,9 @@ defmodule Fluffy.Driver.Live do
   # Reports how the view left a call that failed on it, waiting briefly for its
   # exit.
   defp left_view(session) do
-    left_view_event(Session.page_state(session), min(Session.context(session).timeout, @retry_interval))
+    timeout = Session.context(session).timeout
+    wait = if timeout == :infinity, do: @retry_interval, else: min(timeout, @retry_interval)
+    left_view_event(Session.page_state(session), wait)
   end
 
   # A redirect an event causes comes back as the event call's result, and each
