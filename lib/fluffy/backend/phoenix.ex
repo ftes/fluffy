@@ -318,12 +318,8 @@ defmodule Fluffy.Backend.Phoenix do
 
     session = PageLifecycle.replace_document(session, :live, state, URI.to_string(url), [], &release_page/3)
 
-    # A mount redirect wins. Otherwise the LiveView client patches the join
-    # render like any other, so a form the view renders with phx-trigger-action
-    # is submitted, as after an event. Unlike a browser, which starts a fresh
-    # redirect count for the submission, Fluffy counts it toward the redirects
-    # that led here: following the navigations synchronously, it would otherwise
-    # never return from a view whose form leads back to it.
+    # A mount redirect wins; otherwise the join render may trigger a form, counted
+    # toward the redirects that led here (see docs/capabilities.md).
     case redirect do
       nil -> follow_mount_trigger(session, client_dom, url, redirects)
       redirect -> follow_mount_redirect(session, redirect, url, redirects)

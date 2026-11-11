@@ -16,11 +16,19 @@ defmodule Fluffy.TestWeb.TriggerOnConnectLive do
         _connected -> connected?(socket)
       end
 
+    {method, action} =
+      case params["trigger"] do
+        "loop" -> {"get", "/live/trigger-on-connect"}
+        "ministry" -> {"post", "https://ministry.example/floo"}
+        _hand_off -> {"post", "/session/hand-off"}
+      end
+
     {:ok,
      assign(socket,
-       action: if(params["trigger"] == "ministry", do: "https://ministry.example/floo", else: "/session/hand-off"),
+       action: action,
        identity: params["identity"] || "anonymous",
        loop?: params["trigger"] == "loop",
+       method: method,
        lit?: false,
        trigger?: trigger?
      )}
@@ -36,23 +44,15 @@ defmodule Fluffy.TestWeb.TriggerOnConnectLive do
       <p>Floo powder for {@identity}</p>
       <button type="button" phx-click="lumos">Lumos</button>
       <p :if={@lit?}>Wand lit</p>
-      <form
-        :if={@loop?}
-        id="loop-form"
-        method="get"
-        action="/live/trigger-on-connect"
-        phx-trigger-action={@trigger?}
-      >
-        <input type="hidden" name="trigger" value="loop" />
-      </form>
       <.form
-        :if={!@loop?}
         for={%{}}
         id="hand-off-form"
+        method={@method}
         action={@action}
         phx-trigger-action={@trigger?}
       >
         <input type="hidden" name="identity" value={@identity} />
+        <input :if={@loop?} type="hidden" name="trigger" value="loop" />
       </.form>
     </main>
     """
