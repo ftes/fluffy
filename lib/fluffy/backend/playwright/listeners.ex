@@ -19,18 +19,9 @@ defmodule Fluffy.Backend.Playwright.Listeners do
     end)
   end
 
-  @doc "Removes listeners."
+  @doc "Removes listeners; as in Playwright, this never fails, even once the driver is lost."
   def release(listeners) do
-    for {module, target, event, listener} <- listeners do
-      try do
-        module.off(target, event, listener)
-      catch
-        # A lost driver already released its listeners. Cleanup must
-        # preserve the event outcome or the caller's original failure.
-        _kind, _reason -> :ok
-      end
-    end
-
+    for {module, target, event, listener} <- listeners, do: module.off(target, event, listener)
     :ok
   end
 
