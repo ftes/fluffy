@@ -47,8 +47,11 @@ env:
   MIX_ENV: test
 
 jobs:
-  # Compile, lint and docs per lane; the newest lane also checks formatting, the generated
-  # options and Dialyzer. No browser or database. Saves the deps and _build cache on main.
+  # The newest lane compiles strictly and runs the linters, generators, Dialyzer and docs. The
+  # oldest lane (the Elixir/OTP floor) only compiles, warnings allowed: newer, backwards-compatible
+  # features may warn there. Its Chromium tests guard the floor, so a call to a function the floor
+  # lacks, only a warning there, fails CI only where they run it. No browser or database. Saves the
+  # deps and _build cache on main.
   checks:
     name: checks (${{ matrix.lane }})
     # Draft PRs skip CI until marked ready, and in a stack only the top PR runs it: it holds every
@@ -83,9 +86,13 @@ jobs:
         run: mix format --check-formatted
       # Compiles strictly before the generator's own compile could satisfy it (as `mix lint`).
       - name: Compile and lint
+        if: matrix.lane == 'newest'
         run: |
           mix compile --warnings-as-errors
           mix credo --format oneline
+      - name: Compile
+        if: matrix.lane == 'oldest'
+        run: mix compile
       - name: Check generated PlaywrightEx options
         if: matrix.lane == 'newest'
         run: mix fluffy.gen.native_options --check
@@ -96,6 +103,7 @@ jobs:
         if: matrix.lane == 'newest'
         run: mix dialyzer --format github --format short --list-unused-filters
       - name: Build documentation without warnings
+        if: matrix.lane == 'newest'
         env:
           MIX_ENV: dev
         run: mix docs --warnings-as-errors
@@ -187,7 +195,7 @@ jobs:
       # partition's failures only, and --partitions would split those files again. The first run's
       # failures (Fluffy.FailuresFormatter) go to the job summary and annotations, so a green retry
       # does not hide them. The 10 slowest modules (Fluffy.ModuleTimesFormatter) are the floor of a
-      # partition's time.
+      # partition's time. Warnings fail the newest lane only, as in the checks job.
       - name: Run tests with one retry
         id: tests
         env:
@@ -196,9 +204,11 @@ jobs:
           LANE: ${{ matrix.lane }}
         run: |
           fluffy_test_seed=$RANDOM
+          strict=()
+          if [[ $LANE == newest ]]; then strict=(--warnings-as-errors); fi
           label="$LANE, $FLUFFY_BROWSER, $MIX_TEST_PARTITION/$TEST_PARTITIONS"
           status=0
-          FLUFFY_ARTIFACT_DIR="$FLUFFY_ARTIFACT_DIR/first" mix test --warnings-as-errors --seed "$fluffy_test_seed" --partitions "$TEST_PARTITIONS" || status=$?
+          FLUFFY_ARTIFACT_DIR="$FLUFFY_ARTIFACT_DIR/first" mix test "${strict[@]}" --seed "$fluffy_test_seed" --partitions "$TEST_PARTITIONS" || status=$?
 
           if [[ -s "$FLUFFY_MODULE_TIMES_FILE" ]]; then
             echo "Slowest modules ($label), wall ms, setup_all included:"
@@ -222,7 +232,7 @@ jobs:
 
           echo "retried=true" >> "$GITHUB_OUTPUT"
           echo "::warning::Tests failed; retrying once with seed $fluffy_test_seed. Both attempts' failure artifacts will be uploaded."
-          FLUFFY_ARTIFACT_DIR="$FLUFFY_ARTIFACT_DIR/retry" mix test --warnings-as-errors --seed "$fluffy_test_seed" --failed
+          FLUFFY_ARTIFACT_DIR="$FLUFFY_ARTIFACT_DIR/retry" mix test "${strict[@]}" --seed "$fluffy_test_seed" --failed
       - name: Upload browser failure artifacts
         if: failure() || steps.tests.outputs.retried == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
