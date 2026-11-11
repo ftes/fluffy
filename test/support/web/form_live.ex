@@ -20,7 +20,7 @@ defmodule Fluffy.TestWeb.FormLive do
        external_trigger?: false,
        fields: %{"first" => "", "last" => ""},
        first_disabled?: false,
-       first_name: "profile[first]",
+       first_name: "wizard[first]",
        hidden_version: "version-1",
        last_event: %{},
        last_input_event: %{},
@@ -49,21 +49,21 @@ defmodule Fluffy.TestWeb.FormLive do
 
   @impl true
   def handle_event("validate", params, socket) do
-    profile = Map.get(params, "profile", %{})
+    wizard = Map.get(params, "wizard", %{})
     version = socket.assigns.version + 1
 
     {:noreply,
      assign(socket,
-       colours: List.wrap(Map.get(profile, "colours", [])),
-       debounced: Map.get(profile, "debounced", socket.assigns.debounced),
-       enabled: Map.get(profile, "enabled") == "yes",
+       colours: List.wrap(Map.get(wizard, "colours", [])),
+       debounced: Map.get(wizard, "debounced", socket.assigns.debounced),
+       enabled: Map.get(wizard, "enabled") == "yes",
        event_targets:
          socket.assigns.event_targets ++
            [target_path(Map.get(params, "_target", []))],
-       fields: Map.take(profile, ["first", "last"]),
+       fields: Map.take(wizard, ["first", "last"]),
        hidden_version: "version-#{version}",
        last_event: params,
-       rows: update_rows(socket.assigns.rows, Map.get(profile, "rows", %{})),
+       rows: update_rows(socket.assigns.rows, Map.get(wizard, "rows", %{})),
        stubborn: "server-#{version}",
        version: version
      )}
@@ -78,13 +78,13 @@ defmodule Fluffy.TestWeb.FormLive do
   def handle_event("input-validate", params, socket) do
     {:noreply,
      assign(socket,
-       direct: get_in(params, ["profile", "direct"]) || "",
+       direct: get_in(params, ["wizard", "direct"]) || "",
        last_input_event: params
      )}
   end
 
   def handle_event("rename-and-add", _params, socket) do
-    {:noreply, assign(socket, first_name: "profile[given]", extra?: true)}
+    {:noreply, assign(socket, first_name: "wizard[given]", extra?: true)}
   end
 
   def handle_event("disable-first", _params, socket) do
@@ -149,10 +149,10 @@ defmodule Fluffy.TestWeb.FormLive do
   end
 
   defp save(params, socket) do
-    profile = Map.get(params, "profile", %{})
+    wizard = Map.get(params, "wizard", %{})
 
     saved_rows =
-      profile
+      wizard
       |> Map.get("rows", %{})
       |> Enum.sort_by(&elem(&1, 0))
       |> Enum.map_join(", ", fn {_index, row} -> row["value"] end)
@@ -161,10 +161,10 @@ defmodule Fluffy.TestWeb.FormLive do
      assign(socket,
        last_event: params,
        saved_commit: params["commit"],
-       saved_drop_ok?: Map.get(profile, "drop") == [""],
-       saved_dynamic_ok?: Map.get(profile, "given") == "moonstone" and Map.get(profile, "added") == "new",
-       saved_external: Map.get(profile, "external"),
-       saved_first_present?: Map.has_key?(profile, "first") or Map.has_key?(profile, "given"),
+       saved_drop_ok?: Map.get(wizard, "drop") == [""],
+       saved_dynamic_ok?: Map.get(wizard, "given") == "moonstone" and Map.get(wizard, "added") == "new",
+       saved_external: Map.get(wizard, "external"),
+       saved_first_present?: Map.has_key?(wizard, "first") or Map.has_key?(wizard, "given"),
        saved_rows: saved_rows
      )}
   end
@@ -188,7 +188,7 @@ defmodule Fluffy.TestWeb.FormLive do
       <p :if={@validation_saved?}>Constrained form submitted</p>
 
       <form
-        id="profile-form"
+        id="wizard-form"
         method="get"
         action="/chamber"
         phx-change="validate"
@@ -204,32 +204,32 @@ defmodule Fluffy.TestWeb.FormLive do
             disabled={@first_disabled?}
           />
         </label>
-        <label>Final ingredient <input id="last" name="profile[last]" value={@fields["last"]} /></label>
+        <label>Final ingredient <input id="last" name="wizard[last]" value={@fields["last"]} /></label>
         <label>
-          Cauldron controlled <input id="stubborn" name="profile[stubborn]" value={@stubborn} />
+          Cauldron controlled <input id="stubborn" name="wizard[stubborn]" value={@stubborn} />
         </label>
-        <input id="hidden-version" type="hidden" name="profile[version]" value={@hidden_version} />
+        <input id="hidden-version" type="hidden" name="wizard[version]" value={@hidden_version} />
         <label>
-          Debounced <input name="profile[debounced]" value={@debounced} phx-debounce="blur" />
+          Debounced <input name="wizard[debounced]" value={@debounced} phx-debounce="blur" />
         </label>
         <label>
-          Debounced next <input name="profile[debounced_next]" phx-debounce="blur" />
+          Debounced next <input name="wizard[debounced_next]" phx-debounce="blur" />
         </label>
         <label>
           Direct
           <input
-            name="profile[direct]"
+            name="wizard[direct]"
             value={@direct}
             phx-change="input-validate"
           />
         </label>
-        <label>Encoded target <input name="profile[target%20key]" /></label>
-        <label>Timed <input name="profile[timed]" phx-debounce="25" /></label>
+        <label>Encoded target <input name="wizard[target%20key]" /></label>
+        <label>Timed <input name="wizard[timed]" phx-debounce="25" /></label>
         <label>
           <input
             id="enabled"
             type="checkbox"
-            name="profile[enabled]"
+            name="wizard[enabled]"
             value="yes"
             checked={@enabled}
             phx-click="checkbox-click"
@@ -238,35 +238,35 @@ defmodule Fluffy.TestWeb.FormLive do
         </label>
         <label>
           Potion colours
-          <select name="profile[colours][]" multiple>
+          <select name="wizard[colours][]" multiple>
             <option value="red" selected={"red" in @colours}>Red</option>
             <option value="green" selected={"green" in @colours}>Green</option>
             <option value="blue" selected={"blue" in @colours}>Blue</option>
           </select>
         </label>
-        <input :if={@extra?} name="profile[added]" value="new" />
+        <input :if={@extra?} name="wizard[added]" value="new" />
 
         <div :for={row <- @rows} id={"row-#{row.id}"}>
           <label>
             {"Row #{row.index}"}
             <input
               id={"row-input-#{row.id}"}
-              name={"profile[rows][#{row.index}][value]"}
+              name={"wizard[rows][#{row.index}][value]"}
               value={row.value}
             />
           </label>
-          <input type="hidden" name={"profile[rows][#{row.index}][id]"} value={row.id} />
+          <input type="hidden" name={"wizard[rows][#{row.index}][id]"} value={row.id} />
         </div>
 
         <button
           type="button"
-          name="profile[drop][]"
+          name="wizard[drop][]"
           value="1"
           phx-click="remove-second"
         >
           Remove row 1
         </button>
-        <input type="hidden" name="profile[drop][]" value="" />
+        <input type="hidden" name="wizard[drop][]" value="" />
         <button type="button" phx-click="rename-and-add">Change recipe and add ingredient</button>
         <button type="button" phx-click="disable-first">Disable first ingredient</button>
         <button name="commit" value="save">Bottle potion</button>
@@ -274,20 +274,20 @@ defmodule Fluffy.TestWeb.FormLive do
         <button name="commit" value="trigger">Send potion over HTTP</button>
       </form>
 
-      <input form="profile-form" name="profile[external]" value="outside" />
+      <input form="wizard-form" name="wizard[external]" value="outside" />
 
       <p id="last-event">Last event: {Phoenix.json_library().encode!(@last_event)}</p>
-      <p>Last first: {get_in(@last_event, ["profile", "first"])}</p>
-      <p>Last last: {get_in(@last_event, ["profile", "last"])}</p>
-      <p>Last version: {get_in(@last_event, ["profile", "version"])}</p>
-      <p>Last debounced: {get_in(@last_event, ["profile", "debounced"]) || "none"}</p>
+      <p>Last first: {get_in(@last_event, ["wizard", "first"])}</p>
+      <p>Last last: {get_in(@last_event, ["wizard", "last"])}</p>
+      <p>Last version: {get_in(@last_event, ["wizard", "version"])}</p>
+      <p>Last debounced: {get_in(@last_event, ["wizard", "debounced"]) || "none"}</p>
       <p>Last target: {target_path(Map.get(@last_event, "_target", []))}</p>
       <p>Event targets: {Enum.join(@event_targets, ", ")}</p>
       <p>Unused first: {inspect(unused?(@last_event, "first"))}</p>
       <p>Unused last: {inspect(unused?(@last_event, "last"))}</p>
-      <p>Input event direct: {get_in(@last_input_event, ["profile", "direct"]) || "none"}</p>
+      <p>Input event direct: {get_in(@last_input_event, ["wizard", "direct"]) || "none"}</p>
       <p>
-        Input event has first: {inspect(not is_nil(get_in(@last_input_event, ["profile", "first"])))}
+        Input event has first: {inspect(not is_nil(get_in(@last_input_event, ["wizard", "first"])))}
       </p>
       <p>Input event target: {target_path(Map.get(@last_input_event, "_target", []))}</p>
       <p>Saved rows: {@saved_rows || "not saved"}</p>
@@ -384,7 +384,7 @@ defmodule Fluffy.TestWeb.FormLive do
 
   defp unused?(params, name) do
     params
-    |> Map.get("profile", %{})
+    |> Map.get("wizard", %{})
     |> Map.has_key?("_unused_#{name}")
   end
 

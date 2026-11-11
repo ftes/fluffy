@@ -72,9 +72,9 @@ defmodule Fluffy.TestWeb.PageController do
 
   def redirect_loop(conn, _params), do: redirect(conn, to: "/redirect/loop")
 
-  def report(conn, _params) do
+  def prophet(conn, _params) do
     conn
-    |> Plug.Conn.put_resp_header("content-disposition", ~s(attachment; filename="report.csv"))
+    |> Plug.Conn.put_resp_header("content-disposition", ~s(attachment; filename="daily_prophet.csv"))
     |> Plug.Conn.put_resp_content_type("text/csv")
     |> Plug.Conn.send_resp(200, "id\n1\n")
   end

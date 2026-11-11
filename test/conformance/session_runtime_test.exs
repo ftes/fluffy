@@ -27,12 +27,12 @@ defmodule Fluffy.Conformance.SessionRuntimeTest do
         </section>
         """)
 
-      fill(first, by_label("Name"), "Ada")
+      fill(first, by_label("Name"), "Hermione")
       select_option(first, by_label("Colour"), "Blue")
       fill(second, by_label("Name"), "Grace")
       select_option(second, by_label("Colour"), "Yellow")
 
-      expect(first, "Name" |> by_label() |> to_have_value("Ada"))
+      expect(first, "Name" |> by_label() |> to_have_value("Hermione"))
       expect(second, "Name" |> by_label() |> to_have_value("Grace"))
       expect(first, "option:checked" |> by_css() |> by_text("Blue", exact: true) |> to_have_count(1))
       expect(second, "option:checked" |> by_css() |> by_text("Yellow", exact: true) |> to_have_count(1))

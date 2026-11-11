@@ -8,8 +8,8 @@ defmodule Fluffy.Conformance.LabelLocatorTest do
   cases = [
     {"an explicit for/id label", ~s(<label for="email">Email address</label><input id="email">), "Email address", [], 1},
     {"a wrapping label", "<label>Display name <input></label>", "Display name", [], 1},
-    {"a wrapping label containing nested text", "<label><span>Account</span> <strong>name</strong> <input></label>",
-     "Account name", [exact: true], 1},
+    {"a wrapping label containing nested text", "<label><span>Vault</span> <strong>name</strong> <input></label>",
+     "Vault name", [exact: true], 1},
     {"a wrapping label with a hidden checkbox fallback",
      ~s(<label><input name="enabled" type="hidden" value=""><input name="enabled" type="checkbox" value="true">Daily</label>),
      "Daily", [exact: true], 1},
@@ -25,8 +25,7 @@ defmodule Fluffy.Conformance.LabelLocatorTest do
     {"an HTML label pointing at a non-labelable link",
      ~s(<label for="edit">Edit schedule</label><a id="edit" href="/edit">Edit</a>), "Edit schedule", [exact: true], 0},
     {"a single aria-labelledby reference",
-     ~s(<span id="account-name">Account name</span><input aria-labelledby="account-name">), "Account name", [exact: true],
-     1},
+     ~s(<span id="vault-name">Vault name</span><input aria-labelledby="vault-name">), "Vault name", [exact: true], 1},
     {"case-sensitive exact matching", ~s(<label for="city">City</label><input id="city">), "city", [exact: true], 0},
     {"quotes in a label", ~s(<label for="quote">Say &quot;hello&quot;</label><input id="quote">), ~s(Say "hello"),
      [exact: true], 1}
@@ -64,7 +63,7 @@ defmodule Fluffy.Conformance.LabelLocatorTest do
     @tag driver: driver
     test "matches each aria-labelledby reference rather than a combined label with #{driver}" do
       html = """
-      <span id="first">Billing</span>
+      <span id="first">Vault</span>
       <span id="second">address</span>
       <input aria-labelledby="first second">
       """
@@ -73,9 +72,9 @@ defmodule Fluffy.Conformance.LabelLocatorTest do
         session_for_html(unquote(driver), html, base_url: Fluffy.TestServer.base_url())
 
       session
-      |> expect("Billing" |> by_label(exact: true) |> to_have_count(1))
+      |> expect("Vault" |> by_label(exact: true) |> to_have_count(1))
       |> expect("address" |> by_label(exact: true) |> to_have_count(1))
-      |> expect("Billing address" |> by_label(exact: true) |> to_have_count(0))
+      |> expect("Vault address" |> by_label(exact: true) |> to_have_count(0))
     end
   end
 end

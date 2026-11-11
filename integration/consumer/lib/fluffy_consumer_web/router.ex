@@ -18,8 +18,8 @@ defmodule FluffyConsumerWeb.Router do
     pipe_through :browser
 
     get "/", PageController, :home
-    get "/complete", PageController, :complete
-    get "/download", PageController, :download
+    get "/hogwarts", PageController, :hogwarts
+    get "/marauders-map", PageController, :marauders_map
   end
 
   # Other scopes may use custom stacks.

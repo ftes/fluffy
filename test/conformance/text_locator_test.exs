@@ -7,13 +7,13 @@ defmodule Fluffy.Conformance.TextLocatorTest do
 
   cases = [
     {"normalizes whitespace", "<p>Save\n   changes</p>", "Save changes", [], 1},
-    {"matches substrings case-insensitively by default", "<p>Welcome Back</p>", "come back", [], 1},
-    {"matches exact normalized text", "<p>Hello</p><p>Hello world</p>", "Hello", [exact: true], 1},
-    {"keeps exact matching case-sensitive", "<p>Hello</p>", "hello", [exact: true], 0},
+    {"matches substrings case-insensitively by default", "<p>Welcome back to Hogwarts</p>", "back to hog", [], 1},
+    {"matches exact normalized text", "<p>Lumos</p><p>Lumos Maxima</p>", "Lumos", [exact: true], 1},
+    {"keeps exact matching case-sensitive", "<p>Lumos</p>", "lumos", [exact: true], 0},
     {"selects the deepest matching descendant", "<div>Outer <span>Inner</span></div>", "Inner", [], 1},
     {"can match a parent including descendant text", "<div>Outer <span>Inner</span></div>", "Outer Inner", [exact: true],
      1},
-    {"uses button input values as text", ~s(<input type="submit" value="Log in">), "Log in", [], 1},
+    {"uses button input values as text", ~s(<input type="submit" value="Floo in">), "Floo in", [], 1},
     {"leaves script and style text out of an element's text", "<p>Hi<script>x = 1</script><style>b {}</style></p>", "Hi",
      [exact: true], 1},
     {"escapes quotes in selector values", "<p>Say &quot;hello&quot;</p>", ~s(Say "hello"), [exact: true], 1},

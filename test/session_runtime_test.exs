@@ -29,8 +29,8 @@ defmodule Fluffy.SessionRuntimeTest do
     assert {:error, _} = SessionRuntime.resolve(runtime, Fluffy.Page.new(runtime, make_ref()))
     assert {:ok, page} = SessionRuntime.page(runtime, session.active_page)
     assert {:error, _} = SessionRuntime.replace_page(runtime, %{page | id: make_ref()})
-    Fluffy.fill(session, Fluffy.Locator.by_label("Name"), "Ada")
-    Fluffy.Expect.expect(session, Fluffy.Expect.to_have_value(Fluffy.Locator.by_label("Name"), "Ada"))
+    Fluffy.fill(session, Fluffy.Locator.by_label("Name"), "Hermione")
+    Fluffy.Expect.expect(session, Fluffy.Expect.to_have_value(Fluffy.Locator.by_label("Name"), "Hermione"))
   end
 
   test "cleanup unwinds acquired resources and continues after a failure" do
@@ -71,8 +71,8 @@ defmodule Fluffy.SessionRuntimeTest do
 
   test "state survives discarded handles and session shutdown is idempotent" do
     session = Fluffy.session_for_html(:static, "<input aria-label='Name'>")
-    Fluffy.fill(session, Fluffy.Locator.by_label("Name"), "Ada")
-    Fluffy.Expect.expect(session, Fluffy.Expect.to_have_value(Fluffy.Locator.by_label("Name"), "Ada"))
+    Fluffy.fill(session, Fluffy.Locator.by_label("Name"), "Hermione")
+    Fluffy.Expect.expect(session, Fluffy.Expect.to_have_value(Fluffy.Locator.by_label("Name"), "Hermione"))
     assert :ok = Fluffy.Backend.close_session(session)
     assert :ok = Fluffy.Backend.close_session(session)
     assert_raise ArgumentError, ~r/session is closed/, fn -> Fluffy.Session.context(session) end

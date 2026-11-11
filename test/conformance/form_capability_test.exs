@@ -44,7 +44,7 @@ defmodule Fluffy.Conformance.FormCapabilityTest do
       session_for_html(
         :playwright,
         """
-        <form id="profile" onsubmit="event.preventDefault(); result.value = 'submitted'">
+        <form id="wizard" onsubmit="event.preventDefault(); result.value = 'submitted'">
           <label>Email <input name="email" required></label>
           <button>Save</button>
         </form>
@@ -53,10 +53,10 @@ defmodule Fluffy.Conformance.FormCapabilityTest do
       )
 
     session
-    |> submit(by_css("#profile"))
+    |> submit(by_css("#wizard"))
     |> expect("Result" |> by_label() |> to_have_value("waiting"))
-    |> fill(by_label("Email"), "person@example.test")
-    |> submit(by_css("#profile"))
+    |> fill(by_label("Email"), "neville@hogwarts.example")
+    |> submit(by_css("#wizard"))
     |> expect("Result" |> by_label() |> to_have_value("submitted"))
   end
 

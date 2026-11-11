@@ -376,7 +376,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
         <p hidden>Hidden notice</p><p>Visible notice</p><p>Other</p>
         <label for="email">Email address</label><input id="email" value="reader">
         <label for="other">Email address</label><input id="other" value="other">
-        <label for="sub">Subscribe now</label><input id="sub" type="checkbox" checked>
+        <label for="sub">Join the Quidditch team</label><input id="sub" type="checkbox" checked>
         """)
 
       returned =
@@ -390,8 +390,8 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
         |> refute_has("#missing")
         |> assert_has("#email", value: "reader", label: "Email")
         |> refute_has("#email", value: "wrong")
-        |> assert_has("#sub", checked: true, label: "Subscribe")
-        |> refute_has("#sub", checked: false, label: "Subscribe now", exact: true)
+        |> assert_has("#sub", checked: true, label: "Quidditch")
+        |> refute_has("#sub", checked: false, label: "Join the Quidditch team", exact: true)
 
       assert returned.session == session
 
@@ -469,8 +469,8 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
         <label for="email">Email</label><input id="email">
         <label for="backup">Email backup</label><input id="backup">
         <label for="duplicate">Email</label><input id="duplicate">
-        <label for="sub">Subscribe</label><input id="sub" type="checkbox">
-        <label for="more">Subscribe later</label><input id="more" type="checkbox">
+        <label for="sub">Join the Quidditch team</label><input id="sub" type="checkbox">
+        <label for="more">Join the Quidditch team later</label><input id="more" type="checkbox">
         <label for="radio">Express</label><input id="radio" type="radio" name="delivery">
         <label for="plan">Plan</label><select id="plan"><option value="free">Free</option><option value="pro">Professional</option></select>
         <label for="plans">Plans</label><select id="plans" multiple><option value="free">Free</option><option value="pro">Professional</option></select>
@@ -483,15 +483,15 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
         |> fill_in("#duplicate", "Email", with: "third")
         |> assert_has("#email", value: "first")
         |> assert_has("#backup", value: "second")
-        |> check("Subscribe")
+        |> check("Join the Quidditch team")
         |> assert_has("#more", checked: false)
-        |> uncheck("Subscribe", exact: true)
-        |> check("#sub", "Subscribe")
-        |> uncheck("#sub", "Sub", exact: false)
-        |> check("#sub", "Subscribe", exact: true)
-        |> uncheck("Subscribe")
-        |> check("Subscribe", exact: true)
-        |> uncheck("#sub", "Subscribe")
+        |> uncheck("Join the Quidditch team", exact: true)
+        |> check("#sub", "Join the Quidditch team")
+        |> uncheck("#sub", "Quidditch", exact: false)
+        |> check("#sub", "Join the Quidditch team", exact: true)
+        |> uncheck("Join the Quidditch team")
+        |> check("Join the Quidditch team", exact: true)
+        |> uncheck("#sub", "Join the Quidditch team")
         |> choose("Express")
         |> choose("Express", exact: true)
         |> choose("#radio", "Express")
@@ -557,14 +557,14 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
         :phoenix
         |> start_session(endpoint: Endpoint)
         |> visit(Fluffy.TestHTTPFixtures.path(fixture))
-        |> fill_in("Name", with: "Ada")
+        |> fill_in("Name", with: "Hermione")
 
       assert unwrap_and_return(session, fn %Plug.Conn{} -> :read end) == :read
-      assert_has(session, "input", value: "Ada")
+      assert_has(session, "input", value: "Hermione")
       submit(session)
 
       [_source, submission] = Fluffy.TestHTTPFixtures.requests(fixture)
-      assert URI.decode_query(submission.query) == %{"name" => "Ada"}
+      assert URI.decode_query(submission.query) == %{"name" => "Hermione"}
     end
 
     @tag driver: :live
@@ -715,7 +715,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
         unquote(driver)
         |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
         |> visit(path)
-        |> fill_in("Name", with: "Ada")
+        |> fill_in("Name", with: "Hermione")
 
       session |> submit() |> assert_has("input")
       assert_raise ArgumentError, ~r/no active form/, fn -> session |> reload_page() |> submit() end
@@ -733,7 +733,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
         unquote(driver)
         |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
         |> visit(Fluffy.TestHTTPFixtures.path(fixture))
-        |> fill_in("Name", with: "Ada")
+        |> fill_in("Name", with: "Hermione")
 
       reload_page(session)
 
@@ -1037,7 +1037,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
       |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
       |> visit(Fluffy.TestHTTPFixtures.path(fixture))
       |> unwrap(&send(self(), {:page, &1}))
-      |> fill_in("Name", with: "Ada")
+      |> fill_in("Name", with: "Hermione")
 
     assert_received {:page, page}
     PlaywrightEx.Page.evaluate!(page, "setTimeout(() => location.assign('?next'))")

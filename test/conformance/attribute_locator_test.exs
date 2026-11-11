@@ -13,10 +13,10 @@ defmodule Fluffy.Conformance.AttributeLocatorTest do
      {:placeholder, "Work Email", []}, 0},
     {"alt text", ~s(<img alt="Fluffy logo">), {:alt_text, "LOGO", []}, 1},
     {"title", ~s(<abbr title="Application programming interface">API</abbr>), {:title, "programming", []}, 1},
-    {"test id exact", ~s(<article data-testid="account-row"></article>), {:test_id, "account-row", []}, 1},
-    {"test id does not use substring", ~s(<article data-testid="account-row"></article>), {:test_id, "account", []}, 0},
-    {"custom test id attribute", ~s(<article data-qa="account-row"></article>),
-     {:test_id, "account-row", [attribute: "data-qa"]}, 1}
+    {"test id exact", ~s(<article data-testid="vault-row"></article>), {:test_id, "vault-row", []}, 1},
+    {"test id does not use substring", ~s(<article data-testid="vault-row"></article>), {:test_id, "vault", []}, 0},
+    {"custom test id attribute", ~s(<article data-qa="vault-row"></article>),
+     {:test_id, "vault-row", [attribute: "data-qa"]}, 1}
   ]
 
   for {case_name, html, locator_spec, expected} <- cases,

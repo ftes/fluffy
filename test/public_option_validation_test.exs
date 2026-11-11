@@ -66,11 +66,11 @@ defmodule Fluffy.PublicOptionValidationTest do
 
   test "page expectation options share expectation validation" do
     assert_raise NimbleOptions.ValidationError, ~r/:timeout.*non[- ]negative integer/, fn ->
-      Expect.page_to_have_title("Accounts", timeout: -1)
+      Expect.page_to_have_title("Houses", timeout: -1)
     end
 
     assert_raise NimbleOptions.ValidationError, ~r/:query_mode.*:exact.*:subset/, fn ->
-      Expect.page_to_have_url(path: "/accounts", query_mode: :some)
+      Expect.page_to_have_url(path: "/houses", query_mode: :some)
     end
 
     assert_raise NimbleOptions.ValidationError, ~r/:query.*map/, fn ->
@@ -91,7 +91,7 @@ defmodule Fluffy.PublicOptionValidationTest do
     assert %Event{type: :popup} = Event.popup()
     assert %Event{type: :close} = Event.close()
 
-    assert %Expect{target: :page, kind: :url} = Expect.page_to_have_url("/accounts")
+    assert %Expect{target: :page, kind: :url} = Expect.page_to_have_url("/houses")
     assert %Expect{target: :page, kind: :opener} = Expect.page_to_have_opener(nil)
   end
 

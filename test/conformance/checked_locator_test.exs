@@ -85,7 +85,7 @@ defmodule Fluffy.Conformance.CheckedLocatorTest do
       |> expect("#enabled:checked" |> by_css() |> to_have_count(1))
       |> uncheck(by_css("#enabled:checked"))
       |> expect("Checkbox clicks: 2" |> by_text(exact: true) |> to_be_visible())
-      |> expect("Event targets: profile/enabled, profile/enabled" |> by_text(exact: true) |> to_be_visible())
+      |> expect("Event targets: wizard/enabled, wizard/enabled" |> by_text(exact: true) |> to_be_visible())
       |> expect("#enabled:checked" |> by_css() |> to_have_count(0))
     end
 

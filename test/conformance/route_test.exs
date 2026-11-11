@@ -62,16 +62,16 @@ defmodule Fluffy.Conformance.RouteTest do
     test "a handler can pass the route on, so the test asserts a loading state and answers it" do
       {session, fixture} = session()
       test = self()
-      route(session, TestHTTPFixtures.path(fixture, "/api/report"), &send(test, {:held, &1}))
+      route(session, TestHTTPFixtures.path(fixture, "/api/prophet"), &send(test, {:held, &1}))
 
       session
-      |> visit(TestHTTPFixtures.path(fixture, "/report"))
-      |> expect("Loading report" |> by_text() |> to_be_visible())
+      |> visit(TestHTTPFixtures.path(fixture, "/prophet"))
+      |> expect("Loading the Daily Prophet" |> by_text() |> to_be_visible())
 
       assert_receive {:held, %Route{} = held}, 5_000
-      assert Route.fulfill(held, json: %{title: "Quarterly"}) == :ok
+      assert Route.fulfill(held, json: %{title: "Evening Edition"}) == :ok
 
-      expect(session, "Report: Quarterly" |> by_text() |> to_be_visible())
+      expect(session, "Daily Prophet: Evening Edition" |> by_text() |> to_be_visible())
     end
 
     @tag driver: :playwright
@@ -548,14 +548,14 @@ defmodule Fluffy.Conformance.RouteTest do
           "/next" ->
             %{body: "<h1>Server next</h1>"}
 
-          "/report" ->
+          "/prophet" ->
             %{
               body: """
               <!doctype html><html><body>
-              <p id="report">Loading report</p>
+              <p id="prophet">Loading the Daily Prophet</p>
               <script>
-                fetch("api/report").then(r => r.json()).then(({title}) => {
-                  document.getElementById("report").textContent = "Report: " + title
+                fetch("api/prophet").then(r => r.json()).then(({title}) => {
+                  document.getElementById("prophet").textContent = "Daily Prophet: " + title
                 })
               </script>
               </body></html>

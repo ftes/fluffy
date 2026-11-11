@@ -10,12 +10,12 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
   alias Fluffy.TestHTTPFixtures
 
   test "frame conversions and nested queries remain serializable locator values" do
-    owner = "section" |> by_css() |> by_title("Checkout") |> nth(1)
+    owner = "section" |> by_css() |> by_title("Gringotts") |> nth(1)
     frame = content_frame(owner)
     assert FrameLocator.owner(frame) == owner
     assert inspect(frame) =~ "content_frame()"
 
-    nested = frame |> frame_locator("#payment") |> by_role(:button, name: "Pay")
+    nested = frame |> frame_locator("#vault") |> by_role(:button, name: "Withdraw")
     assert %Fluffy.Locator{} = nested
     assert nested |> :erlang.term_to_binary() |> :erlang.binary_to_term() == nested
 
@@ -24,11 +24,11 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
     assert Fluffy.Locator.Playwright.locator(playwright_frame, nested) ==
              playwright_frame
              |> PlaywrightEx.Frame.locator("css=section")
-             |> PlaywrightEx.Locator.get_by_title("Checkout")
+             |> PlaywrightEx.Locator.get_by_title("Gringotts")
              |> PlaywrightEx.Locator.nth(1)
              |> PlaywrightEx.Locator.content_frame()
-             |> PlaywrightEx.FrameLocator.frame_locator("css=#payment")
-             |> PlaywrightEx.FrameLocator.get_by_role(:button, name: "Pay")
+             |> PlaywrightEx.FrameLocator.frame_locator("css=#vault")
+             |> PlaywrightEx.FrameLocator.get_by_role(:button, name: "Withdraw")
 
     for locator <- [
           by_css(frame, "input"),
@@ -75,12 +75,12 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
     session
     |> expect(to_have_count(by_role(:textbox), 0))
     |> expect(to_have_count(FrameLocator.owner(outer), 1))
-    |> fill(email, "buyer@example.com")
-    |> expect(to_have_value(email, "buyer@example.com"))
+    |> fill(email, "griphook@gringotts.example")
+    |> expect(to_have_value(email, "griphook@gringotts.example"))
     |> focus(email)
     |> press(email, "Tab")
     |> blur(email)
-    |> expect(to_have_value(email, "buyer@example.com"))
+    |> expect(to_have_value(email, "griphook@gringotts.example"))
     |> check(by_label(inner, "Updates"))
     |> expect(to_be_checked(by_label(inner, "Updates")))
     |> select_option(by_label(inner, "Plan"), "pro")
@@ -195,7 +195,9 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
     email = by_label(frame, "Email")
     page = Fluffy.Session.current_page(session)
 
-    session = session |> fill(email, "buyer@example.com") |> expect(to_have_value(email, "buyer@example.com"))
+    session =
+      session |> fill(email, "griphook@gringotts.example") |> expect(to_have_value(email, "griphook@gringotts.example"))
+
     assert Fluffy.Playwright.evaluate(session, "document.querySelector('iframe').contentDocument === null")
     session = session |> submit(by_css(frame, "form")) |> expect(to_be_visible(by_text(frame, "Submitted")))
     assert Fluffy.Session.current_page(session).id == page.id

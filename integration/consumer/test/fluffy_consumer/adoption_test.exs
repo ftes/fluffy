@@ -16,10 +16,10 @@ defmodule FluffyConsumer.AdoptionTest do
 
       session
       |> visit("/")
-      |> assert(by_role(:heading, name: "External consumer") |> count(1))
-      |> click(by_role(:link, name: "Continue"))
-      |> assert(by_text("Consumer complete") |> visible())
-      |> assert(page_url("/complete"))
+      |> assert(by_role(:heading, name: "Platform Nine and Three-Quarters") |> count(1))
+      |> click(by_role(:link, name: "Board the Hogwarts Express"))
+      |> assert(by_text("Welcome to Hogwarts") |> visible())
+      |> assert(page_url("/hogwarts"))
     end
 
     @tag backend: backend
@@ -29,10 +29,10 @@ defmodule FluffyConsumer.AdoptionTest do
       |> visit("/")
       |> assert_event(
         Fluffy.Event.download(),
-        &click(&1, by_role(:link, name: "Download report")),
+        &click(&1, by_role(:link, name: "Marauder's Map")),
         fn download ->
-          assert download.suggested_filename == "report.csv"
-          assert Fluffy.Download.read(download) == "id,total\n1,42\n"
+          assert download.suggested_filename == "marauders_map.csv"
+          assert Fluffy.Download.read(download) == "student,house\nHermione,Gryffindor\n"
         end
       )
       |> assert(page_url("/"))
@@ -48,16 +48,21 @@ defmodule FluffyConsumer.AdoptionTest do
         %Plug.Conn{} = conn ->
           %{
             conn
-            | resp_body: String.replace(conn.resp_body, "External consumer", "Native result")
+            | resp_body:
+                String.replace(
+                  conn.resp_body,
+                  "Platform Nine and Three-Quarters",
+                  "Mischief managed"
+                )
           }
 
         %PlaywrightEx.Page{} = page ->
           PlaywrightEx.Page.evaluate!(
             page,
-            "document.querySelector('h1').textContent = 'Native result'"
+            "document.querySelector('h1').textContent = 'Mischief managed'"
           )
       end)
-      |> assert(by_text("Native result") |> visible())
+      |> assert(by_text("Mischief managed") |> visible())
     end
   end
 end

@@ -13,21 +13,21 @@ defmodule Fluffy.Conformance.StaticHTTPLinkTest do
     test "resolves a relative link against the current document with #{driver}", %{driver: driver} do
       fixture =
         TestHTTPFixtures.register_sequence([
-          %{body: html(~s(<a href="next?state=open#details">Next order</a>))},
-          %{body: html("<h1>Next order page</h1>")}
+          %{body: html(~s(<a href="next?state=open#details">Next owl</a>))},
+          %{body: html("<h1>Next owl landed</h1>")}
         ])
 
       session = start_test_session(driver)
 
       session
-      |> visit(TestHTTPFixtures.path(fixture, "/orders/current"))
-      |> click(by_role(:link, name: "Next order"))
-      |> expect("Next order page" |> by_text() |> to_be_visible())
-      |> expect(Fluffy.Expect.page_to_have_url(TestHTTPFixtures.url(fixture, "/orders/next?state=open#details")))
+      |> visit(TestHTTPFixtures.path(fixture, "/owls/current"))
+      |> click(by_role(:link, name: "Next owl"))
+      |> expect("Next owl landed" |> by_text() |> to_be_visible())
+      |> expect(Fluffy.Expect.page_to_have_url(TestHTTPFixtures.url(fixture, "/owls/next?state=open#details")))
 
       assert Enum.map(TestHTTPFixtures.requests(fixture), &{&1.path, &1.query}) == [
-               {"/orders/current", ""},
-               {"/orders/next", "state=open"}
+               {"/owls/current", ""},
+               {"/owls/next", "state=open"}
              ]
     end
 
@@ -35,16 +35,16 @@ defmodule Fluffy.Conformance.StaticHTTPLinkTest do
     test "a click on text inside a link follows the link with #{driver}", %{driver: driver} do
       fixture =
         TestHTTPFixtures.register_sequence([
-          %{body: html(~s(<a href="next"><span>Next order</span></a>))},
-          %{body: html("<h1>Next order page</h1>")}
+          %{body: html(~s(<a href="next"><span>Next owl</span></a>))},
+          %{body: html("<h1>Next owl landed</h1>")}
         ])
 
       driver
       |> start_test_session()
-      |> visit(TestHTTPFixtures.path(fixture, "/orders/current"))
-      |> click(by_text("Next order", exact: true))
-      |> expect("Next order page" |> by_text() |> to_be_visible())
-      |> expect(Fluffy.Expect.page_to_have_url(TestHTTPFixtures.url(fixture, "/orders/next")))
+      |> visit(TestHTTPFixtures.path(fixture, "/owls/current"))
+      |> click(by_text("Next owl", exact: true))
+      |> expect("Next owl landed" |> by_text() |> to_be_visible())
+      |> expect(Fluffy.Expect.page_to_have_url(TestHTTPFixtures.url(fixture, "/owls/next")))
     end
 
     @tag driver: driver
@@ -71,16 +71,16 @@ defmodule Fluffy.Conformance.StaticHTTPLinkTest do
     } do
       fixture =
         TestHTTPFixtures.register(%{
-          body: html(~s(<a href="#details">Details</a><h2 id="details">Order details</h2>))
+          body: html(~s(<a href="#details">Details</a><h2 id="details">Owl details</h2>))
         })
 
       session = start_test_session(driver)
 
       session
-      |> visit(TestHTTPFixtures.path(fixture, "/orders/current?state=open"))
+      |> visit(TestHTTPFixtures.path(fixture, "/owls/current?state=open"))
       |> click(by_role(:link, name: "Details"))
-      |> expect("Order details" |> by_text() |> to_be_visible())
-      |> expect(Fluffy.Expect.page_to_have_url(TestHTTPFixtures.url(fixture, "/orders/current?state=open#details")))
+      |> expect("Owl details" |> by_text() |> to_be_visible())
+      |> expect(Fluffy.Expect.page_to_have_url(TestHTTPFixtures.url(fixture, "/owls/current?state=open#details")))
 
       assert [_request] = TestHTTPFixtures.requests(fixture)
     end
@@ -90,18 +90,18 @@ defmodule Fluffy.Conformance.StaticHTTPLinkTest do
       test "a link to a #{status} response keeps the current page with #{driver}", %{driver: driver} do
         fixture =
           TestHTTPFixtures.register_sequence([
-            %{body: html(~s(<h1>Current order</h1><a href="acknowledge">Acknowledge</a>))},
+            %{body: html(~s(<h1>Current owl</h1><a href="sign">Sign for parcel</a>))},
             %{status: unquote(status)}
           ])
 
         driver
         |> start_test_session()
-        |> visit(TestHTTPFixtures.path(fixture, "/orders/current"))
-        |> click(by_role(:link, name: "Acknowledge"))
-        |> expect("Current order" |> by_text() |> to_be_visible())
-        |> expect(Fluffy.Expect.page_to_have_url(TestHTTPFixtures.url(fixture, "/orders/current")))
+        |> visit(TestHTTPFixtures.path(fixture, "/owls/current"))
+        |> click(by_role(:link, name: "Sign for parcel"))
+        |> expect("Current owl" |> by_text() |> to_be_visible())
+        |> expect(Fluffy.Expect.page_to_have_url(TestHTTPFixtures.url(fixture, "/owls/current")))
 
-        assert Enum.map(TestHTTPFixtures.requests(fixture), & &1.path) == ["/orders/current", "/orders/acknowledge"]
+        assert Enum.map(TestHTTPFixtures.requests(fixture), & &1.path) == ["/owls/current", "/owls/sign"]
       end
     end
   end

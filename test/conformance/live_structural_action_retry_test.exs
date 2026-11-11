@@ -51,9 +51,9 @@ defmodule Fluffy.Conformance.LiveStructuralActionRetryTest do
       unquote(driver)
       |> live_session()
       |> click(by_role(:button, name: "Release readonly field"))
-      |> fill(by_label("Name"), "Ada", timeout: @action_timeout)
-      |> expect("Name" |> by_label() |> to_have_value("Ada"))
-      |> expect("Name result: Ada" |> by_text(exact: true) |> to_be_visible())
+      |> fill(by_label("Name"), "Hermione", timeout: @action_timeout)
+      |> expect("Name" |> by_label() |> to_have_value("Hermione"))
+      |> expect("Name result: Hermione" |> by_text(exact: true) |> to_be_visible())
     end
 
     @tag driver: driver
@@ -119,7 +119,7 @@ defmodule Fluffy.Conformance.LiveStructuralActionRetryTest do
 
     error =
       assert_raise Fluffy.OperationError, fn ->
-        fill(session, readonly, "Ada", timeout: 20)
+        fill(session, readonly, "Hermione", timeout: 20)
       end
 
     assert error.operation == :fill
@@ -144,12 +144,12 @@ defmodule Fluffy.Conformance.LiveStructuralActionRetryTest do
 
     failures = [
       fn -> click(session, by_css(".ambiguous"), timeout: @action_timeout) end,
-      fn -> fill(session, by_css("#wrong-fill-target"), "Ada", timeout: @action_timeout) end,
+      fn -> fill(session, by_css("#wrong-fill-target"), "Hermione", timeout: @action_timeout) end,
       fn ->
         fill(
           session,
           by_css("#readonly-wrong-fill-target"),
-          "Ada",
+          "Hermione",
           timeout: @action_timeout
         )
       end,

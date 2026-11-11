@@ -8,11 +8,11 @@ defmodule Fluffy.Conformance.PlaywrightEvaluateTest do
 
   test "evaluates JavaScript in the active Playwright page and returns the value" do
     session =
-      session_for_html(:playwright, "<main><h1>Hello</h1><p data-state=ready>Ready</p></main>",
+      session_for_html(:playwright, "<main><h1>Lumos</h1><p data-state=ready>Ready</p></main>",
         base_url: Fluffy.TestServer.base_url()
       )
 
-    assert "Hello" ==
+    assert "Lumos" ==
              Playwright.evaluate(session, "document.querySelector('h1').textContent")
 
     assert %{"count" => 1, "state" => "ready"} ==

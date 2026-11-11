@@ -10,14 +10,14 @@ defmodule Fluffy.HTTPFixtureRegistryTest do
     refute first.token == second.token
     refute first.path == second.path
 
-    response = http_request(:get, TestHTTPFixtures.url(first, "/orders?state=open"))
+    response = http_request(:get, TestHTTPFixtures.url(first, "/owls?state=open"))
 
     assert response.status == 200
     assert response.body == "first"
 
     assert [request] = TestHTTPFixtures.requests(first)
     assert request.method == "GET"
-    assert request.path == "/orders"
+    assert request.path == "/owls"
     assert request.query == "state=open"
     assert request.body == ""
   end

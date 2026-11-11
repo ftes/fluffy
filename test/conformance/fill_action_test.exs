@@ -85,13 +85,13 @@ defmodule Fluffy.Conformance.FillActionTest do
     @tag driver: driver
     test "fill replaces an input's current value with #{driver}" do
       field = by_label("Email")
-      html = ~s(<label for="email">Email</label><input id="email" value="old@example.com">)
+      html = ~s(<label for="email">Email</label><input id="email" value="old@hogwarts.example">)
 
       with_html(unquote(driver), html, fn session ->
         session
-        |> expect(to_have_value(field, "old@example.com"))
-        |> fill(field, "new@example.com")
-        |> expect(to_have_value(field, "new@example.com"))
+        |> expect(to_have_value(field, "old@hogwarts.example"))
+        |> fill(field, "new@hogwarts.example")
+        |> expect(to_have_value(field, "new@hogwarts.example"))
       end)
     end
 
@@ -112,7 +112,7 @@ defmodule Fluffy.Conformance.FillActionTest do
     test "fill requires exactly one target with #{driver}" do
       with_html(unquote(driver), ~s(<input title="Name"><input title="Name">), fn session ->
         assert_action_error(session, Fluffy.StrictnessError, ~r/it matched 2/, fn ->
-          fill(session, by_title("Name"), "Ada", timeout: 5)
+          fill(session, by_title("Name"), "Hermione", timeout: 5)
         end)
       end)
     end
@@ -121,7 +121,7 @@ defmodule Fluffy.Conformance.FillActionTest do
     test "fill rejects a disabled field with #{driver}" do
       with_html(unquote(driver), ~s(<input aria-label="Name" disabled>), fn session ->
         assert_action_error(session, Fluffy.ActionabilityError, ~r/disabled/, fn ->
-          fill(session, by_label("Name"), "Ada", timeout: 5)
+          fill(session, by_label("Name"), "Hermione", timeout: 5)
         end)
       end)
     end
@@ -130,7 +130,7 @@ defmodule Fluffy.Conformance.FillActionTest do
     test "fill rejects a readonly field with #{driver}" do
       with_html(unquote(driver), ~s(<input aria-label="Name" readonly>), fn session ->
         assert_action_error(session, Fluffy.ActionabilityError, ~r/readonly/, fn ->
-          fill(session, by_label("Name"), "Ada", timeout: 5)
+          fill(session, by_label("Name"), "Hermione", timeout: 5)
         end)
       end)
     end
@@ -140,7 +140,7 @@ defmodule Fluffy.Conformance.FillActionTest do
       with_html(unquote(driver), ~s(<button readonly>Save</button>), fn session ->
         error =
           assert_action_error(session, Fluffy.ActionabilityError, ~r/not editable/, fn ->
-            fill(session, by_role(:button, name: "Save"), "Ada", timeout: 5)
+            fill(session, by_role(:button, name: "Save"), "Hermione", timeout: 5)
           end)
 
         if Fluffy.Session.current_driver(session) != :playwright, do: assert(error.cause.reason == :not_editable)
@@ -187,8 +187,8 @@ defmodule Fluffy.Conformance.FillActionTest do
     test "ARIA readonly does not replace native input readonly with #{driver}" do
       with_html(unquote(driver), ~s(<input aria-label="Name" aria-readonly="true">), fn session ->
         session
-        |> fill(by_label("Name"), "Ada")
-        |> expect("Name" |> by_label() |> to_have_value("Ada"))
+        |> fill(by_label("Name"), "Hermione")
+        |> expect("Name" |> by_label() |> to_have_value("Hermione"))
       end)
     end
 

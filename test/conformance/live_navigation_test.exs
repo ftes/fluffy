@@ -418,8 +418,8 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     session = :phoenix |> live_session() |> visit("/live/chamber-map")
     pending = wait_for(session, Fluffy.Event.download())
 
-    click(session, by_role(:button, name: "Fetch report", exact: true))
-    assert await(pending).suggested_filename == "report.csv"
+    click(session, by_role(:button, name: "Fetch the Daily Prophet", exact: true))
+    assert await(pending).suggested_filename == "daily_prophet.csv"
 
     second = wait_for(session, Fluffy.Event.download(), timeout: 300)
     expect(session, to_be_visible(by_label("Map note")))

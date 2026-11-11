@@ -16,7 +16,7 @@ defmodule Fluffy.TestWeb.ExpectationsLive do
     <li class="item">Two</li>
     <li class="item last">Three</li>
   </ul>
-  <a id="link" href="/chamber" data-Note="Hello  World" data-flag>Go</a>
+  <a id="link" href="/chamber" data-Note="Lumos  Maxima" data-flag>Go</a>
   <div id="classy" class="middle  selected row"></div>
   <div id="plain"></div>
   <div id="blank">

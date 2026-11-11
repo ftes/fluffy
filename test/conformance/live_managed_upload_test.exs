@@ -113,12 +113,12 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
     end
 
     test "submits the title captured when a managed upload starts with #{driver}" do
-      expected_title = if unquote(driver) == :playwright, do: "Ada", else: "initial"
+      expected_title = if unquote(driver) == :playwright, do: "Hermione", else: "initial"
 
       unquote(driver)
       |> start_test_session()
       |> visit("/live/scrolls/disable-title-on-progress")
-      |> fill(by_label("Title"), "Ada")
+      |> fill(by_label("Title"), "Hermione")
       |> set_input_files(by_label("Attachment"), fixture_path())
       |> click(by_role(:button, name: "Save", exact: true))
       |> expect("Saved title: #{expected_title}" |> by_text() |> to_be_visible())

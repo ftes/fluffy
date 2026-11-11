@@ -17,13 +17,13 @@ defmodule Fluffy.Conformance.DownloadEventTest do
     } do
       session = session(driver)
       pending = wait_for(session, Event.download())
-      click(session, by_role(:link, name: "Report", exact: true))
+      click(session, by_role(:link, name: "Marauder's Map", exact: true))
       download = await(pending)
-      assert download.suggested_filename == "report.csv"
-      assert String.ends_with?(download.url, "/report")
+      assert download.suggested_filename == "marauders_map.csv"
+      assert String.ends_with?(download.url, "/marauders-map")
       assert download |> Download.page() |> Fluffy.Page.url() |> String.ends_with?("/start")
-      assert Download.read(download) == "id,total\n1,42\n"
-      assert Download.read(download) == "id,total\n1,42\n"
+      assert Download.read(download) == "student,house\nHermione,Gryffindor\n"
+      assert Download.read(download) == "student,house\nHermione,Gryffindor\n"
       destination = Path.join(tmp_dir, "copy.csv")
       assert Download.save_as(download, destination) == :ok
 
@@ -33,13 +33,13 @@ defmodule Fluffy.Conformance.DownloadEventTest do
 
       if driver == :playwright do
         assert Download.page(download) == Fluffy.Playwright.current_page(session)
-        assert unwrap_and_return(download, &PlaywrightEx.Download.suggested_filename/1) == "report.csv"
+        assert unwrap_and_return(download, &PlaywrightEx.Download.suggested_filename/1) == "marauders_map.csv"
       else
         assert_raise Fluffy.CapabilityError, ~r/no native counterpart/, fn -> unwrap_and_return(download, & &1) end
       end
 
       close_session(session)
-      assert File.read!(destination) == "id,total\n1,42\n"
+      assert File.read!(destination) == "student,house\nHermione,Gryffindor\n"
       assert_raise ArgumentError, ~r/session is closed/, fn -> Download.read(download) end
     end
 
@@ -47,7 +47,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
     test "path raises once its session is closed with #{driver}", %{driver: driver} do
       session = session(driver)
       pending = wait_for(session, Event.download())
-      click(session, by_role(:link, name: "Report", exact: true))
+      click(session, by_role(:link, name: "Marauder's Map", exact: true))
       download = await(pending)
 
       close_session(session)
@@ -57,14 +57,14 @@ defmodule Fluffy.Conformance.DownloadEventTest do
     @tag driver: driver
     test "predicates skip unrelated downloads and retain the first match with #{driver}", %{driver: driver} do
       session = session(driver)
-      pending = wait_for(session, Event.download(&(&1.suggested_filename == "report.csv")))
+      pending = wait_for(session, Event.download(&(&1.suggested_filename == "marauders_map.csv")))
 
       session
       |> click(by_role(:link, name: "Noise", exact: true))
-      |> click(by_role(:link, name: "Report", exact: true))
+      |> click(by_role(:link, name: "Marauder's Map", exact: true))
       |> click(by_role(:link, name: "Renamed", exact: true))
 
-      assert Download.read(await(pending)) == "id,total\n1,42\n"
+      assert Download.read(await(pending)) == "student,house\nHermione,Gryffindor\n"
     end
 
     @tag driver: driver
@@ -72,7 +72,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
       session = session(driver)
       first = wait_for(session, Event.download())
       second = wait_for(session, Event.download())
-      click(session, by_role(:link, name: "Report", exact: true))
+      click(session, by_role(:link, name: "Marauder's Map", exact: true))
       assert await(first) == await(second)
     end
 
@@ -81,8 +81,8 @@ defmodule Fluffy.Conformance.DownloadEventTest do
       driver
       |> session()
       |> expect_event(Event.download(), &click(&1, by_role(:link, name: "Redirect", exact: true)), fn download ->
-        assert download.suggested_filename == "report.csv"
-        assert Download.read(download) == "id,total\n1,42\n"
+        assert download.suggested_filename == "marauders_map.csv"
+        assert Download.read(download) == "student,house\nHermione,Gryffindor\n"
       end)
       |> expect("Source" |> by_text() |> to_be_visible())
     end
@@ -101,10 +101,10 @@ defmodule Fluffy.Conformance.DownloadEventTest do
     test "size limits apply when reading, not when observing a download with #{driver}", %{driver: driver} do
       driver
       |> session()
-      |> expect_event(Event.download(), &click(&1, by_role(:link, name: "Report", exact: true)), fn download ->
-        assert download.suggested_filename == "report.csv"
+      |> expect_event(Event.download(), &click(&1, by_role(:link, name: "Marauder's Map", exact: true)), fn download ->
+        assert download.suggested_filename == "marauders_map.csv"
         assert_raise ExUnit.AssertionError, ~r/max_bytes/, fn -> Download.read(download, max_bytes: 1) end
-        assert Download.read(download) == "id,total\n1,42\n"
+        assert Download.read(download) == "student,house\nHermione,Gryffindor\n"
       end)
     end
 
@@ -113,14 +113,14 @@ defmodule Fluffy.Conformance.DownloadEventTest do
       session = session(driver)
       pending = wait_for(session, Event.download(), timeout: 0)
       assert_raise ExUnit.AssertionError, ~r/timeout/, fn -> await(pending) end
-      expect_event(session, Event.download(), &click(&1, by_role(:link, name: "Report", exact: true)))
+      expect_event(session, Event.download(), &click(&1, by_role(:link, name: "Marauder's Map", exact: true)))
     end
 
     @tag driver: driver
     test "a rejected download times out with #{driver}", %{driver: driver} do
       session = session(driver)
       pending = wait_for(session, Event.download(fn _ -> false end), timeout: 500)
-      click(session, by_role(:link, name: "Report", exact: true))
+      click(session, by_role(:link, name: "Marauder's Map", exact: true))
       assert_raise ExUnit.AssertionError, ~r/no matching download event/, fn -> await(pending) end
     end
 
@@ -128,7 +128,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
     test "downloads leave the source document intact without registrations with #{driver}", %{driver: driver} do
       driver
       |> session()
-      |> click(by_role(:link, name: "Report", exact: true))
+      |> click(by_role(:link, name: "Marauder's Map", exact: true))
       |> expect("Source" |> by_text() |> to_be_visible())
     end
   end
@@ -137,23 +137,23 @@ defmodule Fluffy.Conformance.DownloadEventTest do
   test "a Phoenix download is held in memory and has no file" do
     session = session(:phoenix)
     pending = wait_for(session, Event.download())
-    click(session, by_role(:link, name: "Report", exact: true))
+    click(session, by_role(:link, name: "Marauder's Map", exact: true))
     download = await(pending)
 
     error = assert_raise Fluffy.CapabilityError, fn -> Download.path(download) end
     assert error.capability == :download_path
-    assert Download.read(download) == "id,total\n1,42\n"
+    assert Download.read(download) == "student,house\nHermione,Gryffindor\n"
   end
 
   @tag driver: :playwright
   test "path returns the downloaded file" do
     session = session(:playwright)
     pending = wait_for(session, Event.download())
-    click(session, by_role(:link, name: "Report", exact: true))
+    click(session, by_role(:link, name: "Marauder's Map", exact: true))
     download = await(pending)
 
     path = Download.path(download)
-    assert File.read!(path) == "id,total\n1,42\n"
+    assert File.read!(path) == "student,house\nHermione,Gryffindor\n"
   end
 
   @tag driver: :playwright
@@ -162,7 +162,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
     |> session()
     |> expect_event(Event.download(), &click(&1, by_role(:link, name: "New tab", exact: true)), fn download ->
       assert %Fluffy.Page{} = Download.page(download)
-      assert Download.read(download) == "id,total\n1,42\n"
+      assert Download.read(download) == "student,house\nHermione,Gryffindor\n"
     end)
     |> expect("Source" |> by_text() |> to_be_visible())
   end
@@ -282,8 +282,8 @@ defmodule Fluffy.Conformance.DownloadEventTest do
             %{
               body: """
               <!doctype html><html><body><h1>Source</h1>
-              <a href="report">Report</a>
-              <a href="report" target="_blank">New tab</a>
+              <a href="marauders-map">Marauder's Map</a>
+              <a href="marauders-map" target="_blank">New tab</a>
               <a href="redirect">Redirect</a>
               <a href="raw" download="renamed.txt">Renamed</a>
               <a href="noise" download="noise.txt">Noise</a>
@@ -292,12 +292,12 @@ defmodule Fluffy.Conformance.DownloadEventTest do
             }
 
           "/redirect" ->
-            %{status: 302, headers: [{"location", "report"}], body: "redirect"}
+            %{status: 302, headers: [{"location", "marauders-map"}], body: "redirect"}
 
-          "/report" ->
+          "/marauders-map" ->
             %{
-              headers: [{"content-disposition", "attachment; filename=report.csv"}, {"content-type", "text/csv"}],
-              body: "id,total\n1,42\n"
+              headers: [{"content-disposition", "attachment; filename=marauders_map.csv"}, {"content-type", "text/csv"}],
+              body: "student,house\nHermione,Gryffindor\n"
             }
 
           "/raw" ->

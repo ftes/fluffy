@@ -49,7 +49,7 @@ defmodule Fluffy.Conformance.AssertAPITest do
           """
           <p id="visible">Saved</p>
           <p id="hidden" hidden>Hidden</p>
-          <input aria-label="Subscribe" type="checkbox" checked>
+          <input aria-label="Join the Quidditch team" type="checkbox" checked>
           """,
           base_url: Fluffy.TestServer.base_url()
         )
@@ -62,7 +62,7 @@ defmodule Fluffy.Conformance.AssertAPITest do
         |> assert_has(by_css("#visible"))
         |> refute_has(by_css("#hidden"))
         |> refute_has(by_css("#absent"), timeout: 20)
-        |> assert(checked(by_label("Subscribe")))
+        |> assert(checked(by_label("Join the Quidditch team")))
         |> refute(visible(by_css("#hidden")))
         |> refute(visible(by_css("#absent")))
         |> assert(count(by_css("#hidden"), 1))
@@ -113,10 +113,10 @@ defmodule Fluffy.Conformance.AssertAPITest do
   end
 
   test "refute preserves unsupported-operation errors" do
-    session = session_for_html(:static, ~s(<input type="checkbox" aria-label="Subscribe">))
+    session = session_for_html(:static, ~s(<input type="checkbox" aria-label="Join the Quidditch team">))
 
     assert_raise Fluffy.CapabilityError, fn ->
-      refute(session, checked(by_label("Subscribe"), indeterminate: true))
+      refute(session, checked(by_label("Join the Quidditch team"), indeterminate: true))
     end
   end
 end

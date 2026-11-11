@@ -16,25 +16,25 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
         TestHTTPFixtures.register(%{
           status: 200,
           headers: [{"x-fluffy-case", "direct-visit"}],
-          body: html("Dynamic order page")
+          body: html("Dynamic owl page")
         })
 
       session = start_test_session(driver)
 
       session =
         session
-        |> visit(TestHTTPFixtures.path(fixture, "/orders?state=open#summary"))
-        |> expect("Dynamic order page" |> by_text() |> to_be_visible())
-        |> expect(Fluffy.Expect.page_to_have_url(TestHTTPFixtures.url(fixture, "/orders?state=open#summary")))
-        |> expect(Fluffy.Expect.page_to_have_url(~r|/orders\?state=open#summary$|))
-        |> expect(not_(Fluffy.Expect.page_to_have_url(~r|/orders\?state=closed|)))
+        |> visit(TestHTTPFixtures.path(fixture, "/owls?state=open#summary"))
+        |> expect("Dynamic owl page" |> by_text() |> to_be_visible())
+        |> expect(Fluffy.Expect.page_to_have_url(TestHTTPFixtures.url(fixture, "/owls?state=open#summary")))
+        |> expect(Fluffy.Expect.page_to_have_url(~r|/owls\?state=open#summary$|))
+        |> expect(not_(Fluffy.Expect.page_to_have_url(~r|/owls\?state=closed|)))
 
       assert Session.current_page(session).url ==
-               TestHTTPFixtures.url(fixture, "/orders?state=open#summary")
+               TestHTTPFixtures.url(fixture, "/owls?state=open#summary")
 
       assert [request] = TestHTTPFixtures.requests(fixture)
       assert request.method == "GET"
-      assert request.path == "/orders"
+      assert request.path == "/owls"
       assert request.query == "state=open"
       assert request.body == ""
     end
@@ -108,7 +108,7 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
         fixture =
           TestHTTPFixtures.register_sequence([
             %{status: unquote(status)},
-            %{body: html("Orders")},
+            %{body: html("Owls")},
             %{status: unquote(status)}
           ])
 
@@ -116,33 +116,33 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
           driver |> start_test_session() |> visit(TestHTTPFixtures.path(fixture, "/empty"))
         end
 
-        session = driver |> start_test_session() |> visit(TestHTTPFixtures.path(fixture, "/orders"))
+        session = driver |> start_test_session() |> visit(TestHTTPFixtures.path(fixture, "/owls"))
 
         assert_raise navigation_error(driver), ~r/abort|interrupt/i, fn ->
           visit(session, TestHTTPFixtures.path(fixture, "/empty"))
         end
 
-        assert Enum.map(TestHTTPFixtures.requests(fixture), & &1.path) == ["/empty", "/orders", "/empty"]
+        assert Enum.map(TestHTTPFixtures.requests(fixture), & &1.path) == ["/empty", "/owls", "/empty"]
       end
 
       @tag driver: driver
       test "a failed visit keeps the cookies of its #{status} response with #{driver}", %{driver: driver} do
         fixture =
           TestHTTPFixtures.register_sequence([
-            %{body: html("Orders")},
+            %{body: html("Owls")},
             %{status: unquote(status), headers: [{"set-cookie", "seen=1; Path=/"}]},
-            %{body: html("Orders")}
+            %{body: html("Owls")}
           ])
 
-        session = driver |> start_test_session() |> visit(TestHTTPFixtures.path(fixture, "/orders"))
+        session = driver |> start_test_session() |> visit(TestHTTPFixtures.path(fixture, "/owls"))
 
         assert_raise navigation_error(driver), ~r/abort|interrupt/i, fn ->
           visit(session, TestHTTPFixtures.path(fixture, "/beacon"))
         end
 
-        visit(session, TestHTTPFixtures.path(fixture, "/orders"))
+        visit(session, TestHTTPFixtures.path(fixture, "/owls"))
 
-        assert [_orders, _beacon, %{headers: headers}] = TestHTTPFixtures.requests(fixture)
+        assert [_owls, _beacon, %{headers: headers}] = TestHTTPFixtures.requests(fixture)
         assert {"cookie", "seen=1"} in headers
       end
     end
