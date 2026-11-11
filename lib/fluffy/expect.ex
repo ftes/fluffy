@@ -12,7 +12,7 @@ defmodule Fluffy.Expect do
 
   Every constructor documents its options. `expect/3` accepts the shared timeout:
 
-  #{NimbleOptions.docs(Fluffy.Options.expectation_schema())}
+  #{NimbleOptions.docs(Fluffy.Options.timeout_schema())}
   """
   @moduledoc groups: ["Running expectations", "Locator assertions", "Page assertions", "Events"]
 
@@ -72,7 +72,7 @@ defmodule Fluffy.Expect do
           negated?: boolean()
         }
 
-  @type option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema()))
+  @type option :: unquote(NimbleOptions.option_typespec(Options.timeout_schema()))
   @type to_have_count_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_have_count)))
   @type to_be_visible_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_be_visible)))
   @type to_be_disabled_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_be_disabled)))

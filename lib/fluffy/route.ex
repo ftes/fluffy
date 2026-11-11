@@ -47,7 +47,7 @@ defmodule Fluffy.Route do
     {timeout, native} = Keyword.split(options, [:timeout])
 
     timeout =
-      for {:timeout, timeout} <- Fluffy.Options.validate_action!(timeout),
+      for {:timeout, timeout} <- Fluffy.Options.validate_timeout!(timeout),
           do: {:timeout, Fluffy.Deadline.playwright_operation!(:fetch, timeout)}
 
     PlaywrightEx.Route.fetch!(route.native, native ++ timeout)
