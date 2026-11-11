@@ -5,11 +5,13 @@ defmodule FluffyConsumerWeb.PageController do
     render(conn, :home)
   end
 
-  def complete(conn, _params) do
-    Plug.Conn.send_resp(conn, 200, "<!doctype html><h1>Consumer complete</h1>")
+  def hogwarts(conn, _params) do
+    Plug.Conn.send_resp(conn, 200, "<!doctype html><h1>Welcome to Hogwarts</h1>")
   end
 
-  def download(conn, _params) do
-    send_download(conn, {:binary, "id,total\n1,42\n"}, filename: "report.csv")
+  def marauders_map(conn, _params) do
+    send_download(conn, {:binary, "student,house\nHermione,Gryffindor\n"},
+      filename: "marauders_map.csv"
+    )
   end
 end

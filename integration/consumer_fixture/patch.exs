@@ -56,8 +56,8 @@ Igniter.new()
 |> Igniter.Libs.Phoenix.append_to_scope(
   "/",
   """
-  get "/complete", PageController, :complete
-  get "/download", PageController, :download
+  get "/hogwarts", PageController, :hogwarts
+  get "/marauders-map", PageController, :marauders_map
   """,
   router: FluffyConsumerWeb.Router,
   arg2: FluffyConsumerWeb,
