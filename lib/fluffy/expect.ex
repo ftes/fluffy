@@ -245,9 +245,8 @@ defmodule Fluffy.Expect do
   """
   @spec to_be_in_viewport(Locator.t(), [to_be_in_viewport_option()]) :: t()
   def to_be_in_viewport(%Locator{} = locator, options \\ []) do
-    options = Options.validate_expectation!(:to_be_in_viewport, options)
-    {matching, options} = Keyword.split(options, [:ratio])
-    Internal.new({:locator, locator}, :in_viewport, matching, options)
+    {timeout, matching} = Options.split_expectation!(:to_be_in_viewport, options)
+    Internal.new({:locator, locator}, :in_viewport, matching, timeout)
   end
 
   @doc group: "Locator assertions"
@@ -263,9 +262,8 @@ defmodule Fluffy.Expect do
   @spec to_have_css(Locator.t(), String.t(), text_expectation(), [to_have_css_option()]) :: t()
   def to_have_css(%Locator{} = locator, name, value, options \\ [])
       when is_binary(name) and (is_binary(value) or is_struct(value, Regex)) do
-    options = Options.validate_expectation!(:to_have_css, options)
-    {matching, options} = Keyword.split(options, [:pseudo])
-    Internal.new({:locator, locator}, :css, {name, value, matching}, options)
+    {timeout, matching} = Options.split_expectation!(:to_have_css, options)
+    Internal.new({:locator, locator}, :css, {name, value, matching}, timeout)
   end
 
   @doc group: "Locator assertions"
@@ -415,8 +413,8 @@ defmodule Fluffy.Expect do
     do: aria_snapshot_expectation(target, nil, options)
 
   defp aria_snapshot_expectation(target, expected, options) when is_binary(expected) or is_nil(expected) do
-    {file, options} = :to_match_aria_snapshot |> Options.validate_expectation!(options) |> Keyword.split([:path])
-    Internal.new(target, :aria_snapshot, {expected, file}, options)
+    {timeout, file} = Options.split_expectation!(:to_match_aria_snapshot, options)
+    Internal.new(target, :aria_snapshot, {expected, file}, timeout)
   end
 
   @doc group: "Locator assertions"
@@ -434,9 +432,9 @@ defmodule Fluffy.Expect do
   """
   @spec to_be_checked(Locator.t(), [to_be_checked_option()]) :: t()
   def to_be_checked(%Locator{} = locator, options \\ []) do
-    options = Options.validate_expectation!(:to_be_checked, options)
-    {checked, options} = Keyword.pop(options, :checked, :unset)
-    {indeterminate, options} = Keyword.pop(options, :indeterminate, :unset)
+    {timeout, state} = Options.split_expectation!(:to_be_checked, options)
+    checked = Keyword.get(state, :checked, :unset)
+    indeterminate = Keyword.get(state, :indeterminate, :unset)
 
     if indeterminate == true and checked != :unset do
       raise ArgumentError, "checked: and indeterminate: true cannot be used together"
@@ -449,7 +447,7 @@ defmodule Fluffy.Expect do
         true -> :checked
       end
 
-    Internal.new({:locator, locator}, :checked, expected, options)
+    Internal.new({:locator, locator}, :checked, expected, timeout)
   end
 
   @doc group: "Locator assertions"
@@ -545,9 +543,8 @@ defmodule Fluffy.Expect do
 
   def to_have_attribute(%Locator{} = locator, name, value, options)
       when is_binary(name) and (is_nil(value) or is_binary(value) or is_struct(value, Regex)) and is_list(options) do
-    options = Options.validate_expectation!(:to_have_attribute, options)
-    {matching, options} = Keyword.split(options, [:ignore_case])
-    Internal.new({:locator, locator}, :attribute, {name, value, matching}, options)
+    {timeout, matching} = Options.split_expectation!(:to_have_attribute, options)
+    Internal.new({:locator, locator}, :attribute, {name, value, matching}, timeout)
   end
 
   @doc group: "Locator assertions"
@@ -654,10 +651,9 @@ defmodule Fluffy.Expect do
 
   # `visible: false` and the like assert the opposite state, as in PlaywrightEx.
   defp state_expectation(matcher, locator, kind, options) do
-    options = Options.validate_expectation!(matcher, options)
-    {state, options} = Keyword.pop(options, kind, true)
-    expectation = Internal.new({:locator, locator}, kind, true, options)
-    if state, do: expectation, else: Internal.negate(expectation)
+    {timeout, state} = Options.split_expectation!(matcher, options)
+    expectation = Internal.new({:locator, locator}, kind, true, timeout)
+    if Keyword.get(state, kind, true), do: expectation, else: Internal.negate(expectation)
   end
 
   defp native_expectation(matcher, target, kind, expected, options),
@@ -665,9 +661,8 @@ defmodule Fluffy.Expect do
 
   # The options that select how text is read and compared travel with the expected value.
   defp text_expectation(matcher, locator, kind, expected, options) do
-    options = Options.validate_expectation!(matcher, options)
-    {matching, options} = Keyword.split(options, [:ignore_case, :use_inner_text])
-    Internal.new({:locator, locator}, kind, {text_values!(expected), matching}, options)
+    {timeout, matching} = Options.split_expectation!(matcher, options)
+    Internal.new({:locator, locator}, kind, {text_values!(expected), matching}, timeout)
   end
 
   defp text_values!(expected) when is_list(expected) do
@@ -732,16 +727,14 @@ defmodule Fluffy.Expect do
 
   def page_to_have_url(expected, options)
       when (is_binary(expected) or is_struct(expected, Regex) or is_function(expected, 1)) and is_list(options) do
-    options = Options.validate_expectation!(:page_to_have_url, options)
-    {ignore_case, options} = Keyword.pop(options, :ignore_case)
-    Internal.new(:page, :url, URLMatcher.ignore_case(expected, ignore_case), options)
+    {timeout, matching} = Options.split_expectation!(:page_to_have_url, options)
+    Internal.new(:page, :url, URLMatcher.ignore_case(expected, matching[:ignore_case]), timeout)
   end
 
   def page_to_have_url(components, options) when is_list(components) and is_list(options) do
-    options = Options.validate_expectation!(:page_to_have_url, options)
-    {ignore_case, options} = Keyword.pop(options, :ignore_case)
-    if ignore_case, do: raise(ArgumentError, "ignore_case: requires a string or regular expression URL")
-    Internal.new(:page, :url, URLMatcher.new!(components), options)
+    {timeout, matching} = Options.split_expectation!(:page_to_have_url, options)
+    if matching[:ignore_case], do: raise(ArgumentError, "ignore_case: requires a string or regular expression URL")
+    Internal.new(:page, :url, URLMatcher.new!(components), timeout)
   end
 
   @doc group: "Page assertions"
