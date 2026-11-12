@@ -633,12 +633,17 @@ defmodule Fluffy.Playwright do
       |> visit("/potions")
 
   As in PlaywrightEx, the handler runs in a process of its own, with this call's
-  process and its `$callers` in `$callers`, so the Ecto sandbox allows its queries.
-  Call it from the test, or from a process with the test in `$callers`. As in
-  PlaywrightEx, a handler that blocks on anything but Playwright, such as a
-  `receive`, stalls the browser connection: hand the route to another process
-  instead. When several routes match, the last registered wins; `fallback!/2`
-  hands the request to the one registered before it.
+  process and its `$callers` in `$callers`. Call it from the test, or from a process
+  with the test in `$callers`. Don't block in a route handler (`receive`,
+  `Process.sleep`, `GenServer` calls, database or Phoenix work); hand off to a `Task`
+  and fulfil from it. The `Task` inherits `$callers`, so the Ecto sandbox works there:
+
+      route(session, "**/owl-post/**", fn route ->
+        Task.start(fn -> Route.fulfill!(route, json: Owlery.letters_for("Harry")) end)
+      end)
+
+  When several routes match, the last registered wins; `fallback!/2` hands the
+  request to the one registered before it.
 
   As in Playwright, a handler that raises fails the test and leaves its request
   pending, and a request never answered hangs until the action waiting for it times

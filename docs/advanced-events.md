@@ -301,11 +301,18 @@ the page loads the fulfilled document and Fluffy keeps tracking it.
 
 As in PlaywrightEx, each handler runs in a process of its own, since the test
 process is blocked in the action that caused the request. That process has the
-process that called `Fluffy.Playwright.route/4` in `$callers`, so Ecto sandbox
-queries work there as in the test. A handler that blocks on anything but
-Playwright, such as a `receive`, stalls the browser connection, as blocking the
-event loop does in JS; hand the route on instead. Register routes from the test,
-or from a process with the test in `$callers`. As in Playwright, a handler that
+process that called `Fluffy.Playwright.route/4` in `$callers`. Don't block in a
+route handler (`receive`, `Process.sleep`, `GenServer` calls, database or Phoenix
+work); hand off to a `Task` and fulfil from it. The `Task` inherits `$callers`, so
+the Ecto sandbox works there:
+
+```elixir
+route(session, "**/owl-post/**", fn route ->
+  Task.start(fn -> Route.fulfill!(route, json: Owlery.letters_for("Harry")) end)
+end)
+```
+
+Register routes from the test, or from a process with the test in `$callers`. As in Playwright, a handler that
 raises fails the test and leaves its request pending. A route lasts until `unroute/3`,
 `unroute_all/2` or the session's end.
 

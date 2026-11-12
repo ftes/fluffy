@@ -65,7 +65,7 @@ start_session(:phoenix)
 
 - Register before the action. `pending = wait_for(session, Event.download())`, act, then `await(pending)`, once. In a pipeline, `assert_event(Event.download(), &click(&1, button), fn download -> ... end)`, or `expect_event` with `Fluffy.Expect`.
 - Downloads work on every driver: `Download.read/2`, `Download.save_as/2`. Other events require Playwright.
-- `Fluffy.Playwright.route/4` registers before the request and hands the handler a `PlaywrightEx.Route`. Answer once with `PlaywrightEx.Route.fulfill!/2`, `continue!/2`, `abort!/2` or `fallback!/2`; an unanswered request hangs until its action times out. Don't block in a handler (`receive`, `Process.sleep`): send the route to another process to answer later.
+- `Fluffy.Playwright.route/4` registers before the request and hands the handler a `PlaywrightEx.Route`. Answer once with `PlaywrightEx.Route.fulfill!/2`, `continue!/2`, `abort!/2` or `fallback!/2`; an unanswered request hangs until its action times out. Don't block in a route handler (`receive`, `Process.sleep`, `GenServer` calls, database or Phoenix work); hand off to a `Task` and fulfil from it: `fn route -> Task.start(fn -> Route.fulfill!(route, json: Owlery.letters_for("Harry")) end) end`. The `Task` inherits `$callers`, so the Ecto sandbox works there.
 - `&` captures cannot nest, not even `&fun/1` inside another capture. `&on(&1, Event.dialog(), &Dialog.accept!/1)` does not compile: bind `accept = &Dialog.accept!/1` first.
 
 ## Dropping to PlaywrightEx
