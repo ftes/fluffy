@@ -39,7 +39,7 @@ defmodule Fluffy.Expect.Internal do
       target: target,
       kind: kind,
       expected: expected,
-      options: validate_options!(options)
+      options: Options.validate_timeout!(options)
     }
   end
 
@@ -50,7 +50,7 @@ defmodule Fluffy.Expect.Internal do
 
   @doc "Merges validated shared options into `expectation`."
   def merge_options(%Expect{} = expectation, options) when is_list(options) do
-    %{expectation | options: Keyword.merge(expectation.options, validate_options!(options))}
+    %{expectation | options: Keyword.merge(expectation.options, Options.validate_timeout!(options))}
   end
 
   @doc "Describes `expectation` for failure messages."
@@ -59,8 +59,6 @@ defmodule Fluffy.Expect.Internal do
     |> positive_description()
     |> maybe_negated(expectation.negated?)
   end
-
-  defp validate_options!(options), do: Options.validate_expectation!(options)
 
   defp positive_description(%Expect{target: {:locator, locator}, kind: kind, expected: expected}) do
     "#{Locator.Internal.describe(locator)} #{locator_matcher_description(kind, expected)}"

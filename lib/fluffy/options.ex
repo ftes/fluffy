@@ -17,7 +17,7 @@ defmodule Fluffy.Options do
     ]
   ]
 
-  @action_schema NimbleOptions.new!(@timeout_options)
+  @timeout_schema NimbleOptions.new!(@timeout_options)
 
   # Calls that, as in Playwright, have no timeout: they wait while a script blocks the page.
   @untimed_schema NimbleOptions.new!([])
@@ -313,7 +313,6 @@ defmodule Fluffy.Options do
                            |> Enum.uniq()
 
   @playwright_option_keys @native_actions |> Enum.flat_map(fn {_, {_, _, _, keys}} -> keys end) |> Enum.uniq()
-  @expectation_schema NimbleOptions.new!(@timeout_options)
 
   @url_matcher_schema NimbleOptions.new!(
                         path: [
@@ -449,7 +448,7 @@ defmodule Fluffy.Options do
   def playwright_schema, do: @playwright_schema
 
   @doc false
-  def action_schema, do: @action_schema
+  def timeout_schema, do: @timeout_schema
 
   @doc false
   def action_schema(action), do: Map.fetch!(@action_schemas, action)
@@ -491,9 +490,6 @@ defmodule Fluffy.Options do
   def playwright_option_keys, do: @playwright_option_keys
 
   @doc false
-  def expectation_schema, do: @expectation_schema
-
-  @doc false
   def url_matcher_schema, do: @url_matcher_schema
 
   @doc false
@@ -511,8 +507,8 @@ defmodule Fluffy.Options do
   @doc false
   def filter_locator_schema, do: @filter_locator_schema
 
-  @spec validate_action!(keyword()) :: keyword()
-  def validate_action!(options), do: NimbleOptions.validate!(options, @action_schema)
+  @spec validate_timeout!(keyword()) :: keyword()
+  def validate_timeout!(options), do: NimbleOptions.validate!(options, @timeout_schema)
 
   @spec validate_action!(atom(), keyword()) :: keyword()
   def validate_action!(action, options), do: NimbleOptions.validate!(options, action_schema(action))
@@ -523,9 +519,6 @@ defmodule Fluffy.Options do
 
   @spec split_action!(atom(), keyword()) :: {keyword(), keyword()}
   def split_action!(action, options), do: Keyword.split(validate_action!(action, options), [:timeout])
-
-  @spec validate_expectation!(keyword()) :: keyword()
-  def validate_expectation!(options), do: NimbleOptions.validate!(options, @expectation_schema)
 
   @spec validate_expectation!(atom(), keyword()) :: keyword()
   def validate_expectation!(matcher, options), do: NimbleOptions.validate!(options, expectation_schema(matcher))

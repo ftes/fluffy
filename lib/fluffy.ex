@@ -19,7 +19,7 @@ defmodule Fluffy do
   Unless a function documents additional entries, action, assertion, reload,
   and event-wait option lists accept:
 
-  #{NimbleOptions.docs(Fluffy.Options.action_schema())}
+  #{NimbleOptions.docs(Fluffy.Options.timeout_schema())}
   """
   @moduledoc groups: [
                "Lifecycle and navigation",
@@ -78,7 +78,7 @@ defmodule Fluffy do
   #{NimbleOptions.docs(Fluffy.Options.session_schema())}
   """
   @type backend :: :phoenix | :playwright
-  @type action_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema()))
+  @type action_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.timeout_schema()))
   @type wait_for_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema(:wait_for)))
   @type click_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema(:click)))
   @type fill_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema(:fill)))
@@ -384,7 +384,7 @@ defmodule Fluffy do
   """
   @spec submit(Session.t(), Fluffy.Locator.t(), [action_option()]) :: Session.t()
   def submit(%Session{} = session, locator, options \\ []) do
-    options = Fluffy.Options.validate_action!(options)
+    options = Fluffy.Options.validate_timeout!(options)
     dispatch_driver(session, :submit, [locator, options])
   end
 
