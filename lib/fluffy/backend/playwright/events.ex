@@ -220,7 +220,10 @@ defmodule Fluffy.Backend.Playwright.Events do
     end
   end
 
-  defp handle!({:ok, nil}, _session), do: nil
-  defp handle!({:ok, id}, session), do: Page.new(session.runtime, id)
-  defp handle!({:error, message}, _session), do: raise(ArgumentError, message)
+  defp handle!(result, session) do
+    case SessionRuntime.value!(result) do
+      nil -> nil
+      id -> Page.new(session.runtime, id)
+    end
+  end
 end

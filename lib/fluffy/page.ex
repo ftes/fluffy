@@ -47,12 +47,7 @@ defmodule Fluffy.Page do
 
   @doc false
   @spec record(t()) :: map()
-  def record(%__MODULE__{runtime: runtime, id: id}) do
-    case SessionRuntime.page(runtime, id) do
-      {:ok, record} -> record
-      {:error, message} -> raise ArgumentError, message
-    end
-  end
+  def record(%__MODULE__{runtime: runtime, id: id}), do: SessionRuntime.value!(SessionRuntime.page(runtime, id))
 
   @doc false
   @spec ensure_session!(t()) :: :ok
@@ -63,12 +58,7 @@ defmodule Fluffy.Page do
 
   @doc false
   @spec context!(t()) :: map()
-  def context!(%__MODULE__{runtime: runtime}) do
-    case SessionRuntime.context(runtime) do
-      {:ok, context} -> context
-      {:error, message} -> raise ArgumentError, message
-    end
-  end
+  def context!(%__MODULE__{runtime: runtime}), do: SessionRuntime.value!(SessionRuntime.context(runtime))
 
   @doc false
   @spec snapshot(t()) :: map()

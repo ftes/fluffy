@@ -7,6 +7,8 @@ defmodule Fluffy.Session do
   when switching pages. Use each session sequentially from its owning test
   process; concurrent use of the same session is unsupported.
   """
+  import Fluffy.SessionRuntime, only: [value!: 1]
+
   alias Fluffy.Page
   alias Fluffy.SessionRuntime
 
@@ -79,10 +81,6 @@ defmodule Fluffy.Session do
   def activate_page(session, page) do
     %{session | active_page: value!(SessionRuntime.resolve(session.runtime, page))}
   end
-
-  defp value!({:ok, value}), do: value
-  defp value!(:ok), do: :ok
-  defp value!({:error, message}), do: raise(ArgumentError, message)
 
   defp start_runtime do
     case Fluffy.TestScope.current() do
