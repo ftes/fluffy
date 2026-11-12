@@ -234,7 +234,7 @@ defmodule Fluffy.ClientDOM do
   def fill(%__MODULE__{} = client_dom, %Locator{} = locator, value, driver, action \\ :fill) when is_binary(value) do
     target = target!(client_dom, locator)
     ensure_target_enabled!(client_dom, target, action, locator)
-    Actionability.ensure_editable!(target.element, action, locator)
+    ensure_target_editable!(client_dom, target, action, locator)
 
     if target.tag not in ["input", "textarea"] do
       raise Fluffy.CapabilityError,
@@ -353,17 +353,13 @@ defmodule Fluffy.ClientDOM do
     {%{client_dom | properties: properties}, target}
   end
 
+  # Playwright's checked state, which raises for an element without one.
   def checked?(%__MODULE__{} = client_dom, %Locator{} = locator) do
-    target = target!(client_dom, locator)
+    target = state_target(client_dom, target!(client_dom, locator))
 
-    case input_type(target) do
-      type when type in ["checkbox", "radio"] ->
-        client_dom.properties
-        |> Map.get(target.id, %{})
-        |> Map.get(:checked, has_attribute?(target.attributes, "checked"))
-
-      _other ->
-        false
+    case Aria.checked(aria(client_dom), target, checked_target?(client_dom, target)) do
+      :error -> raise Fluffy.ActionabilityError, action: :read_checked, reason: :not_checkbox_or_radio, locator: locator
+      checked -> checked
     end
   end
 
@@ -395,7 +391,9 @@ defmodule Fluffy.ClientDOM do
     target_disabled?(client_dom, state_target(client_dom, target!(client_dom, locator)))
   end
 
-  defp target_disabled?(client_dom, target), do: Aria.aria_disabled?(Aria.for_document(client_dom.document), target)
+  defp target_disabled?(client_dom, target), do: Aria.aria_disabled?(aria(client_dom), target)
+
+  defp aria(client_dom), do: Aria.for_document(client_dom.document)
 
   # Like Playwright, an element other than a form control takes its enabled
   # state from the closest button, so text inside a disabled button is disabled.
@@ -404,15 +402,24 @@ defmodule Fluffy.ClientDOM do
   defp state_target(_client_dom, %Target{tag: tag} = target) when tag in ["input", "textarea", "select"], do: target
 
   defp state_target(client_dom, target) do
-    closest(client_dom, target, fn %{tag: tag, attributes: attributes} ->
-      tag == "button" or attribute(attributes, "role") in ["button", "checkbox", "radio"]
-    end) || target
+    if Aria.content_editable?(aria(client_dom), target) do
+      target
+    else
+      closest(client_dom, target, fn %{tag: tag, attributes: attributes} ->
+        tag == "button" or attribute(attributes, "role") in ["button", "checkbox", "radio"]
+      end) || target
+    end
   end
 
+  # Playwright's editable state, which raises for an element without a readonly state.
   @doc false
   def editable?(%__MODULE__{} = client_dom, %Locator{} = locator) do
-    target = target!(client_dom, locator)
-    not target_disabled?(client_dom, target) and Actionability.editable?(target.element)
+    target = state_target(client_dom, target!(client_dom, locator))
+
+    case Aria.readonly(aria(client_dom), target) do
+      :error -> raise Fluffy.ActionabilityError, action: :read_editable, reason: :no_readonly_state, locator: locator
+      readonly -> not readonly and not target_disabled?(client_dom, target)
+    end
   end
 
   @doc false
@@ -799,6 +806,20 @@ defmodule Fluffy.ClientDOM do
 
   defp checked_action(true), do: :check
   defp checked_action(false), do: :uncheck
+
+  # Playwright's editable state, then fill's own check of the element.
+  defp ensure_target_editable!(client_dom, target, action, locator) do
+    case Aria.readonly(aria(client_dom), target) do
+      :error ->
+        raise Fluffy.ActionabilityError, action: action, reason: :not_editable, locator: locator
+
+      true ->
+        raise Fluffy.ActionabilityError, action: action, reason: :readonly, locator: locator
+
+      false ->
+        Actionability.ensure_fillable!(target.element, Aria.content_editable?(aria(client_dom), target), action, locator)
+    end
+  end
 
   defp ensure_target_enabled!(client_dom, target, action, locator) do
     if target_disabled?(client_dom, target) do

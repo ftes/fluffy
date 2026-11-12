@@ -448,6 +448,57 @@ defmodule Fluffy.HTML.Aria do
     end
   end
 
+  @aria_checked_roles ~w(checkbox menuitemcheckbox option radio switch menuitemradio treeitem)
+
+  # roleUtils.ts getCheckedWithoutMixed, given the input's checkedness. The mixed
+  # variant stays browser-only: an input's indeterminate is a property only
+  # JavaScript sets.
+  def checked(%__MODULE__{} = aria, node, input_checked?) do
+    node = fetch(aria, node.id)
+
+    cond do
+      node.tag == "input" and Semantics.input_type(node) in ["checkbox", "radio"] -> input_checked?
+      role(aria, node) in @aria_checked_roles -> String.downcase(text_attribute(node, "aria-checked")) == "true"
+      true -> :error
+    end
+  end
+
+  @aria_readonly_roles ~w(
+    checkbox combobox grid gridcell listbox radiogroup slider spinbutton textbox columnheader rowheader
+    searchbox switch treegrid
+  )
+
+  # roleUtils.ts getReadonly.
+  def readonly(%__MODULE__{} = aria, node) do
+    node = fetch(aria, node.id)
+
+    cond do
+      node.tag in ["input", "textarea", "select"] -> attribute?(node, "readonly")
+      role(aria, node) in @aria_readonly_roles -> String.downcase(text_attribute(node, "aria-readonly")) == "true"
+      content_editable?(aria, node) -> false
+      true -> :error
+    end
+  end
+
+  # HTMLElement.isContentEditable: the closest valid contenteditable decides.
+  def content_editable?(%__MODULE__{} = aria, node), do: inherited_content_editable?(aria, fetch(aria, node.id))
+
+  defp inherited_content_editable?(_aria, nil), do: false
+
+  defp inherited_content_editable?(aria, node) do
+    case attribute(node, "contenteditable") do
+      nil ->
+        inherited_content_editable?(aria, parent(aria, node))
+
+      value ->
+        case String.downcase(value) do
+          value when value in ["", "true", "plaintext-only"] -> true
+          "false" -> false
+          _invalid -> inherited_content_editable?(aria, parent(aria, node))
+        end
+    end
+  end
+
   defp explicit_aria_disabled?(aria, node) do
     role(aria, node) in @aria_disabled_roles and aria_disabled_in_chain?(aria, node)
   end

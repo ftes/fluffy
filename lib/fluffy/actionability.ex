@@ -1,7 +1,7 @@
 defmodule Fluffy.Actionability do
   @moduledoc false
 
-  import Fluffy.HTML.Semantics, only: [attribute: 2, input_type: 1]
+  import Fluffy.HTML.Semantics, only: [input_type: 1]
 
   @fillable_input_types [
     "color",
@@ -29,26 +29,16 @@ defmodule Fluffy.Actionability do
     :ok
   end
 
-  @doc false
-  def editable?(element) do
+  # Fill's own check, after the editable state: an input it can type into, a
+  # textarea, or contenteditable.
+  def ensure_fillable!(element, content_editable?, action, locator) do
     {tag, attributes} = element_info(element)
 
-    editable_text_control?(tag, attributes) or contenteditable?(attributes)
-  end
-
-  def ensure_editable!(element, action, locator) do
-    {tag, attributes} = element_info(element)
-
-    cond do
-      text_control?(tag, attributes) ->
-        if readonly?(attributes), do: raise_error(action, :readonly, locator), else: :ok
-
-      contenteditable?(attributes) ->
-        :ok
-
-      true ->
-        raise_error(action, :not_editable, locator)
+    if not text_control?(tag, attributes) and not content_editable? do
+      raise_error(action, :not_editable, locator)
     end
+
+    :ok
   end
 
   def ensure_checkable!(element, action, locator) do
@@ -97,28 +87,12 @@ defmodule Fluffy.Actionability do
     end
   end
 
-  defp readonly?(attributes) do
-    List.keymember?(attributes, "readonly", 0)
-  end
-
-  defp editable_text_control?(tag, attributes) do
-    text_control?(tag, attributes) and not readonly?(attributes)
-  end
-
   defp text_control?("textarea", _attributes), do: true
 
   defp text_control?("input", attributes),
     do: input_type(%{tag: "input", attributes: attributes}) in @fillable_input_types
 
   defp text_control?(_tag, _attributes), do: false
-
-  defp contenteditable?(attributes) do
-    attributes |> attribute("contenteditable") |> contenteditable_value?()
-  end
-
-  defp contenteditable_value?(nil), do: false
-  defp contenteditable_value?(""), do: true
-  defp contenteditable_value?(value), do: String.downcase(value) in ["true", "plaintext-only"]
 
   defp raise_error(action, reason, locator) do
     raise Fluffy.ActionabilityError,

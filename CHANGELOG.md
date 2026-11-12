@@ -27,6 +27,7 @@ Upgrading from 0.8? The [upgrade guide](docs/upgrading.md) lists the net changes
 
 ### Fixed
 
+- Static and LiveView compute `to_be_editable` and `to_be_checked` with Playwright's `getReadonly` and `getChecked`: checkable roles read `aria-checked`, textbox-like roles `aria-readonly`, any `input` or `select` is editable unless `readonly`, `contenteditable` is inherited, and an element with no such state raises, as in Playwright, instead of reading false.
 - Static and LiveView compute disabled state with Playwright's `getAriaDisabled`: `aria-disabled` disables descendants too, but only elements whose role takes it, and `select_option` rejects an `aria-disabled` option.
 - Static and LiveView find `by_label` controls with Playwright's `getElementLabels`: a blank `aria-label` or an `aria-labelledby` without a valid reference falls back to the next source, and duplicate ids resolve to the first element.
 - Phoenix requests no longer carry the sandbox header, as with `Phoenix.ConnTest`: they and in-process LiveViews already use the test's connection through `$callers`. The endpoint's sandbox plug ran the allowance in the test process, so it set `trap_exit` there and a custom allowance calling `Mox.allow/3` raised because owner and child were the same.
