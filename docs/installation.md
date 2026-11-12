@@ -132,7 +132,7 @@ call `PlaywrightEx.Test.record_artifacts/2` in its setup, before its first sessi
 
 As in Playwright, browser `console` messages and uncaught page errors are not
 printed; the trace has them. To log them, register a listener, such as
-`on(session, Event.console(), &Logger.info(&1.text))`.
+`on(session, Event.console(), &Logger.info(PlaywrightEx.ConsoleMessage.text(&1)))`.
 
 Set `browser_name: :firefox` or `browser_name: :webkit` after installing the
 corresponding browser (`mix playwright_ex.install -- firefox`).

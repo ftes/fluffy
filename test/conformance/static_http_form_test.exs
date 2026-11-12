@@ -752,8 +752,8 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
   # Dismissing the prompt cancels the navigation; accepting it lets it go on.
   # Filling the field gives the page the user activation the prompt requires.
   for {outcome, handle, heading, requests} <- [
-        {"dismissed", &Fluffy.Dialog.dismiss/1, "Draft", 1},
-        {"accepted", &Fluffy.Dialog.accept/1, "Saved", 2}
+        {"dismissed", &PlaywrightEx.Dialog.dismiss!/1, "Draft", 1},
+        {"accepted", &PlaywrightEx.Dialog.accept!/1, "Saved", 2}
       ] do
     @tag driver: :playwright
     test "Playwright submit returns when a beforeunload prompt is #{outcome}" do

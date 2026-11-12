@@ -236,8 +236,8 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
     |> start_test_session()
     |> visit(TestHTTPFixtures.path(fixture, "/links/start"))
     |> once(Event.dialog(), fn dialog ->
-      assert dialog.message == "Delete?\nThis cannot be undone."
-      Fluffy.Dialog.accept(dialog)
+      assert PlaywrightEx.Dialog.message(dialog) == "Delete?\nThis cannot be undone."
+      PlaywrightEx.Dialog.accept!(dialog)
     end)
     |> expect_event(Event.dialog(), &click(&1, by_text("Delete with confirmation", exact: true)))
     |> expect(:heading |> by_role(name: "Deleted after confirmation", exact: true) |> to_be_visible())
@@ -266,7 +266,7 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
     :playwright
     |> start_test_session()
     |> visit(TestHTTPFixtures.path(fixture, "/links/start"))
-    |> once(Event.dialog(), &Fluffy.Dialog.dismiss/1)
+    |> once(Event.dialog(), &PlaywrightEx.Dialog.dismiss!/1)
     |> expect_event(Event.dialog(), &click(&1, by_text("Delete with confirmation", exact: true)))
     |> expect(Fluffy.Expect.page_to_have_url(source_url))
     |> expect(:heading |> by_role(name: "Before confirmation", exact: true) |> to_be_visible())

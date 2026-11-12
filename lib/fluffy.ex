@@ -35,33 +35,10 @@ defmodule Fluffy do
   alias Fluffy.SelectedFile
   alias Fluffy.Session
 
-  @native_values [
-    Fluffy.Request,
-    Fluffy.Response,
-    Fluffy.Route,
-    Fluffy.Dialog,
-    Fluffy.Download,
-    Fluffy.FileChooser,
-    Fluffy.Frame,
-    Fluffy.ConsoleMessage,
-    Fluffy.PageError,
-    Fluffy.Worker,
-    Fluffy.WebSocket
-  ]
+  @native_values [Fluffy.Route, Fluffy.Download, Fluffy.FileChooser]
 
   @typedoc "A browser value that `unwrap_and_return/2` resolves to its PlaywrightEx counterpart."
-  @type native_value ::
-          Fluffy.Request.t()
-          | Fluffy.Route.t()
-          | Fluffy.Response.t()
-          | Fluffy.Dialog.t()
-          | Fluffy.Download.t()
-          | Fluffy.FileChooser.t()
-          | Fluffy.Frame.t()
-          | Fluffy.ConsoleMessage.t()
-          | Fluffy.PageError.t()
-          | Fluffy.Worker.t()
-          | Fluffy.WebSocket.t()
+  @type native_value :: Fluffy.Route.t() | Fluffy.Download.t() | Fluffy.FileChooser.t()
 
   @doc group: "Lifecycle and navigation"
   @doc """
@@ -182,7 +159,7 @@ defmodule Fluffy do
   receive the `PlaywrightEx.Page`. Successful LiveView and Playwright callback
   return values are ignored; `unwrap_and_return/2` returns the callback's
   result instead of the session. `Fluffy.Playwright.unwrap/3` passes a native
-  locator instead. For a native value such as a `Fluffy.Response`, use
+  locator instead. For the native value of a `Fluffy.Download`, use
   `unwrap_and_return/2`.
 
   Native operations are not cross-driver compatible. Prefer the shared
@@ -216,13 +193,11 @@ defmodule Fluffy do
   page stays as it is. `Fluffy.Playwright.unwrap_and_return/3` passes a native
   locator instead.
 
-  With a `Fluffy.Request`, `Fluffy.Response`, `Fluffy.Route`, `Fluffy.Dialog`,
-  `Fluffy.Download`, `Fluffy.FileChooser`, `Fluffy.Frame`,
-  `Fluffy.ConsoleMessage`, `Fluffy.PageError`, `Fluffy.Worker` or
-  `Fluffy.WebSocket`, `fun` receives its PlaywrightEx counterpart.
-  A Phoenix download has none and raises `Fluffy.CapabilityError`.
+  With a `Fluffy.Route`, `Fluffy.Download` or `Fluffy.FileChooser`, `fun` receives its
+  PlaywrightEx counterpart. A Phoenix download has none and raises `Fluffy.CapabilityError`.
+  Other events deliver PlaywrightEx's values themselves.
 
-      address = unwrap_and_return(response, &PlaywrightEx.Response.server_addr!/1)
+      path = unwrap_and_return(download, &PlaywrightEx.Download.path!/1)
   """
   @spec unwrap_and_return(Session.t(), (term() -> result)) :: result when result: term()
   @spec unwrap_and_return(native_value(), (term() -> result)) :: result when result: term()
@@ -239,8 +214,6 @@ defmodule Fluffy do
       detail: "a Phoenix download has no native counterpart"
   end
 
-  defp native!(%Fluffy.Frame{} = frame), do: Fluffy.Frame.native!(frame)
-
   # A value such as a download outlives its page but not its session.
   defp native!(%{native: native} = value) when is_struct(native) do
     if page = owner_page(value), do: Fluffy.Page.ensure_session!(page)
@@ -249,10 +222,8 @@ defmodule Fluffy do
 
   defp native!(value), do: raise(ArgumentError, "#{inspect(value.__struct__)} has no native counterpart")
 
-  # A popup's initial request may have no page to check.
-  defp owner_page(%Fluffy.Response{request: request}), do: request.page
-  defp owner_page(%Fluffy.Route{request: request}), do: request.page
   defp owner_page(%{page: page}), do: page
+  defp owner_page(_value), do: nil
 
   @doc group: "Events"
   @doc """

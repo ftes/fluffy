@@ -66,7 +66,7 @@ start_session(:phoenix)
 - Register before the action. `pending = wait_for(session, Event.download())`, act, then `await(pending)`, once. In a pipeline, `assert_event(Event.download(), &click(&1, button), fn download -> ... end)`, or `expect_event` with `Fluffy.Expect`.
 - Downloads work on every driver: `Download.read/2`, `Download.save_as/2`. Other events require Playwright.
 - `Fluffy.Playwright.route/4` registers before the request and hands the handler a `Fluffy.Route`. Answer once with `Route.fulfill/2`, `continue/2`, `abort/2` or `fallback/2`; an unanswered request hangs until its action times out.
-- `&` captures cannot nest, not even `&fun/1` inside another capture. `&on(&1, Event.dialog(), &Dialog.accept/1)` does not compile: bind `accept = &Dialog.accept/1` first.
+- `&` captures cannot nest, not even `&fun/1` inside another capture. `&on(&1, Event.dialog(), &Dialog.accept!/1)` does not compile: bind `accept = &Dialog.accept!/1` first.
 
 ## Dropping to PlaywrightEx
 
@@ -74,7 +74,7 @@ Prefer the shared API. For what it does not cover:
 
 - `Fluffy.unwrap(session, fun)` passes a `%Plug.Conn{}` (Static, return the updated conn), `%Phoenix.LiveViewTest.View{}` (LiveView) or `%PlaywrightEx.Page{}` (Playwright), and returns the session. It raises on a Phoenix session before its first visit.
 - `Fluffy.Playwright.unwrap(session, locator, fun)` passes the `%PlaywrightEx.Locator{}` for a Fluffy locator, resolved in the active page and through frame locators. A navigation it causes is adopted. It raises `Fluffy.CapabilityError` on Phoenix.
-- `unwrap_and_return(response, &PlaywrightEx.Response.server_addr!/1)` reaches an event value's native counterpart and returns the callback's result.
+- Events other than page events, downloads and file choosers deliver PlaywrightEx's values, as in Playwright: read a response with `PlaywrightEx.Response.status/1`, accept a dialog with `PlaywrightEx.Dialog.accept!/1`. `Fluffy.Playwright.page(session, native_page)` turns their page into a `Fluffy.Page` for `switch_page`.
 - Use bang functions inside the callback so failures stop the test.
 - Do not natively close the page or context, call `remove_all_listeners`, `set_default_timeout`, `set_default_navigation_timeout` or `set_content`, stop tracing, or pass `no_wait_after:` or `signal:`. Those break Fluffy's tracking.
 - In a LiveView callback, do not consume `assert_patch` or `assert_redirect`; assert the resulting page after `unwrap`.

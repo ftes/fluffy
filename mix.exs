@@ -127,17 +127,9 @@ defmodule Fluffy.MixProject do
           Fluffy.Session,
           Fluffy.PhoenixTest.Session,
           Fluffy.Download,
-          Fluffy.Dialog,
           Fluffy.FileChooser,
           Fluffy.FilePayload,
-          Fluffy.Request,
-          Fluffy.Response,
-          Fluffy.Route,
-          Fluffy.Frame,
-          Fluffy.ConsoleMessage,
-          Fluffy.PageError,
-          Fluffy.Worker,
-          Fluffy.WebSocket
+          Fluffy.Route
         ],
         "Capabilities and errors": [
           Fluffy.Capability,

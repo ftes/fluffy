@@ -10,6 +10,19 @@ defmodule Fluffy.Conformance.PageEventTest do
   alias Fluffy.Page
   alias Fluffy.TestHTTPFixtures
 
+  @tag driver: :playwright
+  test "page/2 turns a PlaywrightEx page of the session into its handle, and rejects another context's" do
+    session = session_for_html(:playwright, "<h1>Main</h1>")
+    other = new_page(session)
+    native = unwrap_and_return(switch_page(session, other), & &1)
+    assert page(session, native) == other
+    assert session |> switch_page(page(session, native)) |> current_page() == other
+
+    elsewhere = session_for_html(:playwright, "<h1>Elsewhere</h1>")
+    native = unwrap_and_return(elsewhere, & &1)
+    assert_raise ArgumentError, ~r/another browser context/, fn -> page(session, native) end
+  end
+
   for event_type <- [:page, :popup] do
     @tag driver: :playwright
     test "#{event_type} remains bound to its registration source after switching pages" do

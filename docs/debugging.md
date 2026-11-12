@@ -123,7 +123,7 @@ session
 |> assert(visible(by_label("Name")))
 ```
 
-Event values such as `Fluffy.Response` reach their PlaywrightEx counterpart through
-`Fluffy.unwrap_and_return/2`; see [Native values](advanced-events.md#native-values). See
+A `Fluffy.Download`, `Fluffy.FileChooser` or `Fluffy.Route` reaches its PlaywrightEx
+counterpart through `Fluffy.unwrap_and_return/2`; see [Native values](advanced-events.md#native-values). See
 [PlaywrightEx coverage](capabilities.md#playwrightex-coverage) for which native
 calls are safe.

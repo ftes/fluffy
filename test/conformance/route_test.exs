@@ -31,9 +31,9 @@ defmodule Fluffy.Conformance.RouteTest do
                url(fixture, "/api")
              ) == [201, "yes", %{"name" => "routed"}]
 
-      assert_receive {:request, %Fluffy.Request{method: "POST", post_data: "payload"} = request}
-      assert request.url == url(fixture, "/api")
-      assert request.page == current_page(session)
+      assert_receive {:request, %PlaywrightEx.Request{} = request}
+      assert {PlaywrightEx.Request.method(request), PlaywrightEx.Request.post_data(request)} == {"POST", "payload"}
+      assert PlaywrightEx.Request.url(request) == url(fixture, "/api")
       assert fixture |> TestHTTPFixtures.requests() |> Enum.count(&(&1.path == "/api")) == 0
     end
 
@@ -42,7 +42,7 @@ defmodule Fluffy.Conformance.RouteTest do
       {session, fixture} = session()
 
       route(session, "**/api", fn route ->
-        Route.continue(route, headers: Map.put(route.request.headers, "x-fluffy-routed", "yes"))
+        Route.continue(route, headers: Map.put(PlaywrightEx.Request.headers(route.request), "x-fluffy-routed", "yes"))
       end)
 
       assert fetch(session, fixture) == ~s({"name":"server"})
@@ -143,12 +143,12 @@ defmodule Fluffy.Conformance.RouteTest do
       owner = self()
 
       route(session, "**/api", fn route ->
-        send(owner, {:first, route.request.headers["x-fallback"]})
+        send(owner, {:first, PlaywrightEx.Request.headers(route.request)["x-fallback"]})
         Route.fulfill(route, body: "first")
       end)
 
       route(session, "**/api", fn route ->
-        Route.fallback(route, headers: Map.put(route.request.headers, "x-fallback", "yes"))
+        Route.fallback(route, headers: Map.put(PlaywrightEx.Request.headers(route.request), "x-fallback", "yes"))
       end)
 
       assert fetch(session, fixture) == "first"

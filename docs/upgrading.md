@@ -37,7 +37,7 @@ matched once can now match twice.
   longer part of accessible names.
 - Browser console messages are no longer logged, as in Playwright, and `js_logger:`,
   custom loggers and `Fluffy.Playwright.ConsoleLogger` are gone. To log them, register
-  a listener: `on(session, Event.console(), &Logger.info(&1.text))`.
+  a listener: `on(session, Event.console(), &Logger.info(PlaywrightEx.ConsoleMessage.text(&1)))`.
 - Playwright sessions use Playwright's `en-US` locale instead of `en`; set
   `browser_context: [locale: "en"]` to keep it.
 - Browser launch gets Playwright's 3-minute default instead of `timeout:`. A
@@ -73,10 +73,14 @@ Timeouts follow Elixir: `0` checks once and `:infinity` means no limit; see
 - `Fluffy.Playwright.cookies(session, urls)` takes the URL list. Cookie maps use
   Playwright's camelCase keys (`httpOnly:`, `sameSite:`, `partitionKey:`), and
   `storage_state/2` returns atom keys: `state["cookies"]` becomes `state.cookies`.
-- `Fluffy.HTTPEvent` is replaced by `Fluffy.Request` and `Fluffy.Response`, whose
-  `request` field is the request.
+- `Fluffy.HTTPEvent` is gone: request and response events deliver a
+  `PlaywrightEx.Request` and `PlaywrightEx.Response`, as do the other browser events
+  (dialog, console, page error, frame, worker and WebSocket) their PlaywrightEx values,
+  as in Playwright. Read them with PlaywrightEx's functions, such as
+  `PlaywrightEx.Response.status/1` and `PlaywrightEx.Dialog.accept!/1`, and turn their
+  page into a `Fluffy.Page` with `Fluffy.Playwright.page/2`.
 - `Fluffy.Download`'s `read!` and `save_as!` are `read` and `save_as`. Only the
-  documented fields of `Fluffy.Download` and `Fluffy.Dialog` remain public.
+  documented fields of `Fluffy.Download` remain public.
 - `page_status`, `page_to_have_status` and `Fluffy.Page.status` are removed, as in
   Playwright; on Playwright, assert on `Fluffy.Event.response/1` instead.
 - Configure the browser with `config :playwright_ex, :test, browser_name: ..., launch_options:

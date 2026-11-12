@@ -6,9 +6,9 @@ defmodule Fluffy.Conformance.DialogEventTest do
   import Fluffy.Locator
   import Fluffy.Playwright
 
-  alias Fluffy.Dialog
   alias Fluffy.Event
   alias Fluffy.Playwright
+  alias PlaywrightEx.Dialog
 
   @tag driver: :playwright
   test "a one-shot handler asserts metadata and accepts while a separate wait requires the dialog" do
@@ -16,13 +16,14 @@ defmodule Fluffy.Conformance.DialogEventTest do
 
     session
     |> once(Event.dialog(), fn dialog ->
-      assert dialog.type == :confirm
-      assert dialog.message == "Proceed?"
-      assert dialog.default_value == ""
-      Dialog.accept(dialog)
+      assert Dialog.type(dialog) == "confirm"
+      assert Dialog.message(dialog) == "Proceed?"
+      assert Dialog.default_value(dialog) == ""
+      Dialog.accept!(dialog)
     end)
     |> expect_event(Event.dialog(), &click(&1, by_role(:button, name: "Confirm")), fn dialog ->
-      assert %Dialog{type: :confirm, message: "Proceed?"} = dialog
+      assert %Dialog{} = dialog
+      assert Dialog.message(dialog) == "Proceed?"
     end)
     |> expect("accepted" |> by_text(exact: true) |> to_be_visible())
     |> click(by_role(:button, name: "Confirm"))
@@ -31,7 +32,7 @@ defmodule Fluffy.Conformance.DialogEventTest do
 
   @tag driver: :playwright
   test "persistent catch-all handling and explicit removal restore automatic dismissal" do
-    accept = &Dialog.accept/1
+    accept = &Dialog.accept!/1
 
     session()
     |> on(Event.dialog(), accept)
@@ -45,32 +46,22 @@ defmodule Fluffy.Conformance.DialogEventTest do
   end
 
   @tag driver: :playwright
-  test "a dialog knows its page and unwraps to the native dialog" do
+  test "a dialog's page becomes a Fluffy page with page/2" do
     session = session()
     pending = wait_for(session, Event.dialog())
-    owner = self()
-
-    once(session, Event.dialog(), fn dialog ->
-      send(owner, {:native_type, unwrap_and_return(dialog, &PlaywrightEx.Dialog.type/1)})
-      Dialog.dismiss(dialog)
-    end)
+    once(session, Event.dialog(), &Dialog.dismiss!/1)
 
     click(session, by_role(:button, name: "Confirm"))
     dialog = await(pending)
 
-    assert Dialog.page(dialog) == current_page(session)
-    assert dialog.page == current_page(session)
-    assert_receive {:native_type, "confirm"}
+    assert page(session, Dialog.page(dialog)) == current_page(session)
     expect(session, "dismissed" |> by_text(exact: true) |> to_be_visible())
-
-    close_session(session)
-    assert_raise ArgumentError, ~r/session is closed/, fn -> unwrap_and_return(dialog, & &1) end
   end
 
   @tag driver: :playwright
   test "dismisses a dialog explicitly" do
     session()
-    |> once(Event.dialog(), &Dialog.dismiss/1)
+    |> once(Event.dialog(), &Dialog.dismiss!/1)
     |> expect_event(Event.dialog(), &click(&1, by_role(:button, name: "Confirm")))
     |> expect("dismissed" |> by_text(exact: true) |> to_be_visible())
   end
@@ -79,10 +70,10 @@ defmodule Fluffy.Conformance.DialogEventTest do
   test "supplies prompt text after asserting its default value" do
     session()
     |> once(Event.dialog(), fn dialog ->
-      assert dialog.type == :prompt
-      assert dialog.message == "Your name?"
-      assert dialog.default_value == "Anonymous"
-      Dialog.accept(dialog, "Fluffy")
+      assert Dialog.type(dialog) == "prompt"
+      assert Dialog.message(dialog) == "Your name?"
+      assert Dialog.default_value(dialog) == "Anonymous"
+      Dialog.accept!(dialog, "Fluffy")
     end)
     |> expect_event(Event.dialog(), &click(&1, by_role(:button, name: "Prompt")))
     |> expect("Fluffy" |> by_text(exact: true) |> to_be_visible())
@@ -97,7 +88,7 @@ defmodule Fluffy.Conformance.DialogEventTest do
     # Schedule outside the evaluated call so the test can inspect the unresolved dialog.
     Playwright.evaluate(session, "setTimeout(() => { window.dialogResult = confirm('Proceed?') }, 0); true")
     dialog = await(pending)
-    assert Dialog.accept(dialog) == :ok
+    assert Dialog.accept!(dialog) == :ok
     assert Playwright.evaluate(session, "window.dialogResult") == true
     off(session, Event.dialog(), handler)
   end
@@ -105,7 +96,7 @@ defmodule Fluffy.Conformance.DialogEventTest do
   @tag driver: :playwright
   test "two observers and one handler receive the same dialog" do
     session = session()
-    once(session, Event.dialog(), &Dialog.accept/1)
+    once(session, Event.dialog(), &Dialog.accept!/1)
     first = wait_for(session, Event.dialog())
     second = wait_for(session, Event.dialog())
     click(session, by_role(:button, name: "Confirm"))
@@ -115,7 +106,7 @@ defmodule Fluffy.Conformance.DialogEventTest do
   @tag driver: :playwright
   test "dialog listeners stay bound to their original page" do
     original = session()
-    handler = &Dialog.accept/1
+    handler = &Dialog.accept!/1
     on(original, Event.dialog(), handler)
     other = switch_page(original, new_page(original))
     off(other, Event.dialog(), handler)

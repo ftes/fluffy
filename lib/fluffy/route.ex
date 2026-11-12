@@ -2,7 +2,7 @@ defmodule Fluffy.Route do
   @moduledoc """
   A browser request held by a handler of `Fluffy.Playwright.route/4`.
 
-  `request` is the intercepted `Fluffy.Request`. Answer the route once, with
+  `request` is the intercepted `PlaywrightEx.Request`. Answer the route once, with
   `fulfill/2`, `continue/2`, `abort/2` or `fallback/2`, from the handler or from
   any other process it passes the route to. As in Playwright, a request never
   answered hangs until the action waiting for it times out.
@@ -15,7 +15,7 @@ defmodule Fluffy.Route do
   @enforce_keys [:request, :native]
   defstruct [:request, :native]
 
-  @type t :: %__MODULE__{request: Fluffy.Request.t()}
+  @type t :: %__MODULE__{request: PlaywrightEx.Request.t()}
 
   @doc """
   Answers the request without reaching the server.

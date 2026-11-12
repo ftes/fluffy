@@ -10,7 +10,6 @@ defmodule Fluffy.Route.Registration do
   # its promise for them: they register under their route's tracker, whose flag
   # tells them to ignore their errors (Playwright's `RouteHandler.stop`).
 
-  alias Fluffy.Backend.Playwright.Events
   alias Fluffy.Route
   alias Fluffy.Session
   alias Fluffy.SessionRuntime
@@ -94,7 +93,7 @@ defmodule Fluffy.Route.Registration do
   end
 
   defp run(session, tracker, handler, native, request, owner) do
-    handler.(%Route{request: Events.request(session, request), native: native})
+    handler.(%Route{request: request, native: native})
   catch
     kind, reason when kind != :exit or reason != :normal ->
       cond do

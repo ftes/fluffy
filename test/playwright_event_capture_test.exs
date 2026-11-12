@@ -19,7 +19,7 @@ defmodule Fluffy.PlaywrightEventCaptureTest do
     pending = wait_for(session, Event.response())
     visit(session, TestHTTPFixtures.url(fixture, "/first"))
     visit(session, TestHTTPFixtures.url(fixture, "/second"))
-    assert String.ends_with?(await(pending).url, "/first")
+    assert String.ends_with?(PlaywrightEx.Response.url(await(pending)), "/first")
   end
 
   test "a wait expires independently of await or later actions" do
@@ -63,7 +63,7 @@ defmodule Fluffy.PlaywrightEventCaptureTest do
     Subscription.cancel(first.pid)
     Subscription.cancel(first.pid)
     visit(session, TestHTTPFixtures.url(fixture))
-    assert await(second).status == 200
+    assert PlaywrightEx.Response.status(await(second)) == 200
   end
 
   test "settled response metadata survives source closure before await" do
@@ -73,7 +73,7 @@ defmodule Fluffy.PlaywrightEventCaptureTest do
     visit(session, TestHTTPFixtures.url(fixture))
     assert_eventually(fn -> :sys.get_state(pending.pid).outcome != nil end)
     close_page(session)
-    assert await(pending).status == 201
+    assert PlaywrightEx.Response.status(await(pending)) == 201
   end
 
   test "source closure and crash resolve outstanding waits" do
@@ -115,11 +115,16 @@ defmodule Fluffy.PlaywrightEventCaptureTest do
     first = wait_for(session, Event.response())
     second = wait_for(session, Event.response())
     visit(session, TestHTTPFixtures.url(fixture))
-    assert await(first).request.page == current_page(session)
-    assert await(second).request.page == current_page(session)
+    response = await(first)
+    assert await(second) == response
+    assert response_page(session, response) == current_page(session)
 
     assert EventEmitter.listener_count(Session.page_state(session).page, "close") == close_listeners
     assert length(pages(session)) == 2
+  end
+
+  defp response_page(session, response) do
+    page(session, response |> PlaywrightEx.Response.frame() |> PlaywrightEx.Frame.page())
   end
 
   defp response_listeners(page), do: EventEmitter.listener_count(page, "response")

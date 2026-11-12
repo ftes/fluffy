@@ -23,8 +23,8 @@ defmodule Fluffy.PlaywrightMembers do
   @native_page {:unwrap, "on the page of Fluffy.unwrap/2"}
   @page_gap {:unwrap, "gap: on the page of Fluffy.unwrap/2"}
   @native_value {:unwrap, "gap: on the PlaywrightEx value of Fluffy.unwrap_and_return/2"}
-  @native_only {:unwrap, "browser network detail on the PlaywrightEx value of Fluffy.unwrap_and_return/2"}
   @native_event {:unwrap, "gap: listen natively inside Fluffy.unwrap/2"}
+  @event_value {:unwrap, "on the PlaywrightEx value an event delivers, as in Playwright"}
   @own_timeouts {:denied, "Fluffy owns timeouts: the session's timeout: is the context default"}
   @own_listeners {:denied, "removes the listeners Fluffy relies on for pages and events"}
   @own_document {:denied, "replaces the tracked document outside navigation tracking"}
@@ -51,18 +51,13 @@ defmodule Fluffy.PlaywrightMembers do
   def counterparts(PlaywrightEx.Locator), do: [Fluffy.Locator, Fluffy, Fluffy.Playwright]
   def counterparts(PlaywrightEx.Expect), do: [Fluffy.Expect]
   def counterparts(PlaywrightEx.Page), do: [Fluffy, Fluffy.Playwright, Fluffy.Page]
-  def counterparts(PlaywrightEx.Frame), do: [Fluffy.Frame]
   def counterparts(PlaywrightEx.FrameLocator), do: [Fluffy.FrameLocator]
   def counterparts(PlaywrightEx.BrowserContext), do: [Fluffy.Playwright]
   def counterparts(PlaywrightEx.Clock), do: [Fluffy.Playwright.Clock]
   def counterparts(PlaywrightEx.Keyboard), do: [Keyboard]
   def counterparts(PlaywrightEx.Mouse), do: [Mouse]
-  def counterparts(PlaywrightEx.Dialog), do: [Fluffy.Dialog]
   def counterparts(PlaywrightEx.Download), do: [Fluffy.Download]
   def counterparts(PlaywrightEx.FileChooser), do: [Fluffy.FileChooser]
-  def counterparts(PlaywrightEx.Request), do: [Fluffy.Request]
-  def counterparts(PlaywrightEx.Response), do: [Fluffy.Response]
-  def counterparts(PlaywrightEx.ConsoleMessage), do: [Fluffy.ConsoleMessage]
   def counterparts(PlaywrightEx.Route), do: [Fluffy.Route]
   def counterparts(:event), do: [Fluffy.Event]
   def counterparts(_module), do: []
@@ -139,7 +134,7 @@ defmodule Fluffy.PlaywrightMembers do
           {@selector_legacy, @legacy}
         ] ++ for({upstream, fluffy} <- @by, do: {[upstream], {:renamed, {Fluffy.Locator, fluffy, 2}}}),
       PlaywrightEx.Frame => [
-        {~w(url page parent_frame)a, :wrapped},
+        {~w(url page parent_frame)a, @event_value},
         {~w(name child_frames is_detached title frame_element goto evaluate evaluate_handle wait_for_load_state
               wait_for_url wait_for_function content add_script_tag add_style_tag locator frame_locator)a,
          {:unwrap, "on the frame of Fluffy.unwrap/2; Fluffy locators resolve from the page"}},
@@ -183,7 +178,7 @@ defmodule Fluffy.PlaywrightMembers do
       PlaywrightEx.Keyboard => [{~w(down insert_text press type up)a, :wrapped}],
       PlaywrightEx.Mouse => [{~w(click dblclick down move up wheel)a, :wrapped}],
       PlaywrightEx.Touchscreen => [{[:tap], {:unwrap, "page-global input on PlaywrightEx.Page.touchscreen/1"}}],
-      PlaywrightEx.Dialog => [{~w(accept dismiss page type message default_value)a, :wrapped}],
+      PlaywrightEx.Dialog => [{~w(accept dismiss page type message default_value)a, @event_value}],
       PlaywrightEx.Download => [
         {~w(suggested_filename url page)a, :wrapped},
         {[:save_as], {:renamed, {Fluffy.Download, :save_as, 2}}},
@@ -198,34 +193,18 @@ defmodule Fluffy.PlaywrightMembers do
         {[:element], @native_value}
       ],
       PlaywrightEx.Request => [
-        {~w(url method headers resource_type post_data failure redirected_from redirected_to)a, :wrapped},
-        {[:all_headers], {:renamed, {Fluffy.Request, :all_headers, 1}}},
-        {[:header_value], {:renamed, {Fluffy.Request, :header_value, 2}}},
-        {[:post_data_json], {:renamed, {Fluffy.Request, :post_data_json, 1}}},
-        {[:frame], {:unwrap, "on the PlaywrightEx value of Fluffy.unwrap_and_return/2; Fluffy.Request has its page"}},
-        {~w(timing sizes)a, @native_only},
-        {~w(response headers_array post_data_buffer is_navigation_request existing_response service_worker)a,
-         @native_value}
+        {~w(url method headers resource_type post_data failure redirected_from redirected_to all_headers header_value
+            post_data_json frame timing sizes response headers_array post_data_buffer is_navigation_request
+            existing_response service_worker)a, @event_value}
       ],
       PlaywrightEx.Response => [
-        {~w(url status status_text headers request)a, :wrapped},
-        {[:ok], {:renamed, {Fluffy.Response, :ok?, 1}}},
-        {[:body], {:renamed, {Fluffy.Response, :body, 1}}},
-        {[:text], {:renamed, {Fluffy.Response, :text, 1}}},
-        {[:json], {:renamed, {Fluffy.Response, :json, 1}}},
-        {[:all_headers], {:renamed, {Fluffy.Response, :all_headers, 1}}},
-        {[:header_value], {:renamed, {Fluffy.Response, :header_value, 2}}},
-        {[:header_values], {:renamed, {Fluffy.Response, :header_values, 2}}},
-        {~w(security_details server_addr)a, @native_only},
-        {~w(finished frame headers_array http_version from_service_worker)a, @native_value}
+        {~w(url status status_text headers request ok body text json all_headers header_value header_values
+            security_details server_addr finished frame headers_array http_version from_service_worker)a, @event_value}
       ],
       PlaywrightEx.Route => [
         {~w(abort continue fallback fulfill request fetch)a, :wrapped}
       ],
-      PlaywrightEx.ConsoleMessage => [
-        {~w(location page text timestamp type)a, :wrapped},
-        {~w(args worker)a, @native_value}
-      ],
+      PlaywrightEx.ConsoleMessage => [{~w(location page text timestamp type args worker)a, @event_value}],
       PlaywrightEx.WebError => [
         {~w(error location page)a, {:unwrap, "gap: from a native web_error listener"}}
       ],

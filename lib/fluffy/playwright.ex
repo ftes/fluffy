@@ -117,6 +117,26 @@ defmodule Fluffy.Playwright do
   @doc group: "Lifecycle and navigation"
   @doc playwright_only: true
   @doc """
+  Returns the handle of a `PlaywrightEx.Page` of the session's browser context, for
+  `switch_page/2`. Events other than page events deliver PlaywrightEx's values, so this
+  turns the page of a dialog or console message into one Fluffy can act on:
+
+      dialog = await(pending)
+      PlaywrightEx.Dialog.dismiss!(dialog)
+      switch_page(session, page(session, PlaywrightEx.Dialog.page(dialog)))
+
+  A page that has closed returns its closed handle. A page of another browser context
+  raises `ArgumentError`.
+  """
+  @spec page(Session.t(), PlaywrightEx.Page.t()) :: Fluffy.Page.t()
+  def page(%Session{} = session, %PlaywrightEx.Page{} = page) do
+    ensure_playwright_backend!(session, :pages)
+    PlaywrightBackend.Events.page(session, page)
+  end
+
+  @doc group: "Lifecycle and navigation"
+  @doc playwright_only: true
+  @doc """
   Creates a blank page in the session's browser context and returns its handle.
 
   The session keeps its current page selection. Use `switch_page/2` to select

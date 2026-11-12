@@ -240,8 +240,8 @@ navigation's response instead:
 ```elixir
 session
 |> assert_event(
-  Fluffy.Event.response(&String.ends_with?(&1.url, "/potions")),
+  Fluffy.Event.response(&String.ends_with?(PlaywrightEx.Response.url(&1), "/potions")),
   &click(&1, by_role(:link, name: "Potions")),
-  fn response -> assert response.status == 200 end
+  fn response -> assert PlaywrightEx.Response.status(response) == 200 end
 )
 ```

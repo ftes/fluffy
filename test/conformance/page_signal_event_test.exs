@@ -7,48 +7,38 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
   import Fluffy.Playwright
 
   alias Fluffy.Event
-  alias Fluffy.Frame
   alias Fluffy.Playwright
   alias Fluffy.Session
   alias Fluffy.TestHTTPFixtures
+  alias PlaywrightEx.ConsoleMessage
+  alias PlaywrightEx.Frame
+  alias PlaywrightEx.Request
 
   describe "console" do
     @tag driver: :playwright
     test "a wait resolves with the message's metadata, and predicates skip others" do
       {session, fixture} = session()
-      pending = wait_for(session, Event.console(&(&1.text == "from button")))
-      other = wait_for(session, Event.console(&(&1.type == "warning")))
+      pending = wait_for(session, Event.console(&(ConsoleMessage.text(&1) == "from button")))
+      other = wait_for(session, Event.console(&(ConsoleMessage.type(&1) == "warning")))
 
       Playwright.evaluate(session, "console.log('skipped')")
       click(session, by_role(:button, name: "Log"))
 
-      assert %Fluffy.ConsoleMessage{type: "error", text: "from button"} = message = await(pending)
-      assert message.page == current_page(session)
-      assert is_number(message.timestamp)
-      assert message.location.url == TestHTTPFixtures.url(fixture, "/start")
+      assert %ConsoleMessage{} = message = await(pending)
+      assert {ConsoleMessage.type(message), ConsoleMessage.text(message)} == {"error", "from button"}
+      assert page(session, ConsoleMessage.page(message)) == current_page(session)
+      assert is_number(ConsoleMessage.timestamp(message))
+      assert ConsoleMessage.location(message).url == TestHTTPFixtures.url(fixture, "/start")
 
       Playwright.evaluate(session, "console.warn('warned')")
-      assert await(other).text == "warned"
-    end
-
-    @tag driver: :playwright
-    test "unwrap reaches the native message until the session closes" do
-      {session, _fixture} = session()
-      pending = wait_for(session, Event.console())
-      Playwright.evaluate(session, "console.log('native', 7)")
-      message = await(pending)
-
-      assert message |> unwrap_and_return(&PlaywrightEx.ConsoleMessage.args/1) |> length() == 2
-
-      close_session(session)
-      assert_raise ArgumentError, ~r/session is closed/, fn -> unwrap_and_return(message, & &1) end
+      assert ConsoleMessage.text(await(other)) == "warned"
     end
 
     @tag driver: :playwright
     test "listeners stop after off and expect_event inspects the message" do
       {session, _fixture} = session()
       owner = self()
-      handler = fn message -> send(owner, {:console, message.text}) end
+      handler = fn message -> send(owner, {:console, ConsoleMessage.text(message)}) end
 
       on(session, Event.console(), handler)
       Playwright.evaluate(session, "console.log('heard')")
@@ -60,9 +50,9 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
 
       assert expect_event(
                session,
-               Event.console(&(&1.text == "expected")),
+               Event.console(&(ConsoleMessage.text(&1) == "expected")),
                &Playwright.evaluate(&1, "console.log('expected')"),
-               fn message -> send(owner, {:expected, message.type}) end
+               fn message -> send(owner, {:expected, ConsoleMessage.type(message)}) end
              ) == session
 
       assert_received {:expected, "log"}
@@ -75,22 +65,20 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
       other = switch_page(session, new_page(session))
       Playwright.evaluate(other, "console.log('other page')")
       Playwright.evaluate(session, "console.log('main page')")
-      assert await(pending).text == "main page"
+      assert ConsoleMessage.text(await(pending)) == "main page"
     end
   end
 
   describe "page_error" do
     @tag driver: :playwright
-    test "an uncaught Error resolves with its name, message, stack and page" do
+    test "an uncaught Error resolves with its name, message and stack" do
       {session, _fixture} = session()
       pending = wait_for(session, Event.page_error())
       Playwright.evaluate(session, "setTimeout(() => { throw new RangeError('boom') }, 0); 1")
 
-      assert %Fluffy.PageError{name: "RangeError"} = error = await(pending)
-      assert error.message =~ "boom"
+      assert %{name: "RangeError"} = error = await(pending)
+      assert Exception.message(error) =~ "boom"
       assert is_binary(error.stack)
-      assert error.page == current_page(session)
-      assert unwrap_and_return(error, &Exception.message/1) =~ "boom"
     end
 
     @tag driver: :playwright
@@ -99,19 +87,16 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
       pending = wait_for(session, Event.page_error())
       Playwright.evaluate(session, "setTimeout(() => { throw 'thrown string' }, 0); 1")
 
-      assert %Fluffy.PageError{} = error = await(pending)
-      assert error.message =~ "thrown string"
-      assert error.page == current_page(session)
-      assert unwrap_and_return(error, &Exception.message/1) =~ "thrown string"
+      assert Exception.message(await(pending)) =~ "thrown string"
     end
 
     @tag driver: :playwright
     test "on delivers each error and off removes it" do
       {session, _fixture} = session()
       owner = self()
-      handler = fn error -> send(owner, {:page_error, error.message}) end
+      handler = fn error -> send(owner, {:page_error, Exception.message(error)}) end
 
-      on(session, Event.page_error(&(&1.message =~ "first")), handler)
+      on(session, Event.page_error(&(Exception.message(&1) =~ "first")), handler)
       Playwright.evaluate(session, "setTimeout(() => { throw new Error('first') }, 0); 1")
       assert_receive {:page_error, message}, Session.timeout(session)
       assert message =~ "first"
@@ -127,17 +112,18 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
     test "a failed request resolves on page and context scope and exposes its failure" do
       {session, _fixture} = session()
       url = closed_port_url()
-      match = &String.starts_with?(&1.url, url)
+      match = &String.starts_with?(Request.url(&1), url)
       pending = wait_for(session, Event.request_failed(match))
       context = wait_for(session, Event.request_failed(match), scope: :context)
       finished = wait_for(session, Event.request_finished(match), timeout: 200)
 
       Playwright.evaluate(session, "url => { fetch(url).catch(() => {}); return true }", url)
 
-      assert %Fluffy.Request{method: "GET", resource_type: "fetch"} = request = await(pending)
-      assert request.page == current_page(session)
+      assert %Request{} = request = await(pending)
+      assert {Request.method(request), Request.resource_type(request)} == {"GET", "fetch"}
+      assert page(session, Frame.page(Request.frame(request))) == current_page(session)
       assert await(context) == request
-      assert %{errorText: reason} = unwrap_and_return(request, &PlaywrightEx.Request.failure/1)
+      assert %{errorText: reason} = Request.failure(request)
       assert is_binary(reason)
       assert_raise ExUnit.AssertionError, ~r/no matching request_finished event/, fn -> await(finished) end
     end
@@ -145,16 +131,16 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
     @tag driver: :playwright
     test "an error status finishes a request, on page and context scope" do
       {session, _fixture} = session()
-      match = &String.ends_with?(&1.url, "/missing")
+      match = &String.ends_with?(Request.url(&1), "/missing")
       pending = wait_for(session, Event.request_finished(match))
       context = wait_for(session, Event.request_finished(match), scope: :context)
       failed = wait_for(session, Event.request_failed(match), timeout: 200)
 
       Playwright.evaluate(session, "fetch('missing'); true")
 
-      assert %Fluffy.Request{method: "GET"} = request = await(pending)
+      assert Request.method(request = await(pending)) == "GET"
       assert await(context) == request
-      assert {:ok, %PlaywrightEx.Response{}} = unwrap_and_return(request, &PlaywrightEx.Request.response/1)
+      assert {:ok, %PlaywrightEx.Response{}} = Request.response(request)
       assert_raise ExUnit.AssertionError, ~r/no matching request_failed event/, fn -> await(failed) end
     end
 
@@ -162,9 +148,9 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
     test "on observes a finished request and off removes the listener" do
       {session, _fixture} = session()
       owner = self()
-      handler = fn request -> send(owner, {:finished, URI.parse(request.url).path}) end
+      handler = fn request -> send(owner, {:finished, URI.parse(Request.url(request)).path}) end
 
-      on(session, Event.request_finished(&String.ends_with?(&1.url, "/api")), handler)
+      on(session, Event.request_finished(&String.ends_with?(Request.url(&1), "/api")), handler)
       Playwright.evaluate(session, "fetch('api'); true")
       assert_receive {:finished, path}, Session.timeout(session)
       assert String.ends_with?(path, "/api")
@@ -231,14 +217,14 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
       Playwright.evaluate(session, "document.body.appendChild(document.createElement('iframe')); true")
 
       frame = await(attached)
-      assert Frame.page(frame) == current_page(session)
+      assert page(session, Frame.page(frame)) == current_page(session)
       assert %Frame{} = Frame.parent_frame(frame)
 
       Playwright.evaluate(session, "document.querySelector('iframe').remove(); true")
 
       assert %Frame{} = gone = await(detached)
-      assert unwrap_and_return(gone, &PlaywrightEx.Frame.is_detached/1)
-      assert Frame.page(gone) == current_page(session)
+      assert Frame.is_detached(gone)
+      assert page(session, Frame.page(gone)) == current_page(session)
     end
 
     @tag driver: :playwright
@@ -259,28 +245,23 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
 
   describe "worker and web_socket" do
     @tag driver: :playwright
-    test "a worker resolves with its url and page, and unwraps" do
+    test "a worker resolves with the PlaywrightEx worker" do
       {session, _fixture} = session()
-      pending = wait_for(session, Event.worker(&String.starts_with?(&1.url, "blob:")))
+      pending = wait_for(session, Event.worker(&String.starts_with?(PlaywrightEx.Worker.url(&1), "blob:")))
 
       Playwright.evaluate(
         session,
         "window.w = new Worker(URL.createObjectURL(new Blob(['1'], {type: 'application/javascript'}))); true"
       )
 
-      assert %Fluffy.Worker{} = worker = await(pending)
-      assert worker.page == current_page(session)
-      assert unwrap_and_return(worker, &PlaywrightEx.Worker.evaluate!(&1, "1 + 1")) == 2
-
-      close_session(session)
-      assert_raise ArgumentError, ~r/session is closed/, fn -> unwrap_and_return(worker, & &1) end
+      assert PlaywrightEx.Worker.evaluate!(await(pending), "1 + 1") == 2
     end
 
     @tag driver: :playwright
     test "on observes a worker and off removes the listener" do
       {session, _fixture} = session()
       owner = self()
-      handler = fn worker -> send(owner, {:worker, worker.url}) end
+      handler = fn worker -> send(owner, {:worker, PlaywrightEx.Worker.url(worker)}) end
       spawn_worker = "window.w = new Worker(URL.createObjectURL(new Blob(['1'], {type: 'text/javascript'}))); true"
 
       on(session, Event.worker(), handler)
@@ -293,19 +274,15 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
     end
 
     @tag driver: :playwright
-    test "a web socket resolves with its url and page, and unwraps" do
+    test "a web socket resolves with the PlaywrightEx web socket" do
       {session, _fixture} = session()
       url = String.replace_prefix(Fluffy.TestServer.base_url(), "http", "ws") <> "/live/websocket?vsn=2.0.0"
-      pending = wait_for(session, Event.web_socket(&(&1.url == url)))
+      pending = wait_for(session, Event.web_socket(&(PlaywrightEx.WebSocket.url(&1) == url)))
 
       Playwright.evaluate(session, "url => { window.s = new WebSocket(url); return true }", url)
 
-      assert %Fluffy.WebSocket{url: ^url} = socket = await(pending)
-      assert socket.page == current_page(session)
-      assert unwrap_and_return(socket, &PlaywrightEx.WebSocket.url/1) == url
-
-      close_session(session)
-      assert_raise ArgumentError, ~r/session is closed/, fn -> unwrap_and_return(socket, & &1) end
+      assert %PlaywrightEx.WebSocket{} = socket = await(pending)
+      assert PlaywrightEx.WebSocket.url(socket) == url
     end
   end
 
