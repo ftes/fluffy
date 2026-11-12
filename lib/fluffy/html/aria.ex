@@ -150,7 +150,7 @@ defmodule Fluffy.HTML.Aria do
                        summary table tbody td textarea tfoot th thead tr ul xmp
                      )
 
-  @context %{target: nil, labelled_by: nil, label: nil, native: nil}
+  @context %{target: nil, labelled_by: nil, described_by: nil, label: nil, native: nil}
 
   # The elements `DocumentIndex.entries` holds: LazyHTML.query/2 finds no HTML template
   # content, and this leaves out the rest of what the index marks inert.
@@ -216,13 +216,52 @@ defmodule Fluffy.HTML.Aria do
     end
   end
 
+  # roleUtils.ts getElementAccessibleNameText.
   def name(%__MODULE__{} = aria, node) do
     if (role(aria, node) || "") in @naming_prohibited_roles do
       ""
     else
       {text, _visited} = text_alternative(aria, node, %{@context | target: :self}, MapSet.new())
-      text
+      as_flat_string(text)
     end
+  end
+
+  # roleUtils.ts getElementAccessibleDescription.
+  def description(%__MODULE__{} = aria, node) do
+    cond do
+      attribute?(node, "aria-describedby") ->
+        aria
+        |> references(node, "aria-describedby")
+        |> Enum.map_join(" ", fn id ->
+          reference = fetch(aria, id)
+          context = %{@context | described_by: visibility(aria, reference)}
+          {text, _visited} = text_alternative(aria, reference, context, MapSet.new())
+          text
+        end)
+        |> as_flat_string()
+
+      attribute?(node, "aria-description") ->
+        as_flat_string(attribute(node, "aria-description"))
+
+      true ->
+        as_flat_string(text_attribute(node, "title"))
+    end
+  end
+
+  # JavaScript's `\s` and `trim()`.
+  @js_white_space "[\\x{09}-\\x{0d}\\x{20}\\x{a0}\\x{1680}\\x{2000}-\\x{200a}\\x{2028}\\x{2029}\\x{202f}\\x{205f}\\x{3000}\\x{feff}]"
+
+  # roleUtils.ts asFlatString: collapses whitespace but keeps non-breaking spaces.
+  defp as_flat_string(text) do
+    text
+    |> String.split("\u00A0")
+    |> Enum.map_join("\u00A0", fn chunk ->
+      chunk
+      |> String.replace("\r\n", "\n")
+      |> String.replace(~r/[\x{200b}\x{00ad}]/u, "")
+      |> String.replace(~r/#{@js_white_space}+/u, " ")
+    end)
+    |> String.replace(~r/\A#{@js_white_space}+|#{@js_white_space}+\z/u, "")
   end
 
   # selectorUtils.ts getElementLabels, what Playwright's label engine (getByLabel)
@@ -672,7 +711,8 @@ defmodule Fluffy.HTML.Aria do
     end
   end
 
-  defp hidden_reference?(context), do: :hidden in [context.labelled_by, context.label, context.native]
+  defp hidden_reference?(context),
+    do: :hidden in [context.labelled_by, context.described_by, context.label, context.native]
 
   defp visibility(aria, node), do: if(hidden?(aria, node), do: :hidden, else: :visible)
 
@@ -943,7 +983,7 @@ defmodule Fluffy.HTML.Aria do
   defp name_from_content?(node, role, context) do
     role in @name_from_content_roles or (context.target == :descendant and role in @name_from_content_descendant_roles) or
       (node.tag == "summary" and role not in @presentation_roles) or
-      context.labelled_by != nil or context.label != nil or context.native != nil
+      context.labelled_by != nil or context.described_by != nil or context.label != nil or context.native != nil
   end
 
   defp inner_text(aria, node, context, visited) do

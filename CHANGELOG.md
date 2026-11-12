@@ -8,6 +8,7 @@ Upgrading from 0.8? The [upgrade guide](docs/upgrading.md) lists the net changes
 
 - `Fluffy.Playwright.page/2` turns a `PlaywrightEx.Page` of the session, such as a dialog's or console message's page, into a `Fluffy.Page` for `switch_page/2`.
 - Static and LiveView match a regex in a locator's `name:`, `has_text:` and `has_not_text:`, as Playwright does, instead of raising `Fluffy.CapabilityError`.
+- Static and LiveView support `to_have_role`, `to_have_accessible_name` and `to_have_accessible_description`, computed from markup by their port of Playwright's `roleUtils`, instead of raising `Fluffy.CapabilityError`.
 
 ### Changed
 

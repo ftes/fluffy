@@ -895,9 +895,6 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
             to_have_js_property(p, "value", "x"),
             to_have_screenshot(p, path: "x.png"),
             page_to_have_screenshot(path: "x.png"),
-            to_have_role(p, :paragraph),
-            to_have_accessible_name(p, "x"),
-            to_have_accessible_description(p, "x"),
             to_have_accessible_error_message(p, "x"),
             to_match_aria_snapshot(p, "- paragraph"),
             page_to_match_aria_snapshot("- paragraph")

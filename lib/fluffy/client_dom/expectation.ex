@@ -86,6 +86,21 @@ defmodule Fluffy.ClientDOM.Expectation do
     end)
   end
 
+  def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :role, expected: expected} = expectation) do
+    with_node(client_dom, locator, expectation, fn aria, node ->
+      actual = Aria.role(aria, node) || ""
+      {actual == to_string(expected), actual}
+    end)
+  end
+
+  def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: kind, expected: {expected, options}} = expectation)
+      when kind in [:accessible_name, :accessible_description] do
+    with_node(client_dom, locator, expectation, fn aria, node ->
+      actual = if kind == :accessible_name, do: Aria.name(aria, node), else: Aria.description(aria, node)
+      {text_matches?(expected, actual, normalize: true, ignore_case: options[:ignore_case]), actual}
+    end)
+  end
+
   def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :disabled}) do
     actual = ClientDOM.disabled?(client_dom, locator)
     {actual, actual}
@@ -147,6 +162,13 @@ defmodule Fluffy.ClientDOM.Expectation do
       [target] -> fun.(target)
       targets -> strictness_error!(locator, Enum.map(targets, & &1.element))
     end
+  end
+
+  defp with_node(client_dom, locator, expectation, fun) do
+    with_element(client_dom, locator, expectation, fn target ->
+      aria = Aria.for_document(client_dom.document)
+      fun.(aria, Aria.node_for(aria, target.element))
+    end)
   end
 
   defp count_visible(_client_dom, []), do: 0

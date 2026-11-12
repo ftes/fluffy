@@ -44,7 +44,7 @@ defmodule Fluffy.Capability do
         playwright: :equivalent
       },
       detail:
-        "Static and LiveView implement the documented HTML/ARIA subset from markup. They do not interpret CSS-generated content or computed visibility."
+        "Static and LiveView port Playwright's role, accessible-name and description computation to markup, for role locators, `to_have_role`, `to_have_accessible_name` and `to_have_accessible_description`. They do not interpret CSS-generated content or computed visibility."
     },
     %{
       id: :playwright_locator_options,

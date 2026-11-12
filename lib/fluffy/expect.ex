@@ -314,9 +314,9 @@ defmodule Fluffy.Expect do
   end
 
   @doc group: "Locator assertions"
-  @doc playwright_only: true
   @doc """
-  Asserts the target's ARIA role, such as `:button`. Requires Playwright, including when negated.
+  Asserts the target's ARIA role, such as `:button`. Static and LiveView compute it
+  from markup, as for `Fluffy.Locator.by_role/2`.
 
   ## Options
 
@@ -328,10 +328,9 @@ defmodule Fluffy.Expect do
   end
 
   @doc group: "Locator assertions"
-  @doc playwright_only: true
   @doc """
   Asserts the target's accessible name, equal to a string or matching a regular
-  expression. Requires Playwright, including when negated.
+  expression. Static and LiveView compute it from markup, as for `Fluffy.Locator.by_role/2`.
 
   ## Options
 
@@ -343,10 +342,9 @@ defmodule Fluffy.Expect do
   end
 
   @doc group: "Locator assertions"
-  @doc playwright_only: true
   @doc """
   Asserts the target's accessible description, equal to a string or matching a regular
-  expression. Requires Playwright, including when negated.
+  expression. Static and LiveView compute it from markup, as for `Fluffy.Locator.by_role/2`.
 
   ## Options
 
