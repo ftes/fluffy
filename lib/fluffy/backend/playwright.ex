@@ -18,18 +18,13 @@ defmodule Fluffy.Backend.Playwright do
   alias Fluffy.SessionRuntime
   alias Fluffy.TestScope
   alias PlaywrightEx.BrowserContext
-  alias PlaywrightEx.ConsoleMessage
   alias PlaywrightEx.Page, as: BrowserPage
   alias PlaywrightEx.TargetClosedError
-  alias PlaywrightEx.WebError
-
-  require Logger
 
   @impl true
   def start_session(options, attachment) do
     {resource_scope, runtime, sandbox_header} = attachment
-    # An unmanaged session (no scope) is no test's: PlaywrightEx.Test records nothing of it.
-    test_context = if resource_scope, do: TestScope.metadata(resource_scope), else: %{}
+    test_context = TestScope.metadata(resource_scope)
     base_url = Keyword.fetch!(options, :base_url)
     config = Options.playwright_config()
     timeout = Keyword.get_lazy(options, :timeout, fn -> Keyword.fetch!(config, :timeout) end)
@@ -67,7 +62,7 @@ defmodule Fluffy.Backend.Playwright do
       _disposable = BrowserContext.add_init_script!(browser_context, Document.init_script())
     end)
 
-    listen(browser_context, runtime, Keyword.fetch!(config, :log_browser_console))
+    listen(browser_context, runtime)
     browser_page = BrowserContext.new_page!(browser_context)
 
     context = %Context{
@@ -94,25 +89,20 @@ defmodule Fluffy.Backend.Playwright do
   @doc false
   # The test's browser from PlaywrightEx.Test's pool, set up by `config :playwright_ex,
   # :test`: shared, or with `isolate: true` the module's own driver and browser, checked
-  # out at its first session. An unmanaged session has no module: it shares.
+  # out at its first session.
   def browser(test_context) do
-    if Keyword.fetch!(Options.playwright_config(), :isolate) and is_map_key(test_context, :module),
+    if Keyword.fetch!(Options.playwright_config(), :isolate),
       do: PlaywrightEx.Test.browser(test_context, isolate: true),
       else: PlaywrightEx.Test.browser([])
   end
 
   # Listeners only forward. The runtime does the work, and receives each
   # message before the reply of the call that caused it.
-  defp listen(browser_context, runtime, log_browser_console?) do
+  defp listen(browser_context, runtime) do
     forward = fn kind -> fn native -> send(runtime, {:fluffy_playwright, kind, native}) end end
 
     BrowserContext.on(browser_context, :page, forward.(:page))
     BrowserContext.on(browser_context, :close, forward.(:context_close))
-
-    if log_browser_console? do
-      BrowserContext.on(browser_context, :console, forward.(:console))
-      BrowserContext.on(browser_context, :web_error, forward.(:web_error))
-    end
   end
 
   @impl true
@@ -203,31 +193,7 @@ defmodule Fluffy.Backend.Playwright do
   def runtime_event(_context, {:fluffy_playwright, :context_close, _browser_context}), do: :closed
   def runtime_event(_context, {:fluffy_playwright, :page_close, browser_page}), do: {:page_closed, browser_page.guid}
 
-  def runtime_event(_context, {:fluffy_playwright, :console, message}) do
-    log(console_level(ConsoleMessage.type(message)), ConsoleMessage.text(message), ConsoleMessage.location(message))
-  end
-
-  def runtime_event(_context, {:fluffy_playwright, :web_error, error}) do
-    log(:error, Exception.message(WebError.error(error)), nil)
-  end
-
   def runtime_event(_context, _message), do: :ignore
-
-  defp log(level, text, location) do
-    Logger.log(level, append_location(text, location), fluffy: :playwright)
-    :ignore
-  end
-
-  defp console_level("error"), do: :error
-  defp console_level("warning"), do: :warning
-  defp console_level("debug"), do: :debug
-  defp console_level(_type), do: :info
-
-  defp append_location(text, %{url: url, line: line, column: column}) when url != "" and is_integer(line) and line > 0,
-    do: "#{text} (#{url}:#{line}:#{column})"
-
-  defp append_location(text, %{url: url}) when is_binary(url) and url != "", do: "#{text} (#{url})"
-  defp append_location(text, _location), do: text
 
   @impl true
   def normalize_error(_session, _operation, _arguments, error), do: error

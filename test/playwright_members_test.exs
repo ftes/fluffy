@@ -76,10 +76,9 @@ defmodule Fluffy.PlaywrightMembersTest do
 
   test "wrapped calls with a timeout classify their options in Fluffy.Options" do
     classified =
-      for {_action, {module, fun, _arity, _keys}} <-
-            Options.native_actions() ++ Options.playwright_actions() ++ Options.native_expectations(),
+      for {_action, call} <- Options.native_actions() ++ Options.playwright_actions() ++ Options.native_expectations(),
           into: MapSet.new(),
-          do: {module, fun}
+          do: {elem(call, 0), elem(call, 1)}
 
     exceptions = PlaywrightMembers.unclassified_options()
 

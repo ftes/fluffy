@@ -93,9 +93,6 @@ jobs:
       - name: Compile
         if: matrix.lane == 'oldest'
         run: mix compile
-      - name: Check generated PlaywrightEx options
-        if: matrix.lane == 'newest'
-        run: mix fluffy.gen.native_options --check
       - name: Check generated usage rules
         if: matrix.lane == 'newest'
         run: mix usage_rules.sync --check

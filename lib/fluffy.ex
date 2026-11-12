@@ -139,15 +139,8 @@ defmodule Fluffy do
   end
 
   def session_for_html(:playwright, html, options) do
-    start_session =
-      if Fluffy.TestScope.current() do
-        &Backend.start_session/2
-      else
-        &Backend.start_unmanaged_session/2
-      end
-
     :playwright
-    |> start_session.(options)
+    |> Backend.start_session(options)
     |> Backend.visit("/harness")
     |> set_html(html)
   end

@@ -133,7 +133,8 @@ configure CI to upload it when the test job fails. Pass `trace:`, `screenshot:` 
 test. See `PlaywrightEx.Test` for the modes and file names.
 
 As in Playwright, browser `console` messages and uncaught page errors are not
-printed; set `log_browser_console: true` to send them to Elixir's `Logger`.
+printed; the trace has them. To log them, register a listener, such as
+`on(session, Event.console(), &Logger.info(&1.text))`.
 
 Set `browser_name: :firefox` or `browser_name: :webkit` after installing the
 corresponding browser (`mix playwright_ex.install -- firefox`).

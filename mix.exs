@@ -185,9 +185,7 @@ defmodule Fluffy.MixProject do
       "assets.build": ["esbuild.install --if-missing", "esbuild test_browser"],
       lint: [
         "format --check-formatted",
-        # Compiles strictly first: the generator's own compile would satisfy it.
         "compile --warnings-as-errors",
-        "fluffy.gen.native_options --check",
         "usage_rules.sync --check",
         "credo --format oneline"
       ],

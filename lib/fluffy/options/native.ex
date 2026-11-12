@@ -1,45 +1,41 @@
 defmodule Fluffy.Options.Native do
   @moduledoc false
-  # Playwright-only options of cross-driver actions follow PlaywrightEx's option docs
-  # and types instead of copying them. `mix fluffy.gen.native_options` extracts those
-  # into `Fluffy.Options.NativeGenerated`, so consumers never parse PlaywrightEx docs.
-
-  alias Fluffy.Options.NativeGenerated
+  # Playwright-only options follow PlaywrightEx's option docs and types, read at compile
+  # time from its facade's `__options__/1` (not a stable contract: playwright_ex is pinned).
 
   @doc "A doc reference to `module.fun/arity`."
   def reference(module, fun, arity), do: "`#{inspect(module)}.#{fun}/#{arity}`"
 
+  @doc "The upstream option keys of `module.fun`, without `excluded`."
+  def keys(module, fun, excluded), do: for({key, _option} <- module.__options__(fun), key not in excluded, do: key)
+
   @doc """
-  NimbleOptions entries for `keys`, documented and typed like the facade. Values are
-  validated by the facade when the action runs.
+  NimbleOptions entries for the upstream options of `module.fun` except `excluded`,
+  documented and typed like the facade. Values are validated by the facade when the
+  action runs.
   """
-  def schema(module, fun, arity, keys) do
-    options = NativeGenerated.options(module, fun, arity)
-
-    # A key missing from stale generated data degrades to an untyped entry so the task
-    # that regenerates it can still compile; the conformance tests catch staleness.
-    for key <- keys do
-      case Keyword.fetch(options, key) do
-        {:ok, {type_doc, doc, type_spec}} ->
-          {key, [type: :any, type_spec: type_spec, type_doc: type_doc, doc: "*Playwright only.* " <> doc]}
-
-        :error ->
-          {key, [type: :any, doc: "*Playwright only.*"]}
-      end
-    end
+  def schema(module, fun, excluded) do
+    for {key, option} <- module.__options__(fun), key not in excluded, do: {key, entry(option)}
   end
 
   @doc """
-  Like `schema/4`, but validated with the NimbleOptions `types` of `keys`, for options
-  that Fluffy compiles itself instead of passing them to the facade. A type given as
-  a keyword list also replaces the documented `type_spec` and `type_doc`.
+  Entries for `keys`, validated with their NimbleOptions `types`, for options that
+  Fluffy compiles itself instead of passing them to the facade. A type given as a
+  keyword list also replaces the documented `type_spec` and `type_doc`.
   """
-  def schema(module, fun, arity, keys, types) do
-    for {key, entry} <- schema(module, fun, arity, keys) do
+  def schema(module, fun, keys, types) do
+    options = module.__options__(fun)
+
+    for key <- keys do
+      entry = entry(Keyword.fetch!(options, key))
+
       case Keyword.fetch!(types, key) do
         [{:type, _type} | _docs] = type -> {key, Keyword.merge(entry, type)}
         type -> {key, Keyword.put(entry, :type, type)}
       end
     end
   end
+
+  defp entry(%{type_doc: type_doc, doc: doc, spec: spec}),
+    do: [type: :any, type_spec: spec, type_doc: type_doc, doc: "*Playwright only.* " <> doc]
 end

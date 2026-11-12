@@ -35,9 +35,9 @@ matched once can now match twice.
 - Playwright 1.65's own breaking changes apply: actions wait for an element to be not
   inert, cookie matching follows RFC 6265, and text the browser does not render is no
   longer part of accessible names.
-- Browser console messages are no longer logged, as in Playwright. Replace `js_logger:`
-  with `log_browser_console: true` to log them; custom loggers and
-  `Fluffy.Playwright.ConsoleLogger` are gone, and `console.warn` logs at `:warning`.
+- Browser console messages are no longer logged, as in Playwright, and `js_logger:`,
+  custom loggers and `Fluffy.Playwright.ConsoleLogger` are gone. To log them, register
+  a listener: `on(session, Event.console(), &Logger.info(&1.text))`.
 - Playwright sessions use Playwright's `en-US` locale instead of `en`; set
   `browser_context: [locale: "en"]` to keep it.
 - Browser launch gets Playwright's 3-minute default instead of `timeout:`. A

@@ -227,7 +227,7 @@ defmodule Fluffy.PlaywrightMembers do
         {~w(args worker)a, @native_value}
       ],
       PlaywrightEx.WebError => [
-        {~w(error location page)a, {:unwrap, "gap: from a native web_error listener; log_browser_console: logs them"}}
+        {~w(error location page)a, {:unwrap, "gap: from a native web_error listener"}}
       ],
       PlaywrightEx.Clock => [
         {~w(install pause_at run_for fast_forward resume set_fixed_time set_system_time)a, :wrapped}

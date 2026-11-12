@@ -13,12 +13,6 @@ defmodule Fluffy.Backend do
   end
 
   @doc false
-  def start_unmanaged_session(name, options) when is_list(options) do
-    {:ok, runtime} = Fluffy.SessionRuntime.start(self())
-    start_session(name, options, {nil, runtime, nil})
-  end
-
-  @doc false
   def static_html_session(html) when is_binary(html) do
     Fluffy.Backend.Phoenix.session_for_html(html)
   end

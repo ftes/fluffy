@@ -36,101 +36,60 @@ defmodule Fluffy.Options do
     :install_clock
   ]
 
-  # The upstream call behind each cross-driver action and its options that pass through
-  # on Playwright. Fluffy owns `timeout` (its retry budget); `no_wait_after` and `signal`
-  # would bypass its navigation tracking.
+  # The upstream call behind each cross-driver action. Its options pass through on
+  # Playwright, read from PlaywrightEx's `__options__/1`, except Fluffy's own `timeout`
+  # (its retry budget) and the denied ones below.
   @native_actions [
-    click:
-      {PlaywrightEx.Locator, :click, 2,
-       [:button, :click_count, :delay, :force, :modifiers, :position, :scroll, :steps, :trial]},
-    fill: {PlaywrightEx.Locator, :fill, 3, [:force]},
-    clear: {PlaywrightEx.Locator, :clear, 2, [:force]},
-    set_checked: {PlaywrightEx.Locator, :set_checked, 3, [:force, :position, :scroll, :trial]},
-    check: {PlaywrightEx.Locator, :check, 2, [:force, :position, :scroll, :trial]},
-    uncheck: {PlaywrightEx.Locator, :uncheck, 2, [:force, :position, :scroll, :trial]},
-    select_option: {PlaywrightEx.Locator, :select_option, 3, [:force]},
-    press: {PlaywrightEx.Locator, :press, 3, [:delay]},
-    set_input_files: {PlaywrightEx.Locator, :set_input_files, 3, []},
-    reload: {PlaywrightEx.Page, :reload, 2, [:wait_until]}
+    click: {PlaywrightEx.Locator, :click, 2},
+    fill: {PlaywrightEx.Locator, :fill, 3},
+    clear: {PlaywrightEx.Locator, :clear, 2},
+    set_checked: {PlaywrightEx.Locator, :set_checked, 3},
+    check: {PlaywrightEx.Locator, :check, 2},
+    uncheck: {PlaywrightEx.Locator, :uncheck, 2},
+    select_option: {PlaywrightEx.Locator, :select_option, 3},
+    press: {PlaywrightEx.Locator, :press, 3},
+    set_input_files: {PlaywrightEx.Locator, :set_input_files, 3},
+    reload: {PlaywrightEx.Page, :reload, 2}
   ]
 
-  # Playwright-only actions, classified like the cross-driver ones.
+  # Playwright-only actions, whose options pass through the same way.
   @playwright_actions [
-    hover: {PlaywrightEx.Locator, :hover, 2, [:force, :modifiers, :position, :scroll, :trial]},
-    drag_to: {PlaywrightEx.Locator, :drag_to, 3, [:force, :scroll, :source_position, :steps, :target_position, :trial]},
-    press_sequentially: {PlaywrightEx.Locator, :press_sequentially, 3, [:delay]},
-    focus: {PlaywrightEx.Locator, :focus, 2, []},
-    blur: {PlaywrightEx.Locator, :blur, 2, []},
-    dblclick:
-      {PlaywrightEx.Locator, :dblclick, 2, [:button, :delay, :force, :modifiers, :position, :scroll, :steps, :trial]},
-    tap: {PlaywrightEx.Locator, :tap, 2, [:force, :modifiers, :position, :scroll, :trial]},
-    dispatch_event: {PlaywrightEx.Locator, :dispatch_event, 4, []},
-    select_text: {PlaywrightEx.Locator, :select_text, 2, [:force]},
-    scroll_into_view_if_needed: {PlaywrightEx.Locator, :scroll_into_view_if_needed, 2, []},
-    wait_for: {PlaywrightEx.Locator, :wait_for, 2, [:state]},
-    bounding_box: {PlaywrightEx.Locator, :bounding_box, 2, []},
-    aria_snapshot: {PlaywrightEx.Locator, :aria_snapshot, 2, [:boxes, :depth, :mode]},
-    drop: {PlaywrightEx.Locator, :drop, 3, [:position]},
-    locator_evaluate: {PlaywrightEx.Locator, :evaluate, 4, [:expose_functions]},
-    locator_wait_for_function: {PlaywrightEx.Locator, :wait_for_function, 4, []},
-    page_aria_snapshot: {PlaywrightEx.Page, :aria_snapshot, 2, [:boxes, :depth, :mode]},
-    wait_for_function: {PlaywrightEx.Page, :wait_for_function, 4, [:polling]},
-    wait_for_load_state: {PlaywrightEx.Page, :wait_for_load_state, 3, []},
-    unroute_all: {PlaywrightEx.BrowserContext, :unroute_all, 2, [:behavior]},
-    locator_screenshot:
-      {PlaywrightEx.Locator, :screenshot, 2,
-       [:animations, :caret, :mask, :mask_color, :omit_background, :quality, :scale, :style, :type]},
-    page_screenshot:
-      {PlaywrightEx.Page, :screenshot, 2,
-       [:animations, :caret, :clip, :full_page, :mask, :mask_color, :omit_background, :quality, :scale, :style, :type]},
-    to_have_screenshot:
-      {PlaywrightEx.Expect, :to_have_screenshot, 2,
-       [
-         :animations,
-         :caret,
-         :clip,
-         :full_page,
-         :mask,
-         :mask_color,
-         :max_diff_pixel_ratio,
-         :max_diff_pixels,
-         :name,
-         :omit_background,
-         :scale,
-         :style_path,
-         :threshold
-       ]},
-    content: {PlaywrightEx.Page, :content, 2, [:include_shadow]},
-    pdf:
-      {PlaywrightEx.Page, :pdf, 2,
-       [
-         :display_header_footer,
-         :footer_template,
-         :format,
-         :header_template,
-         :height,
-         :landscape,
-         :margin,
-         :outline,
-         :page_ranges,
-         :prefer_css_page_size,
-         :print_background,
-         :scale,
-         :tagged,
-         :width
-       ]},
-    emulate_media:
-      {PlaywrightEx.Page, :emulate_media, 2, [:color_scheme, :contrast, :forced_colors, :media, :reduced_motion]},
-    keyboard_press: {PlaywrightEx.Keyboard, :press, 3, [:delay]},
-    keyboard_type: {PlaywrightEx.Keyboard, :type, 3, [:delay]},
-    mouse_click: {PlaywrightEx.Mouse, :click, 4, [:button, :click_count, :delay]},
-    mouse_dblclick: {PlaywrightEx.Mouse, :dblclick, 4, [:button, :delay]},
-    mouse_down: {PlaywrightEx.Mouse, :down, 2, [:button, :click_count]},
-    mouse_up: {PlaywrightEx.Mouse, :up, 2, [:button, :click_count]},
-    mouse_move: {PlaywrightEx.Mouse, :move, 4, [:steps]},
-    go_back: {PlaywrightEx.Page, :go_back, 2, [:wait_until]},
-    go_forward: {PlaywrightEx.Page, :go_forward, 2, [:wait_until]},
-    install_clock: {PlaywrightEx.Clock, :install, 2, [:time]}
+    hover: {PlaywrightEx.Locator, :hover, 2},
+    drag_to: {PlaywrightEx.Locator, :drag_to, 3},
+    press_sequentially: {PlaywrightEx.Locator, :press_sequentially, 3},
+    focus: {PlaywrightEx.Locator, :focus, 2},
+    blur: {PlaywrightEx.Locator, :blur, 2},
+    dblclick: {PlaywrightEx.Locator, :dblclick, 2},
+    tap: {PlaywrightEx.Locator, :tap, 2},
+    dispatch_event: {PlaywrightEx.Locator, :dispatch_event, 4},
+    select_text: {PlaywrightEx.Locator, :select_text, 2},
+    scroll_into_view_if_needed: {PlaywrightEx.Locator, :scroll_into_view_if_needed, 2},
+    wait_for: {PlaywrightEx.Locator, :wait_for, 2},
+    bounding_box: {PlaywrightEx.Locator, :bounding_box, 2},
+    aria_snapshot: {PlaywrightEx.Locator, :aria_snapshot, 2},
+    drop: {PlaywrightEx.Locator, :drop, 3},
+    locator_evaluate: {PlaywrightEx.Locator, :evaluate, 4},
+    locator_wait_for_function: {PlaywrightEx.Locator, :wait_for_function, 4},
+    page_aria_snapshot: {PlaywrightEx.Page, :aria_snapshot, 2},
+    wait_for_function: {PlaywrightEx.Page, :wait_for_function, 4},
+    wait_for_load_state: {PlaywrightEx.Page, :wait_for_load_state, 3},
+    unroute_all: {PlaywrightEx.BrowserContext, :unroute_all, 2},
+    locator_screenshot: {PlaywrightEx.Locator, :screenshot, 2},
+    page_screenshot: {PlaywrightEx.Page, :screenshot, 2},
+    to_have_screenshot: {PlaywrightEx.Expect, :to_have_screenshot, 2},
+    content: {PlaywrightEx.Page, :content, 2},
+    pdf: {PlaywrightEx.Page, :pdf, 2},
+    emulate_media: {PlaywrightEx.Page, :emulate_media, 2},
+    keyboard_press: {PlaywrightEx.Keyboard, :press, 3},
+    keyboard_type: {PlaywrightEx.Keyboard, :type, 3},
+    mouse_click: {PlaywrightEx.Mouse, :click, 4},
+    mouse_dblclick: {PlaywrightEx.Mouse, :dblclick, 4},
+    mouse_down: {PlaywrightEx.Mouse, :down, 2},
+    mouse_up: {PlaywrightEx.Mouse, :up, 2},
+    mouse_move: {PlaywrightEx.Mouse, :move, 4},
+    go_back: {PlaywrightEx.Page, :go_back, 2},
+    go_forward: {PlaywrightEx.Page, :go_forward, 2},
+    install_clock: {PlaywrightEx.Clock, :install, 2}
   ]
 
   @fluffy_native_keys [:timeout]
@@ -182,9 +141,9 @@ defmodule Fluffy.Options do
 
   @action_schemas @native_actions
                   |> Kernel.++(@playwright_actions)
-                  |> Map.new(fn {action, {module, fun, arity, keys}} ->
+                  |> Map.new(fn {action, {module, fun, _arity}} ->
                     native =
-                      for {key, entry} <- Native.schema(module, fun, arity, keys) do
+                      for {key, entry} <- Native.schema(module, fun, @fluffy_native_keys ++ @denied_native_keys) do
                         {key, Keyword.merge(entry, Keyword.get(@native_option_overrides, key, []))}
                       end
 
@@ -304,15 +263,19 @@ defmodule Fluffy.Options do
     selected: :boolean
   ]
 
-  {module, fun, arity, classes} = @native_locators[:by_role]
+  {module, fun, _arity, classes} = @native_locators[:by_role]
 
-  @playwright_role_locator_options Native.schema(module, fun, arity, classes[:playwright], @playwright_locator_types)
+  @playwright_role_locator_options Native.schema(module, fun, classes[:playwright], @playwright_locator_types)
 
   @playwright_locator_keys @native_locators
                            |> Enum.flat_map(fn {_, {_, _, _, classes}} -> Keyword.get(classes, :playwright, []) end)
                            |> Enum.uniq()
 
-  @playwright_option_keys @native_actions |> Enum.flat_map(fn {_, {_, _, _, keys}} -> keys end) |> Enum.uniq()
+  @playwright_option_keys @native_actions
+                          |> Enum.flat_map(fn {_, {module, fun, _}} ->
+                            Native.keys(module, fun, @fluffy_native_keys ++ @denied_native_keys)
+                          end)
+                          |> Enum.uniq()
   @expectation_schema NimbleOptions.new!(@timeout_options)
 
   @url_matcher_schema NimbleOptions.new!(
@@ -431,8 +394,7 @@ defmodule Fluffy.Options do
 
   @playwright_schema NimbleOptions.new!(
                        timeout: [type: :pos_integer, default: 15_000],
-                       isolate: [type: :boolean, default: false],
-                       log_browser_console: [type: :boolean, default: false]
+                       isolate: [type: :boolean, default: false]
                      )
 
   @type setup_option :: unquote(NimbleOptions.option_typespec(@setup_schema))
@@ -477,7 +439,7 @@ defmodule Fluffy.Options do
 
   @doc false
   def native_reference(action) do
-    {module, fun, arity, _keys} = Keyword.fetch!(@native_actions ++ @playwright_actions, action)
+    {module, fun, arity} = Keyword.fetch!(@native_actions ++ @playwright_actions, action)
     Native.reference(module, fun, arity)
   end
 

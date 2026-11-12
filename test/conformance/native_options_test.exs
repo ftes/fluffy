@@ -6,33 +6,12 @@ defmodule Fluffy.Conformance.NativeOptionsTest do
   import Fluffy.Locator
 
   alias Fluffy.Options
-  alias Fluffy.Options.NativeGenerated
   alias Fluffy.Playwright.Keyboard
   alias Fluffy.Playwright.Mouse
   alias Fluffy.TestWeb.Endpoint
-  alias Mix.Tasks.Fluffy.Gen.NativeOptions
 
   @button ~s(<button onclick="this.textContent = event.shiftKey ? 'shift' : 'plain'">Cast</button>)
   @states ~s(<button disabled>Locked</button><input aria-label="Sealed" readonly><p hidden>Secret</p>)
-
-  # Compares data, not source, so older Elixir formatters agree; CI also runs `--check`.
-  test "the generated upstream options are fresh" do
-    for {module, fun, arity} <- NativeOptions.calls() do
-      assert normalize(NativeGenerated.options(module, fun, arity)) ==
-               normalize(NativeOptions.options(module, fun, arity)),
-             "run `mix fluffy.gen.native_options` (#{inspect(module)}.#{fun}/#{arity} is stale)"
-    end
-  end
-
-  # Classification reads the installed PlaywrightEx's `__options__/1`, not the generated file.
-  test "every upstream option of an action is classified" do
-    for {action, {module, fun, _arity, playwright}} <- Options.native_actions() ++ Options.playwright_actions() do
-      fluffy = Options.fluffy_native_keys() ++ Options.denied_native_keys()
-
-      assert Enum.sort(upstream_keys(module, fun) -- fluffy) == Enum.sort(playwright),
-             "classify the upstream options of #{inspect(action)} in Fluffy.Options"
-    end
-  end
 
   test "every upstream option of an expectation is classified" do
     for {matcher, {module, fun, _arity, mirrored}} <- Options.native_expectations() do
@@ -190,9 +169,6 @@ defmodule Fluffy.Conformance.NativeOptionsTest do
       end
     end)
   end
-
-  defp normalize(options),
-    do: for({key, {type_doc, doc, spec}} <- options, do: {key, type_doc, doc, Macro.to_string(spec)})
 
   defp upstream_keys(module, fun), do: fun |> module.__options__() |> Keyword.keys()
 

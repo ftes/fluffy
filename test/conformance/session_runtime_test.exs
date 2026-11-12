@@ -189,32 +189,6 @@ defmodule Fluffy.Conformance.SessionRuntimeTest do
     assert_raise ArgumentError, ~r/session is closed/, fn -> pages(session) end
   end
 
-  for exit <- [:normal, :crash] do
-    @tag driver: :playwright
-    test "an unmanaged browser session closes its context when its owner exits (#{exit})" do
-      parent = self()
-
-      owner =
-        spawn(fn ->
-          session = session_for_html(:playwright, "<p>Owned page</p>")
-          send(parent, {:started, session.runtime, Session.context(session).browser_context})
-
-          receive do
-            :normal -> :ok
-            :crash -> exit(:crash)
-          end
-        end)
-
-      assert_receive {:started, runtime, browser_context}, 5_000
-      browser = PlaywrightEx.BrowserContext.browser(browser_context)
-      assert browser_context.guid in browser_context_guids(browser)
-      monitor = monitor_running(runtime)
-      send(owner, unquote(exit))
-      assert_receive {:DOWN, ^monitor, :process, ^runtime, :normal}, 5_000
-      refute browser_context.guid in browser_context_guids(browser)
-    end
-  end
-
   defp assert_eventually(fun, attempts \\ 100)
   defp assert_eventually(fun, 0), do: assert(fun.())
 
