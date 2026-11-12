@@ -24,6 +24,7 @@ Upgrading from 0.8? The [upgrade guide](docs/upgrading.md) lists the net changes
 
 ### Fixed
 
+- Phoenix requests no longer carry the sandbox header, as with `Phoenix.ConnTest`: they and in-process LiveViews already use the test's connection through `$callers`. The endpoint's sandbox plug ran the allowance in the test process, so it set `trap_exit` there and a custom allowance calling `Mox.allow/3` raised because owner and child were the same.
 - Handlers of `on`/`once` and `wait_for` predicates run with the registering process in `$callers`, as a `Task` does, so they can use the test's Ecto sandbox connection and mocks in async tests.
 - On Phoenix, a form a LiveView renders with `phx-trigger-action` as it connects, such as from `connected?(socket)` in `mount`, is submitted as LiveView's client does, instead of leaving the page on the LiveView. The submission counts toward the redirect limit like a mount redirect.
 - On Phoenix, a `phx-trigger-action` form is also submitted from a render the server pushes, such as from `handle_info` or after `push_patch`, as LiveView's client does; a triggered form that downloads leaves the page inert.

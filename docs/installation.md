@@ -260,6 +260,10 @@ defmodule MyApp.TestSandbox do
 end
 ```
 
+Only browser requests carry the metadata. Phoenix sessions run requests in the test
+process and LiveViews with it in `$callers`, as `Phoenix.ConnTest` does, so they use its
+connection and mocks without an allowance.
+
 Fluffy validates this configuration when its application starts. With the
 `user-agent` header, list `:user_agent` in the socket's `connect_info` in place of
 `:x_headers`. An application may instead retain its own LiveView/channel hook when

@@ -41,7 +41,9 @@ defmodule Fluffy.Backend.Phoenix do
 
   @impl true
   def start_session(options, attachment) do
-    {runtime, sandbox_header, _test_context} = attachment
+    # No sandbox header: requests and LiveViews run in the test process or with it in
+    # `$callers`, so they use its sandbox connection, as with Phoenix.ConnTest.
+    {runtime, _sandbox_header, _test_context} = attachment
 
     context = %Context{
       http: %HTTPClient{
@@ -49,7 +51,7 @@ defmodule Fluffy.Backend.Phoenix do
         endpoint: Keyword.fetch!(options, :endpoint),
         cookie_jar: Fluffy.CookieJar.new(),
         initial_conn: Keyword.get(options, :conn),
-        request_headers: put_header(Keyword.get(options, :headers, []), sandbox_header)
+        request_headers: Keyword.get(options, :headers, [])
       },
       timeout: Keyword.get_lazy(options, :timeout, &configured_timeout!/0)
     }
@@ -547,16 +549,6 @@ defmodule Fluffy.Backend.Phoenix do
     conn
     |> Plug.Conn.get_resp_header(name)
     |> List.first()
-  end
-
-  defp put_header(headers, nil), do: headers
-
-  defp put_header(headers, {name, value}) do
-    headers
-    |> Enum.reject(fn {header_name, _value} ->
-      String.downcase(to_string(header_name)) == name
-    end)
-    |> Kernel.++([{name, value}])
   end
 
   defp commit_static(conn, session, url) do

@@ -89,8 +89,24 @@ defmodule Fluffy.EctoSandboxConformanceTest do
       |> click(by_role(:link, name: "Back to database page", exact: true))
       |> expect("Static values: event, #{value}" |> by_text() |> to_be_visible())
 
-      assert_receive {:fluffy_test_sandbox_allow, TestRepo, child} when is_pid(child)
+      if backend == :playwright do
+        assert_receive {:fluffy_test_sandbox_allow, TestRepo, child} when is_pid(child)
+      else
+        # In-process requests and LiveViews use the sandbox through `$callers`, as with ConnTest.
+        refute_received {:fluffy_test_sandbox_allow, _repo, _child}
+      end
     end
+  end
+
+  test "Phoenix requests run no sandbox allowance in the test process", %{value: value} do
+    Process.flag(:trap_exit, false)
+
+    :phoenix
+    |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+    |> visit("/database")
+    |> expect("Static values: #{value}" |> by_text() |> to_be_visible())
+
+    assert Process.info(self(), :trap_exit) == {:trap_exit, false}
   end
 
   test "uses the configured sandbox transport and allowance adapter" do
