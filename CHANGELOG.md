@@ -27,6 +27,7 @@ Upgrading from 0.8? The [upgrade guide](docs/upgrading.md) lists the net changes
 
 ### Fixed
 
+- Static and LiveView compute disabled state with Playwright's `getAriaDisabled`: `aria-disabled` disables descendants too, but only elements whose role takes it, and `select_option` rejects an `aria-disabled` option.
 - Static and LiveView find `by_label` controls with Playwright's `getElementLabels`: a blank `aria-label` or an `aria-labelledby` without a valid reference falls back to the next source, and duplicate ids resolve to the first element.
 - Phoenix requests no longer carry the sandbox header, as with `Phoenix.ConnTest`: they and in-process LiveViews already use the test's connection through `$callers`. The endpoint's sandbox plug ran the allowance in the test process, so it set `trap_exit` there and a custom allowance calling `Mox.allow/3` raised because owner and child were the same.
 - Handlers of `on`/`once` and `wait_for` predicates run with the registering process in `$callers`, as a `Task` does, so they can use the test's Ecto sandbox connection and mocks in async tests.

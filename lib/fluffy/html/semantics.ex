@@ -73,7 +73,7 @@ defmodule Fluffy.HTML.Semantics do
   end
 
   # What a `select` shows before input. Each option needs :id, :attributes and
-  # :disabled?, from `DocumentIndex.option_disabled?/2`.
+  # :disabled?, from `Fluffy.HTML.Aria.option_disabled?/2`.
   def default_selected_ids(options, attributes) do
     selected = options |> Enum.filter(&has_attribute?(&1.attributes, "selected")) |> Enum.map(& &1.id)
 

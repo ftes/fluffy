@@ -21,6 +21,7 @@ defmodule Fluffy.HTML.Target do
           tag: String.t(),
           ancestors: [t()] | nil,
           selector: String.t() | nil,
+          # Natively disabled, by `Fluffy.HTML.Aria.natively_disabled?/2`.
           disabled?: boolean()
         }
 end

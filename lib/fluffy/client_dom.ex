@@ -233,7 +233,7 @@ defmodule Fluffy.ClientDOM do
 
   def fill(%__MODULE__{} = client_dom, %Locator{} = locator, value, driver, action \\ :fill) when is_binary(value) do
     target = target!(client_dom, locator)
-    ensure_target_enabled!(target, action, locator)
+    ensure_target_enabled!(client_dom, target, action, locator)
     Actionability.ensure_editable!(target.element, action, locator)
 
     if target.tag not in ["input", "textarea"] do
@@ -309,8 +309,7 @@ defmodule Fluffy.ClientDOM do
             locator: locator
 
         true ->
-          ensure_target_enabled!(target, checked_action(desired), locator)
-          Actionability.ensure_enabled!(target.element, checked_action(desired), locator)
+          ensure_target_enabled!(client_dom, target, checked_action(desired), locator)
 
           put_checked_target(client_dom, target, desired)
       end
@@ -320,7 +319,7 @@ defmodule Fluffy.ClientDOM do
 
   def select_option(%__MODULE__{} = client_dom, %Locator{} = locator, requested) do
     target = target!(client_dom, locator)
-    ensure_target_enabled!(target, :select_option, locator)
+    ensure_target_enabled!(client_dom, target, :select_option, locator)
     Actionability.ensure_selectable!(target.element, :select_option, locator)
 
     options = select_options(client_dom, target)
@@ -337,7 +336,7 @@ defmodule Fluffy.ClientDOM do
         locator: locator
     end
 
-    if Enum.any?(selected, & &1.disabled?) do
+    if Enum.any?(selected, &target_disabled?(client_dom, &1)) do
       raise Fluffy.ActionabilityError,
         action: :select_option,
         reason: :disabled_option,
@@ -396,10 +395,7 @@ defmodule Fluffy.ClientDOM do
     target_disabled?(client_dom, state_target(client_dom, target!(client_dom, locator)))
   end
 
-  defp target_disabled?(client_dom, target) do
-    target.disabled? or Actionability.disabled?(target.element) or
-      (target.tag == "option" and DocumentIndex.option_disabled?(index(client_dom), target))
-  end
+  defp target_disabled?(client_dom, target), do: Aria.aria_disabled?(Aria.for_document(client_dom.document), target)
 
   # Like Playwright, an element other than a form control takes its enabled
   # state from the closest button, so text inside a disabled button is disabled.
@@ -416,7 +412,7 @@ defmodule Fluffy.ClientDOM do
   @doc false
   def editable?(%__MODULE__{} = client_dom, %Locator{} = locator) do
     target = target!(client_dom, locator)
-    not target.disabled? and Actionability.editable?(target.element)
+    not target_disabled?(client_dom, target) and Actionability.editable?(target.element)
   end
 
   @doc false
@@ -590,7 +586,7 @@ defmodule Fluffy.ClientDOM do
       value: attribute(target.attributes, "value") || text,
       label: attribute(target.attributes, "label") || text,
       attributes: target.attributes,
-      disabled?: DocumentIndex.option_disabled?(index, target)
+      disabled?: Aria.option_disabled?(index, target)
     }
   end
 
@@ -804,12 +800,9 @@ defmodule Fluffy.ClientDOM do
   defp checked_action(true), do: :check
   defp checked_action(false), do: :uncheck
 
-  defp ensure_target_enabled!(%{disabled?: true}, action, locator) do
-    raise Fluffy.ActionabilityError,
-      action: action,
-      reason: :disabled,
-      locator: locator
+  defp ensure_target_enabled!(client_dom, target, action, locator) do
+    if target_disabled?(client_dom, target) do
+      raise Fluffy.ActionabilityError, action: action, reason: :disabled, locator: locator
+    end
   end
-
-  defp ensure_target_enabled!(_target, _action, _locator), do: :ok
 end

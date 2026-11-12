@@ -283,7 +283,8 @@ defmodule Fluffy.HTML.Aria do
     (node.id + 1)..node.last_id//1 |> Enum.map(&fetch(aria, &1)) |> Enum.reject(& &1.inert?)
   end
 
-  defp fetch(aria, id), do: Map.fetch!(aria.index.nodes_by_id, id)
+  defp fetch(%__MODULE__{index: index}, id), do: fetch(index, id)
+  defp fetch(%DocumentIndex{nodes_by_id: nodes_by_id}, id), do: Map.fetch!(nodes_by_id, id)
 
   defp parent(_aria, %{parent_id: nil}), do: nil
   defp parent(aria, %{parent_id: parent_id}), do: fetch(aria, parent_id)
@@ -394,25 +395,70 @@ defmodule Fluffy.HTML.Aria do
     end
   end
 
-  defp natively_disabled?(aria, %{tag: tag} = node)
-       when tag in ["button", "input", "select", "textarea", "option", "optgroup"] do
-    attribute?(node, "disabled") or disabled_option?(aria, node) or disabled_field_set?(aria, node)
+  @native_form_controls ~w(button input select textarea option optgroup)
+
+  @aria_disabled_roles ~w(
+    application button composite gridcell group input link menuitem scrollbar separator tab checkbox
+    columnheader combobox grid listbox menu menubar menuitemcheckbox menuitemradio option radio radiogroup
+    row rowheader searchbox select slider spinbutton switch tablist textbox toolbar tree treegrid treeitem
+  )
+
+  # roleUtils.ts getAriaDisabled. aria-disabled applies to all descendants, so
+  # it looks up the hierarchy.
+  def aria_disabled?(%__MODULE__{} = aria, node) do
+    node = fetch(aria, node.id)
+    natively_disabled?(aria, node) or explicit_aria_disabled?(aria, node)
   end
 
-  defp natively_disabled?(_aria, _node), do: false
+  # roleUtils.ts isNativelyDisabled. Takes the model or just its index, for
+  # form submission, which honors native disabled state alone. Known difference
+  # there: HTML disables a control in any disabled ancestor fieldset outside its
+  # first legend, Playwright checks only the closest one, so a control in the
+  # legend of a disabled fieldset nested in another is submitted.
+  def natively_disabled?(aria_or_index, %{tag: tag} = node) when tag in @native_form_controls do
+    node = fetch(aria_or_index, node.id)
 
-  defp disabled_option?(aria, %{tag: "option"} = node), do: DocumentIndex.option_disabled?(aria.index, node)
-  defp disabled_option?(_aria, _node), do: false
+    attribute?(node, "disabled") or belongs_to_disabled_opt_group?(aria_or_index, node) or
+      belongs_to_disabled_field_set?(aria_or_index, node)
+  end
+
+  def natively_disabled?(_aria_or_index, _node), do: false
+
+  # HTMLOptionElement.disabled, which a select's default selection and form
+  # submission honor: unlike isNativelyDisabled, a disabled fieldset does not count.
+  def option_disabled?(aria_or_index, option) do
+    attribute?(option, "disabled") or belongs_to_disabled_opt_group?(aria_or_index, fetch(aria_or_index, option.id))
+  end
+
+  defp belongs_to_disabled_opt_group?(aria_or_index, %{tag: "option"} = node) do
+    closest(aria_or_index, node, &(&1.tag == "optgroup" and attribute?(&1, "disabled"))) != nil
+  end
+
+  defp belongs_to_disabled_opt_group?(_aria_or_index, _node), do: false
 
   # Only the closest disabled fieldset counts, as in Playwright.
-  defp disabled_field_set?(aria, node) do
-    case closest(aria, node, &(&1.tag == "fieldset" and attribute?(&1, "disabled"))) do
+  defp belongs_to_disabled_field_set?(aria_or_index, node) do
+    case closest(aria_or_index, node, &(&1.tag == "fieldset" and attribute?(&1, "disabled"))) do
       nil ->
         false
 
       field_set ->
-        legend = first_child(aria, field_set, "legend")
-        legend == nil or node.id not in legend.id..legend.last_id
+        legend = first_child(aria_or_index, field_set, "legend")
+        legend == nil or node.id not in legend.id..legend.last_id//1
+    end
+  end
+
+  defp explicit_aria_disabled?(aria, node) do
+    role(aria, node) in @aria_disabled_roles and aria_disabled_in_chain?(aria, node)
+  end
+
+  defp aria_disabled_in_chain?(_aria, nil), do: false
+
+  defp aria_disabled_in_chain?(aria, node) do
+    case String.downcase(text_attribute(node, "aria-disabled")) do
+      "true" -> true
+      "false" -> false
+      _other -> aria_disabled_in_chain?(aria, parent(aria, node))
     end
   end
 
@@ -652,7 +698,7 @@ defmodule Fluffy.HTML.Aria do
 
     selected_ids =
       options
-      |> Enum.map(&Map.put(&1, :disabled?, DocumentIndex.option_disabled?(aria.index, &1)))
+      |> Enum.map(&Map.put(&1, :disabled?, option_disabled?(aria, &1)))
       |> Semantics.default_selected_ids(select.attributes)
 
     case Enum.filter(options, &(&1.id in selected_ids)) do
