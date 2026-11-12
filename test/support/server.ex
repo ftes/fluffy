@@ -17,9 +17,9 @@ defmodule Fluffy.Support.Server do
   @impl true
   def init([]) do
     children = [
-      {DynamicSupervisor, strategy: :one_for_one, name: Fluffy.TestServices},
       {Registry, keys: :duplicate, name: Fluffy.TestTimingProbe},
-      Fluffy.Support.Database,
+      Fluffy.Support.Repo,
+      Fluffy.Support.RepoTwo,
       Fluffy.Support.HTTPFixtures,
       {Phoenix.PubSub, name: Fluffy.TestPubSub},
       Endpoint

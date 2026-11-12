@@ -61,8 +61,8 @@ defmodule MyAppWeb.PotionTest do
 end
 ```
 
-Keep existing fixture and authentication setup. Fluffy adopts an existing
-sandbox checkout; the required endpoint and sandbox configuration lives in
+Keep existing fixture and authentication setup. The `ConnCase` keeps owning the
+sandbox (`start_owner!`); the required endpoint and sandbox configuration lives in
 [Installation and runtime](installation.md#ecto-sandbox). If your shared case
 already has `use Fluffy.Test`, do not add it again in individual modules.
 

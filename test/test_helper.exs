@@ -1,3 +1,5 @@
+alias Ecto.Adapters.SQL.Sandbox
+
 Application.put_env(:fluffy, :playwright_boot_state, %{pool: Process.whereis(PlaywrightEx.Test.Pool)})
 
 # As many modules at once as Playwright runs workers (half the logical cores), not ExUnit's
@@ -21,3 +23,8 @@ ExUnit.start(
 )
 
 {:ok, _test_server} = Fluffy.Support.Server.start_link()
+
+# The repos run for every test: browser sessions carry the sandbox header of `ecto_repos`,
+# and the endpoint's plug looks them up, also in tests that start no sandbox owner.
+:ok = Sandbox.mode(Fluffy.Support.Repo, :manual)
+:ok = Sandbox.mode(Fluffy.Support.RepoTwo, :manual)

@@ -92,8 +92,13 @@ Timeouts follow Elixir: `0` checks once and `:infinity` means no limit; see
   screenshots and videos come from `PlaywrightEx.Test`: set
   `config :playwright_ex, :test, trace: :retain_on_failure, screenshot: :only_on_failure`
   and replace `setup context do Fluffy.Test.setup(context) end` with `use Fluffy.Test`
-  (its options go to `use`) in modules or case templates. Files go to
+  in modules or case templates. Files go to
   `test-results/<test>/`; a failed operation no longer writes HTML or the error text.
+- Fluffy no longer starts or adopts Ecto sandbox owners: keep the generated DataCase
+  setup (`Sandbox.start_owner!(repo, shared: not tags[:async])` and `stop_owner` in
+  `on_exit`) and use it before `use Fluffy.Test`. Drop `sandbox: false` and `repos:`;
+  Fluffy adds the metadata of `config :fluffy, ecto_repos:` to browser sessions. A plain
+  `Sandbox.checkout` in the test process does not work for browser tests.
 - `Fluffy.Playwright.screenshot` and `pdf` return the image or PDF, as in Playwright,
   instead of the session; the path is the optional `path:`:
   `screenshot(session, path)` becomes `screenshot(session, path: path)`,

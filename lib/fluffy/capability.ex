@@ -289,7 +289,8 @@ defmodule Fluffy.Capability do
       id: :test_isolation,
       feature: "Per-test sessions, cleanup, and Ecto sandbox propagation",
       drivers: %{static: :equivalent, live: :equivalent, playwright: :equivalent},
-      detail: "One test scope owns all sessions and tears pages and LiveViews down before sandbox ownership."
+      detail:
+        "One test scope owns all sessions and tears pages and LiveViews down before the application's sandbox owner stops."
     },
     %{
       id: :url_matching,

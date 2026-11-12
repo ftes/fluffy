@@ -215,27 +215,28 @@ live_session :require_authenticated_user,
 end
 ```
 
-Name the application's repositories once, then establish one scope in every
-Fluffy test with the same `use Fluffy.Test` as applications without Ecto:
+The application owns the sandbox, as with `Phoenix.ConnTest`: keep the generated
+DataCase setup, which starts an owner for each test and stops it in `on_exit`, and use
+your `ConnCase` (or `DataCase`) before `use Fluffy.Test`:
+
+```elixir
+def setup_sandbox(tags) do
+  pid = Ecto.Adapters.SQL.Sandbox.start_owner!(MyApp.Repo, shared: not tags[:async])
+  on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(pid) end)
+end
+```
+
+Name the repositories once, and Fluffy adds their sandbox metadata for the test
+process to every browser session's requests:
 
 ```elixir
 config :fluffy, ecto_repos: [MyApp.Repo]
 ```
 
-```elixir
-use ExUnit.Case, async: true
-use Fluffy.Test
-```
-
-The scope adopts an existing DataCase/ConnCase checkout when present. It
-closes browser contexts and in-process LiveViews before stopping sandbox
-owners, including when the owner test process fails. Sessions also close when
-their owning process exits. Use it once per module (or case template), whether or not
-Ecto is used.
-
-Use `use Fluffy.Test, sandbox: false` for a module that deliberately
-needs lifecycle management without the configured repositories, or pass
-`repos: [...]` to override them in an umbrella or multi-repository test.
+Sessions close in their own `on_exit`, registered after the DataCase's, so browser
+contexts and in-process LiveViews close before the owner stops. A plain
+`Ecto.Adapters.SQL.Sandbox.checkout/1` in the test process is not supported for browser
+tests: its connection goes with the test process, before the browser closes.
 
 The defaults are the `x-fluffy-sandbox` header and
 `Ecto.Adapters.SQL.Sandbox`. Applications that already use Phoenix Ecto's

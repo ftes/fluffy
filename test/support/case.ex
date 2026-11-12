@@ -3,9 +3,11 @@ defmodule Fluffy.Support.Case do
 
   use ExUnit.CaseTemplate
 
+  alias Ecto.Adapters.SQL.Sandbox
+
   using do
     quote do
-      use Fluffy.Test, sandbox: false
+      use Fluffy.Test
 
       import Fluffy.Support.Case,
         only: [
@@ -30,6 +32,19 @@ defmodule Fluffy.Support.Case do
   # module, as Playwright Test's workers have.
   def isolate_firefox(context) do
     if playwright_engine?(:firefox), do: PlaywrightEx.Test.browser(context, isolate: true), else: :ok
+  end
+
+  # The application's sandbox owners, as a generated DataCase starts them: Fluffy only
+  # passes the test's sandbox to browser sessions. `setup {Fluffy.Support.Case, :start_sandbox}`.
+  def start_sandbox(context) do
+    owners =
+      for repo <- [Fluffy.Support.Repo, Fluffy.Support.RepoTwo] do
+        owner = Sandbox.start_owner!(repo, shared: not context[:async])
+        ExUnit.Callbacks.on_exit(fn -> Sandbox.stop_owner(owner) end)
+        owner
+      end
+
+    [sandbox_owners: owners]
   end
 
   # Sets the session's timeout after its setup, which runs under the default so a loaded

@@ -12,25 +12,40 @@ defmodule Fluffy.Test do
       end
 
   `use Fluffy.Test` comes after `use ExUnit.Case` (or in a case template's `using`), in
-  every module with Fluffy sessions. It registers `setup/2` with its options, such as
-  `use Fluffy.Test, sandbox: false`. It also uses `PlaywrightEx.Test`, which records the
-  traces, screenshots and videos of Playwright sessions (`config :playwright_ex, :test`)
-  and marks each test's result for them. Of `PlaywrightEx.Test`, it imports only the
-  `test` macros, as its fragment names clash with `Fluffy.Playwright`'s.
+  every module with Fluffy sessions; `Fluffy.Case` does it for you. It registers
+  `setup/1`, and a second `use` in the same module does nothing. It also uses
+  `PlaywrightEx.Test`, which records the traces, screenshots and videos of Playwright
+  sessions (`config :playwright_ex, :test`) and marks each test's result for them. Of
+  `PlaywrightEx.Test`, it imports only the `test` macros, as its fragment names clash with
+  `Fluffy.Playwright`'s.
 
-  To run `setup/2` yourself, such as after your own setup, `use PlaywrightEx.Test` instead
+  To run `setup/1` yourself, such as after your own setup, `use PlaywrightEx.Test` instead
   and call it. To override the artifact modes for a test, call
   `PlaywrightEx.Test.record_artifacts/2` in its setup, before its first session.
   """
 
   defmacro __using__(options) do
-    quote do
-      use PlaywrightEx.Test
+    if options != [] do
+      raise ArgumentError, "use Fluffy.Test takes no options, got: #{Macro.to_string(options)}"
+    end
 
-      import PlaywrightEx.Test, only: [test: 1, test: 2, test: 3]
+    module = __CALLER__.module
 
-      setup context do
-        Fluffy.Test.setup(context, unquote(options))
+    # Set as the macro expands, not by the code it returns: a later `use` in the same
+    # module body expands before that code runs.
+    if module && Module.has_attribute?(module, :fluffy_test) do
+      :ok
+    else
+      if module, do: Module.put_attribute(module, :fluffy_test, true)
+
+      quote do
+        use PlaywrightEx.Test
+
+        import PlaywrightEx.Test, only: [test: 1, test: 2, test: 3]
+
+        setup context do
+          Fluffy.Test.setup(context)
+        end
       end
     end
   end
@@ -39,29 +54,10 @@ defmodule Fluffy.Test do
   Establishes Fluffy lifecycle management for the current ExUnit test, as
   `use Fluffy.Test` does.
 
-  When Ecto repositories are configured, Fluffy also starts or adopts their SQL
-  sandbox ownership. Pass `sandbox: false` to establish lifecycle management
-  without database ownership.
-
-  ## Options
-
-  #{NimbleOptions.docs(Fluffy.Options.setup_schema())}
+  With `config :fluffy, ecto_repos:`, browser sessions carry the test process's Ecto
+  SQL sandbox metadata. The sandbox owner is the application's, started by its
+  DataCase or ConnCase; see [Ecto sandbox](installation.md#ecto-sandbox).
   """
-  @type setup_option ::
-          unquote(NimbleOptions.option_typespec(Fluffy.Options.setup_schema()))
-  @spec setup(map(), [setup_option()]) :: :ok
-  def setup(context, options \\ []) when is_map(context) and is_list(options) do
-    options = Fluffy.Options.validate_setup!(options)
-    repos = Keyword.get(options, :repos, Application.get_env(:fluffy, :ecto_repos, []))
-    sandbox? = Keyword.get(options, :sandbox, repos != [])
-
-    if sandbox? and repos == [] do
-      raise ArgumentError,
-            "Fluffy test setup requested sandbox ownership but no Ecto repositories are configured"
-    end
-
-    Fluffy.TestScope.setup(context,
-      sandbox: if(sandbox?, do: {Fluffy.Sandbox, :acquire, [context, repos]}, else: false)
-    )
-  end
+  @spec setup(map()) :: :ok
+  def setup(context) when is_map(context), do: Fluffy.TestScope.setup(context)
 end

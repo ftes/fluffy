@@ -2,6 +2,7 @@ defmodule Fluffy.TestScopeSetupTest do
   use ExUnit.Case, async: false
   use PlaywrightEx.Test
 
+  alias Fluffy.Support.Repo
   alias Fluffy.Support.Server
   alias Fluffy.Support.Web.Endpoint
   alias Fluffy.TestScope
@@ -25,7 +26,6 @@ defmodule Fluffy.TestScopeSetupTest do
     assert :ok = Fluffy.Test.setup(context)
 
     assert %{
-             owners: [],
              sandbox_header: nil,
              test_context: %{module: __MODULE__, test: test}
            } = TestScope.current()
@@ -33,11 +33,17 @@ defmodule Fluffy.TestScopeSetupTest do
     assert test == context.test
   end
 
-  test "setup can explicitly omit configured sandbox resources", context do
-    Application.put_env(:fluffy, :ecto_repos, [Fluffy.Support.Repo])
+  test "setup builds the sandbox header of the configured repos for the test process", context do
+    Application.put_env(:fluffy, :ecto_repos, [Repo])
 
-    assert :ok = Fluffy.Test.setup(context, sandbox: false)
-    assert %{owners: [], sandbox_header: nil} = TestScope.current()
+    assert :ok = Fluffy.Test.setup(context)
+    assert %{sandbox_header: {"user-agent", metadata}} = TestScope.current()
+
+    assert Phoenix.Ecto.SQL.Sandbox.decode_metadata(metadata) == %{
+             repo: [Repo],
+             owner: self(),
+             trap_exit: true
+           }
   end
 
   test "setup rejects a second lifecycle scope for the same test", context do
@@ -81,27 +87,27 @@ defmodule Fluffy.TestScopeSetupTest do
     end
   end
 
-  test "setup validates its typed options", context do
-    Application.delete_env(:fluffy, :ecto_repos)
-
-    assert_raise NimbleOptions.ValidationError, ~r/unknown options.*:mystery/, fn ->
-      Fluffy.Test.setup(context, mystery: true)
+  test "use Fluffy.Test takes no options" do
+    # A module without `use Fluffy.Test`: Phoenix sessions work, Playwright sessions need it.
+    assert_raise ArgumentError, ~r/use Fluffy.Test takes no options, got: \[sandbox: false\]/, fn ->
+      Code.compile_quoted(
+        quote do
+          defmodule Fluffy.TestScopeSetupTest.WithOptions do
+            @moduledoc false
+            use ExUnit.Case, register: false
+            use Fluffy.Test, sandbox: false
+          end
+        end
+      )
     end
-
-    assert_raise NimbleOptions.ValidationError,
-                 ~r/:repos.*invalid value|invalid value.*:repos/,
-                 fn ->
-                   Fluffy.Test.setup(context, repos: :not_a_list)
-                 end
   end
 end
 
 defmodule Fluffy.TestScopeWithoutPlaywrightTest do
-  # A module without `use Fluffy.Test`: Phoenix sessions work, Playwright sessions need it.
   use ExUnit.Case, async: true
 
   setup context do
-    Fluffy.Test.setup(context, sandbox: false)
+    Fluffy.Test.setup(context)
   end
 
   test "runs Phoenix sessions and rejects Playwright ones" do

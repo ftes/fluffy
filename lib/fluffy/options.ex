@@ -344,11 +344,6 @@ defmodule Fluffy.Options do
                                ]
                          )
 
-  @setup_schema NimbleOptions.new!(
-                  repos: [type: {:list, :atom}],
-                  sandbox: [type: :boolean]
-                )
-
   @session_schema NimbleOptions.new!(
                     endpoint: [type: :atom],
                     base_url: [type: :string],
@@ -360,7 +355,6 @@ defmodule Fluffy.Options do
 
   @playwright_schema NimbleOptions.new!(timeout: [type: :pos_integer, default: 15_000])
 
-  @type setup_option :: unquote(NimbleOptions.option_typespec(@setup_schema))
   @type session_option :: unquote(NimbleOptions.option_typespec(@session_schema))
   @type playwright_option :: unquote(NimbleOptions.option_typespec(@playwright_schema))
 
@@ -369,9 +363,6 @@ defmodule Fluffy.Options do
   def text_or_reg_exp(value) when is_binary(value) or is_struct(value, PlaywrightEx.RegExp), do: {:ok, value}
   def text_or_reg_exp(%Regex{} = value), do: {:ok, PlaywrightEx.RegExp.new(value)}
   def text_or_reg_exp(value), do: {:error, "expected a string or a regex, got: #{inspect(value)}"}
-
-  @doc false
-  def setup_schema, do: @setup_schema
 
   @doc false
   def session_schema, do: @session_schema
@@ -476,9 +467,6 @@ defmodule Fluffy.Options do
 
   @spec validate_filter_locator!(keyword()) :: keyword()
   def validate_filter_locator!(options), do: NimbleOptions.validate!(options, @filter_locator_schema)
-
-  @spec validate_setup!(keyword()) :: keyword()
-  def validate_setup!(options), do: NimbleOptions.validate!(options, @setup_schema)
 
   @spec validate_session!(atom(), keyword()) :: keyword()
   def validate_session!(backend, options) do

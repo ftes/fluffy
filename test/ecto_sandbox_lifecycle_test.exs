@@ -1,25 +1,19 @@
 defmodule Fluffy.EctoSandboxLifecycleTest do
   use ExUnit.Case, async: true
-  use PlaywrightEx.Test
+  use Fluffy.Test
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
   import Fluffy.Support.Case, only: [browser_context_guids: 1]
 
+  alias Fluffy.Support.Case
   alias Fluffy.Support.Repo
-  alias Fluffy.Support.RepoTwo
   alias Fluffy.Support.Server
   alias Fluffy.Support.Web.Endpoint
-  alias Fluffy.TestScope
-
-  setup_all do
-    :ok = Fluffy.Support.Database.ensure_started()
-  end
 
   test "propagates metadata for multiple repos", context do
-    assert :ok = Fluffy.Test.setup(context, repos: [Repo, RepoTwo])
-    assert length(TestScope.current().owners) == 2
+    Case.start_sandbox(context)
 
     session =
       start_session(:playwright,
@@ -33,17 +27,17 @@ defmodule Fluffy.EctoSandboxLifecycleTest do
   end
 
   @tag :capture_log
-  test "teardown closes sessions before it stops sandbox owners", context do
+  test "teardown closes sessions before the application's sandbox owner stops", context do
     observer = start_exit_observer()
-    # Registered before the setup's callbacks, so it runs after them.
+    # Registered before the owner's callbacks, so it runs after them.
     on_exit(fn ->
       {order, {browser_context, playwright_browser}} = exit_order(observer)
       assert List.last(order) == :owner
       refute browser_context.guid in browser_context_guids(playwright_browser)
     end)
 
-    assert :ok = Fluffy.Test.setup(context, repos: [Repo])
-    [owner] = TestScope.current().owners
+    # As a DataCase's setup would, before the test's sessions.
+    [sandbox_owners: [owner, _owner_two]] = Case.start_sandbox(context)
 
     Repo.query!("CREATE TEMP TABLE fluffy_records (value text NOT NULL) ON COMMIT DROP")
     Repo.query!("INSERT INTO fluffy_records (value) VALUES ('shutdown')")
@@ -94,6 +88,7 @@ defmodule Fluffy.EctoSandboxLifecycleTest do
     {order, data}
   end
 
+  # Not async, so the owner is shared.
   defp database_name do
     :fluffy |> Application.fetch_env!(Repo) |> Keyword.fetch!(:database)
   end
@@ -101,27 +96,17 @@ end
 
 defmodule Fluffy.EctoSandboxSharedModeTest do
   use ExUnit.Case, async: false
-  use PlaywrightEx.Test
+  use Fluffy.Test
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Ecto.Adapters.SQL.Sandbox
   alias Fluffy.Support.Repo
-  alias Fluffy.TestScope
 
-  setup_all do
-    :ok = Fluffy.Support.Database.ensure_started()
-  end
+  setup {Fluffy.Support.Case, :start_sandbox}
 
-  test "adopts an existing shared sandbox and supports multiple sessions", context do
-    owner = Sandbox.start_owner!(Repo, shared: true)
-    on_exit(fn -> Sandbox.stop_owner(owner) end)
-
-    assert :ok = Fluffy.Test.setup(context, repos: [Repo])
-    assert TestScope.current().owners == []
-
+  test "a shared sandbox owner serves multiple sessions" do
     Repo.query!("CREATE TEMP TABLE fluffy_records (value text NOT NULL) ON COMMIT DROP")
     Repo.query!("INSERT INTO fluffy_records (value) VALUES ('shared')")
 

@@ -21,7 +21,7 @@ defmodule Fluffy.SandboxConfigurationTest do
     on_exit(fn -> Application.put_env(:fluffy, Sandbox, original) end)
     Application.put_env(:fluffy, Sandbox, trap_exit: false)
 
-    assert {[], {"x-fluffy-sandbox", metadata}} = Sandbox.acquire(%{async: true}, [])
+    assert {"x-fluffy-sandbox", metadata} = Sandbox.metadata_header(self())
     assert %{trap_exit: false, owner: owner} = Phoenix.Ecto.SQL.Sandbox.decode_metadata(metadata)
     assert owner == self()
     assert_raise ArgumentError, fn -> Sandbox.validate_config!(trap_exit: :invalid) end

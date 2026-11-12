@@ -1,6 +1,6 @@
 defmodule Fluffy.EctoSandboxConformanceTest do
   use ExUnit.Case, async: true
-  use PlaywrightEx.Test
+  use Fluffy.Test
 
   import Fluffy
   import Fluffy.Expect
@@ -11,12 +11,9 @@ defmodule Fluffy.EctoSandboxConformanceTest do
   alias Fluffy.Support.Server
   alias Fluffy.Support.Web.Endpoint
 
-  setup_all do
-    :ok = Fluffy.Support.Database.ensure_started()
-  end
+  setup {Fluffy.Support.Case, :start_sandbox}
 
-  setup context do
-    :ok = Fluffy.Test.setup(context, repos: [Repo])
+  setup do
     value = "record-#{System.unique_integer([:positive, :monotonic])}"
 
     Repo.query!("CREATE TEMP TABLE fluffy_records (value text NOT NULL) ON COMMIT DROP")
@@ -136,62 +133,5 @@ defmodule Fluffy.EctoSandboxConformanceTest do
       base_url: Server.base_url(),
       endpoint: Endpoint
     )
-  end
-end
-
-defmodule Fluffy.EctoSandboxAdoptionTest do
-  use ExUnit.Case, async: true
-  use PlaywrightEx.Test
-
-  import Fluffy
-  import Fluffy.Expect
-  import Fluffy.Locator
-
-  alias Ecto.Adapters.SQL.Sandbox
-  alias Fluffy.Support.Repo
-  alias Fluffy.Support.Server
-  alias Fluffy.Support.Web.Endpoint
-  alias Fluffy.TestScope
-
-  setup_all do
-    :ok = Fluffy.Support.Database.ensure_started()
-  end
-
-  test "adopts an existing sandbox checkout without starting another owner", context do
-    :ok = Sandbox.checkout(Repo)
-    on_exit(fn -> Sandbox.checkin(Repo) end)
-
-    assert :ok = Fluffy.Test.setup(context, repos: [Repo])
-    assert TestScope.current().owners == []
-
-    Repo.query!("CREATE TEMP TABLE fluffy_records (value text NOT NULL) ON COMMIT DROP")
-    Repo.query!("INSERT INTO fluffy_records (value) VALUES ('adopted')")
-
-    :phoenix
-    |> start_session(
-      base_url: Server.base_url(),
-      endpoint: Endpoint
-    )
-    |> visit("/database")
-    |> expect("Static values: adopted" |> by_text() |> to_be_visible())
-  end
-
-  test "adopts an existing sandbox allowance without starting another owner", context do
-    owner = Sandbox.start_owner!(Repo)
-    on_exit(fn -> Sandbox.stop_owner(owner) end)
-
-    assert :ok = Fluffy.Test.setup(context, repos: [Repo])
-    assert TestScope.current().owners == []
-
-    Repo.query!("CREATE TEMP TABLE fluffy_records (value text NOT NULL) ON COMMIT DROP")
-    Repo.query!("INSERT INTO fluffy_records (value) VALUES ('allowed')")
-
-    :phoenix
-    |> start_session(
-      base_url: Server.base_url(),
-      endpoint: Endpoint
-    )
-    |> visit("/database")
-    |> expect("Static values: allowed" |> by_text() |> to_be_visible())
   end
 end

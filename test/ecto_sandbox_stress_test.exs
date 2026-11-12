@@ -6,7 +6,7 @@ defmodule Fluffy.EctoSandboxStressCase do
 
   using do
     quote do
-      use PlaywrightEx.Test
+      use Fluffy.Test
 
       import Fluffy
       import Fluffy.Expect
@@ -14,9 +14,9 @@ defmodule Fluffy.EctoSandboxStressCase do
     end
   end
 
-  setup context do
-    :ok = Fluffy.Support.Database.ensure_started()
-    :ok = Fluffy.Test.setup(context, repos: [Repo])
+  setup {Fluffy.Support.Case, :start_sandbox}
+
+  setup do
     value = "stress-#{System.unique_integer([:positive, :monotonic])}"
 
     Repo.query!("CREATE TEMP TABLE fluffy_records (value text NOT NULL) ON COMMIT DROP")
