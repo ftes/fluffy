@@ -65,7 +65,7 @@ defmodule Fluffy.Backend do
     backend.start_session(options, attachment)
   rescue
     error ->
-      {_scope, runtime, _header} = attachment
+      {runtime, _header, _test_context} = attachment
       Fluffy.SessionRuntime.close(runtime)
       reraise error, __STACKTRACE__
   end

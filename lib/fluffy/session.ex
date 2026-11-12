@@ -84,15 +84,5 @@ defmodule Fluffy.Session do
   defp value!(:ok), do: :ok
   defp value!({:error, message}), do: raise(ArgumentError, message)
 
-  defp start_runtime do
-    case Fluffy.TestScope.current() do
-      scope when is_pid(scope) ->
-        {_scope, runtime, _header} = Fluffy.TestScope.attach_session(scope)
-        runtime
-
-      nil ->
-        {:ok, runtime} = SessionRuntime.start(self())
-        runtime
-    end
-  end
+  defp start_runtime, do: Fluffy.TestScope.start_runtime()
 end

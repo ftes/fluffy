@@ -5,7 +5,7 @@ defmodule Fluffy.EctoSandboxLifecycleTest do
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
-  import Fluffy.TestCase, only: [monitor_running: 1]
+  import Fluffy.TestCase, only: [browser_context_guids: 1]
 
   alias Fluffy.TestRepo
   alias Fluffy.TestRepoTwo
@@ -18,9 +18,7 @@ defmodule Fluffy.EctoSandboxLifecycleTest do
 
   test "propagates metadata for multiple repos", context do
     assert :ok = Fluffy.Test.setup(context, repos: [TestRepo, TestRepoTwo])
-    scope = TestScope.current()
-
-    assert length(TestScope.status(scope).owners) == 2
+    assert length(TestScope.current().owners) == 2
 
     session =
       start_session(:playwright,
@@ -34,74 +32,62 @@ defmodule Fluffy.EctoSandboxLifecycleTest do
   end
 
   @tag :capture_log
-  test "scope shutdown closes browser contexts before sandbox owners", context do
+  test "teardown closes sessions before it stops sandbox owners", context do
+    observer = start_exit_observer()
+    # Registered before the setup's callbacks, so it runs after them.
+    on_exit(fn ->
+      {order, browser_context} = exit_order(observer)
+      assert List.last(order) == :owner
+      refute browser_context.guid in browser_context_guids(PlaywrightEx.BrowserContext.browser(browser_context))
+    end)
+
     assert :ok = Fluffy.Test.setup(context, repos: [TestRepo])
-    scope = TestScope.current()
-    [owner] = TestScope.status(scope).owners
+    [owner] = TestScope.current().owners
 
     TestRepo.query!("CREATE TEMP TABLE fluffy_records (value text NOT NULL) ON COMMIT DROP")
     TestRepo.query!("INSERT INTO fluffy_records (value) VALUES ('shutdown')")
 
-    session =
+    browser =
       :playwright
-      |> start_session(
-        base_url: Fluffy.TestServer.base_url(),
-        endpoint: Endpoint
-      )
+      |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
       |> visit("/live/database?delay=250")
 
-    browser_context = Fluffy.Session.context(session).browser_context
-    browser = PlaywrightEx.BrowserContext.browser(browser_context)
-    GenServer.stop(scope)
-
-    refute Process.alive?(owner)
-    refute browser_context.guid in Fluffy.TestCase.browser_context_guids(browser)
-  end
-
-  @tag :capture_log
-  test "a sandbox owner crash closes the scope's browser resources", context do
-    assert :ok = Fluffy.Test.setup(context, repos: [TestRepo])
-    scope = TestScope.current()
-    [owner] = TestScope.status(scope).owners
-
-    session =
-      start_session(:playwright,
-        base_url: Fluffy.TestServer.base_url(),
-        endpoint: Endpoint
-      )
-
-    %{browser_context: browser_context, timeout: timeout} = Fluffy.Session.context(session)
-    browser = PlaywrightEx.BrowserContext.browser(browser_context)
-    scope_reference = monitor_running(scope)
-    Process.exit(owner, :kill)
-
-    # Teardown waits up to the session timeout for the browser context to close.
-    assert_receive {:DOWN, ^scope_reference, :process, ^scope, {:shutdown, {:sandbox_owner_down, :killed}}},
-                   timeout + 1_000
-
-    refute browser_context.guid in Fluffy.TestCase.browser_context_guids(browser)
-  end
-
-  test "supervisor shutdown drains Live resources before stopping sandbox ownership" do
-    owner = Ecto.Adapters.SQL.Sandbox.start_owner!(TestRepo)
-    {:ok, supervisor} = DynamicSupervisor.start_link(strategy: :one_for_one)
-
-    {:ok, scope} =
-      DynamicSupervisor.start_child(
-        supervisor,
-        {TestScope, owners: [owner], sandbox_header: nil, test_context: %{}}
-      )
-
-    {_scope, runtime, _header} = TestScope.attach_session(scope)
+    live = start_session(:phoenix, base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
     {:ok, live_view} = Agent.start(fn -> nil end)
-    :ok = Fluffy.Backend.Phoenix.register_process(runtime, :live_view, live_view, 100)
+    :ok = Fluffy.Backend.Phoenix.register_process(live.runtime, :live_view, live_view, 100)
 
-    owner_reference = monitor_running(owner)
-    view_reference = monitor_running(live_view)
-    Supervisor.stop(supervisor)
+    watch_exits(
+      observer,
+      %{browser.runtime => :browser, live_view => :live_view, owner => :owner},
+      Fluffy.Session.context(browser).browser_context
+    )
+  end
 
-    assert_receive {:DOWN, ^view_reference, :process, ^live_view, :shutdown}, 1_000
-    assert_receive {:DOWN, ^owner_reference, :process, ^owner, :normal}, 1_000
+  # Records the order in which the watched processes exit, for an `on_exit` to read with `data`.
+  defp start_exit_observer do
+    spawn(fn ->
+      receive do
+        {:watch, from, names, data} ->
+          references = Map.new(names, fn {pid, name} -> {Process.monitor(pid), name} end)
+          send(from, :watching)
+
+          order =
+            for _name <- names, do: receive(do: ({:DOWN, reference, :process, _pid, _reason} -> references[reference]))
+
+          receive do: ({:order, from} -> send(from, {:order, order, data}))
+      end
+    end)
+  end
+
+  defp watch_exits(observer, names, data) do
+    send(observer, {:watch, self(), names, data})
+    assert_receive :watching
+  end
+
+  defp exit_order(observer) do
+    send(observer, {:order, self()})
+    assert_receive {:order, order, data}, 5_000
+    {order, data}
   end
 
   defp database_name do
@@ -130,8 +116,7 @@ defmodule Fluffy.EctoSandboxSharedModeTest do
     on_exit(fn -> Sandbox.stop_owner(owner) end)
 
     assert :ok = Fluffy.Test.setup(context, repos: [TestRepo])
-    scope = TestScope.current()
-    assert TestScope.status(scope).owners == []
+    assert TestScope.current().owners == []
 
     TestRepo.query!("CREATE TEMP TABLE fluffy_records (value text NOT NULL) ON COMMIT DROP")
     TestRepo.query!("INSERT INTO fluffy_records (value) VALUES ('shared')")

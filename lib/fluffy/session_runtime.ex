@@ -4,8 +4,8 @@ defmodule Fluffy.SessionRuntime do
 
   alias Fluffy.Page
 
-  def start(owner, scope \\ nil) do
-    DynamicSupervisor.start_child(__MODULE__.Supervisor, {__MODULE__, owner: owner, scope: scope})
+  def start(owner) do
+    DynamicSupervisor.start_child(__MODULE__.Supervisor, {__MODULE__, owner: owner})
   end
 
   def start_link(options), do: GenServer.start_link(__MODULE__, options)
@@ -88,9 +88,7 @@ defmodule Fluffy.SessionRuntime do
   @impl true
   def init(options) do
     Process.flag(:trap_exit, true)
-    owner = Keyword.fetch!(options, :owner)
-    scope = Keyword.get(options, :scope)
-    monitors = [Process.monitor(owner)] ++ if(scope, do: [Process.monitor(scope)], else: [])
+    monitors = [Process.monitor(Keyword.fetch!(options, :owner))]
 
     {:ok,
      %{

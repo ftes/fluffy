@@ -41,7 +41,7 @@ defmodule Fluffy.Backend.Phoenix do
 
   @impl true
   def start_session(options, attachment) do
-    {resource_scope, runtime, sandbox_header} = attachment
+    {runtime, sandbox_header, _test_context} = attachment
 
     context = %Context{
       http: %HTTPClient{
@@ -51,7 +51,6 @@ defmodule Fluffy.Backend.Phoenix do
         initial_conn: Keyword.get(options, :conn),
         request_headers: put_header(Keyword.get(options, :headers, []), sandbox_header)
       },
-      resource_scope: resource_scope,
       timeout: Keyword.get_lazy(options, :timeout, &configured_timeout!/0)
     }
 
@@ -79,7 +78,7 @@ defmodule Fluffy.Backend.Phoenix do
 
     Session.new(
       __MODULE__,
-      %Context{http: nil, resource_scope: nil, timeout: 1_000},
+      %Context{http: nil, timeout: 1_000},
       page
     )
   end

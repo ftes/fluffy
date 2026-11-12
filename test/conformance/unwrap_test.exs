@@ -606,7 +606,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
 
       browser_context = BrowserPage.context(untracked)
       browser = BrowserContext.browser(browser_context)
-      :ok = GenServer.stop(Fluffy.TestScope.current())
+      :ok = close_session(session)
 
       refute browser_context.guid in browser_context_guids(browser)
     end

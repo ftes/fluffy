@@ -8,7 +8,6 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
   alias Fluffy.Driver.Live.UploadState
   alias Fluffy.FilePayload
   alias Fluffy.Session
-  alias Fluffy.TestScope
 
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
@@ -591,7 +590,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
     refute Process.alive?(upload_client)
   end
 
-  test "scope teardown releases a managed upload client after an assertion failure" do
+  test "closing the session releases a managed upload client after an assertion failure" do
     session =
       :phoenix
       |> start_test_session()
@@ -599,7 +598,6 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       |> set_input_files(by_label("Attachment"), fixture_path())
 
     [upload_client] = upload_clients(session)
-    scope = TestScope.current()
 
     assert_raise ExUnit.AssertionError, fn ->
       expect(session, "not rendered" |> by_text() |> to_be_visible(), timeout: 0)
@@ -608,7 +606,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
     trap_exits? = Process.flag(:trap_exit, true)
 
     try do
-      :ok = GenServer.stop(scope)
+      :ok = close_session(session)
       refute Process.alive?(upload_client)
     after
       Process.flag(:trap_exit, trap_exits?)

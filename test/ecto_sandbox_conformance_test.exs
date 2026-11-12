@@ -130,8 +130,7 @@ defmodule Fluffy.EctoSandboxAdoptionTest do
     on_exit(fn -> Sandbox.checkin(TestRepo) end)
 
     assert :ok = Fluffy.Test.setup(context, repos: [TestRepo])
-    scope = TestScope.current()
-    assert TestScope.status(scope).owners == []
+    assert TestScope.current().owners == []
 
     TestRepo.query!("CREATE TEMP TABLE fluffy_records (value text NOT NULL) ON COMMIT DROP")
     TestRepo.query!("INSERT INTO fluffy_records (value) VALUES ('adopted')")
@@ -150,8 +149,7 @@ defmodule Fluffy.EctoSandboxAdoptionTest do
     on_exit(fn -> Sandbox.stop_owner(owner) end)
 
     assert :ok = Fluffy.Test.setup(context, repos: [TestRepo])
-    scope = TestScope.current()
-    assert TestScope.status(scope).owners == []
+    assert TestScope.current().owners == []
 
     TestRepo.query!("CREATE TEMP TABLE fluffy_records (value text NOT NULL) ON COMMIT DROP")
     TestRepo.query!("INSERT INTO fluffy_records (value) VALUES ('allowed')")

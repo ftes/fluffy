@@ -16,15 +16,13 @@ defmodule Fluffy.Backend.Playwright do
   alias Fluffy.PageLifecycle
   alias Fluffy.Session
   alias Fluffy.SessionRuntime
-  alias Fluffy.TestScope
   alias PlaywrightEx.BrowserContext
   alias PlaywrightEx.Page, as: BrowserPage
   alias PlaywrightEx.TargetClosedError
 
   @impl true
   def start_session(options, attachment) do
-    {resource_scope, runtime, sandbox_header} = attachment
-    test_context = TestScope.metadata(resource_scope)
+    {runtime, sandbox_header, test_context} = attachment
     base_url = Keyword.fetch!(options, :base_url)
     config = Options.playwright_config()
     timeout = Keyword.get_lazy(options, :timeout, fn -> Keyword.fetch!(config, :timeout) end)
@@ -69,7 +67,6 @@ defmodule Fluffy.Backend.Playwright do
       browser_context: browser_context,
       base_url: base_url,
       extra_http_headers: headers,
-      resource_scope: resource_scope,
       timeout: timeout
     }
 

@@ -22,16 +22,12 @@ defmodule Fluffy.TestScopeSetupTest do
     Application.delete_env(:fluffy, :ecto_repos)
 
     assert :ok = Fluffy.Test.setup(context)
-    scope = TestScope.current()
-
-    assert is_pid(scope)
-    assert Process.alive?(scope)
 
     assert %{
              owners: [],
              sandbox_header: nil,
              test_context: %{module: __MODULE__, test: test}
-           } = TestScope.status(scope)
+           } = TestScope.current()
 
     assert test == context.test
   end
@@ -40,7 +36,7 @@ defmodule Fluffy.TestScopeSetupTest do
     Application.put_env(:fluffy, :ecto_repos, [Fluffy.TestRepo])
 
     assert :ok = Fluffy.Test.setup(context, sandbox: false)
-    assert %{owners: [], sandbox_header: nil} = TestScope.status(TestScope.current())
+    assert %{owners: [], sandbox_header: nil} = TestScope.current()
   end
 
   test "setup rejects a second lifecycle scope for the same test", context do
