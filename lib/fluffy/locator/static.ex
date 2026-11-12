@@ -85,8 +85,8 @@ defmodule Fluffy.Locator.Static do
     end)
   end
 
-  # Playwright's test id engine: any of the comma-separated names of Playwright Test's
-  # `testIdAttribute`, which the Playwright driver's selectors get from the same config.
+  # Playwright's test id engine: any of the comma-separated names of `test_id_attribute`,
+  # Fluffy's config, which the Playwright driver's locators get too.
   defp apply_operation({:test_id, test_id}, scopes) do
     names = test_id_attribute_names()
 
@@ -188,14 +188,8 @@ defmodule Fluffy.Locator.Static do
 
   defp text(aria, element), do: Semantics.text(Aria.node_for(aria, element))
 
-  # PlaywrightEx's `test_id_attribute` config, as PlaywrightEx.Test reads it (it has no public
-  # reader).
-  defp test_id_attribute_names do
-    :playwright_ex
-    |> Application.get_env(:test, [])
-    |> Keyword.get(:test_id_attribute, "data-testid")
-    |> LocatorUtils.split_test_id_attribute_names()
-  end
+  defp test_id_attribute_names,
+    do: :test_id_attribute |> Fluffy.Options.config!() |> LocatorUtils.split_test_id_attribute_names()
 
   defp element_attribute(element, name) do
     case LazyHTML.attribute(element, name) do

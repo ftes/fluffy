@@ -54,17 +54,17 @@ Timeouts follow Playwright Test, and Elixir for `timeout:`: `0` checks once and 
 means no limit; see [Timeouts](installation.md#timeouts).
 
 - `start_session(timeout:)`, `config :fluffy, timeout:` and `config :fluffy, :playwright`
-  are removed; the config raises at startup. Set the defaults in PlaywrightEx's config:
+  are removed; the old config raises at startup. Set Playwright Test's defaults instead:
 
   ```diff
-  -config :fluffy, playwright: [timeout: 15_000]
-  +config :playwright_ex, :test, action_timeout: 15_000, navigation_timeout: 15_000
+  -config :fluffy, timeout: 2_000, playwright: [timeout: 15_000]
+  +config :fluffy, action_timeout: 15_000, navigation_timeout: 15_000, expect_timeout: 5_000
   ```
 
   Without them, actions and navigations have no timeout, so the test's timeout bounds them,
   and a Static or LiveView action on a missing element fails with ExUnit's timeout rather
-  than Fluffy's error. Assertions default to 5 seconds on every driver
-  (`config :playwright_ex, :expect, timeout:`); Phoenix used to wait 1 second.
+  than Fluffy's error. Assertions default to 5 seconds on every driver; Phoenix used to wait
+  1 second. PlaywrightEx's own timeout config doesn't affect Fluffy sessions.
 - Playwright actions, waits, `reload`, `go_back` and `go_forward` raise `ArgumentError`
   for `timeout: 0` instead of timing out after 1ms; pass a positive timeout. Assertions
   and Phoenix actions still check once.
@@ -118,7 +118,7 @@ means no limit; see [Timeouts](installation.md#timeouts).
 - `Fluffy.step/3` is `Fluffy.Playwright.step/4`, `PlaywrightEx.Test.step/3` in a pipeline.
   It raises `Fluffy.CapabilityError` on Phoenix, where it used to just run the callback.
 - `by_test_id/2` takes no `attribute:`, as Playwright's `getByTestId`: every driver reads
-  `config :playwright_ex, :test, test_id_attribute:` (`data-testid` by default). For another
+  `config :fluffy, test_id_attribute:` (`data-testid` by default). For another
   attribute in one place, replace `by_test_id("hedwig", attribute: "data-owl")` with
   `by_css("[data-owl=\"hedwig\"]")`.
 - `filter/2` takes no `exact:`, as in Playwright. Match a whole text with a regex, such as

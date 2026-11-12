@@ -27,8 +27,8 @@ defmodule Fluffy.Support.PlaywrightMembers do
   @event_value {:unwrap, "on the PlaywrightEx value an event delivers, as in Playwright"}
   @native_retry {:unwrap, "gap: retries any callback natively, Fluffy calls in it too"}
   @own_timeouts {:denied,
-                 "the defaults are config, as in Playwright Test: `action_timeout` and `navigation_timeout` of " <>
-                   "`config :playwright_ex, :test`; Fluffy's own calls read them there"}
+                 "the defaults are config, as in Playwright Test: `config :fluffy, action_timeout:, " <>
+                   "navigation_timeout:`, which the session sets on its context"}
   @own_listeners {:denied, "removes the listeners Fluffy relies on for pages and events"}
   @own_document {:denied, "replaces the tracked document outside navigation tracking"}
 

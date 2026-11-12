@@ -40,8 +40,9 @@ Igniter.new()
   [:endpoint],
   FluffyConsumerWeb.Endpoint
 )
+|> Config.configure("test.exs", :fluffy, [:action_timeout], 15_000)
+|> Config.configure("test.exs", :fluffy, [:navigation_timeout], 15_000)
 |> Config.configure("test.exs", :playwright_ex, [:test, :launch_options], headless: true)
-|> Config.configure("test.exs", :playwright_ex, [:test, :action_timeout], 15_000)
 |> Igniter.Libs.Phoenix.append_to_scope(
   "/",
   """

@@ -43,7 +43,7 @@ defmodule Fluffy.Conformance.LiveReadinessTimeoutTest do
   alias Fluffy.Support.Server
 
   setup_all do
-    put_playwright_ex_config(:test, navigation_timeout: 1_000)
+    put_fluffy_config(navigation_timeout: 1_000)
   end
 
   @tag driver: :playwright

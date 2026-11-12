@@ -40,8 +40,8 @@ defmodule Fluffy.Backend.Playwright do
       |> Map.new(fn {name, value} -> {String.downcase(to_string(name)), value} end)
 
     # PlaywrightEx.Test records the context for the test and gives it Playwright Test's
-    # defaults, its action and navigation timeouts too, also from a process with the test
-    # in `$callers`; the runtime closes it with the session. As in Playwright, closing has
+    # defaults, also from a process with the test in `$callers`; the runtime closes it with
+    # the session. As in Playwright, closing has
     # no timeout. A browser lost to a dead driver still refuses contexts until its
     # disconnect arrives; as in Playwright Test, that session fails.
     browser_context =
@@ -64,6 +64,10 @@ defmodule Fluffy.Backend.Playwright do
         end)
 
       SessionRuntime.run(runtime, fn ->
+        # Fluffy's action and navigation timeouts, over PlaywrightEx.Test's: native calls in
+        # `unwrap` default to them too, as Fluffy's own calls do.
+        :ok = BrowserContext.set_default_timeout(browser_context, Timeouts.action())
+        :ok = BrowserContext.set_default_navigation_timeout(browser_context, Timeouts.navigation())
         _disposable = BrowserContext.add_init_script!(browser_context, Document.init_script())
       end)
 

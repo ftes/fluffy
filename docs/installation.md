@@ -60,18 +60,24 @@ for Fluffy's automatic LiveView connection wait.
 
 ## Timeouts
 
-As in Playwright Test, the defaults are PlaywrightEx's config, on every driver:
+Fluffy's config sets the defaults on every driver, with Playwright Test's names and defaults:
 
 ```elixir
-config :playwright_ex, :test,
-  # Actions, locator waits and event waits; none by default.
+config :fluffy,
+  # Actions, locator waits and event waits; `:infinity` (none) by default.
   action_timeout: 15_000,
-  # `visit`, `reload`, `go_back`, `go_forward` and `wait_for_load_state`; none by default.
-  navigation_timeout: 15_000
-
-# Assertions; 5 seconds by default.
-config :playwright_ex, :expect, timeout: 5_000
+  # `visit`, `reload`, `go_back`, `go_forward` and `wait_for_load_state`; `:infinity` by default.
+  navigation_timeout: 15_000,
+  # Assertions; 5 seconds by default.
+  expect_timeout: 5_000
 ```
+
+They are Elixir timeouts: a positive integer or `:infinity`, and for `expect_timeout` also `0`,
+which checks once, as a call's `timeout: 0`. `action_timeout` and `navigation_timeout` reject
+`0`, as Playwright actions and navigations cannot check once. A Playwright session sets them
+on its browser context, so native calls in an `unwrap` callback get them too.
+PlaywrightEx's own `action_timeout` and `navigation_timeout` apply only to raw PlaywrightEx
+tests and don't affect Fluffy sessions.
 
 With no action or navigation timeout, the test's timeout bounds them (ExUnit's default
 is 60 seconds). On Playwright, PlaywrightEx.Test closes the test's contexts just before,
@@ -80,8 +86,7 @@ Static or LiveView action that never finds its element fails with ExUnit's timeo
 set an `action_timeout` to get Fluffy's error with the locator. There is no per-session
 timeout; pass `timeout:` to a call.
 
-An operation's `timeout: 0` checks once, unlike Playwright, where `0` disables the timeout
-(as it does in the config above).
+An operation's `timeout: 0` checks once, unlike Playwright, where `0` disables the timeout.
 Playwright assertions check once too, but Playwright actions and waits reject 0 with an
 `ArgumentError`, as they cannot check once; pass a positive timeout.
 
@@ -115,8 +120,8 @@ mix playwright_ex.install -- chromium
 On Linux CI runners, add `--with-deps` to install the browser's system packages too:
 `mix playwright_ex.install -- chromium --with-deps`.
 
-Configure the backend in `config/test.exs`. The browser, its driver and the default
-[timeouts](#timeouts) are `PlaywrightEx.Test`'s:
+Configure the backend in `config/test.exs`. The browser and its driver are
+`PlaywrightEx.Test`'s; the [timeouts](#timeouts) are Fluffy's:
 
 ```elixir
 config :playwright_ex, :test,

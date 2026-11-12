@@ -1,5 +1,5 @@
 defmodule Fluffy.Conformance.DefaultTimeoutTest do
-  # As in Playwright Test, the defaults are PlaywrightEx's config, which is global.
+  # As in Playwright Test, the defaults are config, Fluffy's, which is global.
   use Fluffy.Support.Case, async: false
 
   import Fluffy
@@ -17,10 +17,12 @@ defmodule Fluffy.Conformance.DefaultTimeoutTest do
   @missing by_role(:button, name: "Missing")
   @appeared by_role(:button, name: "Appeared")
 
-  # PlaywrightEx.Test sets each context's defaults when a test registers, in its `setup`.
   setup_all do
-    put_playwright_ex_config(:test, action_timeout: @action_timeout, navigation_timeout: @navigation_timeout)
-    put_playwright_ex_config(:expect, timeout: @expect_timeout)
+    put_fluffy_config(
+      action_timeout: @action_timeout,
+      navigation_timeout: @navigation_timeout,
+      expect_timeout: @expect_timeout
+    )
   end
 
   for driver <- [:phoenix, :playwright] do
@@ -57,6 +59,18 @@ defmodule Fluffy.Conformance.DefaultTimeoutTest do
       |> expect("Activated" |> by_text() |> to_be_visible(timeout: :infinity))
     end
 
+    # Set before the session starts: a Playwright session sets it on its context then.
+    @tag driver: driver
+    test "action_timeout: :infinity waits past the default with #{driver}", %{driver: driver} do
+      put_fluffy_config(action_timeout: :infinity, expect_timeout: :infinity)
+
+      driver
+      |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+      |> visit("/live/async?delay=#{@expect_timeout + 300}")
+      |> click(@appeared)
+      |> expect("Activated" |> by_text() |> to_be_visible())
+    end
+
     @tag driver: driver
     test "timeout: 0 checks an expectation once with #{driver}", %{driver: driver} do
       session =
@@ -65,6 +79,19 @@ defmodule Fluffy.Conformance.DefaultTimeoutTest do
         |> visit("/live/async?delay=300")
 
       assert failure_time(fn -> expect(session, to_be_visible(@appeared), timeout: 0) end) < 300
+    end
+
+    # As a call's `timeout: 0`.
+    @tag driver: driver
+    test "expect_timeout: 0 checks expectations once with #{driver}", %{driver: driver} do
+      put_fluffy_config(expect_timeout: 0)
+
+      session =
+        driver
+        |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+        |> visit("/live/async?delay=300")
+
+      assert failure_time(fn -> expect(session, to_be_visible(@appeared)) end) < 300
     end
   end
 
@@ -89,9 +116,9 @@ defmodule Fluffy.Conformance.DefaultTimeoutTest do
     assert elapsed < @action_timeout
   end
 
-  # PlaywrightEx.Test sets them on the context: a native call gets them too.
+  # The session sets them on its context, over PlaywrightEx.Test's: a native call gets them too.
   @tag driver: :playwright
-  test "native calls get the context's defaults" do
+  test "native navigations default to the navigation timeout" do
     session = start_session(:playwright)
     started = System.monotonic_time(:millisecond)
 
@@ -101,6 +128,19 @@ defmodule Fluffy.Conformance.DefaultTimeoutTest do
     elapsed = System.monotonic_time(:millisecond) - started
     assert elapsed >= @navigation_timeout - 100
     assert elapsed < @action_timeout
+  end
+
+  @tag driver: :playwright
+  test "native actions default to the action timeout" do
+    session = start_session(:playwright)
+    started = System.monotonic_time(:millisecond)
+
+    assert {:error, %PlaywrightEx.TimeoutError{}} =
+             Fluffy.Playwright.unwrap_and_return(session, @missing, &PlaywrightEx.Locator.click/1)
+
+    elapsed = System.monotonic_time(:millisecond) - started
+    assert elapsed >= @action_timeout - 100
+    assert elapsed < @action_timeout + 3_000
   end
 
   @tag driver: :playwright
@@ -146,6 +186,72 @@ defmodule Fluffy.Conformance.DefaultTimeoutTest do
       end
 
     assert is_exception(outcome)
+    System.monotonic_time(:millisecond) - started
+  end
+end
+
+defmodule Fluffy.Conformance.PlaywrightExTimeoutTest do
+  # PlaywrightEx's own timeouts are for raw PlaywrightEx tests: Fluffy's config sets a Fluffy
+  # session's. Both are global.
+  use Fluffy.Support.Case, async: false
+
+  import Fluffy
+  import Fluffy.Expect
+  import Fluffy.Locator
+
+  alias Fluffy.Support.Server
+  alias Fluffy.Support.Web.Endpoint
+
+  @fluffy_timeout 1_500
+  @missing by_role(:button, name: "Missing")
+
+  # PlaywrightEx.Test sets its timeouts on each context when a test registers, in its `setup`.
+  setup_all do
+    put_fluffy_config(
+      action_timeout: @fluffy_timeout,
+      navigation_timeout: @fluffy_timeout,
+      expect_timeout: @fluffy_timeout
+    )
+
+    put_playwright_ex_config(:test, action_timeout: 100, navigation_timeout: 100)
+    put_playwright_ex_config(:expect, timeout: 100)
+  end
+
+  for driver <- [:phoenix, :playwright] do
+    @tag driver: driver
+    test "PlaywrightEx's timeouts don't change a Fluffy session's defaults with #{driver}", %{driver: driver} do
+      session = start_session(driver, base_url: Server.base_url(), endpoint: Endpoint)
+      session = if driver == :phoenix, do: visit(session, "/live/chamber-map"), else: session
+
+      assert failure_time(fn -> click(session, @missing) end) >= @fluffy_timeout - 100
+      assert failure_time(fn -> expect(session, to_be_visible(@missing)) end) >= @fluffy_timeout - 100
+    end
+  end
+
+  @tag driver: :playwright
+  test "PlaywrightEx's timeouts don't change a Fluffy context's defaults" do
+    session = start_session(:playwright)
+
+    assert failure_time(fn ->
+             assert {:error, %PlaywrightEx.TimeoutError{}} =
+                      Fluffy.Playwright.unwrap_and_return(session, @missing, &PlaywrightEx.Locator.click/1)
+           end) >= @fluffy_timeout - 100
+
+    assert failure_time(fn ->
+             assert {:error, %PlaywrightEx.TimeoutError{}} =
+                      Fluffy.unwrap_and_return(session, &PlaywrightEx.Page.wait_for_url(&1, "**/never"))
+           end) >= @fluffy_timeout - 100
+  end
+
+  defp failure_time(operation) do
+    started = System.monotonic_time(:millisecond)
+
+    try do
+      operation.()
+    rescue
+      error in [ExUnit.AssertionError, Fluffy.OperationError, Fluffy.ActionabilityError] -> error
+    end
+
     System.monotonic_time(:millisecond) - started
   end
 end

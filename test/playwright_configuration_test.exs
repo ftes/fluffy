@@ -1,59 +1,81 @@
 defmodule Fluffy.PlaywrightConfigurationTest do
-  # Changes the global config of Fluffy and PlaywrightEx.
+  # Changes Fluffy's global config.
   use ExUnit.Case, async: false
 
   alias Fluffy.Options
   alias Fluffy.Timeouts
 
+  @keys [:timeout, :playwright, :action_timeout, :navigation_timeout, :expect_timeout, :test_id_attribute]
+
   setup do
-    originals =
-      for {app, key} <- [fluffy: :timeout, fluffy: :playwright, playwright_ex: :test, playwright_ex: :expect],
-          do: {app, key, Application.fetch_env(app, key)}
+    originals = for key <- @keys, do: {key, Application.fetch_env(:fluffy, key)}
+    Enum.each(@keys, &Application.delete_env(:fluffy, &1))
 
     on_exit(fn ->
-      for {app, key, original} <- originals do
+      for {key, original} <- originals do
         case original do
-          {:ok, value} -> Application.put_env(app, key, value)
-          :error -> Application.delete_env(app, key)
+          {:ok, value} -> Application.put_env(:fluffy, key, value)
+          :error -> Application.delete_env(:fluffy, key)
         end
       end
     end)
   end
 
-  # Fluffy's timeout config is gone: PlaywrightEx's, as Playwright Test's, sets the defaults.
-  test "rejects Fluffy's removed timeout config" do
-    for {key, value} <- [timeout: 2_000, playwright: [timeout: 15_000]] do
-      put_env(:fluffy, key, value)
+  test "rejects Fluffy's removed timeout config with the keys to use instead" do
+    put_env(timeout: 2_000)
 
-      assert_raise ArgumentError, ~r/config :fluffy, #{key}: is removed.*action_timeout/, fn ->
-        Options.reject_removed_config!()
+    assert_raise ArgumentError,
+                 ~r/config :fluffy, timeout: is removed.*expect_timeout.*action_timeout/,
+                 &Options.config!/0
+
+    Application.delete_env(:fluffy, :timeout)
+
+    put_env(playwright: [timeout: 15_000])
+
+    assert_raise ArgumentError,
+                 ~r/config :fluffy, playwright: is removed.*action_timeout.*navigation_timeout.*expect_timeout/,
+                 &Options.config!/0
+
+    put_env(playwright: false)
+    assert Options.config!()
+  end
+
+  test "defaults to Playwright Test's timeouts and test id attribute" do
+    assert {Timeouts.action(), Timeouts.navigation(), Timeouts.expect()} == {:infinity, :infinity, 5_000}
+    assert Options.config!(:test_id_attribute) == "data-testid"
+
+    put_env(action_timeout: 2_000, navigation_timeout: 3_000, expect_timeout: 1_000, test_id_attribute: "data-owl")
+    assert {Timeouts.action(), Timeouts.navigation(), Timeouts.expect()} == {2_000, 3_000, 1_000}
+    assert Options.config!(:test_id_attribute) == "data-owl"
+
+    put_env(action_timeout: :infinity, navigation_timeout: :infinity, expect_timeout: :infinity)
+    assert {Timeouts.action(), Timeouts.navigation(), Timeouts.expect()} == {:infinity, :infinity, :infinity}
+  end
+
+  # As a call's `timeout: 0`, `expect_timeout: 0` checks once; Playwright actions and
+  # navigations can't, so their defaults reject it.
+  test "a configured 0 checks assertions once and is rejected for actions and navigations" do
+    put_env(expect_timeout: 0)
+    assert Timeouts.expect() == 0
+
+    for key <- [:action_timeout, :navigation_timeout] do
+      put_env([{key, 0}])
+
+      assert_raise ArgumentError, ~r/invalid config :fluffy: .*#{key}.*got: 0.*use :infinity/, fn ->
+        Options.config!(key)
       end
 
       Application.delete_env(:fluffy, key)
     end
-
-    put_env(:fluffy, :playwright, false)
-    assert Options.reject_removed_config!() == :ok
   end
 
-  test "reads the default timeouts from PlaywrightEx's config, as Playwright Test does" do
-    put_env(:playwright_ex, :test, [])
-    put_env(:playwright_ex, :expect, [])
-    assert {Timeouts.action(), Timeouts.navigation(), Timeouts.expect()} == {:infinity, :infinity, 5_000}
-
-    put_env(:playwright_ex, :test, action_timeout: 2_000, navigation_timeout: 3_000)
-    put_env(:playwright_ex, :expect, timeout: 1_000)
-    assert {Timeouts.action(), Timeouts.navigation(), Timeouts.expect()} == {2_000, 3_000, 1_000}
-
-    # A configured 0 is no timeout, as in PlaywrightEx; an operation's own 0 checks once.
-    put_env(:playwright_ex, :test, action_timeout: 0, navigation_timeout: :infinity)
-    put_env(:playwright_ex, :expect, timeout: 0)
-    assert {Timeouts.action(), Timeouts.navigation(), Timeouts.expect()} == {:infinity, :infinity, :infinity}
-    assert Timeouts.get([timeout: 0], &Timeouts.expect/0) == 0
-
-    put_env(:playwright_ex, :test, action_timeout: -1)
-    assert_raise ArgumentError, ~r/config :playwright_ex, :test, action_timeout:/, &Timeouts.action/0
+  test "rejects invalid values" do
+    for {key, value} <- [action_timeout: -1, navigation_timeout: "1s", expect_timeout: -1, test_id_attribute: ""] do
+      put_env([{key, value}])
+      assert_raise ArgumentError, ~r/invalid config :fluffy: .*#{key}/, &Options.config!/0
+      Application.delete_env(:fluffy, key)
+    end
   end
 
-  defp put_env(app, key, value), do: Application.put_env(app, key, value)
+  defp put_env(config), do: Enum.each(config, fn {key, value} -> Application.put_env(:fluffy, key, value) end)
 end

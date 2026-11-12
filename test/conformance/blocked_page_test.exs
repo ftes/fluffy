@@ -17,7 +17,7 @@ defmodule Fluffy.Conformance.BlockedPageTest do
   @html "<button>Other</button>"
 
   setup_all do
-    put_playwright_ex_config(:test, action_timeout: 1_000)
+    put_fluffy_config(action_timeout: 1_000)
   end
 
   test "an action on a blocked page fails within the action timeout" do

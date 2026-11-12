@@ -29,7 +29,7 @@ start_session(:phoenix)
 
 ## Locators
 
-- Prefer, in order: `by_label` for form controls, `by_role(:button, name: ...)`, `by_text`, `by_test_id`, and `by_css` when nothing user-facing identifies the element. `by_test_id(id)` takes no options: set the attribute with `config :playwright_ex, :test, test_id_attribute: ...`, or use `by_css("[data-owl=\"hedwig\"]")` for another attribute.
+- Prefer, in order: `by_label` for form controls, `by_role(:button, name: ...)`, `by_text`, `by_test_id`, and `by_css` when nothing user-facing identifies the element. `by_test_id(id)` takes no options: set the attribute with `config :fluffy, test_id_attribute: ...`, or use `by_css("[data-owl=\"hedwig\"]")` for another attribute.
 - Text, role-name and label matching is substring by default; pass `exact: true` for a complete match.
 - Locators are values. Scope with `by_role(parent, :row, name: "x")`, refine with `filter(has: ...)`, `first`, `last`, zero-based `nth`, `and_`, `or_`. Use `frame_locator` for iframes on Playwright.
 - Single-target actions and native `visible` are strict and fail on several matches. Narrow the locator, or assert `count(locator, n)` when several are intended. Facade `assert_has` accepts any visible match.
@@ -37,7 +37,7 @@ start_session(:phoenix)
 ## Assertions and waiting
 
 - Do not assert readiness before acting. Playwright waits natively, LiveView retries actions and assertions until the timeout, and Static checks immediately. Pass `timeout:` to change a deadline.
-- Default timeouts are Playwright Test's, from PlaywrightEx's config, on every driver: `config :playwright_ex, :test, action_timeout:, navigation_timeout:` (none by default: the test's timeout bounds them) and `config :playwright_ex, :expect, timeout:` (5 s). There is no `start_session(timeout:)` or `config :fluffy, timeout:`. Set an `action_timeout` so a Static or LiveView action on a missing element fails with Fluffy's error rather than ExUnit's timeout.
+- Default timeouts are Playwright Test's, on every driver: `config :fluffy, action_timeout:, navigation_timeout:` (`:infinity` by default: the test's timeout bounds them) and `expect_timeout:` (5 s). PlaywrightEx's own timeout config doesn't affect Fluffy sessions. There is no `start_session(timeout:)` or `config :fluffy, timeout:`. Set an `action_timeout` so a Static or LiveView action on a missing element fails with Fluffy's error rather than ExUnit's timeout.
 - `timeout: 0` checks once, unlike Playwright's no timeout; Playwright actions and waits reject it. For no timeout, pass `timeout: :infinity`, never Playwright's `0`.
 - A Playwright `visit` already waits for LiveViews to connect, so do not assert `.phx-connected`.
 - `use Fluffy.Assert` gives `assert(visible(l))` and `refute(visible(l))`, and ordinary ExUnit asserts still work. `import Fluffy.Expect` gives `expect(to_be_visible(l))` and `expect(not_(to_be_visible(l)))`. Both return the session.

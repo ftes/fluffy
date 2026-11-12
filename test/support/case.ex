@@ -16,6 +16,7 @@ defmodule Fluffy.Support.Case do
           freeze_page: 1,
           monitor_running: 1,
           playwright_engine?: 1,
+          put_fluffy_config: 1,
           put_playwright_ex_config: 2
         ]
 
@@ -49,10 +50,28 @@ defmodule Fluffy.Support.Case do
     [sandbox_owners: owners]
   end
 
-  # Merges `options` into `config :playwright_ex, key` (`:test` or `:expect`), such as the
-  # default timeouts, until the module (`setup_all`) or test (`setup`) ends. The config is
-  # global, so only in an `async: false` module. PlaywrightEx.Test reads `:test` when a test
-  # registers, in its `setup`: set the context timeouts in `setup_all`.
+  # Puts `options` in `config :fluffy`, such as the default timeouts, until the module
+  # (`setup_all`) or test (`setup`) ends. The config is global, so only in an `async: false`
+  # module. A Playwright session sets its context's timeouts when it starts.
+  def put_fluffy_config(options) do
+    for {key, value} <- options do
+      original = Application.fetch_env(:fluffy, key)
+      Application.put_env(:fluffy, key, value)
+
+      ExUnit.Callbacks.on_exit(fn ->
+        case original do
+          {:ok, original} -> Application.put_env(:fluffy, key, original)
+          :error -> Application.delete_env(:fluffy, key)
+        end
+      end)
+    end
+
+    :ok
+  end
+
+  # Merges `options` into `config :playwright_ex, key` (`:test` or `:expect`), as
+  # `put_fluffy_config/1`. PlaywrightEx.Test reads `:test` when a test registers, in its
+  # `setup`: set the context timeouts in `setup_all`.
   def put_playwright_ex_config(key, options) when key in [:test, :expect] do
     original = Application.get_env(:playwright_ex, key)
     Application.put_env(:playwright_ex, key, Keyword.merge(original || [], options))

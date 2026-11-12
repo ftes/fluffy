@@ -8,9 +8,8 @@ defmodule Fluffy.Options do
       type: :timeout,
       doc:
         "Maximum time in milliseconds to wait for the operation. As in Playwright Test, defaults to " <>
-          "`action_timeout` (navigations: `navigation_timeout`) of `config :playwright_ex, :test`, no timeout " <>
-          "unless set, and for assertions to the `timeout` of `config :playwright_ex, :expect`, 5 seconds " <>
-          "([Timeouts](installation.md#timeouts)). " <>
+          "`config :fluffy, action_timeout:` (navigations: `navigation_timeout`), no timeout unless set, " <>
+          "and for assertions to `expect_timeout`, 5 seconds ([Timeouts](installation.md#timeouts)). " <>
           "`0` checks once, unlike Playwright, where `0` disables the timeout. Playwright actions and waits " <>
           "reject `0` with an `ArgumentError`, as they cannot check once; Playwright assertions accept it. " <>
           "`:infinity` disables the timeout: Playwright waits with no timeout, LiveView retries until the test " <>
@@ -354,6 +353,21 @@ defmodule Fluffy.Options do
                     ]
                   )
 
+  # Playwright Test's `actionTimeout`, `navigationTimeout`, `expect.timeout` and `testIdAttribute`,
+  # Fluffy's for its sessions on every driver.
+  @config_schema NimbleOptions.new!(
+                   action_timeout: [type: {:custom, __MODULE__, :default_timeout, []}, default: :infinity],
+                   navigation_timeout: [
+                     type: {:custom, __MODULE__, :default_timeout, []},
+                     default: :infinity
+                   ],
+                   # `0`: assertions check once, as with a call's `timeout: 0`.
+                   expect_timeout: [type: :timeout, default: 5_000],
+                   test_id_attribute: [type: {:custom, __MODULE__, :test_id_attribute, []}, default: "data-testid"]
+                 )
+
+  @config_keys Keyword.keys(@config_schema.schema)
+
   @type session_option :: unquote(NimbleOptions.option_typespec(@session_schema))
 
   @doc false
@@ -481,19 +495,59 @@ defmodule Fluffy.Options do
   end
 
   @doc false
-  # Fluffy's timeout config is gone: as in Playwright Test, PlaywrightEx's sets the defaults.
-  # Kept, it would silently stop limiting anything.
-  @spec reject_removed_config!() :: :ok
-  def reject_removed_config! do
-    for key <- [:timeout, :playwright], Application.get_env(:fluffy, key) not in [nil, false] do
-      raise ArgumentError,
-            "config :fluffy, #{key}: is removed: set the defaults as in Playwright Test, " <>
-              "`config :playwright_ex, :test, action_timeout: ..., navigation_timeout: ...` and " <>
-              "`config :playwright_ex, :expect, timeout: ...`"
+  # One of Fluffy's settings of `@config_schema`, validated, its default if unset.
+  @spec config!(atom()) :: term()
+  def config!(key) when key in @config_keys, do: Keyword.fetch!(config!(), key)
+
+  @doc false
+  # Fluffy's settings of `@config_schema`, validated, with their defaults. Fluffy's old timeout
+  # config raises: kept, it would silently stop limiting anything.
+  @spec config!() :: keyword()
+  def config! do
+    reject_removed_config!()
+
+    :fluffy
+    |> Application.get_all_env()
+    |> Keyword.take(@config_keys)
+    |> NimbleOptions.validate(@config_schema)
+    |> case do
+      {:ok, config} -> config
+      {:error, error} -> raise ArgumentError, "invalid config :fluffy: " <> Exception.message(error)
+    end
+  end
+
+  @removed_config [
+    timeout: "`config :fluffy, expect_timeout: ...` for assertions and `action_timeout: ...` for actions",
+    playwright:
+      "`config :fluffy, action_timeout: ..., navigation_timeout: ..., expect_timeout: ...` " <>
+        "instead of `playwright: [timeout: ...]`"
+  ]
+
+  defp reject_removed_config! do
+    for {key, hint} <- @removed_config, Application.get_env(:fluffy, key) not in [nil, false] do
+      raise ArgumentError, "config :fluffy, #{key}: is removed: as in Playwright Test, set #{hint}"
     end
 
     :ok
   end
+
+  @doc false
+  # Playwright actions and navigations can't check once, so a default of `0` could only fail
+  # them; Playwright's no limit is `:infinity` here.
+  def default_timeout(timeout) when timeout == :infinity or (is_integer(timeout) and timeout > 0), do: {:ok, timeout}
+
+  def default_timeout(0),
+    do:
+      {:error,
+       "expected a positive integer or :infinity, got: 0. As Playwright actions and navigations " <>
+         "cannot check once, 0 is no default; for no limit, use :infinity"}
+
+  def default_timeout(timeout), do: {:error, "expected a positive integer or :infinity, got: #{inspect(timeout)}"}
+
+  @doc false
+  # As PlaywrightEx.Test's `test_id_attribute`: one attribute or a comma-separated list.
+  def test_id_attribute(name) when is_binary(name) and name != "", do: {:ok, name}
+  def test_id_attribute(name), do: {:error, "expected a non-empty string, got: #{inspect(name)}"}
 
   defp validate_conn!(nil), do: :ok
 

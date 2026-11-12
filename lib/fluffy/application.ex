@@ -8,7 +8,7 @@ defmodule Fluffy.Application do
   @impl true
   def start(_type, _args) do
     Fluffy.Sandbox.config()
-    Fluffy.Options.reject_removed_config!()
+    _config = Fluffy.Options.config!()
 
     Supervisor.start_link(
       [
