@@ -36,6 +36,8 @@ use `exact: true` for a complete match. Role names follow accessible-name
 precedence: `aria-labelledby`, then `aria-label`, then native labels and
 captions, then content for the roles Playwright names from content, then
 `title`. Landmarks, lists, list items and dialogs are not named by their content.
+`by_test_id` reads Playwright Test's `testIdAttribute` on every driver,
+`config :playwright_ex, :test, test_id_attribute: "data-owl"` (`data-testid` by default).
 Explicit ARIA roles override implicit roles. See `Fluffy.Locator.by_role/2` for the
 implicit roles the Phoenix backend knows. Phoenix computes these from markup, so
 computed CSS and live input state stay browser-only. CSS must be valid browser

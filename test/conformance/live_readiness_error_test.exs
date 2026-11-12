@@ -10,11 +10,9 @@ defmodule Fluffy.Conformance.LiveReadinessErrorTest do
 
   @tag driver: :playwright
   test "a parent patch does not make a connected nested LiveView unready" do
-    # Firefox dispatches input for one page of the shared browser at a time, so
-    # with many parallel cases an action can queue behind others for seconds.
     session =
       :playwright
-      |> start_session(base_url: Server.base_url(), timeout: 5_000)
+      |> start_session(base_url: Server.base_url())
       |> visit("/live/nested")
       |> fill(by_label("Parent email"), "parent@hogwarts.example")
       |> click(by_role(:button, name: "Save parent"))
@@ -31,6 +29,21 @@ defmodule Fluffy.Conformance.LiveReadinessErrorTest do
     |> visit("/live/nested#after-parent-patch")
     |> click(by_role(:button, name: "Increment child"))
     |> expect("Child count: 1" |> by_text() |> to_be_visible())
+  end
+end
+
+defmodule Fluffy.Conformance.LiveReadinessTimeoutTest do
+  # The readiness waits after a navigation share its timeout, `navigation_timeout`, which is
+  # global config.
+  use Fluffy.Support.Case, async: false
+
+  import Fluffy
+
+  alias Fluffy.Playwright
+  alias Fluffy.Support.Server
+
+  setup_all do
+    put_playwright_ex_config(:test, navigation_timeout: 1_000)
   end
 
   @tag driver: :playwright
@@ -53,18 +66,14 @@ defmodule Fluffy.Conformance.LiveReadinessErrorTest do
     )
 
     assert_raise RuntimeError, ~r/expected every LiveView root to be connected/, fn ->
-      session |> put_session_timeout(1_000) |> visit("/live/nested#disconnected-child")
+      visit(session, "/live/nested#disconnected-child")
     end
   end
 
   @tag driver: :playwright
   test "names the destination and expected marker on a readiness timeout" do
     session =
-      start_session(:playwright,
-        base_url: Server.base_url(),
-        endpoint: Fluffy.Support.Web.Endpoint,
-        timeout: 1_000
-      )
+      start_session(:playwright, base_url: Server.base_url(), endpoint: Fluffy.Support.Web.Endpoint)
 
     error =
       assert_raise RuntimeError, fn ->

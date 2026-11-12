@@ -26,7 +26,9 @@ defmodule Fluffy.Support.PlaywrightMembers do
   @native_event {:unwrap, "gap: listen natively inside Fluffy.unwrap/2"}
   @event_value {:unwrap, "on the PlaywrightEx value an event delivers, as in Playwright"}
   @native_retry {:unwrap, "gap: retries any callback natively, Fluffy calls in it too"}
-  @own_timeouts {:denied, "Fluffy owns timeouts: the session's timeout: is the context default"}
+  @own_timeouts {:denied,
+                 "the defaults are config, as in Playwright Test: `action_timeout` and `navigation_timeout` of " <>
+                   "`config :playwright_ex, :test`; Fluffy's own calls read them there"}
   @own_listeners {:denied, "removes the listeners Fluffy relies on for pages and events"}
   @own_document {:denied, "replaces the tracked document outside navigation tracking"}
 
@@ -46,7 +48,11 @@ defmodule Fluffy.Support.PlaywrightMembers do
   }
 
   # Scoped locator builders (scope, value, options).
-  defp by(arity), do: for({upstream, fluffy} <- @by, do: {[upstream], {:renamed, {Fluffy.Locator, fluffy, arity}}})
+  # `by_test_id` takes no options, as `getByTestId`.
+  defp by(arity) do
+    for {upstream, fluffy} <- @by,
+        do: {[upstream], {:renamed, {Fluffy.Locator, fluffy, if(fluffy == :by_test_id, do: 2, else: arity)}}}
+  end
 
   @doc "Fluffy modules searched for a `:wrapped` member."
   def counterparts(PlaywrightEx.Locator), do: [Fluffy.Locator, Fluffy, Fluffy.Playwright]

@@ -50,10 +50,9 @@ defmodule Fluffy.Locator.Playwright do
   defp apply_operation(_frame, {:attribute, "title", text, options}, scope),
     do: call(scope, :get_by_title, [text, options])
 
-  # `get_by_test_id` reads one attribute for all locators (`set_test_id_attribute`), while
-  # `by_test_id(attribute:)` picks it per locator, so this passes it to PlaywrightEx's builder.
-  defp apply_operation(_frame, {:test_id, attribute_name, test_id}, scope),
-    do: call(scope, :locator, [LocatorUtils.get_by_test_id_selector(attribute_name, test_id)])
+  # The attribute is the client's `selectors.setTestIdAttribute`, which PlaywrightEx.Test sets
+  # from `config :playwright_ex, :test, test_id_attribute:` on each pooled driver.
+  defp apply_operation(_frame, {:test_id, test_id}, scope), do: call(scope, :get_by_test_id, [test_id])
 
   defp apply_operation(frame, {:and, right}, scope), do: scope |> native() |> Native.and_(locator(frame, right))
   defp apply_operation(frame, {:or, right}, scope), do: scope |> native() |> Native.or_(locator(frame, right))

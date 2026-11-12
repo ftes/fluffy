@@ -5,27 +5,7 @@ defmodule Fluffy.Conformance.TimeoutInfinityTest do
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.Support.Web.Endpoint
-
-  @appeared by_role(:button, name: "Appeared")
-
-  # The button renders after the session timeout, so only `:infinity` waits for it.
-  for driver <- [:phoenix, :playwright] do
-    @tag driver: driver
-    test "timeout: :infinity waits past the session timeout with #{driver}", %{driver: driver} do
-      session =
-        driver
-        |> start_session(base_url: Fluffy.Support.Server.base_url(), endpoint: Endpoint)
-        |> visit("/live/async?delay=300")
-        |> put_session_timeout(50)
-
-      session
-      |> expect(to_be_visible(@appeared), timeout: :infinity)
-      |> click(@appeared, timeout: :infinity)
-      |> expect("Activated" |> by_text() |> to_be_visible(timeout: :infinity))
-    end
-  end
-
+  # `Fluffy.Conformance.DefaultTimeoutTest` waits past the default with `:infinity`.
   @tag driver: :static
   test "timeout: :infinity checks once with static" do
     session =

@@ -476,21 +476,12 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
              |> wait_for(by_css("#here"), state: :attached) == session
     end
 
-    test "is bounded by timeout: and the session's timeout:" do
+    test "is bounded by timeout:" do
       session = session_for_html(:playwright, "<p>Harness</p>")
 
       assert_raise Fluffy.OperationError, ~r/wait_for.*[Tt]imeout/s, fn ->
         wait_for(session, by_css("#missing"), timeout: 100)
       end
-
-      bounded = start_session(:playwright, timeout: 300)
-      started = System.monotonic_time(:millisecond)
-
-      assert_raise Fluffy.OperationError, ~r/wait_for.*[Tt]imeout/s, fn ->
-        wait_for(bounded, by_css("#missing"), [])
-      end
-
-      assert System.monotonic_time(:millisecond) - started < 5_000
     end
 
     test "rejects unknown options" do

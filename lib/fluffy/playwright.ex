@@ -198,8 +198,8 @@ defmodule Fluffy.Playwright do
   Waits for the active page to reach a load state and returns the session.
 
   `state` is `:load` (the default), `:domcontentloaded` or `:networkidle`, and the
-  options may take its place. The call raises after the session's `timeout:` unless
-  `timeout:` is given. Phoenix sessions raise `Fluffy.CapabilityError`.
+  options may take its place. As in Playwright, `timeout:` defaults to the navigation
+  timeout ([Timeouts](installation.md#timeouts)). Phoenix sessions raise `Fluffy.CapabilityError`.
 
   ## Options
 
@@ -388,8 +388,8 @@ defmodule Fluffy.Playwright do
   or `nil` if the element is not visible.
 
   Coordinates are in CSS pixels relative to the main frame's viewport. As in
-  Playwright, finding the element raises after the session's `timeout:` unless
-  `timeout:` is given; reading its box has no timeout. Phoenix sessions raise
+  Playwright, `timeout:` (by default the action timeout) limits finding the element;
+  reading its box has no timeout. Phoenix sessions raise
   `Fluffy.CapabilityError`.
 
   ## Options
@@ -408,7 +408,7 @@ defmodule Fluffy.Playwright do
   @doc """
   Returns the ARIA snapshot of the active page, or of a locator, as YAML text.
 
-  The call raises after the session's `timeout:` unless `timeout:` is given. Phoenix
+  `timeout:` defaults to the action timeout ([Timeouts](installation.md#timeouts)). Phoenix
   sessions raise `Fluffy.CapabilityError`.
 
   ## Options
@@ -931,8 +931,8 @@ defmodule Fluffy.Playwright do
 
   The expression is JavaScript source, either an expression or a function that
   receives `arg`, as in `evaluate/3`. It is re-evaluated until it is truthy, across
-  navigations of the page; a navigation meanwhile is adopted. The call raises
-  after the session's `timeout:` unless `timeout:` is given:
+  navigations of the page; a navigation meanwhile is adopted. `timeout:` defaults to
+  the action timeout ([Timeouts](installation.md#timeouts)):
 
       session
       |> Fluffy.Playwright.wait_for_function("window.editor?.ready === true")

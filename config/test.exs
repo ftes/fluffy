@@ -47,12 +47,18 @@ config :fluffy, RepoTwo,
 
 config :fluffy,
   ecto_repos: [Repo, RepoTwo],
-  endpoint: Endpoint,
-  playwright: [timeout: 15_000]
+  endpoint: Endpoint
 
 # The tests write their baselines on first use: written and passed, not failed at the test's end.
 config :playwright_ex, :expect, update_snapshots: :missing
-config :playwright_ex, :test, browser_name: browser_engine, launch_options: [headless: true]
+
+# A failing action or navigation fails in 15 s, not at the test's timeout, as a loaded machine
+# may take long but not that long.
+config :playwright_ex, :test,
+  browser_name: browser_engine,
+  launch_options: [headless: true],
+  action_timeout: 15_000,
+  navigation_timeout: 15_000
 
 # CI keeps a screenshot of each failed test's pages in FLUFFY_ARTIFACT_DIR.
 if artifact_dir = System.get_env("FLUFFY_ARTIFACT_DIR") do

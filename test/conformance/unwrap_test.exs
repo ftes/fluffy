@@ -580,6 +580,22 @@ defmodule Fluffy.Conformance.UnwrapTest do
       end
     end
 
+    # With no action timeout, a native call waits until PlaywrightEx.Test closes the test's
+    # contexts at its timeout. As in Playwright, the call's error and its log show through.
+    @tag driver: :playwright
+    @tag timeout: 6_000
+    test "lets the error of a call the test timeout ended show through" do
+      session = playwright_html("<p>Tracked context</p>")
+
+      error =
+        assert_raise PlaywrightEx.TargetClosedError, fn ->
+          unwrap(session, &BrowserPage.click(&1, "#missing", timeout: :infinity))
+        end
+
+      assert error.message =~ "Test timeout of 6000ms exceeded."
+      assert error.message =~ "waiting for locator('#missing')"
+    end
+
     @tag driver: :playwright
     test "reports invalidation when native code closes the tracked context" do
       session = playwright_html("<p>Tracked context</p>")

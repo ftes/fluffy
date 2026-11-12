@@ -49,7 +49,7 @@ defmodule Fluffy.EctoSandboxLifecycleTest do
 
     live = start_session(:phoenix, base_url: Server.base_url(), endpoint: Endpoint)
     {:ok, live_view} = Agent.start(fn -> nil end)
-    :ok = Fluffy.Backend.Phoenix.register_process(live.runtime, :live_view, live_view, 100)
+    :ok = Fluffy.Backend.Phoenix.register_process(live.runtime, :live_view, live_view)
 
     # The context's browser is read now: it is closed by the time `on_exit` runs.
     browser_context = Fluffy.Session.context(browser).browser_context

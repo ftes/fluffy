@@ -7,13 +7,14 @@ defmodule Fluffy.Options do
     timeout: [
       type: :timeout,
       doc:
-        "Maximum time in milliseconds to wait for the operation. Defaults to the session's `timeout:`. " <>
+        "Maximum time in milliseconds to wait for the operation. As in Playwright Test, defaults to " <>
+          "`action_timeout` (navigations: `navigation_timeout`) of `config :playwright_ex, :test`, no timeout " <>
+          "unless set, and for assertions to the `timeout` of `config :playwright_ex, :expect`, 5 seconds " <>
+          "([Timeouts](installation.md#timeouts)). " <>
           "`0` checks once, unlike Playwright, where `0` disables the timeout. Playwright actions and waits " <>
           "reject `0` with an `ArgumentError`, as they cannot check once; Playwright assertions accept it. " <>
           "`:infinity` disables the timeout: Playwright waits with no timeout, LiveView retries until the test " <>
-          "times out, and Static, where nothing changes, checks once. " <>
-          "Playwright browser bookkeeping and navigation synchronization use the session timeout separately, " <>
-          "and at least 1 second."
+          "times out, and Static, where nothing changes, checks once."
     ]
   ]
 
@@ -305,14 +306,6 @@ defmodule Fluffy.Options do
                          ] ++ @playwright_role_locator_options
                        )
 
-  @test_id_locator_schema NimbleOptions.new!(
-                            attribute: [
-                              type: :string,
-                              default: "data-testid",
-                              doc: "Attribute used as the test-id source."
-                            ]
-                          )
-
   @filter_locator_schema NimbleOptions.new!(
                            visible: [
                              type: :boolean,
@@ -349,7 +342,6 @@ defmodule Fluffy.Options do
                     base_url: [type: :string],
                     headers: [type: {:list, {:tuple, [{:or, [:atom, :string]}, :string]}}],
                     conn: [type: {:struct, Plug.Conn}],
-                    timeout: [type: :pos_integer],
                     browser_context: [type: :keyword_list],
                     browser: [
                       type: {:struct, PlaywrightEx.Browser},
@@ -362,10 +354,7 @@ defmodule Fluffy.Options do
                     ]
                   )
 
-  @playwright_schema NimbleOptions.new!(timeout: [type: :pos_integer, default: 15_000])
-
   @type session_option :: unquote(NimbleOptions.option_typespec(@session_schema))
-  @type playwright_option :: unquote(NimbleOptions.option_typespec(@playwright_schema))
 
   @doc false
   # A string or a regex; a `Regex` becomes its `PlaywrightEx.RegExp`, raising on PCRE-only syntax.
@@ -375,9 +364,6 @@ defmodule Fluffy.Options do
 
   @doc false
   def session_schema, do: @session_schema
-
-  @doc false
-  def playwright_schema, do: @playwright_schema
 
   @doc false
   def action_schema, do: @action_schema
@@ -434,9 +420,6 @@ defmodule Fluffy.Options do
   def role_locator_schema, do: @role_locator_schema
 
   @doc false
-  def test_id_locator_schema, do: @test_id_locator_schema
-
-  @doc false
   def filter_locator_schema, do: @filter_locator_schema
 
   @spec validate_action!(keyword()) :: keyword()
@@ -471,9 +454,6 @@ defmodule Fluffy.Options do
   @spec validate_role_locator!(keyword()) :: keyword()
   def validate_role_locator!(options), do: NimbleOptions.validate!(options, @role_locator_schema)
 
-  @spec validate_test_id_locator!(keyword()) :: keyword()
-  def validate_test_id_locator!(options), do: NimbleOptions.validate!(options, @test_id_locator_schema)
-
   @spec validate_filter_locator!(keyword()) :: keyword()
   def validate_filter_locator!(options), do: NimbleOptions.validate!(options, @filter_locator_schema)
 
@@ -501,23 +481,18 @@ defmodule Fluffy.Options do
   end
 
   @doc false
-  # The `config :fluffy, :playwright` a session runs with, schema defaults included.
-  @spec playwright_config() :: keyword()
-  def playwright_config do
-    case :fluffy |> Application.get_env(:playwright, false) |> validate_playwright!() do
-      false -> NimbleOptions.validate!([], @playwright_schema)
-      config -> config
+  # Fluffy's timeout config is gone: as in Playwright Test, PlaywrightEx's sets the defaults.
+  # Kept, it would silently stop limiting anything.
+  @spec reject_removed_config!() :: :ok
+  def reject_removed_config! do
+    for key <- [:timeout, :playwright], Application.get_env(:fluffy, key) not in [nil, false] do
+      raise ArgumentError,
+            "config :fluffy, #{key}: is removed: set the defaults as in Playwright Test, " <>
+              "`config :playwright_ex, :test, action_timeout: ..., navigation_timeout: ...` and " <>
+              "`config :playwright_ex, :expect, timeout: ...`"
     end
-  end
 
-  @spec validate_playwright!(false | keyword()) :: false | keyword()
-  def validate_playwright!(false), do: false
-
-  def validate_playwright!(options) when is_list(options), do: NimbleOptions.validate!(options, @playwright_schema)
-
-  def validate_playwright!(other) do
-    raise ArgumentError,
-          "expected :fluffy, :playwright configuration to be false or a keyword list, got: #{inspect(other)}"
+    :ok
   end
 
   defp validate_conn!(nil), do: :ok

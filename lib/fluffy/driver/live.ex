@@ -28,6 +28,7 @@ defmodule Fluffy.Driver.Live do
   alias Fluffy.Locator
   alias Fluffy.Page
   alias Fluffy.Session
+  alias Fluffy.Timeouts
   # StringUtils is internal to PlaywrightEx, which is pinned.
   alias PlaywrightEx.Isomorphic.StringUtils
 
@@ -46,7 +47,8 @@ defmodule Fluffy.Driver.Live do
 
   @impl true
   def expect(%Session{} = session, %Expect{} = expectation) do
-    deadline = Retry.deadline(session, Keyword.validate!(expectation.options, [:timeout]))
+    deadline =
+      expectation.options |> Keyword.validate!([:timeout]) |> Timeouts.get(&Timeouts.expect/0) |> Retry.deadline()
 
     result =
       eventually(session, deadline, fn session ->
@@ -543,11 +545,7 @@ defmodule Fluffy.Driver.Live do
 
   # Reports how the view left a call that failed on it, waiting briefly for its
   # exit.
-  defp left_view(session) do
-    timeout = Session.context(session).timeout
-    wait = if timeout == :infinity, do: @retry_interval, else: min(timeout, @retry_interval)
-    left_view_event(Session.page_state(session), wait)
-  end
+  defp left_view(session), do: left_view_event(Session.page_state(session), @retry_interval)
 
   # A redirect an event causes comes back as the event call's result, and each
   # call that sends the view an event records that it reached the view for the
@@ -641,7 +639,8 @@ defmodule Fluffy.Driver.Live do
   # following a navigation leaves its session on its page with the navigation
   # unread. `arguments` are the driver call's own, which the retry repeats.
   defp act(session, operation, arguments, action) do
-    deadline = Retry.deadline(session, Keyword.validate!(List.last(arguments), [:timeout]))
+    deadline =
+      arguments |> List.last() |> Keyword.validate!([:timeout]) |> Timeouts.get(&Timeouts.action/0) |> Retry.deadline()
 
     result =
       ActionScope.run(fn ->
@@ -1158,13 +1157,7 @@ defmodule Fluffy.Driver.Live do
     append? = live_multiple_file_input?(target) and live_upload_present?(session, form_key)
     session = if append?, do: session, else: release_live_upload_for_form(session, form_key)
 
-    :ok =
-      Fluffy.Backend.Phoenix.register_process(
-        session.runtime,
-        :upload_client,
-        upload.pid,
-        Session.context(session).timeout
-      )
+    :ok = Fluffy.Backend.Phoenix.register_process(session.runtime, :upload_client, upload.pid)
 
     # The selection-triggered `phx-change` may replace or remove this input.
     # Register its client state before reconciling that render, so stale-input

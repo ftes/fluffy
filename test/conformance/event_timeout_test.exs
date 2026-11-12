@@ -110,10 +110,9 @@ defmodule Fluffy.Conformance.EventTimeoutTest do
 
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
-    test "timeout: :infinity waits past the session timeout with #{driver}", %{driver: driver, fixture: fixture} do
+    test "timeout: :infinity waits for the event with #{driver}", %{driver: driver, fixture: fixture} do
       driver
       |> start_test_session(fixture)
-      |> put_session_timeout(50)
       |> expect_event(
         Event.download(&(&1.suggested_filename == "marauders_map.csv")),
         fn session ->

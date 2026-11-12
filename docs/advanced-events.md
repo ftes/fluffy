@@ -18,7 +18,8 @@ assert Download.read(download) =~ "student,house"
 ```
 
 Each wait has an independent source, predicate, and deadline. The deadline starts
-at registration, using the session timeout unless `timeout:` is supplied. Await
+at registration, using the action timeout, as Playwright's `waitForEvent`, unless
+`timeout:` is supplied. Await
 once; reuse the returned value freely. Separate waits can observe the same event.
 A settled event outcome survives subsequent timeout or source closure. A still-pending
 wait reports timeout, page closure, or session closure through `await`.

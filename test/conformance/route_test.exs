@@ -244,18 +244,6 @@ defmodule Fluffy.Conformance.RouteTest do
       assert message =~ ~s("Target page, context or browser has been closed" while running route callback.)
       assert message =~ "unrouteAll({ behavior: 'ignoreErrors' })"
     end
-
-    @tag driver: :playwright
-    test "that returns without answering leaves the action to fail at its own timeout" do
-      session = start_session(:playwright, base_url: Server.base_url(), timeout: 500)
-      fixture = HTTPFixtures.register(fn _request -> %{body: "<h1>Never</h1>"} end)
-      route(session, "**/never", fn _route -> :ok end)
-
-      started = System.monotonic_time(:millisecond)
-      error = assert_raise Fluffy.OperationError, fn -> visit(session, HTTPFixtures.path(fixture, "/never")) end
-      assert %PlaywrightEx.TimeoutError{} = error.cause
-      assert System.monotonic_time(:millisecond) - started < 5_000
-    end
   end
 
   describe "cleanup" do

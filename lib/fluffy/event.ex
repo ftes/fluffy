@@ -84,8 +84,8 @@ defmodule Fluffy.Event do
   @doc false
   def wait(session, event, options) do
     {source, options} = registration(session, event, options, :wait)
-    timeout = Keyword.get(options, :timeout, Session.context(session).timeout)
-    deadline = Fluffy.Deadline.new(timeout)
+    # As Playwright's `waitForEvent`, the action timeout by default.
+    deadline = options |> Fluffy.Timeouts.get(&Fluffy.Timeouts.action/0) |> Fluffy.Deadline.new()
     pid = Subscription.start(session, event, source, :wait, nil, deadline)
     Pending.new(pid)
   end

@@ -60,12 +60,28 @@ for Fluffy's automatic LiveView connection wait.
 
 ## Timeouts
 
-Phoenix sessions wait up to 1 second by default. Set `config :fluffy, timeout: 2_000`
-to change that, or pass `timeout:` to `Fluffy.start_session/2` for one session. Playwright
-sessions ignore it and use the `timeout` under `config :fluffy, playwright:` (default
-`15_000`), also overridden by `Fluffy.start_session/2`.
+As in Playwright Test, the defaults are PlaywrightEx's config, on every driver:
 
-An operation's `timeout: 0` checks once, unlike Playwright, where `0` disables the timeout.
+```elixir
+config :playwright_ex, :test,
+  # Actions, locator waits and event waits; none by default.
+  action_timeout: 15_000,
+  # `visit`, `reload`, `go_back`, `go_forward` and `wait_for_load_state`; none by default.
+  navigation_timeout: 15_000
+
+# Assertions; 5 seconds by default.
+config :playwright_ex, :expect, timeout: 5_000
+```
+
+With no action or navigation timeout, the test's timeout bounds them (ExUnit's default
+is 60 seconds). On Playwright, PlaywrightEx.Test closes the test's contexts just before,
+so a call that hangs fails with "Test timeout of 60000ms exceeded." and its call log. A
+Static or LiveView action that never finds its element fails with ExUnit's timeout, so
+set an `action_timeout` to get Fluffy's error with the locator. There is no per-session
+timeout; pass `timeout:` to a call.
+
+An operation's `timeout: 0` checks once, unlike Playwright, where `0` disables the timeout
+(as it does in the config above).
 Playwright assertions check once too, but Playwright actions and waits reject 0 with an
 `ArgumentError`, as they cannot check once; pass a positive timeout.
 
@@ -73,18 +89,19 @@ For no timeout, pass `timeout: :infinity`, never Playwright's `0`. Playwright th
 with no timeout, and LiveView retries and event waits go on until the test times out; Static
 checks once, as with any timeout, since nothing on its page changes.
 
-A Playwright timeout under a second limits the operation only. Fluffy's own reads of the page
-around it still get a full second, so a page whose main thread is blocked takes a second to
-report, not the shorter timeout.
+Fluffy's own reads of the page around a Playwright operation share its timeout, but get
+at least a second: a page whose main thread is blocked takes a second to report, not a
+shorter timeout. Its waits for a LiveView to connect after a navigation share the
+navigation timeout.
 
 As in Playwright, calls that have no timeout there have none in Fluffy and take no
 `timeout:`: page `evaluate`, `content` and `title`, page-wide keyboard and mouse input,
 clock calls, context setters, closing a page, `unroute_all`, and reading a download or a
 response body. Page `evaluate`, context setters, closing a page, `unroute_all`, stopping a
 trace, network and download reads, and the PhoenixTest facade's link lookup in
-`click_link/4` wait on a blocked page until the test times out (ExUnit's default is 60
-seconds). The others first check the page's document, so on a page that is already blocked
-they fail after the session timeout, or a second if that is shorter.
+`click_link/4` wait on a blocked page until the test times out. The others first check the
+page's document, so on a page that is already blocked they fail after the action timeout,
+or a second if that is shorter, and with none at the test's timeout.
 
 ## Playwright setup
 
@@ -98,8 +115,8 @@ mix playwright_ex.install -- chromium
 On Linux CI runners, add `--with-deps` to install the browser's system packages too:
 `mix playwright_ex.install -- chromium --with-deps`.
 
-Configure the backend in `config/test.exs`. The browser and its driver are
-`PlaywrightEx.Test`'s, Fluffy's config is the session's:
+Configure the backend in `config/test.exs`. The browser, its driver and the default
+[timeouts](#timeouts) are `PlaywrightEx.Test`'s:
 
 ```elixir
 config :playwright_ex, :test,
@@ -108,8 +125,6 @@ config :playwright_ex, :test,
   # Traces, screenshots and videos of failed tests, under test-results/.
   trace: :retain_on_failure,
   screenshot: :only_on_failure
-
-config :fluffy, playwright: [timeout: 15_000]
 ```
 
 `driver: [executable: ...]` optionally points at a Playwright 1.65 CLI such as

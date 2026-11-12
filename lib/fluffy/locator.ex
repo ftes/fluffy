@@ -23,10 +23,6 @@ defmodule Fluffy.Locator do
 
   #{NimbleOptions.docs(Fluffy.Options.exact_locator_schema())}
 
-  Test-id locators accept:
-
-  #{NimbleOptions.docs(Fluffy.Options.test_id_locator_schema())}
-
   `filter/2` accepts:
 
   #{NimbleOptions.docs(Fluffy.Options.filter_locator_schema())}
@@ -44,7 +40,6 @@ defmodule Fluffy.Locator do
   @type scope :: t() | FrameLocator.t()
   @type role_option :: unquote(NimbleOptions.option_typespec(Options.role_locator_schema()))
   @type exact_option :: unquote(NimbleOptions.option_typespec(Options.exact_locator_schema()))
-  @type test_id_option :: unquote(NimbleOptions.option_typespec(Options.test_id_locator_schema()))
   @type filter_option :: unquote(NimbleOptions.option_typespec(Options.filter_locator_schema()))
 
   @doc group: "Constructors"
@@ -215,29 +210,33 @@ defmodule Fluffy.Locator do
 
   @doc group: "Constructors"
   @doc """
-  Matches elements whose test-id attribute, by default `data-testid`, equals `test_id`.
+  Matches elements whose test id equals `test_id`, as Playwright's `getByTestId`.
 
-  Pass a locator or frame scope first to match inside it; `by_test_id/3` also takes options.
+  The attribute is Playwright Test's `testIdAttribute`, on every driver:
+  `config :playwright_ex, :test, test_id_attribute: "data-owl"`, `data-testid` by default.
+  For another attribute in one place, use `by_css("[data-owl=\\"hedwig\\"]")`.
+
+  Pass a locator or frame scope first to match inside it.
+
+      by_test_id("hedwig")
+      by_css("#owlery") |> by_test_id("hedwig")
   """
-  @spec by_test_id(String.t(), [test_id_option()]) :: t()
-  @spec by_test_id(scope(), String.t()) :: t()
-  @spec by_test_id(scope(), String.t(), [test_id_option()]) :: t()
-  def by_test_id(test_id, options \\ [])
-
-  def by_test_id(test_id, options) when is_binary(test_id) and is_list(options) do
-    options = Options.validate_test_id_locator!(options)
-    Internal.new({:test_id, validate_attribute!(options[:attribute]), test_id})
-  end
-
-  def by_test_id(parent, test_id) when is_struct(parent, __MODULE__) or is_struct(parent, FrameLocator) do
-    by_test_id(parent, test_id, [])
-  end
+  @spec by_test_id(String.t()) :: t()
+  def by_test_id(test_id) when is_binary(test_id), do: Internal.new({:test_id, test_id})
 
   @doc group: "Constructors"
-  @doc "Like `by_test_id/2`, inside `parent`, a locator or frame scope, with options."
-  def by_test_id(parent, test_id, options) when is_binary(test_id) and is_list(options) do
-    options = Options.validate_test_id_locator!(options)
-    child_query(parent, {:test_id, validate_attribute!(options[:attribute]), test_id})
+  @doc "Like `by_test_id/1`, inside `parent`, a locator or frame scope."
+  @spec by_test_id(scope(), String.t()) :: t()
+  @spec by_test_id(String.t(), keyword()) :: no_return()
+  def by_test_id(parent, test_id)
+      when is_binary(test_id) and (is_struct(parent, __MODULE__) or is_struct(parent, FrameLocator)),
+      do: child_query(parent, {:test_id, test_id})
+
+  def by_test_id(test_id, options) when is_binary(test_id) and is_list(options) do
+    raise ArgumentError,
+          "by_test_id/2 takes no options, as Playwright's getByTestId: set the attribute with " <>
+            ~s{`config :playwright_ex, :test, test_id_attribute: ...`, or use by_css("[data-owl=\\"hedwig\\"]"), } <>
+            "got: #{inspect(options)}"
   end
 
   @doc group: "Constructors"
@@ -365,14 +364,6 @@ defmodule Fluffy.Locator do
       parent,
       {:attribute, attribute, text, Options.validate_exact_locator!(options)}
     )
-  end
-
-  defp validate_attribute!(attribute) when is_binary(attribute) do
-    if Regex.match?(~r/^[a-zA-Z_][a-zA-Z0-9_.:-]*$/, attribute) do
-      attribute
-    else
-      raise ArgumentError, "invalid test-id attribute name: #{inspect(attribute)}"
-    end
   end
 end
 

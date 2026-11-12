@@ -33,15 +33,6 @@ defmodule Fluffy.PlaywrightSessionTest do
     assert_live_view_connected(session)
   end
 
-  test "a session starts when the Playwright config leaves out timeout:" do
-    config = Application.fetch_env!(:fluffy, :playwright)
-    Application.put_env(:fluffy, :playwright, Keyword.delete(config, :timeout))
-    on_exit(fn -> Application.put_env(:fluffy, :playwright, config) end)
-
-    assert Session.context(Fluffy.start_session(:playwright)).timeout == 15_000
-    assert Session.context(Fluffy.start_session(:playwright, timeout: 2_000)).timeout == 2_000
-  end
-
   test "subscribing an already closed page reports it and leaves no close listener" do
     session = Fluffy.start_session(:playwright)
     browser_page = PlaywrightEx.BrowserContext.new_page!(Session.context(session).browser_context)

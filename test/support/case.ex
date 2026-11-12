@@ -16,7 +16,7 @@ defmodule Fluffy.Support.Case do
           freeze_page: 1,
           monitor_running: 1,
           playwright_engine?: 1,
-          put_session_timeout: 2
+          put_playwright_ex_config: 2
         ]
 
       setup {Fluffy.Support.Case, :exclusive_firefox}
@@ -49,10 +49,21 @@ defmodule Fluffy.Support.Case do
     [sandbox_owners: owners]
   end
 
-  # Sets the session's timeout after its setup, which runs under the default so a loaded
-  # machine cannot fail it. No public API changes a live session's timeout.
-  def put_session_timeout(session, timeout) do
-    Fluffy.Session.put_context(session, %{Fluffy.Session.context(session) | timeout: timeout})
+  # Merges `options` into `config :playwright_ex, key` (`:test` or `:expect`), such as the
+  # default timeouts, until the module (`setup_all`) or test (`setup`) ends. The config is
+  # global, so only in an `async: false` module. PlaywrightEx.Test reads `:test` when a test
+  # registers, in its `setup`: set the context timeouts in `setup_all`.
+  def put_playwright_ex_config(key, options) when key in [:test, :expect] do
+    original = Application.get_env(:playwright_ex, key)
+    Application.put_env(:playwright_ex, key, Keyword.merge(original || [], options))
+
+    ExUnit.Callbacks.on_exit(fn ->
+      if original,
+        do: Application.put_env(:playwright_ex, key, original),
+        else: Application.delete_env(:playwright_ex, key)
+    end)
+
+    :ok
   end
 
   # Blocks the page's main thread for good. The loop starts in a task after the

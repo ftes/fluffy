@@ -173,9 +173,8 @@ defmodule Fluffy.Conformance.NativeOptionsTest do
   end
 
   defp locator_schema(:by_role), do: Options.role_locator_schema()
-  defp locator_schema(:by_test_id), do: Options.test_id_locator_schema()
   defp locator_schema(:filter), do: Options.filter_locator_schema()
-  defp locator_schema(:by_css), do: NimbleOptions.new!([])
+  defp locator_schema(locator) when locator in [:by_css, :by_test_id], do: NimbleOptions.new!([])
   defp locator_schema(_text_locator), do: Options.exact_locator_schema()
 
   defp visited_session(driver, path) when driver in [:static, :live],

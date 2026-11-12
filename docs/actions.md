@@ -47,10 +47,9 @@ Static and LiveView raise `Fluffy.CapabilityError` for indeterminate state.
 LiveView expectations observe fresh renders and retry until they pass or reach
 their deadline. Supported LiveView actions also retry transient missing or
 actionability failures, as listed below. Waiting is enabled by default; pass
-`timeout:` to an action or expectation to change its deadline. It defaults to the
-session's `timeout:` from `Fluffy.start_session/2`, then the backend's
-[configured timeout](installation.md#timeouts). Static checks
-are immediate. Playwright uses the browser's native waiting behavior.
+`timeout:` to an action or expectation to change its deadline. As in Playwright Test,
+it defaults to the [configured](installation.md#timeouts) action or expect timeout.
+Static checks are immediate. Playwright uses the browser's native waiting behavior.
 
 When a Playwright visit finds LiveView roots, it waits for every root, including
 nested views, to connect and finish joining. Application-specific loading may

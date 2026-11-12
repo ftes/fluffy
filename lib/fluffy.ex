@@ -234,8 +234,8 @@ defmodule Fluffy do
 
   With a `Fluffy.Locator`, blocks until the locator reaches `state:`, by default
   `:visible`, and returns the session. This form is Playwright only, and raises
-  `Fluffy.CapabilityError` on Phoenix. It raises after the session's `timeout:` unless
-  `timeout:` is given. Prefer an `expect` when asserting what the page shows.
+  `Fluffy.CapabilityError` on Phoenix. `timeout:` defaults to the action timeout
+  ([Timeouts](installation.md#timeouts)). Prefer an `expect` when asserting what the page shows.
 
       session |> wait_for(by_role(:dialog), state: :hidden) |> click(by_role(:button))
 

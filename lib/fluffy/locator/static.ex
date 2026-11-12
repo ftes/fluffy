@@ -5,6 +5,7 @@ defmodule Fluffy.Locator.Static do
   alias Fluffy.HTML.Semantics
   alias Fluffy.Locator
   # StringUtils is internal to PlaywrightEx, which is pinned.
+  alias PlaywrightEx.Isomorphic.LocatorUtils
   alias PlaywrightEx.Isomorphic.StringUtils
   alias PlaywrightEx.RegExp
 
@@ -84,10 +85,14 @@ defmodule Fluffy.Locator.Static do
     end)
   end
 
-  defp apply_operation({:test_id, attribute_name, test_id}, scopes) do
+  # Playwright's test id engine: any of the comma-separated names of Playwright Test's
+  # `testIdAttribute`, which the Playwright driver's selectors get from the same config.
+  defp apply_operation({:test_id, test_id}, scopes) do
+    names = test_id_attribute_names()
+
     scopes
-    |> query_scopes("[#{attribute_name}]")
-    |> Enum.filter(&(element_attribute(&1, attribute_name) == test_id))
+    |> query_scopes(Enum.map_join(names, ",", &"[#{&1}]"))
+    |> Enum.filter(fn element -> Enum.any?(names, &(element_attribute(element, &1) == test_id)) end)
   end
 
   defp apply_operation({:nth, index}, scopes) do
@@ -182,6 +187,15 @@ defmodule Fluffy.Locator.Static do
   defp node_text_matches?(node, expected, exact?), do: text_matches?(Semantics.text(node), expected, exact?)
 
   defp text(aria, element), do: Semantics.text(Aria.node_for(aria, element))
+
+  # PlaywrightEx's `test_id_attribute` config, as PlaywrightEx.Test reads it (it has no public
+  # reader).
+  defp test_id_attribute_names do
+    :playwright_ex
+    |> Application.get_env(:test, [])
+    |> Keyword.get(:test_id_attribute, "data-testid")
+    |> LocatorUtils.split_test_id_attribute_names()
+  end
 
   defp element_attribute(element, name) do
     case LazyHTML.attribute(element, name) do

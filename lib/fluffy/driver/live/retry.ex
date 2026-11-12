@@ -4,10 +4,9 @@ defmodule Fluffy.Driver.Live.Retry do
   alias Fluffy.Deadline
   alias Fluffy.Session
 
-  # The deadline an operation's `:timeout` option, or the session default, sets.
-  def deadline(%Session{} = session, options) when is_list(options) do
-    options |> Keyword.get(:timeout, Session.context(session).timeout) |> Deadline.new()
-  end
+  # The deadline of an operation's timeout, its `timeout:` or its default
+  # (`Fluffy.Timeouts`). Without one, the retry goes on until ExUnit's test timeout.
+  def deadline(timeout), do: Deadline.new(timeout)
 
   def run(%Session{} = session, deadline, attempt, refresh, wait_for_retry)
       when (is_integer(deadline) or deadline == :infinity) and is_function(attempt, 1) and is_function(refresh, 1) and

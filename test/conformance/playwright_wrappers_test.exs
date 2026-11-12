@@ -421,15 +421,15 @@ defmodule Fluffy.Conformance.PlaywrightWrappersTest do
       assert Playwright.evaluate(session, "1 + 1") == 2
     end
 
-    test "is bounded by the session's timeout, even while a script blocks the page" do
-      session = :playwright |> session_for_html("<p>Harness</p>") |> put_session_timeout(1_000) |> freeze_page()
+    test "is bounded by its timeout, even while a script blocks the page" do
+      session = :playwright |> session_for_html("<p>Harness</p>") |> freeze_page()
       started = System.monotonic_time(:millisecond)
 
       assert_raise RuntimeError, ~r/document check within 1000ms/, fn ->
-        Playwright.wait_for_function(session, "() => false")
+        Playwright.wait_for_function(session, "() => false", nil, timeout: 1_000)
       end
 
-      # The default session timeout is much longer; failure artifacts can add a few seconds.
+      # The default action timeout is much longer; failure artifacts can add a few seconds.
       assert System.monotonic_time(:millisecond) - started < 10_000
     end
 

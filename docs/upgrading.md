@@ -50,18 +50,28 @@ matched once can now match twice.
 
 ## Timeouts
 
-Timeouts follow Elixir: `0` checks once and `:infinity` means no limit; see
-[Timeouts](installation.md#timeouts).
+Timeouts follow Playwright Test, and Elixir for `timeout:`: `0` checks once and `:infinity`
+means no limit; see [Timeouts](installation.md#timeouts).
 
+- `start_session(timeout:)`, `config :fluffy, timeout:` and `config :fluffy, :playwright`
+  are removed; the config raises at startup. Set the defaults in PlaywrightEx's config:
+
+  ```diff
+  -config :fluffy, playwright: [timeout: 15_000]
+  +config :playwright_ex, :test, action_timeout: 15_000, navigation_timeout: 15_000
+  ```
+
+  Without them, actions and navigations have no timeout, so the test's timeout bounds them,
+  and a Static or LiveView action on a missing element fails with ExUnit's timeout rather
+  than Fluffy's error. Assertions default to 5 seconds on every driver
+  (`config :playwright_ex, :expect, timeout:`); Phoenix used to wait 1 second.
 - Playwright actions, waits, `reload`, `go_back` and `go_forward` raise `ArgumentError`
   for `timeout: 0` instead of timing out after 1ms; pass a positive timeout. Assertions
-  and Phoenix actions still check once. `config :fluffy, timeout:` must be positive.
+  and Phoenix actions still check once.
 - For no limit, pass `timeout: :infinity`, never Playwright's `0`.
-- Playwright actions and expectations default to the session's `timeout:` from
-  `Fluffy.start_session/2`, as on Phoenix, not only to the configured one.
 - Calls that have no timeout in Playwright take no `timeout:`: `Fluffy.Playwright.evaluate`,
   `cookies`, `clear_cookies` and `storage_state`. Download `read` and `save_as` no longer
-  end at the session's `timeout:`; an unfinished download waits until the test times out.
+  end at a timeout; an unfinished download waits until the test times out.
 
 ## Renamed and removed APIs
 
@@ -84,9 +94,8 @@ Timeouts follow Elixir: `0` checks once and `:infinity` means no limit; see
 - `page_status`, `page_to_have_status` and `Fluffy.Page.status` are removed, as in
   Playwright; on Playwright, assert on `Fluffy.Event.response/1` instead.
 - Configure the browser with `config :playwright_ex, :test, browser_name: ..., launch_options:
-  ...` (`driver: [executable: ...]` for a CLI). `config :fluffy, :playwright` drops
-  `enabled`, `engine`, `executable`, `launch_options` and `pool_size`; on Firefox, replace
-  `pool_size` with `start_session(:playwright, browser: PlaywrightEx.Test.BrowserPool.exclusive())`
+  ...` (`driver: [executable: ...]` for a CLI) instead of `config :fluffy, :playwright`,
+  which is removed; on Firefox, replace `pool_size` with `start_session(:playwright, browser: PlaywrightEx.Test.BrowserPool.exclusive())`
   ([Exclusive browsers](`e:playwright_ex:testing-with-exunit.md#exclusive-browsers`)).
 - `Fluffy.Playwright.trace/2`, `artifact_dir` and `trace_dir` are removed. Traces,
   screenshots and videos come from `PlaywrightEx.Test`: set
@@ -108,6 +117,10 @@ Timeouts follow Elixir: `0` checks once and `:infinity` means no limit; see
   `pdf(session, path: path)`.
 - `Fluffy.step/3` is `Fluffy.Playwright.step/4`, `PlaywrightEx.Test.step/3` in a pipeline.
   It raises `Fluffy.CapabilityError` on Phoenix, where it used to just run the callback.
+- `by_test_id/2` takes no `attribute:`, as Playwright's `getByTestId`: every driver reads
+  `config :playwright_ex, :test, test_id_attribute:` (`data-testid` by default). For another
+  attribute in one place, replace `by_test_id("hedwig", attribute: "data-owl")` with
+  `by_css("[data-owl=\"hedwig\"]")`.
 - `filter/2` takes no `exact:`, as in Playwright. Match a whole text with a regex, such as
   `filter(has_text: ~r/^Pro$/)`, which works on every driver.
 - `page_url`/`page_to_have_url` and `Fluffy.Playwright.route/4` take URLs as Playwright

@@ -43,7 +43,7 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
 
       on(session, Event.console(), handler)
       Playwright.evaluate(session, "console.log('heard')")
-      assert_receive {:console, "heard"}, Session.timeout(session)
+      assert_receive {:console, "heard"}, 5_000
 
       off(session, Event.console(), handler)
       Playwright.evaluate(session, "console.log('unheard')")
@@ -99,7 +99,7 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
 
       on(session, Event.page_error(&(Exception.message(&1) =~ "first")), handler)
       Playwright.evaluate(session, "setTimeout(() => { throw new Error('first') }, 0); 1")
-      assert_receive {:page_error, message}, Session.timeout(session)
+      assert_receive {:page_error, message}, 5_000
       assert message =~ "first"
 
       off(session, Event.page_error(), handler)
@@ -153,7 +153,7 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
 
       on(session, Event.request_finished(&String.ends_with?(Request.url(&1), "/api")), handler)
       Playwright.evaluate(session, "fetch('api'); true")
-      assert_receive {:finished, path}, Session.timeout(session)
+      assert_receive {:finished, path}, 5_000
       assert String.ends_with?(path, "/api")
 
       off(session, Event.request_finished(), handler)
@@ -236,7 +236,7 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
 
       on(session, Event.frame_attached(), handler)
       Playwright.evaluate(session, "document.body.appendChild(document.createElement('iframe')); true")
-      assert_receive {:attached, %Frame{}}, Session.timeout(session)
+      assert_receive {:attached, %Frame{}}, 5_000
 
       off(session, Event.frame_attached(), handler)
       Playwright.evaluate(session, "document.body.appendChild(document.createElement('iframe')); true")
@@ -267,7 +267,7 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
 
       on(session, Event.worker(), handler)
       Playwright.evaluate(session, spawn_worker)
-      assert_receive {:worker, "blob:" <> _url}, Session.timeout(session)
+      assert_receive {:worker, "blob:" <> _url}, 5_000
 
       off(session, Event.worker(), handler)
       Playwright.evaluate(session, spawn_worker)
