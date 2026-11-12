@@ -217,7 +217,7 @@ end
 
 The application owns the sandbox, as with `Phoenix.ConnTest`: keep the generated
 DataCase setup, which starts an owner for each test and stops it in `on_exit`, and use
-your `ConnCase` (or `DataCase`) before `use Fluffy.Test`:
+your `ConnCase` (or `DataCase`) before `use Fluffy.Test` or `use Fluffy.Case`:
 
 ```elixir
 def setup_sandbox(tags) do

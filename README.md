@@ -87,7 +87,8 @@ import Fluffy.Locator
 Start with `start_session(:phoenix)` for in-process Static and LiveView tests.
 Use `start_session(:playwright)` when a test needs a real browser. See
 [Installation and runtime](docs/installation.md) for Playwright and Ecto sandbox
-setup, then [Usage](docs/usage.md) for writing tests and a shared `FluffyCase`.
+setup, then [Usage](docs/usage.md) for writing tests and `use Fluffy.Case`, which
+starts a session per test after your `ConnCase`.
 
 ## Coming from PhoenixTest
 

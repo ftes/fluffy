@@ -93,33 +93,10 @@ See the [capability matrix](capabilities.md) for backend differences.
 
 ## Shared test case
 
-Put shared imports and session setup in an application-owned `FluffyCase`.
-Keep your ordinary `ConnCase` for fixtures, routes, and sandbox setup, then
-start the Fluffy session after it:
-
-```elixir
-# test/support/fluffy_case.ex
-defmodule MyAppWeb.FluffyCase do
-  use ExUnit.CaseTemplate
-
-  using do
-    quote do
-      use MyAppWeb.ConnCase
-      use Fluffy.Test
-      use Fluffy.Assert
-
-      import Fluffy
-      import Fluffy.Locator
-
-      alias Fluffy.Event
-
-      setup context do
-        %{session: start_session(Map.get(context, :backend, :phoenix))}
-      end
-    end
-  end
-end
-```
+`use Fluffy.Case` after your `ConnCase` adds Fluffy's setup, imports and a session per
+test. Keep the `ConnCase` for fixtures, routes and the sandbox, and use it first: used
+after `Fluffy.Case`, its `use ExUnit.Case` imports `test` again and the module fails to
+compile on an ambiguous `test/3`.
 
 Tests receive `session` in their context and default to Phoenix. Use
 `@moduletag backend: :playwright` for an entire module, `@describetag` for a
@@ -127,7 +104,8 @@ describe block, or `@tag` for one test—without a separate browser test module:
 
 ```elixir
 defmodule MyAppWeb.PotionTest do
-  use MyAppWeb.FluffyCase, async: true
+  use MyAppWeb.ConnCase, async: true
+  use Fluffy.Case
 
   test "lists the available potions", %{session: session} do
     session
@@ -144,3 +122,6 @@ defmodule MyAppWeb.PotionTest do
   end
 end
 ```
+
+`Fluffy.Case` is a few lines; to change them, copy them into your own case template's
+`using`, keeping the session setup after `use Fluffy.Test`.

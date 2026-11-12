@@ -5,7 +5,7 @@ Fluffy runs Phoenix feature tests through one Playwright-shaped API, in-process 
 ## Setup
 
 - `config :fluffy, endpoint: MyAppWeb.Endpoint` in `config/test.exs`. With Ecto, also `config :fluffy, ecto_repos: [MyApp.Repo]` and the sandbox plug and mount hook from `docs/installation.md`, behind an `Application.compile_env` flag set in `config/test.exs` because Fluffy is not in production. The app's DataCase/ConnCase owns the sandbox (`Sandbox.start_owner!` and `stop_owner` in `on_exit`), used before `use Fluffy.Test`; Fluffy only sends its metadata from browser sessions. A plain `Sandbox.checkout` does not work for browser tests.
-- Add `use Fluffy.Test` after `use ExUnit.Case` exactly once per module, with or without Ecto, ideally in a shared case module.
+- Add `use Fluffy.Case` after the app's `ConnCase` (never before it: the `test/3` imports clash), or `use Fluffy.Test` after `use ExUnit.Case`. `Fluffy.Case` adds `use Fluffy.Test`, `use Fluffy.Assert`, `import Fluffy`, `import Fluffy.Locator` and a `session` per test from the `backend` tag (`:phoenix` by default). A second `use Fluffy.Test` in a module does nothing.
 - Browser tests need `server: true` on the endpoint, `config :playwright_ex, :test` for the browser (`browser_name`, `launch_options`) and `mix playwright_ex.install -- chromium`. For a system browser, install with `--no-browsers` and set `launch_options: [executable_path: ...]`. On Firefox, give each browser module (or its case template) `setup_all context, do: PlaywrightEx.Test.browser(context, isolate: true)`. A module's browser comes from its `setup_all` (like Playwright Test's worker-scoped `browser` fixture), else the shared pool; for more users, start more sessions, each in its own browser context.
 - The browser opens the endpoint listener's address, such as `127.0.0.1`. Set `check_origin: false` on the endpoint only when its `url` host differs from that address, as a stock `localhost` does.
 
@@ -16,7 +16,7 @@ Fluffy runs Phoenix feature tests through one Playwright-shaped API, in-process 
 - `start_session(:phoenix)` is the default choice. Its first visit picks the Static or LiveView driver, and later navigations pick again. There is nothing to select between those two.
 - `start_session(:playwright)` is for JavaScript, computed style and layout, native validation, dialogs, network events, tabs or focus.
 - In the facade, `conn |> visit(path)` always starts a Phoenix session; use `start_session(:playwright) |> visit(path)` for a browser.
-- Fluffy does not read test tags. To switch with `@tag backend: :playwright`, have the shared case call `start_session(Map.get(context, :backend, :phoenix))`.
+- Only `Fluffy.Case` reads a test tag: `@tag`, `@describetag` or `@moduletag backend: :playwright` picks the backend of its `session`.
 
 ```elixir
 start_session(:phoenix)

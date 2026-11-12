@@ -1,16 +1,10 @@
 defmodule FluffyConsumer.AdoptionTest do
-  use ExUnit.Case, async: true
-  use Fluffy.Test
-  use Fluffy.Assert
-
-  import Fluffy
-  import Fluffy.Locator
+  use FluffyConsumerWeb.ConnCase, async: true
+  use Fluffy.Case
 
   for backend <- [:phoenix, :playwright] do
     @tag backend: backend
-    test "one vanilla ExUnit scenario runs with #{backend}", %{backend: backend} do
-      session = start_session(backend)
-
+    test "one vanilla ExUnit scenario runs with #{backend}", %{session: session} do
       session
       |> visit("/")
       |> assert(by_role(:heading, name: "Platform Nine and Three-Quarters") |> count(1))
@@ -20,12 +14,11 @@ defmodule FluffyConsumer.AdoptionTest do
     end
 
     @tag backend: backend
-    test "download events compose with ordinary assertions using #{backend}", %{backend: backend} do
-      backend
-      |> start_session()
+    test "download events compose with ordinary assertions using #{backend}", %{session: session} do
+      session
       |> visit("/")
       |> assert_event(
-        Fluffy.Event.download(),
+        Event.download(),
         &click(&1, by_role(:link, name: "Marauder's Map")),
         fn download ->
           assert download.suggested_filename == "marauders_map.csv"
@@ -36,9 +29,7 @@ defmodule FluffyConsumer.AdoptionTest do
     end
 
     @tag backend: backend
-    test "the public native escape hatch remains pipeable with #{backend}", %{backend: backend} do
-      session = start_session(backend)
-
+    test "the public native escape hatch remains pipeable with #{backend}", %{session: session} do
       session
       |> visit("/")
       |> unwrap(fn

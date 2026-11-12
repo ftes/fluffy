@@ -106,6 +106,7 @@ defmodule Fluffy.MixProject do
       groups_for_modules: [
         "Core API": [
           Fluffy,
+          Fluffy.Case,
           Fluffy.Test,
           Fluffy.Locator,
           Fluffy.FrameLocator,
