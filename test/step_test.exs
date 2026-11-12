@@ -14,7 +14,7 @@ defmodule Fluffy.StepTest do
       |> step("Lull one of Fluffy's heads", fn session ->
         click(session, by_role(:button, name: "Play the flute"))
       end)
-      |> step("Lull another", &click(&1, by_role(:button, name: "Play the flute")), box: true, timeout: 5_000)
+      |> step("Lull another", &click(&1, by_role(:button, name: "Play the flute")), box: true)
 
     expect(session, "Sleeping heads: 2" |> by_text() |> to_be_visible())
   end

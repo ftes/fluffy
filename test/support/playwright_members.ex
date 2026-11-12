@@ -93,7 +93,8 @@ defmodule Fluffy.PlaywrightMembers do
               to_have_accessible_description to_have_accessible_error_message to_match_aria_snapshot)a, :wrapped},
           {[:to_have_title], {:renamed, {Fluffy.Expect, :page_to_have_title, 2}}},
           {[:to_have_url], {:renamed, {Fluffy.Expect, :page_to_have_url, 2}}},
-          {[:to_be_ok], {:na, "APIResponse assertion"}}
+          {[:to_be_ok], {:na, "APIResponse assertion"}},
+          {[:soft], {:unwrap, "gap: soft matchers on the native locator of Fluffy.Playwright.unwrap/3"}}
         ]),
       PlaywrightEx.Page =>
         [

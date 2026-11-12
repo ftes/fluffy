@@ -1297,8 +1297,6 @@ defmodule Fluffy.Playwright do
   ## Options
 
     * `:box` - reports an error inside the step at the step's call instead of inside it.
-    * `:timeout` - fails the step after this many milliseconds, with `fun` in a process of
-      its own; see `PlaywrightEx.Test.step/3`.
   """
   defmacro step(session, title, fun, options \\ []) do
     location = Macro.escape(%{file: __CALLER__.file, line: __CALLER__.line, column: 0})
@@ -1311,12 +1309,7 @@ defmodule Fluffy.Playwright do
   @doc false
   def __step__(%Session{} = session, title, fun, options, location) when is_binary(title) and is_function(fun, 1) do
     ensure_playwright_backend!(session, :steps)
-    options = Keyword.validate!(options, [:box, :timeout])
-
-    options =
-      if timeout = options[:timeout],
-        do: Keyword.put(options, :timeout, Fluffy.Deadline.playwright(timeout)),
-        else: options
+    options = Keyword.validate!(options, [:box])
 
     case PlaywrightEx.Test.step(title, fn -> fun.(session) end, [location: location] ++ options) do
       %Session{} = updated_session ->
