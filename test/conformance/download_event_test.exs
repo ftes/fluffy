@@ -29,7 +29,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
       assert Download.save_as(download, destination) == :ok
 
       session
-      |> expect(page_to_have_url(&String.ends_with?(URI.parse(&1).path, "/start")))
+      |> expect(page_to_have_url(&String.ends_with?(&1.path, "/start")))
       |> expect("Source" |> by_text() |> to_be_visible())
 
       if driver == :playwright do

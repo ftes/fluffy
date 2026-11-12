@@ -282,7 +282,7 @@ session
 ```
 
 `url` is what Playwright's `route` takes: a glob string (resolved against
-`base_url:`), a regular expression, or a predicate over the URL string. A handler
+`base_url:`), a regular expression, or a predicate over the URL as a `%URI{}`. A handler
 taking two arguments also gets the `PlaywrightEx.Request`.
 
 Answers are `PlaywrightEx.Route.fulfill!/2` (status, headers, `body:`, `json:`,

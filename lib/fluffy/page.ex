@@ -14,8 +14,8 @@ defmodule Fluffy.Page do
 
   @opaque t :: %__MODULE__{runtime: pid(), id: reference()}
   @type title_expectation :: String.t() | Regex.t() | PlaywrightEx.RegExp.t()
-  @typedoc "A URL as Playwright takes it: a string, a regular expression or a predicate over the URL string."
-  @type url_expectation :: String.t() | Regex.t() | PlaywrightEx.RegExp.t() | (String.t() -> as_boolean(term()))
+  @typedoc "A URL as Playwright takes it: a string, a regular expression or a predicate over the parsed URL."
+  @type url_expectation :: String.t() | Regex.t() | PlaywrightEx.RegExp.t() | (URI.t() -> as_boolean(term()))
 
   @doc false
   @spec new(pid(), reference()) :: t()

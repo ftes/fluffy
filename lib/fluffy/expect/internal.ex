@@ -27,7 +27,7 @@ defmodule Fluffy.Expect.Internal do
   @doc """
   Whether `url` matches a `page_to_have_url/2` expectation on the Phoenix drivers, as in
   PlaywrightEx's `toHaveURL`: a string resolved against `base_url` equals the URL, a
-  regular expression matches it, and a predicate gets the URL string. `ignore_case:` compares
+  regular expression matches it, and a predicate gets it as a `%URI{}`. `ignore_case:` compares
   strings and predicate URLs in lower case and overrides a regular expression's `i` flag.
   """
   def url_matches?({expected, options}, base_url, url) when is_binary(url) do

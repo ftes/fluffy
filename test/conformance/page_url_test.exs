@@ -75,17 +75,16 @@ defmodule Fluffy.Conformance.PageURLTest do
         |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
         |> visit(path <> "?answer=42#summary")
         |> expect(
-          page_to_have_url(fn url ->
-            %URI{path: actual, query: query, fragment: fragment} = URI.parse(url)
+          page_to_have_url(fn %URI{path: actual, query: query, fragment: fragment} ->
             actual == path and URI.decode_query(query)["answer"] == "42" and fragment == "summary"
           end),
           timeout: 0
         )
-        |> expect(not_(page_to_have_url(&String.ends_with?(&1, "/missing"))), timeout: 0)
+        |> expect(not_(page_to_have_url(&(&1.path == "/missing"))), timeout: 0)
 
       error =
         assert_raise ExUnit.AssertionError, fn ->
-          expect(session, page_to_have_url(&String.ends_with?(&1, "/missing")), timeout: 0)
+          expect(session, page_to_have_url(&(&1.path == "/missing")), timeout: 0)
         end
 
       assert error.message =~ path
@@ -101,7 +100,7 @@ defmodule Fluffy.Conformance.PageURLTest do
 
     predicate = fn url ->
       Process.sleep(10)
-      URI.parse(url).path == "/chamber"
+      url.path == "/chamber"
     end
 
     expect(session, page_to_have_url(predicate), timeout: 0)
@@ -115,8 +114,8 @@ defmodule Fluffy.Conformance.PageURLTest do
   test "waits for a future same-document URL change with a URL predicate" do
     session = session_for_html(:playwright, "<h1>URL changes</h1>")
     Fluffy.Playwright.evaluate(session, "setTimeout(() => location.hash = 'ready', 100)")
-    expect(session, page_to_have_url(&String.ends_with?(&1, "#ready")), timeout: 1_000)
+    expect(session, page_to_have_url(&(&1.fragment == "ready")), timeout: 1_000)
     Fluffy.Playwright.evaluate(session, "setTimeout(() => location.hash = 'finished', 100)")
-    expect(session, not_(page_to_have_url(&String.ends_with?(&1, "#ready"))), timeout: 1_000)
+    expect(session, not_(page_to_have_url(&(&1.fragment == "ready"))), timeout: 1_000)
   end
 end

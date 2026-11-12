@@ -220,13 +220,13 @@ the title matches; Static checks immediately. LiveView also observes later
 URL assertions use the same `page_` prefix and take what Playwright's `toHaveURL`
 takes. A string is resolved against the session base URL and must equal the
 complete URL, query and fragment included. A regular expression matches the URL,
-and a function gets the URL string:
+and a function gets the URL as a `%URI{}`, as Playwright passes a `URL`:
 
 ```elixir
 session
 |> assert(page_url("/potions"))
 |> assert(page_url(~r{/potions\?state=brewing}))
-|> assert(page_url(&(URI.decode_query(URI.parse(&1).query || "")["state"] == "brewing")))
+|> assert(page_url(&(URI.decode_query(&1.query || "")["state"] == "brewing")))
 ```
 
 Predicates work with every driver and with negated assertions. Keep them quick

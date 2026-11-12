@@ -173,7 +173,19 @@ browser = PlaywrightEx.Test.BrowserPool.exclusive(launch_options: [headless: fal
 
 Take it from `PlaywrightEx.Test.BrowserPool.exclusive/1`, not `shared/1`: a shared browser is
 never evicted, so a headed one stays open until the suite ends. Call it in `setup_all` to cover
-a module; `browser_name:` and `driver:` override the same way.
+a module; `browser_name:` and `driver:` override the same way. See
+[Debugging one test](`e:playwright_ex:testing-with-exunit.md#debugging-one-test`).
+
+To run the browsers on a Playwright server, such as Playwright's Docker image, set
+`connect_options: [ws_endpoint: "ws://localhost:3000/", expose_network: "<loopback>"]` in
+`config :playwright_ex, :test`, or give one session
+`browser: PlaywrightEx.Test.BrowserPool.exclusive(connect_options: [...])`. The remote browser
+must reach your app, as pages, the Ecto sandbox header and the LiveView socket go to `base_url`:
+`expose_network: "<loopback>"` tunnels `localhost` and `127.0.0.1` to your machine, so
+`base_url` stays as it is. Otherwise `base_url` must be an address the container reaches, such as
+`http://host.docker.internal:4002`, and the endpoint's `check_origin` must allow it. See
+[Remote browsers](`e:playwright_ex:testing-with-exunit.md#remote-browsers`) for the options and
+an env-var switch.
 
 ## Ecto sandbox
 

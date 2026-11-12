@@ -297,7 +297,7 @@ defmodule Fluffy.Capability do
       feature: "URL matching",
       drivers: %{static: :equivalent, live: :equivalent, playwright: :equivalent},
       detail:
-        "page_to_have_url/2 takes what Playwright's toHaveURL takes: a string resolved against the base URL that must equal the URL, a regex, or a predicate over the URL string. Phoenix drivers match with PlaywrightEx.Isomorphic.UrlMatch."
+        "page_to_have_url/2 takes what Playwright's toHaveURL takes: a string resolved against the base URL that must equal the URL, a regex, or a predicate over the URL as a %URI{}. Phoenix drivers match with PlaywrightEx.Isomorphic.UrlMatch."
     },
     %{
       id: :file_uploads,

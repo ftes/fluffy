@@ -70,9 +70,9 @@ defmodule Fluffy.Conformance.NativeOptionsTest do
 
       unquote(driver)
       |> visited_session(path)
-      |> expect(page_to_have_url(&String.ends_with?(&1, path), ignore_case: true))
-      |> expect(not_(page_to_have_url(&String.ends_with?(&1, upper), ignore_case: true)))
-      |> expect(page_to_have_url(&String.ends_with?(&1, path), ignore_case: false))
+      |> expect(page_to_have_url(&String.ends_with?(&1.path, path), ignore_case: true))
+      |> expect(not_(page_to_have_url(&String.ends_with?(&1.path, upper), ignore_case: true)))
+      |> expect(page_to_have_url(&String.ends_with?(&1.path, path), ignore_case: false))
     end
   end
 

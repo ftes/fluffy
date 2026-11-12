@@ -95,7 +95,7 @@ defmodule Fluffy.Conformance.RouteTest do
 
       route(session, "**/glob", answer.("glob"))
       route(session, ~r{/regex$}, answer.("regex"))
-      route(session, &String.ends_with?(&1, "/predicate?a=1"), answer.("predicate"))
+      route(session, &(String.ends_with?(&1.path, "/predicate") and &1.query == "a=1"), answer.("predicate"))
 
       assert fetch(session, fixture, "/glob") == "glob"
       assert fetch(session, fixture, "/regex") == "regex"

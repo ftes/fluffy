@@ -619,7 +619,7 @@ defmodule Fluffy.Playwright do
 
   `url` is what Playwright's `route` takes: a glob string, resolved against the
   session's `base_url:` (such as `"**/api/*"` or `"/api/potions"`), a regular
-  expression, or a predicate over the URL string.
+  expression, or a predicate over the URL as a `%URI{}`.
 
   `handler` receives the `PlaywrightEx.Route` (and its `PlaywrightEx.Request`, if it
   takes two arguments) and answers it with `PlaywrightEx.Route.fulfill!/2`,

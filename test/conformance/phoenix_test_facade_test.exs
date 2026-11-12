@@ -1044,7 +1044,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
 
     assert_received {:page, page}
     PlaywrightEx.Page.evaluate!(page, "setTimeout(() => location.assign('?next'))")
-    :ok = PlaywrightEx.Page.wait_for_url(page, &String.ends_with?(&1, "?next"), wait_until: :commit, timeout: 10_000)
+    :ok = PlaywrightEx.Page.wait_for_url(page, &(&1.query == "next"), wait_until: :commit, timeout: 10_000)
 
     assert_raise ArgumentError, ~r/no active form/, fn -> submit(session) end
   end

@@ -111,9 +111,9 @@ Timeouts follow Elixir: `0` checks once and `:infinity` means no limit; see
 - `filter/2` takes no `exact:`, as in Playwright. Match a whole text with a regex, such as
   `filter(has_text: ~r/^Pro$/)`, which works on every driver.
 - `page_url`/`page_to_have_url` and `Fluffy.Playwright.route/4` take URLs as Playwright
-  does: a string, a regex or a predicate, which gets the URL string instead of a `%URI{}`.
+  does: a string, a regex or a predicate, which gets a `%URI{}` as before.
   Replace `page_url(path: "/potions")` with `page_url("/potions")` when the URL has no
-  query, or with `page_url(&(URI.parse(&1).path == "/potions"))`; the `query:` and
+  query, or with `page_url(&(&1.path == "/potions"))`; the `query:` and
   `fragment:` forms become a regex or a predicate too.
 - A regex is a JavaScript `RegExp` on every driver: PCRE-only syntax such as `\A`, `\z`,
   `(?i)` or the `x` modifier raises `ArgumentError` on Static and LiveView too. Use `^`, `$`

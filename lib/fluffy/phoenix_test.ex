@@ -541,8 +541,7 @@ defmodule Fluffy.PhoenixTest do
     parts = String.split(path, "/")
     query = if Keyword.has_key?(options, :query_params), do: options[:query_params] |> query_map!() |> Enum.sort()
 
-    expected = fn url ->
-      uri = URI.parse(url)
+    expected = fn %URI{} = uri ->
       path_parts_match?(parts, uri.path) and (is_nil(query) or query == decode_query(uri.query))
     end
 

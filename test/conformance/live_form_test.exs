@@ -135,7 +135,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
       |> fill(by_label("Row 0"), "aconite")
       |> submit(by_css("#wizard-form"), timeout: 2_000)
       |> expect("Saved rows: aconite, belladonna, cinder" |> by_text() |> to_be_visible())
-      |> expect(page_to_have_url(&(URI.parse(&1).path == "/live/potions")))
+      |> expect(page_to_have_url(&(&1.path == "/live/potions")))
     end
 
     for status <- [204, 205] do
@@ -154,7 +154,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
         |> fill(by_label("Note"), "edited")
         |> submit(by_css("#http-form"), timeout: 2_000)
         |> expect("Note" |> by_label() |> to_have_value("edited"))
-        |> expect(page_to_have_url(&(URI.parse(&1).path == "/live/no-content")))
+        |> expect(page_to_have_url(&(&1.path == "/live/no-content")))
         |> click(by_role(:button, name: "Increment"))
         |> expect("Count: 1" |> by_text() |> to_be_visible())
 
@@ -355,7 +355,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
       |> expect(
         Fluffy.Expect.page_to_have_url(fn url ->
-          URI.decode_query(URI.parse(url).query)["wizard[stubborn]"] ==
+          URI.decode_query(url.query)["wizard[stubborn]"] ==
             if(driver == :playwright, do: "silver dust", else: "server-2")
         end)
       )

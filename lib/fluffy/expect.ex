@@ -687,11 +687,12 @@ defmodule Fluffy.Expect do
 
   A string is resolved against the session's base URL and must equal the complete URL,
   query and fragment included. A regular expression matches the URL, and a function gets the
-  URL string and returns whether it matches. Keep predicates quick and nonblocking.
+  URL as a `%URI{}`, as Playwright passes a `URL`, and returns whether it matches. Keep
+  predicates quick and nonblocking.
 
       expect(session, page_to_have_url("/creatures/fluffy"))
       expect(session, page_to_have_url(~r{/creatures/[a-z]+$}))
-      expect(session, page_to_have_url(&(URI.parse(&1).path == "/creatures")))
+      expect(session, page_to_have_url(&(&1.path == "/creatures")))
 
   ## Assertion options
 
