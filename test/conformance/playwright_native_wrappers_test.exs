@@ -6,7 +6,6 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
   import Fluffy.Locator
 
   alias Fluffy.Playwright
-  alias Fluffy.Route
   alias Fluffy.TestHTTPFixtures
 
   @moduletag driver: :playwright
@@ -742,52 +741,6 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
     end
   end
 
-  describe "Route.fetch" do
-    test "returns the real response, usable with fulfill" do
-      fixture = TestHTTPFixtures.register(fn _request -> %{body: "server"} end)
-      session = start_session(:playwright)
-      visit(session, TestHTTPFixtures.path(fixture, "/page"))
-
-      Playwright.route(session, "**/api", fn route ->
-        # Firefox offers zstd, whose bodies Playwright's fetch hands back still compressed.
-        response = Route.fetch(route, headers: %{"accept-encoding" => "identity"})
-        Route.fulfill(route, response: response, status: 201)
-      end)
-
-      assert Playwright.evaluate(
-               session,
-               "url => fetch(url).then(async r => r.status + ':' + (await r.text()))",
-               TestHTTPFixtures.url(fixture, "/api")
-             ) == "201:server"
-    end
-
-    test "timeout: 0 raises, as for actions, an invalid timeout fails validation, and :infinity waits without limit" do
-      fixture =
-        TestHTTPFixtures.register(fn _request ->
-          Process.sleep(100)
-          %{body: "server"}
-        end)
-
-      session = start_session(:playwright)
-      visit(session, TestHTTPFixtures.path(fixture, "/page"))
-      owner = self()
-
-      Playwright.route(session, "**/api", fn route ->
-        send(owner, {:fetch, catch_error(Route.fetch(route, timeout: 0))})
-        for invalid <- [-1, 1500.0], do: send(owner, {:fetch, catch_error(Route.fetch(route, timeout: invalid))})
-        response = Route.fetch(route, timeout: :infinity, headers: %{"accept-encoding" => "identity"})
-        Route.fulfill(route, response: response)
-      end)
-
-      assert Playwright.evaluate(session, "url => fetch(url).then(r => r.text())", TestHTTPFixtures.url(fixture, "/api")) ==
-               "server"
-
-      assert_receive {:fetch, %ArgumentError{message: "fetch: timeout: 0 means check once" <> _}}
-      assert_receive {:fetch, %NimbleOptions.ValidationError{key: :timeout, value: -1}}
-      assert_receive {:fetch, %NimbleOptions.ValidationError{key: :timeout, value: 1500.0}}
-    end
-  end
-
   describe "page output" do
     test "content returns the page's HTML" do
       session = session_for_html(:playwright, "<p id='here'>Harness</p>")
@@ -898,7 +851,7 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
       visit(session, TestHTTPFixtures.path(fixture, "/page"))
       url = TestHTTPFixtures.url(fixture, "/api")
       other = TestHTTPFixtures.url(fixture, "/other")
-      handler = fn route -> Route.fulfill(route, body: "routed") end
+      handler = fn route -> PlaywrightEx.Route.fulfill!(route, body: "routed") end
 
       session = session |> Playwright.route("**/api", handler) |> Playwright.route("**/other", handler)
       assert Playwright.evaluate(session, @fetch, url) == "routed"

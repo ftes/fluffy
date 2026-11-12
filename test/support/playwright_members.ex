@@ -58,7 +58,6 @@ defmodule Fluffy.PlaywrightMembers do
   def counterparts(PlaywrightEx.Mouse), do: [Mouse]
   def counterparts(PlaywrightEx.Download), do: [Fluffy.Download]
   def counterparts(PlaywrightEx.FileChooser), do: [Fluffy.FileChooser]
-  def counterparts(PlaywrightEx.Route), do: [Fluffy.Route]
   def counterparts(:event), do: [Fluffy.Event]
   def counterparts(_module), do: []
 
@@ -203,7 +202,8 @@ defmodule Fluffy.PlaywrightMembers do
             security_details server_addr finished frame headers_array http_version from_service_worker)a, @event_value}
       ],
       PlaywrightEx.Route => [
-        {~w(abort continue fallback fulfill request fetch)a, :wrapped}
+        {~w(abort continue fallback fulfill request fetch)a,
+         {:unwrap, "on the PlaywrightEx route a route/4 handler receives"}}
       ],
       PlaywrightEx.ConsoleMessage => [{~w(location page text timestamp type args worker)a, @event_value}],
       PlaywrightEx.WebError => [
@@ -245,7 +245,6 @@ defmodule Fluffy.PlaywrightMembers do
   def unclassified_options do
     %{
       {PlaywrightEx.Page, :goto} => "Fluffy.visit/2 navigates by path and takes no options",
-      {PlaywrightEx.Route, :fetch} => "Fluffy validates timeout:; the other options pass through to PlaywrightEx",
       {PlaywrightEx.Page, :wait_for_event} => "Fluffy.Event waits take timeout: and scope:",
       {PlaywrightEx.Page, :expect_event} => "Fluffy.Event waits take timeout: and scope:",
       {PlaywrightEx.Page, :expect_download} => "Fluffy.Event waits take timeout: and scope:",

@@ -129,8 +129,7 @@ Most `unwrap` callbacks that called PlaywrightEx with the handle's `frame_id`,
   `Fluffy.Playwright.evaluate(session, locator, "el => el.dataset.state")`.
 - `Frame.expect(expression: "to.be.in.viewport")`: `Fluffy.Assert.in_viewport/2` or
   `Fluffy.Expect.to_be_in_viewport/2`.
-- `Page.route` with `PlaywrightEx.Route.fulfill`: `Fluffy.Playwright.route/4` with
-  `Fluffy.Route.fulfill/2`.
+- `Page.route`: `Fluffy.Playwright.route/4`, whose handler gets the `PlaywrightEx.Route`.
 - `BrowserContext.clock_install` and `clock_fast_forward`:
   `Fluffy.Playwright.Clock.install/2` and `fast_forward/3`.
 - `Frame.press`: `Fluffy.press/4`, which takes any Playwright key.

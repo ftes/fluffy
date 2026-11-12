@@ -97,13 +97,6 @@ defmodule Fluffy.Options do
 
   # Upstream docs and types of a passed-through option that Fluffy's behavior completes.
   @native_option_overrides [
-    behavior: [
-      doc:
-        "*Playwright only.* What to do with route handlers already running: `:default` does not wait, and a " <>
-          "handler that fails later, such as by answering a request that went on to the server, fails as usual; " <>
-          "`:wait` waits for them to finish; `:ignore_errors` does not wait and ignores their failures, letting " <>
-          "their requests go on."
-    ],
     wait_until: [
       doc:
         "*Playwright only.* When Playwright considers the navigation done: `:commit`, `:domcontentloaded`, " <>

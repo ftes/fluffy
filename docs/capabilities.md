@@ -280,8 +280,7 @@ fails when PlaywrightEx adds or removes one.
   message assertions, `to_match_aria_snapshot` and `to_have_screenshot`, navigation,
   page management, cookies, storage state, including `set_storage_state`,
   `local_storage` and `session_storage`, permissions, geolocation, offline mode,
-  HTTP credentials, extra HTTP headers, request routing, including `unroute_all`
-  and `Fluffy.Route.fetch/2`,
+  HTTP credentials, extra HTTP headers, request routing, including `unroute_all`,
   tracing, page and element screenshots, page evaluation, init scripts, script and
   style tags, `wait_for_function` and `wait_for_load_state` on the page, the clock in
   `Fluffy.Playwright.Clock`, keyboard and mouse input in `Fluffy.Playwright.Keyboard`

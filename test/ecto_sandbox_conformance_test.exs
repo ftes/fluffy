@@ -29,7 +29,7 @@ defmodule Fluffy.EctoSandboxConformanceTest do
 
     Fluffy.Playwright.route(session, "**/fluffy-sandbox-route", fn route ->
       %{rows: [[read]]} = TestRepo.query!("SELECT value FROM fluffy_records")
-      Fluffy.Route.fulfill(route, json: %{value: read})
+      PlaywrightEx.Route.fulfill!(route, json: %{value: read})
     end)
 
     session = visit(session, "/database")

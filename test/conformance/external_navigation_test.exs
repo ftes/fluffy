@@ -17,7 +17,7 @@ defmodule Fluffy.Conformance.ExternalNavigationTest do
     session = start_test_session(:playwright)
 
     Fluffy.Playwright.route(session, "https://hogsmeade.example/**", fn route ->
-      Fluffy.Route.fulfill(route, content_type: "text/html", body: "<h1>The Three Broomsticks</h1>")
+      PlaywrightEx.Route.fulfill!(route, content_type: "text/html", body: "<h1>The Three Broomsticks</h1>")
     end)
 
     session

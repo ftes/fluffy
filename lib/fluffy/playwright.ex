@@ -23,7 +23,6 @@ defmodule Fluffy.Playwright do
   alias Fluffy.Backend.Playwright.Document
   alias Fluffy.CapabilityError
   alias Fluffy.Options
-  alias Fluffy.Route
   alias Fluffy.Session
   alias PlaywrightEx.BrowserContext
   alias PlaywrightEx.WebStorage
@@ -38,6 +37,9 @@ defmodule Fluffy.Playwright do
                 )
 
   @type route_option :: unquote(NimbleOptions.option_typespec(@route_schema))
+  @typedoc "A `route/4` handler: as for `PlaywrightEx.BrowserContext.route/4`."
+  @type route_handler ::
+          (PlaywrightEx.Route.t() -> term()) | (PlaywrightEx.Route.t(), PlaywrightEx.Request.t() -> term())
 
   @type go_back_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:go_back)))
   @type go_forward_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:go_forward)))
@@ -612,36 +614,37 @@ defmodule Fluffy.Playwright do
   @doc playwright_only: true
   @doc """
   Intercepts matching browser requests in the session's context, so popups and
-  new pages are covered too, and returns the session.
+  new pages are covered too, and returns the session. It is
+  `PlaywrightEx.BrowserContext.route/4` on the session's context.
 
   `url` is what Playwright's `route` takes: a glob string, resolved against the
   session's `base_url:` (such as `"**/api/*"` or `"/api/potions"`), a regular
   expression, or a predicate over the URL string.
 
-  `handler` receives a `Fluffy.Route` and must answer it with
-  `Fluffy.Route.fulfill/2`, `continue/2`, `abort/2` or `fallback/2`:
+  `handler` receives the `PlaywrightEx.Route` (and its `PlaywrightEx.Request`, if it
+  takes two arguments) and answers it with `PlaywrightEx.Route.fulfill!/2`,
+  `continue!/2`, `abort!/2` or `fallback!/2`:
 
       import Fluffy.Playwright
-      alias Fluffy.Route
+      alias PlaywrightEx.Route
 
       session
-      |> route("/api/potions", fn route -> Route.fulfill(route, json: [%{name: "Felix Felicis"}]) end)
+      |> route("/api/potions", fn route -> Route.fulfill!(route, json: [%{name: "Felix Felicis"}]) end)
       |> visit("/potions")
 
-  The handler runs in its own process, since the test process is blocked in the
-  action that caused the request. That process is a `$callers` descendant of
-  this call's process, so the Ecto sandbox allows its queries. Requests run
-  concurrently.
-
-  When several routes match, the last registered wins; `Fluffy.Route.fallback/2`
+  As in PlaywrightEx, the handler runs in a process of its own, with this call's
+  process and its `$callers` in `$callers`, so the Ecto sandbox allows its queries.
+  Call it from the test, or from a process with the test in `$callers`. As in
+  PlaywrightEx, a handler that blocks on anything but Playwright, such as a
+  `receive`, stalls the browser connection: hand the route to another process
+  instead. When several routes match, the last registered wins; `fallback!/2`
   hands the request to the one registered before it.
 
-  A handler that raises aborts its request and fails this call's process, like a
-  `Fluffy.on/4` handler. A handler may return without answering and leave the
-  route to another process, such as the test; a request never answered hangs until
-  the action waiting for it times out, as in Playwright. The route lasts until
-  `unroute/3` or the session's end, even if this call's process exits first, unlike
-  an `on/4` listener. Like Playwright, routing disables the browser's HTTP cache. See
+  As in Playwright, a handler that raises fails the test and leaves its request
+  pending, and a request never answered hangs until the action waiting for it times
+  out. A handler may leave the route to another process, such as the test. The
+  route lasts until `unroute/3`, `unroute_all/2` or the session's end. Like
+  Playwright, routing disables the browser's HTTP cache. See
   [Routing requests](advanced-events.md#routing-requests).
 
   Phoenix sessions raise `Fluffy.CapabilityError`.
@@ -650,11 +653,10 @@ defmodule Fluffy.Playwright do
 
   #{NimbleOptions.docs(@route_schema)}
   """
-  @spec route(Session.t(), Fluffy.Page.url_expectation(), (Route.t() -> term()), [route_option()]) :: Session.t()
-  def route(%Session{} = session, url, handler, options \\ []) when is_function(handler, 1) and is_list(options) do
-    ensure_playwright_backend!(session, :routing)
+  @spec route(Session.t(), Fluffy.Page.url_expectation(), route_handler(), [route_option()]) :: Session.t()
+  def route(%Session{} = session, url, handler, options \\ []) when is_function(handler) and is_list(options) do
     options = NimbleOptions.validate!(options, @route_schema)
-    Route.Registration.start(session, url, handler, options)
+    _disposable = session |> browser_context!(:routing) |> BrowserContext.route!(url, handler, options)
     session
   end
 
@@ -662,30 +664,28 @@ defmodule Fluffy.Playwright do
   @doc playwright_only: true
   @doc """
   Removes the routes registered for `url` by `route/4`, or only those of `handler`,
-  and returns the session.
+  and returns the session. It is `PlaywrightEx.BrowserContext.unroute/3`.
 
-  `url` must be the matcher given to `route/4`. As in Playwright, this does not
-  wait for handlers already running. Removing the last route lets their requests go
-  on to the server, so a late answer raises in its handler and fails this call's
-  process; `unroute_all/2` with `behavior:` avoids that. Phoenix sessions raise
-  `Fluffy.CapabilityError`.
+  `url` must equal the matcher given to `route/4`. As in Playwright, this does not
+  wait for handlers already running; `unroute_all/2` with `behavior:` does.
+  Phoenix sessions raise `Fluffy.CapabilityError`.
   """
-  @spec unroute(Session.t(), Fluffy.Page.url_expectation(), (Route.t() -> term()) | nil) :: Session.t()
-  def unroute(%Session{} = session, url, handler \\ nil) when is_nil(handler) or is_function(handler, 1) do
-    ensure_playwright_backend!(session, :routing)
-    Route.Registration.remove(session, url, handler)
+  @spec unroute(Session.t(), Fluffy.Page.url_expectation(), route_handler() | nil) :: Session.t()
+  def unroute(%Session{} = session, url, handler \\ nil) when is_nil(handler) or is_function(handler) do
+    :ok = session |> browser_context!(:routing) |> BrowserContext.unroute!(url, handler)
     session
   end
 
   @doc group: "Network"
   @doc playwright_only: true
   @doc """
-  Removes every route on the browser context and returns the session.
+  Removes every route on the browser context and returns the session. It is
+  `PlaywrightEx.BrowserContext.unroute_all/2`.
 
-  As in Playwright, this includes routes set up natively and HAR routers, not only
-  those registered by `route/4`. `behavior:` decides what happens to handlers
-  already running, and there is no timeout, as in Playwright. Phoenix sessions
-  raise `Fluffy.CapabilityError`.
+  As in Playwright, this includes routes set up natively and HAR routers, and there
+  is no timeout. `behavior: :ignore_errors` lets handlers still running fail
+  nothing, such as at the end of a test. Phoenix sessions raise
+  `Fluffy.CapabilityError`.
 
   ## Options
 
@@ -693,8 +693,8 @@ defmodule Fluffy.Playwright do
   """
   @spec unroute_all(Session.t(), [unroute_all_option()]) :: Session.t()
   def unroute_all(%Session{} = session, options \\ []) do
-    ensure_playwright_backend!(session, :routing)
-    Route.Registration.remove_all(session, Options.validate_action!(:unroute_all, options))
+    options = Options.validate_action!(:unroute_all, options)
+    :ok = session |> browser_context!(:routing) |> BrowserContext.unroute_all!(options)
     session
   end
 

@@ -122,7 +122,7 @@ session
 |> assert(visible(by_label("Name")))
 ```
 
-A `Fluffy.Download`, `Fluffy.FileChooser` or `Fluffy.Route` reaches its PlaywrightEx
+A `Fluffy.Download` or `Fluffy.FileChooser` reaches its PlaywrightEx
 counterpart through `Fluffy.unwrap_and_return/2`; see [Native values](advanced-events.md#native-values). See
 [PlaywrightEx coverage](capabilities.md#playwrightex-coverage) for which native
 calls are safe.

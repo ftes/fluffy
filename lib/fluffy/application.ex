@@ -13,7 +13,6 @@ defmodule Fluffy.Application do
     Supervisor.start_link(
       [
         {Task.Supervisor, name: Fluffy.TaskSupervisor},
-        {Registry, keys: :duplicate, name: Fluffy.Route.Registry},
         {DynamicSupervisor, strategy: :one_for_one, name: Fluffy.SessionRuntime.Supervisor}
       ],
       strategy: :rest_for_one,

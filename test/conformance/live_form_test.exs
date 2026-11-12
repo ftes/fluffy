@@ -448,7 +448,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
       # A browser really loads the external page, so Playwright stubs its host.
       if driver == :playwright do
         Fluffy.Playwright.route(session, "https://ministry.example/**", fn route ->
-          Fluffy.Route.fulfill(route, content_type: "text/html", body: "<h1>Floo to the Ministry</h1>")
+          PlaywrightEx.Route.fulfill!(route, content_type: "text/html", body: "<h1>Floo to the Ministry</h1>")
         end)
       end
 

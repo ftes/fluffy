@@ -244,7 +244,7 @@ defmodule Fluffy.Capability do
       feature: "Browser request routing",
       drivers: %{static: :browser_only, live: :browser_only, playwright: :equivalent},
       detail:
-        "Fluffy.Playwright.route/4 fulfills, continues, aborts, or falls back matching requests of a session's context, with handlers in their own process. Phoenix raises Fluffy.CapabilityError."
+        "Fluffy.Playwright.route/4 routes matching requests of a session's context through PlaywrightEx's route handlers. Phoenix raises Fluffy.CapabilityError."
     },
     %{
       id: :javascript_evaluation,

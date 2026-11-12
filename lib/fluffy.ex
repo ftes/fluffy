@@ -35,10 +35,10 @@ defmodule Fluffy do
   alias Fluffy.SelectedFile
   alias Fluffy.Session
 
-  @native_values [Fluffy.Route, Fluffy.Download, Fluffy.FileChooser]
+  @native_values [Fluffy.Download, Fluffy.FileChooser]
 
   @typedoc "A browser value that `unwrap_and_return/2` resolves to its PlaywrightEx counterpart."
-  @type native_value :: Fluffy.Route.t() | Fluffy.Download.t() | Fluffy.FileChooser.t()
+  @type native_value :: Fluffy.Download.t() | Fluffy.FileChooser.t()
 
   @doc group: "Lifecycle and navigation"
   @doc """
@@ -193,7 +193,7 @@ defmodule Fluffy do
   page stays as it is. `Fluffy.Playwright.unwrap_and_return/3` passes a native
   locator instead.
 
-  With a `Fluffy.Route`, `Fluffy.Download` or `Fluffy.FileChooser`, `fun` receives its
+  With a `Fluffy.Download` or `Fluffy.FileChooser`, `fun` receives its
   PlaywrightEx counterpart. A Phoenix download has none and raises `Fluffy.CapabilityError`.
   Other events deliver PlaywrightEx's values themselves.
 

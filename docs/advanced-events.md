@@ -7,7 +7,8 @@ use Fluffy.Assert
 import Fluffy
 import Fluffy.Locator
 import Fluffy.Playwright
-alias Fluffy.{Dialog, Download, Event, FileChooser, Frame, Page, Request, Response, Route}
+alias Fluffy.{Dialog, Download, Event, FileChooser, Frame, Page, Request, Response}
+alias PlaywrightEx.Route
 
 pending = wait_for(session, Event.download())
 click(session, by_role(:button, name: "Download the Marauder's Map"))
@@ -269,42 +270,44 @@ with a `PlaywrightEx.Frame`, like `Event.frame_navigated()`.
 ## Routing requests
 
 `Fluffy.Playwright.route/4` intercepts matching requests of the session's browser
-context, including popups, before they reach the network. Register routes before
-the action that sends the request. The handler receives a `Fluffy.Route` with the
-`PlaywrightEx.Request` in `route.request` and answers it once:
+context, including popups, before they reach the network. It is
+`PlaywrightEx.BrowserContext.route/4`: register routes before the action that sends
+the request, and answer the `PlaywrightEx.Route` the handler receives once:
 
 ```elixir
 session
-|> route("/api/potions", fn route -> Route.fulfill(route, json: [%{name: "Felix Felicis"}]) end)
-|> route(~r{/api/owls$}, fn route -> Route.abort(route) end)
+|> route("/api/potions", fn route -> Route.fulfill!(route, json: [%{name: "Felix Felicis"}]) end)
+|> route(~r{/api/owls$}, fn route -> Route.abort!(route) end)
 |> visit("/potions")
 ```
 
 `url` is what Playwright's `route` takes: a glob string (resolved against
-`base_url:`), a regular expression, or a predicate over the URL string.
+`base_url:`), a regular expression, or a predicate over the URL string. A handler
+taking two arguments also gets the `PlaywrightEx.Request`.
 
-Answers are `Fluffy.Route.fulfill/2` (status, headers, `body:`, `json:`, `path:`),
-`Fluffy.Route.continue/2` (with optional overrides), `Fluffy.Route.abort/2`, and
-`Fluffy.Route.fallback/2`.
+Answers are `PlaywrightEx.Route.fulfill!/2` (status, headers, `body:`, `json:`,
+`path:`, `response:` from `PlaywrightEx.Route.fetch!/2`), `continue!/2` (with
+optional overrides), `abort!/2` and `fallback!/2`.
 When several routes match, the last registered wins; `fallback` hands the
 request to the route registered before it, and finally to the server.
 `times:` limits how many requests a route handles, and `Fluffy.Playwright.unroute/3` removes a route
 (for a given handler or all of them for that `url`). As in Playwright, it does not
 wait for handlers already running: removing the last route lets their requests go on
-to the server, so a late answer fails its handler. `Fluffy.Playwright.unroute_all/2`
+to the server, so a late answer fails the test. `Fluffy.Playwright.unroute_all/2`
 takes Playwright's `behavior:` to wait for them (`:wait`) or ignore their failures
 (`:ignore_errors`).
 Routing a document request, such as a `visit` or a link, works like any other:
 the page loads the fulfilled document and Fluffy keeps tracking it.
 
-Each handler runs in its own process, one per request, so a slow handler holds
-only its request; the test process is blocked in the action that caused it. That
-process has `$callers` through the process that called `Fluffy.Playwright.route/4`, so Ecto sandbox
-queries work there as in the test. A handler that raises aborts its request and
-fails the process that called `Fluffy.Playwright.route/4`, like `Fluffy.on/4` handlers. A route lasts until
-`Fluffy.Playwright.unroute/3` or the session's end, even if the process that called `Fluffy.Playwright.route/4` exits
-first, unlike a `Fluffy.on/4` listener; only while that process lives does a failure
-reach it.
+As in PlaywrightEx, each handler runs in a process of its own, since the test
+process is blocked in the action that caused the request. That process has the
+process that called `Fluffy.Playwright.route/4` in `$callers`, so Ecto sandbox
+queries work there as in the test. A handler that blocks on anything but
+Playwright, such as a `receive`, stalls the browser connection, as blocking the
+event loop does in JS; hand the route on instead. Register routes from the test,
+or from a process with the test in `$callers`. As in Playwright, a handler that
+raises fails the test and leaves its request pending. A route lasts until `unroute/3`,
+`unroute_all/2` or the session's end.
 
 A handler may return without answering and leave the route to another process. To
 hold a request while the test observes the page, send the route to the test
@@ -319,7 +322,7 @@ session
 |> assert("Loading" |> by_text() |> visible())
 
 assert_receive {:held, route}
-Route.fulfill(route, json: %{title: "Evening Edition"})
+Route.fulfill!(route, json: %{title: "Evening Edition"})
 ```
 
 As in Playwright, a request never answered hangs until the action waiting for it
@@ -356,8 +359,8 @@ with `start_session(:playwright, browser_context: [storage_state: state])`.
 
 ## Native values
 
-A `Fluffy.Route`, `Fluffy.Download` and `Fluffy.FileChooser` keep their PlaywrightEx
+A `Fluffy.Download` and `Fluffy.FileChooser` keep their PlaywrightEx
 counterpart private; reach it with `Fluffy.unwrap_and_return/2` (see
 [Native escape hatch](debugging.md#native-escape-hatch)) for members Fluffy does not
-wrap. Other events deliver PlaywrightEx's values themselves. Phoenix downloads have none and raise
+wrap. Other events and route handlers get PlaywrightEx's values themselves. Phoenix downloads have none and raise
 `Fluffy.CapabilityError`.

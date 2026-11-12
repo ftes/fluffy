@@ -128,8 +128,7 @@ defmodule Fluffy.MixProject do
           Fluffy.PhoenixTest.Session,
           Fluffy.Download,
           Fluffy.FileChooser,
-          Fluffy.FilePayload,
-          Fluffy.Route
+          Fluffy.FilePayload
         ],
         "Capabilities and errors": [
           Fluffy.Capability,
