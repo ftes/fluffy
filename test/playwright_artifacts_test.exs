@@ -1,7 +1,6 @@
 defmodule Fluffy.PlaywrightArtifactsTest do
-  # Fluffy's side of PlaywrightEx.Test's recording: contexts that sessions create in their
-  # runtime processes are the test's, and steps are its test steps. PlaywrightEx.Test merges
-  # `trace.zip` in its own `on_exit`, so the assertions run in one registered before it.
+  # Fluffy's side of PlaywrightEx.Test's recording: the contexts of a test's sessions are
+  # the test's, and steps are its test steps.
   use ExUnit.Case, async: true
   use Fluffy.Test
 
@@ -19,17 +18,27 @@ defmodule Fluffy.PlaywrightArtifactsTest do
   # Derived, so the trace's copy of this source file does not contain it.
   @secret "FLUFFY-" <> Base.encode16("upload secret of gringotts")
 
+  @moduletag trace: true
+
+  # PlaywrightEx.Test writes `trace.zip` in the `on_exit` its registration adds. One added
+  # before that runs after it, and reads the path the test's setup puts in.
   setup context do
-    path = PlaywrightEx.Test.output_path(context, "trace.zip")
+    {:ok, path} = Agent.start(fn -> nil end)
 
     on_exit(fn ->
+      path = Agent.get(path, & &1)
       trace = read_trace(path)
       File.rm_rf!(Path.dirname(path))
       for expected <- context[:trace_has] || [], do: assert(trace =~ expected)
       for unexpected <- context[:trace_lacks] || [], do: refute(trace =~ unexpected)
     end)
 
-    PlaywrightEx.Test.record_artifacts(context, trace: :on)
+    %{trace_path: path}
+  end
+
+  setup %{trace_path: path} do
+    trace_path = PlaywrightEx.Test.output_path("trace.zip")
+    Agent.update(path, fn _ -> trace_path end)
   end
 
   @tag trace_has: [

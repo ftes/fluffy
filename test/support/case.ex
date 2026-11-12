@@ -19,7 +19,7 @@ defmodule Fluffy.Support.Case do
           put_session_timeout: 2
         ]
 
-      setup_all {Fluffy.Support.Case, :isolate_firefox}
+      setup {Fluffy.Support.Case, :exclusive_firefox}
     end
   end
 
@@ -28,10 +28,12 @@ defmodule Fluffy.Support.Case do
   def playwright_engine?(engine),
     do: engine == Keyword.get(Application.get_env(:playwright_ex, :test, []), :browser_name, :chromium)
 
-  # Firefox dispatches input for all of a browser's pages in one queue: a browser per
-  # module, as Playwright Test's workers have.
-  def isolate_firefox(context) do
-    if playwright_engine?(:firefox), do: PlaywrightEx.Test.browser(context, isolate: true), else: :ok
+  # Firefox dispatches input for all of a browser's pages in one queue: a browser per test,
+  # taken at its first Playwright session, as Playwright Test's workers have one.
+  def exclusive_firefox(_context) do
+    if playwright_engine?(:firefox),
+      do: Fluffy.Backend.Playwright.put_default_browser(&PlaywrightEx.Test.BrowserPool.exclusive/0),
+      else: :ok
   end
 
   # The application's sandbox owners, as a generated DataCase starts them: Fluffy only

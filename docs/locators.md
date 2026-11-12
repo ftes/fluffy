@@ -52,9 +52,11 @@ filters against the element's raw text, so `~r/^Pro$/` does not match
 `<li> Pro </li>`. A regex is a JavaScript `RegExp` on every driver: an Elixir
 `Regex` becomes one with `PlaywrightEx.RegExp.new/1`, which raises `ArgumentError`
 on PCRE-only syntax such as `\A` or `(?i)`, and Static and LiveView match it as
-the browser does. Pass a `PlaywrightEx.RegExp` for JavaScript-only syntax. One
-difference stays: without the `u` modifier the browser matches UTF-16 code units and
+the browser does. Pass a `PlaywrightEx.RegExp` for JavaScript-only syntax. Two
+differences stay: without the `u` modifier the browser matches UTF-16 code units and
 Static and LiveView match code points, so `~r/^.$/` matches an emoji only on Phoenix.
+And on OTP 27, Static and LiveView let `\w` and `\b` also match Latin-1 letters such as
+`é` (OTP 27's PCRE tables); from OTP 28 they are ASCII, as in JavaScript.
 
 Refine a locator with `filter`, `first`, `last`, or zero-based `nth`.
 Use `and_` to require both locators to match the same element:

@@ -236,8 +236,8 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
       expect(session, to_have_screenshot(box, path: path, mask: [box]))
     end
 
-    test "resolves name: through PlaywrightEx.Test's snapshot path", context do
-      path = PlaywrightEx.Test.snapshot_path(context, "fluffy-box.png", kind: :screenshot)
+    test "resolves name: through PlaywrightEx.Test's snapshot path" do
+      path = PlaywrightEx.Test.snapshot_path("fluffy-box.png", kind: :screenshot)
       on_exit(fn -> File.rm_rf!(Path.dirname(path)) end)
       session = session_for_html(:playwright, @html)
 

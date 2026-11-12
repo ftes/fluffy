@@ -5,6 +5,8 @@ defmodule Fluffy.BrowserContextConfigurationTest do
 
   alias Fluffy.Playwright
   alias Fluffy.Support.Server
+  alias Fluffy.Support.Web.Endpoint
+  alias PlaywrightEx.Test.BrowserPool
 
   test "applies typed BrowserContext options in isolated contexts on one browser" do
     origin = Server.base_url()
@@ -82,9 +84,24 @@ defmodule Fluffy.BrowserContextConfigurationTest do
   test "BrowserContext options are rejected by the Phoenix backend" do
     assert_raise ArgumentError, ~r/browser_context.*Playwright/, fn ->
       start_session(:phoenix,
-        endpoint: Fluffy.Support.Web.Endpoint,
+        endpoint: Endpoint,
         browser_context: [locale: "de-DE"]
       )
     end
+
+    assert_raise ArgumentError, ~r/browser.*Playwright/, fn ->
+      start_session(:phoenix, endpoint: Endpoint, browser: BrowserPool.shared())
+    end
+  end
+
+  test "creates the context in the browser: given, else in the default one" do
+    browser = BrowserPool.exclusive()
+    session = start_session(:playwright, base_url: Server.base_url(), browser: browser)
+    assert Fluffy.Session.context(session).browser_context.guid in browser_context_guids(browser)
+
+    # On Firefox, the suite's default is this test's exclusive browser too.
+    default = start_session(:playwright, base_url: Server.base_url())
+    in_browser? = Fluffy.Session.context(default).browser_context.guid in browser_context_guids(browser)
+    assert in_browser? == playwright_engine?(:firefox)
   end
 end

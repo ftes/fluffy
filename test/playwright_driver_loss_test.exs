@@ -1,6 +1,6 @@
 defmodule Fluffy.PlaywrightDriverLossTest do
   # Kills the shared driver, so it runs after the async tests that use it. Not a
-  # Fluffy.Support.Case, whose Firefox modules hold a browser of their own for good.
+  # Fluffy.Support.Case, whose Firefox tests take a browser of their own.
   use ExUnit.Case, async: false
   use Fluffy.Test
 
@@ -9,14 +9,16 @@ defmodule Fluffy.PlaywrightDriverLossTest do
   import Fluffy.Locator
   import Fluffy.Support.Case, only: [monitor_running: 1]
 
+  alias PlaywrightEx.Test.BrowserPool
+
   @moduletag driver: :playwright, capture_log: true
 
-  test "a lost driver stops running sessions and a new session relaunches the browser", context do
+  test "a lost driver stops running sessions and a new session relaunches the browser" do
     session = session_for_html(:playwright, "<button>Save</button>")
     runtime = session.runtime
     monitor = monitor_running(runtime)
 
-    kill_driver(context)
+    kill_driver()
 
     # The driver's loss closes the browser context, which stops the session.
     assert_receive {:DOWN, ^monitor, :process, ^runtime, :normal}, 5_000
@@ -32,13 +34,13 @@ defmodule Fluffy.PlaywrightDriverLossTest do
   end
 
   # The lost driver closes the action's page too; that is no page closing itself.
-  test "a driver lost during an action fails the action", context do
+  test "a driver lost during an action fails the action" do
     session = session_for_html(:playwright, "<button disabled>Save</button>")
 
     {:ok, _killer} =
       Task.start(fn ->
         Process.sleep(200)
-        kill_driver(context)
+        kill_driver()
       end)
 
     assert_raise Fluffy.OperationError, ~r/closed/, fn ->
@@ -46,9 +48,9 @@ defmodule Fluffy.PlaywrightDriverLossTest do
     end
   end
 
-  # The driver of the test's browser in PlaywrightEx.Test's pool.
-  defp kill_driver(context) do
-    %{playwright: playwright} = PlaywrightEx.Test.browser(context)
+  # The driver of the shared browser in PlaywrightEx.Test's pool.
+  defp kill_driver do
+    playwright = BrowserPool.playwright(BrowserPool.shared())
     driver = PlaywrightEx.Runtime.Heap.get(playwright, :driverProcess)
     %{port: port} = :sys.get_state(driver)
     {:os_pid, os_pid} = Port.info(port, :os_pid)

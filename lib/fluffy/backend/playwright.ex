@@ -22,13 +22,15 @@ defmodule Fluffy.Backend.Playwright do
 
   @impl true
   def start_session(options, attachment) do
-    {runtime, sandbox_header, test_context} = attachment
+    {runtime, _sandbox_header, _test_context} = attachment
+    # Raises outside a test, saying to add `use PlaywrightEx.Test`.
+    %{test_pid: test_pid} = PlaywrightEx.Test.info()
     base_url = Keyword.fetch!(options, :base_url)
     config = Options.playwright_config()
     timeout = Keyword.get_lazy(options, :timeout, fn -> Keyword.fetch!(config, :timeout) end)
     browser_context_options = Keyword.get(options, :browser_context, [])
 
-    # Merged over the config's, which `context_options:` would replace as a whole.
+    # Merged over the config's, which `extra_http_headers:` would replace as a whole.
     headers =
       :playwright_ex
       |> Application.get_env(:test, [])
@@ -36,17 +38,18 @@ defmodule Fluffy.Backend.Playwright do
       |> Access.get(:extra_http_headers, %{})
       |> Enum.concat(Keyword.get(browser_context_options, :extra_http_headers, %{}))
       |> Enum.concat(Keyword.get(options, :headers, []))
-      |> Enum.concat(List.wrap(sandbox_header))
+      |> Enum.concat(List.wrap(Fluffy.Sandbox.metadata_header(test_pid)))
       |> Map.new(fn {name, value} -> {String.downcase(to_string(name)), value} end)
 
-    context_options =
-      browser_context_options
-      |> Keyword.put(:base_url, base_url)
-      |> Keyword.put(:extra_http_headers, headers)
-
-    # Created in the test process, so PlaywrightEx.Test records it for the test; the
-    # runtime closes it with the session. As in Playwright, closing has no timeout.
-    browser_context = new_context!(context_options, test_context)
+    # PlaywrightEx.Test records the context for the test and gives it Playwright Test's
+    # defaults, also from a process with the test in `$callers`; the runtime closes it with
+    # the session. As in Playwright, closing has no timeout. A browser lost to a dead driver
+    # still refuses contexts until its disconnect arrives; as in Playwright Test, that
+    # session fails.
+    browser_context =
+      options
+      |> Keyword.get_lazy(:browser, fn -> default_browser(test_pid) end)
+      |> PlaywrightEx.Browser.new_context!(browser_context_options ++ [base_url: base_url, extra_http_headers: headers])
 
     :ok =
       SessionRuntime.register(runtime, {:browser_context, browser_context.guid}, fn ->
@@ -71,22 +74,21 @@ defmodule Fluffy.Backend.Playwright do
     Session.new(__MODULE__, context, page_record(browser_page), runtime)
   end
 
-  # PlaywrightEx.Test records the context for the test (traces, screenshots, videos),
-  # starting the recording at the test's first context. A browser lost to a dead driver
-  # still refuses contexts until its disconnect arrives; as in Playwright Test, that
-  # session fails.
-  defp new_context!(options, test_context) do
-    test_context
-    |> Map.put(:browser, browser(test_context))
-    |> PlaywrightEx.Test.new_context(context_options: options)
-    |> Map.fetch!(:context)
+  @doc false
+  # Fluffy's own Firefox suite: the browser of a test's sessions without `browser:`, chosen
+  # at its first Playwright session by `browser_fun` (`&BrowserPool.exclusive/0`). Kept by
+  # the test process, so its Tasks find it and it goes with the test. Not public API.
+  def put_default_browser(browser_fun) when is_function(browser_fun, 0) do
+    {:ok, _owner} = Registry.register(__MODULE__.DefaultBrowser, self(), browser_fun)
+    :ok
   end
 
-  # The test's `browser`, such as a module's own from a `setup_all` returning
-  # `PlaywrightEx.Test.browser(context, isolate: true)`, else the shared one of
-  # PlaywrightEx.Test's pool (`config :playwright_ex, :test`).
-  defp browser(%{browser: browser}), do: browser
-  defp browser(test_context), do: PlaywrightEx.Test.browser(test_context).browser
+  defp default_browser(test_pid) do
+    case Registry.lookup(__MODULE__.DefaultBrowser, test_pid) do
+      [{^test_pid, browser_fun}] -> browser_fun.()
+      [] -> PlaywrightEx.Test.BrowserPool.shared()
+    end
+  end
 
   # Listeners only forward. The runtime does the work, and receives each
   # message before the reply of the call that caused it.

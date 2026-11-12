@@ -350,7 +350,14 @@ defmodule Fluffy.Options do
                     headers: [type: {:list, {:tuple, [{:or, [:atom, :string]}, :string]}}],
                     conn: [type: {:struct, Plug.Conn}],
                     timeout: [type: :pos_integer],
-                    browser_context: [type: :keyword_list]
+                    browser_context: [type: :keyword_list],
+                    browser: [
+                      type: {:struct, PlaywrightEx.Browser},
+                      doc:
+                        "*Playwright only.* The `PlaywrightEx.Browser` the session's context is created in. " <>
+                          "Defaults to `PlaywrightEx.Test.BrowserPool.shared()`; on Firefox, pass " <>
+                          "`PlaywrightEx.Test.BrowserPool.exclusive()`, the test's own."
+                    ]
                   )
 
   @playwright_schema NimbleOptions.new!(timeout: [type: :pos_integer, default: 15_000])
@@ -475,6 +482,9 @@ defmodule Fluffy.Options do
     cond do
       backend == :phoenix and Keyword.has_key?(options, :browser_context) ->
         raise ArgumentError, ":browser_context options are available only for Playwright sessions"
+
+      backend == :phoenix and Keyword.has_key?(options, :browser) ->
+        raise ArgumentError, ":browser is available only for Playwright sessions"
 
       backend == :playwright and Keyword.has_key?(options, :conn) ->
         raise ArgumentError, ":conn is available only for Phoenix sessions"

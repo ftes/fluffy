@@ -153,7 +153,7 @@ defmodule Fluffy.Support.PlaywrightMembers do
         ] ++ by(3),
       PlaywrightEx.BrowserContext => [
         {~w(add_cookies cookies clear_cookies storage_state new_page pages add_init_script)a, :wrapped},
-        {[:tracing], {:denied, "PlaywrightEx.Test records the trace: record_artifacts(trace:)"}},
+        {[:tracing], {:denied, "PlaywrightEx.Test records the trace: config or `@tag trace: true`"}},
         {[:on], {:renamed, {Fluffy, :on, 4}}},
         {[:once], {:renamed, {Fluffy, :once, 4}}},
         {[:off], {:renamed, {Fluffy, :off, 4}}},
@@ -213,7 +213,7 @@ defmodule Fluffy.Support.PlaywrightMembers do
         {~w(install pause_at run_for fast_forward resume set_fixed_time set_system_time)a, :wrapped}
       ],
       PlaywrightEx.Tracing => [
-        {~w(start stop stop_chunk)a, {:denied, "PlaywrightEx.Test records the trace: record_artifacts(trace:)"}},
+        {~w(start stop stop_chunk)a, {:denied, "PlaywrightEx.Test records the trace: config or `@tag trace: true`"}},
         {~w(group group_end)a, {:renamed, {Fluffy.Playwright, :step, 4}}},
         {~w(start_chunk start_har stop_har)a, {:unwrap, "on PlaywrightEx.BrowserContext.tracing/1"}}
       ]
