@@ -35,6 +35,16 @@
   ],
   "packageRules": [
     {
+      "description": "playwright-ex-update.yml updates PlaywrightEx, classifying its new members",
+      "matchManagers": [
+        "mix"
+      ],
+      "matchPackageNames": [
+        "playwright_ex"
+      ],
+      "enabled": false
+    },
+    {
       "description": "Keep runtime updates together",
       "matchManagers": [
         "asdf"

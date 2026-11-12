@@ -1,0 +1,191 @@
+name: PlaywrightEx Update
+
+# Opens a draft PR updating PlaywrightEx to its newest Hex release, as PlaywrightEx's own
+# upstream-update.yml does for Playwright. Renovate leaves playwright_ex to this workflow: a new
+# PlaywrightEx member fails `Fluffy.PlaywrightMembersTest` until it is classified, which Renovate
+# can't do.
+on:
+  schedule:
+    - cron: "37 4 * * *"
+  workflow_dispatch:
+
+# One run at a time and no cancelling: a queued run waits for the update in progress, then finds
+# its branch and stops in `check`.
+concurrency:
+  group: playwright-ex-update
+  cancel-in-progress: false
+
+permissions: {}
+
+env:
+  # As in ci.yml.
+  MISE_VERSION: "2026.8.14"
+  MIX_ENV: test
+  # As in claude-nightly.yml.
+  CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1"
+  # Steers Claude off the Bash habits (cd, pipes, heredocs) that miss the allowlist. Plain text
+  # only (no quotes, $ or backslashes): claude.yml passes it in a quoted claude_args argument.
+  TOOL_HINT: "Prefer your file tools over Bash to read, search and edit files, and keep any scratch files under tmp/; run each allowed Bash command on its own, without cd, semicolons, &&, pipes or heredocs (you are already in the repository)."
+
+jobs:
+  # Cheap, no Claude: is there a newer release without a branch or PR for it?
+  check:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read # gh pr list (dedup)
+    outputs:
+      update: ${{ steps.check.outputs.update }}
+      from: ${{ steps.check.outputs.from }}
+      to: ${{ steps.check.outputs.to }}
+      branch: ${{ steps.check.outputs.branch }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          sparse-checkout: mix.lock
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: Find a newer PlaywrightEx release
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+        # Hex's latest_version is the highest release, pre-releases included. A git dep (main, for
+        # a fix not yet released) waits for a release that contains its commit. The branch, or a PR
+        # from it, means the release is handled; a dispatch retries one whose PR was closed (delete
+        # the branch first).
+        run: |
+          out() { echo "$1=$2" | tee -a "$GITHUB_OUTPUT"; }
+          lock=$(sed -nE 's/^  "playwright_ex": \{:(hex|git), [^,]+, "([^"]+)".*/\1 \2/p' mix.lock)
+          read -r kind from <<< "$lock"
+          to=$(curl -fsSL --retry 3 https://hex.pm/api/packages/playwright_ex | jq -r .latest_version)
+          [[ -n $from && -n $to ]] || { echo "::error::cannot read mix.lock or Hex"; exit 1; }
+          out from "$from"
+          out to "$to"
+          if [[ $kind == hex ]]; then
+            newer=$([[ $to != "$from" ]] && echo true || echo false)
+          else
+            status=$(gh api "repos/ftes/playwright_ex/compare/$from...v$to" --jq .status)
+            newer=$([[ $status == ahead || $status == identical ]] && echo true || echo false)
+          fi
+          branch="claude/playwright-ex-$to"
+          out branch "$branch"
+          states=$([[ $EVENT == workflow_dispatch ]] && echo open || echo all)
+          prs=$(gh pr list --head "$branch" --state "$states" --json url --jq 'map(.url) | join(" ")')
+          if [[ $newer != true ]]; then
+            echo "::notice::$to doesn't update the locked $from"
+            out update false
+          elif [[ -n $prs ]]; then
+            echo "::notice::PR exists: $prs"
+            out update false
+          elif gh api "repos/$GH_REPO/git/ref/heads/$branch" --silent 2> /dev/null; then
+            echo "::notice::Branch $branch exists"
+            out update false
+          else
+            out update true
+          fi
+
+  update:
+    needs: check
+    if: needs.check.outputs.update == 'true'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write # Exchanged for the Claude app token, which pushes and opens the PR.
+    # For `mix check`, as in ci.yml's test job.
+    services:
+      postgres:
+        image: postgres:18.6@sha256:e3d24f6906d0760bf4da0dae872415391ededefad23fd471c47dc53b0ddf3c42
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 1s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      BRANCH: ${{ needs.check.outputs.branch }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # Else checkout's read-only token can override the app token Claude pushes with: from v6
+          # it sits in an includeIf file claude-code-action doesn't clear, so the push gets a 403.
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up toolchain and deps
+        uses: ./.github/actions/setup
+        with:
+          lane: newest
+      # For the current driver; Claude reinstalls the browser if the update changes it.
+      - name: Install Playwright browser
+        uses: ./.github/actions/browser
+      - name: Build test assets
+        run: mix assets.build
+      - name: Fetch Playwright source
+        run: mix fluffy.playwright_source
+      - run: git switch -c "$BRANCH"
+      - name: Run Claude
+        id: claude
+        uses: anthropics/claude-code-action@61a9c274fa7110a66dfafc1bbbced03833eb25fe # v1.0.269
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            FROM: ${{ needs.check.outputs.from }} (in mix.lock: a Hex version, or a commit on playwright_ex's main)
+            TO: ${{ needs.check.outputs.to }}
+            BRANCH: ${{ env.BRANCH }} (already checked out, from main)
+
+            PlaywrightEx TO is on Hex. Update Fluffy to it and open a draft PR. Read AGENTS.md
+            first.
+
+            1. In mix.exs, require `~> TO` from Hex, replacing any `github:` source and its comment.
+               Run `mix deps.update playwright_ex`, then read what deps/playwright_ex/CHANGELOG.md
+               lists since FROM.
+            2. If the update changed deps/playwright_ex/DRIVER_VERSION, run
+               `mix playwright_ex.install -- chromium` and `mix fluffy.playwright_source`.
+            3. Run `mix test test/playwright_members_test.exs`. Classify each new PlaywrightEx member
+               and event in test/support/playwright_members.ex, as its header describes, and drop
+               removed ones. Wrap one in Fluffy only when it's a small, obvious extension of what
+               Fluffy already wraps; otherwise classify it, with "gap:" for an API candidate.
+            4. Run `mix fluffy.gen.native_options` and `mix usage_rules.sync --yes`.
+            5. Run `mix check` (Chromium; Postgres is up) and fix what the update breaks, following
+               AGENTS.md. Don't weaken or skip a test to get it green. Rerun failed tests once with
+               `mix test --failed`; one that still fails and that the update didn't cause is
+               reported in the PR body, not hidden.
+            6. Under `## Unreleased` in CHANGELOG.md, in the style of the existing entries:
+               "Requires PlaywrightEx TO", and anything else users see change.
+
+            If the update needs a decision beyond this, like a breaking PlaywrightEx change or a
+            larger Fluffy API, still open the PR with what you have and say what's left.
+
+            To publish, commit with "Update PlaywrightEx to TO" as the subject and write
+            tmp/playwright-ex-pr.md (tmp/ is gitignored): a few sentences on what changed, the gaps
+            and decisions left for a human, and the `mix check` result. Then run exactly:
+              git push -u origin ${{ env.BRANCH }}
+              gh pr create --draft --base main --head ${{ env.BRANCH }} --title "Update PlaywrightEx to ${{ needs.check.outputs.to }}" --body-file tmp/playwright-ex-pr.md
+
+            ${{ env.TOOL_HINT }}
+
+            No attribution anywhere: no Co-Authored-By trailers or "Generated with" lines.
+          # The owner forbids attribution; the prompt says so too.
+          settings: |
+            {"includeCoAuthoredBy": false, "attribution": {"commit": "", "pr": ""}}
+          claude_args: |
+            --model claude-opus-5-5
+            --max-turns 150
+            --allowedTools "Read,Grep,Glob,Edit,Write,Agent,Task,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git add:*),Bash(git commit:*),Bash(mix deps.update playwright_ex),Bash(mix deps.get),Bash(mix playwright_ex.install:*),Bash(mix fluffy.playwright_source),Bash(mix fluffy.gen.native_options:*),Bash(mix usage_rules.sync:*),Bash(mix usage_rules.docs:*),Bash(mix usage_rules.search_docs:*),Bash(mix format:*),Bash(mix compile:*),Bash(mix credo:*),Bash(mix test:*),Bash(mix check:*),Bash(git push -u origin ${{ env.BRANCH }}),Bash(gh pr create --draft --base main --head ${{ env.BRANCH }} *)"
+      - name: Summarize Claude's result
+        if: ${{ !cancelled() && steps.claude.outputs.execution_file != '' }}
+        env:
+          EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
+        # .github/claude-summary.jq: only the final message and the denied calls (public repo). From
+        # the run's commit, as Claude may have edited the checkout; a failed `git show` stops the step.
+        run: |
+          filter=$(git show "$GITHUB_SHA:.github/claude-summary.jq")
+          jq -r "$filter" "$EXECUTION_FILE" >> "$GITHUB_STEP_SUMMARY"
