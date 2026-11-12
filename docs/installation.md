@@ -150,9 +150,7 @@ defmodule MyAppWeb.ForbiddenCorridorTest do
   use ExUnit.Case, async: true
   use Fluffy.Test
 
-  setup_all context do
-    PlaywrightEx.Test.browser(context, isolate: true)
-  end
+  setup_all context, do: PlaywrightEx.Test.browser(context, isolate: true)
 end
 ```
 
