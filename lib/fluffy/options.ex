@@ -355,8 +355,9 @@ defmodule Fluffy.Options do
                       type: {:struct, PlaywrightEx.Browser},
                       doc:
                         "*Playwright only.* The `PlaywrightEx.Browser` the session's context is created in. " <>
-                          "Defaults to `PlaywrightEx.Test.BrowserPool.shared()`; on Firefox, pass " <>
-                          "`PlaywrightEx.Test.BrowserPool.exclusive()`, the test's own."
+                          "Defaults to the browser of `PlaywrightEx.Test.BrowserPool.shared/1`; " <>
+                          "on Firefox, pass the test's own from `PlaywrightEx.Test.BrowserPool.exclusive/1` " <>
+                          "([Playwright setup](installation.md#playwright-setup))."
                     ]
                   )
 

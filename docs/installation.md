@@ -136,17 +136,19 @@ printed; the trace has them. To log them, register a listener, such as
 `on(session, Event.console(), &Logger.info(PlaywrightEx.ConsoleMessage.text(&1)))`.
 
 Set `browser_name: :firefox` or `browser_name: :webkit` after installing the
-corresponding browser (`mix playwright_ex.install -- firefox`).
+corresponding browser (`mix playwright_ex.install -- firefox`); on Firefox, also give
+sessions an exclusive browser, as below.
 See [Browser baseline](capabilities.md#browser-baseline) for conformance coverage.
 Fluffy creates a fresh isolated `BrowserContext` for each session, in the browser of
-its `browser:` option, else in `PlaywrightEx.Test.BrowserPool.shared()`. No driver or
-browser starts until a session needs one, a lost browser is launched again for the next
-session, and the drivers stop after the suite. For more users in a test, start more
+its `browser:` option, else in the shared browser of
+`PlaywrightEx.Test.BrowserPool.shared/1`. No driver or browser starts until a session
+needs one, a lost browser is launched again for the next session, and the drivers stop
+after the suite. For more users in a test, start more
 sessions: each gets its own browser context.
 
 Firefox dispatches input for all of a browser's pages in one queue and times out under
-load, so on Firefox use an exclusive browser (one browser per worker, like Playwright
-Test):
+load, so on Firefox give each test an exclusive browser from
+`PlaywrightEx.Test.BrowserPool.exclusive/1` (one browser per worker, like Playwright Test):
 
 ```elixir
 start_session(:playwright, browser: PlaywrightEx.Test.BrowserPool.exclusive())
@@ -154,8 +156,9 @@ start_session(:playwright, browser: PlaywrightEx.Test.BrowserPool.exclusive())
 
 The test holds it until it ends, and its further `exclusive()` calls return the same
 browser. At most `workers` are out at once (`config :playwright_ex, :test`, half the
-schedulers); see [Exclusive browsers](https://hexdocs.pm/playwright_ex/testing-with-exunit.html#exclusive-browsers)
-in PlaywrightEx's guide.
+schedulers); see [Exclusive browsers](`e:playwright_ex:testing-with-exunit.md#exclusive-browsers`)
+in PlaywrightEx's guide. `Fluffy.Case` uses the shared browser, so on Firefox write your own
+session setup.
 
 ## Ecto sandbox
 
