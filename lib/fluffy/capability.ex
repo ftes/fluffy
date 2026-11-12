@@ -292,18 +292,11 @@ defmodule Fluffy.Capability do
       detail: "One test scope owns all sessions and tears pages and LiveViews down before sandbox ownership."
     },
     %{
-      id: :regex_url_matching,
-      feature: "Regex URL matching",
+      id: :url_matching,
+      feature: "URL matching",
       drivers: %{static: :equivalent, live: :equivalent, playwright: :equivalent},
       detail:
-        "Regex expectations run one Elixir Regex against the complete canonical serialized URL above all three drivers."
-    },
-    %{
-      id: :structured_url_matching,
-      feature: "Structured path, query, and fragment URL matching",
-      drivers: %{static: :equivalent, live: :equivalent, playwright: :equivalent},
-      detail:
-        "Fluffy.Expect.page_to_have_url/1 supports path-only and exact/subset decoded query matching. Distinct-name order is ignored, repeated-value order is retained, and every driver uses the same matcher."
+        "page_to_have_url/2 takes what Playwright's toHaveURL takes: a string resolved against the base URL that must equal the URL, a regex, or a predicate over the URL string. Phoenix drivers match with PlaywrightEx.Isomorphic.UrlMatch."
     },
     %{
       id: :file_uploads,

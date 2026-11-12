@@ -24,7 +24,7 @@ start_session(:phoenix)
 |> fill(by_label("Name"), "Basilisk")
 |> click(by_role(:button, name: "Register"))
 |> assert(visible(by_text("Creature registered")))
-|> assert(page_url(path: "/creatures"))
+|> assert(page_url("/creatures"))
 ```
 
 ## Locators
@@ -41,7 +41,7 @@ start_session(:phoenix)
 - A Playwright `visit` already waits for LiveViews to connect, so do not assert `.phx-connected`.
 - `use Fluffy.Assert` gives `assert(visible(l))` and `refute(visible(l))`, and ordinary ExUnit asserts still work. `import Fluffy.Expect` gives `expect(to_be_visible(l))` and `expect(not_(to_be_visible(l)))`. Both return the session.
 - `refute(visible(l))` passes for an absent or invisible element. Use `assert(count(l, 0))` to require DOM absence.
-- URL strings match the complete URL, including query and fragment. Use `page_url(path: "/x")` when only the path matters.
+- URL strings match the complete URL, including query and fragment. When only the path matters, use a regex or a predicate over the URL string: `page_url(&(URI.parse(&1).path == "/x"))`.
 - There is no page status assertion. On Playwright, assert on `Event.response` instead.
 - Static and LiveView check structural visibility (`hidden`, `type="hidden"`) and do not compute CSS, so `display: none` alone counts as visible there. `aria-hidden="true"` does not affect visibility; only `by_role` excludes it. Use `:playwright` to test rendered visibility.
 - Text matching skips `<script>` and `<style>`, as in Playwright, so `assert_has("script", text: ...)` fails even with `count:`. Match attributes with `count:`, or read the text natively: `unwrap` on Static passes the conn (`conn.resp_body`), and on Playwright use `Fluffy.Playwright.evaluate(session, locator, "el => el.textContent")`.

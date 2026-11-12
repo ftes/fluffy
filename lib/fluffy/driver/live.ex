@@ -28,7 +28,6 @@ defmodule Fluffy.Driver.Live do
   alias Fluffy.Locator
   alias Fluffy.Page
   alias Fluffy.Session
-  alias Fluffy.URLMatcher
 
   @retry_interval 10
 
@@ -452,7 +451,7 @@ defmodule Fluffy.Driver.Live do
 
   defp evaluate_expectation(%Session{} = session, %Expect{target: :page, kind: :url, expected: expected}) do
     actual = Session.current_page(session).url
-    {:ok, URLMatcher.matches?(expected, actual), actual}
+    {:ok, Expect.Internal.url_matches?(expected, Session.context(session).http.base_url, actual), actual}
   end
 
   defp evaluate_expectation(%Session{} = session, %Expect{target: :page, kind: :title, expected: expected}) do

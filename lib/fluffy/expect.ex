@@ -21,7 +21,6 @@ defmodule Fluffy.Expect do
   alias Fluffy.Locator
   alias Fluffy.Options
   alias Fluffy.Session
-  alias Fluffy.URLMatcher
 
   @enforce_keys [:target, :kind]
   defstruct [:target, :kind, :expected, options: [], negated?: false]
@@ -116,9 +115,7 @@ defmodule Fluffy.Expect do
   @spec expect(Session.t(), t(), [option()]) :: Session.t()
   def expect(%Session{} = session, %Expect{} = expectation, options \\ []) do
     expectation =
-      expectation
-      |> Internal.merge_options(options)
-      |> normalize_expectation(session)
+      Internal.merge_options(expectation, options)
 
     case expectation.target do
       {:locator, _locator} ->
@@ -693,27 +690,15 @@ defmodule Fluffy.Expect do
 
   @doc group: "Page assertions"
   @doc """
-  Expects the active page to have the requested URL.
+  Expects the active page to have the requested URL, as Playwright's `toHaveURL`.
 
-  A string matches the complete canonical absolute URL after resolving a
-  relative value against the session base URL. A regular expression matches
-  that complete serialized URL. A function receives a `%URI{}` and returns a boolean.
-  Keep predicates quick and nonblocking.
+  A string is resolved against the session's base URL and must equal the complete URL,
+  query and fragment included. A regular expression matches the URL, and a function gets the
+  URL string and returns whether it matches. Keep predicates quick and nonblocking.
 
-  A keyword list selects structured components. `:path` and `:fragment` are
-  exact serialized component values; omit either to ignore it. `:fragment`
-  excludes the leading `#`, and `fragment: nil` requires no fragment.
-
-  `:query` is a map from decoded parameter names to one value or an ordered
-  list of repeated values. Ordering between distinct names is ignored while
-  repeated-value order is retained. Bare names and names with an empty value
-  both decode to `""`; `+` and `%20` both decode to a space. Exact mode is the
-  default. `query_mode: :subset` permits unrelated names but still requires
-  the complete ordered value list for each requested name.
-
-  ## Structured components
-
-  #{NimbleOptions.docs(Options.url_matcher_schema())}
+      expect(session, page_to_have_url("/creatures/fluffy"))
+      expect(session, page_to_have_url(~r{/creatures/[a-z]+$}))
+      expect(session, page_to_have_url(&(URI.parse(&1).path == "/creatures")))
 
   ## Assertion options
 
@@ -726,13 +711,7 @@ defmodule Fluffy.Expect do
   def page_to_have_url(expected, options)
       when (is_binary(expected) or is_struct(expected, Regex) or is_function(expected, 1)) and is_list(options) do
     {timeout, matching} = Options.split_expectation!(:page_to_have_url, options)
-    Internal.new(:page, :url, URLMatcher.ignore_case(expected, matching[:ignore_case]), timeout)
-  end
-
-  def page_to_have_url(components, options) when is_list(components) and is_list(options) do
-    {timeout, matching} = Options.split_expectation!(:page_to_have_url, options)
-    if matching[:ignore_case], do: raise(ArgumentError, "ignore_case: requires a string or regular expression URL")
-    Internal.new(:page, :url, URLMatcher.new!(components), timeout)
+    Internal.new(:page, :url, {expected, matching}, timeout)
   end
 
   @doc group: "Page assertions"
@@ -803,18 +782,4 @@ defmodule Fluffy.Expect do
 
     :ok
   end
-
-  defp normalize_expectation(%Expect{target: :page, kind: :url, expected: expected} = expectation, session)
-       when is_binary(expected) do
-    %{expectation | expected: Fluffy.Backend.absolute_url(session, expected)}
-  end
-
-  defp normalize_expectation(
-         %Expect{target: :page, kind: :url, expected: {:ignore_case, expected}} = expectation,
-         session
-       ) do
-    %{expectation | expected: {:ignore_case, Fluffy.Backend.absolute_url(session, expected)}}
-  end
-
-  defp normalize_expectation(%Expect{} = expectation, _session), do: expectation
 end

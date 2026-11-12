@@ -65,7 +65,7 @@ directly and assert the result, without first asserting that the target is ready
 session
 |> fill(by_label("Potion name"), "Polyjuice Potion")
 |> click(by_role(:button, name: "Save potion"))
-|> assert(page_url(path: "/potions"))
+|> assert(page_url("/potions"))
 ```
 
 The Phoenix backend checks HTML structure and control state. Each action

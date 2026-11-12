@@ -14,13 +14,8 @@ defmodule Fluffy.Page do
 
   @opaque t :: %__MODULE__{runtime: pid(), id: reference()}
   @type title_expectation :: String.t() | Regex.t()
-  @type query_value :: String.t() | [String.t()]
-  @type url_component ::
-          {:path, String.t()}
-          | {:query, %{String.t() => query_value()}}
-          | {:query_mode, :exact | :subset}
-          | {:fragment, String.t() | nil}
-  @type url_expectation :: String.t() | Regex.t() | (URI.t() -> boolean()) | [url_component()]
+  @typedoc "A URL as Playwright takes it: a string, a regular expression or a predicate over the URL string."
+  @type url_expectation :: String.t() | Regex.t() | (String.t() -> as_boolean(term()))
 
   @doc false
   @spec new(pid(), reference()) :: t()

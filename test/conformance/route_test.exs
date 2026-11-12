@@ -98,20 +98,18 @@ defmodule Fluffy.Conformance.RouteTest do
 
   describe "url" do
     @tag driver: :playwright
-    test "a glob, a regular expression, a predicate and URL components each match" do
+    test "a glob, a regular expression and a predicate each match" do
       {session, fixture} = session()
       answer = fn body -> fn route -> Route.fulfill(route, body: body) end end
 
       route(session, "**/glob", answer.("glob"))
       route(session, ~r{/regex$}, answer.("regex"))
-      route(session, &String.ends_with?(&1.path, "/predicate"), answer.("predicate"))
-      route(session, [path: TestHTTPFixtures.path(fixture, "/components"), query: %{"a" => "1"}], answer.("components"))
+      route(session, &String.ends_with?(&1, "/predicate?a=1"), answer.("predicate"))
 
       assert fetch(session, fixture, "/glob") == "glob"
       assert fetch(session, fixture, "/regex") == "regex"
-      assert fetch(session, fixture, "/predicate") == "predicate"
-      assert fetch(session, fixture, "/components?a=1") == "components"
-      assert fetch(session, fixture, "/components?a=2") =~ "server"
+      assert fetch(session, fixture, "/predicate?a=1") == "predicate"
+      assert fetch(session, fixture, "/predicate?a=2") =~ "server"
     end
 
     @tag driver: :playwright
@@ -126,7 +124,7 @@ defmodule Fluffy.Conformance.RouteTest do
       {session, _fixture} = session()
       handler = fn route -> Route.continue(route) end
       assert_raise ArgumentError, fn -> route(session, :nope, handler) end
-      assert_raise NimbleOptions.ValidationError, fn -> route(session, [nope: "x"], handler) end
+      assert_raise ArgumentError, fn -> route(session, [path: "/api"], handler) end
     end
   end
 

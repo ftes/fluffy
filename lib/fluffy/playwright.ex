@@ -592,10 +592,9 @@ defmodule Fluffy.Playwright do
   Intercepts matching browser requests in the session's context, so popups and
   new pages are covered too, and returns the session.
 
-  `url` is what `Fluffy.Expect.page_to_have_url/2` accepts: a string, a regular
-  expression, a unary predicate over the `URI`, or path, query and fragment
-  components. A string is a Playwright glob, resolved against the session's
-  `base_url:`, such as `"**/api/*"` or `"/api/potions"`.
+  `url` is what Playwright's `route` takes: a glob string, resolved against the
+  session's `base_url:` (such as `"**/api/*"` or `"/api/potions"`), a regular
+  expression, or a predicate over the URL string.
 
   `handler` receives a `Fluffy.Route` and must answer it with
   `Fluffy.Route.fulfill/2`, `continue/2`, `abort/2` or `fallback/2`:

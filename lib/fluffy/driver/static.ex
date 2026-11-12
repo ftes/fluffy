@@ -11,7 +11,6 @@ defmodule Fluffy.Driver.Static do
   alias Fluffy.Internal.Navigation
   alias Fluffy.Locator
   alias Fluffy.Session
-  alias Fluffy.URLMatcher
 
   @impl true
   def open_browser(%Session{} = session, open_fun) do
@@ -48,7 +47,8 @@ defmodule Fluffy.Driver.Static do
 
       %Expect{target: :page, kind: :url, expected: expected} ->
         actual = Session.current_page(session).url
-        assert_truth!(expectation, URLMatcher.matches?(expected, actual), actual)
+        base_url = Session.context(session).http.base_url
+        assert_truth!(expectation, Expect.Internal.url_matches?(expected, base_url, actual), actual)
 
       %Expect{target: :page, kind: :title, expected: expected} ->
         actual = session |> Session.page_state() |> document() |> page_title()

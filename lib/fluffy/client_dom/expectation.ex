@@ -6,7 +6,6 @@ defmodule Fluffy.ClientDOM.Expectation do
   alias Fluffy.HTML.Aria
   alias Fluffy.HTML.Semantics
   alias Fluffy.Locator.Static
-  alias Fluffy.URLMatcher
 
   # Evaluate one DOM snapshot. Drivers own retries, negation, and diagnostics.
   def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :count, expected: expected}) do
@@ -183,7 +182,7 @@ defmodule Fluffy.ClientDOM.Expectation do
   end
 
   defp text_matches?(%Regex{} = expected, actual, options) do
-    expected |> URLMatcher.ignore_case(options[:ignore_case]) |> Regex.match?(actual)
+    expected |> Expect.Internal.ignore_case(options[:ignore_case]) |> Regex.match?(actual)
   end
 
   defp text_matches?(expected, actual, options) when is_binary(expected) do

@@ -532,7 +532,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     end
 
     # Clicking the button would have redirected to /chamber.
-    expect(session, Fluffy.Expect.page_to_have_url(&(&1.path == "/live/chamber-map" and &1.query =~ "delay=600")))
+    expect(session, Fluffy.Expect.page_to_have_url(~r{/live/chamber-map\?.*delay=600}))
   end
 
   @tag driver: :phoenix

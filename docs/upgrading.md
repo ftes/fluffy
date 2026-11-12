@@ -94,6 +94,11 @@ Timeouts follow Elixir: `0` checks once and `:infinity` means no limit; see
   It raises `Fluffy.CapabilityError` on Phoenix, where it used to just run the callback.
 - `filter/2` takes no `exact:`, as in Playwright. Match a whole text with a regex, such as
   `filter(has_text: ~r/^Pro$/)`, which works on every driver.
+- `page_url`/`page_to_have_url` and `Fluffy.Playwright.route/4` take URLs as Playwright
+  does: a string, a regex or a predicate, which gets the URL string instead of a `%URI{}`.
+  Replace `page_url(path: "/potions")` with `page_url("/potions")` when the URL has no
+  query, or with `page_url(&(URI.parse(&1).path == "/potions"))`; the `query:` and
+  `fragment:` forms become a regex or a predicate too.
 - The `Fluffy.Expect.checked_option` type is `to_be_checked_option`.
   `Fluffy.Locator.describe`, `new` and `append` are internal; `inspect/1` renders a locator.
 - On Playwright, a failed `visit`, `reload`, `go_back` or `go_forward` raises

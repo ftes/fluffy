@@ -58,28 +58,20 @@ defmodule Fluffy.Conformance.NativeOptionsTest do
       |> expect(page_to_have_url("/STAGE", ignore_case: true))
       |> expect(page_to_have_url(~r/STAGE$/, ignore_case: true))
       |> expect(not_(page_to_have_url(~r/STAGE$/i, ignore_case: false)))
-      |> expect(page_to_have_url(~r/(*UCP)\bSTAGE$/, ignore_case: true))
-      |> expect(not_(page_to_have_url(~r/(*UCP)\bSTAGE$/i, ignore_case: false)))
     end
   end
 
   for driver <- [:static, :live, :playwright] do
     @tag driver: driver
-    test "ignore_case: false leaves a predicate or structured URL unchanged with #{driver}" do
+    test "ignore_case: hands a predicate the URL in lower case with #{driver}" do
       path = if unquote(driver) == :live, do: "/live/nested", else: "/stage"
+      upper = String.upcase(path)
 
       unquote(driver)
       |> visited_session(path)
-      |> expect(page_to_have_url(&(&1.path == path), ignore_case: false))
-      |> expect(page_to_have_url([path: path], ignore_case: false))
-    end
-  end
-
-  test "ignore_case requires a string or regular expression URL" do
-    assert_raise ArgumentError, ~r/ignore_case: requires/, fn -> page_to_have_url([path: "/"], ignore_case: true) end
-
-    assert_raise ArgumentError, ~r/ignore_case: requires/, fn ->
-      page_to_have_url(&(&1.path == "/"), ignore_case: true)
+      |> expect(page_to_have_url(&String.ends_with?(&1, path), ignore_case: true))
+      |> expect(not_(page_to_have_url(&String.ends_with?(&1, upper), ignore_case: true)))
+      |> expect(page_to_have_url(&String.ends_with?(&1, path), ignore_case: false))
     end
   end
 

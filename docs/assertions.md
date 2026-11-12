@@ -219,31 +219,19 @@ Title assertions normalize whitespace. LiveView and Playwright retry until
 the title matches; Static checks immediately. LiveView also observes later
 `@page_title` updates, including `live_title` prefixes and suffixes.
 
-URL assertions use the same `page_` prefix. Strings and regular expressions
-match the complete canonical URL. Use the structured form when query
-serialization order is not part of the contract:
+URL assertions use the same `page_` prefix and take what Playwright's `toHaveURL`
+takes. A string is resolved against the session base URL and must equal the
+complete URL, query and fragment included. A regular expression matches the URL,
+and a function gets the URL string:
 
 ```elixir
 session
-|> assert(page_url(path: "/potions"))
-|> assert(
-  page_url(
-    path: "/potions",
-    query: %{"state" => "brewing", "ingredient" => ["lacewing", "boomslang"]},
-    query_mode: :subset
-  )
-)
+|> assert(page_url("/potions"))
+|> assert(page_url(~r{/potions\?state=brewing}))
+|> assert(page_url(&(URI.decode_query(URI.parse(&1).query || "")["state"] == "brewing")))
 ```
 
-Exact URL strings include the query and fragment; relative strings resolve
-against the session base URL. Structured matching can select `:path`, `:query`,
-and `:fragment`; omitted components are ignored. A function receives a `%URI{}`:
-
-```elixir
-session |> assert(page_url(fn uri -> uri.path == "/potions" and uri.fragment == "ready" end))
-```
-
-Predicates work with both backends and with negated assertions. Keep them quick
+Predicates work with every driver and with negated assertions. Keep them quick
 and nonblocking.
 
 Like Playwright, Fluffy has no page status assertion. On Playwright, assert on the
@@ -257,10 +245,3 @@ session
   fn response -> assert response.status == 200 end
 )
 ```
-
-Structured queries decode like `URLSearchParams`: distinct parameter-name
-order is ignored, and repeated values retain their order and duplicates.
-Exact query mode rejects unrelated names; `query_mode: :subset` allows them
-while requiring all values for each requested name. Keys and values are strings;
-bracketed names remain literal, rather than becoming nested Plug data. Bare
-parameters and empty values both decode to `""`; `+` and `%20` decode to a space.

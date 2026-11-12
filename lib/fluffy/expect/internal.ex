@@ -6,12 +6,50 @@ defmodule Fluffy.Expect.Internal do
   alias Fluffy.Expect
   alias Fluffy.Locator
   alias Fluffy.Options
-  alias Fluffy.URLMatcher
+  alias PlaywrightEx.Isomorphic.UrlMatch
 
   @doc "Whether `actual` equals `expected` or matches its regular expression."
   def matches?(%Regex{} = expected, actual) when is_binary(actual), do: Regex.match?(expected, actual)
 
   def matches?(expected, actual), do: actual == expected
+
+  @doc """
+  Whether `url` matches a `page_to_have_url/2` expectation on the Phoenix drivers, as in
+  PlaywrightEx's `toHaveURL`: a string resolved against `base_url` equals the URL, a
+  regular expression matches it, and a predicate gets the URL string. `ignore_case:` compares
+  strings and predicate URLs in lower case and overrides a regular expression's `i` flag.
+  """
+  def url_matches?({expected, options}, base_url, url) when is_binary(url) do
+    ignore_case = options[:ignore_case]
+
+    cond do
+      is_binary(expected) ->
+        expected = UrlMatch.construct_url_based_on_base_url(base_url, expected)
+        if ignore_case, do: String.downcase(expected) == String.downcase(url), else: expected == url
+
+      is_struct(expected, Regex) ->
+        Regex.match?(ignore_case(expected, ignore_case), url)
+
+      true ->
+        url = if ignore_case, do: String.downcase(url), else: url
+        !!UrlMatch.url_matches(nil, base_url, url, expected)
+    end
+  end
+
+  def url_matches?(_expected, _base_url, _url), do: false
+
+  @doc """
+  Applies `ignore_case:` to a regular expression. It takes precedence over the expression's
+  own `i` flag, as in PlaywrightEx.
+  """
+  def ignore_case(%Regex{} = expected, nil), do: expected
+
+  # Prefixing an inline flag would break a source that must start with a PCRE verb such as `(*UCP)`.
+  def ignore_case(%Regex{} = expected, ignore_case) do
+    options = List.delete(Regex.opts(expected), :caseless)
+    options = if ignore_case, do: [:caseless | options], else: options
+    Regex.compile!(Regex.source(expected), options)
+  end
 
   @doc "Whether a page title matches `expected`, comparing normalized whitespace."
   def title_matches?(expected, actual) when is_binary(actual) do
@@ -66,8 +104,8 @@ defmodule Fluffy.Expect.Internal do
     "#{Locator.Internal.describe(locator)} #{locator_matcher_description(kind, expected)}"
   end
 
-  defp positive_description(%Expect{target: :page, kind: :url, expected: expected}) do
-    "active page to have URL #{URLMatcher.describe(expected)}"
+  defp positive_description(%Expect{target: :page, kind: :url, expected: {expected, options}}) do
+    "active page to have URL #{inspect(expected)}#{ignoring_case(options)}"
   end
 
   defp positive_description(%Expect{target: :page, kind: :title, expected: expected}) do

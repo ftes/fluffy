@@ -278,28 +278,6 @@ defmodule Fluffy.Options do
                           |> Enum.uniq()
   @expectation_schema NimbleOptions.new!(@timeout_options)
 
-  @url_matcher_schema NimbleOptions.new!(
-                        path: [
-                          type: :string,
-                          doc: "Serialized URL pathname to match exactly."
-                        ],
-                        query: [
-                          type: {:map, :string, {:or, [:string, {:list, :string}]}},
-                          type_spec: quote(do: %{String.t() => String.t() | [String.t()]}),
-                          doc: "Decoded query names and their ordered value or values."
-                        ],
-                        query_mode: [
-                          type: {:in, [:exact, :subset]},
-                          default: :exact,
-                          doc: "Require the complete query or allow unrelated parameter names."
-                        ],
-                        fragment: [
-                          type: {:or, [nil, :string]},
-                          type_spec: quote(do: String.t() | nil),
-                          doc: "Serialized fragment without `#`; nil requires no fragment."
-                        ]
-                      )
-
   @file_input_schema NimbleOptions.new!(
                        @timeout_options ++
                          [
@@ -447,9 +425,6 @@ defmodule Fluffy.Options do
   def expectation_schema, do: @expectation_schema
 
   @doc false
-  def url_matcher_schema, do: @url_matcher_schema
-
-  @doc false
   def file_input_schema, do: @file_input_schema
 
   @doc false
@@ -486,9 +461,6 @@ defmodule Fluffy.Options do
   @doc "Splits an expectation's validated `timeout:` from the options that select how it matches."
   @spec split_expectation!(atom(), keyword()) :: {keyword(), keyword()}
   def split_expectation!(matcher, options), do: Keyword.split(validate_expectation!(matcher, options), [:timeout])
-
-  @spec validate_url_matcher!(keyword()) :: keyword()
-  def validate_url_matcher!(options), do: NimbleOptions.validate!(options, @url_matcher_schema)
 
   @spec validate_file_input!(keyword()) :: keyword()
   def validate_file_input!(options), do: NimbleOptions.validate!(options, @file_input_schema)

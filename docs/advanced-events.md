@@ -85,7 +85,7 @@ prophet = await(pending)
 session
 |> switch_page(prophet)
 |> assert(page_opener(main))
-|> assert(page_url(path: "/prophet/preview"))
+|> assert(page_url("/prophet/preview"))
 |> close_page()
 |> switch_page(main)
 ```
@@ -140,7 +140,7 @@ For navigation outcomes on either backend, use ordinary page assertions:
 ```elixir
 session
 |> click(by_role(:link, name: "Continue"))
-|> assert(page_url(path: "/next"))
+|> assert(page_url("/next"))
 ```
 
 `Fluffy.Playwright.go_back/2` and `Fluffy.Playwright.go_forward/2` require Playwright and accept the
@@ -284,9 +284,8 @@ session
 |> visit("/potions")
 ```
 
-`url` accepts what `page_to_have_url` accepts: a Playwright glob string (resolved
-against `base_url:`), a regular expression, a predicate over the `URI`, or
-path, query, and fragment components.
+`url` is what Playwright's `route` takes: a glob string (resolved against
+`base_url:`), a regular expression, or a predicate over the URL string.
 
 Answers are `Fluffy.Route.fulfill/2` (status, headers, `body:`, `json:`, `path:`),
 `Fluffy.Route.continue/2` (with optional overrides), `Fluffy.Route.abort/2`, and

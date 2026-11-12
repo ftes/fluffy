@@ -13,7 +13,6 @@ defmodule Fluffy.Driver.Playwright do
   alias Fluffy.Locator
   alias Fluffy.Locator.Playwright, as: PlaywrightLocator
   alias Fluffy.Session
-  alias Fluffy.URLMatcher
   alias PlaywrightEx.AbortController
   alias PlaywrightEx.BrowserContext
   alias PlaywrightEx.Client.Errors
@@ -59,20 +58,6 @@ defmodule Fluffy.Driver.Playwright do
     end
   end
 
-  defp execute_expectation(session, %Expect{target: :page, kind: :url, expected: expected} = expectation) do
-    page = Session.page_state(session).page
-    matcher = fn url -> URLMatcher.matches?(expected, url) != expectation.negated? end
-    timeout = Session.timeout(session, expectation.options)
-
-    case BrowserPage.wait_for_url(page, matcher, wait_until: :commit, timeout: timeout) do
-      :ok ->
-        :ok
-
-      {:error, error} ->
-        expectation_failed!(expectation, error, ", got #{inspect(BrowserPage.url(page))}")
-    end
-  end
-
   defp execute_expectation(session, %Expect{} = expectation) do
     {target, assertion, arguments, options} = native_expectation(session, expectation)
     target = if expectation.negated?, do: BrowserExpect.not_(target), else: target
@@ -104,6 +89,9 @@ defmodule Fluffy.Driver.Playwright do
 
   defp native_expectation(session, %Expect{target: :page, kind: :title, expected: expected}),
     do: {Session.page_state(session).page, :to_have_title, [expected], []}
+
+  defp native_expectation(session, %Expect{target: :page, kind: :url, expected: {expected, options}}),
+    do: {Session.page_state(session).page, :to_have_url, [expected], options}
 
   defp native_expectation(session, %Expect{target: :page, kind: :aria_snapshot, expected: expected}) do
     {assertion, arguments, options} = locator_assertion(:aria_snapshot, expected)

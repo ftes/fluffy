@@ -160,7 +160,12 @@ defmodule Fluffy.Conformance.FileChooserEventTest do
 
       expect(
         original,
-        page_to_have_url(if(unquote(navigation) == :patch, do: [fragment: "selected"], else: [path: "/chamber"]))
+        page_to_have_url(
+          if(unquote(navigation) == :patch,
+            do: &(URI.parse(&1).fragment == "selected"),
+            else: &(URI.parse(&1).path == "/chamber")
+          )
+        )
       )
     end
   end

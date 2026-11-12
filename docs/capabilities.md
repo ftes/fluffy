@@ -49,8 +49,7 @@ boundaries described below.
 | Native invalid, submit, and formdata event ordering | - | equivalent |
 | Hard-wrapped textarea, object, and custom-element entries | - | equivalent |
 | Per-test sessions, cleanup, and Ecto sandbox propagation | equivalent | equivalent |
-| Regex URL matching | equivalent | equivalent |
-| Structured path, query, and fragment URL matching | equivalent | equivalent |
+| URL matching | equivalent | equivalent |
 | Typed file selection and supported upload lifecycle | equivalent | equivalent |
 | Script-opened file chooser events | - | equivalent |
 <!-- capability-matrix:end -->
@@ -187,8 +186,7 @@ session
 
 Only URL expectations and `visit` back into the app work on that page; everything else raises
 `Fluffy.CapabilityError` (`:external_navigation`), as does `visit` to another origin. Use
-the string, regex or function form of `page_to_have_url`: `assert_path` and the keyword
-form ignore the host. On Playwright the browser loads the external page; stub it with
+`page_to_have_url`, since `assert_path` ignores the host. On Playwright the browser loads the external page; stub it with
 `Fluffy.Playwright.route/4`, which catches a link's or form's target but not a redirect's.
 
 ### Browser baseline
