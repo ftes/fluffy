@@ -356,7 +356,8 @@ defmodule Fluffy.Options do
                       doc:
                         "*Playwright only.* The `PlaywrightEx.Browser` the session's context is created in. " <>
                           "Defaults to the browser of `PlaywrightEx.Test.BrowserPool.shared/1`; " <>
-                          "on Firefox, pass the test's own from `PlaywrightEx.Test.BrowserPool.exclusive/1` " <>
+                          "on Firefox, or to override launch options such as `headless: false` for one test, " <>
+                          "pass the test's own from `PlaywrightEx.Test.BrowserPool.exclusive/1` " <>
                           "([Playwright setup](installation.md#playwright-setup))."
                     ]
                   )

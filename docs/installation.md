@@ -160,6 +160,21 @@ schedulers); see [Exclusive browsers](`e:playwright_ex:testing-with-exunit.md#ex
 in PlaywrightEx's guide. `Fluffy.Case` uses the shared browser, so on Firefox write your own
 session setup.
 
+To debug one test headed or slowed down, pass it a browser with its own `launch_options:`,
+merged over the config:
+
+```elixir
+browser = PlaywrightEx.Test.BrowserPool.exclusive(launch_options: [headless: false, slow_mo: 500])
+
+:playwright
+|> start_session(browser: browser)
+|> visit("/creatures")
+```
+
+Take it from `PlaywrightEx.Test.BrowserPool.exclusive/1`, not `shared/1`: a shared browser is
+never evicted, so a headed one stays open until the suite ends. Call it in `setup_all` to cover
+a module; `browser_name:` and `driver:` override the same way.
+
 ## Ecto sandbox
 
 Fluffy is not a production dependency, so application code that names it must
