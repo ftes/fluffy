@@ -21,7 +21,6 @@ defmodule Fluffy.Backend.Playwright do
   alias PlaywrightEx.ConsoleMessage
   alias PlaywrightEx.Page, as: BrowserPage
   alias PlaywrightEx.TargetClosedError
-  alias PlaywrightEx.Tracing
   alias PlaywrightEx.WebError
 
   require Logger
@@ -229,19 +228,6 @@ defmodule Fluffy.Backend.Playwright do
 
   defp append_location(text, %{url: url}) when is_binary(url) and url != "", do: "#{text} (#{url})"
   defp append_location(text, _location), do: text
-
-  @impl true
-  # A group is a no-op unless the context is traced (`record_artifacts`, `trace:`).
-  def run_step(session, name, location, fun) do
-    tracing = BrowserContext.tracing(Session.context(session).browser_context)
-    Tracing.group!(tracing, name, location: Map.new(location))
-
-    try do
-      fun.()
-    after
-      Tracing.group_end(tracing)
-    end
-  end
 
   @impl true
   def normalize_error(_session, _operation, _arguments, error), do: error

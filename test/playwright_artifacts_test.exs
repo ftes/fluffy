@@ -1,6 +1,6 @@
 defmodule Fluffy.PlaywrightArtifactsTest do
   # Fluffy's side of PlaywrightEx.Test's recording: contexts that sessions create in their
-  # runtime processes are the test's, and steps are trace groups. PlaywrightEx.Test merges
+  # runtime processes are the test's, and steps are its test steps. PlaywrightEx.Test merges
   # `trace.zip` in its own `on_exit`, so the assertions run in one registered before it.
   use ExUnit.Case, async: true
   use Fluffy.Test
@@ -60,7 +60,7 @@ defmodule Fluffy.PlaywrightArtifactsTest do
   end
 
   @tag trace_has: ["Outer workflow", "Inner operation", Path.absname(__ENV__.file)]
-  test "records steps as nested groups with source locations" do
+  test "records steps as nested test steps with source locations" do
     :playwright
     |> start_session(base_url: Fluffy.TestServer.base_url())
     |> visit("/stage")

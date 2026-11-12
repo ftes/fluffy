@@ -28,6 +28,8 @@ defmodule Fluffy.Playwright do
   alias PlaywrightEx.BrowserContext
   alias PlaywrightEx.WebStorage
 
+  require PlaywrightEx.Test
+
   @route_schema NimbleOptions.new!(
                   times: [
                     type: :pos_integer,
@@ -1249,6 +1251,57 @@ defmodule Fluffy.Playwright do
 
   @doc false
   def __ensure_playwright_backend__!(session, capability), do: ensure_playwright_backend!(session, capability)
+
+  @doc group: "Diagnostics and native access"
+  @doc playwright_only: true
+  @doc """
+  Runs `fun` with the session as a step of the test, titled `title`, and returns the
+  session `fun` returns, for a pipeline:
+
+      session
+      |> visit("/potions/polyjuice")
+      |> step("Brew Polyjuice Potion", fn session ->
+        session
+        |> fill(by_label("Boomslang skin"), "3")
+        |> click(by_role(:button, name: "Brew"))
+      end)
+
+  It is `PlaywrightEx.Test.step/3` at this call's location: the step, with the operations
+  in it, is in the test's trace (`test.trace` in `trace.zip`), and steps nest. It needs a
+  module with `use Fluffy.Test`.
+
+  ## Options
+
+    * `:box` - reports an error inside the step at the step's call instead of inside it.
+    * `:timeout` - fails the step after this many milliseconds, with `fun` in a process of
+      its own; see `PlaywrightEx.Test.step/3`.
+  """
+  defmacro step(session, title, fun, options \\ []) do
+    location = Macro.escape(%{file: __CALLER__.file, line: __CALLER__.line, column: 0})
+
+    quote do
+      Fluffy.Playwright.__step__(unquote(session), unquote(title), unquote(fun), unquote(options), unquote(location))
+    end
+  end
+
+  @doc false
+  def __step__(%Session{} = session, title, fun, options, location) when is_binary(title) and is_function(fun, 1) do
+    ensure_playwright_backend!(session, :steps)
+    options = Keyword.validate!(options, [:box, :timeout])
+
+    options =
+      if timeout = options[:timeout],
+        do: Keyword.put(options, :timeout, Fluffy.Deadline.playwright(timeout)),
+        else: options
+
+    case PlaywrightEx.Test.step(title, fn -> fun.(session) end, [location: location] ++ options) do
+      %Session{} = updated_session ->
+        updated_session
+
+      other ->
+        raise ArgumentError, "Fluffy.Playwright.step/4 callback must return a Fluffy.Session, got: #{inspect(other)}"
+    end
+  end
 
   defp ensure_playwright_backend!(session, capability) do
     if Session.backend(session) != PlaywrightBackend do

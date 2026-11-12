@@ -44,10 +44,6 @@ defmodule Fluffy.Backend do
     dispatch(session, :close_page, [page_id])
   end
 
-  def run_step(session, name, location, fun) do
-    Session.backend(session).run_step(session, name, location, fun)
-  end
-
   def absolute_url(session, path), do: Session.backend(session).absolute_url(session, path)
 
   def normalize_error(session, operation, arguments, error)

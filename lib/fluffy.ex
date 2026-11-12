@@ -103,37 +103,6 @@ defmodule Fluffy do
 
   @doc group: "Diagnostics and native access"
   @doc """
-  Groups the operations in `fun` under a named diagnostic step.
-
-  A traced Playwright session (`trace:` of `PlaywrightEx.Test.record_artifacts/2`)
-  records a nested trace group at the call site's source location. Phoenix
-  sessions and untraced Playwright sessions simply run the callback. The callback must return the updated
-  session, which is also returned by `step/3`.
-  """
-  defmacro step(session, name, fun) do
-    location = [file: Path.absname(__CALLER__.file), line: __CALLER__.line]
-
-    quote do
-      Fluffy.__step__(unquote(session), unquote(name), unquote(fun), unquote(location))
-    end
-  end
-
-  @doc false
-  def __step__(%Session{} = session, name, fun, location) when is_binary(name) and is_function(fun, 1) do
-    result = Backend.run_step(session, name, location, fn -> fun.(session) end)
-
-    case result do
-      %Session{} = updated_session ->
-        updated_session
-
-      other ->
-        raise ArgumentError,
-              "Fluffy.step/3 callback must return a Fluffy.Session, got: #{inspect(other)}"
-    end
-  end
-
-  @doc group: "Diagnostics and native access"
-  @doc """
   Opens a temporary HTML snapshot of the active page in your default browser.
 
   Returns the unchanged session so it can be used in a pipeline. Static and

@@ -253,6 +253,13 @@ defmodule Fluffy.Capability do
       detail: "Only the Playwright driver can execute JavaScript in a real browser context."
     },
     %{
+      id: :steps,
+      feature: "Test steps",
+      drivers: %{static: :browser_only, live: :browser_only, playwright: :equivalent},
+      detail:
+        "Fluffy.Playwright.step/4 is PlaywrightEx.Test.step/3 in a pipeline, in the test's Playwright trace. Phoenix raises Fluffy.CapabilityError."
+    },
+    %{
       id: :clock,
       feature: "Fake page clock and timers",
       drivers: %{static: :browser_only, live: :browser_only, playwright: :equivalent},

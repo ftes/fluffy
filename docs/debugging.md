@@ -24,7 +24,8 @@ include the expected condition and Playwright's received values, timeout details
 and call log. No candidate markup is reconstructed after browser failure.
 
 Trace a Playwright test with `trace: :on` (or `:retain_on_failure` in the config, see
-[Playwright setup](installation.md#playwright-setup)), and name groups of steps in it:
+[Playwright setup](installation.md#playwright-setup)), and name its steps with
+`Fluffy.Playwright.step/4`:
 
 ```elixir
 setup context, do: Fluffy.Test.setup(context, trace: :on)
@@ -41,9 +42,9 @@ end
 ```
 
 The test's one `trace.zip` covers every page of all its sessions; open it with
-`mix playwright_ex.cli show-trace test-results/<test>/trace.zip`. `Fluffy.step/3`
-remains portable: it adds nested, source-linked trace groups when tracing is active
-and simply runs the callback on Phoenix or an untraced Playwright session.
+`mix playwright_ex.cli show-trace test-results/<test>/trace.zip`. Steps nest and link to
+their source; they are `PlaywrightEx.Test.step/3`'s, so Phoenix sessions raise
+`Fluffy.CapabilityError`.
 
 Save an explicit PNG while retaining the pipeline with:
 
