@@ -16,6 +16,8 @@ defmodule Fluffy.TestCase do
           playwright_engine?: 1,
           put_session_timeout: 2
         ]
+
+      setup_all {Fluffy.TestCase, :isolate_firefox}
     end
   end
 
@@ -23,6 +25,12 @@ defmodule Fluffy.TestCase do
   # Read at call time, as the config can differ between runs (FLUFFY_BROWSER).
   def playwright_engine?(engine),
     do: engine == Keyword.get(Application.get_env(:playwright_ex, :test, []), :browser_name, :chromium)
+
+  # Firefox dispatches input for all of a browser's pages in one queue: a browser per
+  # module, as Playwright Test's workers have.
+  def isolate_firefox(context) do
+    if playwright_engine?(:firefox), do: PlaywrightEx.Test.browser(context, isolate: true), else: :ok
+  end
 
   # Sets the session's timeout after its setup, which runs under the default so a loaded
   # machine cannot fail it. No public API changes a live session's timeout.

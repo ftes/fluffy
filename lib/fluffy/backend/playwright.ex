@@ -79,20 +79,16 @@ defmodule Fluffy.Backend.Playwright do
   # session fails.
   defp new_context!(options, test_context) do
     test_context
-    |> Map.put(:browser, browser(test_context).browser)
+    |> Map.put(:browser, browser(test_context))
     |> PlaywrightEx.Test.new_context(context_options: options)
     |> Map.fetch!(:context)
   end
 
-  @doc false
-  # The test's browser from PlaywrightEx.Test's pool, set up by `config :playwright_ex,
-  # :test`: shared, or with `isolate: true` the module's own driver and browser, checked
-  # out at its first session.
-  def browser(test_context) do
-    if Keyword.fetch!(Options.playwright_config(), :isolate),
-      do: PlaywrightEx.Test.browser(test_context, isolate: true),
-      else: PlaywrightEx.Test.browser([])
-  end
+  # The test's `browser`, such as a module's own from a `setup_all` returning
+  # `PlaywrightEx.Test.browser(context, isolate: true)`, else the shared one of
+  # PlaywrightEx.Test's pool (`config :playwright_ex, :test`).
+  defp browser(%{browser: browser}), do: browser
+  defp browser(test_context), do: PlaywrightEx.Test.browser(test_context).browser
 
   # Listeners only forward. The runtime does the work, and receives each
   # message before the reply of the call that caused it.

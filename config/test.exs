@@ -46,12 +46,7 @@ config :fluffy, Fluffy.TestRepoTwo,
 config :fluffy,
   ecto_repos: [Fluffy.TestRepo, Fluffy.TestRepoTwo],
   endpoint: Endpoint,
-  playwright: [
-    timeout: 15_000,
-    # Firefox dispatches input for all of a browser's pages in one queue: a browser per
-    # module, as Playwright Test's workers have.
-    isolate: browser_engine == :firefox
-  ]
+  playwright: [timeout: 15_000]
 
 # The tests write their baselines on first use: written and passed, not failed at the test's end.
 config :playwright_ex, :expect, update_snapshots: :missing

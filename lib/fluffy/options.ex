@@ -386,10 +386,7 @@ defmodule Fluffy.Options do
                     browser_context: [type: :keyword_list]
                   )
 
-  @playwright_schema NimbleOptions.new!(
-                       timeout: [type: :pos_integer, default: 15_000],
-                       isolate: [type: :boolean, default: false]
-                     )
+  @playwright_schema NimbleOptions.new!(timeout: [type: :pos_integer, default: 15_000])
 
   @type setup_option :: unquote(NimbleOptions.option_typespec(@setup_schema))
   @type session_option :: unquote(NimbleOptions.option_typespec(@session_schema))

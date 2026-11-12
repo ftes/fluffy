@@ -5,12 +5,12 @@ defmodule Fluffy.PlaywrightConfigurationTest do
 
   # Browser, driver and launch options are PlaywrightEx.Test's (`config :playwright_ex, :test`).
   test "validates Fluffy's Playwright configuration" do
-    assert Enum.sort(Options.validate_playwright!(timeout: 2_000, isolate: true)) ==
-             [isolate: true, timeout: 2_000]
+    assert Options.validate_playwright!(timeout: 2_000) == [timeout: 2_000]
 
     assert false == Options.validate_playwright!(false)
 
     for removed <- [
+          isolate: true,
           log_browser_console: true,
           engine: :firefox,
           pool_size: 2,

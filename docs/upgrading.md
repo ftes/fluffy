@@ -82,7 +82,8 @@ Timeouts follow Elixir: `0` checks once and `:infinity` means no limit; see
 - Configure the browser with `config :playwright_ex, :test, browser_name: ..., launch_options:
   ...` (`driver: [executable: ...]` for a CLI). `config :fluffy, :playwright` drops
   `enabled`, `engine`, `executable`, `launch_options` and `pool_size`; on Firefox, replace
-  `pool_size` with `isolate: true`.
+  `pool_size` with a `setup_all` returning `PlaywrightEx.Test.browser(context, isolate: true)`
+  in each browser module.
 - `Fluffy.Playwright.trace/2`, `artifact_dir` and `trace_dir` are removed. Traces,
   screenshots and videos come from `PlaywrightEx.Test`: set
   `config :playwright_ex, :test, trace: :retain_on_failure, screenshot: :only_on_failure`

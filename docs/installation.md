@@ -137,15 +137,28 @@ printed; the trace has them. To log them, register a listener, such as
 Set `browser_name: :firefox` or `browser_name: :webkit` after installing the
 corresponding browser (`mix playwright_ex.install -- firefox`).
 See [Browser baseline](capabilities.md#browser-baseline) for conformance coverage.
-Fluffy creates a fresh isolated `BrowserContext` for each session, in the browser
+Fluffy creates a fresh isolated `BrowserContext` for each session, in the test's
+`browser` if a `setup_all` put one in the context, else in the browser
 `PlaywrightEx.Test.browser/1` shares between modules. No driver or browser starts until
 a session needs one, a lost browser is launched again for the next session, and the
 drivers stop after the suite. Firefox dispatches input for all of a browser's pages in
-one queue and times out under load, so for Firefox suites set
-`config :fluffy, playwright: [isolate: true]`: each module gets a driver and browser of
-its own at its first session, at most `workers` at once (`config :playwright_ex, :test`,
-half the schedulers), as Playwright Test's workers do. A module beyond them waits at its
-first session, within the test's timeout, so keep ExUnit's `max_cases` at most `workers`.
+one queue and times out under load, so give each Firefox module a driver and browser of
+its own:
+
+```elixir
+defmodule MyAppWeb.ForbiddenCorridorTest do
+  use ExUnit.Case, async: true
+  use Fluffy.Test
+
+  setup_all context do
+    PlaywrightEx.Test.browser(context, isolate: true)
+  end
+end
+```
+
+At most `workers` modules hold one at once (`config :playwright_ex, :test`, half the
+schedulers), as Playwright Test's workers do. A module beyond them waits in its
+`setup_all`, so keep ExUnit's `max_cases` at most `workers`.
 
 ## Ecto sandbox
 
