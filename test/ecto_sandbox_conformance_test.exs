@@ -7,28 +7,29 @@ defmodule Fluffy.EctoSandboxConformanceTest do
   import Fluffy.Locator
 
   alias Fluffy.Event
-  alias Fluffy.TestRepo
-  alias Fluffy.TestWeb.Endpoint
+  alias Fluffy.Support.Repo
+  alias Fluffy.Support.Server
+  alias Fluffy.Support.Web.Endpoint
 
   setup_all do
-    :ok = Fluffy.TestDatabase.ensure_started()
+    :ok = Fluffy.Support.Database.ensure_started()
   end
 
   setup context do
-    :ok = Fluffy.Test.setup(context, repos: [TestRepo])
+    :ok = Fluffy.Test.setup(context, repos: [Repo])
     value = "record-#{System.unique_integer([:positive, :monotonic])}"
 
-    TestRepo.query!("CREATE TEMP TABLE fluffy_records (value text NOT NULL) ON COMMIT DROP")
-    TestRepo.query!("INSERT INTO fluffy_records (value) VALUES ($1)", [value])
+    Repo.query!("CREATE TEMP TABLE fluffy_records (value text NOT NULL) ON COMMIT DROP")
+    Repo.query!("INSERT INTO fluffy_records (value) VALUES ($1)", [value])
 
     [value: value]
   end
 
   test "a Playwright route handler runs inside the test's sandbox", %{value: value} do
-    session = start_session(:playwright, base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+    session = start_session(:playwright, base_url: Server.base_url(), endpoint: Endpoint)
 
     Fluffy.Playwright.route(session, "**/fluffy-sandbox-route", fn route ->
-      %{rows: [[read]]} = TestRepo.query!("SELECT value FROM fluffy_records")
+      %{rows: [[read]]} = Repo.query!("SELECT value FROM fluffy_records")
       PlaywrightEx.Route.fulfill!(route, json: %{value: read})
     end)
 
@@ -37,14 +38,14 @@ defmodule Fluffy.EctoSandboxConformanceTest do
     assert Fluffy.Playwright.evaluate(
              session,
              "url => fetch(url).then(response => response.json())",
-             Fluffy.TestServer.base_url() <> "/fluffy-sandbox-route"
+             Server.base_url() <> "/fluffy-sandbox-route"
            ) == %{"value" => value}
   end
 
   test "event handlers and wait predicates run inside the test's sandbox", %{value: value} do
     test = self()
-    read = fn -> TestRepo.query!("SELECT value FROM fluffy_records").rows end
-    session = start_session(:playwright, base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+    read = fn -> Repo.query!("SELECT value FROM fluffy_records").rows end
+    session = start_session(:playwright, base_url: Server.base_url(), endpoint: Endpoint)
 
     on(session, Event.console(), fn _message -> send(test, {:handled, read.()}) end)
     wait = wait_for(session, Event.console(fn _message -> read.() == [[value]] end))
@@ -56,7 +57,7 @@ defmodule Fluffy.EctoSandboxConformanceTest do
 
   test "a request after set_extra_http_headers still reaches the sandboxed connection", %{value: value} do
     :playwright
-    |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+    |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
     |> Fluffy.Playwright.set_extra_http_headers(%{"x-fluffy-extra" => "1"})
     |> visit("/database")
     |> expect("Static values: #{value}" |> by_text() |> to_be_visible())
@@ -70,7 +71,7 @@ defmodule Fluffy.EctoSandboxConformanceTest do
     } do
       session =
         start_session(backend,
-          base_url: Fluffy.TestServer.base_url(),
+          base_url: Server.base_url(),
           endpoint: Endpoint
         )
 
@@ -90,7 +91,7 @@ defmodule Fluffy.EctoSandboxConformanceTest do
       |> expect("Static values: event, #{value}" |> by_text() |> to_be_visible())
 
       if backend == :playwright do
-        assert_receive {:fluffy_test_sandbox_allow, TestRepo, child} when is_pid(child)
+        assert_receive {:fluffy_test_sandbox_allow, Repo, child} when is_pid(child)
       else
         # In-process requests and LiveViews use the sandbox through `$callers`, as with ConnTest.
         refute_received {:fluffy_test_sandbox_allow, _repo, _child}
@@ -102,7 +103,7 @@ defmodule Fluffy.EctoSandboxConformanceTest do
     Process.flag(:trap_exit, false)
 
     :phoenix
-    |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+    |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
     |> visit("/database")
     |> expect("Static values: #{value}" |> by_text() |> to_be_visible())
 
@@ -112,7 +113,7 @@ defmodule Fluffy.EctoSandboxConformanceTest do
   test "uses the configured sandbox transport and allowance adapter" do
     assert Fluffy.Sandbox.header() == "user-agent"
     assert Fluffy.Sandbox.connect_info() == :user_agent
-    assert Fluffy.Sandbox.allowance() == Fluffy.TestSandbox
+    assert Fluffy.Sandbox.allowance() == Fluffy.Support.Sandbox
   end
 
   test "two browser sessions share a sandbox but use isolated BrowserContexts", %{value: value} do
@@ -132,7 +133,7 @@ defmodule Fluffy.EctoSandboxConformanceTest do
 
   defp browser_session do
     start_session(:playwright,
-      base_url: Fluffy.TestServer.base_url(),
+      base_url: Server.base_url(),
       endpoint: Endpoint
     )
   end
@@ -147,27 +148,28 @@ defmodule Fluffy.EctoSandboxAdoptionTest do
   import Fluffy.Locator
 
   alias Ecto.Adapters.SQL.Sandbox
-  alias Fluffy.TestRepo
+  alias Fluffy.Support.Repo
+  alias Fluffy.Support.Server
+  alias Fluffy.Support.Web.Endpoint
   alias Fluffy.TestScope
-  alias Fluffy.TestWeb.Endpoint
 
   setup_all do
-    :ok = Fluffy.TestDatabase.ensure_started()
+    :ok = Fluffy.Support.Database.ensure_started()
   end
 
   test "adopts an existing sandbox checkout without starting another owner", context do
-    :ok = Sandbox.checkout(TestRepo)
-    on_exit(fn -> Sandbox.checkin(TestRepo) end)
+    :ok = Sandbox.checkout(Repo)
+    on_exit(fn -> Sandbox.checkin(Repo) end)
 
-    assert :ok = Fluffy.Test.setup(context, repos: [TestRepo])
+    assert :ok = Fluffy.Test.setup(context, repos: [Repo])
     assert TestScope.current().owners == []
 
-    TestRepo.query!("CREATE TEMP TABLE fluffy_records (value text NOT NULL) ON COMMIT DROP")
-    TestRepo.query!("INSERT INTO fluffy_records (value) VALUES ('adopted')")
+    Repo.query!("CREATE TEMP TABLE fluffy_records (value text NOT NULL) ON COMMIT DROP")
+    Repo.query!("INSERT INTO fluffy_records (value) VALUES ('adopted')")
 
     :phoenix
     |> start_session(
-      base_url: Fluffy.TestServer.base_url(),
+      base_url: Server.base_url(),
       endpoint: Endpoint
     )
     |> visit("/database")
@@ -175,18 +177,18 @@ defmodule Fluffy.EctoSandboxAdoptionTest do
   end
 
   test "adopts an existing sandbox allowance without starting another owner", context do
-    owner = Sandbox.start_owner!(TestRepo)
+    owner = Sandbox.start_owner!(Repo)
     on_exit(fn -> Sandbox.stop_owner(owner) end)
 
-    assert :ok = Fluffy.Test.setup(context, repos: [TestRepo])
+    assert :ok = Fluffy.Test.setup(context, repos: [Repo])
     assert TestScope.current().owners == []
 
-    TestRepo.query!("CREATE TEMP TABLE fluffy_records (value text NOT NULL) ON COMMIT DROP")
-    TestRepo.query!("INSERT INTO fluffy_records (value) VALUES ('allowed')")
+    Repo.query!("CREATE TEMP TABLE fluffy_records (value text NOT NULL) ON COMMIT DROP")
+    Repo.query!("INSERT INTO fluffy_records (value) VALUES ('allowed')")
 
     :phoenix
     |> start_session(
-      base_url: Fluffy.TestServer.base_url(),
+      base_url: Server.base_url(),
       endpoint: Endpoint
     )
     |> visit("/database")

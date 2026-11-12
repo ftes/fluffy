@@ -1,12 +1,13 @@
 defmodule Fluffy.Conformance.ExternalNavigationTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.TestHTTPFixtures
-  alias Fluffy.TestWeb.Endpoint
+  alias Fluffy.Support.HTTPFixtures
+  alias Fluffy.Support.Server
+  alias Fluffy.Support.Web.Endpoint
 
   @three_broomsticks "https://hogsmeade.example/three-broomsticks"
 
@@ -27,11 +28,11 @@ defmodule Fluffy.Conformance.ExternalNavigationTest do
     @tag driver: driver
     test "an off-origin link ends at its URL from a static page with #{driver}", %{driver: driver} do
       fixture =
-        TestHTTPFixtures.register(%{body: html(~s(<a href="#{@three_broomsticks}?from=link">The Three Broomsticks</a>))})
+        HTTPFixtures.register(%{body: html(~s(<a href="#{@three_broomsticks}?from=link">The Three Broomsticks</a>))})
 
       driver
       |> hogsmeade_session()
-      |> visit(TestHTTPFixtures.path(fixture, "/source"))
+      |> visit(HTTPFixtures.path(fixture, "/source"))
       |> click(by_role(:link, name: "The Three Broomsticks"))
       |> expect(page_to_have_url(@three_broomsticks <> "?from=link"))
     end
@@ -40,11 +41,11 @@ defmodule Fluffy.Conformance.ExternalNavigationTest do
     test "a visit whose response redirects off-origin ends at the redirect's location with #{driver}",
          %{driver: driver} do
       ministry_url = cross_origin_ministry("/floo?from=visit")
-      fixture = TestHTTPFixtures.register(%{status: 302, headers: [{"location", ministry_url}]})
+      fixture = HTTPFixtures.register(%{status: 302, headers: [{"location", ministry_url}]})
 
       driver
       |> start_test_session()
-      |> visit(TestHTTPFixtures.path(fixture, "/auth"))
+      |> visit(HTTPFixtures.path(fixture, "/auth"))
       |> expect(page_to_have_url(ministry_url))
     end
 
@@ -53,13 +54,13 @@ defmodule Fluffy.Conformance.ExternalNavigationTest do
       ministry_url = cross_origin_ministry("/floo?from=form")
 
       fixture =
-        TestHTTPFixtures.register(%{
+        HTTPFixtures.register(%{
           body: html(~s(<form method="post" action="#{ministry_url}"><button>Floo to the Ministry</button></form>))
         })
 
       driver
       |> start_test_session()
-      |> visit(TestHTTPFixtures.path(fixture, "/start"))
+      |> visit(HTTPFixtures.path(fixture, "/start"))
       |> click(by_role(:button, name: "Floo to the Ministry"))
       |> expect(page_to_have_url(ministry_url))
     end
@@ -70,14 +71,14 @@ defmodule Fluffy.Conformance.ExternalNavigationTest do
       ministry_url = cross_origin_ministry("/floo?from=redirect")
 
       fixture =
-        TestHTTPFixtures.register_sequence([
+        HTTPFixtures.register_sequence([
           %{body: html(~s(<form method="post" action="floo"><button>Floo to the Ministry</button></form>))},
           %{status: 302, headers: [{"location", ministry_url}]}
         ])
 
       driver
       |> start_test_session()
-      |> visit(TestHTTPFixtures.path(fixture, "/start"))
+      |> visit(HTTPFixtures.path(fixture, "/start"))
       |> click(by_role(:button, name: "Floo to the Ministry"))
       |> expect(page_to_have_url(ministry_url))
     end
@@ -118,14 +119,14 @@ defmodule Fluffy.Conformance.ExternalNavigationTest do
 
   # Hosts are case-insensitive. The test server's 127.0.0.1 has no case, so the session names it localhost.
   test "a Phoenix link to the app's host in another case stays in the app" do
-    base_url = %{URI.parse(Fluffy.TestServer.base_url()) | host: "localhost"}
-    next = TestHTTPFixtures.register(%{body: html("<h1>Next page</h1>")})
-    next_url = URI.to_string(%{base_url | host: "LOCALHOST", path: TestHTTPFixtures.path(next)})
-    source = TestHTTPFixtures.register(%{body: html(~s(<a href="#{next_url}">Next</a>))})
+    base_url = %{URI.parse(Server.base_url()) | host: "localhost"}
+    next = HTTPFixtures.register(%{body: html("<h1>Next page</h1>")})
+    next_url = URI.to_string(%{base_url | host: "LOCALHOST", path: HTTPFixtures.path(next)})
+    source = HTTPFixtures.register(%{body: html(~s(<a href="#{next_url}">Next</a>))})
 
     :phoenix
     |> start_session(base_url: URI.to_string(base_url), endpoint: Endpoint)
-    |> visit(TestHTTPFixtures.path(source))
+    |> visit(HTTPFixtures.path(source))
     |> click(by_role(:link, name: "Next"))
     |> expect("Next page" |> by_text() |> to_be_visible())
   end
@@ -133,7 +134,7 @@ defmodule Fluffy.Conformance.ExternalNavigationTest do
   describe "on Phoenix, the external page" do
     setup do
       fixture =
-        TestHTTPFixtures.register_sequence([
+        HTTPFixtures.register_sequence([
           %{body: html(~s(<form method="post" action="floo"><button>Floo to the Ministry</button></form>))},
           %{status: 302, headers: [{"location", @three_broomsticks <> "?from=redirect"}]},
           %{body: html("<h1>Back home</h1>")}
@@ -142,7 +143,7 @@ defmodule Fluffy.Conformance.ExternalNavigationTest do
       session =
         :phoenix
         |> start_test_session()
-        |> visit(TestHTTPFixtures.path(fixture, "/start"))
+        |> visit(HTTPFixtures.path(fixture, "/start"))
         |> click(by_role(:button, name: "Floo to the Ministry"))
 
       %{fixture: fixture, session: session}
@@ -170,7 +171,7 @@ defmodule Fluffy.Conformance.ExternalNavigationTest do
 
     test "visits back into the app", %{fixture: fixture, session: session} do
       session
-      |> visit(TestHTTPFixtures.path(fixture, "/home"))
+      |> visit(HTTPFixtures.path(fixture, "/home"))
       |> expect("Back home" |> by_text() |> to_be_visible())
     end
   end
@@ -179,15 +180,15 @@ defmodule Fluffy.Conformance.ExternalNavigationTest do
   # another origin instead, like Playwright's own CROSS_PROCESS_PREFIX: Phoenix stops there and
   # Playwright loads the page.
   defp cross_origin_ministry(suffix) do
-    ministry = TestHTTPFixtures.register(%{body: html("<h1>Ministry of Magic</h1>")})
-    url = %{URI.parse(TestHTTPFixtures.url(ministry, suffix)) | host: "localhost"}
-    assert url.host != URI.parse(Fluffy.TestServer.base_url()).host
+    ministry = HTTPFixtures.register(%{body: html("<h1>Ministry of Magic</h1>")})
+    url = %{URI.parse(HTTPFixtures.url(ministry, suffix)) | host: "localhost"}
+    assert url.host != URI.parse(Server.base_url()).host
     URI.to_string(url)
   end
 
   defp start_test_session(driver) do
     start_session(driver,
-      base_url: Fluffy.TestServer.base_url(),
+      base_url: Server.base_url(),
       endpoint: Endpoint
     )
   end

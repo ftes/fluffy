@@ -1,5 +1,5 @@
 defmodule Fluffy.Conformance.SessionTimeoutTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
@@ -66,8 +66,8 @@ defmodule Fluffy.Conformance.SessionTimeoutTest do
     session =
       :phoenix
       |> start_session(
-        base_url: Fluffy.TestServer.base_url(),
-        endpoint: Fluffy.TestWeb.Endpoint,
+        base_url: Fluffy.Support.Server.base_url(),
+        endpoint: Fluffy.Support.Web.Endpoint,
         timeout: @session_timeout
       )
       |> visit("/live/chamber-map")

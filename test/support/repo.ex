@@ -1,4 +1,4 @@
-defmodule Fluffy.TestRepo do
+defmodule Fluffy.Support.Repo do
   @moduledoc false
 
   use Ecto.Repo,
@@ -6,7 +6,7 @@ defmodule Fluffy.TestRepo do
     adapter: Ecto.Adapters.Postgres
 end
 
-defmodule Fluffy.TestRepoTwo do
+defmodule Fluffy.Support.RepoTwo do
   @moduledoc false
 
   use Ecto.Repo,
@@ -14,12 +14,14 @@ defmodule Fluffy.TestRepoTwo do
     adapter: Ecto.Adapters.Postgres
 end
 
-defmodule Fluffy.TestDatabase do
+defmodule Fluffy.Support.Database do
   @moduledoc false
 
   use GenServer
 
   alias Ecto.Adapters.SQL.Sandbox
+  alias Fluffy.Support.Repo
+  alias Fluffy.Support.RepoTwo
 
   def start_link(_options) do
     GenServer.start_link(__MODULE__, :ok, name: __MODULE__)
@@ -34,11 +36,11 @@ defmodule Fluffy.TestDatabase do
 
   @impl true
   def handle_call(:ensure_started, _from, %{repo_started?: false} = state) do
-    start_repo(Fluffy.TestRepo)
-    start_repo(Fluffy.TestRepoTwo)
+    start_repo(Repo)
+    start_repo(RepoTwo)
 
-    :ok = Sandbox.mode(Fluffy.TestRepo, :manual)
-    :ok = Sandbox.mode(Fluffy.TestRepoTwo, :manual)
+    :ok = Sandbox.mode(Repo, :manual)
+    :ok = Sandbox.mode(RepoTwo, :manual)
     {:reply, :ok, %{state | repo_started?: true}}
   end
 

@@ -1,12 +1,13 @@
 defmodule Fluffy.Conformance.LiveRedirectReadinessTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
 
   alias Fluffy.Expect
-  alias Fluffy.TestWeb.Endpoint
+  alias Fluffy.Support.Server
+  alias Fluffy.Support.Web.Endpoint
 
   @tag driver: :playwright
   test "controller pages await every embedded LiveView before a broadcast" do
@@ -14,7 +15,7 @@ defmodule Fluffy.Conformance.LiveRedirectReadinessTest do
 
     session =
       :playwright
-      |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+      |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
       |> visit("/embedded-ready?topic=#{topic}")
 
     :ok = Phoenix.PubSub.broadcast(Fluffy.TestPubSub, topic, {:redirect_ready, "connected"})
@@ -31,7 +32,7 @@ defmodule Fluffy.Conformance.LiveRedirectReadinessTest do
 
       session =
         start_session(driver,
-          base_url: Fluffy.TestServer.base_url(),
+          base_url: Server.base_url(),
           endpoint: Endpoint
         )
 

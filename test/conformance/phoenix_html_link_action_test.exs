@@ -1,5 +1,5 @@
 defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
@@ -7,7 +7,7 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
   import Fluffy.Playwright
 
   alias Fluffy.Event
-  alias Fluffy.TestHTTPFixtures
+  alias Fluffy.Support.HTTPFixtures
 
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
@@ -15,7 +15,7 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
       driver: driver
     } do
       fixture =
-        TestHTTPFixtures.register_sequence([
+        HTTPFixtures.register_sequence([
           %{
             body:
               html("""
@@ -29,12 +29,12 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
 
       driver
       |> start_test_session()
-      |> visit(TestHTTPFixtures.path(fixture, "/links/start"))
+      |> visit(HTTPFixtures.path(fixture, "/links/start"))
       |> click(by_text("Delete potion", exact: true))
       |> expect(:heading |> by_role(name: "Deleted", exact: true) |> to_be_visible())
-      |> expect(Fluffy.Expect.page_to_have_url(TestHTTPFixtures.url(fixture, "/links/delete?from=link#done")))
+      |> expect(Fluffy.Expect.page_to_have_url(HTTPFixtures.url(fixture, "/links/delete?from=link#done")))
 
-      [_source, submission] = TestHTTPFixtures.requests(fixture)
+      [_source, submission] = HTTPFixtures.requests(fixture)
       assert submission.method == "POST"
       assert submission.path == "/links/delete"
       assert submission.query == "from=link"
@@ -46,7 +46,7 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
       driver: driver
     } do
       fixture =
-        TestHTTPFixtures.register_sequence([
+        HTTPFixtures.register_sequence([
           %{
             body:
               html("""
@@ -62,11 +62,11 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
 
       driver
       |> start_test_session()
-      |> visit(TestHTTPFixtures.path(fixture, "/links/start"))
+      |> visit(HTTPFixtures.path(fixture, "/links/start"))
       |> click(by_css("#nested-action-target"))
       |> expect(:heading |> by_role(name: "Inner action", exact: true) |> to_be_visible())
 
-      [_source, submission] = TestHTTPFixtures.requests(fixture)
+      [_source, submission] = HTTPFixtures.requests(fixture)
       assert submission.method == "POST"
       assert submission.path == "/links/inner"
       assert submission.body == "_csrf_token=inner-csrf&_method=patch"
@@ -75,7 +75,7 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
     @tag driver: driver
     test "uses the stock Phoenix.HTML GET form shape with #{driver}", %{driver: driver} do
       fixture =
-        TestHTTPFixtures.register_sequence([
+        HTTPFixtures.register_sequence([
           %{
             body:
               html("""
@@ -87,14 +87,14 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
 
       driver
       |> start_test_session()
-      |> visit(TestHTTPFixtures.path(fixture, "/links/start"))
+      |> visit(HTTPFixtures.path(fixture, "/links/start"))
       |> click(by_text("Search", exact: true))
       |> expect(:heading |> by_role(name: "Results", exact: true) |> to_be_visible())
       |> expect(
-        Fluffy.Expect.page_to_have_url(TestHTTPFixtures.url(fixture, "/links/search?_csrf_token=csrf-token&_method=get"))
+        Fluffy.Expect.page_to_have_url(HTTPFixtures.url(fixture, "/links/search?_csrf_token=csrf-token&_method=get"))
       )
 
-      [_source, submission] = TestHTTPFixtures.requests(fixture)
+      [_source, submission] = HTTPFixtures.requests(fixture)
       assert submission.method == "GET"
       assert submission.path == "/links/search"
       assert submission.query == "_csrf_token=csrf-token&_method=get"
@@ -106,18 +106,18 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
       driver: driver
     } do
       fixture =
-        TestHTTPFixtures.register_sequence([
+        HTTPFixtures.register_sequence([
           %{body: html(~s(<a data-method="patch" data-to="update">Update</a>))},
           %{body: html("<h1>Updated</h1>")}
         ])
 
       driver
       |> start_test_session()
-      |> visit(TestHTTPFixtures.path(fixture, "/links/start"))
+      |> visit(HTTPFixtures.path(fixture, "/links/start"))
       |> click(by_text("Update", exact: true))
       |> expect(:heading |> by_role(name: "Updated", exact: true) |> to_be_visible())
 
-      [_source, submission] = TestHTTPFixtures.requests(fixture)
+      [_source, submission] = HTTPFixtures.requests(fixture)
       assert submission.method == "POST"
       assert submission.body == "_csrf_token=&_method=patch"
     end
@@ -125,7 +125,7 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
     @tag driver: driver
     test "follows redirects through ordinary navigation with #{driver}", %{driver: driver} do
       fixture =
-        TestHTTPFixtures.register(fn request ->
+        HTTPFixtures.register(fn request ->
           case request.path do
             "/links/start" ->
               %{body: html(~s(<a data-method="delete" data-to="delete">Delete</a>))}
@@ -140,11 +140,11 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
 
       driver
       |> start_test_session()
-      |> visit(TestHTTPFixtures.path(fixture, "/links/start"))
+      |> visit(HTTPFixtures.path(fixture, "/links/start"))
       |> click(by_text("Delete", exact: true))
       |> expect(:heading |> by_role(name: "Redirect complete", exact: true) |> to_be_visible())
 
-      [_source, submission, redirected] = TestHTTPFixtures.requests(fixture)
+      [_source, submission, redirected] = HTTPFixtures.requests(fixture)
       assert submission.method == "POST"
       assert redirected.method == "GET"
       assert redirected.path == "/links/done"
@@ -154,18 +154,18 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
   @tag driver: :playwright
   test "captures a Phoenix.HTML target=_blank form page with Playwright" do
     fixture =
-      TestHTTPFixtures.register_sequence([
+      HTTPFixtures.register_sequence([
         %{
           body: html(~s(<h1>Opener</h1><a target="_blank" data-method="delete" data-to="delete">Delete</a>))
         },
         %{body: html("<h1>Deleted in popup</h1>")}
       ])
 
-    opener_url = TestHTTPFixtures.url(fixture, "/links/start")
+    opener_url = HTTPFixtures.url(fixture, "/links/start")
 
     :playwright
     |> start_test_session()
-    |> visit(TestHTTPFixtures.path(fixture, "/links/start"))
+    |> visit(HTTPFixtures.path(fixture, "/links/start"))
     |> then(fn session ->
       pending = wait_for(session, Event.popup())
       click(session, by_text("Delete", exact: true))
@@ -174,7 +174,7 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
     end)
     |> expect(:heading |> by_role(name: "Deleted in popup", exact: true) |> to_be_visible())
 
-    [_source, submission] = TestHTTPFixtures.requests(fixture)
+    [_source, submission] = HTTPFixtures.requests(fixture)
     assert submission.method == "POST"
   end
 
@@ -183,8 +183,8 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
     test "submits the plain-link Phoenix.HTML action from a LiveView with #{driver}", %{
       driver: driver
     } do
-      fixture = TestHTTPFixtures.register(%{body: html("<h1>Deleted from LiveView</h1>")})
-      action = TestHTTPFixtures.path(fixture, "/live-delete")
+      fixture = HTTPFixtures.register(%{body: html("<h1>Deleted from LiveView</h1>")})
+      action = HTTPFixtures.path(fixture, "/live-delete")
 
       driver
       |> start_test_session()
@@ -192,7 +192,7 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
       |> click(by_text("Delete from LiveView", exact: true))
       |> expect(:heading |> by_role(name: "Deleted from LiveView", exact: true) |> to_be_visible())
 
-      [submission] = TestHTTPFixtures.requests(fixture)
+      [submission] = HTTPFixtures.requests(fixture)
       assert submission.method == "POST"
       assert submission.path == "/live-delete"
       assert submission.body == "_csrf_token=live-csrf&_method=delete"
@@ -200,8 +200,8 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
   end
 
   test "Live rejects a competing action on a Phoenix.HTML ancestor clicked through a descendant" do
-    fixture = TestHTTPFixtures.register(%{body: html("<h1>Unexpected submission</h1>")})
-    action = TestHTTPFixtures.path(fixture, "/live-delete")
+    fixture = HTTPFixtures.register(%{body: html("<h1>Unexpected submission</h1>")})
+    action = HTTPFixtures.path(fixture, "/live-delete")
 
     session =
       :phoenix
@@ -214,12 +214,12 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
       end
 
     assert error.capability == :phoenix_html_live_action_conflict
-    assert TestHTTPFixtures.requests(fixture) == []
+    assert HTTPFixtures.requests(fixture) == []
   end
 
   test "Playwright observes and accepts Phoenix.HTML's multiline confirmation" do
     fixture =
-      TestHTTPFixtures.register_sequence([
+      HTTPFixtures.register_sequence([
         %{
           body:
             html("""
@@ -234,7 +234,7 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
 
     :playwright
     |> start_test_session()
-    |> visit(TestHTTPFixtures.path(fixture, "/links/start"))
+    |> visit(HTTPFixtures.path(fixture, "/links/start"))
     |> once(Event.dialog(), fn dialog ->
       assert PlaywrightEx.Dialog.message(dialog) == "Delete?\nThis cannot be undone."
       PlaywrightEx.Dialog.accept!(dialog)
@@ -242,13 +242,13 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
     |> expect_event(Event.dialog(), &click(&1, by_text("Delete with confirmation", exact: true)))
     |> expect(:heading |> by_role(name: "Deleted after confirmation", exact: true) |> to_be_visible())
 
-    assert [_source, submission] = TestHTTPFixtures.requests(fixture)
+    assert [_source, submission] = HTTPFixtures.requests(fixture)
     assert submission.path == "/links/delete"
   end
 
   test "Playwright cancellation prevents Phoenix.HTML's confirmed action" do
     fixture =
-      TestHTTPFixtures.register_sequence([
+      HTTPFixtures.register_sequence([
         %{
           body:
             html("""
@@ -261,22 +261,22 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
         %{body: html("<h1>Unexpected submission</h1>")}
       ])
 
-    source_url = TestHTTPFixtures.url(fixture, "/links/start")
+    source_url = HTTPFixtures.url(fixture, "/links/start")
 
     :playwright
     |> start_test_session()
-    |> visit(TestHTTPFixtures.path(fixture, "/links/start"))
+    |> visit(HTTPFixtures.path(fixture, "/links/start"))
     |> once(Event.dialog(), &PlaywrightEx.Dialog.dismiss!/1)
     |> expect_event(Event.dialog(), &click(&1, by_text("Delete with confirmation", exact: true)))
     |> expect(Fluffy.Expect.page_to_have_url(source_url))
     |> expect(:heading |> by_role(name: "Before confirmation", exact: true) |> to_be_visible())
 
-    assert [_source] = TestHTTPFixtures.requests(fixture)
+    assert [_source] = HTTPFixtures.requests(fixture)
   end
 
   test "Phoenix ignores data-confirm and performs the structural Phoenix.HTML action" do
     fixture =
-      TestHTTPFixtures.register_sequence([
+      HTTPFixtures.register_sequence([
         %{
           body:
             html("""
@@ -290,36 +290,36 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
 
     :phoenix
     |> start_test_session()
-    |> visit(TestHTTPFixtures.path(fixture, "/links/start"))
+    |> visit(HTTPFixtures.path(fixture, "/links/start"))
     |> click(by_text("Delete without a browser", exact: true))
     |> expect(:heading |> by_role(name: "Deleted structurally", exact: true) |> to_be_visible())
 
-    assert [_source, submission] = TestHTTPFixtures.requests(fixture)
+    assert [_source, submission] = HTTPFixtures.requests(fixture)
     assert submission.path == "/links/delete"
   end
 
   test "a partial Phoenix.HTML attribute pair preserves ordinary anchor navigation" do
     fixture =
-      TestHTTPFixtures.register_sequence([
+      HTTPFixtures.register_sequence([
         %{body: html(~s(<a href="next" data-method="delete">Next</a>))},
         %{body: html("<h1>Next</h1>")}
       ])
 
     :phoenix
     |> start_test_session()
-    |> visit(TestHTTPFixtures.path(fixture, "/links/start"))
+    |> visit(HTTPFixtures.path(fixture, "/links/start"))
     |> click(by_role(:link, name: "Next", exact: true))
     |> expect(:heading |> by_role(name: "Next", exact: true) |> to_be_visible())
 
-    [_source, navigation] = TestHTTPFixtures.requests(fixture)
+    [_source, navigation] = HTTPFixtures.requests(fixture)
     assert navigation.method == "GET"
     assert navigation.path == "/links/next"
   end
 
   defp start_test_session(driver) do
     start_session(driver,
-      base_url: Fluffy.TestServer.base_url(),
-      endpoint: Fluffy.TestWeb.Endpoint
+      base_url: Fluffy.Support.Server.base_url(),
+      endpoint: Fluffy.Support.Web.Endpoint
     )
   end
 

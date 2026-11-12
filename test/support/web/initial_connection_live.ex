@@ -1,4 +1,4 @@
-defmodule Fluffy.TestWeb.InitialConnectionLive do
+defmodule Fluffy.Support.Web.InitialConnectionLive do
   @moduledoc false
 
   use Phoenix.LiveView

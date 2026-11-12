@@ -1,7 +1,7 @@
 defmodule Fluffy.SessionRuntimeTest do
   use ExUnit.Case, async: true
 
-  import Fluffy.TestCase, only: [monitor_running: 1]
+  import Fluffy.Support.Case, only: [monitor_running: 1]
 
   alias Fluffy.SessionRuntime
 

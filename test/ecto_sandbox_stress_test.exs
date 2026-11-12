@@ -2,6 +2,8 @@ defmodule Fluffy.EctoSandboxStressCase do
   @moduledoc false
   use ExUnit.CaseTemplate
 
+  alias Fluffy.Support.Repo
+
   using do
     quote do
       use PlaywrightEx.Test
@@ -13,13 +15,13 @@ defmodule Fluffy.EctoSandboxStressCase do
   end
 
   setup context do
-    :ok = Fluffy.TestDatabase.ensure_started()
-    :ok = Fluffy.Test.setup(context, repos: [Fluffy.TestRepo])
+    :ok = Fluffy.Support.Database.ensure_started()
+    :ok = Fluffy.Test.setup(context, repos: [Repo])
     value = "stress-#{System.unique_integer([:positive, :monotonic])}"
 
-    Fluffy.TestRepo.query!("CREATE TEMP TABLE fluffy_records (value text NOT NULL) ON COMMIT DROP")
+    Repo.query!("CREATE TEMP TABLE fluffy_records (value text NOT NULL) ON COMMIT DROP")
 
-    Fluffy.TestRepo.query!("INSERT INTO fluffy_records (value) VALUES ($1)", [value])
+    Repo.query!("INSERT INTO fluffy_records (value) VALUES ($1)", [value])
     [value: value]
   end
 end
@@ -32,8 +34,8 @@ defmodule Fluffy.EctoSandboxStressOneTest do
   defp assert_isolated(value) do
     :playwright
     |> start_session(
-      base_url: Fluffy.TestServer.base_url(),
-      endpoint: Fluffy.TestWeb.Endpoint
+      base_url: Fluffy.Support.Server.base_url(),
+      endpoint: Fluffy.Support.Web.Endpoint
     )
     |> visit("/database")
     |> expect("Static values: #{value}" |> by_text(exact: true) |> to_have_count(1))
@@ -48,8 +50,8 @@ defmodule Fluffy.EctoSandboxStressTwoTest do
   defp assert_isolated(value) do
     :playwright
     |> start_session(
-      base_url: Fluffy.TestServer.base_url(),
-      endpoint: Fluffy.TestWeb.Endpoint
+      base_url: Fluffy.Support.Server.base_url(),
+      endpoint: Fluffy.Support.Web.Endpoint
     )
     |> visit("/database")
     |> expect("Static values: #{value}" |> by_text(exact: true) |> to_have_count(1))
@@ -64,8 +66,8 @@ defmodule Fluffy.EctoSandboxStressThreeTest do
   defp assert_isolated(value) do
     :playwright
     |> start_session(
-      base_url: Fluffy.TestServer.base_url(),
-      endpoint: Fluffy.TestWeb.Endpoint
+      base_url: Fluffy.Support.Server.base_url(),
+      endpoint: Fluffy.Support.Web.Endpoint
     )
     |> visit("/database")
     |> expect("Static values: #{value}" |> by_text(exact: true) |> to_have_count(1))
@@ -80,8 +82,8 @@ defmodule Fluffy.EctoSandboxStressFourTest do
   defp assert_isolated(value) do
     :playwright
     |> start_session(
-      base_url: Fluffy.TestServer.base_url(),
-      endpoint: Fluffy.TestWeb.Endpoint
+      base_url: Fluffy.Support.Server.base_url(),
+      endpoint: Fluffy.Support.Web.Endpoint
     )
     |> visit("/database")
     |> expect("Static values: #{value}" |> by_text(exact: true) |> to_have_count(1))

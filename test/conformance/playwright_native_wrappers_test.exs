@@ -1,12 +1,12 @@
 defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
 
   alias Fluffy.Playwright
-  alias Fluffy.TestHTTPFixtures
+  alias Fluffy.Support.HTTPFixtures
 
   @moduletag driver: :playwright
 
@@ -359,15 +359,15 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
 
   describe "set_extra_http_headers" do
     test "sends the headers, replaces an earlier call and keeps the session's headers" do
-      fixture = TestHTTPFixtures.register(fn _request -> %{body: "<p>Page</p>"} end)
+      fixture = HTTPFixtures.register(fn _request -> %{body: "<p>Page</p>"} end)
       session = start_session(:playwright, headers: [{"x-session", "kept"}])
 
       assert Playwright.set_extra_http_headers(session, %{"X-First" => "1"}) == session
-      visit(session, TestHTTPFixtures.path(fixture, "/first"))
+      visit(session, HTTPFixtures.path(fixture, "/first"))
 
       session
       |> Playwright.set_extra_http_headers(%{"x-second" => "2"})
-      |> visit(TestHTTPFixtures.path(fixture, "/second"))
+      |> visit(HTTPFixtures.path(fixture, "/second"))
 
       first = headers(fixture, "/first")
       assert {"x-first", "1"} in first
@@ -380,18 +380,18 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
     end
 
     test "overrides a header of the same name" do
-      fixture = TestHTTPFixtures.register(fn _request -> %{body: "<p>Page</p>"} end)
+      fixture = HTTPFixtures.register(fn _request -> %{body: "<p>Page</p>"} end)
 
       :playwright
       |> start_session(headers: [{"x-session", "start"}])
       |> Playwright.set_extra_http_headers(%{"X-Session" => "changed"})
-      |> visit(TestHTTPFixtures.path(fixture, "/page"))
+      |> visit(HTTPFixtures.path(fixture, "/page"))
 
       assert {"x-session", "changed"} in headers(fixture, "/page")
     end
 
     defp headers(fixture, path) do
-      fixture |> TestHTTPFixtures.requests() |> Enum.find(&(&1.path == path)) |> Map.fetch!(:headers)
+      fixture |> HTTPFixtures.requests() |> Enum.find(&(&1.path == path)) |> Map.fetch!(:headers)
     end
   end
 
@@ -402,7 +402,7 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
       File.write!(file, "window.fromFile = 'file'")
 
       fixture =
-        TestHTTPFixtures.register(fn _request ->
+        HTTPFixtures.register(fn _request ->
           %{headers: [{"content-type", "text/javascript"}], body: "window.fromUrl = 'url'"}
         end)
 
@@ -411,7 +411,7 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
         |> session_for_html("<p>Harness</p>")
         |> Playwright.add_script_tag(content: "window.fromContent = 'content'")
         |> Playwright.add_script_tag(path: file)
-        |> Playwright.add_script_tag(url: TestHTTPFixtures.url(fixture, "/script.js"))
+        |> Playwright.add_script_tag(url: HTTPFixtures.url(fixture, "/script.js"))
 
       assert Playwright.evaluate(session, "[window.fromContent, window.fromFile, window.fromUrl]") ==
                ["content", "file", "url"]
@@ -706,8 +706,8 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
     end
 
     test "an action navigating to a page that closes while Fluffy adopts it succeeds" do
-      closing = TestHTTPFixtures.register(%{body: @closes_on_adoption})
-      popup = popup_showing(~s|<a href="#{TestHTTPFixtures.path(closing)}">Next</a>|)
+      closing = HTTPFixtures.register(%{body: @closes_on_adoption})
+      popup = popup_showing(~s|<a href="#{HTTPFixtures.path(closing)}">Next</a>|)
 
       assert %Fluffy.Session{} = click(popup, by_role(:link, name: "Next"))
     end
@@ -726,9 +726,9 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
     """
 
     test "a page closing while Fluffy adopts a navigation fails visit, reload and history navigation" do
-      closing = TestHTTPFixtures.register(%{body: @closes_on_navigation})
-      plain = TestHTTPFixtures.path(TestHTTPFixtures.register(%{body: "<p>Plain</p>"}))
-      closes_on = &TestHTTPFixtures.path(closing, "?close=#{&1}")
+      closing = HTTPFixtures.register(%{body: @closes_on_navigation})
+      plain = HTTPFixtures.path(HTTPFixtures.register(%{body: "<p>Plain</p>"}))
+      closes_on = &HTTPFixtures.path(closing, "?close=#{&1}")
 
       for {operation, call} <- [
             visit: &visit(&1, closes_on.("navigate")),
@@ -848,11 +848,11 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
     @fetch "url => fetch(url).then(response => response.text())"
 
     test "removes every route, which unroute and route can then follow" do
-      fixture = TestHTTPFixtures.register(fn _request -> %{body: "server"} end)
+      fixture = HTTPFixtures.register(fn _request -> %{body: "server"} end)
       session = start_session(:playwright)
-      visit(session, TestHTTPFixtures.path(fixture, "/page"))
-      url = TestHTTPFixtures.url(fixture, "/api")
-      other = TestHTTPFixtures.url(fixture, "/other")
+      visit(session, HTTPFixtures.path(fixture, "/page"))
+      url = HTTPFixtures.url(fixture, "/api")
+      other = HTTPFixtures.url(fixture, "/other")
       handler = fn route -> PlaywrightEx.Route.fulfill!(route, body: "routed") end
 
       session = session |> Playwright.route("**/api", handler) |> Playwright.route("**/other", handler)
@@ -944,14 +944,14 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
   # A popup whose `body` has loaded, not yet adopted by any Fluffy action.
   defp popup_showing(body) do
     ready = "<script>window.opener.postMessage('ready', '*')</script>"
-    fixture = TestHTTPFixtures.register(%{body: body <> ready})
+    fixture = HTTPFixtures.register(%{body: body <> ready})
     session = session_for_html(:playwright, "<p>Opener</p>")
     pending = wait_for(session, Fluffy.Event.popup())
 
     Playwright.evaluate(
       session,
       "url => new Promise(resolve => { window.addEventListener('message', resolve); window.open(url) }).then(() => true)",
-      TestHTTPFixtures.path(fixture)
+      HTTPFixtures.path(fixture)
     )
 
     Playwright.switch_page(session, await(pending))

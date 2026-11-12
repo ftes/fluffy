@@ -1,5 +1,5 @@
 defmodule Fluffy.Conformance.NativeOptionsTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
@@ -8,7 +8,8 @@ defmodule Fluffy.Conformance.NativeOptionsTest do
   alias Fluffy.Options
   alias Fluffy.Playwright.Keyboard
   alias Fluffy.Playwright.Mouse
-  alias Fluffy.TestWeb.Endpoint
+  alias Fluffy.Support.Server
+  alias Fluffy.Support.Web.Endpoint
 
   @button ~s(<button onclick="this.textContent = event.shiftKey ? 'shift' : 'plain'">Cast</button>)
   @states ~s(<button disabled>Locked</button><input aria-label="Sealed" readonly><p hidden>Secret</p>)
@@ -47,7 +48,7 @@ defmodule Fluffy.Conformance.NativeOptionsTest do
     @tag driver: driver
     test "state flags and ignore_case mirror Playwright with #{driver}" do
       unquote(driver)
-      |> session_for_html(@states, base_url: Fluffy.TestServer.base_url())
+      |> session_for_html(@states, base_url: Server.base_url())
       |> expect(to_be_enabled(by_role(:button, name: "Locked"), enabled: false))
       |> expect(to_be_editable(by_label("Sealed"), editable: false))
       |> expect(to_be_visible(by_text("Secret"), visible: false))
@@ -94,7 +95,7 @@ defmodule Fluffy.Conformance.NativeOptionsTest do
     pad_locator = by_css("#pad")
 
     :playwright
-    |> session_for_html(pad, base_url: Fluffy.TestServer.base_url())
+    |> session_for_html(pad, base_url: Server.base_url())
     |> click(pad_locator)
     |> expect(to_have_text(pad_locator, "40,20"))
     |> click(pad_locator, position: %{x: 5, y: 7})
@@ -180,8 +181,7 @@ defmodule Fluffy.Conformance.NativeOptionsTest do
   defp visited_session(driver, path) when driver in [:static, :live],
     do: :phoenix |> start_session(endpoint: Endpoint) |> visit(path)
 
-  defp visited_session(:playwright, path),
-    do: :playwright |> start_session(base_url: Fluffy.TestServer.base_url()) |> visit(path)
+  defp visited_session(:playwright, path), do: :playwright |> start_session(base_url: Server.base_url()) |> visit(path)
 
   # Options are validated before the target is resolved.
   defp with_session(:live, fun) do
@@ -189,6 +189,6 @@ defmodule Fluffy.Conformance.NativeOptionsTest do
   end
 
   defp with_session(driver, fun) do
-    fun.(session_for_html(driver, @button, base_url: Fluffy.TestServer.base_url()))
+    fun.(session_for_html(driver, @button, base_url: Server.base_url()))
   end
 end

@@ -1,5 +1,5 @@
 defmodule Fluffy.Conformance.InitialConnTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
@@ -7,6 +7,7 @@ defmodule Fluffy.Conformance.InitialConnTest do
   import Phoenix.ConnTest
 
   alias Fluffy.Session
+  alias Fluffy.Support.Server
 
   test "uses an initial connection's authorization assign for a first Static visit only" do
     session = initial_session()
@@ -70,7 +71,7 @@ defmodule Fluffy.Conformance.InitialConnTest do
 
     assert_raise ArgumentError, ~r/:conn.*only for Phoenix/, fn ->
       start_session(:playwright,
-        base_url: Fluffy.TestServer.base_url(),
+        base_url: Server.base_url(),
         conn: build_conn()
       )
     end
@@ -84,8 +85,8 @@ defmodule Fluffy.Conformance.InitialConnTest do
     start_session(
       :phoenix,
       [
-        base_url: Fluffy.TestServer.base_url(),
-        endpoint: Fluffy.TestWeb.Endpoint
+        base_url: Server.base_url(),
+        endpoint: Fluffy.Support.Web.Endpoint
       ] ++ options
     )
   end

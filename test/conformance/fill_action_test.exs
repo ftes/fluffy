@@ -1,5 +1,5 @@
 defmodule Fluffy.Conformance.FillActionTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
@@ -68,7 +68,7 @@ defmodule Fluffy.Conformance.FillActionTest do
         {~U[2026-09-30 12:34:56Z], "2026-09-30 12:34:56Z"},
         {~c"<tag>&\"'", "<tag>&\"'"},
         {"<tag>&\"'", "<tag>&\"'"},
-        {%Fluffy.TestFormValue{value: "<tag>&"}, "custom:<tag>&"}
+        {%Fluffy.Support.FormValue{value: "<tag>&"}, "custom:<tag>&"}
       ]
 
       Enum.reduce(values, session, fn {value, expected}, session ->
@@ -322,7 +322,7 @@ defmodule Fluffy.Conformance.FillActionTest do
   end
 
   defp with_html(driver, html, fun) do
-    session = session_for_html(driver, html, base_url: Fluffy.TestServer.base_url())
+    session = session_for_html(driver, html, base_url: Fluffy.Support.Server.base_url())
     fun.(session)
   end
 end

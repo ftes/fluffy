@@ -1,4 +1,4 @@
-defmodule Fluffy.TestWeb.CheckboxPayloadComponent do
+defmodule Fluffy.Support.Web.CheckboxPayloadComponent do
   @moduledoc false
   use Phoenix.LiveComponent
 

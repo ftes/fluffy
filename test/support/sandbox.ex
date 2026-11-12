@@ -1,4 +1,4 @@
-defmodule Fluffy.TestSandbox do
+defmodule Fluffy.Support.Sandbox do
   @moduledoc false
 
   # Refuses owner == child, as `Mox.allow/3` does.

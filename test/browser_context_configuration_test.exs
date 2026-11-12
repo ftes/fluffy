@@ -1,12 +1,13 @@
 defmodule Fluffy.BrowserContextConfigurationTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
 
   alias Fluffy.Playwright
+  alias Fluffy.Support.Server
 
   test "applies typed BrowserContext options in isolated contexts on one browser" do
-    origin = Fluffy.TestServer.base_url()
+    origin = Server.base_url()
 
     configured =
       :playwright
@@ -68,20 +69,20 @@ defmodule Fluffy.BrowserContextConfigurationTest do
   test "rejects unknown session and BrowserContext options before creation" do
     assert_raise NimbleOptions.ValidationError, ~r/unknown options.*:page/, fn ->
       start_session(:playwright,
-        base_url: Fluffy.TestServer.base_url(),
+        base_url: Server.base_url(),
         page: [viewport: %{width: 100, height: 100}]
       )
     end
 
     assert_raise ArgumentError, ~r/mystery/, fn ->
-      start_session(:playwright, base_url: Fluffy.TestServer.base_url(), browser_context: [mystery: true])
+      start_session(:playwright, base_url: Server.base_url(), browser_context: [mystery: true])
     end
   end
 
   test "BrowserContext options are rejected by the Phoenix backend" do
     assert_raise ArgumentError, ~r/browser_context.*Playwright/, fn ->
       start_session(:phoenix,
-        endpoint: Fluffy.TestWeb.Endpoint,
+        endpoint: Fluffy.Support.Web.Endpoint,
         browser_context: [locale: "de-DE"]
       )
     end

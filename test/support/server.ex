@@ -1,9 +1,9 @@
-defmodule Fluffy.TestServer do
+defmodule Fluffy.Support.Server do
   @moduledoc false
 
   use Supervisor
 
-  alias Fluffy.TestWeb.Endpoint
+  alias Fluffy.Support.Web.Endpoint
 
   def start_link(_options \\ []) do
     configure_endpoint(lease_port())
@@ -19,8 +19,8 @@ defmodule Fluffy.TestServer do
     children = [
       {DynamicSupervisor, strategy: :one_for_one, name: Fluffy.TestServices},
       {Registry, keys: :duplicate, name: Fluffy.TestTimingProbe},
-      Fluffy.TestDatabase,
-      Fluffy.TestHTTPFixtures,
+      Fluffy.Support.Database,
+      Fluffy.Support.HTTPFixtures,
       {Phoenix.PubSub, name: Fluffy.TestPubSub},
       Endpoint
     ]

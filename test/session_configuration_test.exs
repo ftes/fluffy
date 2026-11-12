@@ -1,11 +1,12 @@
 defmodule Fluffy.SessionConfigurationTest do
-  use Fluffy.TestCase, async: false
+  use Fluffy.Support.Case, async: false
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.TestWeb.Endpoint
+  alias Fluffy.Support.Server
+  alias Fluffy.Support.Web.Endpoint
 
   setup do
     original_endpoint = Application.get_env(:fluffy, :endpoint)
@@ -58,7 +59,7 @@ defmodule Fluffy.SessionConfigurationTest do
     session =
       start_session(:phoenix,
         endpoint: Endpoint,
-        base_url: Fluffy.TestServer.base_url()
+        base_url: Server.base_url()
       )
 
     session
@@ -77,11 +78,11 @@ defmodule Fluffy.SessionConfigurationTest do
 
   test "a configured base URL starts Playwright without an endpoint" do
     Application.delete_env(:fluffy, :endpoint)
-    Application.put_env(:fluffy, :base_url, Fluffy.TestServer.base_url())
+    Application.put_env(:fluffy, :base_url, Server.base_url())
 
     session = start_session(:playwright)
 
-    assert Fluffy.Session.context(session).base_url == Fluffy.TestServer.base_url()
+    assert Fluffy.Session.context(session).base_url == Server.base_url()
   end
 
   test "missing global and session configuration reports the required setting" do

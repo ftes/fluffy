@@ -1,5 +1,5 @@
 defmodule Fluffy.Conformance.PageEventTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
@@ -8,7 +8,8 @@ defmodule Fluffy.Conformance.PageEventTest do
 
   alias Fluffy.Event
   alias Fluffy.Page
-  alias Fluffy.TestHTTPFixtures
+  alias Fluffy.Support.HTTPFixtures
+  alias Fluffy.Support.Server
 
   @tag driver: :playwright
   test "page/2 turns a PlaywrightEx page of the session into its handle, and rejects another context's" do
@@ -43,7 +44,7 @@ defmodule Fluffy.Conformance.PageEventTest do
         end
 
       assert Page.opener(captured) == opener
-      session |> switch_page(captured) |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, path)))
+      session |> switch_page(captured) |> expect(page_to_have_url(HTTPFixtures.url(fixture, path)))
     end
   end
 
@@ -61,10 +62,10 @@ defmodule Fluffy.Conformance.PageEventTest do
     session
     |> switch_page(page)
     |> expect(:heading |> by_role(name: "Details") |> to_be_visible())
-    |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/details")))
+    |> expect(page_to_have_url(HTTPFixtures.url(fixture, "/details")))
     |> close_page()
     |> switch_page(current_page(session))
-    |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/start")))
+    |> expect(page_to_have_url(HTTPFixtures.url(fixture, "/start")))
 
     assert pages(session) == [current_page(session)]
   end
@@ -147,7 +148,7 @@ defmodule Fluffy.Conformance.PageEventTest do
         Process.sleep(3_000)
       end,
       fn page ->
-        session |> switch_page(page) |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/details")))
+        session |> switch_page(page) |> expect(page_to_have_url(HTTPFixtures.url(fixture, "/details")))
       end,
       timeout: 3_000
     )
@@ -159,10 +160,10 @@ defmodule Fluffy.Conformance.PageEventTest do
     pending = wait_for(session, Event.popup())
     click(session, by_role(:button, name: "Buy now"))
     session |> switch_page(await(pending)) |> expect(:heading |> by_role(name: "Receipt") |> to_be_visible())
-    submission = Enum.find(TestHTTPFixtures.requests(fixture), &(&1.path == "/receipt"))
+    submission = Enum.find(HTTPFixtures.requests(fixture), &(&1.path == "/receipt"))
     assert submission.method == "POST"
     assert submission.body == "item=book&commit=Buy"
-    expect(session, page_to_have_url(TestHTTPFixtures.url(fixture, "/start")))
+    expect(session, page_to_have_url(HTTPFixtures.url(fixture, "/start")))
   end
 
   @tag driver: :playwright
@@ -175,7 +176,7 @@ defmodule Fluffy.Conformance.PageEventTest do
 
     session
     |> switch_page(await(pending))
-    |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/details")))
+    |> expect(page_to_have_url(HTTPFixtures.url(fixture, "/details")))
     |> expect(:heading |> by_role(name: "Details") |> to_be_visible())
   end
 
@@ -217,7 +218,7 @@ defmodule Fluffy.Conformance.PageEventTest do
     owner = self()
 
     fixture =
-      TestHTTPFixtures.register(fn request ->
+      HTTPFixtures.register(fn request ->
         case request.path do
           "/start" ->
             %{body: ~s(<a href="slow" target="_blank">Open</a>)}
@@ -226,7 +227,7 @@ defmodule Fluffy.Conformance.PageEventTest do
             %{
               stream: fn conn ->
                 {:ok, conn} =
-                  Plug.Conn.chunk(conn, "<!doctype html><html><body><h1>Loading</h1>" <> TestHTTPFixtures.sniff_padding())
+                  Plug.Conn.chunk(conn, "<!doctype html><html><body><h1>Loading</h1>" <> HTTPFixtures.sniff_padding())
 
                 send(owner, {:stream, self()})
 
@@ -245,8 +246,8 @@ defmodule Fluffy.Conformance.PageEventTest do
 
     session =
       :playwright
-      |> start_session(base_url: Fluffy.TestServer.base_url())
-      |> visit(TestHTTPFixtures.path(fixture, "/start"))
+      |> start_session(base_url: Server.base_url())
+      |> visit(HTTPFixtures.path(fixture, "/start"))
 
     pending = wait_for(session, Event.popup())
     click(session, by_role(:link, name: "Open"))
@@ -256,7 +257,7 @@ defmodule Fluffy.Conformance.PageEventTest do
 
     try do
       page = await(pending)
-      assert Page.url(page) == TestHTTPFixtures.url(fixture, "/slow")
+      assert Page.url(page) == HTTPFixtures.url(fixture, "/slow")
       send(server, :finish)
       session |> switch_page(page) |> expect("Loaded" |> by_text() |> to_be_visible())
     after
@@ -285,7 +286,7 @@ defmodule Fluffy.Conformance.PageEventTest do
 
   defp browser_session do
     fixture =
-      TestHTTPFixtures.register(fn request ->
+      HTTPFixtures.register(fn request ->
         case request.path do
           "/start" ->
             %{
@@ -319,8 +320,8 @@ defmodule Fluffy.Conformance.PageEventTest do
 
     session =
       :playwright
-      |> start_session(base_url: Fluffy.TestServer.base_url())
-      |> visit(TestHTTPFixtures.path(fixture, "/start"))
+      |> start_session(base_url: Server.base_url())
+      |> visit(HTTPFixtures.path(fixture, "/start"))
 
     {session, fixture}
   end

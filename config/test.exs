@@ -1,7 +1,9 @@
 import Config
 
 alias Ecto.Adapters.SQL.Sandbox
-alias Fluffy.TestWeb.Endpoint
+alias Fluffy.Support.Repo
+alias Fluffy.Support.RepoTwo
+alias Fluffy.Support.Web.Endpoint
 
 browser_engine =
   case System.get_env("FLUFFY_BROWSER", "chromium") do
@@ -16,16 +18,16 @@ config :fluffy, Endpoint,
   http: [ip: {127, 0, 0, 1}, port: 0],
   live_view: [signing_salt: "fluffy-live-view"],
   pubsub_server: Fluffy.TestPubSub,
-  render_errors: [formats: [html: Fluffy.TestWeb.ErrorHTML], layout: false],
+  render_errors: [formats: [html: Fluffy.Support.Web.ErrorHTML], layout: false],
   secret_key_base: String.duplicate("fluffy-secret-", 8),
   server: true,
   url: [host: "127.0.0.1", port: 0, scheme: "http"]
 
 config :fluffy, Fluffy.Sandbox,
   header: "user-agent",
-  sandbox: Fluffy.TestSandbox
+  sandbox: Fluffy.Support.Sandbox
 
-config :fluffy, Fluffy.TestRepo,
+config :fluffy, Repo,
   pool: Sandbox,
   pool_size: System.schedulers_online() * 2,
   database: System.get_env("FLUFFY_DB_NAME", "postgres"),
@@ -34,7 +36,7 @@ config :fluffy, Fluffy.TestRepo,
   port: String.to_integer(System.get_env("FLUFFY_DB_PORT", "5432")),
   username: System.get_env("FLUFFY_DB_USER", "postgres")
 
-config :fluffy, Fluffy.TestRepoTwo,
+config :fluffy, RepoTwo,
   pool: Sandbox,
   pool_size: System.schedulers_online() * 2,
   database: System.get_env("FLUFFY_DB_NAME", "postgres"),
@@ -44,7 +46,7 @@ config :fluffy, Fluffy.TestRepoTwo,
   username: System.get_env("FLUFFY_DB_USER", "postgres")
 
 config :fluffy,
-  ecto_repos: [Fluffy.TestRepo, Fluffy.TestRepoTwo],
+  ecto_repos: [Repo, RepoTwo],
   endpoint: Endpoint,
   playwright: [timeout: 15_000]
 

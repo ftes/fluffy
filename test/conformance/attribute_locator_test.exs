@@ -1,9 +1,11 @@
 defmodule Fluffy.Conformance.AttributeLocatorTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
+
+  alias Fluffy.Support.Server
 
   cases = [
     {"placeholder substring", ~s(<input placeholder="Work Email">), {:placeholder, "email", []}, 1},
@@ -24,7 +26,7 @@ defmodule Fluffy.Conformance.AttributeLocatorTest do
     @tag driver: driver
     test "matches #{case_name} with #{driver}" do
       session =
-        session_for_html(unquote(driver), unquote(html), base_url: Fluffy.TestServer.base_url())
+        session_for_html(unquote(driver), unquote(html), base_url: Server.base_url())
 
       locator =
         case unquote(Macro.escape(locator_spec)) do
@@ -45,7 +47,7 @@ defmodule Fluffy.Conformance.AttributeLocatorTest do
         session_for_html(
           unquote(driver),
           ~s(<section class="wanted"><input placeholder="Email"></section><input placeholder="Email">),
-          base_url: Fluffy.TestServer.base_url()
+          base_url: Server.base_url()
         )
 
       expect(session, ".wanted" |> by_css() |> by_placeholder("Email", exact: true) |> to_have_count(1))

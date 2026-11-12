@@ -1,17 +1,17 @@
 defmodule Fluffy.Conformance.StaticHTTPFormTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.TestHTTPFixtures
+  alias Fluffy.Support.HTTPFixtures
 
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
     test "submits ordered successful controls with GET using #{driver}", %{driver: driver} do
       fixture =
-        TestHTTPFixtures.register_sequence([
+        HTTPFixtures.register_sequence([
           %{
             body:
               html("""
@@ -36,20 +36,20 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       session = start_test_session(driver)
 
       session
-      |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+      |> visit(HTTPFixtures.path(fixture, "/forms/start"))
       |> fill(by_label("Query"), "fluffy test")
       |> click(by_role(:button, name: "Search"))
       |> expect("Search results" |> by_text() |> to_be_visible())
       |> expect(
         Fluffy.Expect.page_to_have_url(
-          TestHTTPFixtures.url(
+          HTTPFixtures.url(
             fixture,
             "/forms/search?token=abc&query=fluffy+test&scope=open&sort=newest&commit=Search#results"
           )
         )
       )
 
-      [source, submission] = TestHTTPFixtures.requests(fixture)
+      [source, submission] = HTTPFixtures.requests(fixture)
       assert source.method == "GET"
       assert submission.method == "GET"
       assert submission.path == "/forms/search"
@@ -63,7 +63,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
     @tag driver: driver
     test "submits a form without a submitter using #{driver}", %{driver: driver} do
       fixture =
-        TestHTTPFixtures.register_sequence([
+        HTTPFixtures.register_sequence([
           %{
             body:
               html("""
@@ -78,12 +78,12 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       session = start_test_session(driver)
 
       session
-      |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+      |> visit(HTTPFixtures.path(fixture, "/forms/start"))
       |> fill(by_label("Query"), "fluffy test")
       |> submit(by_css("#search-form"))
       |> expect("Search results" |> by_text() |> to_be_visible())
 
-      [_source, submission] = TestHTTPFixtures.requests(fixture)
+      [_source, submission] = HTTPFixtures.requests(fixture)
       assert submission.method == "GET"
       assert submission.path == "/forms/search"
       assert submission.query == "query=fluffy+test"
@@ -92,7 +92,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
     @tag driver: driver
     test "a click on text inside a submit button submits its form with #{driver}", %{driver: driver} do
       fixture =
-        TestHTTPFixtures.register_sequence([
+        HTTPFixtures.register_sequence([
           %{
             body:
               html("""
@@ -107,27 +107,27 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
 
       driver
       |> start_test_session()
-      |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+      |> visit(HTTPFixtures.path(fixture, "/forms/start"))
       |> click(by_text("Search", exact: true))
       |> expect("Search results" |> by_text() |> to_be_visible())
 
-      assert [_source, %{query: "query=fluffy&commit=on"}] = TestHTTPFixtures.requests(fixture)
+      assert [_source, %{query: "query=fluffy&commit=on"}] = HTTPFixtures.requests(fixture)
     end
 
     @tag driver: driver
     test "submit returns once the server has received the submission using #{driver}", %{driver: driver} do
       fixture =
-        TestHTTPFixtures.register_sequence([
+        HTTPFixtures.register_sequence([
           %{body: html(~s(<form id="note" method="post" action="save"><input name="note" value="kept"></form>))},
           %{body: html("<h1>Saved</h1>")}
         ])
 
       driver
       |> start_test_session()
-      |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+      |> visit(HTTPFixtures.path(fixture, "/forms/start"))
       |> submit(by_css("#note"))
 
-      [_source, submission] = TestHTTPFixtures.requests(fixture)
+      [_source, submission] = HTTPFixtures.requests(fixture)
       assert submission.body == "note=kept"
     end
 
@@ -136,7 +136,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       test = self()
 
       fixture =
-        TestHTTPFixtures.register_sequence([
+        HTTPFixtures.register_sequence([
           %{body: html(~s(<form id="note" method="post" action="save"><input name="note" value="kept"></form>))},
           %{status: 303, headers: [{"location", "saved"}]},
           fn _request ->
@@ -148,7 +148,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
 
       driver
       |> start_test_session()
-      |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+      |> visit(HTTPFixtures.path(fixture, "/forms/start"))
       |> submit(by_css("#note"), timeout: 5_000)
 
       assert_received :saved_page_served
@@ -159,17 +159,17 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
     @tag driver: driver
     test "submit returns after a no-content response using #{driver}", %{driver: driver} do
       fixture =
-        TestHTTPFixtures.register_sequence([
+        HTTPFixtures.register_sequence([
           %{body: html(~s(<form id="note" method="post" action="save"><input name="note" value="kept"></form>))},
           %{status: 204}
         ])
 
       driver
       |> start_test_session()
-      |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+      |> visit(HTTPFixtures.path(fixture, "/forms/start"))
       |> submit(by_css("#note"), timeout: 2_000)
 
-      assert [_source, %{method: "POST", body: "note=kept"}] = TestHTTPFixtures.requests(fixture)
+      assert [_source, %{method: "POST", body: "note=kept"}] = HTTPFixtures.requests(fixture)
     end
 
     # Browsers abort the navigation and keep the document; none resets the form on 205.
@@ -177,7 +177,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       @tag driver: driver
       test "a #{status} response to submit keeps the current page and form state using #{driver}", %{driver: driver} do
         fixture =
-          TestHTTPFixtures.register_sequence([
+          HTTPFixtures.register_sequence([
             %{
               body:
                 html(
@@ -189,21 +189,21 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
 
         driver
         |> start_test_session()
-        |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+        |> visit(HTTPFixtures.path(fixture, "/forms/start"))
         |> fill(by_label("Note"), "edited")
         |> submit(by_css("#note"), timeout: 2_000)
         |> expect("Draft" |> by_text() |> to_be_visible())
         |> expect("Note" |> by_label() |> to_have_value("edited"))
-        |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/forms/start")))
+        |> expect(page_to_have_url(HTTPFixtures.url(fixture, "/forms/start")))
 
-        assert [_source, %{method: "POST", body: "note=edited"}] = TestHTTPFixtures.requests(fixture)
+        assert [_source, %{method: "POST", body: "note=edited"}] = HTTPFixtures.requests(fixture)
       end
     end
 
     @tag driver: driver
     test "a download response to submit keeps the current page using #{driver}", %{driver: driver} do
       fixture =
-        TestHTTPFixtures.register_sequence([
+        HTTPFixtures.register_sequence([
           %{body: html(~s(<h1>Exports</h1><form id="export" method="post" action="export"></form>))},
           %{
             headers: [{"content-type", "text/csv"}, {"content-disposition", ~s(attachment; filename="marauders_map.csv")}],
@@ -213,12 +213,12 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
 
       driver
       |> start_test_session()
-      |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+      |> visit(HTTPFixtures.path(fixture, "/forms/start"))
       |> submit(by_css("#export"), timeout: 2_000)
       |> expect("Exports" |> by_text() |> to_be_visible())
-      |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/forms/start")))
+      |> expect(page_to_have_url(HTTPFixtures.url(fixture, "/forms/start")))
 
-      assert [_source, %{method: "POST"}] = TestHTTPFixtures.requests(fixture)
+      assert [_source, %{method: "POST"}] = HTTPFixtures.requests(fixture)
     end
 
     @tag driver: driver
@@ -226,7 +226,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       driver: driver
     } do
       fixture =
-        TestHTTPFixtures.register_sequence([
+        HTTPFixtures.register_sequence([
           %{
             body:
               html("""
@@ -243,14 +243,14 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       session = start_test_session(driver)
 
       session
-      |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+      |> visit(HTTPFixtures.path(fixture, "/forms/start"))
       |> fill(by_label("First"), "updated")
       |> fill(by_label("Notes"), "line one")
       |> click(by_role(:button, name: "Send owl"))
       |> expect("Owl sent" |> by_text() |> to_be_visible())
-      |> expect(Fluffy.Expect.page_to_have_url(TestHTTPFixtures.url(fixture, "/forms/submit?source=form#receipt")))
+      |> expect(Fluffy.Expect.page_to_have_url(HTTPFixtures.url(fixture, "/forms/submit?source=form#receipt")))
 
-      [_source, submission] = TestHTTPFixtures.requests(fixture)
+      [_source, submission] = HTTPFixtures.requests(fixture)
       assert submission.method == "POST"
       assert submission.path == "/forms/submit"
       assert submission.query == "source=form"
@@ -267,7 +267,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       driver: driver
     } do
       fixture =
-        TestHTTPFixtures.register_sequence([
+        HTTPFixtures.register_sequence([
           %{
             body:
               html("""
@@ -284,12 +284,12 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       session = start_test_session(driver)
 
       session
-      |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+      |> visit(HTTPFixtures.path(fixture, "/forms/start"))
       |> fill(by_label("First"), "updated")
       |> click(by_role(:button, name: "Send owl"))
       |> expect("Owl sent" |> by_text() |> to_be_visible())
 
-      [_source, submission] = TestHTTPFixtures.requests(fixture)
+      [_source, submission] = HTTPFixtures.requests(fixture)
 
       assert {"content-type", "multipart/form-data; boundary=" <> boundary} =
                List.keyfind(submission.headers, "content-type", 0)
@@ -312,7 +312,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       driver: driver
     } do
       fixture =
-        TestHTTPFixtures.register_sequence([
+        HTTPFixtures.register_sequence([
           %{
             body:
               html("""
@@ -328,11 +328,11 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       session = start_test_session(driver)
 
       session
-      |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+      |> visit(HTTPFixtures.path(fixture, "/forms/start"))
       |> click(by_role(:button, name: "Save"))
       |> expect("Saved" |> by_text() |> to_be_visible())
 
-      [_source, submission] = TestHTTPFixtures.requests(fixture)
+      [_source, submission] = HTTPFixtures.requests(fixture)
       assert submission.body == "confirmed=yes"
     end
 
@@ -341,7 +341,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       driver: driver
     } do
       fixture =
-        TestHTTPFixtures.register_sequence([
+        HTTPFixtures.register_sequence([
           %{
             body:
               html("""
@@ -375,12 +375,12 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       session = start_test_session(driver)
 
       session
-      |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+      |> visit(HTTPFixtures.path(fixture, "/forms/start"))
       |> fill(by_label("Notes"), "first\nsecond")
       |> click(by_role(:button, name: "Save"))
       |> expect("Saved" |> by_text() |> to_be_visible())
 
-      [_source, submission] = TestHTTPFixtures.requests(fixture)
+      [_source, submission] = HTTPFixtures.requests(fixture)
 
       assert submission.body ==
                "outside_before=before&legend=yes&readonly=kept&invisible=hidden&item=one&item=two&datalist_fallback=wrong&notes=first%0D%0Asecond&choice=kept&commit=Save&outside_after=after"
@@ -391,7 +391,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       driver: driver
     } do
       fixture =
-        TestHTTPFixtures.register_sequence([
+        HTTPFixtures.register_sequence([
           %{
             body:
               html("""
@@ -408,12 +408,12 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       session = start_test_session(driver)
 
       session
-      |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+      |> visit(HTTPFixtures.path(fixture, "/forms/start"))
       |> uncheck(by_role(:checkbox, name: "One"))
       |> click(by_role(:button, name: "Save"))
       |> expect("Saved" |> by_text() |> to_be_visible())
 
-      [_source, submission] = TestHTTPFixtures.requests(fixture)
+      [_source, submission] = HTTPFixtures.requests(fixture)
       assert submission.body == "items%5B%5D=two&commit=Save"
     end
 
@@ -422,7 +422,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       driver: driver
     } do
       fixture =
-        TestHTTPFixtures.register_sequence([
+        HTTPFixtures.register_sequence([
           %{
             body:
               html("""
@@ -444,11 +444,11 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       session = start_test_session(driver)
 
       session
-      |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+      |> visit(HTTPFixtures.path(fixture, "/forms/start"))
       |> click(by_role(:button, name: "Search"))
       |> expect("Overridden" |> by_text() |> to_be_visible())
 
-      [_source, submission] = TestHTTPFixtures.requests(fixture)
+      [_source, submission] = HTTPFixtures.requests(fixture)
       assert submission.method == "POST"
       assert submission.path == "/forms/override"
       assert submission.query == "source=button"
@@ -458,7 +458,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
     @tag driver: driver
     test "uses the HTML form URL-encoded percent-encode set with #{driver}", %{driver: driver} do
       fixture =
-        TestHTTPFixtures.register_sequence([
+        HTTPFixtures.register_sequence([
           %{
             body:
               html("""
@@ -474,11 +474,11 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       session = start_test_session(driver)
 
       session
-      |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+      |> visit(HTTPFixtures.path(fixture, "/forms/start"))
       |> click(by_role(:button, name: "Save"))
       |> expect("Saved" |> by_text() |> to_be_visible())
 
-      [_source, submission] = TestHTTPFixtures.requests(fixture)
+      [_source, submission] = HTTPFixtures.requests(fixture)
       assert submission.body == "symbols=a+b%2Bc%7Ed%21*%28%29%C3%A9"
     end
 
@@ -486,7 +486,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
     test "uses browser defaults for charset, option text, selection, and form ownership with #{driver}",
          %{driver: driver} do
       fixture =
-        TestHTTPFixtures.register_sequence([
+        HTTPFixtures.register_sequence([
           %{
             body:
               html("""
@@ -512,18 +512,18 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       session = start_test_session(driver)
 
       session
-      |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+      |> visit(HTTPFixtures.path(fixture, "/forms/start"))
       |> click(by_role(:button, name: "Save"))
       |> expect("Saved" |> by_text() |> to_be_visible())
 
-      [_source, submission] = TestHTTPFixtures.requests(fixture)
+      [_source, submission] = HTTPFixtures.requests(fixture)
       assert submission.body == "_charset_=UTF-8&plan=current&label=Gold+plan"
     end
 
     @tag driver: driver
     test "a control inside noscript is not submitted with #{driver}", %{driver: driver} do
       fixture =
-        TestHTTPFixtures.register_sequence([
+        HTTPFixtures.register_sequence([
           %{
             body:
               html("""
@@ -539,18 +539,18 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
 
       driver
       |> start_test_session()
-      |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+      |> visit(HTTPFixtures.path(fixture, "/forms/start"))
       |> click(by_role(:button, name: "Save"))
       |> expect("Saved" |> by_text() |> to_be_visible())
 
-      [_source, submission] = TestHTTPFixtures.requests(fixture)
+      [_source, submission] = HTTPFixtures.requests(fixture)
       assert submission.body == "kept=yes"
     end
 
     @tag driver: driver
     test "a select in a disabled fieldset is not submitted with #{driver}", %{driver: driver} do
       fixture =
-        TestHTTPFixtures.register_sequence([
+        HTTPFixtures.register_sequence([
           %{
             body:
               html("""
@@ -570,18 +570,18 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
 
       driver
       |> start_test_session()
-      |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+      |> visit(HTTPFixtures.path(fixture, "/forms/start"))
       |> click(by_role(:button, name: "Save"))
       |> expect("Saved" |> by_text() |> to_be_visible())
 
-      [_source, submission] = TestHTTPFixtures.requests(fixture)
+      [_source, submission] = HTTPFixtures.requests(fixture)
       assert submission.body == "legend=Second"
     end
 
     @tag driver: driver
     test "a single select with every option deselected is not submitted with #{driver}", %{driver: driver} do
       fixture =
-        TestHTTPFixtures.register_sequence([
+        HTTPFixtures.register_sequence([
           %{
             body:
               html("""
@@ -597,12 +597,12 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
 
       driver
       |> start_test_session()
-      |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+      |> visit(HTTPFixtures.path(fixture, "/forms/start"))
       |> select_option(by_label("Plan"), [])
       |> click(by_role(:button, name: "Save"))
       |> expect("Saved" |> by_text() |> to_be_visible())
 
-      [_source, submission] = TestHTTPFixtures.requests(fixture)
+      [_source, submission] = HTTPFixtures.requests(fixture)
       assert submission.body == "kept=yes"
     end
 
@@ -612,7 +612,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
         driver: driver
       } do
         fixture =
-          TestHTTPFixtures.register_sequence([
+          HTTPFixtures.register_sequence([
             %{
               body:
                 html("""
@@ -629,12 +629,12 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
         session = start_test_session(driver)
 
         session
-        |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+        |> visit(HTTPFixtures.path(fixture, "/forms/start"))
         |> click(by_role(:button, name: "Save"))
         |> expect("Redirected receipt" |> by_text() |> to_be_visible())
-        |> expect(Fluffy.Expect.page_to_have_url(TestHTTPFixtures.url(fixture, "/forms/receipt")))
+        |> expect(Fluffy.Expect.page_to_have_url(HTTPFixtures.url(fixture, "/forms/receipt")))
 
-        [_source, submission, redirected] = TestHTTPFixtures.requests(fixture)
+        [_source, submission, redirected] = HTTPFixtures.requests(fixture)
         assert submission.method == "POST"
         assert submission.body == "token=abc&commit=Save"
         assert redirected.method == unquote(redirected_method)
@@ -647,7 +647,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
 
   test "Phoenix submits specialized scalar input values as plain strings" do
     fixture =
-      TestHTTPFixtures.register_sequence([
+      HTTPFixtures.register_sequence([
         %{
           body:
             html("""
@@ -672,14 +672,14 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
     session = start_test_session(:phoenix)
 
     session
-    |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+    |> visit(HTTPFixtures.path(fixture, "/forms/start"))
     |> fill(by_label("Email"), "not an email")
     |> fill(by_label("Number"), "many")
     |> fill(by_label("URL"), "not a url")
     |> click(by_role(:button, name: "Save"))
     |> expect("Saved" |> by_text() |> to_be_visible())
 
-    [_source, submission] = TestHTTPFixtures.requests(fixture)
+    [_source, submission] = HTTPFixtures.requests(fixture)
 
     assert submission.body ==
              "email=not+an+email&number=many&url=not+a+url&colour=not-a-colour&date=not-a-date&datetime=soon&month=later&range=wide&time=noon&week=someday"
@@ -697,11 +697,11 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       ] do
     @tag driver: :playwright
     test "Playwright submit with #{name} does not wait for a page navigation" do
-      fixture = TestHTTPFixtures.register(%{body: html("<h1>Draft</h1>" <> unquote(form))})
+      fixture = HTTPFixtures.register(%{body: html("<h1>Draft</h1>" <> unquote(form))})
 
       :playwright
       |> start_test_session()
-      |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+      |> visit(HTTPFixtures.path(fixture, "/forms/start"))
       |> submit(by_css("#note"), timeout: 2_000)
       |> expect("Draft" |> by_text() |> to_be_visible())
     end
@@ -711,18 +711,18 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
   @tag driver: :playwright
   test "Playwright submit of a GET to a fragment of the current URL navigates within the document" do
     fixture =
-      TestHTTPFixtures.register(%{
+      HTTPFixtures.register(%{
         body: html(~s(<h1>Draft</h1><form id="note" action="#results"><input name="q" value="fluffy"></form>))
       })
 
     :playwright
     |> start_test_session()
-    |> visit(TestHTTPFixtures.path(fixture, "/forms/start?q=fluffy"))
+    |> visit(HTTPFixtures.path(fixture, "/forms/start?q=fluffy"))
     |> submit(by_css("#note"), timeout: 2_000)
     |> expect("Draft" |> by_text() |> to_be_visible())
-    |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/forms/start?q=fluffy#results")))
+    |> expect(page_to_have_url(HTTPFixtures.url(fixture, "/forms/start?q=fluffy#results")))
 
-    assert [_source] = TestHTTPFixtures.requests(fixture)
+    assert [_source] = HTTPFixtures.requests(fixture)
   end
 
   @tag driver: :playwright
@@ -736,17 +736,17 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
     """
 
     fixture =
-      TestHTTPFixtures.register(%{
+      HTTPFixtures.register(%{
         body: html(~s(<h1>Draft</h1><form id="note" method="post" action="save"></form>) <> intercept)
       })
 
     :playwright
     |> start_test_session()
-    |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+    |> visit(HTTPFixtures.path(fixture, "/forms/start"))
     |> submit(by_css("#note"), timeout: 2_000)
     |> expect("Intercepted" |> by_text() |> to_be_visible())
 
-    assert [_source] = TestHTTPFixtures.requests(fixture)
+    assert [_source] = HTTPFixtures.requests(fixture)
   end
 
   # Dismissing the prompt cancels the navigation; accepting it lets it go on.
@@ -762,17 +762,17 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       <script>addEventListener('beforeunload', event => event.preventDefault())</script>
       """
 
-      fixture = TestHTTPFixtures.register_sequence([%{body: html(body)}, %{body: html("<h1>Saved</h1>")}])
+      fixture = HTTPFixtures.register_sequence([%{body: html(body)}, %{body: html("<h1>Saved</h1>")}])
 
       :playwright
       |> start_test_session()
-      |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+      |> visit(HTTPFixtures.path(fixture, "/forms/start"))
       |> fill(by_label("Title"), "Draft")
       |> once(Fluffy.Event.dialog(), unquote(handle))
       |> submit(by_css("#note"), timeout: 2_000)
       |> expect(unquote(heading) |> by_text() |> to_be_visible())
 
-      assert length(TestHTTPFixtures.requests(fixture)) == unquote(requests)
+      assert length(HTTPFixtures.requests(fixture)) == unquote(requests)
     end
   end
 
@@ -787,8 +787,8 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
     <body><form id="note" method="post" action="save"></form></body></html>
     """
 
-    fixture = TestHTTPFixtures.register(%{body: body})
-    session = :playwright |> start_test_session() |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+    fixture = HTTPFixtures.register(%{body: body})
+    session = :playwright |> start_test_session() |> visit(HTTPFixtures.path(fixture, "/forms/start"))
 
     assert_raise Fluffy.OperationError, ~r/Timeout 2000ms exceeded/, fn ->
       submit(session, by_css("#note"), timeout: 2_000)
@@ -809,9 +809,9 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
     end
 
     fixture =
-      TestHTTPFixtures.register_sequence([%{body: html(~s(<form id="note" method="post" action="save"></form>))}, slow])
+      HTTPFixtures.register_sequence([%{body: html(~s(<form id="note" method="post" action="save"></form>))}, slow])
 
-    session = :playwright |> start_test_session() |> visit(TestHTTPFixtures.path(fixture, "/forms/start"))
+    session = :playwright |> start_test_session() |> visit(HTTPFixtures.path(fixture, "/forms/start"))
 
     assert_raise Fluffy.OperationError, ~r/Timeout 2000ms exceeded/, fn ->
       submit(session, by_css("#note"), timeout: 2_000)
@@ -823,8 +823,8 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
 
   defp start_test_session(driver) do
     start_session(driver,
-      base_url: Fluffy.TestServer.base_url(),
-      endpoint: Fluffy.TestWeb.Endpoint
+      base_url: Fluffy.Support.Server.base_url(),
+      endpoint: Fluffy.Support.Web.Endpoint
     )
   end
 

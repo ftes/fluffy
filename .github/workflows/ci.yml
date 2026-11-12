@@ -191,8 +191,8 @@ jobs:
       # Test failures (exit 2) are retried once, only the failed tests (`mix test --failed`);
       # compile errors are not. The retry takes no --partitions: the failures manifest holds this
       # partition's failures only, and --partitions would split those files again. The first run's
-      # failures (Fluffy.FailuresFormatter) go to the job summary and annotations, so a green retry
-      # does not hide them. The 10 slowest modules (Fluffy.ModuleTimesFormatter) are the floor of a
+      # failures (Fluffy.Support.FailuresFormatter) go to the job summary and annotations, so a green retry
+      # does not hide them. The 10 slowest modules (Fluffy.Support.ModuleTimesFormatter) are the floor of a
       # partition's time. Warnings fail the newest lane only, as in the checks job.
       - name: Run tests with one retry
         id: tests

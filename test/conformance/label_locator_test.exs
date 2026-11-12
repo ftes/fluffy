@@ -1,9 +1,11 @@
 defmodule Fluffy.Conformance.LabelLocatorTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
+
+  alias Fluffy.Support.Server
 
   cases = [
     {"an explicit for/id label", ~s(<label for="email">Email address</label><input id="email">), "Email address", [], 1},
@@ -62,7 +64,7 @@ defmodule Fluffy.Conformance.LabelLocatorTest do
     @tag driver: driver
     test "finds a control from #{case_name} with #{driver}" do
       session =
-        session_for_html(unquote(driver), unquote(html), base_url: Fluffy.TestServer.base_url())
+        session_for_html(unquote(driver), unquote(html), base_url: Server.base_url())
 
       expect(session, unquote(label) |> by_label(unquote(options)) |> to_have_count(unquote(expected)))
     end
@@ -78,7 +80,7 @@ defmodule Fluffy.Conformance.LabelLocatorTest do
       """
 
       session =
-        session_for_html(unquote(driver), html, base_url: Fluffy.TestServer.base_url())
+        session_for_html(unquote(driver), html, base_url: Server.base_url())
 
       session
       |> expect("ARIA Labelled Search" |> by_label(exact: true) |> to_have_count(1))
@@ -95,7 +97,7 @@ defmodule Fluffy.Conformance.LabelLocatorTest do
       """
 
       session =
-        session_for_html(unquote(driver), html, base_url: Fluffy.TestServer.base_url())
+        session_for_html(unquote(driver), html, base_url: Server.base_url())
 
       session
       |> expect("Vault" |> by_label(exact: true) |> to_have_count(1))

@@ -1,5 +1,5 @@
 defmodule Fluffy.Conformance.HTMLIsolationTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
@@ -11,7 +11,7 @@ defmodule Fluffy.Conformance.HTMLIsolationTest do
       # Sessions start in the test process, which owns them; the documents run in parallel.
       [{"Alpha", "Beta"}, {"Beta", "Alpha"}]
       |> Enum.map(fn {present, absent} ->
-        session = session_for_html(driver, "<button>#{present}</button>", base_url: Fluffy.TestServer.base_url())
+        session = session_for_html(driver, "<button>#{present}</button>", base_url: Fluffy.Support.Server.base_url())
 
         Task.async(fn ->
           session

@@ -1,5 +1,5 @@
 defmodule Fluffy.Conformance.LiveTimingTest do
-  use Fluffy.TestCase, async: false
+  use Fluffy.Support.Case, async: false
 
   import Fluffy
   import Fluffy.Locator
@@ -145,8 +145,8 @@ defmodule Fluffy.Conformance.LiveTimingTest do
 
   defp start_test_session(driver) do
     start_session(driver,
-      base_url: Fluffy.TestServer.base_url(),
-      endpoint: Fluffy.TestWeb.Endpoint
+      base_url: Fluffy.Support.Server.base_url(),
+      endpoint: Fluffy.Support.Web.Endpoint
     )
   end
 end

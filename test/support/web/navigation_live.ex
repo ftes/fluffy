@@ -1,4 +1,4 @@
-defmodule Fluffy.TestWeb.NavigationLive do
+defmodule Fluffy.Support.Web.NavigationLive do
   @moduledoc false
 
   use Phoenix.LiveView
@@ -192,7 +192,7 @@ defmodule Fluffy.TestWeb.NavigationLive do
   end
 end
 
-defmodule Fluffy.TestWeb.DestinationLive do
+defmodule Fluffy.Support.Web.DestinationLive do
   @moduledoc false
 
   use Phoenix.LiveView
@@ -208,7 +208,7 @@ defmodule Fluffy.TestWeb.DestinationLive do
   end
 end
 
-defmodule Fluffy.TestWeb.MountedPatchLive do
+defmodule Fluffy.Support.Web.MountedPatchLive do
   @moduledoc false
 
   use Phoenix.LiveView

@@ -1,19 +1,19 @@
 defmodule Fluffy.Conformance.BlockedPageTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Locator
 
   alias Fluffy.Playwright
-
-  @moduletag driver: :playwright
-
-  @html "<button>Other</button>"
-
   # Calls that, as in Playwright, have no timeout wait on a blocked page until the test
   # times out if Fluffy calls Playwright directly (page `evaluate`, a context setter,
   # `unroute_all`). The others, `content` among them, first make Fluffy's bounded
   # document check.
+  alias Fluffy.Support.Server
+
+  @moduletag driver: :playwright
+
+  @html "<button>Other</button>"
 
   test "an action on a blocked page fails within the session timeout" do
     session = frozen_session()
@@ -48,7 +48,7 @@ defmodule Fluffy.Conformance.BlockedPageTest do
 
   test "a blocked page that page code navigated reports its URL without waiting for the page" do
     session =
-      :playwright |> session_for_html(@html, base_url: Fluffy.TestServer.base_url()) |> put_session_timeout(1_000)
+      :playwright |> session_for_html(@html, base_url: Server.base_url()) |> put_session_timeout(1_000)
 
     Playwright.evaluate(session, "history.pushState(null, '', 'pushed')")
     freeze_page(session)
@@ -60,7 +60,7 @@ defmodule Fluffy.Conformance.BlockedPageTest do
 
   defp frozen_session do
     :playwright
-    |> session_for_html(@html, base_url: Fluffy.TestServer.base_url())
+    |> session_for_html(@html, base_url: Server.base_url())
     |> put_session_timeout(1_000)
     |> freeze_page()
   end

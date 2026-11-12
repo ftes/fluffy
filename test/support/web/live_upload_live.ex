@@ -1,4 +1,4 @@
-defmodule Fluffy.TestWeb.LiveUploadLive do
+defmodule Fluffy.Support.Web.LiveUploadLive do
   @moduledoc false
 
   use Phoenix.LiveView

@@ -1,4 +1,4 @@
-defmodule Fluffy.TestCase do
+defmodule Fluffy.Support.Case do
   @moduledoc false
 
   use ExUnit.CaseTemplate
@@ -7,7 +7,7 @@ defmodule Fluffy.TestCase do
     quote do
       use Fluffy.Test, sandbox: false
 
-      import Fluffy.TestCase,
+      import Fluffy.Support.Case,
         only: [
           assert_action_error: 4,
           browser_context_guids: 1,
@@ -17,7 +17,7 @@ defmodule Fluffy.TestCase do
           put_session_timeout: 2
         ]
 
-      setup_all {Fluffy.TestCase, :isolate_firefox}
+      setup_all {Fluffy.Support.Case, :isolate_firefox}
     end
   end
 

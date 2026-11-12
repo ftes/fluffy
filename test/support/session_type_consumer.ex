@@ -1,4 +1,4 @@
-defmodule Fluffy.SessionTypeConsumer do
+defmodule Fluffy.Support.SessionTypeConsumer do
   @moduledoc false
 
   # Compiled by mix quality so Dialyzer checks the public API from a consumer

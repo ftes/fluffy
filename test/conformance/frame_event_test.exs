@@ -1,5 +1,5 @@
 defmodule Fluffy.Conformance.FrameEventTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Playwright

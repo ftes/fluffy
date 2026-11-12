@@ -1,4 +1,4 @@
-defmodule Fluffy.FailuresFormatter do
+defmodule Fluffy.Support.FailuresFormatter do
   @moduledoc """
   An ExUnit formatter that appends each failed test to the file named by `FLUFFY_FAILURES_FILE`
   (if set), one `file:line<TAB>module: test name` line per failure (a failed `setup_all` reports

@@ -1,5 +1,5 @@
 defmodule Fluffy.SandboxConfigurationTest do
-  use Fluffy.TestCase, async: false
+  use Fluffy.Support.Case, async: false
 
   alias Fluffy.Sandbox
 

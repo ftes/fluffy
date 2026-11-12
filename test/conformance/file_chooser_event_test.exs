@@ -1,5 +1,5 @@
 defmodule Fluffy.Conformance.FileChooserEventTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
@@ -179,7 +179,7 @@ defmodule Fluffy.Conformance.FileChooserEventTest do
       <input id="attachment" type="file"#{multiple} hidden>
       <button onclick="document.querySelector('#attachment').click()">Choose attachment</button>
       """,
-      base_url: Fluffy.TestServer.base_url()
+      base_url: Fluffy.Support.Server.base_url()
     )
   end
 end

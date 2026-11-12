@@ -1,15 +1,17 @@
 defmodule Fluffy.StepTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
   import Fluffy.Playwright, only: [step: 3, step: 4]
 
+  alias Fluffy.Support.Server
+
   test "returns the callback's updated session" do
     session =
       :playwright
-      |> start_session(base_url: Fluffy.TestServer.base_url())
+      |> start_session(base_url: Server.base_url())
       |> visit("/live/three-heads")
       |> step("Lull one of Fluffy's heads", fn session ->
         click(session, by_role(:button, name: "Play the flute"))
@@ -20,7 +22,7 @@ defmodule Fluffy.StepTest do
   end
 
   test "requires the callback to return a session and rejects unknown options" do
-    session = start_session(:playwright, base_url: Fluffy.TestServer.base_url())
+    session = start_session(:playwright, base_url: Server.base_url())
 
     assert_raise ArgumentError, ~r/must return a Fluffy.Session, got: :ok/, fn ->
       step(session, "Feed Fluffy", fn _session -> :ok end)
@@ -32,7 +34,7 @@ defmodule Fluffy.StepTest do
   end
 
   test "raises a capability error on Phoenix" do
-    session = start_session(:phoenix, endpoint: Fluffy.TestWeb.Endpoint)
+    session = start_session(:phoenix, endpoint: Fluffy.Support.Web.Endpoint)
 
     assert_raise Fluffy.CapabilityError, ~r/:steps requires a Playwright session/, fn ->
       step(session, "Feed Fluffy", & &1)

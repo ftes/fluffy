@@ -1,5 +1,5 @@
 defmodule Fluffy.Conformance.NetworkEventTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
@@ -9,7 +9,8 @@ defmodule Fluffy.Conformance.NetworkEventTest do
   alias Fluffy.Event
   alias Fluffy.Playwright
   alias Fluffy.SessionRuntime
-  alias Fluffy.TestHTTPFixtures
+  alias Fluffy.Support.HTTPFixtures
+  alias Fluffy.Support.Server
   alias PlaywrightEx.Request
   alias PlaywrightEx.Response
 
@@ -23,7 +24,7 @@ defmodule Fluffy.Conformance.NetworkEventTest do
     assert %Request{} = request = await(request_wait)
     assert {Request.method(request), Request.resource_type(request)} == {"POST", "fetch"}
     assert Request.post_data(request) == "payload"
-    assert Request.url(request) == TestHTTPFixtures.url(fixture, "/api?source=button")
+    assert Request.url(request) == HTTPFixtures.url(fixture, "/api?source=button")
     assert Request.headers(request)["x-fluffy"] == "network-test"
     assert request_page(session, request) == current_page(session)
 
@@ -42,7 +43,7 @@ defmodule Fluffy.Conformance.NetworkEventTest do
     Playwright.evaluate(
       session,
       "url => { fetch(url, {method: 'POST', body: new Uint8Array([0xff, 0x00, 0x89, 0x50])}); return true }",
-      TestHTTPFixtures.url(fixture, "/api?source=bytes")
+      HTTPFixtures.url(fixture, "/api?source=bytes")
     )
 
     assert Request.post_data_buffer(await(request_wait)) == <<0xFF, 0x00, 0x89, 0x50>>
@@ -51,7 +52,7 @@ defmodule Fluffy.Conformance.NetworkEventTest do
   @tag driver: :playwright
   test "page and context waits observe the same request, including child-frame requests" do
     {session, fixture} = session()
-    frame_url = TestHTTPFixtures.url(fixture, "/child")
+    frame_url = HTTPFixtures.url(fixture, "/child")
     frame_wait = wait_for(session, Event.frame_navigated(&(PlaywrightEx.Frame.url(&1) == frame_url)))
 
     Playwright.evaluate(
@@ -68,7 +69,7 @@ defmodule Fluffy.Conformance.NetworkEventTest do
     Playwright.evaluate(
       session,
       "url => { document.querySelector('iframe').contentWindow.fetch(url); return true }",
-      TestHTTPFixtures.url(fixture, "/api")
+      HTTPFixtures.url(fixture, "/api")
     )
 
     request = await(page_wait)
@@ -82,7 +83,7 @@ defmodule Fluffy.Conformance.NetworkEventTest do
     page_wait = wait_for(original, Event.request())
     context_wait = wait_for(original, Event.request(), scope: :context)
     other = switch_page(original, new_page(original))
-    visit(other, TestHTTPFixtures.path(fixture, "/child"))
+    visit(other, HTTPFixtures.path(fixture, "/child"))
     assert request_page(original, await(context_wait)) == current_page(other)
     click(original, by_role(:button, name: "Save"))
     assert request_page(original, await(page_wait)) == current_page(original)
@@ -91,7 +92,7 @@ defmodule Fluffy.Conformance.NetworkEventTest do
   @tag driver: :playwright
   test "context scope observes a popup's initial request" do
     {session, fixture} = session()
-    pending = wait_for(session, Event.request(&(url(&1) == TestHTTPFixtures.url(fixture, "/child"))), scope: :context)
+    pending = wait_for(session, Event.request(&(url(&1) == HTTPFixtures.url(fixture, "/child"))), scope: :context)
     popup = wait_for(session, Event.popup())
     click(session, by_role(:link, name: "Open child"))
     request = await(pending)
@@ -146,7 +147,7 @@ defmodule Fluffy.Conformance.NetworkEventTest do
     on(original, Event.request(), handler)
     on(original, Event.request(), handler, scope: :context)
     off(other, Event.request(), handler)
-    visit(other, TestHTTPFixtures.path(fixture, "/child"))
+    visit(other, HTTPFixtures.path(fixture, "/child"))
     other_page = current_page(other)
     assert_receive {:request, ^other_page}
     off(other, Event.request(), handler, scope: :context)
@@ -162,7 +163,7 @@ defmodule Fluffy.Conformance.NetworkEventTest do
     owner = self()
 
     fixture =
-      TestHTTPFixtures.register(fn request ->
+      HTTPFixtures.register(fn request ->
         case request.path do
           "/start" ->
             %{
@@ -192,8 +193,8 @@ defmodule Fluffy.Conformance.NetworkEventTest do
 
     session =
       :playwright
-      |> start_session(base_url: Fluffy.TestServer.base_url())
-      |> visit(TestHTTPFixtures.path(fixture, "/start"))
+      |> start_session(base_url: Server.base_url())
+      |> visit(HTTPFixtures.path(fixture, "/start"))
 
     pending = wait_for(session, Event.response(&String.ends_with?(url(&1), "/stream")))
     click(session, by_role(:button, name: "Fetch"))
@@ -225,7 +226,7 @@ defmodule Fluffy.Conformance.NetworkEventTest do
 
   defp session do
     fixture =
-      TestHTTPFixtures.register(fn request ->
+      HTTPFixtures.register(fn request ->
         case request.path do
           "/start" ->
             %{
@@ -250,8 +251,8 @@ defmodule Fluffy.Conformance.NetworkEventTest do
 
     session =
       :playwright
-      |> start_session(base_url: Fluffy.TestServer.base_url())
-      |> visit(TestHTTPFixtures.path(fixture, "/start"))
+      |> start_session(base_url: Server.base_url())
+      |> visit(HTTPFixtures.path(fixture, "/start"))
 
     {session, fixture}
   end

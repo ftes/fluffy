@@ -1,11 +1,11 @@
 defmodule Fluffy.Conformance.TimeoutInfinityTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.TestWeb.Endpoint
+  alias Fluffy.Support.Web.Endpoint
 
   @appeared by_role(:button, name: "Appeared")
 
@@ -15,7 +15,7 @@ defmodule Fluffy.Conformance.TimeoutInfinityTest do
     test "timeout: :infinity waits past the session timeout with #{driver}", %{driver: driver} do
       session =
         driver
-        |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+        |> start_session(base_url: Fluffy.Support.Server.base_url(), endpoint: Endpoint)
         |> visit("/live/async?delay=300")
         |> put_session_timeout(50)
 

@@ -1,4 +1,4 @@
-defmodule Fluffy.TestWeb.PatchedControlsLive do
+defmodule Fluffy.Support.Web.PatchedControlsLive do
   @moduledoc false
 
   use Phoenix.LiveView
@@ -25,13 +25,13 @@ defmodule Fluffy.TestWeb.PatchedControlsLive do
       <button type="button" phx-click="bump">Bump</button>
       <button type="button" phx-click="retitle">Retitle</button>
       <p>Count: {@count}</p>
-      <.live_component module={Fluffy.TestWeb.PatchedControlsComponent} id="patched-component" />
+      <.live_component module={Fluffy.Support.Web.PatchedControlsComponent} id="patched-component" />
     </main>
     """
   end
 end
 
-defmodule Fluffy.TestWeb.PatchedControlsComponent do
+defmodule Fluffy.Support.Web.PatchedControlsComponent do
   @moduledoc false
 
   use Phoenix.LiveComponent

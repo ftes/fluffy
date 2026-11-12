@@ -1,11 +1,12 @@
 defmodule Fluffy.Conformance.LiveReadinessErrorTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
 
   alias Fluffy.Playwright
+  alias Fluffy.Support.Server
 
   @tag driver: :playwright
   test "a parent patch does not make a connected nested LiveView unready" do
@@ -13,7 +14,7 @@ defmodule Fluffy.Conformance.LiveReadinessErrorTest do
     # with many parallel cases an action can queue behind others for seconds.
     session =
       :playwright
-      |> start_session(base_url: Fluffy.TestServer.base_url(), timeout: 5_000)
+      |> start_session(base_url: Server.base_url(), timeout: 5_000)
       |> visit("/live/nested")
       |> fill(by_label("Parent email"), "parent@hogwarts.example")
       |> click(by_role(:button, name: "Save parent"))
@@ -36,7 +37,7 @@ defmodule Fluffy.Conformance.LiveReadinessErrorTest do
   test "a disconnected nested channel is not ready even with a connected CSS marker" do
     session =
       :playwright
-      |> start_session(base_url: Fluffy.TestServer.base_url())
+      |> start_session(base_url: Server.base_url())
       |> visit("/live/nested")
 
     Playwright.evaluate(
@@ -60,8 +61,8 @@ defmodule Fluffy.Conformance.LiveReadinessErrorTest do
   test "names the destination and expected marker on a readiness timeout" do
     session =
       start_session(:playwright,
-        base_url: Fluffy.TestServer.base_url(),
-        endpoint: Fluffy.TestWeb.Endpoint,
+        base_url: Server.base_url(),
+        endpoint: Fluffy.Support.Web.Endpoint,
         timeout: 1_000
       )
 

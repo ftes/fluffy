@@ -1,5 +1,5 @@
 defmodule Fluffy.Conformance.PageSignalEventTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
@@ -9,7 +9,8 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
   alias Fluffy.Event
   alias Fluffy.Playwright
   alias Fluffy.Session
-  alias Fluffy.TestHTTPFixtures
+  alias Fluffy.Support.HTTPFixtures
+  alias Fluffy.Support.Server
   alias PlaywrightEx.ConsoleMessage
   alias PlaywrightEx.Frame
   alias PlaywrightEx.Request
@@ -28,7 +29,7 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
       assert {ConsoleMessage.type(message), ConsoleMessage.text(message)} == {"error", "from button"}
       assert page(session, ConsoleMessage.page(message)) == current_page(session)
       assert is_number(ConsoleMessage.timestamp(message))
-      assert ConsoleMessage.location(message).url == TestHTTPFixtures.url(fixture, "/start")
+      assert ConsoleMessage.location(message).url == HTTPFixtures.url(fixture, "/start")
 
       Playwright.evaluate(session, "console.warn('warned')")
       assert ConsoleMessage.text(await(other)) == "warned"
@@ -168,7 +169,7 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
       loaded = wait_for(session, Event.load())
       content_loaded = wait_for(session, Event.dom_content_loaded())
 
-      visit(session, TestHTTPFixtures.path(fixture, "/child"))
+      visit(session, HTTPFixtures.path(fixture, "/child"))
 
       assert await(content_loaded) == current_page(session)
       assert await(loaded) == current_page(session)
@@ -182,12 +183,12 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
       assert expect_event(
                session,
                Event.load(&(&1 == page)),
-               &visit(&1, TestHTTPFixtures.path(fixture, "/child")),
+               &visit(&1, HTTPFixtures.path(fixture, "/child")),
                fn loaded -> assert loaded == page end
              ) == session
 
       pending = wait_for(session, Event.load(fn _page -> false end), timeout: 200)
-      visit(session, TestHTTPFixtures.path(fixture, "/start"))
+      visit(session, HTTPFixtures.path(fixture, "/start"))
       assert_raise ExUnit.AssertionError, ~r/no matching load event/, fn -> await(pending) end
     end
 
@@ -276,7 +277,7 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
     @tag driver: :playwright
     test "a web socket resolves with the PlaywrightEx web socket" do
       {session, _fixture} = session()
-      url = String.replace_prefix(Fluffy.TestServer.base_url(), "http", "ws") <> "/live/websocket?vsn=2.0.0"
+      url = String.replace_prefix(Server.base_url(), "http", "ws") <> "/live/websocket?vsn=2.0.0"
       pending = wait_for(session, Event.web_socket(&(PlaywrightEx.WebSocket.url(&1) == url)))
 
       Playwright.evaluate(session, "url => { window.s = new WebSocket(url); return true }", url)
@@ -332,7 +333,7 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
 
   defp session do
     fixture =
-      TestHTTPFixtures.register(fn request ->
+      HTTPFixtures.register(fn request ->
         case request.path do
           "/start" ->
             %{body: ~s|<!doctype html><button onclick="console.error('from button')">Log</button>|}
@@ -350,8 +351,8 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
 
     session =
       :playwright
-      |> start_session(base_url: Fluffy.TestServer.base_url())
-      |> visit(TestHTTPFixtures.path(fixture, "/start"))
+      |> start_session(base_url: Server.base_url())
+      |> visit(HTTPFixtures.path(fixture, "/start"))
 
     {session, fixture}
   end

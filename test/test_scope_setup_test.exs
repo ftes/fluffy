@@ -2,8 +2,9 @@ defmodule Fluffy.TestScopeSetupTest do
   use ExUnit.Case, async: false
   use PlaywrightEx.Test
 
+  alias Fluffy.Support.Server
+  alias Fluffy.Support.Web.Endpoint
   alias Fluffy.TestScope
-  alias Fluffy.TestWeb.Endpoint
 
   setup do
     previous_repos = Application.get_env(:fluffy, :ecto_repos, :not_configured)
@@ -33,7 +34,7 @@ defmodule Fluffy.TestScopeSetupTest do
   end
 
   test "setup can explicitly omit configured sandbox resources", context do
-    Application.put_env(:fluffy, :ecto_repos, [Fluffy.TestRepo])
+    Application.put_env(:fluffy, :ecto_repos, [Fluffy.Support.Repo])
 
     assert :ok = Fluffy.Test.setup(context, sandbox: false)
     assert %{owners: [], sandbox_header: nil} = TestScope.current()
@@ -58,12 +59,12 @@ defmodule Fluffy.TestScopeSetupTest do
     assert_raise ArgumentError, message, fn ->
       Fluffy.start_session(:phoenix,
         endpoint: Endpoint,
-        base_url: Fluffy.TestServer.base_url()
+        base_url: Server.base_url()
       )
     end
 
     assert_raise ArgumentError, message, fn ->
-      Fluffy.start_session(:playwright, base_url: Fluffy.TestServer.base_url())
+      Fluffy.start_session(:playwright, base_url: Server.base_url())
     end
   end
 
@@ -74,7 +75,7 @@ defmodule Fluffy.TestScopeSetupTest do
     assert_raise ArgumentError, ~r/unknown.*scope|unknown keys.*scope/, fn ->
       Fluffy.start_session(:phoenix,
         endpoint: Endpoint,
-        base_url: Fluffy.TestServer.base_url(),
+        base_url: Server.base_url(),
         scope: self()
       )
     end
@@ -104,10 +105,10 @@ defmodule Fluffy.TestScopeWithoutPlaywrightTest do
   end
 
   test "runs Phoenix sessions and rejects Playwright ones" do
-    Fluffy.start_session(:phoenix, endpoint: Fluffy.TestWeb.Endpoint)
+    Fluffy.start_session(:phoenix, endpoint: Fluffy.Support.Web.Endpoint)
 
     assert_raise ArgumentError, ~r/use PlaywrightEx.Test/, fn ->
-      Fluffy.start_session(:playwright, base_url: Fluffy.TestServer.base_url())
+      Fluffy.start_session(:playwright, base_url: Fluffy.Support.Server.base_url())
     end
   end
 end

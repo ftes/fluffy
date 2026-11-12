@@ -1,10 +1,11 @@
 defmodule Fluffy.Conformance.PageURLTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
 
-  alias Fluffy.TestWeb.Endpoint
+  alias Fluffy.Support.Server
+  alias Fluffy.Support.Web.Endpoint
 
   @query "b=2&a=1&tag=a&tag=b&empty=&bare&space=hello+world&unicode=%C3%A4&plus=%2B"
 
@@ -13,7 +14,7 @@ defmodule Fluffy.Conformance.PageURLTest do
     test "immediate URL assertions read the current URL and report mismatches with #{driver}", %{driver: driver} do
       session =
         driver
-        |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+        |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
         |> visit("/chamber")
         |> expect(page_to_have_url("/chamber"), timeout: 0)
 
@@ -28,10 +29,10 @@ defmodule Fluffy.Conformance.PageURLTest do
 
     @tag driver: driver
     test "a string is resolved against the base URL and equals the complete URL with #{driver}", %{driver: driver} do
-      exact = Fluffy.TestServer.base_url() <> "/chamber?#{@query}#summary"
+      exact = Server.base_url() <> "/chamber?#{@query}#summary"
 
       driver
-      |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+      |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
       |> visit("/chamber?#{@query}#summary")
       |> expect(Fluffy.Expect.page_to_have_url(exact))
       |> expect(Fluffy.Expect.page_to_have_url("/chamber?#{@query}#summary"))
@@ -44,7 +45,7 @@ defmodule Fluffy.Conformance.PageURLTest do
     test "a regex is a JS RegExp, and PCRE-only syntax raises, with #{driver}", %{driver: driver} do
       session =
         driver
-        |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+        |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
         |> visit("/chamber")
         |> expect(page_to_have_url(PlaywrightEx.RegExp.new("/CHAMBER$", "i")))
         |> expect(page_to_have_url(~r{/CHAMBER$}, ignore_case: true))
@@ -58,7 +59,7 @@ defmodule Fluffy.Conformance.PageURLTest do
     @tag driver: driver
     test "a string matches a Live document's complete URL with #{driver}", %{driver: driver} do
       driver
-      |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+      |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
       |> visit("/live/chamber-map?b=2&a=1&tag=a&tag=b#summary")
       |> expect(Fluffy.Expect.page_to_have_url("/live/chamber-map?b=2&a=1&tag=a&tag=b#summary"))
     end
@@ -71,7 +72,7 @@ defmodule Fluffy.Conformance.PageURLTest do
 
       session =
         driver
-        |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+        |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
         |> visit(path <> "?answer=42#summary")
         |> expect(
           page_to_have_url(fn url ->
@@ -95,7 +96,7 @@ defmodule Fluffy.Conformance.PageURLTest do
   test "zero-timeout URL assertions allow the current URL predicate to finish" do
     session =
       :playwright
-      |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+      |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
       |> visit("/chamber")
 
     predicate = fn url ->

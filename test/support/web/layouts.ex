@@ -1,4 +1,4 @@
-defmodule Fluffy.TestWeb.Layouts do
+defmodule Fluffy.Support.Web.Layouts do
   @moduledoc false
 
   use Phoenix.Component
@@ -51,7 +51,7 @@ defmodule Fluffy.TestWeb.Layouts do
         </nav>
         {@inner_content}
         <aside id="portal-root"></aside>
-        {live_render(@conn, Fluffy.TestWeb.KennelSidebarLive, id: "kennel-sidebar", sticky: true)}
+        {live_render(@conn, Fluffy.Support.Web.KennelSidebarLive, id: "kennel-sidebar", sticky: true)}
       </body>
     </html>
     """

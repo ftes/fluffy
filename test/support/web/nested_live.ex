@@ -1,4 +1,4 @@
-defmodule Fluffy.TestWeb.NestedParentLive do
+defmodule Fluffy.Support.Web.NestedParentLive do
   @moduledoc false
 
   use Phoenix.LiveView
@@ -62,7 +62,7 @@ defmodule Fluffy.TestWeb.NestedParentLive do
       <p :if={@shifted?}>Child shifted</p>
       <p :if={@child_removed?}>Child removed</p>
       {if !@child_removed? do
-        live_render(@socket, Fluffy.TestWeb.NestedChildLive,
+        live_render(@socket, Fluffy.Support.Web.NestedChildLive,
           id: "nested-child",
           session: %{"late" => @late?}
         )
@@ -72,7 +72,7 @@ defmodule Fluffy.TestWeb.NestedParentLive do
   end
 end
 
-defmodule Fluffy.TestWeb.NestedChildLive do
+defmodule Fluffy.Support.Web.NestedChildLive do
   @moduledoc false
 
   use Phoenix.LiveView

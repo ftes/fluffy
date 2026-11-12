@@ -5,24 +5,25 @@ defmodule Fluffy.EctoSandboxLifecycleTest do
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
-  import Fluffy.TestCase, only: [browser_context_guids: 1]
+  import Fluffy.Support.Case, only: [browser_context_guids: 1]
 
-  alias Fluffy.TestRepo
-  alias Fluffy.TestRepoTwo
+  alias Fluffy.Support.Repo
+  alias Fluffy.Support.RepoTwo
+  alias Fluffy.Support.Server
+  alias Fluffy.Support.Web.Endpoint
   alias Fluffy.TestScope
-  alias Fluffy.TestWeb.Endpoint
 
   setup_all do
-    :ok = Fluffy.TestDatabase.ensure_started()
+    :ok = Fluffy.Support.Database.ensure_started()
   end
 
   test "propagates metadata for multiple repos", context do
-    assert :ok = Fluffy.Test.setup(context, repos: [TestRepo, TestRepoTwo])
+    assert :ok = Fluffy.Test.setup(context, repos: [Repo, RepoTwo])
     assert length(TestScope.current().owners) == 2
 
     session =
       start_session(:playwright,
-        base_url: Fluffy.TestServer.base_url(),
+        base_url: Server.base_url(),
         endpoint: Endpoint
       )
 
@@ -41,18 +42,18 @@ defmodule Fluffy.EctoSandboxLifecycleTest do
       refute browser_context.guid in browser_context_guids(playwright_browser)
     end)
 
-    assert :ok = Fluffy.Test.setup(context, repos: [TestRepo])
+    assert :ok = Fluffy.Test.setup(context, repos: [Repo])
     [owner] = TestScope.current().owners
 
-    TestRepo.query!("CREATE TEMP TABLE fluffy_records (value text NOT NULL) ON COMMIT DROP")
-    TestRepo.query!("INSERT INTO fluffy_records (value) VALUES ('shutdown')")
+    Repo.query!("CREATE TEMP TABLE fluffy_records (value text NOT NULL) ON COMMIT DROP")
+    Repo.query!("INSERT INTO fluffy_records (value) VALUES ('shutdown')")
 
     browser =
       :playwright
-      |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+      |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
       |> visit("/live/database?delay=250")
 
-    live = start_session(:phoenix, base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+    live = start_session(:phoenix, base_url: Server.base_url(), endpoint: Endpoint)
     {:ok, live_view} = Agent.start(fn -> nil end)
     :ok = Fluffy.Backend.Phoenix.register_process(live.runtime, :live_view, live_view, 100)
 
@@ -94,7 +95,7 @@ defmodule Fluffy.EctoSandboxLifecycleTest do
   end
 
   defp database_name do
-    :fluffy |> Application.fetch_env!(TestRepo) |> Keyword.fetch!(:database)
+    :fluffy |> Application.fetch_env!(Repo) |> Keyword.fetch!(:database)
   end
 end
 
@@ -107,22 +108,22 @@ defmodule Fluffy.EctoSandboxSharedModeTest do
   import Fluffy.Locator
 
   alias Ecto.Adapters.SQL.Sandbox
-  alias Fluffy.TestRepo
+  alias Fluffy.Support.Repo
   alias Fluffy.TestScope
 
   setup_all do
-    :ok = Fluffy.TestDatabase.ensure_started()
+    :ok = Fluffy.Support.Database.ensure_started()
   end
 
   test "adopts an existing shared sandbox and supports multiple sessions", context do
-    owner = Sandbox.start_owner!(TestRepo, shared: true)
+    owner = Sandbox.start_owner!(Repo, shared: true)
     on_exit(fn -> Sandbox.stop_owner(owner) end)
 
-    assert :ok = Fluffy.Test.setup(context, repos: [TestRepo])
+    assert :ok = Fluffy.Test.setup(context, repos: [Repo])
     assert TestScope.current().owners == []
 
-    TestRepo.query!("CREATE TEMP TABLE fluffy_records (value text NOT NULL) ON COMMIT DROP")
-    TestRepo.query!("INSERT INTO fluffy_records (value) VALUES ('shared')")
+    Repo.query!("CREATE TEMP TABLE fluffy_records (value text NOT NULL) ON COMMIT DROP")
+    Repo.query!("INSERT INTO fluffy_records (value) VALUES ('shared')")
 
     first = browser_session()
     second = browser_session()
@@ -133,8 +134,8 @@ defmodule Fluffy.EctoSandboxSharedModeTest do
 
   defp browser_session do
     start_session(:playwright,
-      base_url: Fluffy.TestServer.base_url(),
-      endpoint: Fluffy.TestWeb.Endpoint
+      base_url: Fluffy.Support.Server.base_url(),
+      endpoint: Fluffy.Support.Web.Endpoint
     )
   end
 end

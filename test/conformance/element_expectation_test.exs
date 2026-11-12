@@ -1,12 +1,13 @@
 defmodule Fluffy.Conformance.ElementExpectationTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.TestWeb.Endpoint
-  alias Fluffy.TestWeb.ExpectationsLive
+  alias Fluffy.Support.Server
+  alias Fluffy.Support.Web.Endpoint
+  alias Fluffy.Support.Web.ExpectationsLive
 
   @miss by_css("#absent")
   @timeout 5_000
@@ -281,7 +282,7 @@ defmodule Fluffy.Conformance.ElementExpectationTest do
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
     test "the element expectations retry a changing LiveView with #{driver}", %{driver: driver} do
-      session = start_session(driver, base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+      session = start_session(driver, base_url: Server.base_url(), endpoint: Endpoint)
 
       session
       |> visit("/live/expectations?delay=25")
@@ -367,11 +368,11 @@ defmodule Fluffy.Conformance.ElementExpectationTest do
 
   defp session(:live) do
     :phoenix
-    |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+    |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
     |> visit("/live/expectations")
   end
 
-  defp session(driver), do: session_for_html(driver, ExpectationsLive.markup(), base_url: Fluffy.TestServer.base_url())
+  defp session(driver), do: session_for_html(driver, ExpectationsLive.markup(), base_url: Server.base_url())
 
   defp refute_passes(session, expectation) do
     assert_raise ExUnit.AssertionError, fn -> expect(session, expectation, timeout: 50) end

@@ -17,7 +17,7 @@ ExUnit.start(
   # Added to, so `mix test --formatter` still applies.
   formatters:
     ExUnit.configuration()[:formatters] ++
-      [Fluffy.FailuresFormatter, Fluffy.ModuleTimesFormatter]
+      [Fluffy.Support.FailuresFormatter, Fluffy.Support.ModuleTimesFormatter]
 )
 
-{:ok, _test_server} = Fluffy.TestServer.start_link()
+{:ok, _test_server} = Fluffy.Support.Server.start_link()

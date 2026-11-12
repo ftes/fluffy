@@ -1,5 +1,5 @@
 defmodule Fluffy.Conformance.DownloadEventTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
@@ -7,7 +7,8 @@ defmodule Fluffy.Conformance.DownloadEventTest do
 
   alias Fluffy.Download
   alias Fluffy.Event
-  alias Fluffy.TestHTTPFixtures
+  alias Fluffy.Support.HTTPFixtures
+  alias Fluffy.Support.Server
 
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver, tmp_dir: true
@@ -170,10 +171,10 @@ defmodule Fluffy.Conformance.DownloadEventTest do
   @tag driver: :playwright
   test "download metadata is available before completion, while read waits for the bytes" do
     owner = self()
-    first = "first" <> TestHTTPFixtures.sniff_padding()
+    first = "first" <> HTTPFixtures.sniff_padding()
 
     fixture =
-      TestHTTPFixtures.register(fn request ->
+      HTTPFixtures.register(fn request ->
         case request.path do
           "/start" ->
             %{body: ~s(<a href="slow">Download</a>)}
@@ -200,8 +201,8 @@ defmodule Fluffy.Conformance.DownloadEventTest do
 
     session =
       :playwright
-      |> start_session(base_url: Fluffy.TestServer.base_url())
-      |> visit(TestHTTPFixtures.path(fixture, "/start"))
+      |> start_session(base_url: Server.base_url())
+      |> visit(HTTPFixtures.path(fixture, "/start"))
 
     pending = wait_for(session, Event.download())
     click(session, by_role(:link, name: "Download"))
@@ -228,7 +229,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
     owner = self()
 
     fixture =
-      TestHTTPFixtures.register(fn request ->
+      HTTPFixtures.register(fn request ->
         case request.path do
           "/start" ->
             %{body: ~s(<a href="broken">Download</a>)}
@@ -237,7 +238,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
             %{
               headers: [{"content-disposition", "attachment; filename=broken.txt"}],
               stream: fn conn ->
-                {:ok, _conn} = Plug.Conn.chunk(conn, "partial" <> TestHTTPFixtures.sniff_padding())
+                {:ok, _conn} = Plug.Conn.chunk(conn, "partial" <> HTTPFixtures.sniff_padding())
                 send(owner, {:stream, self()})
 
                 receive do
@@ -252,8 +253,8 @@ defmodule Fluffy.Conformance.DownloadEventTest do
 
     session =
       :playwright
-      |> start_session(base_url: Fluffy.TestServer.base_url())
-      |> visit(TestHTTPFixtures.path(fixture, "/start"))
+      |> start_session(base_url: Server.base_url())
+      |> visit(HTTPFixtures.path(fixture, "/start"))
 
     pending = wait_for(session, Event.download())
     click(session, by_role(:link, name: "Download"))
@@ -276,7 +277,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
 
   defp session(driver) do
     fixture =
-      TestHTTPFixtures.register(fn request ->
+      HTTPFixtures.register(fn request ->
         case request.path do
           "/start" ->
             %{
@@ -309,7 +310,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
       end)
 
     driver
-    |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Fluffy.TestWeb.Endpoint)
-    |> visit(TestHTTPFixtures.path(fixture, "/start"))
+    |> start_session(base_url: Server.base_url(), endpoint: Fluffy.Support.Web.Endpoint)
+    |> visit(HTTPFixtures.path(fixture, "/start"))
   end
 end

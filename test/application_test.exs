@@ -1,5 +1,5 @@
 defmodule Fluffy.ApplicationTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   test "starts the Fluffy supervision tree" do
     assert Process.alive?(Process.whereis(Fluffy.Supervisor))

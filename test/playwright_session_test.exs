@@ -1,11 +1,12 @@
 defmodule Fluffy.PlaywrightSessionTest do
-  use Fluffy.TestCase, async: false
+  use Fluffy.Support.Case, async: false
 
   alias Fluffy.Backend.Playwright, as: PlaywrightBackend
   alias Fluffy.Backend.Playwright.Document
   alias Fluffy.Driver.Playwright, as: PlaywrightDriver
   alias Fluffy.Driver.Registry, as: DriverRegistry
   alias Fluffy.Session
+  alias Fluffy.Support.Server
   alias PlaywrightEx.Frame
   alias PlaywrightEx.Runtime.Heap
 
@@ -23,7 +24,7 @@ defmodule Fluffy.PlaywrightSessionTest do
   end
 
   test "a LiveView visit and reload wait for the browser connection" do
-    session = Fluffy.start_session(:playwright, base_url: Fluffy.TestServer.base_url())
+    session = Fluffy.start_session(:playwright, base_url: Server.base_url())
 
     session = Fluffy.visit(session, "/live/three-heads")
     assert_live_view_connected(session)
@@ -77,7 +78,7 @@ defmodule Fluffy.PlaywrightSessionTest do
   test "LiveView waits leave no handles behind" do
     session =
       :playwright
-      |> Fluffy.start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Fluffy.TestWeb.Endpoint)
+      |> Fluffy.start_session(base_url: Server.base_url(), endpoint: Fluffy.Support.Web.Endpoint)
       |> Fluffy.visit("/live/chamber-map")
       |> Fluffy.click(Fluffy.Locator.by_role(:link, name: "Reveal passage"))
       |> Fluffy.fill(Fluffy.Locator.by_label("Map step"), "patched")

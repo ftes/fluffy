@@ -1,5 +1,5 @@
 defmodule Fluffy.Conformance.AccessibilityExpectationTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
@@ -90,7 +90,7 @@ defmodule Fluffy.Conformance.AccessibilityExpectationTest do
   end
 
   defp with_html(driver, html, fun) do
-    session = session_for_html(driver, html, base_url: Fluffy.TestServer.base_url())
+    session = session_for_html(driver, html, base_url: Fluffy.Support.Server.base_url())
     fun.(session)
   end
 end

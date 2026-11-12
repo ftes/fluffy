@@ -1,4 +1,4 @@
-defmodule Fluffy.TestWeb.ClockLive do
+defmodule Fluffy.Support.Web.ClockLive do
   @moduledoc false
 
   use Phoenix.LiveView

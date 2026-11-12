@@ -1,5 +1,5 @@
 defmodule Fluffy.Conformance.RouteTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
@@ -8,8 +8,9 @@ defmodule Fluffy.Conformance.RouteTest do
 
   alias Fluffy.Event
   alias Fluffy.Playwright
-  alias Fluffy.TestHTTPFixtures
-  alias Fluffy.TestWeb.Endpoint
+  alias Fluffy.Support.HTTPFixtures
+  alias Fluffy.Support.Server
+  alias Fluffy.Support.Web.Endpoint
   alias PlaywrightEx.Route
   alias PlaywrightEx.Test.TestInfo
 
@@ -36,7 +37,7 @@ defmodule Fluffy.Conformance.RouteTest do
       assert_receive {:request, %PlaywrightEx.Request{} = request}
       assert {PlaywrightEx.Request.method(request), PlaywrightEx.Request.post_data(request)} == {"POST", "payload"}
       assert PlaywrightEx.Request.url(request) == url(fixture, "/api")
-      assert fixture |> TestHTTPFixtures.requests() |> Enum.count(&(&1.path == "/api")) == 0
+      assert fixture |> HTTPFixtures.requests() |> Enum.count(&(&1.path == "/api")) == 0
     end
 
     @tag driver: :playwright
@@ -50,7 +51,7 @@ defmodule Fluffy.Conformance.RouteTest do
       end)
 
       assert fetch(session, fixture) == ~s({"name":"server"})
-      assert [%{headers: headers}] = Enum.filter(TestHTTPFixtures.requests(fixture), &(&1.path == "/api"))
+      assert [%{headers: headers}] = Enum.filter(HTTPFixtures.requests(fixture), &(&1.path == "/api"))
       assert {"x-fluffy-routed", "yes"} in headers
     end
 
@@ -66,10 +67,10 @@ defmodule Fluffy.Conformance.RouteTest do
     test "a handler can pass the route on, so the test asserts a loading state and answers it" do
       {session, fixture} = session()
       test = self()
-      route(session, TestHTTPFixtures.path(fixture, "/api/prophet"), &send(test, {:held, &1}))
+      route(session, HTTPFixtures.path(fixture, "/api/prophet"), &send(test, {:held, &1}))
 
       session
-      |> visit(TestHTTPFixtures.path(fixture, "/prophet"))
+      |> visit(HTTPFixtures.path(fixture, "/prophet"))
       |> expect("Loading the Daily Prophet" |> by_text() |> to_be_visible())
 
       assert_receive {:held, %Route{} = held}, 5_000
@@ -105,7 +106,7 @@ defmodule Fluffy.Conformance.RouteTest do
     @tag driver: :playwright
     test "a glob resolves against the session's base_url" do
       {session, fixture} = session()
-      route(session, TestHTTPFixtures.path(fixture, "/api"), fn route -> Route.fulfill!(route, body: "relative") end)
+      route(session, HTTPFixtures.path(fixture, "/api"), fn route -> Route.fulfill!(route, body: "relative") end)
       assert fetch(session, fixture) == "relative"
     end
   end
@@ -246,12 +247,12 @@ defmodule Fluffy.Conformance.RouteTest do
 
     @tag driver: :playwright
     test "that returns without answering leaves the action to fail at its own timeout" do
-      session = start_session(:playwright, base_url: Fluffy.TestServer.base_url(), timeout: 500)
-      fixture = TestHTTPFixtures.register(fn _request -> %{body: "<h1>Never</h1>"} end)
+      session = start_session(:playwright, base_url: Server.base_url(), timeout: 500)
+      fixture = HTTPFixtures.register(fn _request -> %{body: "<h1>Never</h1>"} end)
       route(session, "**/never", fn _route -> :ok end)
 
       started = System.monotonic_time(:millisecond)
-      error = assert_raise Fluffy.OperationError, fn -> visit(session, TestHTTPFixtures.path(fixture, "/never")) end
+      error = assert_raise Fluffy.OperationError, fn -> visit(session, HTTPFixtures.path(fixture, "/never")) end
       assert %PlaywrightEx.TimeoutError{} = error.cause
       assert System.monotonic_time(:millisecond) - started < 5_000
     end
@@ -382,7 +383,7 @@ defmodule Fluffy.Conformance.RouteTest do
       end)
 
       session
-      |> visit(TestHTTPFixtures.path(fixture, "/fulfilled"))
+      |> visit(HTTPFixtures.path(fixture, "/fulfilled"))
       |> expect(:heading |> by_role(name: "Fulfilled visit") |> to_be_visible())
       |> page_to_have_url_ok(url(fixture, "/fulfilled"))
     end
@@ -393,14 +394,14 @@ defmodule Fluffy.Conformance.RouteTest do
       {session, fixture} = session()
       route(session, "**/blocked", fn route -> Route.abort!(route) end)
 
-      error = assert_raise Fluffy.OperationError, fn -> visit(session, TestHTTPFixtures.path(fixture, "/blocked")) end
+      error = assert_raise Fluffy.OperationError, fn -> visit(session, HTTPFixtures.path(fixture, "/blocked")) end
       assert %PlaywrightEx.PlaywrightError{} = error.cause
     end
 
     @tag driver: :playwright
     test "a route over every request leaves a LiveView working" do
       session =
-        start_session(:playwright, base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+        start_session(:playwright, base_url: Server.base_url(), endpoint: Endpoint)
 
       route(session, "**/*", &Route.continue!/1)
 
@@ -459,7 +460,7 @@ defmodule Fluffy.Conformance.RouteTest do
 
   defp page_to_have_url_ok(session, url), do: expect(session, page_to_have_url(url))
 
-  defp url(fixture, suffix), do: TestHTTPFixtures.url(fixture, suffix)
+  defp url(fixture, suffix), do: HTTPFixtures.url(fixture, suffix)
 
   defp start_held_fetch(session, fixture) do
     Playwright.evaluate(
@@ -477,7 +478,7 @@ defmodule Fluffy.Conformance.RouteTest do
     test = self()
 
     fixture =
-      TestHTTPFixtures.register(fn request ->
+      HTTPFixtures.register(fn request ->
         case request.path do
           "/held" ->
             send(test, {:held, self()})
@@ -520,8 +521,8 @@ defmodule Fluffy.Conformance.RouteTest do
 
     session =
       :playwright
-      |> start_session(base_url: Fluffy.TestServer.base_url())
-      |> visit(TestHTTPFixtures.path(fixture, "/start"))
+      |> start_session(base_url: Server.base_url())
+      |> visit(HTTPFixtures.path(fixture, "/start"))
 
     {session, fixture}
   end

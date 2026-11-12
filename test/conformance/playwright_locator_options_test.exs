@@ -1,11 +1,11 @@
 defmodule Fluffy.Conformance.PlaywrightLocatorOptionsTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.TestWeb.Endpoint
+  alias Fluffy.Support.Web.Endpoint
 
   @states """
   <button aria-pressed="true">Bold</button>
@@ -30,7 +30,7 @@ defmodule Fluffy.Conformance.PlaywrightLocatorOptionsTest do
   @tag driver: :playwright
   test "role states compile into the Playwright role selector" do
     :playwright
-    |> session_for_html(@states, base_url: Fluffy.TestServer.base_url())
+    |> session_for_html(@states, base_url: Fluffy.Support.Server.base_url())
     |> expect(to_have_count(by_role(:button, pressed: true), 1))
     |> expect(to_have_count(by_role(:button, name: "Bold", pressed: false), 0))
     |> expect(to_have_count(by_role(:button, name: "Locked", disabled: true), 1))

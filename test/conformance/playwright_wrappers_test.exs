@@ -1,5 +1,5 @@
 defmodule Fluffy.Conformance.PlaywrightWrappersTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
@@ -12,7 +12,7 @@ defmodule Fluffy.Conformance.PlaywrightWrappersTest do
 
   @moduletag driver: :playwright
 
-  defp chamber, do: Fluffy.TestServer.base_url() <> "/chamber"
+  defp chamber, do: Fluffy.Support.Server.base_url() <> "/chamber"
 
   test "dblclick fires a double click and passes options through" do
     html = ~s|<button ondblclick="this.textContent = event.shiftKey ? 'shift' : 'twice'">Cast</button>|

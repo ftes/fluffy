@@ -1,5 +1,5 @@
 defmodule Fluffy.Conformance.FileInputActionTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
@@ -7,13 +7,14 @@ defmodule Fluffy.Conformance.FileInputActionTest do
 
   alias Fluffy.FilePayload
   alias Fluffy.Playwright
-  alias Fluffy.TestHTTPFixtures
+  alias Fluffy.Support.HTTPFixtures
+  alias Fluffy.Support.Server
 
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
     test "selects one local file and submits its multipart part with #{driver}" do
       fixture =
-        TestHTTPFixtures.register_sequence([
+        HTTPFixtures.register_sequence([
           %{
             body:
               html("""
@@ -33,13 +34,13 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       session = start_test_session(unquote(driver))
 
       session
-      |> visit(TestHTTPFixtures.path(fixture, "/upload/start"))
+      |> visit(HTTPFixtures.path(fixture, "/upload/start"))
       |> fill(by_label("Title"), "Release notes")
       |> set_input_files(by_label("Attachment"), file)
       |> click(by_role(:button, name: "Save"))
       |> expect("Uploaded" |> by_text() |> to_be_visible())
 
-      [_source, submission] = TestHTTPFixtures.requests(fixture)
+      [_source, submission] = HTTPFixtures.requests(fixture)
 
       assert {"content-type", "multipart/form-data; boundary=" <> boundary} =
                List.keyfind(submission.headers, "content-type", 0)
@@ -72,12 +73,12 @@ defmodule Fluffy.Conformance.FileInputActionTest do
 
       unquote(driver)
       |> start_test_session()
-      |> visit(TestHTTPFixtures.path(fixture, "/upload/start"))
+      |> visit(HTTPFixtures.path(fixture, "/upload/start"))
       |> set_input_files(by_label("Attachment"), payload)
       |> click(by_role(:button, name: "Save"))
       |> expect("Uploaded" |> by_text() |> to_be_visible())
 
-      [_source, submission] = TestHTTPFixtures.requests(fixture)
+      [_source, submission] = HTTPFixtures.requests(fixture)
 
       assert submission.body =~
                ~s(Content-Disposition: form-data; name="attachment"; filename="generated.csv"\r\n) <>
@@ -92,12 +93,12 @@ defmodule Fluffy.Conformance.FileInputActionTest do
 
       unquote(driver)
       |> start_test_session()
-      |> visit(TestHTTPFixtures.path(fixture, "/upload/start"))
+      |> visit(HTTPFixtures.path(fixture, "/upload/start"))
       |> set_input_files(by_label("Attachment"), payload)
       |> click(by_role(:button, name: "Save"))
       |> expect("Uploaded" |> by_text() |> to_be_visible())
 
-      [_source, submission] = TestHTTPFixtures.requests(fixture)
+      [_source, submission] = HTTPFixtures.requests(fixture)
       assert submission.body =~ "Content-Type: text/csv\r\n"
     end
 
@@ -112,12 +113,12 @@ defmodule Fluffy.Conformance.FileInputActionTest do
 
       unquote(driver)
       |> start_test_session()
-      |> visit(TestHTTPFixtures.path(fixture, "/upload/start"))
+      |> visit(HTTPFixtures.path(fixture, "/upload/start"))
       |> set_input_files(by_label("Attachment"), payload)
       |> click(by_role(:button, name: "Save"))
       |> expect("Uploaded" |> by_text() |> to_be_visible())
 
-      [_source, submission] = TestHTTPFixtures.requests(fixture)
+      [_source, submission] = HTTPFixtures.requests(fixture)
       assert submission.body =~ "Content-Type: text/plain\r\n"
       refute submission.body =~ "Content-Type: TEXT/PLAIN\r\n"
     end
@@ -133,12 +134,12 @@ defmodule Fluffy.Conformance.FileInputActionTest do
 
       unquote(driver)
       |> start_test_session()
-      |> visit(TestHTTPFixtures.path(fixture, "/upload/start"))
+      |> visit(HTTPFixtures.path(fixture, "/upload/start"))
       |> set_input_files(by_label("Attachment"), payload)
       |> click(by_role(:button, name: "Save"))
       |> expect("Uploaded" |> by_text() |> to_be_visible())
 
-      [_source, submission] = TestHTTPFixtures.requests(fixture)
+      [_source, submission] = HTTPFixtures.requests(fixture)
       assert submission.body =~ "Content-Type: application/octet-stream\r\n"
       refute submission.body =~ "X-Injected"
     end
@@ -154,12 +155,12 @@ defmodule Fluffy.Conformance.FileInputActionTest do
 
       unquote(driver)
       |> start_test_session()
-      |> visit(TestHTTPFixtures.path(fixture, "/upload/start"))
+      |> visit(HTTPFixtures.path(fixture, "/upload/start"))
       |> set_input_files(by_label("Attachment"), payload)
       |> click(by_role(:button, name: "Save"))
       |> expect("Uploaded" |> by_text() |> to_be_visible())
 
-      [_source, submission] = TestHTTPFixtures.requests(fixture)
+      [_source, submission] = HTTPFixtures.requests(fixture)
       assert submission.body =~ ~s(filename="homework%22%0D%0Anext.txt")
       refute submission.body =~ "\r\nnext.txt"
     end
@@ -170,12 +171,12 @@ defmodule Fluffy.Conformance.FileInputActionTest do
 
       unquote(driver)
       |> start_test_session()
-      |> visit(TestHTTPFixtures.path(fixture, "/upload/start"))
+      |> visit(HTTPFixtures.path(fixture, "/upload/start"))
       |> set_input_files(by_label("Attachments"), files)
       |> click(by_role(:button, name: "Save"))
       |> expect("Uploaded" |> by_text() |> to_be_visible())
 
-      [_source, submission] = TestHTTPFixtures.requests(fixture)
+      [_source, submission] = HTTPFixtures.requests(fixture)
 
       assert_file_parts_in_order(submission.body, files)
     end
@@ -190,12 +191,12 @@ defmodule Fluffy.Conformance.FileInputActionTest do
 
       unquote(driver)
       |> start_test_session()
-      |> visit(TestHTTPFixtures.path(fixture, "/upload/start"))
+      |> visit(HTTPFixtures.path(fixture, "/upload/start"))
       |> set_input_files(by_label("Attachments"), payloads)
       |> click(by_role(:button, name: "Save"))
       |> expect("Uploaded" |> by_text() |> to_be_visible())
 
-      [_source, submission] = TestHTTPFixtures.requests(fixture)
+      [_source, submission] = HTTPFixtures.requests(fixture)
       first = :binary.match(submission.body, ~s(filename="first.txt"))
       second = :binary.match(submission.body, ~s(filename="second.bin"))
       assert elem(first, 0) < elem(second, 0)
@@ -209,13 +210,13 @@ defmodule Fluffy.Conformance.FileInputActionTest do
 
       unquote(driver)
       |> start_test_session()
-      |> visit(TestHTTPFixtures.path(fixture, "/upload/start"))
+      |> visit(HTTPFixtures.path(fixture, "/upload/start"))
       |> set_input_files(by_label("Attachments"), files)
       |> set_input_files(by_label("Attachments"), [])
       |> click(by_role(:button, name: "Save"))
       |> expect("Uploaded" |> by_text() |> to_be_visible())
 
-      [_source, submission] = TestHTTPFixtures.requests(fixture)
+      [_source, submission] = HTTPFixtures.requests(fixture)
 
       assert String.contains?(submission.body, ~s(name="attachment"; filename=""))
       assert occurrence_count(submission.body, ~s(name="attachment")) == 1
@@ -225,7 +226,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
 
     test "only Playwright discards its selected FileList on reset with #{driver}" do
       fixture =
-        TestHTTPFixtures.register_sequence([
+        HTTPFixtures.register_sequence([
           %{
             body:
               html("""
@@ -243,13 +244,13 @@ defmodule Fluffy.Conformance.FileInputActionTest do
 
       unquote(driver)
       |> start_test_session()
-      |> visit(TestHTTPFixtures.path(fixture, "/upload/start"))
+      |> visit(HTTPFixtures.path(fixture, "/upload/start"))
       |> set_input_files(by_label("Attachment"), file)
       |> click(by_role(:button, name: "Reset"))
       |> click(by_role(:button, name: "Save"))
       |> expect("Uploaded" |> by_text() |> to_be_visible())
 
-      [_source, submission] = TestHTTPFixtures.requests(fixture)
+      [_source, submission] = HTTPFixtures.requests(fixture)
 
       if unquote(driver) == :playwright do
         assert submission.body =~ ~s(name="attachment"; filename="")
@@ -268,7 +269,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       session =
         unquote(driver)
         |> start_test_session()
-        |> visit(TestHTTPFixtures.path(fixture, "/upload/start"))
+        |> visit(HTTPFixtures.path(fixture, "/upload/start"))
         |> set_input_files(by_label("Attachment"), file)
 
       error =
@@ -285,7 +286,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       |> click(by_role(:button, name: "Save"))
       |> expect("Uploaded" |> by_text() |> to_be_visible())
 
-      [_source, submission] = TestHTTPFixtures.requests(fixture)
+      [_source, submission] = HTTPFixtures.requests(fixture)
       assert_file_parts_in_order(submission.body, [file])
     end
 
@@ -297,19 +298,19 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       session = start_test_session(unquote(driver))
 
       session
-      |> visit(TestHTTPFixtures.path(fixture, "/upload/start"))
+      |> visit(HTTPFixtures.path(fixture, "/upload/start"))
       |> set_input_files(by_label("Attachment"), file)
       |> mutate_file_control(unquote(driver), :disable)
       |> click(by_role(:button, name: "Save"))
       |> expect("Uploaded" |> by_text() |> to_be_visible())
 
-      assert_file_omitted(TestHTTPFixtures.requests(fixture), file)
+      assert_file_omitted(HTTPFixtures.requests(fixture), file)
     end
 
     @tag driver: driver
     test "can select a disabled file input but omits it from submission with #{driver}" do
       fixture =
-        TestHTTPFixtures.register_sequence([
+        HTTPFixtures.register_sequence([
           %{
             body:
               html("""
@@ -326,12 +327,12 @@ defmodule Fluffy.Conformance.FileInputActionTest do
 
       unquote(driver)
       |> start_test_session()
-      |> visit(TestHTTPFixtures.path(fixture, "/upload/start"))
+      |> visit(HTTPFixtures.path(fixture, "/upload/start"))
       |> set_input_files(by_label("Attachment"), file)
       |> click(by_role(:button, name: "Save"))
       |> expect("Uploaded" |> by_text() |> to_be_visible())
 
-      assert_file_omitted(TestHTTPFixtures.requests(fixture), file)
+      assert_file_omitted(HTTPFixtures.requests(fixture), file)
     end
 
     @tag driver: driver
@@ -342,13 +343,13 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       session = start_test_session(unquote(driver))
 
       session
-      |> visit(TestHTTPFixtures.path(fixture, "/upload/start"))
+      |> visit(HTTPFixtures.path(fixture, "/upload/start"))
       |> set_input_files(by_label("Attachment"), file)
       |> mutate_file_control(unquote(driver), :remove)
       |> click(by_role(:button, name: "Save"))
       |> expect("Uploaded" |> by_text() |> to_be_visible())
 
-      assert_file_omitted(TestHTTPFixtures.requests(fixture), file)
+      assert_file_omitted(HTTPFixtures.requests(fixture), file)
     end
 
     @tag driver: driver
@@ -359,13 +360,13 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       session = start_test_session(unquote(driver))
 
       session
-      |> visit(TestHTTPFixtures.path(fixture, "/upload/start"))
+      |> visit(HTTPFixtures.path(fixture, "/upload/start"))
       |> set_input_files(by_label("Attachment"), file)
       |> mutate_file_control(unquote(driver), :replace)
       |> click(by_role(:button, name: "Save"))
       |> expect("Uploaded" |> by_text() |> to_be_visible())
 
-      [_source, submission] = TestHTTPFixtures.requests(fixture)
+      [_source, submission] = HTTPFixtures.requests(fixture)
 
       assert submission.body =~
                ~s(Content-Disposition: form-data; name="attachment"; filename=""\r\n) <>
@@ -390,12 +391,12 @@ defmodule Fluffy.Conformance.FileInputActionTest do
         session = start_test_session(unquote(driver))
 
         session
-        |> visit(TestHTTPFixtures.path(fixture, "/upload/start"))
+        |> visit(HTTPFixtures.path(fixture, "/upload/start"))
         |> set_input_files(by_label("Attachment"), file)
         |> click(by_role(:button, name: "Save"))
         |> expect("Redirected upload" |> by_text() |> to_be_visible())
 
-        [_source, submission, redirected] = TestHTTPFixtures.requests(fixture)
+        [_source, submission, redirected] = HTTPFixtures.requests(fixture)
         assert submission.method == "POST"
         assert submission.body =~ "filename=\"fluffy-upload.txt\""
         assert submission.body =~ File.read!(file)
@@ -512,7 +513,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
         session_for_html(
           unquote(driver),
           ~s(<label>Attachment <input name="attachment" type="text"></label>),
-          base_url: Fluffy.TestServer.base_url()
+          base_url: Server.base_url()
         )
 
       error =
@@ -527,8 +528,8 @@ defmodule Fluffy.Conformance.FileInputActionTest do
 
   defp start_test_session(driver) do
     start_session(driver,
-      base_url: Fluffy.TestServer.base_url(),
-      endpoint: Fluffy.TestWeb.Endpoint
+      base_url: Server.base_url(),
+      endpoint: Fluffy.Support.Web.Endpoint
     )
   end
 
@@ -541,7 +542,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
   end
 
   defp upload_fixture do
-    TestHTTPFixtures.register_sequence([
+    HTTPFixtures.register_sequence([
       %{
         body:
           html("""
@@ -556,7 +557,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
   end
 
   defp multiple_upload_fixture do
-    TestHTTPFixtures.register_sequence([
+    HTTPFixtures.register_sequence([
       %{
         body:
           html("""
@@ -571,7 +572,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
   end
 
   defp redirect_upload_fixture(status) do
-    TestHTTPFixtures.register_sequence([
+    HTTPFixtures.register_sequence([
       %{
         body:
           html("""

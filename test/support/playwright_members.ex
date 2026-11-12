@@ -1,6 +1,6 @@
-defmodule Fluffy.PlaywrightMembers do
+defmodule Fluffy.Support.PlaywrightMembers do
   # How Fluffy covers each member of the PlaywrightEx facade it builds on, checked
-  # against the installed PlaywrightEx by `Fluffy.PlaywrightMembersTest`. Review it on a
+  # against the installed PlaywrightEx by `Fluffy.Support.PlaywrightMembersTest`. Review it on a
   # PlaywrightEx upgrade: new members are unclassified, removed ones stale.
   #
   #   * `:wrapped` - a Fluffy function or value field of the same name in `counterparts/1`.
