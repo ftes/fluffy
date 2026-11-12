@@ -101,6 +101,7 @@ defmodule Fluffy.Support.PlaywrightMembers do
           {[:to_have_url], {:renamed, {Fluffy.Expect, :page_to_have_url, 2}}},
           {[:to_be_ok], {:na, "APIResponse assertion"}},
           {[:soft], {:unwrap, "gap: soft matchers on the native locator of Fluffy.Playwright.unwrap/3"}},
+          {[:message], {:unwrap, "gap: custom expect messages on the native locator of Fluffy.Playwright.unwrap/3"}},
           {[:to_pass], @native_retry},
           {[:poll], @native_retry}
         ]),
