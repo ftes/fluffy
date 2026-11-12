@@ -7,7 +7,10 @@ defmodule Fluffy.Event.Subscription do
   alias Fluffy.SessionRuntime
 
   def start(session, event, source, mode, handler, deadline) do
-    options = {self(), session, event, source, mode, handler, deadline}
+    # Handlers and predicates run as the caller's: `$callers` lets them use its Ecto
+    # sandbox connection and mocks, as in a `Task`.
+    callers = [self() | Process.get(:"$callers", [])]
+    options = {callers, session, event, source, mode, handler, deadline}
     start = if mode == :wait, do: &GenServer.start/3, else: &GenServer.start_link/3
 
     case start.(__MODULE__, options, []) do
@@ -31,7 +34,8 @@ defmodule Fluffy.Event.Subscription do
   end
 
   @impl true
-  def init({owner, session, event, source, mode, handler, deadline}) do
+  def init({[owner | _] = callers, session, event, source, mode, handler, deadline}) do
+    Process.put(:"$callers", callers)
     Process.flag(:trap_exit, true)
     Process.monitor(owner)
     runtime_monitor = Process.monitor(session.runtime)

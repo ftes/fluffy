@@ -6,6 +6,7 @@ defmodule Fluffy.EctoSandboxConformanceTest do
   import Fluffy.Expect
   import Fluffy.Locator
 
+  alias Fluffy.Event
   alias Fluffy.TestRepo
   alias Fluffy.TestWeb.Endpoint
 
@@ -38,6 +39,19 @@ defmodule Fluffy.EctoSandboxConformanceTest do
              "url => fetch(url).then(response => response.json())",
              Fluffy.TestServer.base_url() <> "/fluffy-sandbox-route"
            ) == %{"value" => value}
+  end
+
+  test "event handlers and wait predicates run inside the test's sandbox", %{value: value} do
+    test = self()
+    read = fn -> TestRepo.query!("SELECT value FROM fluffy_records").rows end
+    session = start_session(:playwright, base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+
+    on(session, Event.console(), fn _message -> send(test, {:handled, read.()}) end)
+    wait = wait_for(session, Event.console(fn _message -> read.() == [[value]] end))
+    Fluffy.Playwright.evaluate(session, "() => console.log('Hedwig')")
+
+    assert %PlaywrightEx.ConsoleMessage{} = await(wait)
+    assert_receive {:handled, [[^value]]}
   end
 
   test "a request after set_extra_http_headers still reaches the sandboxed connection", %{value: value} do

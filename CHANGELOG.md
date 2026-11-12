@@ -24,6 +24,7 @@ Upgrading from 0.8? The [upgrade guide](docs/upgrading.md) lists the net changes
 
 ### Fixed
 
+- Handlers of `on`/`once` and `wait_for` predicates run with the registering process in `$callers`, as a `Task` does, so they can use the test's Ecto sandbox connection and mocks in async tests.
 - On Phoenix, a form a LiveView renders with `phx-trigger-action` as it connects, such as from `connected?(socket)` in `mount`, is submitted as LiveView's client does, instead of leaving the page on the LiveView. The submission counts toward the redirect limit like a mount redirect.
 - On Phoenix, a `phx-trigger-action` form is also submitted from a render the server pushes, such as from `handle_info` or after `push_patch`, as LiveView's client does; a triggered form that downloads leaves the page inert.
 - The browsers and the Playwright driver close before `mix test` halts the VM, and Fluffy waits for the driver to exit. The driver used to exit afterwards and could leave the shell's terminal in the wrong mode, so ↑ printed `OA` ([#213](https://github.com/ftes/fluffy/issues/213)).

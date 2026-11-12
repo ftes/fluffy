@@ -160,7 +160,8 @@ Repeated registrations require repeated removal calls.
 Each listener handles matching events in delivery order. Different listeners run
 independently; relative ordering is unspecified. Handlers and predicates execute
 outside the session runtime and browser connection, linked to the registering
-caller so unhandled failures fail that caller. Registration completes before
+caller so unhandled failures fail that caller. They have that caller in `$callers`,
+so Ecto sandbox queries and mocks work there as in the test. Registration completes before
 returning. Listeners have no deadline and are cleaned up when removed or when
 their owner or session closes.
 
