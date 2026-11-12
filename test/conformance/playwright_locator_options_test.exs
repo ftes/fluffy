@@ -53,13 +53,14 @@ defmodule Fluffy.Conformance.PlaywrightLocatorOptionsTest do
     assert_raise NimbleOptions.ValidationError, ~r/:level/, fn -> by_role(:heading, level: "2") end
     assert_raise NimbleOptions.ValidationError, ~r/:has_text/, fn -> filter(by_css("li"), has_text: 1) end
 
-    # Text options take an Elixir regex, not a PlaywrightEx one.
+    # Text options take a string, a Regex or a PlaywrightEx.RegExp; a Regex becomes a RegExp.
     for {key, locator} <- [description: &by_role(:button, description: &1), name: &by_role(:button, name: &1)] do
-      assert_raise NimbleOptions.ValidationError, ~r/#{key}/, fn -> locator.(PlaywrightEx.RegExp.new("x")) end
+      assert_raise NimbleOptions.ValidationError, ~r/#{key}/, fn -> locator.(:x) end
+      assert locator.(~r/x/i) == locator.(PlaywrightEx.RegExp.new("x", "i"))
     end
 
     assert inspect(by_role(:button, name: ~r/x/, pressed: true)) ==
-             "#Fluffy.Locator<by_role(:button, name: ~r/x/, pressed: true)>"
+             "#Fluffy.Locator<by_role(:button, name: #PlaywrightEx.RegExp</x/>, pressed: true)>"
   end
 
   for driver <- [:static, :live] do

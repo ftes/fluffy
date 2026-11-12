@@ -41,6 +41,21 @@ defmodule Fluffy.Conformance.PageURLTest do
     end
 
     @tag driver: driver
+    test "a regex is a JS RegExp, and PCRE-only syntax raises, with #{driver}", %{driver: driver} do
+      session =
+        driver
+        |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+        |> visit("/chamber")
+        |> expect(page_to_have_url(PlaywrightEx.RegExp.new("/CHAMBER$", "i")))
+        |> expect(page_to_have_url(~r{/CHAMBER$}, ignore_case: true))
+        |> expect(not_(page_to_have_url(~r{/CHAMBER$}i, ignore_case: false)))
+
+      assert_raise ArgumentError, "\\z is not JS RegExp syntax: ~r/\\/chamber\\z/", fn ->
+        expect(session, page_to_have_url(~r{/chamber\z}))
+      end
+    end
+
+    @tag driver: driver
     test "a string matches a Live document's complete URL with #{driver}", %{driver: driver} do
       driver
       |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)

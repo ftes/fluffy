@@ -239,13 +239,13 @@ defmodule Fluffy.Options do
   ]
 
   @text_or_regex [
-    type: {:or, [:string, {:struct, Regex}]},
-    type_spec: quote(do: String.t() | Regex.t()),
-    type_doc: "`t:String.t/0` | `t:Regex.t/0`"
+    type: {:custom, __MODULE__, :text_or_reg_exp, []},
+    type_spec: quote(do: String.t() | Regex.t() | PlaywrightEx.RegExp.t()),
+    type_doc: "`t:String.t/0` | `t:Regex.t/0` | `t:PlaywrightEx.RegExp.t/0`"
   ]
 
   # Fluffy compiles locator selectors itself, so it validates what PlaywrightEx would.
-  # Text options take a string or an Elixir regex, like `name:` and `has_text:`.
+  # Text options take a string or a regex, like `name:` and `has_text:`.
   @playwright_locator_types [
     checked: :boolean,
     description: @text_or_regex,
@@ -363,6 +363,12 @@ defmodule Fluffy.Options do
   @type setup_option :: unquote(NimbleOptions.option_typespec(@setup_schema))
   @type session_option :: unquote(NimbleOptions.option_typespec(@session_schema))
   @type playwright_option :: unquote(NimbleOptions.option_typespec(@playwright_schema))
+
+  @doc false
+  # A string or a regex; a `Regex` becomes its `PlaywrightEx.RegExp`, raising on PCRE-only syntax.
+  def text_or_reg_exp(value) when is_binary(value) or is_struct(value, PlaywrightEx.RegExp), do: {:ok, value}
+  def text_or_reg_exp(%Regex{} = value), do: {:ok, PlaywrightEx.RegExp.new(value)}
+  def text_or_reg_exp(value), do: {:error, "expected a string or a regex, got: #{inspect(value)}"}
 
   @doc false
   def setup_schema, do: @setup_schema

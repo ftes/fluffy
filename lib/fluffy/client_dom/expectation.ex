@@ -183,8 +183,8 @@ defmodule Fluffy.ClientDOM.Expectation do
     end
   end
 
-  defp text_matches?(%Regex{} = expected, actual, options) do
-    expected |> Expect.Internal.ignore_case(options[:ignore_case]) |> Regex.match?(actual)
+  defp text_matches?(%PlaywrightEx.RegExp{} = expected, actual, options) do
+    expected |> Expect.Internal.ignore_case(options[:ignore_case]) |> Expect.Internal.matches?(actual)
   end
 
   defp text_matches?(expected, actual, options) when is_binary(expected) do

@@ -6,6 +6,7 @@ defmodule Fluffy.Locator.Static do
   alias Fluffy.Locator
   # StringUtils is internal to PlaywrightEx, which is pinned.
   alias PlaywrightEx.Isomorphic.StringUtils
+  alias PlaywrightEx.RegExp
 
   @labelled_control_selector Enum.join(Semantics.labelable_tags(), ", ")
 
@@ -167,8 +168,8 @@ defmodule Fluffy.Locator.Static do
   defp accessible_name_matches?(_aria, _node, nil, _exact?), do: true
 
   # As upstream, a regular expression sees the normalized accessible name.
-  defp accessible_name_matches?(aria, node, %Regex{} = expected, _exact?),
-    do: Regex.match?(expected, aria |> Aria.name(node) |> StringUtils.normalize_white_space())
+  defp accessible_name_matches?(aria, node, %RegExp{} = expected, _exact?),
+    do: expected |> RegExp.compile!() |> Regex.match?(aria |> Aria.name(node) |> StringUtils.normalize_white_space())
 
   defp accessible_name_matches?(aria, node, expected, exact?) do
     aria |> Aria.name(node) |> text_matches?(expected, exact?)
@@ -268,7 +269,7 @@ defmodule Fluffy.Locator.Static do
   defp text_matches?(nil, _expected, _exact?), do: false
 
   # As upstream, a regular expression ignores `exact?` and sees the text as is.
-  defp text_matches?(actual, %Regex{} = expected, _exact?), do: Regex.match?(expected, actual)
+  defp text_matches?(actual, %RegExp{} = expected, _exact?), do: expected |> RegExp.compile!() |> Regex.match?(actual)
 
   defp text_matches?(actual, expected, true),
     do: StringUtils.normalize_white_space(actual) == StringUtils.normalize_white_space(expected)

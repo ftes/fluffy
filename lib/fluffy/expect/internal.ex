@@ -9,9 +9,18 @@ defmodule Fluffy.Expect.Internal do
   # StringUtils is internal to PlaywrightEx, which is pinned.
   alias PlaywrightEx.Isomorphic.StringUtils
   alias PlaywrightEx.Isomorphic.UrlMatch
+  alias PlaywrightEx.RegExp
 
-  @doc "Whether `actual` equals `expected` or matches its regular expression."
-  def matches?(%Regex{} = expected, actual) when is_binary(actual), do: Regex.match?(expected, actual)
+  @doc """
+  An expected text value as every driver matches it: an Elixir `Regex` becomes the
+  `PlaywrightEx.RegExp` that Playwright runs, raising `ArgumentError` on PCRE-only syntax.
+  """
+  def reg_exp(%Regex{} = expected), do: RegExp.new(expected)
+  def reg_exp(expected), do: expected
+
+  @doc "Whether `actual` equals `expected` or matches its regular expression, with JS semantics."
+  def matches?(%RegExp{} = expected, actual) when is_binary(actual),
+    do: expected |> RegExp.compile!() |> Regex.match?(actual)
 
   def matches?(expected, actual), do: actual == expected
 
@@ -29,8 +38,8 @@ defmodule Fluffy.Expect.Internal do
         expected = UrlMatch.construct_url_based_on_base_url(base_url, expected)
         if ignore_case, do: String.downcase(expected) == String.downcase(url), else: expected == url
 
-      is_struct(expected, Regex) ->
-        Regex.match?(ignore_case(expected, ignore_case), url)
+      is_struct(expected, RegExp) ->
+        matches?(ignore_case(expected, ignore_case), url)
 
       true ->
         url = if ignore_case, do: String.downcase(url), else: url
@@ -44,21 +53,17 @@ defmodule Fluffy.Expect.Internal do
   Applies `ignore_case:` to a regular expression. It takes precedence over the expression's
   own `i` flag, as in PlaywrightEx.
   """
-  def ignore_case(%Regex{} = expected, nil), do: expected
+  def ignore_case(%RegExp{} = expected, nil), do: expected
 
-  # Prefixing an inline flag would break a source that must start with a PCRE verb such as `(*UCP)`.
-  def ignore_case(%Regex{} = expected, ignore_case) do
-    options = List.delete(Regex.opts(expected), :caseless)
-    options = if ignore_case, do: [:caseless | options], else: options
-    Regex.compile!(Regex.source(expected), options)
-  end
+  def ignore_case(%RegExp{flags: flags} = expected, ignore_case),
+    do: RegExp.new(expected, String.replace(flags, "i", "") <> if(ignore_case, do: "i", else: ""))
 
   @doc "Whether a page title matches `expected`, comparing normalized whitespace."
   def title_matches?(expected, actual) when is_binary(actual) do
     actual = StringUtils.normalize_white_space(actual)
 
     case expected do
-      %Regex{} -> matches?(expected, actual)
+      %RegExp{} -> matches?(expected, actual)
       expected when is_binary(expected) -> StringUtils.normalize_white_space(expected) == actual
     end
   end
@@ -130,6 +135,7 @@ defmodule Fluffy.Expect.Internal do
   defp locator_matcher_description(:in_viewport, ratio: ratio), do: "to be in viewport with ratio #{ratio}"
   defp locator_matcher_description(:css, {name, value, _options}), do: "to have CSS #{name} #{inspect(value)}"
   defp locator_matcher_description(:js_property, {name, value}), do: "to have JS property #{name} #{inspect(value)}"
+
   defp locator_matcher_description(:screenshot, options), do: "to match the screenshot at #{inspect(options[:path])}"
 
   defp locator_matcher_description(:aria_snapshot, {nil, path: path}),

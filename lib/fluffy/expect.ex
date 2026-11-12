@@ -27,6 +27,9 @@ defmodule Fluffy.Expect do
 
   @dialyzer {:nowarn_function, expect: 3}
 
+  # An Elixir `Regex` is converted to the `PlaywrightEx.RegExp` it stands for (`text_values!/1`).
+  defguardp is_text(value) when is_binary(value) or is_struct(value, Regex) or is_struct(value, PlaywrightEx.RegExp)
+
   @type target :: {:locator, Locator.t()} | :page
 
   @type kind ::
@@ -61,7 +64,7 @@ defmodule Fluffy.Expect do
           | :values
           | :visible
 
-  @type text_expectation :: String.t() | Regex.t()
+  @type text_expectation :: String.t() | Regex.t() | PlaywrightEx.RegExp.t()
 
   @type t :: %__MODULE__{
           target: target(),
@@ -257,10 +260,9 @@ defmodule Fluffy.Expect do
   #{NimbleOptions.docs(Options.expectation_schema(:to_have_css))}
   """
   @spec to_have_css(Locator.t(), String.t(), text_expectation(), [to_have_css_option()]) :: t()
-  def to_have_css(%Locator{} = locator, name, value, options \\ [])
-      when is_binary(name) and (is_binary(value) or is_struct(value, Regex)) do
+  def to_have_css(%Locator{} = locator, name, value, options \\ []) when is_binary(name) and is_text(value) do
     {timeout, matching} = Options.split_expectation!(:to_have_css, options)
-    Internal.new({:locator, locator}, :css, {name, value, matching}, timeout)
+    Internal.new({:locator, locator}, :css, {name, text_values!(value), matching}, timeout)
   end
 
   @doc group: "Locator assertions"
@@ -336,8 +338,7 @@ defmodule Fluffy.Expect do
   #{NimbleOptions.docs(Options.expectation_schema(:to_have_accessible_name))}
   """
   @spec to_have_accessible_name(Locator.t(), text_expectation(), [to_have_accessible_name_option()]) :: t()
-  def to_have_accessible_name(%Locator{} = locator, expected, options \\ [])
-      when is_binary(expected) or is_struct(expected, Regex) do
+  def to_have_accessible_name(%Locator{} = locator, expected, options \\ []) when is_text(expected) do
     text_expectation(:to_have_accessible_name, locator, :accessible_name, expected, options)
   end
 
@@ -352,8 +353,7 @@ defmodule Fluffy.Expect do
   #{NimbleOptions.docs(Options.expectation_schema(:to_have_accessible_description))}
   """
   @spec to_have_accessible_description(Locator.t(), text_expectation(), [to_have_accessible_description_option()]) :: t()
-  def to_have_accessible_description(%Locator{} = locator, expected, options \\ [])
-      when is_binary(expected) or is_struct(expected, Regex) do
+  def to_have_accessible_description(%Locator{} = locator, expected, options \\ []) when is_text(expected) do
     text_expectation(:to_have_accessible_description, locator, :accessible_description, expected, options)
   end
 
@@ -369,8 +369,7 @@ defmodule Fluffy.Expect do
   """
   @spec to_have_accessible_error_message(Locator.t(), text_expectation(), [to_have_accessible_error_message_option()]) ::
           t()
-  def to_have_accessible_error_message(%Locator{} = locator, expected, options \\ [])
-      when is_binary(expected) or is_struct(expected, Regex) do
+  def to_have_accessible_error_message(%Locator{} = locator, expected, options \\ []) when is_text(expected) do
     text_expectation(:to_have_accessible_error_message, locator, :accessible_error_message, expected, options)
   end
 
@@ -493,8 +492,7 @@ defmodule Fluffy.Expect do
   #{NimbleOptions.docs(Options.expectation_schema(:to_have_text))}
   """
   @spec to_have_text(Locator.t(), text_expectation() | [text_expectation()], [to_have_text_option()]) :: t()
-  def to_have_text(%Locator{} = locator, expected, options \\ [])
-      when is_binary(expected) or is_struct(expected, Regex) or is_list(expected) do
+  def to_have_text(%Locator{} = locator, expected, options \\ []) when is_text(expected) or is_list(expected) do
     text_expectation(:to_have_text, locator, :text, expected, options)
   end
 
@@ -511,8 +509,7 @@ defmodule Fluffy.Expect do
   #{NimbleOptions.docs(Options.expectation_schema(:to_contain_text))}
   """
   @spec to_contain_text(Locator.t(), text_expectation() | [text_expectation()], [to_contain_text_option()]) :: t()
-  def to_contain_text(%Locator{} = locator, expected, options \\ [])
-      when is_binary(expected) or is_struct(expected, Regex) or is_list(expected) do
+  def to_contain_text(%Locator{} = locator, expected, options \\ []) when is_text(expected) or is_list(expected) do
     text_expectation(:to_contain_text, locator, :contain_text, expected, options)
   end
 
@@ -537,9 +534,9 @@ defmodule Fluffy.Expect do
     do: to_have_attribute(locator, name, nil, options)
 
   def to_have_attribute(%Locator{} = locator, name, value, options)
-      when is_binary(name) and (is_nil(value) or is_binary(value) or is_struct(value, Regex)) and is_list(options) do
+      when is_binary(name) and (is_nil(value) or is_text(value)) and is_list(options) do
     {timeout, matching} = Options.split_expectation!(:to_have_attribute, options)
-    Internal.new({:locator, locator}, :attribute, {name, value, matching}, timeout)
+    Internal.new({:locator, locator}, :attribute, {name, text_values!(value), matching}, timeout)
   end
 
   @doc group: "Locator assertions"
@@ -555,8 +552,7 @@ defmodule Fluffy.Expect do
   #{NimbleOptions.docs(Options.expectation_schema(:to_have_class))}
   """
   @spec to_have_class(Locator.t(), text_expectation() | [text_expectation()], [to_have_class_option()]) :: t()
-  def to_have_class(%Locator{} = locator, expected, options \\ [])
-      when is_binary(expected) or is_struct(expected, Regex) or is_list(expected) do
+  def to_have_class(%Locator{} = locator, expected, options \\ []) when is_text(expected) or is_list(expected) do
     native_expectation(:to_have_class, {:locator, locator}, :class, text_values!(expected), options)
   end
 
@@ -592,8 +588,8 @@ defmodule Fluffy.Expect do
   #{NimbleOptions.docs(Options.expectation_schema(:to_have_id))}
   """
   @spec to_have_id(Locator.t(), text_expectation(), [to_have_id_option()]) :: t()
-  def to_have_id(%Locator{} = locator, expected, options \\ []) when is_binary(expected) or is_struct(expected, Regex) do
-    native_expectation(:to_have_id, {:locator, locator}, :id, expected, options)
+  def to_have_id(%Locator{} = locator, expected, options \\ []) when is_text(expected) do
+    native_expectation(:to_have_id, {:locator, locator}, :id, text_values!(expected), options)
   end
 
   @doc group: "Locator assertions"
@@ -661,14 +657,14 @@ defmodule Fluffy.Expect do
   end
 
   defp text_values!(expected) when is_list(expected) do
-    if Enum.all?(expected, &(is_binary(&1) or is_struct(&1, Regex))) do
-      expected
+    if Enum.all?(expected, &is_text(&1)) do
+      Enum.map(expected, &Internal.reg_exp/1)
     else
       raise ArgumentError, "expected a list of strings or regular expressions, got: #{inspect(expected)}"
     end
   end
 
-  defp text_values!(expected), do: expected
+  defp text_values!(expected), do: Internal.reg_exp(expected)
 
   @doc group: "Page assertions"
   @doc """
@@ -683,9 +679,8 @@ defmodule Fluffy.Expect do
   """
   @spec page_to_have_title(Fluffy.Page.title_expectation()) :: Expect.t()
   @spec page_to_have_title(Fluffy.Page.title_expectation(), [page_to_have_title_option()]) :: Expect.t()
-  def page_to_have_title(expected, options \\ [])
-      when (is_binary(expected) or is_struct(expected, Regex)) and is_list(options) do
-    native_expectation(:page_to_have_title, :page, :title, expected, options)
+  def page_to_have_title(expected, options \\ []) when is_text(expected) and is_list(options) do
+    native_expectation(:page_to_have_title, :page, :title, text_values!(expected), options)
   end
 
   @doc group: "Page assertions"
@@ -708,10 +703,9 @@ defmodule Fluffy.Expect do
   @spec page_to_have_url(Fluffy.Page.url_expectation(), [page_to_have_url_option()]) :: Expect.t()
   def page_to_have_url(expected, options \\ [])
 
-  def page_to_have_url(expected, options)
-      when (is_binary(expected) or is_struct(expected, Regex) or is_function(expected, 1)) and is_list(options) do
+  def page_to_have_url(expected, options) when (is_text(expected) or is_function(expected, 1)) and is_list(options) do
     {timeout, matching} = Options.split_expectation!(:page_to_have_url, options)
-    Internal.new(:page, :url, {expected, matching}, timeout)
+    Internal.new(:page, :url, {Internal.reg_exp(expected), matching}, timeout)
   end
 
   @doc group: "Page assertions"

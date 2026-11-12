@@ -143,9 +143,9 @@ session
 
 A string compares normalized whitespace in the text; a regular expression sees
 it as is. LiveView text can differ in whitespace-only nodes between elements:
-`<b>a</b> <i>b</i>` reads "ab" there. On Static and
-LiveView a regular expression runs as PCRE, and in the browser as JavaScript, so `$` also matches before a final newline on Phoenix, and
-without the `u` flag `.` matches one byte there rather than one character.
+`<b>a</b> <i>b</i>` reads "ab" there. A regular expression is a JavaScript
+`RegExp` on every driver, as in [Locators](locators.md): PCRE-only syntax raises
+`ArgumentError`, and a `PlaywrightEx.RegExp` takes JavaScript-only syntax.
 `ignore_case:` takes precedence over a regular expression's own flag.
 A list checks each matched element in order, while any other form requires
 exactly one match. `use_inner_text: true` reads rendered text and requires

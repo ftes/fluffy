@@ -55,6 +55,34 @@ defmodule Fluffy.Conformance.ElementExpectationTest do
     end
 
     @tag driver: driver
+    test "regular expressions run as JS RegExps with #{driver}", %{driver: driver} do
+      spaced = by_css("#spaced")
+
+      # `[^]` is JS-only syntax.
+      driver
+      |> session()
+      |> expect(to_have_text(spaced, PlaywrightEx.RegExp.new("sleeping[^]+dragon", "i")))
+      |> expect(to_have_count(filter(by_css("p"), has_text: PlaywrightEx.RegExp.new("Sleeping[^]+dragon")), 1))
+      |> expect(to_have_count(by_role(:button, name: ~r/^Send$/), 1))
+    end
+
+    @tag driver: driver
+    test "a PCRE-only regular expression raises with #{driver}", %{driver: driver} do
+      session = session(driver)
+
+      for {expectation, message} <- [
+            {fn -> to_have_text(by_css("#spaced"), ~r/\ASleeping/) end, "\\A is not JS RegExp syntax: ~r/\\ASleeping/"},
+            {fn -> to_have_count(by_role(:button, name: ~r/Send\z/), 1) end, "\\z is not JS RegExp syntax: ~r/Send\\z/"},
+            {fn -> to_be_visible(filter(by_css("p"), has_text: ~r/(?i)dragon/)) end,
+             "an inline option group (?...) is not JS RegExp syntax: ~r/(?i)dragon/"},
+            {fn -> to_have_text(by_css("#spaced"), ~r/dragon/x) end,
+             "Regex options [:extended] have no JS RegExp equivalent: ~r/dragon/x"}
+          ] do
+        assert_raise ArgumentError, message, fn -> expect(session, expectation.()) end
+      end
+    end
+
+    @tag driver: driver
     test "to_contain_text finds a normalized substring with #{driver}", %{driver: driver} do
       spaced = by_css("#spaced")
 

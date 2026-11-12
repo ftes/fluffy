@@ -11,9 +11,9 @@ defmodule Fluffy.Locator do
   LiveView sessions raise `Fluffy.CapabilityError` when they resolve a locator that
   uses one.
 
-  A regular expression in `name:`, `has_text:` or `has_not_text:` runs as PCRE on
-  Static and LiveView and as JavaScript in the browser, so edge cases differ: `$`
-  also matches before a final newline on Phoenix.
+  A regular expression in `name:`, `has_text:` or `has_not_text:` is a JavaScript
+  `RegExp` on every driver: a `Regex` becomes one with `PlaywrightEx.RegExp.new/1`,
+  which raises `ArgumentError` on PCRE-only syntax, or pass a `PlaywrightEx.RegExp`.
 
   Role locators accept these options:
 

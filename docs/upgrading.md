@@ -109,6 +109,9 @@ Timeouts follow Elixir: `0` checks once and `:infinity` means no limit; see
   Replace `page_url(path: "/potions")` with `page_url("/potions")` when the URL has no
   query, or with `page_url(&(URI.parse(&1).path == "/potions"))`; the `query:` and
   `fragment:` forms become a regex or a predicate too.
+- A regex is a JavaScript `RegExp` on every driver: PCRE-only syntax such as `\A`, `\z`,
+  `(?i)` or the `x` modifier raises `ArgumentError` on Static and LiveView too. Use `^`, `$`
+  and the `i` modifier, or a `PlaywrightEx.RegExp` for JavaScript-only syntax.
 - The `Fluffy.Expect.checked_option` type is `to_be_checked_option`.
   `Fluffy.Locator.describe`, `new` and `append` are internal; `inspect/1` renders a locator.
 - On Playwright, a failed `visit`, `reload`, `go_back` or `go_forward` raises

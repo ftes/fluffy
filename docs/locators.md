@@ -49,10 +49,12 @@ when they resolve such a locator.
 `name:`, `has_text:` and `has_not_text:` also take a regular expression, as in
 Playwright: `name:` tests it against the normalized accessible name, and the text
 filters against the element's raw text, so `~r/^Pro$/` does not match
-`<li> Pro </li>`. On Static and LiveView it runs as PCRE, and in the browser as
-JavaScript, so edge cases differ: `$` also matches before a final newline on
-Phoenix, and without the `u` flag `.` matches one byte there rather than one
-character.
+`<li> Pro </li>`. A regex is a JavaScript `RegExp` on every driver: an Elixir
+`Regex` becomes one with `PlaywrightEx.RegExp.new/1`, which raises `ArgumentError`
+on PCRE-only syntax such as `\A` or `(?i)`, and Static and LiveView match it as
+the browser does. Pass a `PlaywrightEx.RegExp` for JavaScript-only syntax. One
+difference stays: without the `u` modifier the browser matches UTF-16 code units and
+Static and LiveView match code points, so `~r/^.$/` matches an emoji only on Phoenix.
 
 Refine a locator with `filter`, `first`, `last`, or zero-based `nth`.
 Use `and_` to require both locators to match the same element:
