@@ -16,7 +16,6 @@ assertions, pattern bindings, custom messages, and other helpers remain availabl
 
 ```elixir
 use ExUnit.Case, async: true
-use Fluffy.Test
 use Fluffy.Assert
 
 import Fluffy
@@ -56,7 +55,6 @@ keep their names; assertion constructors use `to_be_*` and `to_have_*`.
 
 ```elixir
 use ExUnit.Case, async: true
-use Fluffy.Test
 
 import Fluffy
 import Fluffy.Expect

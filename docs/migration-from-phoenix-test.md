@@ -38,13 +38,13 @@ in your shared case module. Import the facade on its own; mixing it with
 `import Fluffy` introduces overlapping function names.
 
 After completing [Installation and runtime](installation.md), keep your application's
-`ConnCase` and add `use Fluffy.Test` after it. A prepared connection can
+`ConnCase`, and add `use PlaywrightEx.Test` after it in modules with browser tests. A
+prepared connection can
 still be piped directly into `Fluffy.PhoenixTest.visit/2`:
 
 ```elixir
 defmodule MyAppWeb.PotionTest do
   use MyAppWeb.ConnCase, async: true
-  use Fluffy.Test
   import Fluffy.PhoenixTest
 
   test "saves a potion", %{conn: conn} do
@@ -63,8 +63,7 @@ end
 
 Keep existing fixture and authentication setup. The `ConnCase` keeps owning the
 sandbox (`start_owner!`); the required endpoint and sandbox configuration lives in
-[Installation and runtime](installation.md#ecto-sandbox). If your shared case
-already has `use Fluffy.Test`, do not add it again in individual modules.
+[Installation and runtime](installation.md#ecto-sandbox).
 
 ## Using native assertions alongside the facade
 
@@ -92,7 +91,7 @@ To choose a backend, start a session explicitly. The same facade calls work with
 ```elixir
 defmodule MyAppWeb.PotionTest do
   use ExUnit.Case, async: true
-  use Fluffy.Test
+  use PlaywrightEx.Test
   import Fluffy.PhoenixTest
 
   setup context do

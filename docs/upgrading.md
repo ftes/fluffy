@@ -86,17 +86,17 @@ Timeouts follow Elixir: `0` checks once and `:infinity` means no limit; see
 - Configure the browser with `config :playwright_ex, :test, browser_name: ..., launch_options:
   ...` (`driver: [executable: ...]` for a CLI). `config :fluffy, :playwright` drops
   `enabled`, `engine`, `executable`, `launch_options` and `pool_size`; on Firefox, replace
-  `pool_size` with `setup_all context, do: PlaywrightEx.Test.browser(context, isolate: true)`
-  in each browser module.
+  `pool_size` with `start_session(:playwright, browser: PlaywrightEx.Test.BrowserPool.exclusive())`.
 - `Fluffy.Playwright.trace/2`, `artifact_dir` and `trace_dir` are removed. Traces,
   screenshots and videos come from `PlaywrightEx.Test`: set
   `config :playwright_ex, :test, trace: :retain_on_failure, screenshot: :only_on_failure`
-  and replace `setup context do Fluffy.Test.setup(context) end` with `use Fluffy.Test`
-  in modules or case templates. Files go to
+  and replace `setup context do Fluffy.Test.setup(context) end` with `use PlaywrightEx.Test`
+  in modules with browser tests or their case templates (Phoenix-only modules need nothing);
+  tag a module or test with `trace: true` (or `screenshot:`, `video:`) to record it. Files go to
   `test-results/<test>/`; a failed operation no longer writes HTML or the error text.
 - Fluffy no longer starts or adopts Ecto sandbox owners: keep the generated DataCase
   setup (`Sandbox.start_owner!(repo, shared: not tags[:async])` and `stop_owner` in
-  `on_exit`) and use it before `use Fluffy.Test`. Drop `sandbox: false` and `repos:`;
+  `on_exit`) and use it before `use PlaywrightEx.Test`. Drop `sandbox: false` and `repos:`;
   Fluffy adds the metadata of `config :fluffy, ecto_repos:` to browser sessions. A plain
   `Sandbox.checkout` in the test process does not work for browser tests.
 - `Fluffy.Playwright.screenshot` and `pdf` return the image or PDF, as in Playwright,

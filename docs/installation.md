@@ -121,14 +121,15 @@ default of 3 minutes applies. To use a system browser, set
 `launch_options: [executable_path: System.find_executable("google-chrome-stable")]`.
 `mix playwright_ex.install --no-browsers` installs only the driver for an existing browser.
 
-A module that starts Playwright sessions needs `use Fluffy.Test` after `use ExUnit.Case`
-(or in your case template's `using`), which uses `PlaywrightEx.Test`. It records every
-Playwright session of the test: one `trace.zip` of all its sessions, a screenshot
-of each page as its session closes, and videos, each `:off` by default. The
-`*_on_failure` modes record every test and drop the files of passing ones. Each test
-writes to its own dir under `output_dir` (`test-results`); ignore it in git and
-configure CI to upload it when the test job fails. To override the config for a test,
-call `PlaywrightEx.Test.record_artifacts/2` in its setup, before its first session. See `PlaywrightEx.Test` for the modes and file names.
+A module that starts Playwright sessions needs `use PlaywrightEx.Test` after
+`use ExUnit.Case` (or in your case template's `using`). It records every Playwright
+session of the test: one `trace.zip` of all its sessions, a screenshot of each page as
+its session closes, and videos, each `:off` by default, and a failed test's
+`error-context.md`. The `*_on_failure` modes record every test and drop the files of
+passing ones. Each test writes to its own dir under `output_dir` (`test-results`);
+ignore it in git and configure CI to upload it when the test job fails. To override the
+config for a module or test, tag it, such as `@tag trace: true`. See `PlaywrightEx.Test`
+for the modes and file names.
 
 As in Playwright, browser `console` messages and uncaught page errors are not
 printed; the trace has them. To log them, register a listener, such as
@@ -137,30 +138,24 @@ printed; the trace has them. To log them, register a listener, such as
 Set `browser_name: :firefox` or `browser_name: :webkit` after installing the
 corresponding browser (`mix playwright_ex.install -- firefox`).
 See [Browser baseline](capabilities.md#browser-baseline) for conformance coverage.
-Fluffy creates a fresh isolated `BrowserContext` for each session, in the test's
-`browser` if a `setup_all` put one in the context, else in the browser
-`PlaywrightEx.Test.browser/1` shares between modules. No driver or browser starts until
-a session needs one, a lost browser is launched again for the next session, and the
-drivers stop after the suite. Firefox dispatches input for all of a browser's pages in
-one queue and times out under load, so give each Firefox module a driver and browser of
-its own:
-
-```elixir
-defmodule MyAppWeb.ForbiddenCorridorTest do
-  use ExUnit.Case, async: true
-  use Fluffy.Test
-
-  setup_all context, do: PlaywrightEx.Test.browser(context, isolate: true)
-end
-```
-
-A module's browser comes from its `setup_all`, like Playwright Test's worker-scoped
-`browser` fixture, else from the shared pool. For more users in a test, start more
+Fluffy creates a fresh isolated `BrowserContext` for each session, in the browser of
+its `browser:` option, else in `PlaywrightEx.Test.BrowserPool.shared()`. No driver or
+browser starts until a session needs one, a lost browser is launched again for the next
+session, and the drivers stop after the suite. For more users in a test, start more
 sessions: each gets its own browser context.
 
-At most `workers` modules hold one at once (`config :playwright_ex, :test`, half the
-schedulers), as Playwright Test's workers do. A module beyond them waits in its
-`setup_all`, so keep ExUnit's `max_cases` at most `workers`.
+Firefox dispatches input for all of a browser's pages in one queue and times out under
+load, so on Firefox use an exclusive browser (one browser per worker, like Playwright
+Test):
+
+```elixir
+start_session(:playwright, browser: PlaywrightEx.Test.BrowserPool.exclusive())
+```
+
+The test holds it until it ends, and its further `exclusive()` calls return the same
+browser. At most `workers` are out at once (`config :playwright_ex, :test`, half the
+schedulers); see [Exclusive browsers](https://hexdocs.pm/playwright_ex/testing-with-exunit.html#exclusive-browsers)
+in PlaywrightEx's guide.
 
 ## Ecto sandbox
 
@@ -217,7 +212,7 @@ end
 
 The application owns the sandbox, as with `Phoenix.ConnTest`: keep the generated
 DataCase setup, which starts an owner for each test and stops it in `on_exit`, and use
-your `ConnCase` (or `DataCase`) before `use Fluffy.Test` or `use Fluffy.Case`:
+your `ConnCase` (or `DataCase`) before `use PlaywrightEx.Test` or `use Fluffy.Case`:
 
 ```elixir
 def setup_sandbox(tags) do

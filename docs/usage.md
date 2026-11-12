@@ -13,7 +13,6 @@ Import the actions and locators; `use Fluffy.Assert` imports the assertion vocab
 ```elixir
 defmodule MyAppWeb.CreatureTest do
   use ExUnit.Case, async: true
-  use Fluffy.Test
   use Fluffy.Assert
 
   import Fluffy
@@ -78,7 +77,7 @@ For LiveView event scheduling and keyboard limitations, see
 Use `:playwright` when the behavior depends on JavaScript, browser layout,
 native-validation events or blocking, dialogs, request/response events, or
 another capability shown as unavailable on Phoenix. Choose the backend when
-starting the session:
+starting the session, in a module with `use PlaywrightEx.Test` after `use ExUnit.Case`:
 
 ```elixir
 test "updates the preview rendered by a JavaScript hook" do
@@ -93,8 +92,8 @@ See the [capability matrix](capabilities.md) for backend differences.
 
 ## Shared test case
 
-`use Fluffy.Case` after your `ConnCase` adds Fluffy's setup, imports and a session per
-test. Keep the `ConnCase` for fixtures, routes and the sandbox, and use it first: used
+`use Fluffy.Case` after your `ConnCase` adds `use PlaywrightEx.Test`, Fluffy's imports
+and a session per test. Keep the `ConnCase` for fixtures, routes and the sandbox, and use it first: used
 after `Fluffy.Case`, its `use ExUnit.Case` imports `test` again and the module fails to
 compile on an ambiguous `test/3`.
 
@@ -124,4 +123,4 @@ end
 ```
 
 `Fluffy.Case` is a few lines; to change them, copy them into your own case template's
-`using`, keeping the session setup after `use Fluffy.Test`.
+`using`, keeping the session setup after `use PlaywrightEx.Test`.
