@@ -6,10 +6,6 @@ defmodule FluffyConsumer.AdoptionTest do
   import Fluffy
   import Fluffy.Locator
 
-  setup context do
-    Fluffy.Test.setup(context)
-  end
-
   for backend <- [:phoenix, :playwright] do
     @tag backend: backend
     test "one vanilla ExUnit scenario runs with #{backend}", %{backend: backend} do

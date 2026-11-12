@@ -28,7 +28,7 @@ Trace a Playwright test with `trace: :on` (or `:retain_on_failure` in the config
 `Fluffy.Playwright.step/4`:
 
 ```elixir
-setup context, do: Fluffy.Test.setup(context, trace: :on)
+setup context, do: PlaywrightEx.Test.record_artifacts(context, trace: :on)
 
 test "brews Polyjuice" do
   start_session(:playwright)

@@ -16,14 +16,11 @@ assertions, pattern bindings, custom messages, and other helpers remain availabl
 
 ```elixir
 use ExUnit.Case, async: true
+use Fluffy.Test
 use Fluffy.Assert
 
 import Fluffy
 import Fluffy.Locator
-
-setup context do
-  Fluffy.Test.setup(context)
-end
 
 test "registers a creature" do
   start_session(:phoenix)
@@ -59,14 +56,11 @@ keep their names; assertion constructors use `to_be_*` and `to_have_*`.
 
 ```elixir
 use ExUnit.Case, async: true
+use Fluffy.Test
 
 import Fluffy
 import Fluffy.Expect
 import Fluffy.Locator
-
-setup context do
-  Fluffy.Test.setup(context)
-end
 
 test "registers a creature" do
   start_session(:phoenix)

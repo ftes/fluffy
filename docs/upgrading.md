@@ -86,8 +86,8 @@ Timeouts follow Elixir: `0` checks once and `:infinity` means no limit; see
 - `Fluffy.Playwright.trace/2`, `artifact_dir` and `trace_dir` are removed. Traces,
   screenshots and videos come from `PlaywrightEx.Test`: set
   `config :playwright_ex, :test, trace: :retain_on_failure, screenshot: :only_on_failure`
-  and add `use Fluffy.Test` to modules (or case templates) with Playwright
-  sessions, which they now need. Files go to
+  and replace `setup context do Fluffy.Test.setup(context) end` with `use Fluffy.Test`
+  (its options go to `use`) in modules or case templates. Files go to
   `test-results/<test>/`; a failed operation no longer writes HTML or the error text.
 - `Fluffy.step/3` is `Fluffy.Playwright.step/4`, `PlaywrightEx.Test.step/3` in a pipeline.
   It raises `Fluffy.CapabilityError` on Phoenix, where it used to just run the callback.

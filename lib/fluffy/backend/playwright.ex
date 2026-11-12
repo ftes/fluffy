@@ -30,9 +30,13 @@ defmodule Fluffy.Backend.Playwright do
     timeout = Keyword.get_lazy(options, :timeout, fn -> Keyword.fetch!(config, :timeout) end)
     browser_context_options = Keyword.get(options, :browser_context, [])
 
+    # Merged over the config's, which `context_options:` would replace as a whole.
     headers =
-      browser_context_options
-      |> Keyword.get(:extra_http_headers, %{})
+      :playwright_ex
+      |> Application.get_env(:test, [])
+      |> Access.get(:context_options, [])
+      |> Access.get(:extra_http_headers, %{})
+      |> Enum.concat(Keyword.get(browser_context_options, :extra_http_headers, %{}))
       |> Enum.concat(Keyword.get(options, :headers, []))
       |> Enum.concat(List.wrap(sandbox_header))
       |> Map.new(fn {name, value} -> {String.downcase(to_string(name)), value} end)
@@ -44,17 +48,13 @@ defmodule Fluffy.Backend.Playwright do
       |> Keyword.put(:base_url, base_url)
       |> Keyword.put(:extra_http_headers, headers)
 
-    # The runtime creates and closes the context: PlaywrightEx keeps a closed
-    # context's data until those processes exit. Its cleanup is registered in
-    # the same runtime call, before any further setup can fail.
-    browser_context =
-      SessionRuntime.run_registered(runtime, fn ->
-        browser_context = new_context!(context_options, test_context)
+    # Created in the test process, so PlaywrightEx.Test records it for the test; the
+    # runtime closes it with the session. As in Playwright, closing has no timeout.
+    browser_context = new_context!(context_options, test_context)
 
-        # As in Playwright, closing the context has no timeout.
-        close = fn -> BrowserContext.close(browser_context) end
-
-        {browser_context, {:browser_context, browser_context.guid}, close}
+    :ok =
+      SessionRuntime.register(runtime, {:browser_context, browser_context.guid}, fn ->
+        BrowserContext.close(browser_context)
       end)
 
     SessionRuntime.run(runtime, fn ->
@@ -76,9 +76,10 @@ defmodule Fluffy.Backend.Playwright do
     Session.new(__MODULE__, context, page_record(browser_page), runtime)
   end
 
-  # PlaywrightEx.Test records the context for the test's `test_pid` (traces, screenshots,
-  # videos). A browser lost to a dead driver still refuses contexts until its disconnect
-  # arrives; as in Playwright Test, that session fails.
+  # PlaywrightEx.Test records the context for the test (traces, screenshots, videos),
+  # starting the recording at the test's first context. A browser lost to a dead driver
+  # still refuses contexts until its disconnect arrives; as in Playwright Test, that
+  # session fails.
   defp new_context!(options, test_context) do
     test_context
     |> Map.put(:browser, browser(test_context).browser)

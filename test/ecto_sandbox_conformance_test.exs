@@ -1,6 +1,6 @@
 defmodule Fluffy.EctoSandboxConformanceTest do
   use ExUnit.Case, async: true
-  use Fluffy.Test
+  use PlaywrightEx.Test
 
   import Fluffy
   import Fluffy.Expect
@@ -110,7 +110,7 @@ end
 
 defmodule Fluffy.EctoSandboxAdoptionTest do
   use ExUnit.Case, async: true
-  use Fluffy.Test
+  use PlaywrightEx.Test
 
   import Fluffy
   import Fluffy.Expect

@@ -138,12 +138,12 @@ defmodule Fluffy.TestScope do
           Process.delete(@process_key)
 
           raise ArgumentError,
-                "call Fluffy.Test.setup(context) before Fluffy.start_session/1,2"
+                "add `use Fluffy.Test` (or call Fluffy.Test.setup(context)) before Fluffy.start_session/1,2"
         end
 
       nil ->
         raise ArgumentError,
-              "call Fluffy.Test.setup(context) before Fluffy.start_session/1,2"
+              "add `use Fluffy.Test` (or call Fluffy.Test.setup(context)) before Fluffy.start_session/1,2"
     end
   end
 
@@ -153,7 +153,7 @@ defmodule Fluffy.TestScope do
     apply(module, function, arguments)
   end
 
-  # The whole map, for PlaywrightEx.Test (a `parameterize:` module's values pick its owner).
-  # Setup runs in the test process: PlaywrightEx.Test finds the test's recording by its pid.
-  defp test_context(context), do: Map.put(context, :test_pid, self())
+  # The whole map, with ExUnit's `test_pid`, for PlaywrightEx.Test (a `parameterize:`
+  # module's values pick its owner).
+  defp test_context(context), do: context
 end

@@ -13,14 +13,11 @@ Import the actions and locators; `use Fluffy.Assert` imports the assertion vocab
 ```elixir
 defmodule MyAppWeb.CreatureTest do
   use ExUnit.Case, async: true
+  use Fluffy.Test
   use Fluffy.Assert
 
   import Fluffy
   import Fluffy.Locator
-
-  setup context do
-    Fluffy.Test.setup(context)
-  end
 
   test "puts Fluffy to sleep" do
     start_session(:phoenix)
@@ -117,7 +114,6 @@ defmodule MyAppWeb.FluffyCase do
       alias Fluffy.Event
 
       setup context do
-        :ok = Fluffy.Test.setup(context)
         %{session: start_session(Map.get(context, :backend, :phoenix))}
       end
     end

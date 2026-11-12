@@ -5,7 +5,7 @@ defmodule Fluffy.TestCase do
 
   using do
     quote do
-      use Fluffy.Test
+      use Fluffy.Test, sandbox: false
 
       import Fluffy.TestCase,
         only: [
@@ -72,9 +72,5 @@ defmodule Fluffy.TestCase do
     end
 
     error
-  end
-
-  setup context do
-    :ok = Fluffy.Test.setup(context, sandbox: false)
   end
 end

@@ -77,14 +77,11 @@ For the native locator API, establish a lifecycle scope and import its helpers:
 
 ```elixir
 use ExUnit.Case, async: true
+use Fluffy.Test
 use Fluffy.Assert
 
 import Fluffy
 import Fluffy.Locator
-
-setup context do
-  Fluffy.Test.setup(context)
-end
 ```
 
 Start with `start_session(:phoenix)` for in-process Static and LiveView tests.
@@ -95,7 +92,7 @@ setup, then [Usage](docs/usage.md) for writing tests and a shared `FluffyCase`.
 ## Coming from PhoenixTest
 
 Replace `import PhoenixTest` with `import Fluffy.PhoenixTest` and add
-`Fluffy.Test.setup/1` to your test setup. Existing pipelines keep familiar helpers
+`use Fluffy.Test` to your test modules. Existing pipelines keep familiar helpers
 such as `fill_in`, `click_button`, and `assert_has`, and their prepared connections:
 
 ```elixir

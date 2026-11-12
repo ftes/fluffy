@@ -2,34 +2,46 @@ defmodule Fluffy.Test do
   @moduledoc """
   ExUnit lifecycle setup for Fluffy tests.
 
-  A module that starts Playwright sessions adds `use Fluffy.Test` after `use ExUnit.Case`
-  (or in a case template's `using`). It uses `PlaywrightEx.Test`, which marks the test's
-  result for its artifacts and pool, and imports only its `test` macros, whose fragment
-  names would clash with `Fluffy.Playwright`'s.
+      defmodule MyAppWeb.CreatureTest do
+        use ExUnit.Case, async: true
+        use Fluffy.Test
+
+        test "puts Fluffy to sleep" do
+          ...
+        end
+      end
+
+  `use Fluffy.Test` comes after `use ExUnit.Case` (or in a case template's `using`), in
+  every module with Fluffy sessions. It registers `setup/2` with its options, such as
+  `use Fluffy.Test, sandbox: false`. It also uses `PlaywrightEx.Test`, which records the
+  traces, screenshots and videos of Playwright sessions (`config :playwright_ex, :test`)
+  and marks each test's result for them. Of `PlaywrightEx.Test`, it imports only the
+  `test` macros, as its fragment names clash with `Fluffy.Playwright`'s.
+
+  To run `setup/2` yourself, such as after your own setup, `use PlaywrightEx.Test` instead
+  and call it. To override the artifact modes for a test, call
+  `PlaywrightEx.Test.record_artifacts/2` in its setup, before its first session.
   """
 
-  defmacro __using__(_options) do
+  defmacro __using__(options) do
     quote do
       use PlaywrightEx.Test
 
       import PlaywrightEx.Test, only: [test: 1, test: 2, test: 3]
 
-      @moduletag fluffy_playwright: true
+      setup context do
+        Fluffy.Test.setup(context, unquote(options))
+      end
     end
   end
 
   @doc """
-  Establishes Fluffy lifecycle management for the current ExUnit test.
+  Establishes Fluffy lifecycle management for the current ExUnit test, as
+  `use Fluffy.Test` does.
 
-  Call this from the test case's setup callback before starting sessions. When
-  Ecto repositories are configured, Fluffy also starts or adopts their SQL
+  When Ecto repositories are configured, Fluffy also starts or adopts their SQL
   sandbox ownership. Pass `sandbox: false` to establish lifecycle management
   without database ownership.
-
-  In a module with `use Fluffy.Test`, which Playwright sessions need, it also
-  calls `PlaywrightEx.Test.record_artifacts/2`: that records the traces, screenshots and
-  videos of the test's Playwright sessions. Its modes come from
-  `config :playwright_ex, :test`, overridden by `trace:`, `screenshot:` and `video:`.
 
   ## Options
 
@@ -48,15 +60,8 @@ defmodule Fluffy.Test do
             "Fluffy test setup requested sandbox ownership but no Ecto repositories are configured"
     end
 
-    :ok =
-      Fluffy.TestScope.setup(context,
-        sandbox: if(sandbox?, do: {Fluffy.Sandbox, :acquire, [context, repos]}, else: false)
-      )
-
-    if context[:fluffy_playwright] do
-      PlaywrightEx.Test.record_artifacts(context, Keyword.take(options, [:trace, :screenshot, :video]))
-    else
-      :ok
-    end
+    Fluffy.TestScope.setup(context,
+      sandbox: if(sandbox?, do: {Fluffy.Sandbox, :acquire, [context, repos]}, else: false)
+    )
   end
 end

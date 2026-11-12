@@ -5,7 +5,7 @@ Fluffy runs Phoenix feature tests through one Playwright-shaped API, in-process 
 ## Setup
 
 - `config :fluffy, endpoint: MyAppWeb.Endpoint` in `config/test.exs`. With Ecto, also `config :fluffy, ecto_repos: [MyApp.Repo]` and the sandbox plug and mount hook from `docs/installation.md`, behind an `Application.compile_env` flag set in `config/test.exs` because Fluffy is not in production.
-- Call `Fluffy.Test.setup(context)` exactly once per test, with or without Ecto, ideally in a shared case module.
+- Add `use Fluffy.Test` after `use ExUnit.Case` exactly once per module, with or without Ecto, ideally in a shared case module.
 - Browser tests need `server: true` on the endpoint, `config :playwright_ex, :test` for the browser (`browser_name`, `launch_options`) and `mix playwright_ex.install -- chromium`. For a system browser, install with `--no-browsers` and set `launch_options: [executable_path: ...]`. On Firefox, set `config :fluffy, playwright: [isolate: true]`.
 - The browser opens the endpoint listener's address, such as `127.0.0.1`. Set `check_origin: false` on the endpoint only when its `url` host differs from that address, as a stock `localhost` does.
 
@@ -82,4 +82,4 @@ Prefer the shared API. For what it does not cover:
 ## Debugging
 
 - Element actions fail with `Fluffy.OperationError`, whose `cause` holds the driver's error. Failed assertions are `ExUnit.AssertionError`.
-- Traces, screenshots and videos are PlaywrightEx.Test's: `config :playwright_ex, :test, trace: :retain_on_failure, screenshot: :only_on_failure`. Modules with Playwright sessions need `use Fluffy.Test` after `use ExUnit.Case`. `Fluffy.Playwright.step/4` names a step of the test in its trace (Playwright only). `Fluffy.open_browser/1` opens the current page on any driver.
+- Traces, screenshots and videos are PlaywrightEx.Test's: `config :playwright_ex, :test, trace: :retain_on_failure, screenshot: :only_on_failure`. `Fluffy.Playwright.step/4` names a step of the test in its trace (Playwright only). `Fluffy.open_browser/1` opens the current page on any driver.

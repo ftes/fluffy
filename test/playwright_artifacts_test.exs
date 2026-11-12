@@ -3,7 +3,7 @@ defmodule Fluffy.PlaywrightArtifactsTest do
   # runtime processes are the test's, and steps are its test steps. PlaywrightEx.Test merges
   # `trace.zip` in its own `on_exit`, so the assertions run in one registered before it.
   use ExUnit.Case, async: true
-  use Fluffy.Test
+  use Fluffy.Test, sandbox: false
 
   import Fluffy
   import Fluffy.Expect
@@ -28,7 +28,7 @@ defmodule Fluffy.PlaywrightArtifactsTest do
       for unexpected <- context[:trace_lacks] || [], do: refute(trace =~ unexpected)
     end)
 
-    Fluffy.Test.setup(context, sandbox: false, trace: :on)
+    PlaywrightEx.Test.record_artifacts(context, trace: :on)
   end
 
   @tag trace_has: [

@@ -122,15 +122,13 @@ default of 3 minutes applies. To use a system browser, set
 `mix playwright_ex.install --no-browsers` installs only the driver for an existing browser.
 
 A module that starts Playwright sessions needs `use Fluffy.Test` after `use ExUnit.Case`
-(or in your case template's `using`), which uses `PlaywrightEx.Test`. There
-`Fluffy.Test.setup/2` records every Playwright session of the test with
-`PlaywrightEx.Test.record_artifacts/2`: one `trace.zip` of all its sessions, a screenshot
+(or in your case template's `using`), which uses `PlaywrightEx.Test`. It records every
+Playwright session of the test: one `trace.zip` of all its sessions, a screenshot
 of each page as its session closes, and videos, each `:off` by default. The
 `*_on_failure` modes record every test and drop the files of passing ones. Each test
 writes to its own dir under `output_dir` (`test-results`); ignore it in git and
-configure CI to upload it when the test job fails. Pass `trace:`, `screenshot:` or
-`video:` (a mode or its options) to `Fluffy.Test.setup/2` to override the config for a
-test. See `PlaywrightEx.Test` for the modes and file names.
+configure CI to upload it when the test job fails. To override the config for a test,
+call `PlaywrightEx.Test.record_artifacts/2` in its setup, before its first session. See `PlaywrightEx.Test` for the modes and file names.
 
 As in Playwright, browser `console` messages and uncaught page errors are not
 printed; the trace has them. To log them, register a listener, such as
@@ -203,24 +201,24 @@ end
 ```
 
 Name the application's repositories once, then establish one scope in every
-Fluffy test through the same callback used by applications without Ecto:
+Fluffy test with the same `use Fluffy.Test` as applications without Ecto:
 
 ```elixir
 config :fluffy, ecto_repos: [MyApp.Repo]
 ```
 
 ```elixir
-setup context do
-  Fluffy.Test.setup(context)
-end
+use ExUnit.Case, async: true
+use Fluffy.Test
 ```
 
 The scope adopts an existing DataCase/ConnCase checkout when present. It
 closes browser contexts and in-process LiveViews before stopping sandbox
 owners, including when the owner test process fails. Sessions also close when
-their owning process exits. Call setup once per test, whether or not Ecto is used.
+their owning process exits. Use it once per module (or case template), whether or not
+Ecto is used.
 
-Use `Fluffy.Test.setup(context, sandbox: false)` for a test that deliberately
+Use `use Fluffy.Test, sandbox: false` for a module that deliberately
 needs lifecycle management without the configured repositories, or pass
 `repos: [...]` to override them in an umbrella or multi-repository test.
 

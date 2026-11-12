@@ -374,13 +374,7 @@ defmodule Fluffy.Options do
 
   @setup_schema NimbleOptions.new!(
                   repos: [type: {:list, :atom}],
-                  sandbox: [type: :boolean],
-                  trace: [type: :any, doc: "`PlaywrightEx.Test.record_artifacts/2`'s `trace:`, a mode or options."],
-                  screenshot: [
-                    type: :any,
-                    doc: "`PlaywrightEx.Test.record_artifacts/2`'s `screenshot:`, a mode or options."
-                  ],
-                  video: [type: :any, doc: "`PlaywrightEx.Test.record_artifacts/2`'s `video:`, a mode or options."]
+                  sandbox: [type: :boolean]
                 )
 
   @session_schema NimbleOptions.new!(
