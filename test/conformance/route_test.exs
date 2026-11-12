@@ -483,8 +483,14 @@ defmodule Fluffy.Conformance.RouteTest do
           "/held" ->
             send(test, {:held, self()})
 
+            # Upstream Playwright bug (microsoft/playwright#37032, closed as stale, still present
+            # in 1.65): Route.fetch replays the browser's request headers, and Firefox sends
+            # `accept-encoding: …, zstd`. Playwright's fetch decodes only gzip, deflate and br, so
+            # a zstd response comes back still compressed, and `text()` decodes it lossily as
+            # UTF-8. Chromium sends no accept-encoding there. The tests using this are about
+            # handler concurrency, so `no-transform` keeps Bandit from compressing the body.
             receive do
-              :release -> %{body: "held"}
+              :release -> %{headers: [{"cache-control", "no-transform"}], body: "held"}
             end
 
           "/start" ->
