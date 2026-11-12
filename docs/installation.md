@@ -154,6 +154,10 @@ defmodule MyAppWeb.ForbiddenCorridorTest do
 end
 ```
 
+A module's browser comes from its `setup_all`, like Playwright Test's worker-scoped
+`browser` fixture, else from the shared pool. For more users in a test, start more
+sessions: each gets its own browser context.
+
 At most `workers` modules hold one at once (`config :playwright_ex, :test`, half the
 schedulers), as Playwright Test's workers do. A module beyond them waits in its
 `setup_all`, so keep ExUnit's `max_cases` at most `workers`.
