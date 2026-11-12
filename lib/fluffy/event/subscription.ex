@@ -112,12 +112,12 @@ defmodule Fluffy.Event.Subscription do
       else: fail(state, reason)
   end
 
-  def handle_info(:timeout, state), do: fail(state, "no matching #{state.event.type} event occurred before the timeout")
+  def handle_info(:timeout, state), do: fail_timeout(state)
   def handle_info(_message, %{outcome: outcome} = state) when not is_nil(outcome), do: {:noreply, state}
 
   def handle_info(message, state) do
     if state.deadline && Deadline.expired?(state.deadline) do
-      fail(state, "no matching #{state.event.type} event occurred before the timeout")
+      fail_timeout(state)
     else
       deliver(message, state)
     end
@@ -127,6 +127,11 @@ defmodule Fluffy.Event.Subscription do
   def terminate(_reason, state) do
     if state.task, do: Task.shutdown(state.task, :brutal_kill)
     release(state)
+  end
+
+  defp fail_timeout(state) do
+    message = "no matching #{state.event.type} event occurred before the timeout"
+    fail(state, Fluffy.TestTimeout.explain(message, state.deadline))
   end
 
   # A source's close can itself be the event, and is its last one.

@@ -61,10 +61,11 @@ means no limit; see [Timeouts](installation.md#timeouts).
   +config :fluffy, action_timeout: 15_000, navigation_timeout: 15_000, expect_timeout: 5_000
   ```
 
-  Without them, actions and navigations have no timeout, so the test's timeout bounds them,
-  and a Static or LiveView action on a missing element fails with ExUnit's timeout rather
-  than Fluffy's error. Assertions default to 5 seconds on every driver; Phoenix used to wait
-  1 second. PlaywrightEx's own timeout config doesn't affect Fluffy sessions.
+  Without them, actions and navigations have no timeout, so the test's timeout bounds them:
+  with `Fluffy.Case`, a LiveView action on a missing element fails with Fluffy's error at the
+  test timeout, and without it with ExUnit's timeout. Assertions default to 5 seconds on
+  every driver; Phoenix used to wait 1 second. PlaywrightEx's own timeout config doesn't
+  affect Fluffy sessions.
 - Playwright actions, waits, `reload`, `go_back` and `go_forward` raise `ArgumentError`
   for `timeout: 0` instead of timing out after 1ms; pass a positive timeout. Assertions
   and Phoenix actions still check once.

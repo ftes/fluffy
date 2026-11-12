@@ -37,7 +37,7 @@ start_session(:phoenix)
 ## Assertions and waiting
 
 - Do not assert readiness before acting. Playwright waits natively, LiveView retries actions and assertions until the timeout, and Static checks immediately. Pass `timeout:` to change a deadline.
-- Default timeouts are Playwright Test's, on every driver: `config :fluffy, action_timeout:, navigation_timeout:` (`:infinity` by default: the test's timeout bounds them) and `expect_timeout:` (5 s). PlaywrightEx's own timeout config doesn't affect Fluffy sessions. There is no `start_session(timeout:)` or `config :fluffy, timeout:`. Set an `action_timeout` so a Static or LiveView action on a missing element fails with Fluffy's error rather than ExUnit's timeout.
+- Default timeouts are Playwright Test's, on every driver: `config :fluffy, action_timeout:, navigation_timeout:` (`:infinity` by default: the test's timeout bounds them) and `expect_timeout:` (5 s). PlaywrightEx's own timeout config doesn't affect Fluffy sessions. There is no `start_session(timeout:)` or `config :fluffy, timeout:`. With `Fluffy.Case`, a LiveView action on a missing element fails with Fluffy's error at the test timeout; Phoenix-only tests without it fail with ExUnit's timeout unless an `action_timeout` is set.
 - `timeout: 0` checks once, unlike Playwright's no timeout; Playwright actions and waits reject it. For no timeout, pass `timeout: :infinity`, never Playwright's `0`.
 - A Playwright `visit` already waits for LiveViews to connect, so do not assert `.phx-connected`.
 - `use Fluffy.Assert` gives `assert(visible(l))` and `refute(visible(l))`, and ordinary ExUnit asserts still work. `import Fluffy.Expect` gives `expect(to_be_visible(l))` and `expect(not_(to_be_visible(l)))`. Both return the session.

@@ -86,6 +86,10 @@ defmodule Fluffy.Event do
     {source, options} = registration(session, event, options, :wait)
     # As Playwright's `waitForEvent`, the action timeout by default.
     deadline = options |> Fluffy.Timeouts.get(&Fluffy.Timeouts.action/0) |> Fluffy.Deadline.new()
+    # Phoenix has no browser for PlaywrightEx.Test to close at the test's timeout.
+    deadline =
+      if Session.backend(session) == Fluffy.Backend.Phoenix, do: Fluffy.TestTimeout.bound(deadline), else: deadline
+
     pid = Subscription.start(session, event, source, :wait, nil, deadline)
     Pending.new(pid)
   end

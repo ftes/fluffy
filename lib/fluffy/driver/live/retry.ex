@@ -3,13 +3,13 @@ defmodule Fluffy.Driver.Live.Retry do
 
   alias Fluffy.Deadline
   alias Fluffy.Session
+  alias Fluffy.TestTimeout
 
   # The deadline of an operation's timeout, its `timeout:` or its default
-  # (`Fluffy.Timeouts`). Without one, the retry goes on until ExUnit's test timeout.
-  # The spot for the test's deadline, once PlaywrightEx exposes it: bounded by it, a retry
-  # without a limit would fail with Fluffy's error before ExUnit's timeout, as a Playwright
-  # call does when PlaywrightEx.Test closes its context then.
-  def deadline(timeout), do: Deadline.new(timeout)
+  # (`Fluffy.Timeouts`), bounded by the test's (`Fluffy.TestTimeout`): a retry without a limit
+  # fails with Fluffy's error before ExUnit's timeout, as a Playwright call does when
+  # PlaywrightEx.Test closes its context then. Without either, it goes on until ExUnit's.
+  def deadline(timeout), do: timeout |> Deadline.new() |> TestTimeout.bound()
 
   def run(%Session{} = session, deadline, attempt, refresh, wait_for_retry)
       when (is_integer(deadline) or deadline == :infinity) and is_function(attempt, 1) and is_function(refresh, 1) and
@@ -44,7 +44,7 @@ defmodule Fluffy.Driver.Live.Retry do
     remaining = Deadline.remaining(deadline)
 
     if remaining == 0 do
-      raise_failure(failure)
+      failure |> exception() |> TestTimeout.explain(deadline) |> raise()
     else
       wait_and_retry(session, deadline, attempt, refresh, wait_for_retry, remaining)
     end
@@ -62,11 +62,9 @@ defmodule Fluffy.Driver.Live.Retry do
     end
   end
 
-  defp raise_failure({:strictness, locator, candidates}) do
-    raise Fluffy.StrictnessError, locator: locator, candidates: candidates
-  end
+  defp exception({:strictness, locator, candidates}),
+    do: Fluffy.StrictnessError.exception(locator: locator, candidates: candidates)
 
-  defp raise_failure({:exception, exception}), do: raise(exception)
-
-  defp raise_failure(message) when is_binary(message), do: raise(ExUnit.AssertionError, message: message)
+  defp exception({:exception, exception}), do: exception
+  defp exception(message) when is_binary(message), do: ExUnit.AssertionError.exception(message: message)
 end

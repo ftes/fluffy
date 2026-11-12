@@ -13,6 +13,7 @@ defmodule Fluffy.Application do
     Supervisor.start_link(
       [
         {Registry, keys: :unique, name: Fluffy.Backend.Playwright.DefaultBrowser},
+        {Registry, keys: :unique, name: Fluffy.TestTimeout},
         {Task.Supervisor, name: Fluffy.TaskSupervisor},
         {DynamicSupervisor, strategy: :one_for_one, name: Fluffy.SessionRuntime.Supervisor}
       ],

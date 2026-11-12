@@ -655,7 +655,7 @@ defmodule Fluffy.Driver.Live do
 
     case result do
       {:retry_on_new_page, session, redirects} ->
-        if Deadline.expired?(deadline), do: raise_navigated_away(operation, arguments)
+        if Deadline.expired?(deadline), do: raise_navigated_away(operation, arguments, deadline)
         retry_on_new_page(session, redirects, operation, arguments, deadline)
 
       result ->
@@ -669,7 +669,7 @@ defmodule Fluffy.Driver.Live do
         {:navigate, session, navigation}
 
       {{session, navigation}, false} ->
-        if Deadline.expired?(deadline), do: raise_navigated_away(operation, arguments)
+        if Deadline.expired?(deadline), do: raise_navigated_away(operation, arguments, deadline)
 
         {session, redirects} = follow_for_retry(session, navigation)
         {:retry_on_new_page, session, redirects}
@@ -700,11 +700,11 @@ defmodule Fluffy.Driver.Live do
   defp put_timeout(%Expect{} = expectation, timeout), do: Expect.Internal.merge_options(expectation, timeout: timeout)
   defp put_timeout(options, timeout), do: Keyword.put(options, :timeout, timeout)
 
-  defp raise_navigated_away(operation, arguments) do
-    raise Fluffy.ActionabilityError,
-      action: action_label(operation, arguments),
-      reason: :navigated_away,
-      locator: hd(arguments)
+  defp raise_navigated_away(operation, arguments, deadline) do
+    [action: action_label(operation, arguments), reason: :navigated_away, locator: hd(arguments)]
+    |> Fluffy.ActionabilityError.exception()
+    |> Fluffy.TestTimeout.explain(deadline)
+    |> raise()
   end
 
   defp action_label(:set_checked, [_locator, desired, _options]), do: if(desired, do: :check, else: :uncheck)

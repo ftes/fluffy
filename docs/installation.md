@@ -81,10 +81,11 @@ tests and don't affect Fluffy sessions.
 
 With no action or navigation timeout, the test's timeout bounds them (ExUnit's default
 is 60 seconds). On Playwright, PlaywrightEx.Test closes the test's contexts just before,
-so a call that hangs fails with "Test timeout of 60000ms exceeded." and its call log. A
-Static or LiveView action that never finds its element fails with ExUnit's timeout, so
-set an `action_timeout` to get Fluffy's error with the locator. There is no per-session
-timeout; pass `timeout:` to a call.
+so a call that hangs fails with "Test timeout of 60000ms exceeded." and its call log. In a
+test with `Fluffy.Case`, a LiveView action that never finds its element, or a Phoenix event
+wait, fails at the same moment with Fluffy's error and the same reason. Phoenix-only tests
+without `Fluffy.Case` have no such backstop and fail with ExUnit's timeout, so set an
+`action_timeout` there. There is no per-session timeout; pass `timeout:` to a call.
 
 An operation's `timeout: 0` checks once, unlike Playwright, where `0` disables the timeout.
 Playwright assertions check once too, but Playwright actions and waits reject 0 with an
