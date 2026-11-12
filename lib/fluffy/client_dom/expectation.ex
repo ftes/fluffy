@@ -6,6 +6,8 @@ defmodule Fluffy.ClientDOM.Expectation do
   alias Fluffy.HTML.Aria
   alias Fluffy.HTML.Semantics
   alias Fluffy.Locator.Static
+  # StringUtils is internal to PlaywrightEx, which is pinned.
+  alias PlaywrightEx.Isomorphic.StringUtils
 
   # Evaluate one DOM snapshot. Drivers own retries, negation, and diagnostics.
   def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :count, expected: expected}) do
@@ -192,7 +194,7 @@ defmodule Fluffy.ClientDOM.Expectation do
   end
 
   defp comparable(text, options) do
-    text = if options[:normalize], do: Expect.Internal.normalize_text(text), else: text
+    text = if options[:normalize], do: StringUtils.normalize_white_space(text), else: text
     if options[:ignore_case], do: String.downcase(text), else: text
   end
 

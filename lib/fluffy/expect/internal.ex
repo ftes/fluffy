@@ -6,6 +6,8 @@ defmodule Fluffy.Expect.Internal do
   alias Fluffy.Expect
   alias Fluffy.Locator
   alias Fluffy.Options
+  # StringUtils is internal to PlaywrightEx, which is pinned.
+  alias PlaywrightEx.Isomorphic.StringUtils
   alias PlaywrightEx.Isomorphic.UrlMatch
 
   @doc "Whether `actual` equals `expected` or matches its regular expression."
@@ -53,23 +55,15 @@ defmodule Fluffy.Expect.Internal do
 
   @doc "Whether a page title matches `expected`, comparing normalized whitespace."
   def title_matches?(expected, actual) when is_binary(actual) do
-    actual = normalize_text(actual)
+    actual = StringUtils.normalize_white_space(actual)
 
     case expected do
       %Regex{} -> matches?(expected, actual)
-      expected when is_binary(expected) -> normalize_text(expected) == actual
+      expected when is_binary(expected) -> StringUtils.normalize_white_space(expected) == actual
     end
   end
 
   def title_matches?(_expected, _actual), do: false
-
-  @doc "`text` with Playwright's whitespace normalization."
-  def normalize_text(text) do
-    text
-    |> String.replace(["\u200B", "\u00AD"], "")
-    |> String.replace(~r/\s+/u, " ")
-    |> String.trim()
-  end
 
   @doc "An expectation with validated shared options."
   def new(target, kind, expected, options \\ []) when is_atom(kind) and is_list(options) do

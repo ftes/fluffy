@@ -28,6 +28,8 @@ defmodule Fluffy.Driver.Live do
   alias Fluffy.Locator
   alias Fluffy.Page
   alias Fluffy.Session
+  # StringUtils is internal to PlaywrightEx, which is pinned.
+  alias PlaywrightEx.Isomorphic.StringUtils
 
   @retry_interval 10
 
@@ -470,7 +472,7 @@ defmodule Fluffy.Driver.Live do
   # The page's text as Playwright reads it, without <template> content.
   defp document_text(session) do
     {:ok, root} = session |> client_dom() |> ClientDOM.index() |> DocumentIndex.fetch_by_id(0)
-    root |> Semantics.text() |> normalize()
+    root |> Semantics.text() |> StringUtils.normalize_white_space()
   end
 
   defp resolve_live_action(session, locator, deadline, action) do
@@ -1553,11 +1555,5 @@ defmodule Fluffy.Driver.Live do
     Fluffy.SessionRuntime.release(session.runtime, {:upload_client, upload.pid})
 
     UploadCompat.stop(upload)
-  end
-
-  defp normalize(text) do
-    text
-    |> String.replace(~r/\s+/u, " ")
-    |> String.trim()
   end
 end
