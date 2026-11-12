@@ -293,8 +293,9 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
     test "to_match_aria_snapshot fails with the current snapshot when none is given" do
       session = session_for_html(:playwright, @html)
 
+      # As upstream, a new baseline waits out the timeout against an impossible match.
       assert_raise ExUnit.AssertionError, ~r/New snapshot:.*button "Cast"/s, fn ->
-        expect(session, to_match_aria_snapshot(by_css("#panel"), ""))
+        expect(session, to_match_aria_snapshot(by_css("#panel"), "", timeout: 100))
       end
     end
 
@@ -306,10 +307,11 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
       file = Path.join(tmp_dir, "snapshots/panel.aria.yml")
       page_file = Path.join(tmp_dir, "page.aria.yml")
 
+      # As upstream, writing a missing baseline waits out the timeout.
       ExUnit.CaptureIO.capture_io(fn ->
         session
-        |> expect(to_match_aria_snapshot(by_css("#panel"), path: file))
-        |> expect(page_to_match_aria_snapshot(path: page_file))
+        |> expect(to_match_aria_snapshot(by_css("#panel"), path: file, timeout: 100))
+        |> expect(page_to_match_aria_snapshot(path: page_file, timeout: 100))
       end)
 
       assert File.read!(file) =~ ~s(button "Cast")
