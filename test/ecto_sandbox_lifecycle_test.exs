@@ -36,9 +36,9 @@ defmodule Fluffy.EctoSandboxLifecycleTest do
     observer = start_exit_observer()
     # Registered before the setup's callbacks, so it runs after them.
     on_exit(fn ->
-      {order, browser_context} = exit_order(observer)
+      {order, {browser_context, playwright_browser}} = exit_order(observer)
       assert List.last(order) == :owner
-      refute browser_context.guid in browser_context_guids(PlaywrightEx.BrowserContext.browser(browser_context))
+      refute browser_context.guid in browser_context_guids(playwright_browser)
     end)
 
     assert :ok = Fluffy.Test.setup(context, repos: [TestRepo])
@@ -56,10 +56,13 @@ defmodule Fluffy.EctoSandboxLifecycleTest do
     {:ok, live_view} = Agent.start(fn -> nil end)
     :ok = Fluffy.Backend.Phoenix.register_process(live.runtime, :live_view, live_view, 100)
 
+    # The context's browser is read now: it is closed by the time `on_exit` runs.
+    browser_context = Fluffy.Session.context(browser).browser_context
+
     watch_exits(
       observer,
       %{browser.runtime => :browser, live_view => :live_view, owner => :owner},
-      Fluffy.Session.context(browser).browser_context
+      {browser_context, PlaywrightEx.BrowserContext.browser(browser_context)}
     )
   end
 
