@@ -39,6 +39,21 @@ defmodule Fluffy.Conformance.SessionTimeoutTest do
     end
   end
 
+  # The session timeout is the context's default navigation timeout too, which PlaywrightEx.Test
+  # sets to none.
+  @tag driver: :playwright
+  test "native navigations default to the session timeout" do
+    session = start_session(:playwright, timeout: @session_timeout)
+    started = System.monotonic_time(:millisecond)
+
+    assert {:error, %PlaywrightEx.TimeoutError{}} =
+             unwrap_and_return(session, &PlaywrightEx.Page.wait_for_url(&1, "**/never"))
+
+    elapsed = System.monotonic_time(:millisecond) - started
+    assert elapsed >= @session_timeout - 100
+    assert elapsed < @session_timeout + 3_000
+  end
+
   @tag driver: :playwright
   test "a session timeout too short for Playwright's bookkeeping limits only the operation" do
     session = start_session(:playwright, timeout: 1)

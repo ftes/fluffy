@@ -68,6 +68,9 @@ defmodule Fluffy.Backend.Playwright do
 
       SessionRuntime.run(runtime, fn ->
         :ok = BrowserContext.set_default_timeout(browser_context, timeout)
+        # PlaywrightEx.Test gives the context Playwright Test's navigation default (none),
+        # which navigations take over the default timeout: the session's bounds them too.
+        :ok = BrowserContext.set_default_navigation_timeout(browser_context, timeout)
         _disposable = BrowserContext.add_init_script!(browser_context, Document.init_script())
       end)
 
