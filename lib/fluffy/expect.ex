@@ -288,7 +288,7 @@ defmodule Fluffy.Expect do
 
       expect(session, to_have_screenshot(by_role(:main), name: "main.png"))
 
-  In a module with `use Fluffy.Test`, `PlaywrightEx.Test` resolves `name:` (or, without
+  In a module with `use PlaywrightEx.Test`, `PlaywrightEx.Test` resolves `name:` (or, without
   one, the test's name) to a file, as Playwright does; see "Snapshots" in its docs. A
   missing baseline is written there and fails the test at the end of its body, as in
   Playwright. A mismatch writes `-actual`, `-diff` and `-previous` images to the test's
@@ -382,7 +382,7 @@ defmodule Fluffy.Expect do
   An empty `expected` fails with the current snapshot in its message, to paste in.
 
   The file is found as a screenshot baseline is (see `to_have_screenshot/2`): `name:`, or
-  the test's name, resolved by `PlaywrightEx.Test` in a module with `use Fluffy.Test`, or
+  the test's name, resolved by `PlaywrightEx.Test` in a module with `use PlaywrightEx.Test`, or
   `path:`, relative to the current working directory. A missing file is written and fails
   the test at its end, or passes under `update_snapshots: :missing`; negated, it fails.
   Under `:none` a missing file fails, comparing against an empty snapshot. Negated, a

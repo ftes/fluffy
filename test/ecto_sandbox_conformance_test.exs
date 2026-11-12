@@ -1,6 +1,6 @@
 defmodule Fluffy.EctoSandboxConformanceTest do
   use ExUnit.Case, async: true
-  use Fluffy.Test
+  use PlaywrightEx.Test
 
   import Fluffy
   import Fluffy.Expect
@@ -50,6 +50,31 @@ defmodule Fluffy.EctoSandboxConformanceTest do
 
     assert %PlaywrightEx.ConsoleMessage{} = await(wait)
     assert_receive {:handled, [[^value]]}
+  end
+
+  test "a session a Task of the test starts belongs to the test and its sandbox", %{value: value} do
+    session = Task.await(Task.async(fn -> start_session(:playwright, base_url: Server.base_url()) end))
+
+    # The Task is gone; the session closes with the test.
+    on_exit(fn ->
+      monitor = Process.monitor(session.runtime)
+      assert_receive {:DOWN, ^monitor, :process, _runtime, _reason}, 5_000
+    end)
+
+    session
+    |> visit("/database")
+    |> expect("Static values: #{value}" |> by_text() |> to_be_visible())
+  end
+
+  test "a Phoenix session in a Task of the test uses its sandbox", %{value: value} do
+    Task.await(
+      Task.async(fn ->
+        :phoenix
+        |> start_session(endpoint: Endpoint)
+        |> visit("/database")
+        |> expect("Static values: #{value}" |> by_text() |> to_be_visible())
+      end)
+    )
   end
 
   test "a request after set_extra_http_headers still reaches the sandboxed connection", %{value: value} do

@@ -2,7 +2,7 @@ defmodule Fluffy.PlaywrightArtifactsTest do
   # Fluffy's side of PlaywrightEx.Test's recording: the contexts of a test's sessions are
   # the test's, and steps are its test steps.
   use ExUnit.Case, async: true
-  use Fluffy.Test
+  use PlaywrightEx.Test
 
   import Fluffy
   import Fluffy.Expect

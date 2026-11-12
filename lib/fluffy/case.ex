@@ -21,7 +21,7 @@ defmodule Fluffy.Case do
         end
       end
 
-  It adds `use Fluffy.Test` and `use Fluffy.Assert`, imports `Fluffy` and
+  It adds `use PlaywrightEx.Test` and `use Fluffy.Assert`, imports `Fluffy` and
   `Fluffy.Locator`, aliases `Fluffy.Event`, and starts a session per test, in its
   `session`: Phoenix by default, the backend of a `@tag`, `@describetag` or `@moduletag`
   `backend:` otherwise.
@@ -34,14 +34,14 @@ defmodule Fluffy.Case do
   async: true` stands alone.
 
   It is only a few lines: to change them, copy them into your own case template's
-  `using`, keeping the session setup after `use Fluffy.Test`.
+  `using`, keeping the session setup after `use PlaywrightEx.Test`.
   """
 
   use ExUnit.CaseTemplate
 
   using do
     quote do
-      use Fluffy.Test
+      use PlaywrightEx.Test
       use Fluffy.Assert
 
       import Fluffy

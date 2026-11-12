@@ -7,7 +7,7 @@ defmodule Fluffy.Support.Case do
 
   using do
     quote do
-      use Fluffy.Test
+      use PlaywrightEx.Test
 
       import Fluffy.Support.Case,
         only: [

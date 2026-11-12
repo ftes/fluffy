@@ -40,11 +40,9 @@ defmodule Fluffy.Backend.Phoenix do
   @no_content_statuses [204, 205]
 
   @impl true
-  def start_session(options, attachment) do
+  def start_session(options) do
     # No sandbox header: requests and LiveViews run in the test process or with it in
     # `$callers`, so they use its sandbox connection, as with Phoenix.ConnTest.
-    {runtime, _sandbox_header, _test_context} = attachment
-
     context = %Context{
       http: %HTTPClient{
         base_url: Keyword.fetch!(options, :base_url),
@@ -57,7 +55,7 @@ defmodule Fluffy.Backend.Phoenix do
     }
 
     page = %Page.State{driver: :unvisited, state: %UnvisitedState{}}
-    Session.new(__MODULE__, context, page, runtime)
+    Session.new(__MODULE__, context, page)
   end
 
   # Positive like a session's `timeout:`; an operation's `timeout: 0` checks once.

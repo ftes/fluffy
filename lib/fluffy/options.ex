@@ -118,7 +118,7 @@ defmodule Fluffy.Options do
         type: :string,
         doc:
           "*Playwright only.* The baseline image, a `.png` or `.webp` file, resolved against the current " <>
-            "working directory, in place of `:name`. Required in a module without `use Fluffy.Test`."
+            "working directory, in place of `:name`. Required in a module without `use PlaywrightEx.Test`."
       ]
     ]
   ]

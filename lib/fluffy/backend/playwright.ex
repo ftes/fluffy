@@ -21,9 +21,9 @@ defmodule Fluffy.Backend.Playwright do
   alias PlaywrightEx.TargetClosedError
 
   @impl true
-  def start_session(options, attachment) do
-    {runtime, _sandbox_header, _test_context} = attachment
-    # Raises outside a test, saying to add `use PlaywrightEx.Test`.
+  def start_session(options) do
+    # Raises outside a test, saying to add `use PlaywrightEx.Test`. The session belongs to
+    # the test, also when a Task of it starts the session.
     %{test_pid: test_pid} = PlaywrightEx.Test.info()
     base_url = Keyword.fetch!(options, :base_url)
     config = Options.playwright_config()
@@ -51,19 +51,6 @@ defmodule Fluffy.Backend.Playwright do
       |> Keyword.get_lazy(:browser, fn -> default_browser(test_pid) end)
       |> PlaywrightEx.Browser.new_context!(browser_context_options ++ [base_url: base_url, extra_http_headers: headers])
 
-    :ok =
-      SessionRuntime.register(runtime, {:browser_context, browser_context.guid}, fn ->
-        BrowserContext.close(browser_context)
-      end)
-
-    SessionRuntime.run(runtime, fn ->
-      :ok = BrowserContext.set_default_timeout(browser_context, timeout)
-      _disposable = BrowserContext.add_init_script!(browser_context, Document.init_script())
-    end)
-
-    listen(browser_context, runtime)
-    browser_page = BrowserContext.new_page!(browser_context)
-
     context = %Context{
       browser_context: browser_context,
       base_url: base_url,
@@ -71,7 +58,27 @@ defmodule Fluffy.Backend.Playwright do
       timeout: timeout
     }
 
-    Session.new(__MODULE__, context, page_record(browser_page), runtime)
+    runtime = SessionRuntime.start!(test_pid)
+
+    try do
+      :ok =
+        SessionRuntime.register(runtime, {:browser_context, browser_context.guid}, fn ->
+          BrowserContext.close(browser_context)
+        end)
+
+      SessionRuntime.run(runtime, fn ->
+        :ok = BrowserContext.set_default_timeout(browser_context, timeout)
+        _disposable = BrowserContext.add_init_script!(browser_context, Document.init_script())
+      end)
+
+      listen(browser_context, runtime)
+      browser_page = BrowserContext.new_page!(browser_context)
+      Session.new(__MODULE__, context, page_record(browser_page), runtime)
+    rescue
+      error ->
+        SessionRuntime.close(runtime)
+        reraise error, __STACKTRACE__
+    end
   end
 
   @doc false

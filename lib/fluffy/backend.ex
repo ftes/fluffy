@@ -4,12 +4,8 @@ defmodule Fluffy.Backend do
   alias Fluffy.Session
 
   def start_session(name, options) when is_list(options) do
-    if Keyword.has_key?(options, :scope) do
-      raise ArgumentError, "unknown session option :scope"
-    end
-
-    attachment = Fluffy.TestScope.attach_session()
-    start_session(name, options, attachment)
+    options = name |> Fluffy.Options.validate_session!(options) |> session_options(name)
+    Fluffy.Backend.Registry.module(name).start_session(options)
   end
 
   @doc false
@@ -57,17 +53,6 @@ defmodule Fluffy.Backend do
 
   defp dispatch(session, operation, args) do
     apply(Session.backend(session), operation, [session | args])
-  end
-
-  defp start_session(name, options, attachment) do
-    options = name |> Fluffy.Options.validate_session!(options) |> session_options(name)
-    backend = Fluffy.Backend.Registry.module(name)
-    backend.start_session(options, attachment)
-  rescue
-    error ->
-      {runtime, _header, _test_context} = attachment
-      Fluffy.SessionRuntime.close(runtime)
-      reraise error, __STACKTRACE__
   end
 
   defp session_options(options, :phoenix) do

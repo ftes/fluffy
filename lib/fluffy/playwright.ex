@@ -1297,7 +1297,7 @@ defmodule Fluffy.Playwright do
 
   It is `PlaywrightEx.Test.step/3` at this call's location: the step, with the operations
   in it, is in the test's trace (`test.trace` in `trace.zip`), and steps nest. It needs a
-  module with `use Fluffy.Test`.
+  module with `use PlaywrightEx.Test`.
 
   ## Options
 

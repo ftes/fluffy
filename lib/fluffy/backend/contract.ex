@@ -4,9 +4,8 @@ defmodule Fluffy.Backend.Contract do
   alias Fluffy.Internal.Navigation
   alias Fluffy.Page
   alias Fluffy.Session
-  alias Fluffy.TestScope
 
-  @callback start_session(keyword(), TestScope.attachment()) :: Session.t()
+  @callback start_session(keyword()) :: Session.t()
   @callback new_page(Session.t()) :: Page.t()
   @callback history(Session.t(), :go_back | :go_forward, keyword()) :: Session.t()
   @callback visit(Session.t(), String.t()) :: Session.t()

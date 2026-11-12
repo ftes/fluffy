@@ -84,5 +84,5 @@ defmodule Fluffy.Session do
   defp value!(:ok), do: :ok
   defp value!({:error, message}), do: raise(ArgumentError, message)
 
-  defp start_runtime, do: Fluffy.TestScope.start_runtime()
+  defp start_runtime, do: SessionRuntime.start!(self())
 end

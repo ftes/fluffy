@@ -107,7 +107,6 @@ defmodule Fluffy.MixProject do
         "Core API": [
           Fluffy,
           Fluffy.Case,
-          Fluffy.Test,
           Fluffy.Locator,
           Fluffy.FrameLocator,
           Fluffy.Expect,

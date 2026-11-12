@@ -2,7 +2,7 @@ defmodule Fluffy.PlaywrightDriverLossTest do
   # Kills the shared driver, so it runs after the async tests that use it. Not a
   # Fluffy.Support.Case, whose Firefox tests take a browser of their own.
   use ExUnit.Case, async: false
-  use Fluffy.Test
+  use PlaywrightEx.Test
 
   import Fluffy
   import Fluffy.Expect

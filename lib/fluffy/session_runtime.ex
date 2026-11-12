@@ -8,6 +8,24 @@ defmodule Fluffy.SessionRuntime do
     DynamicSupervisor.start_child(__MODULE__.Supervisor, {__MODULE__, owner: owner})
   end
 
+  # A session's runtime, which stops with `owner`. Started by the owner, it also stops at
+  # the end of the test it runs: ExUnit runs `on_exit` callbacks in reverse, after the test
+  # process exits and also when it fails, so sessions close before the application's
+  # sandbox owners stop, which its DataCase registered first. A Task can't register one.
+  def start!(owner) do
+    {:ok, runtime} = start(owner)
+
+    if owner == self() do
+      try do
+        ExUnit.Callbacks.on_exit(fn -> close(runtime) end)
+      rescue
+        ArgumentError -> :ok
+      end
+    end
+
+    runtime
+  end
+
   def start_link(options), do: GenServer.start_link(__MODULE__, options)
 
   def child_spec(options),
