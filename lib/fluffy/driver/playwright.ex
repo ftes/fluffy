@@ -401,18 +401,16 @@ defmodule Fluffy.Driver.Playwright do
     end
   end
 
-  def screenshot(session, locator, path, options) do
-    options = screenshot_options(session, path, options)
-    locator_action(session, :screenshot, locator, options, &BrowserLocator.screenshot(&1, native(options, &2)))
+  def screenshot(session, locator, options) do
+    options = resolve_mask(options, session)
+    locator_read(session, :screenshot, locator, options, &BrowserLocator.screenshot(&1, native(options, &2)))
   end
 
-  def page_screenshot(session, path, options) do
+  def page_screenshot(session, options) do
     page = Session.page_state(session).page
-    options = screenshot_options(session, path, options)
-    action(session, :screenshot, nil, options, &BrowserPage.screenshot(page, native(options, &1)))
+    options = resolve_mask(options, session)
+    read(session, :screenshot, nil, options, &BrowserPage.screenshot(page, native(options, &1)))
   end
-
-  defp screenshot_options(session, path, options), do: options |> Keyword.put(:path, path) |> resolve_mask(session)
 
   # As in Playwright, page-wide input and emulation have no timeout and wait while
   # a script blocks the page. Unlike a locator action, Playwright does not wait for

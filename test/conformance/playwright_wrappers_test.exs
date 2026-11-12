@@ -83,24 +83,25 @@ defmodule Fluffy.Conformance.PlaywrightWrappersTest do
 
     @html ~s(<button id="a" style="width:80px;height:40px">Cast</button><p id="m">Mask</p>)
 
-    # The page form, screenshot/3, and the element form, screenshot/4.
+    # The page form, screenshot/2, and the element form, screenshot/3.
     defp shots do
       [
-        page: {nil, &Playwright.screenshot(&1, &2, &3)},
-        element: {by_css("#a"), &Playwright.screenshot(&1, by_css("#a"), &2, &3)}
+        page: {nil, &Playwright.screenshot(&1, &2)},
+        element: {by_css("#a"), &Playwright.screenshot(&1, by_css("#a"), &2)}
       ]
     end
 
-    test "saves the page or one element and leaves the session working", %{directory: directory} do
+    test "returns the page or one element, writes path:, and leaves the session working", %{directory: directory} do
       session = session_for_html(:playwright, @html)
 
       for {form, {_locator, shot}} <- shots() do
         png = Path.join([directory, "nested", "#{form}.png"])
         jpeg = Path.join(directory, "#{form}.jpg")
 
-        assert shot.(session, png, []) == session
-        assert shot.(session, jpeg, type: :jpeg, quality: 50, mask: [by_css("#m")]) == session
-        assert <<0x89, "PNG", _rest::binary>> = File.read!(png)
+        assert <<0x89, "PNG", _rest::binary>> = shot.(session, [])
+        assert <<0x89, "PNG", _rest::binary>> = bytes = shot.(session, path: png)
+        assert File.read!(png) == bytes
+        assert <<0xFF, 0xD8, _rest::binary>> = shot.(session, path: jpeg, quality: 50, mask: [by_css("#m")])
         assert <<0xFF, 0xD8, _rest::binary>> = File.read!(jpeg)
       end
 
@@ -110,15 +111,13 @@ defmodule Fluffy.Conformance.PlaywrightWrappersTest do
       expect(session, to_be_visible(by_role(:button)))
     end
 
-    test "takes the path as an argument, and fails like an action", %{directory: directory} do
+    test "fails like an action", %{directory: directory} do
       session = session_for_html(:playwright, @html)
       path = Path.join(directory, "x.png")
 
       for {_form, {locator, shot}} <- shots() do
-        assert_raise NimbleOptions.ValidationError, fn -> shot.(session, path, path: "/tmp/y.png") end
-
         # Playwright rejects quality: for a PNG.
-        error = assert_raise Fluffy.OperationError, fn -> shot.(session, path, quality: 50) end
+        error = assert_raise Fluffy.OperationError, fn -> shot.(session, path: path, quality: 50) end
         assert %Fluffy.OperationError{operation: :screenshot, locator: ^locator} = error
       end
     end
@@ -128,10 +127,9 @@ defmodule Fluffy.Conformance.PlaywrightWrappersTest do
 
       for {form, {_locator, shot}} <- shots() do
         path = Path.join(directory, "#{form}.png")
-        assert_raise ArgumentError, fn -> shot.(session, path, timeout: 0) end
+        assert_raise ArgumentError, fn -> shot.(session, path: path, timeout: 0) end
         refute File.exists?(path)
-        assert shot.(session, path, timeout: :infinity) == session
-        assert File.exists?(path)
+        assert shot.(session, path: path, timeout: :infinity) == File.read!(path)
       end
     end
   end
@@ -504,7 +502,7 @@ defmodule Fluffy.Conformance.PlaywrightWrappersTest do
           fn -> dispatch_event(session, button, "click") end,
           fn -> select_text(session, button) end,
           fn -> scroll_into_view_if_needed(session, button) end,
-          fn -> Playwright.screenshot(session, button, "/tmp/x.png") end,
+          fn -> Playwright.screenshot(session, button) end,
           fn -> set_viewport_size(session, %{width: 1, height: 1}) end,
           fn -> emulate_media(session, color_scheme: :dark) end,
           fn -> Keyboard.press(session, "a") end,

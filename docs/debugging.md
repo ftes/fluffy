@@ -46,12 +46,11 @@ The test's one `trace.zip` covers every page of all its sessions; open it with
 their source; they are `PlaywrightEx.Test.step/3`'s, so Phoenix sessions raise
 `Fluffy.CapabilityError`.
 
-Save an explicit PNG while retaining the pipeline with:
+As in Playwright, `Fluffy.Playwright.screenshot/2` returns the PNG, and `path:` also
+writes it to a file:
 
 ```elixir
-session
-|> Playwright.screenshot("tmp/screenshots/polyjuice.png", full_page: true)
-|> assert(visible(by_text("Potion ready")))
+Playwright.screenshot(session, path: "tmp/screenshots/polyjuice.png", full_page: true)
 ```
 
 `Fluffy.open_browser/1` opens an HTML snapshot of the active page in your default

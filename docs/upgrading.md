@@ -44,9 +44,9 @@ matched once can now match twice.
   `launch_options: [timeout: ...]` that raised the limit on 0.8 now shortens it and can
   fail a loaded machine with `browserType.launch: Timeout ... exceeded`, so drop it.
 - `browser_context:`, `launch_options:` and the options of `storage_state` and cookies
-  pass through to PlaywrightEx, which rejects unknown ones. Page `screenshot/3`
-  validates its options as `screenshot/4` does: `mask:` takes Fluffy locators,
-  `timeout: 0` raises, and `path:` is only the argument.
+  pass through to PlaywrightEx, which rejects unknown ones. Page screenshots
+  validate their options as element screenshots do: `mask:` takes Fluffy locators
+  and `timeout: 0` raises.
 
 ## Timeouts
 
@@ -94,6 +94,12 @@ Timeouts follow Elixir: `0` checks once and `:infinity` means no limit; see
   and replace `setup context do Fluffy.Test.setup(context) end` with `use Fluffy.Test`
   (its options go to `use`) in modules or case templates. Files go to
   `test-results/<test>/`; a failed operation no longer writes HTML or the error text.
+- `Fluffy.Playwright.screenshot` and `pdf` return the image or PDF, as in Playwright,
+  instead of the session; the path is the optional `path:`:
+  `screenshot(session, path)` becomes `screenshot(session, path: path)`,
+  `screenshot(session, locator, path, options)` becomes
+  `screenshot(session, locator, [path: path] ++ options)` and `pdf(session, path)` becomes
+  `pdf(session, path: path)`.
 - `Fluffy.step/3` is `Fluffy.Playwright.step/4`, `PlaywrightEx.Test.step/3` in a pipeline.
   It raises `Fluffy.CapabilityError` on Phoenix, where it used to just run the callback.
 - `filter/2` takes no `exact:`, as in Playwright. Match a whole text with a regex, such as

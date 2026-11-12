@@ -9,8 +9,8 @@ defmodule Fluffy.SessionTypeConsumer do
   @spec visit(keyword(), String.t()) :: Fluffy.Session.t()
   def visit(options, url), do: options |> playwright_session() |> Fluffy.visit(url)
 
-  @spec screenshot(Fluffy.Session.t(), String.t()) :: Fluffy.Session.t()
-  def screenshot(session, path), do: Fluffy.Playwright.screenshot(session, path)
+  @spec screenshot(Fluffy.Session.t(), String.t()) :: binary()
+  def screenshot(session, path), do: Fluffy.Playwright.screenshot(session, path: path)
 
   @spec evaluate(Fluffy.Session.t(), String.t()) :: term()
   def evaluate(session, expression), do: Fluffy.Playwright.evaluate(session, expression)

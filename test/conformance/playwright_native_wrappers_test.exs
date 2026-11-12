@@ -811,12 +811,13 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
 
     @tag :tmp_dir
     @tag skip: if(not playwright_engine?(:chromium), do: "only Chromium prints PDFs")
-    test "pdf saves the page and returns the session", %{tmp_dir: tmp_dir} do
+    test "pdf returns the page and writes it to path:", %{tmp_dir: tmp_dir} do
       session = session_for_html(:playwright, "<p>Harness</p>")
       path = Path.join([tmp_dir, "nested", "page.pdf"])
 
-      assert Playwright.pdf(session, path, landscape: true) == session
-      assert <<"%PDF", _rest::binary>> = File.read!(path)
+      assert <<"%PDF", _rest::binary>> = Playwright.pdf(session)
+      assert <<"%PDF", _rest::binary>> = pdf = Playwright.pdf(session, path: path, landscape: true)
+      assert File.read!(path) == pdf
     end
 
     # As in Playwright, none of these has a timeout.
@@ -835,7 +836,7 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
             &Playwright.add_script_tag(session, [content: "1"] ++ &1),
             &Playwright.add_style_tag(session, [content: "p {}"] ++ &1),
             &Playwright.unroute_all(session, &1),
-            &Playwright.pdf(session, "/tmp/fluffy-never-written.pdf", &1)
+            &Playwright.pdf(session, [path: "/tmp/fluffy-never-written.pdf"] ++ &1)
           ] do
         assert_raise NimbleOptions.ValidationError, ~r/unknown options/, fn -> call.([option]) end
       end
@@ -972,7 +973,7 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
           fn -> Playwright.wait_for_function(session, p, "true") end,
           fn -> Playwright.all(session, p) end,
           fn -> Playwright.drop(session, p, %{data: %{"text/plain" => "x"}}) end,
-          fn -> Playwright.pdf(session, "/tmp/fluffy-never-written.pdf") end,
+          fn -> Playwright.pdf(session) end,
           fn -> Playwright.bring_to_front(session) end,
           fn -> Playwright.content(session) end,
           fn -> Playwright.title(session) end,

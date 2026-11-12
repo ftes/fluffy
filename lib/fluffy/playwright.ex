@@ -470,7 +470,10 @@ defmodule Fluffy.Playwright do
   @doc group: "Diagnostics and native access"
   @doc playwright_only: true
   @doc """
-  Saves the active page as a PDF and returns the session.
+  Returns the active page as a PDF binary, as Playwright's `page.pdf()`. With `path:`,
+  it also writes the file.
+
+      pdf = Fluffy.Playwright.pdf(session, path: "tmp/half-blood-prince.pdf")
 
   Browsers other than Chromium cannot generate one and raise. Phoenix sessions raise
   `Fluffy.CapabilityError`.
@@ -481,12 +484,11 @@ defmodule Fluffy.Playwright do
 
   #{NimbleOptions.docs(Options.action_schema(:pdf))}
   """
-  @spec pdf(Session.t(), Path.t(), [pdf_option()]) :: Session.t()
-  def pdf(%Session{} = session, path, options \\ []) when is_binary(path) do
+  @spec pdf(Session.t(), [pdf_option()]) :: binary()
+  def pdf(%Session{} = session, options \\ []) do
     ensure_playwright_backend!(session, :pdf)
     native = Options.validate_action!(:pdf, options)
-    native = Keyword.put(native, :path, path)
-    page_action(session, :pdf, &PlaywrightEx.Page.pdf(&1, native))
+    page_read(session, :pdf, &PlaywrightEx.Page.pdf(&1, native))
   end
 
   @doc group: "Lifecycle and navigation"
@@ -740,9 +742,12 @@ defmodule Fluffy.Playwright do
   @doc group: "Diagnostics and native access"
   @doc playwright_only: true
   @doc """
-  Saves a screenshot of the active page and returns the session.
+  Returns a screenshot of the active page as a binary, as Playwright's
+  `page.screenshot()`. With `path:`, it also writes the file.
 
-  Pass a locator and a path to capture one element, see `screenshot/4`.
+      png = Fluffy.Playwright.screenshot(session, path: "tmp/marauders-map.png", full_page: true)
+
+  Pass a locator to capture one element, see `screenshot/3`.
 
   ## Options
 
@@ -750,23 +755,23 @@ defmodule Fluffy.Playwright do
 
   #{NimbleOptions.docs(Options.action_schema(:page_screenshot))}
   """
-  @spec screenshot(Session.t(), Path.t(), [page_screenshot_option()]) :: Session.t()
-  @spec screenshot(Session.t(), Fluffy.Locator.t(), Path.t()) :: Session.t()
-  def screenshot(session, target, path_or_options \\ [])
+  @spec screenshot(Session.t(), [page_screenshot_option()]) :: binary()
+  @spec screenshot(Session.t(), Fluffy.Locator.t()) :: binary()
+  def screenshot(session, locator_or_options \\ [])
 
-  def screenshot(session, path, options) when is_binary(path) and is_list(options) do
+  def screenshot(%Session{} = session, options) when is_list(options) do
     ensure_playwright_backend!(session, :screenshot)
     options = Options.validate_action!(:page_screenshot, options)
-    Fluffy.__dispatch_driver__(session, :page_screenshot, [path, options])
+    Fluffy.__dispatch_driver__(session, :page_screenshot, [options])
   end
 
-  def screenshot(session, %Fluffy.Locator{} = locator, path) when is_binary(path),
-    do: screenshot(session, locator, path, [])
+  def screenshot(session, %Fluffy.Locator{} = locator), do: screenshot(session, locator, [])
 
   @doc group: "Diagnostics and native access"
   @doc playwright_only: true
   @doc """
-  Saves a screenshot of one element and returns the session.
+  Returns a screenshot of one element as a binary, as Playwright's
+  `locator.screenshot()`. With `path:`, it also writes the file.
 
   ## Options
 
@@ -774,11 +779,11 @@ defmodule Fluffy.Playwright do
 
   #{NimbleOptions.docs(Options.action_schema(:locator_screenshot))}
   """
-  @spec screenshot(Session.t(), Fluffy.Locator.t(), Path.t(), [locator_screenshot_option()]) :: Session.t()
-  def screenshot(%Session{} = session, %Fluffy.Locator{} = locator, path, options) when is_binary(path) do
+  @spec screenshot(Session.t(), Fluffy.Locator.t(), [locator_screenshot_option()]) :: binary()
+  def screenshot(%Session{} = session, %Fluffy.Locator{} = locator, options) when is_list(options) do
     ensure_playwright_backend!(session, :screenshot)
     options = Options.validate_action!(:locator_screenshot, options)
-    Fluffy.__dispatch_driver__(session, :screenshot, [locator, path, options])
+    Fluffy.__dispatch_driver__(session, :screenshot, [locator, options])
   end
 
   @doc group: "JavaScript"

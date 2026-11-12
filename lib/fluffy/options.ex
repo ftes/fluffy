@@ -93,8 +93,7 @@ defmodule Fluffy.Options do
   ]
 
   @fluffy_native_keys [:timeout]
-  # `path` is the positional argument of a screenshot.
-  @denied_native_keys [:no_wait_after, :signal, :path]
+  @denied_native_keys [:no_wait_after, :signal]
 
   # Upstream docs and types of a passed-through option that Fluffy's behavior completes.
   @native_option_overrides [
@@ -118,8 +117,8 @@ defmodule Fluffy.Options do
     ]
   ]
 
-  # A screenshot's positional `path` is denied above; a baseline's `path:` is upstream's
-  # option, which PlaywrightEx requires outside a `PlaywrightEx.Test` test.
+  # These replace the upstream option of the same name: a baseline's `path:`, which
+  # PlaywrightEx requires outside a `PlaywrightEx.Test` test.
   @required_action_options [
     to_have_screenshot: [
       path: [
@@ -131,8 +130,8 @@ defmodule Fluffy.Options do
     ]
   ]
 
-  # `path:` of a script or style tag is the file to inject, not a screenshot's positional
-  # path, so these are not classified with the upstream options above.
+  # `path:` of a script or style tag is the file to inject, not a file to write, so these
+  # are not classified with the upstream options above.
   @tag_options [
     content: [type: :string, doc: "Raw source to inject."],
     path: [type: :string, doc: "File to inject, resolved against the current working directory."],
@@ -142,12 +141,14 @@ defmodule Fluffy.Options do
   @action_schemas @native_actions
                   |> Kernel.++(@playwright_actions)
                   |> Map.new(fn {action, {module, fun, _arity}} ->
+                    required = Keyword.get(@required_action_options, action, [])
+                    excluded = @fluffy_native_keys ++ @denied_native_keys ++ Keyword.keys(required)
+
                     native =
-                      for {key, entry} <- Native.schema(module, fun, @fluffy_native_keys ++ @denied_native_keys) do
+                      for {key, entry} <- Native.schema(module, fun, excluded) do
                         {key, Keyword.merge(entry, Keyword.get(@native_option_overrides, key, []))}
                       end
 
-                    required = Keyword.get(@required_action_options, action, [])
                     timeout = if action in @untimed_actions, do: [], else: @timeout_options
                     {action, NimbleOptions.new!(timeout ++ required ++ native)}
                   end)

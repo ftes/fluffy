@@ -134,8 +134,9 @@ For character-by-character browser typing, use `Fluffy.Playwright.press_sequenti
 `Fluffy.Playwright` wraps more of Playwright's actions, such as `dblclick`, `tap`,
 `dispatch_event`, `select_text`, `scroll_into_view_if_needed`, element `screenshot`,
 `set_viewport_size`, and `emulate_media`. `Fluffy.Playwright.Keyboard` and
-`Fluffy.Playwright.Mouse` send page-wide input. Each returns the session and
-raises `Fluffy.CapabilityError` on Phoenix:
+`Fluffy.Playwright.Mouse` send page-wide input. Each returns the session, except
+`screenshot`, which returns the image as in Playwright, and raises
+`Fluffy.CapabilityError` on Phoenix:
 
 ```elixir
 alias Fluffy.Playwright
@@ -147,7 +148,7 @@ session
 |> Playwright.dblclick(by_role(:cell, name: "Fluffy"))
 |> Keyboard.press("Enter")
 |> assert(visible(by_text("Fluffy's chamber")))
-|> Playwright.screenshot(by_css("table"), "tmp/creatures.png")
+|> Playwright.screenshot(by_css("table"), path: "tmp/creatures.png")
 ```
 
 As in Playwright, page-wide input and `dispatch_event` do not wait for a navigation
