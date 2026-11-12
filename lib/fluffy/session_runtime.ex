@@ -32,23 +32,18 @@ defmodule Fluffy.SessionRuntime do
   def release(runtime, resource), do: call(runtime, {:release_resource, resource})
 
   # Runs `fun` in the runtime process, so the runtime owns what it creates.
-  def run(runtime, fun) when is_function(fun, 0) do
-    case call(runtime, {:run, fun}) do
-      {:ok, value} -> value
-      {:raise, kind, reason, stacktrace} -> :erlang.raise(kind, reason, stacktrace)
-      {:error, message} -> raise ArgumentError, message
-    end
-  end
+  def run(runtime, fun) when is_function(fun, 0), do: runtime |> call({:run, fun}) |> value!()
 
   # Like `run/2` for a `fun` returning `{value, resource, cleanup}`: the cleanup
   # is registered in the same call, so the resource never goes unregistered.
-  def run_registered(runtime, fun) when is_function(fun, 0) do
-    case call(runtime, {:run_registered, fun}) do
-      {:ok, value} -> value
-      {:raise, kind, reason, stacktrace} -> :erlang.raise(kind, reason, stacktrace)
-      {:error, message} -> raise ArgumentError, message
-    end
-  end
+  def run_registered(runtime, fun) when is_function(fun, 0), do: runtime |> call({:run_registered, fun}) |> value!()
+
+  # Unwraps a reply: re-raises what a `run/2` fun raised, and raises an error,
+  # such as a closed session, as an `ArgumentError`.
+  def value!({:ok, value}), do: value
+  def value!(:ok), do: :ok
+  def value!({:raise, kind, reason, stacktrace}), do: :erlang.raise(kind, reason, stacktrace)
+  def value!({:error, message}), do: raise(ArgumentError, message)
 
   def subscribe(runtime, pid, source, type, handler), do: call(runtime, {:subscribe, pid, source, type, handler})
   def unsubscribe(runtime, pid), do: call(runtime, {:unsubscribe, pid})

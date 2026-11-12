@@ -88,10 +88,5 @@ defmodule Fluffy.Request do
     end
   end
 
-  defp context!(%__MODULE__{runtime: runtime}) do
-    case SessionRuntime.context(runtime) do
-      {:ok, context} -> context
-      {:error, message} -> raise ArgumentError, message
-    end
-  end
+  defp context!(%__MODULE__{runtime: runtime}), do: SessionRuntime.value!(SessionRuntime.context(runtime))
 end

@@ -96,10 +96,9 @@ defmodule Fluffy.Event do
   def off(session, event, handler, options) when is_function(handler, 1) do
     {source, _options} = registration(session, event, options, :listener)
 
-    case SessionRuntime.remove_listener(session.runtime, source, event.type, handler) do
-      {:ok, nil} -> :ok
-      {:ok, pid} -> Subscription.remove(pid)
-      {:error, message} -> raise ArgumentError, message
+    case SessionRuntime.value!(SessionRuntime.remove_listener(session.runtime, source, event.type, handler)) do
+      nil -> :ok
+      pid -> Subscription.remove(pid)
     end
 
     session
