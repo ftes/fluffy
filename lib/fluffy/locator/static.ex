@@ -8,8 +8,6 @@ defmodule Fluffy.Locator.Static do
   alias PlaywrightEx.Isomorphic.StringUtils
   alias PlaywrightEx.RegExp
 
-  @labelled_control_selector Enum.join(Semantics.labelable_tags(), ", ")
-
   # Operations that search inside each candidate. As in Playwright's chains, they
   # find descendants only, except that its text engine also matches the scope itself.
   @descendant_queries [:css, :attribute, :test_id]
@@ -144,17 +142,16 @@ defmodule Fluffy.Locator.Static do
   defp self_and_scoped_nodes(%Aria{index: %{document: document}} = aria, document), do: Aria.scoped_nodes(aria, document)
   defp self_and_scoped_nodes(aria, scope), do: [{Aria.node_for(aria, scope), scope} | Aria.scoped_nodes(aria, scope)]
 
-  # A label or an aria-labelledby reference may be anywhere in the document; only
-  # the control has to be inside the scope.
+  # Playwright's label engine: the elements in scope with a matching label, by
+  # getElementLabels. A label or reference may be anywhere in the document.
   defp label_matches(scopes, aria, text, options) do
-    labelled =
-      aria.index.document
-      |> labelled_controls(aria, text, Keyword.get(options, :exact, false))
-      |> MapSet.new(&Aria.node_for(aria, &1).id)
+    exact? = Keyword.get(options, :exact, false)
 
     scopes
     |> scoped_nodes(aria)
-    |> Enum.filter(fn {node, _element} -> MapSet.member?(labelled, node.id) end)
+    |> Enum.filter(fn {node, _element} ->
+      aria |> Aria.element_labels(node) |> Enum.any?(&text_matches?(&1, text, exact?))
+    end)
     |> Enum.map(fn {_node, element} -> element end)
   end
 
@@ -179,76 +176,6 @@ defmodule Fluffy.Locator.Static do
     scopes
     |> Enum.flat_map(fn scope -> scope |> LazyHTML.query(selector) |> Enum.to_list() end)
     |> Enum.uniq()
-  end
-
-  defp labelled_controls(scope, aria, expected, exact?) do
-    controls = query_scopes([scope], @labelled_control_selector)
-
-    html_labelled =
-      scope
-      |> LazyHTML.query("label")
-      |> Enum.filter(&text_matches?(text(aria, &1), expected, exact?))
-      |> Enum.flat_map(fn label ->
-        case element_attribute(label, "for") do
-          nil ->
-            label
-            |> LazyHTML.query(@labelled_control_selector)
-            |> Enum.filter(&labelable?/1)
-            |> Enum.take(1)
-
-          id ->
-            Enum.filter(controls, &(element_attribute(&1, "id") == id and labelable?(&1)))
-        end
-      end)
-      |> Enum.reject(&has_author_label?/1)
-
-    aria_labelled =
-      [scope]
-      |> query_scopes("[aria-label], [aria-labelledby]")
-      |> Enum.filter(fn control ->
-        case element_attribute(control, "aria-labelledby") do
-          nil -> direct_label_matches?(control, expected, exact?)
-          _references -> referenced_label_matches?(scope, aria, control, expected, exact?)
-        end
-      end)
-
-    html_labelled ++ aria_labelled
-  end
-
-  defp direct_label_matches?(control, expected, exact?) do
-    case element_attribute(control, "aria-label") do
-      nil -> false
-      label -> text_matches?(label, expected, exact?)
-    end
-  end
-
-  defp labelable?(control) do
-    case LazyHTML.to_tree(control) do
-      [{tag, attributes, _children}] -> Semantics.labelable?(%{tag: tag, attributes: attributes})
-      _other -> false
-    end
-  end
-
-  defp has_author_label?(control) do
-    element_attribute(control, "aria-labelledby") != nil or
-      element_attribute(control, "aria-label") != nil
-  end
-
-  defp referenced_label_matches?(scope, aria, control, expected, exact?) do
-    case element_attribute(control, "aria-labelledby") do
-      nil ->
-        false
-
-      ids ->
-        references = String.split(ids)
-
-        scope
-        |> LazyHTML.query("[id]")
-        |> Enum.any?(fn reference ->
-          element_attribute(reference, "id") in references and
-            text_matches?(text(aria, reference), expected, exact?)
-        end)
-    end
   end
 
   defp node_text_matches?(%{tag: tag}, _expected, _exact?) when tag in ~w(script style noscript), do: false

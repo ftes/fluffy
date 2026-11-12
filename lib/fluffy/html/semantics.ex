@@ -61,8 +61,6 @@ defmodule Fluffy.HTML.Semantics do
   # option.text apply it.
   def collapse_whitespace(text), do: text |> String.split(~r/[\t\n\f\r ]+/, trim: true) |> Enum.join(" ")
 
-  def labelable_tags, do: @labelable_tags
-
   def labelable?(%{tag: "input"} = target), do: input_type(target) != "hidden"
   def labelable?(%{tag: tag}), do: tag in @labelable_tags
 

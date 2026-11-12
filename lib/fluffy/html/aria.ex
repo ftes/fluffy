@@ -225,6 +225,27 @@ defmodule Fluffy.HTML.Aria do
     end
   end
 
+  # selectorUtils.ts getElementLabels, what Playwright's label engine (getByLabel)
+  # matches: the text of each aria-labelledby reference, else a non-blank
+  # aria-label, else the text of each label of a labelable element.
+  def element_labels(%__MODULE__{} = aria, node) do
+    aria_label = text_attribute(node, "aria-label")
+
+    cond do
+      labelled_by = aria_labelled_by_elements(aria, node) -> Enum.map(labelled_by, &Semantics.text/1)
+      not blank?(aria_label) -> [aria_label]
+      true -> aria |> labels(node) |> Enum.map(&Semantics.text(fetch(aria, &1)))
+    end
+  end
+
+  # roleUtils.ts getAriaLabelledByElements: nil unless a reference is valid.
+  defp aria_labelled_by_elements(aria, node) do
+    case references(aria, node, "aria-labelledby") do
+      [] -> nil
+      ids -> Enum.map(ids, &fetch(aria, &1))
+    end
+  end
+
   defp html_ids(aria) do
     aria
     |> all_nodes()
@@ -772,6 +793,7 @@ defmodule Fluffy.HTML.Aria do
 
   defp placeholder_control?(_node), do: false
 
+  # A labelable element's `labels`, in document order.
   defp labels(aria, node), do: Map.get(aria.labels, node.id, [])
 
   defp labels_name(aria, node, visited) do
