@@ -157,50 +157,37 @@ printed; the trace has them. To log them, register a listener, such as
 `on(session, Event.console(), &Logger.info(PlaywrightEx.ConsoleMessage.text(&1)))`.
 
 Set `browser_name: :firefox` or `browser_name: :webkit` after installing the
-corresponding browser (`mix playwright_ex.install -- firefox`); on Firefox, also give
-sessions an exclusive browser, as below.
+corresponding browser (`mix playwright_ex.install -- firefox`).
 See [Browser baseline](capabilities.md#browser-baseline) for conformance coverage.
 Fluffy creates a fresh isolated `BrowserContext` for each session, in the browser of
-its `browser:` option, else in the shared browser of
-`PlaywrightEx.Test.BrowserPool.shared/1`. No driver or browser starts until a session
-needs one, a lost browser is launched again for the next session, and the drivers stop
-after the suite. For more users in a test, start more
-sessions: each gets its own browser context.
-
-Firefox dispatches input for all of a browser's pages in one queue and times out under
-load, so on Firefox give each test an exclusive browser from
-`PlaywrightEx.Test.BrowserPool.exclusive/1` (one browser per worker, like Playwright Test):
-
-```elixir
-start_session(:playwright, browser: PlaywrightEx.Test.BrowserPool.exclusive())
-```
-
-The test holds it until it ends, and its further `exclusive()` calls return the same
-browser. At most `workers` are out at once (`config :playwright_ex, :test`, half the
-schedulers); see [Exclusive browsers](`e:playwright_ex:testing-with-exunit.md#exclusive-browsers`)
-in PlaywrightEx's guide. `Fluffy.Case` uses the shared browser, so on Firefox write your own
-session setup.
+its `browser:` option, else in the test's browser from
+`PlaywrightEx.Test.BrowserPool.browser/1`, Playwright Test's worker-scoped `browser`. The
+test holds that browser until it ends, and a test that starts no Playwright session takes
+none. At most `workers` tests hold one at once (`config :playwright_ex, :test`, half the
+schedulers by default), others wait for one; see
+[Workers](`e:playwright_ex:testing-with-exunit.md#workers`). No driver or browser starts
+until a session needs one, a lost browser is launched again for the next session, and the
+drivers stop after the suite. For more users in a test, start more sessions: each gets its
+own browser context.
 
 To debug one test headed or slowed down, pass it a browser with its own `launch_options:`,
 merged over the config:
 
 ```elixir
-browser = PlaywrightEx.Test.BrowserPool.exclusive(launch_options: [headless: false, slow_mo: 500])
+browser = PlaywrightEx.Test.BrowserPool.browser(launch_options: [headless: false, slow_mo: 500])
 
 :playwright
 |> start_session(browser: browser)
 |> visit("/creatures")
 ```
 
-Take it from `PlaywrightEx.Test.BrowserPool.exclusive/1`, not `shared/1`: a shared browser is
-never evicted, so a headed one stays open until the suite ends. Call it in `setup_all` to cover
-a module; `browser_name:` and `driver:` override the same way. See
-[Debugging one test](`e:playwright_ex:testing-with-exunit.md#debugging-one-test`).
+Call it in `setup_all` to cover a module; `browser_name:` and `driver:` override the same
+way. See [Debugging one test](`e:playwright_ex:testing-with-exunit.md#debugging-one-test`).
 
 To run the browsers on a Playwright server, such as Playwright's Docker image, set
 `connect_options: [ws_endpoint: "ws://localhost:3000/", expose_network: "<loopback>"]` in
 `config :playwright_ex, :test`, or give one session
-`browser: PlaywrightEx.Test.BrowserPool.exclusive(connect_options: [...])`. The remote browser
+`browser: PlaywrightEx.Test.BrowserPool.browser(connect_options: [...])`. The remote browser
 must reach your app, as pages, the Ecto sandbox header and the LiveView socket go to `base_url`:
 `expose_network: "<loopback>"` tunnels `localhost` and `127.0.0.1` to your machine, so
 `base_url` stays as it is. Otherwise `base_url` must be an address the container reaches, such as

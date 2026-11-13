@@ -90,18 +90,19 @@ defmodule Fluffy.BrowserContextConfigurationTest do
     end
 
     assert_raise ArgumentError, ~r/browser.*Playwright/, fn ->
-      start_session(:phoenix, endpoint: Endpoint, browser: BrowserPool.shared())
+      start_session(:phoenix, endpoint: Endpoint, browser: BrowserPool.browser())
     end
   end
 
-  test "creates the context in the browser: given, else in the default one" do
-    browser = BrowserPool.exclusive()
-    session = start_session(:playwright, base_url: Server.base_url(), browser: browser)
-    assert Fluffy.Session.context(session).browser_context.guid in browser_context_guids(browser)
+  test "creates the context in the browser: given, else in the test's" do
+    # Other launch options, so another browser on the test's driver.
+    given = BrowserPool.browser(launch_options: [timeout: 60_000])
+    session = start_session(:playwright, base_url: Server.base_url(), browser: given)
+    assert Fluffy.Session.context(session).browser_context.guid in browser_context_guids(given)
 
-    # On Firefox, the suite's default is this test's exclusive browser too.
     default = start_session(:playwright, base_url: Server.base_url())
-    in_browser? = Fluffy.Session.context(default).browser_context.guid in browser_context_guids(browser)
-    assert in_browser? == playwright_engine?(:firefox)
+    guid = Fluffy.Session.context(default).browser_context.guid
+    assert guid in browser_context_guids(BrowserPool.browser())
+    refute guid in browser_context_guids(given)
   end
 end

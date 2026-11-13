@@ -19,8 +19,6 @@ defmodule Fluffy.Support.Case do
           put_fluffy_config: 1,
           put_playwright_ex_config: 2
         ]
-
-      setup {Fluffy.Support.Case, :exclusive_firefox}
     end
   end
 
@@ -28,14 +26,6 @@ defmodule Fluffy.Support.Case do
   # Read at call time, as the config can differ between runs (FLUFFY_BROWSER).
   def playwright_engine?(engine),
     do: engine == Keyword.get(Application.get_env(:playwright_ex, :test, []), :browser_name, :chromium)
-
-  # Firefox dispatches input for all of a browser's pages in one queue: a browser per test,
-  # taken at its first Playwright session, as Playwright Test's workers have one.
-  def exclusive_firefox(_context) do
-    if playwright_engine?(:firefox),
-      do: Fluffy.Backend.Playwright.put_default_browser(&PlaywrightEx.Test.BrowserPool.exclusive/0),
-      else: :ok
-  end
 
   # The application's sandbox owners, as a generated DataCase starts them: Fluffy only
   # passes the test's sandbox to browser sessions. `setup {Fluffy.Support.Case, :start_sandbox}`.

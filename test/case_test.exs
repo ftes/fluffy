@@ -2,9 +2,6 @@ defmodule Fluffy.CaseTest do
   use ExUnit.Case, async: true
   use Fluffy.Case
 
-  # Before Fluffy.Case's session setup.
-  setup {Fluffy.Support.Case, :exclusive_firefox}
-
   test "starts a Phoenix session by default", %{session: session} do
     session
     |> visit("/live/fluffy")
@@ -23,8 +20,34 @@ defmodule Fluffy.CaseTest do
   end
 end
 
+defmodule Fluffy.CaseBrowserLeaseTest do
+  # A test takes a browser from PlaywrightEx.Test's pool, and with it one of `workers`
+  # leases, only for a Playwright session. The pool has no public view of its leases, so this
+  # reads its state: the leases by scope, here the test process, until the test's `on_exit`.
+  use ExUnit.Case, async: true
+  use Fluffy.Case
+
+  test "takes no browser without a Playwright session", %{session: session} do
+    session
+    |> visit("/live/fluffy")
+    |> assert(visible(by_text("Guardian head count: 0")))
+
+    refute holds_lease?()
+  end
+
+  @tag backend: :playwright
+  test "takes the test's browser for a Playwright session", %{session: session} do
+    assert Fluffy.Session.current_driver(session) == :playwright
+    assert holds_lease?()
+  end
+
+  defp holds_lease? do
+    pool = Process.whereis(PlaywrightEx.Test.Pool)
+    pool != nil and Map.has_key?(:sys.get_state(pool).leases, self())
+  end
+end
+
 defmodule Fluffy.CaseWithPlaywrightExTestTest do
-  # A second `use PlaywrightEx.Test` registers no second setup, which would raise.
   use ExUnit.Case, async: true
   use Fluffy.Case
   use PlaywrightEx.Test

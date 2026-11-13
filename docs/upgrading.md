@@ -96,8 +96,9 @@ means no limit; see [Timeouts](installation.md#timeouts).
   Playwright; on Playwright, assert on `Fluffy.Event.response/1` instead.
 - Configure the browser with `config :playwright_ex, :test, browser_name: ..., launch_options:
   ...` (`driver: [executable: ...]` for a CLI) instead of `config :fluffy, :playwright`,
-  which is removed; on Firefox, replace `pool_size` with `start_session(:playwright, browser: PlaywrightEx.Test.BrowserPool.exclusive())`
-  ([Exclusive browsers](`e:playwright_ex:testing-with-exunit.md#exclusive-browsers`)).
+  which is removed. `pool_size` goes too: each test takes its own browser from
+  `PlaywrightEx.Test.BrowserPool.browser/1`, at most `workers` at once
+  ([Workers](`e:playwright_ex:testing-with-exunit.md#workers`)).
 - `Fluffy.Playwright.trace/2`, `artifact_dir` and `trace_dir` are removed. Traces,
   screenshots and videos come from `PlaywrightEx.Test`: set
   `config :playwright_ex, :test, trace: :retain_on_failure, screenshot: :only_on_failure`

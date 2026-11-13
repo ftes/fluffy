@@ -1,7 +1,6 @@
 defmodule Fluffy.PlaywrightDriverLossTest do
-  # Kills the shared driver, so it runs after the async tests that use it. Not a
-  # Fluffy.Support.Case, whose Firefox tests take a browser of their own.
-  use ExUnit.Case, async: false
+  # Kills the test's own driver, which PlaywrightEx.Test's pool replaces.
+  use ExUnit.Case, async: true
   use PlaywrightEx.Test
 
   import Fluffy
@@ -48,9 +47,9 @@ defmodule Fluffy.PlaywrightDriverLossTest do
     end
   end
 
-  # The driver of the shared browser in PlaywrightEx.Test's pool.
+  # The driver of the test's browser in PlaywrightEx.Test's pool.
   defp kill_driver do
-    playwright = BrowserPool.playwright(BrowserPool.shared())
+    playwright = BrowserPool.playwright(BrowserPool.browser())
     driver = PlaywrightEx.Runtime.Heap.get(playwright, :driverProcess)
     %{port: port} = :sys.get_state(driver)
     {:os_pid, os_pid} = Port.info(port, :os_pid)

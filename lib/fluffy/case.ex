@@ -34,8 +34,8 @@ defmodule Fluffy.Case do
   async: true` stands alone.
 
   It is only a few lines: to change them, copy them into your own case template's
-  `using`, keeping the session setup after `use PlaywrightEx.Test`. On Firefox, write your
-  own session setup with `browser: PlaywrightEx.Test.BrowserPool.exclusive()`; see
+  `using`, keeping the session setup after `use PlaywrightEx.Test`. A test takes a browser
+  from `PlaywrightEx.Test.BrowserPool.browser/1` only when it starts a Playwright session; see
   [Playwright setup](installation.md#playwright-setup).
   """
 

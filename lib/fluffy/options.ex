@@ -346,9 +346,9 @@ defmodule Fluffy.Options do
                       type: {:struct, PlaywrightEx.Browser},
                       doc:
                         "*Playwright only.* The `PlaywrightEx.Browser` the session's context is created in. " <>
-                          "Defaults to the browser of `PlaywrightEx.Test.BrowserPool.shared/1`; " <>
-                          "on Firefox, or to override launch options such as `headless: false` for one test, " <>
-                          "pass the test's own from `PlaywrightEx.Test.BrowserPool.exclusive/1` " <>
+                          "Defaults to the test's browser from `PlaywrightEx.Test.BrowserPool.browser/1`; " <>
+                          "to override launch options such as `headless: false` for one test, " <>
+                          "pass `PlaywrightEx.Test.BrowserPool.browser(launch_options: ...)` " <>
                           "([Playwright setup](installation.md#playwright-setup))."
                     ]
                   )

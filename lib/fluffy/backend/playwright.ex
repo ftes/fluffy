@@ -43,10 +43,11 @@ defmodule Fluffy.Backend.Playwright do
     # defaults, also from a process with the test in `$callers`; the runtime closes it with
     # the session. As in Playwright, closing has
     # no timeout. A browser lost to a dead driver still refuses contexts until its
-    # disconnect arrives; as in Playwright Test, that session fails.
+    # disconnect arrives; as in Playwright Test, that session fails. The default browser is
+    # the test's lease of the pool, taken here so a test without a Playwright session takes none.
     browser_context =
       options
-      |> Keyword.get_lazy(:browser, fn -> default_browser(test_pid) end)
+      |> Keyword.get_lazy(:browser, &PlaywrightEx.Test.BrowserPool.browser/0)
       |> PlaywrightEx.Browser.new_context!(browser_context_options ++ [base_url: base_url, extra_http_headers: headers])
 
     context = %Context{
@@ -78,22 +79,6 @@ defmodule Fluffy.Backend.Playwright do
       error ->
         SessionRuntime.close(runtime)
         reraise error, __STACKTRACE__
-    end
-  end
-
-  @doc false
-  # Fluffy's own Firefox suite: the browser of a test's sessions without `browser:`, chosen
-  # at its first Playwright session by `browser_fun` (`&BrowserPool.exclusive/0`). Kept by
-  # the test process, so its Tasks find it and it goes with the test. Not public API.
-  def put_default_browser(browser_fun) when is_function(browser_fun, 0) do
-    {:ok, _owner} = Registry.register(__MODULE__.DefaultBrowser, self(), browser_fun)
-    :ok
-  end
-
-  defp default_browser(test_pid) do
-    case Registry.lookup(__MODULE__.DefaultBrowser, test_pid) do
-      [{^test_pid, browser_fun}] -> browser_fun.()
-      [] -> PlaywrightEx.Test.BrowserPool.shared()
     end
   end
 
