@@ -17,9 +17,11 @@ matched once can now match twice.
   `node_modules/.bin/playwright`, not `cli.js`; usually drop it and let PlaywrightEx
   install the driver.
 - Run the install in CI too, with `-- chromium --with-deps` on Linux runners; the driver
-  would install itself in the first browser test, but browsers do not. For a system
-  browser, as on Nix or in Docker, pass `--no-browsers` and set
-  `launch_options: [executable_path: ...]` or `channel:`; see
+  would install itself in the first browser test, but browsers do not; see
+  [GitHub Actions](`e:playwright_ex:debugging-and-ci.md#github-actions`). In Microsoft's
+  Playwright image, whose tag must match `PlaywrightEx.Driver.version/0`, `--no-browsers`
+  is enough: the driver finds the image's browsers. For a system browser, as on Nix, pass
+  `--no-browsers` and set `launch_options: [executable_path: ...]` or `channel:`; see
   [Playwright setup](installation.md#playwright-setup).
 - Prefer `only: [:dev, :test]` to `only: :test`, so PlaywrightEx's Mix tasks and
   `mix usage_rules.sync` work in `:dev`, and widen the `lazy_html` line `phx.new`

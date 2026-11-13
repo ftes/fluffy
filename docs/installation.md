@@ -119,7 +119,8 @@ mix playwright_ex.install -- chromium
 ```
 
 On Linux CI runners, add `--with-deps` to install the browser's system packages too:
-`mix playwright_ex.install -- chromium --with-deps`.
+`mix playwright_ex.install -- chromium --with-deps`. See
+[GitHub Actions](`e:playwright_ex:debugging-and-ci.md#github-actions`) for a workflow.
 
 Configure the backend in `config/test.exs`. The browser and its driver are
 `PlaywrightEx.Test`'s; the [timeouts](#timeouts) are Fluffy's:
@@ -138,9 +139,14 @@ config :playwright_ex, :test,
 
 `launch_options` are passed to `PlaywrightEx.BrowserType.launch/2` unchanged. Set
 `launch_options: [timeout: 10_000]` to limit browser launch; otherwise Playwright's
-default of 3 minutes applies. To use a system browser, set
-`launch_options: [executable_path: System.find_executable("google-chrome-stable")]`.
-`mix playwright_ex.install --no-browsers` installs only the driver for an existing browser.
+default of 3 minutes applies.
+
+`mix playwright_ex.install --no-browsers` installs only the driver. That is enough in
+Microsoft's Playwright image, `mcr.microsoft.com/playwright:v<version>-noble` with the
+driver's version (`PlaywrightEx.Driver.version/0`): the driver finds the image's browsers at
+`PLAYWRIGHT_BROWSERS_PATH`. For a system browser, as on Nix, also set
+`launch_options: [executable_path: System.find_executable("google-chrome-stable")]` or
+`channel:`.
 
 A module that starts Playwright sessions needs `use PlaywrightEx.Test` after
 `use ExUnit.Case` (or in your case template's `using`). It records every Playwright
