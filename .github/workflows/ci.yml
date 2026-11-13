@@ -194,7 +194,8 @@ jobs:
       # failures are annotated by PlaywrightEx.Test.GitHubFormatter and listed in the job summary
       # (Fluffy.Support.FailuresFormatter), so a green retry does not hide them; the retry has no
       # annotations, so a test failing twice is annotated once. `--formatter` replaces test_helper's
-      # list, so the first run names every formatter. The 10 slowest modules
+      # list, so the first run names every formatter. The retry writes each test's artifacts to
+      # `<dir>-retry1`, next to the first run's, as Playwright Test's retries do. The 10 slowest modules
       # (Fluffy.Support.ModuleTimesFormatter) are the floor of a partition's time. Warnings fail the
       # newest lane only, as in the checks job.
       - name: Run tests with one retry
@@ -213,7 +214,7 @@ jobs:
             --formatter ExUnit.CLIFormatter --formatter PlaywrightEx.Test.GitHubFormatter
             --formatter Fluffy.Support.FailuresFormatter --formatter Fluffy.Support.ModuleTimesFormatter
           )
-          FLUFFY_ARTIFACT_DIR="$FLUFFY_ARTIFACT_DIR/first" mix test "${strict[@]}" "${formatters[@]}" --seed "$fluffy_test_seed" --partitions "$TEST_PARTITIONS" || status=$?
+          mix test "${strict[@]}" "${formatters[@]}" --seed "$fluffy_test_seed" --partitions "$TEST_PARTITIONS" || status=$?
 
           if [[ -s "$FLUFFY_MODULE_TIMES_FILE" ]]; then
             echo "Slowest modules ($label), wall ms, setup_all included:"
@@ -232,7 +233,7 @@ jobs:
 
           echo "retried=true" >> "$GITHUB_OUTPUT"
           echo "::warning::Tests failed; retrying once with seed $fluffy_test_seed. Both attempts' failure artifacts will be uploaded."
-          FLUFFY_ARTIFACT_DIR="$FLUFFY_ARTIFACT_DIR/retry" mix test "${strict[@]}" --seed "$fluffy_test_seed" --failed
+          mix test "${strict[@]}" --seed "$fluffy_test_seed" --failed
       - name: Upload browser failure artifacts
         if: failure() || steps.tests.outputs.retried == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7

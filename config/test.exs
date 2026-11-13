@@ -61,9 +61,10 @@ config :playwright_ex, :test,
   launch_options: [headless: true],
   navigation_timeout: 15_000
 
-# CI keeps a screenshot of each failed test's pages in FLUFFY_ARTIFACT_DIR.
+# CI keeps a screenshot of each failed test's pages in FLUFFY_ARTIFACT_DIR, and traces the
+# `--failed` retry, as Playwright's CI default (`trace: 'on-first-retry'`).
 if artifact_dir = System.get_env("FLUFFY_ARTIFACT_DIR") do
-  config :playwright_ex, :test, output_dir: artifact_dir, screenshot: :only_on_failure
+  config :playwright_ex, :test, output_dir: artifact_dir, screenshot: :only_on_failure, trace: :on_first_retry
 end
 
 config :logger, level: :warning
