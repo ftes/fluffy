@@ -1,9 +1,11 @@
 defmodule Fluffy.Conformance.LiveActionTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
+
+  alias Fluffy.Support.Server
 
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
@@ -100,7 +102,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
       |> visit("/live/nested")
       |> click(by_role(child, :button, name: "Navigate from child", exact: true))
       |> expect("The secret chamber is open" |> by_text() |> to_be_visible())
-      |> expect(Fluffy.Expect.page_to_have_url(Fluffy.TestServer.base_url() <> "/live/secret-chamber"))
+      |> expect(Fluffy.Expect.page_to_have_url(Server.base_url() <> "/live/secret-chamber"))
     end
 
     @tag driver: driver
@@ -111,7 +113,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
       |> live_session()
       |> visit("/live/nested")
       |> click(by_role(child, :button, name: "Patch from child", exact: true))
-      |> expect(Fluffy.Expect.page_to_have_url(Fluffy.TestServer.base_url() <> "/live/nested?from=child"))
+      |> expect(Fluffy.Expect.page_to_have_url(Server.base_url() <> "/live/nested?from=child"))
     end
   end
 
@@ -296,7 +298,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
       driver: driver
     } do
       log = by_css("#log")
-      page = Fluffy.TestServer.base_url() <> "/live/click-bindings"
+      page = Server.base_url() <> "/live/click-bindings"
 
       driver
       |> live_session()
@@ -391,8 +393,8 @@ defmodule Fluffy.Conformance.LiveActionTest do
 
   defp live_session(driver) do
     start_session(driver,
-      base_url: Fluffy.TestServer.base_url(),
-      endpoint: Fluffy.TestWeb.Endpoint
+      base_url: Server.base_url(),
+      endpoint: Fluffy.Support.Web.Endpoint
     )
   end
 end

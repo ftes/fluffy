@@ -1,11 +1,12 @@
 defmodule Fluffy.Conformance.ClickActionTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.TestWeb.Endpoint
+  alias Fluffy.Support.Server
+  alias Fluffy.Support.Web.Endpoint
 
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
@@ -13,7 +14,7 @@ defmodule Fluffy.Conformance.ClickActionTest do
          %{driver: driver} do
       session =
         driver
-        |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+        |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
         |> visit("/live/three-heads")
 
       flute = by_role(:button, name: "Play the flute")
@@ -179,7 +180,7 @@ defmodule Fluffy.Conformance.ClickActionTest do
     test "clicking a link hands navigation to the #{driver} backend" do
       session =
         start_session(unquote(driver),
-          base_url: Fluffy.TestServer.base_url(),
+          base_url: Server.base_url(),
           endpoint: Endpoint
         )
 
@@ -191,7 +192,7 @@ defmodule Fluffy.Conformance.ClickActionTest do
   end
 
   defp with_html(driver, html, fun) do
-    session = session_for_html(driver, html, base_url: Fluffy.TestServer.base_url())
+    session = session_for_html(driver, html, base_url: Server.base_url())
     fun.(session)
   end
 end

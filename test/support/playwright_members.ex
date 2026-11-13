@@ -1,6 +1,6 @@
-defmodule Fluffy.PlaywrightMembers do
+defmodule Fluffy.Support.PlaywrightMembers do
   # How Fluffy covers each member of the PlaywrightEx facade it builds on, checked
-  # against the installed PlaywrightEx by `Fluffy.PlaywrightMembersTest`. Review it on a
+  # against the installed PlaywrightEx by `Fluffy.Support.PlaywrightMembersTest`. Review it on a
   # PlaywrightEx upgrade: new members are unclassified, removed ones stale.
   #
   #   * `:wrapped` - a Fluffy function or value field of the same name in `counterparts/1`.
@@ -23,9 +23,12 @@ defmodule Fluffy.PlaywrightMembers do
   @native_page {:unwrap, "on the page of Fluffy.unwrap/2"}
   @page_gap {:unwrap, "gap: on the page of Fluffy.unwrap/2"}
   @native_value {:unwrap, "gap: on the PlaywrightEx value of Fluffy.unwrap_and_return/2"}
-  @native_only {:unwrap, "browser network detail on the PlaywrightEx value of Fluffy.unwrap_and_return/2"}
   @native_event {:unwrap, "gap: listen natively inside Fluffy.unwrap/2"}
-  @own_timeouts {:denied, "Fluffy owns timeouts: the session's timeout: is the context default"}
+  @event_value {:unwrap, "on the PlaywrightEx value an event delivers, as in Playwright"}
+  @native_retry {:unwrap, "gap: retries any callback natively, Fluffy calls in it too"}
+  @own_timeouts {:denied,
+                 "the defaults are config, as in Playwright Test: the resolved action and navigation " <>
+                   "timeouts, which the session sets on its context"}
   @own_listeners {:denied, "removes the listeners Fluffy relies on for pages and events"}
   @own_document {:denied, "replaces the tracked document outside navigation tracking"}
 
@@ -45,25 +48,23 @@ defmodule Fluffy.PlaywrightMembers do
   }
 
   # Scoped locator builders (scope, value, options).
-  defp by(arity), do: for({upstream, fluffy} <- @by, do: {[upstream], {:renamed, {Fluffy.Locator, fluffy, arity}}})
+  # `by_test_id` takes no options, as `getByTestId`.
+  defp by(arity) do
+    for {upstream, fluffy} <- @by,
+        do: {[upstream], {:renamed, {Fluffy.Locator, fluffy, if(fluffy == :by_test_id, do: 2, else: arity)}}}
+  end
 
   @doc "Fluffy modules searched for a `:wrapped` member."
   def counterparts(PlaywrightEx.Locator), do: [Fluffy.Locator, Fluffy, Fluffy.Playwright]
   def counterparts(PlaywrightEx.Expect), do: [Fluffy.Expect]
   def counterparts(PlaywrightEx.Page), do: [Fluffy, Fluffy.Playwright, Fluffy.Page]
-  def counterparts(PlaywrightEx.Frame), do: [Fluffy.Frame]
   def counterparts(PlaywrightEx.FrameLocator), do: [Fluffy.FrameLocator]
   def counterparts(PlaywrightEx.BrowserContext), do: [Fluffy.Playwright]
   def counterparts(PlaywrightEx.Clock), do: [Fluffy.Playwright.Clock]
   def counterparts(PlaywrightEx.Keyboard), do: [Keyboard]
   def counterparts(PlaywrightEx.Mouse), do: [Mouse]
-  def counterparts(PlaywrightEx.Dialog), do: [Fluffy.Dialog]
   def counterparts(PlaywrightEx.Download), do: [Fluffy.Download]
   def counterparts(PlaywrightEx.FileChooser), do: [Fluffy.FileChooser]
-  def counterparts(PlaywrightEx.Request), do: [Fluffy.Request]
-  def counterparts(PlaywrightEx.Response), do: [Fluffy.Response]
-  def counterparts(PlaywrightEx.ConsoleMessage), do: [Fluffy.ConsoleMessage]
-  def counterparts(PlaywrightEx.Route), do: [Fluffy.Route]
   def counterparts(:event), do: [Fluffy.Event]
   def counterparts(_module), do: []
 
@@ -98,7 +99,11 @@ defmodule Fluffy.PlaywrightMembers do
               to_have_accessible_description to_have_accessible_error_message to_match_aria_snapshot)a, :wrapped},
           {[:to_have_title], {:renamed, {Fluffy.Expect, :page_to_have_title, 2}}},
           {[:to_have_url], {:renamed, {Fluffy.Expect, :page_to_have_url, 2}}},
-          {[:to_be_ok], {:na, "APIResponse assertion"}}
+          {[:to_be_ok], {:na, "APIResponse assertion"}},
+          {[:soft], {:unwrap, "gap: soft matchers on the native locator of Fluffy.Playwright.unwrap/3"}},
+          {[:message], {:unwrap, "gap: custom expect messages on the native locator of Fluffy.Playwright.unwrap/3"}},
+          {[:to_pass], @native_retry},
+          {[:poll], @native_retry}
         ]),
       PlaywrightEx.Page =>
         [
@@ -139,7 +144,7 @@ defmodule Fluffy.PlaywrightMembers do
           {@selector_legacy, @legacy}
         ] ++ for({upstream, fluffy} <- @by, do: {[upstream], {:renamed, {Fluffy.Locator, fluffy, 2}}}),
       PlaywrightEx.Frame => [
-        {~w(url page parent_frame)a, :wrapped},
+        {~w(url page parent_frame)a, @event_value},
         {~w(name child_frames is_detached title frame_element goto evaluate evaluate_handle wait_for_load_state
               wait_for_url wait_for_function content add_script_tag add_style_tag locator frame_locator)a,
          {:unwrap, "on the frame of Fluffy.unwrap/2; Fluffy locators resolve from the page"}},
@@ -158,7 +163,7 @@ defmodule Fluffy.PlaywrightMembers do
         ] ++ by(3),
       PlaywrightEx.BrowserContext => [
         {~w(add_cookies cookies clear_cookies storage_state new_page pages add_init_script)a, :wrapped},
-        {[:tracing], {:renamed, {Fluffy.Playwright, :trace, 2}}},
+        {[:tracing], {:denied, "PlaywrightEx.Test records the trace: config or `@tag trace: true`"}},
         {[:on], {:renamed, {Fluffy, :on, 4}}},
         {[:once], {:renamed, {Fluffy, :once, 4}}},
         {[:off], {:renamed, {Fluffy, :off, 4}}},
@@ -183,7 +188,7 @@ defmodule Fluffy.PlaywrightMembers do
       PlaywrightEx.Keyboard => [{~w(down insert_text press type up)a, :wrapped}],
       PlaywrightEx.Mouse => [{~w(click dblclick down move up wheel)a, :wrapped}],
       PlaywrightEx.Touchscreen => [{[:tap], {:unwrap, "page-global input on PlaywrightEx.Page.touchscreen/1"}}],
-      PlaywrightEx.Dialog => [{~w(accept dismiss page type message default_value)a, :wrapped}],
+      PlaywrightEx.Dialog => [{~w(accept dismiss page type message default_value)a, @event_value}],
       PlaywrightEx.Download => [
         {~w(suggested_filename url page)a, :wrapped},
         {[:save_as], {:renamed, {Fluffy.Download, :save_as, 2}}},
@@ -198,44 +203,28 @@ defmodule Fluffy.PlaywrightMembers do
         {[:element], @native_value}
       ],
       PlaywrightEx.Request => [
-        {~w(url method headers resource_type post_data failure redirected_from redirected_to)a, :wrapped},
-        {[:all_headers], {:renamed, {Fluffy.Request, :all_headers, 1}}},
-        {[:header_value], {:renamed, {Fluffy.Request, :header_value, 2}}},
-        {[:post_data_json], {:renamed, {Fluffy.Request, :post_data_json, 1}}},
-        {[:frame], {:unwrap, "on the PlaywrightEx value of Fluffy.unwrap_and_return/2; Fluffy.Request has its page"}},
-        {~w(timing sizes)a, @native_only},
-        {~w(response headers_array post_data_buffer is_navigation_request existing_response service_worker)a,
-         @native_value}
+        {~w(url method headers resource_type post_data failure redirected_from redirected_to all_headers header_value
+            post_data_json frame timing sizes response headers_array post_data_buffer is_navigation_request
+            existing_response service_worker)a, @event_value}
       ],
       PlaywrightEx.Response => [
-        {~w(url status status_text headers request)a, :wrapped},
-        {[:ok], {:renamed, {Fluffy.Response, :ok?, 1}}},
-        {[:body], {:renamed, {Fluffy.Response, :body, 1}}},
-        {[:text], {:renamed, {Fluffy.Response, :text, 1}}},
-        {[:json], {:renamed, {Fluffy.Response, :json, 1}}},
-        {[:all_headers], {:renamed, {Fluffy.Response, :all_headers, 1}}},
-        {[:header_value], {:renamed, {Fluffy.Response, :header_value, 2}}},
-        {[:header_values], {:renamed, {Fluffy.Response, :header_values, 2}}},
-        {~w(security_details server_addr)a, @native_only},
-        {~w(finished frame headers_array http_version from_service_worker)a, @native_value}
+        {~w(url status status_text headers request ok body text json all_headers header_value header_values
+            security_details server_addr finished frame headers_array http_version from_service_worker)a, @event_value}
       ],
       PlaywrightEx.Route => [
-        {~w(abort continue fallback fulfill request fetch)a, :wrapped}
+        {~w(abort continue fallback fulfill request fetch)a,
+         {:unwrap, "on the PlaywrightEx route a route/4 handler receives"}}
       ],
-      PlaywrightEx.ConsoleMessage => [
-        {~w(location page text timestamp type)a, :wrapped},
-        {~w(args worker)a, @native_value}
-      ],
+      PlaywrightEx.ConsoleMessage => [{~w(location page text timestamp type args worker)a, @event_value}],
       PlaywrightEx.WebError => [
-        {~w(error location page)a, {:unwrap, "gap: from a native web_error listener; log_browser_console: logs them"}}
+        {~w(error location page)a, {:unwrap, "gap: from a native web_error listener"}}
       ],
       PlaywrightEx.Clock => [
         {~w(install pause_at run_for fast_forward resume set_fixed_time set_system_time)a, :wrapped}
       ],
       PlaywrightEx.Tracing => [
-        {[:start], {:renamed, {Fluffy.Playwright, :trace, 2}}},
-        {~w(group group_end)a, {:renamed, {Fluffy, :step, 3}}},
-        {~w(stop stop_chunk)a, {:denied, "ends the trace Fluffy saves when the test finishes"}},
+        {~w(start stop stop_chunk)a, {:denied, "PlaywrightEx.Test records the trace: config or `@tag trace: true`"}},
+        {~w(group group_end)a, {:renamed, {Fluffy.Playwright, :step, 4}}},
         {~w(start_chunk start_har stop_har)a, {:unwrap, "on PlaywrightEx.BrowserContext.tracing/1"}}
       ]
     }
@@ -266,7 +255,6 @@ defmodule Fluffy.PlaywrightMembers do
   def unclassified_options do
     %{
       {PlaywrightEx.Page, :goto} => "Fluffy.visit/2 navigates by path and takes no options",
-      {PlaywrightEx.Route, :fetch} => "Fluffy validates timeout:; the other options pass through to PlaywrightEx",
       {PlaywrightEx.Page, :wait_for_event} => "Fluffy.Event waits take timeout: and scope:",
       {PlaywrightEx.Page, :expect_event} => "Fluffy.Event waits take timeout: and scope:",
       {PlaywrightEx.Page, :expect_download} => "Fluffy.Event waits take timeout: and scope:",

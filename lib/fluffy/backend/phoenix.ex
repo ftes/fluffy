@@ -40,34 +40,21 @@ defmodule Fluffy.Backend.Phoenix do
   @no_content_statuses [204, 205]
 
   @impl true
-  def start_session(options, attachment) do
-    {resource_scope, runtime, sandbox_header} = attachment
-
+  def start_session(options) do
+    # No sandbox header: requests and LiveViews run in the test process or with it in
+    # `$callers`, so they use its sandbox connection, as with Phoenix.ConnTest.
     context = %Context{
       http: %HTTPClient{
         base_url: Keyword.fetch!(options, :base_url),
         endpoint: Keyword.fetch!(options, :endpoint),
         cookie_jar: Fluffy.CookieJar.new(),
         initial_conn: Keyword.get(options, :conn),
-        request_headers: put_header(Keyword.get(options, :headers, []), sandbox_header)
-      },
-      resource_scope: resource_scope,
-      timeout: Keyword.get_lazy(options, :timeout, &configured_timeout!/0)
+        request_headers: Keyword.get(options, :headers, [])
+      }
     }
 
     page = %Page.State{driver: :unvisited, state: %UnvisitedState{}}
-    Session.new(__MODULE__, context, page, runtime)
-  end
-
-  # Positive like a session's `timeout:`; an operation's `timeout: 0` checks once.
-  defp configured_timeout! do
-    case Application.get_env(:fluffy, :timeout, 1_000) do
-      timeout when is_integer(timeout) and timeout > 0 ->
-        timeout
-
-      other ->
-        raise ArgumentError, "expected config :fluffy, timeout: to be a positive integer, got: #{inspect(other)}"
-    end
+    Session.new(__MODULE__, context, page)
   end
 
   @doc false
@@ -79,7 +66,7 @@ defmodule Fluffy.Backend.Phoenix do
 
     Session.new(
       __MODULE__,
-      %Context{http: nil, resource_scope: nil, timeout: 1_000},
+      %Context{http: nil},
       page
     )
   end
@@ -109,16 +96,14 @@ defmodule Fluffy.Backend.Phoenix do
   @impl true
   def runtime_event(_context, _message), do: :ignore
 
+  # How long a LiveView, its proxy or an upload client may take to stop before it is
+  # killed: OTP's default shutdown of a worker.
+  @stop_timeout 5_000
+
   @doc false
-  def register_process(runtime, kind, pid, timeout) do
-    Fluffy.SessionRuntime.register(runtime, {kind, pid}, fn -> stop_process(pid, timeout, :shutdown) end)
+  def register_process(runtime, kind, pid) do
+    Fluffy.SessionRuntime.register(runtime, {kind, pid}, fn -> stop_process(pid, @stop_timeout, :shutdown) end)
   end
-
-  @impl true
-  def run_step(%Session{} = _session, _name, _location, fun), do: fun.()
-
-  @impl true
-  def capture_failure(%Session{}, _operation, _error, _stacktrace), do: :ok
 
   @impl true
   def normalize_error(session, operation, arguments, error),
@@ -298,11 +283,8 @@ defmodule Fluffy.Backend.Phoenix do
     # The Live driver reads how the view left from this monitor's message.
     monitor = LiveState.monitor_view(view.pid)
 
-    :ok =
-      register_process(session.runtime, :live_view, view.pid, Session.context(session).timeout)
-
-    :ok =
-      register_process(session.runtime, :live_view, proxy_pid, Session.context(session).timeout)
+    :ok = register_process(session.runtime, :live_view, view.pid)
+    :ok = register_process(session.runtime, :live_view, proxy_pid)
 
     document = LiveDocument.new(html, view.id)
 
@@ -556,16 +538,6 @@ defmodule Fluffy.Backend.Phoenix do
     |> List.first()
   end
 
-  defp put_header(headers, nil), do: headers
-
-  defp put_header(headers, {name, value}) do
-    headers
-    |> Enum.reject(fn {header_name, _value} ->
-      String.downcase(to_string(header_name)) == name
-    end)
-    |> Kernel.++([{name, value}])
-  end
-
   defp commit_static(conn, session, url) do
     state = %StaticState{
       conn: conn,
@@ -587,8 +559,8 @@ defmodule Fluffy.Backend.Phoenix do
     proxy_pid = live_view_proxy_pid(page.state.view)
     :ok = LiveDriver.release_page_uploads(session, page)
     Process.demonitor(page.state.monitor, [:flush])
-    stop_process(page.state.view.pid, Session.context(session).timeout, :normal)
-    stop_process(proxy_pid, Session.context(session).timeout, :normal)
+    stop_process(page.state.view.pid, @stop_timeout, :normal)
+    stop_process(proxy_pid, @stop_timeout, :normal)
 
     Fluffy.SessionRuntime.release(session.runtime, {:live_view, page.state.view.pid})
 

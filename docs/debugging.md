@@ -23,34 +23,34 @@ Failed assertions remain `ExUnit.AssertionError`. Browser assertion messages
 include the expected condition and Playwright's received values, timeout details,
 and call log. No candidate markup is reconstructed after browser failure.
 
-Start a context-wide trace explicitly when debugging a Playwright scenario:
+Trace a Playwright test with `@tag trace: true` (or `trace: :retain_on_failure` in the
+config, see [Playwright setup](installation.md#playwright-setup)), and name its steps
+with `Fluffy.Playwright.step/4`:
 
 ```elixir
-alias Fluffy.Playwright
-
-start_session(:playwright)
-|> Playwright.trace(open: false)
-|> visit("/potions/polyjuice")
-|> step("Brew Polyjuice Potion", fn session ->
-  session
-  |> fill(by_label("Boomslang skin"), "3")
-  |> click(by_role(:button, name: "Brew"))
-end)
+@tag trace: true
+test "brews Polyjuice" do
+  start_session(:playwright)
+  |> visit("/potions/polyjuice")
+  |> step("Brew Polyjuice Potion", fn session ->
+    session
+    |> fill(by_label("Boomslang skin"), "3")
+    |> click(by_role(:button, name: "Brew"))
+  end)
+end
 ```
 
-Fluffy saves the trace before closing its BrowserContext. A trace covers all pages in
-the session; different sessions produce different archives. Explicit tracing opens Trace
-Viewer by default for local debugging, while `open: false` is appropriate in CI.
-`Fluffy.step/3` remains portable: it adds nested, source-linked trace groups when
-tracing is active and simply runs the callback on Phoenix or an untraced Playwright
-session.
+The test's one `trace.zip` covers every page of all its sessions; open it with
+`mix playwright_ex.cli show-trace test-results/<test>/trace.zip`. A failed test also gets
+`error-context.md` there: its errors, source and an aria snapshot of its page. Steps nest and link to
+their source; they are `PlaywrightEx.Test.step/3`'s, so Phoenix sessions raise
+`Fluffy.CapabilityError`.
 
-Save an explicit PNG while retaining the pipeline with:
+As in Playwright, `Fluffy.Playwright.screenshot/2` returns the PNG, and `path:` also
+writes it to a file:
 
 ```elixir
-session
-|> Playwright.screenshot("tmp/screenshots/polyjuice.png", full_page: true)
-|> assert(visible(by_text("Potion ready")))
+Playwright.screenshot(session, path: "tmp/screenshots/polyjuice.png", full_page: true)
 ```
 
 `Fluffy.open_browser/1` opens an HTML snapshot of the active page in your default
@@ -64,7 +64,7 @@ session
 ```
 
 See [Playwright setup](installation.md#playwright-setup) for console logging,
-failure artifacts, and their configuration. See [Events and pages](advanced-events.md)
+traces, screenshots and videos. See [Events and pages](advanced-events.md)
 for downloads, popups, dialogs, and network events.
 
 ## Native escape hatch
@@ -122,7 +122,7 @@ session
 |> assert(visible(by_label("Name")))
 ```
 
-Event values such as `Fluffy.Response` reach their PlaywrightEx counterpart through
-`Fluffy.unwrap_and_return/2`; see [Native values](advanced-events.md#native-values). See
+A `Fluffy.Download` or `Fluffy.FileChooser` reaches its PlaywrightEx
+counterpart through `Fluffy.unwrap_and_return/2`; see [Native values](advanced-events.md#native-values). See
 [PlaywrightEx coverage](capabilities.md#playwrightex-coverage) for which native
 calls are safe.

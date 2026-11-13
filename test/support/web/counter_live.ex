@@ -1,4 +1,4 @@
-defmodule Fluffy.TestWeb.CounterLive do
+defmodule Fluffy.Support.Web.CounterLive do
   @moduledoc false
 
   use Phoenix.LiveView

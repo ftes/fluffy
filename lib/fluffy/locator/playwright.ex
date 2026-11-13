@@ -50,10 +50,13 @@ defmodule Fluffy.Locator.Playwright do
   defp apply_operation(_frame, {:attribute, "title", text, options}, scope),
     do: call(scope, :get_by_title, [text, options])
 
-  # `get_by_test_id` reads one attribute for all locators (`set_test_id_attribute`), while
-  # `by_test_id(attribute:)` picks it per locator, so this passes it to PlaywrightEx's builder.
-  defp apply_operation(_frame, {:test_id, attribute_name, test_id}, scope),
-    do: call(scope, :locator, [LocatorUtils.get_by_test_id_selector(attribute_name, test_id)])
+  # `get_by_test_id`'s selector with the resolved `test_id_attribute` (Fluffy's, else
+  # PlaywrightEx.Test's), not the client's VM-global `selectors.setTestIdAttribute`, which
+  # PlaywrightEx.Test sets from its own config. With only PlaywrightEx's set, they agree.
+  defp apply_operation(_frame, {:test_id, test_id}, scope) do
+    attribute = Fluffy.Options.config!(:test_id_attribute)
+    call(scope, :locator, [LocatorUtils.get_by_test_id_selector(attribute, test_id)])
+  end
 
   defp apply_operation(frame, {:and, right}, scope), do: scope |> native() |> Native.and_(locator(frame, right))
   defp apply_operation(frame, {:or, right}, scope), do: scope |> native() |> Native.or_(locator(frame, right))

@@ -1,7 +1,7 @@
 defmodule Fluffy.SessionRuntimeTest do
   use ExUnit.Case, async: true
 
-  import Fluffy.TestCase, only: [monitor_running: 1]
+  import Fluffy.Support.Case, only: [monitor_running: 1]
 
   alias Fluffy.SessionRuntime
 
@@ -52,21 +52,6 @@ defmodule Fluffy.SessionRuntimeTest do
     assert_received second
     assert second == :first_closed
     refute_received :released_closed
-  end
-
-  test "a run registers the cleanup of the resource it creates in the same call" do
-    {:ok, runtime} = SessionRuntime.start(self())
-    caller = self()
-
-    assert SessionRuntime.run_registered(runtime, fn ->
-             {self(), :created, fn -> send(caller, :created_closed) end}
-           end) == runtime
-
-    assert SessionRuntime.resources(runtime) == {:ok, [:created]}
-    assert_raise RuntimeError, "failed", fn -> SessionRuntime.run_registered(runtime, fn -> raise "failed" end) end
-    assert SessionRuntime.resources(runtime) == {:ok, [:created]}
-    assert :ok = SessionRuntime.close(runtime)
-    assert_received :created_closed
   end
 
   test "state survives discarded handles and session shutdown is idempotent" do

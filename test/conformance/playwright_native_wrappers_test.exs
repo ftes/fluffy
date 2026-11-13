@@ -1,13 +1,12 @@
 defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
 
   alias Fluffy.Playwright
-  alias Fluffy.Route
-  alias Fluffy.TestHTTPFixtures
+  alias Fluffy.Support.HTTPFixtures
 
   @moduletag driver: :playwright
 
@@ -237,15 +236,14 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
       expect(session, to_have_screenshot(box, path: path, mask: [box]))
     end
 
-    test "requires path:, and does not derive one from the test" do
-      for missing <- [
-            fn -> to_have_screenshot(by_css("#box")) end,
-            fn -> to_have_screenshot(by_css("#box"), full_page: false) end,
-            fn -> page_to_have_screenshot() end,
-            fn -> page_to_have_screenshot(timeout: 100) end
-          ] do
-        assert_raise NimbleOptions.ValidationError, ~r/required :path option not found/, missing
-      end
+    test "resolves name: through PlaywrightEx.Test's snapshot path" do
+      path = PlaywrightEx.Test.snapshot_path("fluffy-box.png", kind: :screenshot)
+      on_exit(fn -> File.rm_rf!(Path.dirname(path)) end)
+      session = session_for_html(:playwright, @html)
+
+      ExUnit.CaptureIO.capture_io(fn -> expect(session, to_have_screenshot(by_css("#box"), name: "fluffy-box.png")) end)
+      assert File.exists?(path)
+      expect(session, to_have_screenshot(by_css("#box"), name: "fluffy-box.png"))
     end
 
     test "rejects options that bypass tracking" do
@@ -295,8 +293,9 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
     test "to_match_aria_snapshot fails with the current snapshot when none is given" do
       session = session_for_html(:playwright, @html)
 
+      # As upstream, a new baseline waits out the timeout against an impossible match.
       assert_raise ExUnit.AssertionError, ~r/New snapshot:.*button "Cast"/s, fn ->
-        expect(session, to_match_aria_snapshot(by_css("#panel"), ""))
+        expect(session, to_match_aria_snapshot(by_css("#panel"), "", timeout: 100))
       end
     end
 
@@ -308,10 +307,11 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
       file = Path.join(tmp_dir, "snapshots/panel.aria.yml")
       page_file = Path.join(tmp_dir, "page.aria.yml")
 
+      # As upstream, writing a missing baseline waits out the timeout.
       ExUnit.CaptureIO.capture_io(fn ->
         session
-        |> expect(to_match_aria_snapshot(by_css("#panel"), path: file))
-        |> expect(page_to_match_aria_snapshot(path: page_file))
+        |> expect(to_match_aria_snapshot(by_css("#panel"), path: file, timeout: 100))
+        |> expect(page_to_match_aria_snapshot(path: page_file, timeout: 100))
       end)
 
       assert File.read!(file) =~ ~s(button "Cast")
@@ -359,15 +359,15 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
 
   describe "set_extra_http_headers" do
     test "sends the headers, replaces an earlier call and keeps the session's headers" do
-      fixture = TestHTTPFixtures.register(fn _request -> %{body: "<p>Page</p>"} end)
+      fixture = HTTPFixtures.register(fn _request -> %{body: "<p>Page</p>"} end)
       session = start_session(:playwright, headers: [{"x-session", "kept"}])
 
       assert Playwright.set_extra_http_headers(session, %{"X-First" => "1"}) == session
-      visit(session, TestHTTPFixtures.path(fixture, "/first"))
+      visit(session, HTTPFixtures.path(fixture, "/first"))
 
       session
       |> Playwright.set_extra_http_headers(%{"x-second" => "2"})
-      |> visit(TestHTTPFixtures.path(fixture, "/second"))
+      |> visit(HTTPFixtures.path(fixture, "/second"))
 
       first = headers(fixture, "/first")
       assert {"x-first", "1"} in first
@@ -380,18 +380,18 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
     end
 
     test "overrides a header of the same name" do
-      fixture = TestHTTPFixtures.register(fn _request -> %{body: "<p>Page</p>"} end)
+      fixture = HTTPFixtures.register(fn _request -> %{body: "<p>Page</p>"} end)
 
       :playwright
       |> start_session(headers: [{"x-session", "start"}])
       |> Playwright.set_extra_http_headers(%{"X-Session" => "changed"})
-      |> visit(TestHTTPFixtures.path(fixture, "/page"))
+      |> visit(HTTPFixtures.path(fixture, "/page"))
 
       assert {"x-session", "changed"} in headers(fixture, "/page")
     end
 
     defp headers(fixture, path) do
-      fixture |> TestHTTPFixtures.requests() |> Enum.find(&(&1.path == path)) |> Map.fetch!(:headers)
+      fixture |> HTTPFixtures.requests() |> Enum.find(&(&1.path == path)) |> Map.fetch!(:headers)
     end
   end
 
@@ -402,7 +402,7 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
       File.write!(file, "window.fromFile = 'file'")
 
       fixture =
-        TestHTTPFixtures.register(fn _request ->
+        HTTPFixtures.register(fn _request ->
           %{headers: [{"content-type", "text/javascript"}], body: "window.fromUrl = 'url'"}
         end)
 
@@ -411,7 +411,7 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
         |> session_for_html("<p>Harness</p>")
         |> Playwright.add_script_tag(content: "window.fromContent = 'content'")
         |> Playwright.add_script_tag(path: file)
-        |> Playwright.add_script_tag(url: TestHTTPFixtures.url(fixture, "/script.js"))
+        |> Playwright.add_script_tag(url: HTTPFixtures.url(fixture, "/script.js"))
 
       assert Playwright.evaluate(session, "[window.fromContent, window.fromFile, window.fromUrl]") ==
                ["content", "file", "url"]
@@ -476,21 +476,12 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
              |> wait_for(by_css("#here"), state: :attached) == session
     end
 
-    test "is bounded by timeout: and the session's timeout:" do
+    test "is bounded by timeout:" do
       session = session_for_html(:playwright, "<p>Harness</p>")
 
       assert_raise Fluffy.OperationError, ~r/wait_for.*[Tt]imeout/s, fn ->
         wait_for(session, by_css("#missing"), timeout: 100)
       end
-
-      bounded = start_session(:playwright, timeout: 300)
-      started = System.monotonic_time(:millisecond)
-
-      assert_raise Fluffy.OperationError, ~r/wait_for.*[Tt]imeout/s, fn ->
-        wait_for(bounded, by_css("#missing"), [])
-      end
-
-      assert System.monotonic_time(:millisecond) - started < 5_000
     end
 
     test "rejects unknown options" do
@@ -706,8 +697,8 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
     end
 
     test "an action navigating to a page that closes while Fluffy adopts it succeeds" do
-      closing = TestHTTPFixtures.register(%{body: @closes_on_adoption})
-      popup = popup_showing(~s|<a href="#{TestHTTPFixtures.path(closing)}">Next</a>|)
+      closing = HTTPFixtures.register(%{body: @closes_on_adoption})
+      popup = popup_showing(~s|<a href="#{HTTPFixtures.path(closing)}">Next</a>|)
 
       assert %Fluffy.Session{} = click(popup, by_role(:link, name: "Next"))
     end
@@ -726,9 +717,9 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
     """
 
     test "a page closing while Fluffy adopts a navigation fails visit, reload and history navigation" do
-      closing = TestHTTPFixtures.register(%{body: @closes_on_navigation})
-      plain = TestHTTPFixtures.path(TestHTTPFixtures.register(%{body: "<p>Plain</p>"}))
-      closes_on = &TestHTTPFixtures.path(closing, "?close=#{&1}")
+      closing = HTTPFixtures.register(%{body: @closes_on_navigation})
+      plain = HTTPFixtures.path(HTTPFixtures.register(%{body: "<p>Plain</p>"}))
+      closes_on = &HTTPFixtures.path(closing, "?close=#{&1}")
 
       for {operation, call} <- [
             visit: &visit(&1, closes_on.("navigate")),
@@ -740,52 +731,6 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
         error = assert_raise Fluffy.OperationError, fn -> call.(popup) end
         assert %Fluffy.OperationError{operation: ^operation, cause: %PlaywrightEx.TargetClosedError{}} = error
       end
-    end
-  end
-
-  describe "Route.fetch" do
-    test "returns the real response, usable with fulfill" do
-      fixture = TestHTTPFixtures.register(fn _request -> %{body: "server"} end)
-      session = start_session(:playwright)
-      visit(session, TestHTTPFixtures.path(fixture, "/page"))
-
-      Playwright.route(session, "**/api", fn route ->
-        # Firefox offers zstd, whose bodies Playwright's fetch hands back still compressed.
-        response = Route.fetch(route, headers: %{"accept-encoding" => "identity"})
-        Route.fulfill(route, response: response, status: 201)
-      end)
-
-      assert Playwright.evaluate(
-               session,
-               "url => fetch(url).then(async r => r.status + ':' + (await r.text()))",
-               TestHTTPFixtures.url(fixture, "/api")
-             ) == "201:server"
-    end
-
-    test "timeout: 0 raises, as for actions, an invalid timeout fails validation, and :infinity waits without limit" do
-      fixture =
-        TestHTTPFixtures.register(fn _request ->
-          Process.sleep(100)
-          %{body: "server"}
-        end)
-
-      session = start_session(:playwright)
-      visit(session, TestHTTPFixtures.path(fixture, "/page"))
-      owner = self()
-
-      Playwright.route(session, "**/api", fn route ->
-        send(owner, {:fetch, catch_error(Route.fetch(route, timeout: 0))})
-        for invalid <- [-1, 1500.0], do: send(owner, {:fetch, catch_error(Route.fetch(route, timeout: invalid))})
-        response = Route.fetch(route, timeout: :infinity, headers: %{"accept-encoding" => "identity"})
-        Route.fulfill(route, response: response)
-      end)
-
-      assert Playwright.evaluate(session, "url => fetch(url).then(r => r.text())", TestHTTPFixtures.url(fixture, "/api")) ==
-               "server"
-
-      assert_receive {:fetch, %ArgumentError{message: "fetch: timeout: 0 means check once" <> _}}
-      assert_receive {:fetch, %NimbleOptions.ValidationError{key: :timeout, value: -1}}
-      assert_receive {:fetch, %NimbleOptions.ValidationError{key: :timeout, value: 1500.0}}
     end
   end
 
@@ -812,12 +757,13 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
 
     @tag :tmp_dir
     @tag skip: if(not playwright_engine?(:chromium), do: "only Chromium prints PDFs")
-    test "pdf saves the page and returns the session", %{tmp_dir: tmp_dir} do
+    test "pdf returns the page and writes it to path:", %{tmp_dir: tmp_dir} do
       session = session_for_html(:playwright, "<p>Harness</p>")
       path = Path.join([tmp_dir, "nested", "page.pdf"])
 
-      assert Playwright.pdf(session, path, landscape: true) == session
-      assert <<"%PDF", _rest::binary>> = File.read!(path)
+      assert <<"%PDF", _rest::binary>> = Playwright.pdf(session)
+      assert <<"%PDF", _rest::binary>> = pdf = Playwright.pdf(session, path: path, landscape: true)
+      assert File.read!(path) == pdf
     end
 
     # As in Playwright, none of these has a timeout.
@@ -836,7 +782,7 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
             &Playwright.add_script_tag(session, [content: "1"] ++ &1),
             &Playwright.add_style_tag(session, [content: "p {}"] ++ &1),
             &Playwright.unroute_all(session, &1),
-            &Playwright.pdf(session, "/tmp/fluffy-never-written.pdf", &1)
+            &Playwright.pdf(session, [path: "/tmp/fluffy-never-written.pdf"] ++ &1)
           ] do
         assert_raise NimbleOptions.ValidationError, ~r/unknown options/, fn -> call.([option]) end
       end
@@ -893,12 +839,12 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
     @fetch "url => fetch(url).then(response => response.text())"
 
     test "removes every route, which unroute and route can then follow" do
-      fixture = TestHTTPFixtures.register(fn _request -> %{body: "server"} end)
+      fixture = HTTPFixtures.register(fn _request -> %{body: "server"} end)
       session = start_session(:playwright)
-      visit(session, TestHTTPFixtures.path(fixture, "/page"))
-      url = TestHTTPFixtures.url(fixture, "/api")
-      other = TestHTTPFixtures.url(fixture, "/other")
-      handler = fn route -> Route.fulfill(route, body: "routed") end
+      visit(session, HTTPFixtures.path(fixture, "/page"))
+      url = HTTPFixtures.url(fixture, "/api")
+      other = HTTPFixtures.url(fixture, "/other")
+      handler = fn route -> PlaywrightEx.Route.fulfill!(route, body: "routed") end
 
       session = session |> Playwright.route("**/api", handler) |> Playwright.route("**/other", handler)
       assert Playwright.evaluate(session, @fetch, url) == "routed"
@@ -940,9 +886,6 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
             to_have_js_property(p, "value", "x"),
             to_have_screenshot(p, path: "x.png"),
             page_to_have_screenshot(path: "x.png"),
-            to_have_role(p, :paragraph),
-            to_have_accessible_name(p, "x"),
-            to_have_accessible_description(p, "x"),
             to_have_accessible_error_message(p, "x"),
             to_match_aria_snapshot(p, "- paragraph"),
             page_to_match_aria_snapshot("- paragraph")
@@ -973,7 +916,7 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
           fn -> Playwright.wait_for_function(session, p, "true") end,
           fn -> Playwright.all(session, p) end,
           fn -> Playwright.drop(session, p, %{data: %{"text/plain" => "x"}}) end,
-          fn -> Playwright.pdf(session, "/tmp/fluffy-never-written.pdf") end,
+          fn -> Playwright.pdf(session) end,
           fn -> Playwright.bring_to_front(session) end,
           fn -> Playwright.content(session) end,
           fn -> Playwright.title(session) end,
@@ -992,14 +935,14 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
   # A popup whose `body` has loaded, not yet adopted by any Fluffy action.
   defp popup_showing(body) do
     ready = "<script>window.opener.postMessage('ready', '*')</script>"
-    fixture = TestHTTPFixtures.register(%{body: body <> ready})
+    fixture = HTTPFixtures.register(%{body: body <> ready})
     session = session_for_html(:playwright, "<p>Opener</p>")
     pending = wait_for(session, Fluffy.Event.popup())
 
     Playwright.evaluate(
       session,
       "url => new Promise(resolve => { window.addEventListener('message', resolve); window.open(url) }).then(() => true)",
-      TestHTTPFixtures.path(fixture)
+      HTTPFixtures.path(fixture)
     )
 
     Playwright.switch_page(session, await(pending))

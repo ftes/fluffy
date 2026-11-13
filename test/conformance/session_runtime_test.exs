@@ -1,5 +1,5 @@
 defmodule Fluffy.Conformance.SessionRuntimeTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
@@ -9,6 +9,7 @@ defmodule Fluffy.Conformance.SessionRuntimeTest do
   alias Fluffy.Backend
   alias Fluffy.Page
   alias Fluffy.Session
+  alias Fluffy.Support.HTTPFixtures
 
   for driver <- [:static, :playwright] do
     @tag driver: driver
@@ -109,14 +110,14 @@ defmodule Fluffy.Conformance.SessionRuntimeTest do
     @tag driver: :playwright
     test "closing the opener through #{close} clears the child's opener" do
       fixture =
-        Fluffy.TestHTTPFixtures.register(%{
+        HTTPFixtures.register(%{
           body: "<html><body><a href='about:blank' target='_blank'>Open</a></body></html>"
         })
 
       session =
         :playwright
         |> start_session()
-        |> visit(Fluffy.TestHTTPFixtures.path(fixture))
+        |> visit(HTTPFixtures.path(fixture))
 
       pending = wait_for(session, Fluffy.Event.popup())
       click(session, by_role(:link, name: "Open"))
@@ -187,31 +188,6 @@ defmodule Fluffy.Conformance.SessionRuntimeTest do
 
     assert_receive {:DOWN, ^monitor, :process, ^runtime, :normal}, 5_000
     assert_raise ArgumentError, ~r/session is closed/, fn -> pages(session) end
-  end
-
-  for exit <- [:normal, :crash] do
-    @tag driver: :playwright
-    test "an unmanaged browser session closes its context when its owner exits (#{exit})" do
-      parent = self()
-
-      owner =
-        spawn(fn ->
-          session = session_for_html(:playwright, "<p>Owned page</p>")
-          send(parent, {:started, session.runtime, Session.context(session).browser_context})
-
-          receive do
-            :normal -> :ok
-            :crash -> exit(:crash)
-          end
-        end)
-
-      assert_receive {:started, runtime, browser_context}, 5_000
-      assert browser_context.guid in browser_context_guids()
-      monitor = monitor_running(runtime)
-      send(owner, unquote(exit))
-      assert_receive {:DOWN, ^monitor, :process, ^runtime, :normal}, 5_000
-      refute browser_context.guid in browser_context_guids()
-    end
   end
 
   defp assert_eventually(fun, attempts \\ 100)

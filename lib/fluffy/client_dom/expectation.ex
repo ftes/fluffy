@@ -6,7 +6,8 @@ defmodule Fluffy.ClientDOM.Expectation do
   alias Fluffy.HTML.Aria
   alias Fluffy.HTML.Semantics
   alias Fluffy.Locator.Static
-  alias Fluffy.URLMatcher
+  # StringUtils is internal to PlaywrightEx, which is pinned.
+  alias PlaywrightEx.Isomorphic.StringUtils
 
   # Evaluate one DOM snapshot. Drivers own retries, negation, and diagnostics.
   def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :count, expected: expected}) do
@@ -85,6 +86,21 @@ defmodule Fluffy.ClientDOM.Expectation do
     end)
   end
 
+  def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :role, expected: expected} = expectation) do
+    with_node(client_dom, locator, expectation, fn aria, node ->
+      actual = Aria.role(aria, node) || ""
+      {actual == to_string(expected), actual}
+    end)
+  end
+
+  def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: kind, expected: {expected, options}} = expectation)
+      when kind in [:accessible_name, :accessible_description] do
+    with_node(client_dom, locator, expectation, fn aria, node ->
+      actual = if kind == :accessible_name, do: Aria.name(aria, node), else: Aria.description(aria, node)
+      {text_matches?(expected, actual, normalize: true, ignore_case: options[:ignore_case]), actual}
+    end)
+  end
+
   def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :disabled}) do
     actual = ClientDOM.disabled?(client_dom, locator)
     {actual, actual}
@@ -148,6 +164,13 @@ defmodule Fluffy.ClientDOM.Expectation do
     end
   end
 
+  defp with_node(client_dom, locator, expectation, fun) do
+    with_element(client_dom, locator, expectation, fn target ->
+      aria = Aria.for_document(client_dom.document)
+      fun.(aria, Aria.node_for(aria, target.element))
+    end)
+  end
+
   defp count_visible(_client_dom, []), do: 0
 
   defp count_visible(client_dom, candidates) do
@@ -182,8 +205,8 @@ defmodule Fluffy.ClientDOM.Expectation do
     end
   end
 
-  defp text_matches?(%Regex{} = expected, actual, options) do
-    expected |> URLMatcher.ignore_case(options[:ignore_case]) |> Regex.match?(actual)
+  defp text_matches?(%PlaywrightEx.RegExp{} = expected, actual, options) do
+    expected |> Expect.Internal.ignore_case(options[:ignore_case]) |> Expect.Internal.matches?(actual)
   end
 
   defp text_matches?(expected, actual, options) when is_binary(expected) do
@@ -193,7 +216,7 @@ defmodule Fluffy.ClientDOM.Expectation do
   end
 
   defp comparable(text, options) do
-    text = if options[:normalize], do: Expect.Internal.normalize_text(text), else: text
+    text = if options[:normalize], do: StringUtils.normalize_white_space(text), else: text
     if options[:ignore_case], do: String.downcase(text), else: text
   end
 

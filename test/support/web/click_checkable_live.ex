@@ -1,4 +1,4 @@
-defmodule Fluffy.TestWeb.ClickCheckableLive do
+defmodule Fluffy.Support.Web.ClickCheckableLive do
   @moduledoc false
 
   use Phoenix.LiveView

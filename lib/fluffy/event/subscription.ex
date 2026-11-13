@@ -7,7 +7,10 @@ defmodule Fluffy.Event.Subscription do
   alias Fluffy.SessionRuntime
 
   def start(session, event, source, mode, handler, deadline) do
-    options = {self(), session, event, source, mode, handler, deadline}
+    # Handlers and predicates run as the caller's: `$callers` lets them use its Ecto
+    # sandbox connection and mocks, as in a `Task`.
+    callers = [self() | Process.get(:"$callers", [])]
+    options = {callers, session, event, source, mode, handler, deadline}
     start = if mode == :wait, do: &GenServer.start/3, else: &GenServer.start_link/3
 
     case start.(__MODULE__, options, []) do
@@ -31,7 +34,8 @@ defmodule Fluffy.Event.Subscription do
   end
 
   @impl true
-  def init({owner, session, event, source, mode, handler, deadline}) do
+  def init({[owner | _] = callers, session, event, source, mode, handler, deadline}) do
+    Process.put(:"$callers", callers)
     Process.flag(:trap_exit, true)
     Process.monitor(owner)
     runtime_monitor = Process.monitor(session.runtime)
@@ -108,12 +112,12 @@ defmodule Fluffy.Event.Subscription do
       else: fail(state, reason)
   end
 
-  def handle_info(:timeout, state), do: fail(state, "no matching #{state.event.type} event occurred before the timeout")
+  def handle_info(:timeout, state), do: fail_timeout(state)
   def handle_info(_message, %{outcome: outcome} = state) when not is_nil(outcome), do: {:noreply, state}
 
   def handle_info(message, state) do
     if state.deadline && Deadline.expired?(state.deadline) do
-      fail(state, "no matching #{state.event.type} event occurred before the timeout")
+      fail_timeout(state)
     else
       deliver(message, state)
     end
@@ -123,6 +127,11 @@ defmodule Fluffy.Event.Subscription do
   def terminate(_reason, state) do
     if state.task, do: Task.shutdown(state.task, :brutal_kill)
     release(state)
+  end
+
+  defp fail_timeout(state) do
+    message = "no matching #{state.event.type} event occurred before the timeout"
+    fail(state, Fluffy.TestTimeout.explain(message, state.deadline))
   end
 
   # A source's close can itself be the event, and is its last one.

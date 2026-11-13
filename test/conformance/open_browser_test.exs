@@ -1,12 +1,12 @@
 defmodule Fluffy.Conformance.OpenBrowserTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
   import Fluffy.Playwright
 
-  alias Fluffy.TestWeb.Endpoint
+  alias Fluffy.Support.Web.Endpoint
 
   for backend <- [:phoenix, :playwright] do
     @tag backend: backend
@@ -61,7 +61,7 @@ defmodule Fluffy.Conformance.OpenBrowserTest do
 
     html = snapshot(session)
     assert html =~ "Second page"
-    assert html =~ Fluffy.TestServer.base_url() <> "/assets/image.png"
+    assert html =~ Fluffy.Support.Server.base_url() <> "/assets/image.png"
   end
 
   test "requires a visited Phoenix page" do

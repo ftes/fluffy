@@ -1,32 +1,77 @@
-defmodule Fluffy.TestCase do
+defmodule Fluffy.Support.Case do
   @moduledoc false
 
   use ExUnit.CaseTemplate
 
+  alias Ecto.Adapters.SQL.Sandbox
+
   using do
     quote do
-      import Fluffy.TestCase,
+      use PlaywrightEx.Test
+
+      import Fluffy.Support.Case,
         only: [
           assert_action_error: 4,
-          browser_context_guids: 0,
+          browser_context_guids: 1,
           freeze_page: 1,
           monitor_running: 1,
           playwright_engine?: 1,
-          put_session_timeout: 2
+          put_fluffy_config: 1,
+          put_playwright_ex_config: 2
         ]
     end
   end
 
   # A plain function, compiled before the tests, so `@tag skip:` can call it at compile time.
-  # Read at call time: compile_env would record the whole :playwright config (artifact_dir
-  # included) in the app and fail at boot whenever it differs.
-  def playwright_engine?(engine),
-    do: engine == Keyword.get(Application.fetch_env!(:fluffy, :playwright), :engine, :chromium)
+  # Read at call time, as the config can differ between runs (FLUFFY_BROWSER).
+  def playwright_engine?(engine), do: engine == PlaywrightEx.Test.config().browser_name
 
-  # Sets the session's timeout after its setup, which runs under the default so a loaded
-  # machine cannot fail it. No public API changes a live session's timeout.
-  def put_session_timeout(session, timeout) do
-    Fluffy.Session.put_context(session, %{Fluffy.Session.context(session) | timeout: timeout})
+  # The application's sandbox owners, as a generated DataCase starts them: Fluffy only
+  # passes the test's sandbox to browser sessions. `setup {Fluffy.Support.Case, :start_sandbox}`.
+  def start_sandbox(context) do
+    owners =
+      for repo <- [Fluffy.Support.Repo, Fluffy.Support.RepoTwo] do
+        owner = Sandbox.start_owner!(repo, shared: not context[:async])
+        ExUnit.Callbacks.on_exit(fn -> Sandbox.stop_owner(owner) end)
+        owner
+      end
+
+    [sandbox_owners: owners]
+  end
+
+  # Puts `options` in `config :fluffy`, such as the default timeouts, until the module
+  # (`setup_all`) or test (`setup`) ends; `nil` unsets a key. The config is global, so only in an
+  # `async: false` module. A Playwright session sets its context's timeouts when it starts.
+  def put_fluffy_config(options) do
+    for {key, value} <- options do
+      original = Application.fetch_env(:fluffy, key)
+      if value == nil, do: Application.delete_env(:fluffy, key), else: Application.put_env(:fluffy, key, value)
+
+      ExUnit.Callbacks.on_exit(fn ->
+        case original do
+          {:ok, original} -> Application.put_env(:fluffy, key, original)
+          :error -> Application.delete_env(:fluffy, key)
+        end
+      end)
+    end
+
+    :ok
+  end
+
+  # Merges `options` into `config :playwright_ex, key` (`:test` or `:expect`), as
+  # `put_fluffy_config/1`. PlaywrightEx.Test reads `:test` when a test registers, in its
+  # `setup`, and Fluffy when a session starts: set the context timeouts in `setup_all`.
+  def put_playwright_ex_config(key, options) when key in [:test, :expect] do
+    original = Application.get_env(:playwright_ex, key)
+    Application.put_env(:playwright_ex, key, Keyword.merge(original || [], options))
+
+    ExUnit.Callbacks.on_exit(fn ->
+      if original,
+        do: Application.put_env(:playwright_ex, key, original),
+        else: Application.delete_env(:playwright_ex, key)
+    end)
+
+    :ok
   end
 
   # Blocks the page's main thread for good. The loop starts in a task after the
@@ -46,11 +91,10 @@ defmodule Fluffy.TestCase do
     monitor
   end
 
-  # Every context open across the pool: a session's context may be in any of its browsers.
-  def browser_context_guids do
-    for %{browser: %{} = browser} <- Fluffy.BrowserRuntime.status().slots,
-        browser_context <- PlaywrightEx.Browser.contexts(browser),
-        do: browser_context.guid
+  # The contexts open in `browser`, which a test reads from a context while it's open
+  # (`PlaywrightEx.BrowserContext.browser/1`).
+  def browser_context_guids(browser) do
+    for browser_context <- PlaywrightEx.Browser.contexts(browser), do: browser_context.guid
   end
 
   def assert_action_error(session, structural_exception, structural_message, action) do
@@ -72,9 +116,5 @@ defmodule Fluffy.TestCase do
     end
 
     error
-  end
-
-  setup context do
-    :ok = Fluffy.Test.setup(context, sandbox: false)
   end
 end

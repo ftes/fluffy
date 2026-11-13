@@ -4,6 +4,7 @@ defmodule Fluffy.Form do
   import Fluffy.HTML.Semantics, only: [attribute: 2, has_attribute?: 2]
 
   alias Fluffy.CapabilityError
+  alias Fluffy.HTML.Aria
   alias Fluffy.HTML.DocumentIndex
   alias Fluffy.HTML.Semantics
   alias Fluffy.HTML.Target
@@ -104,11 +105,6 @@ defmodule Fluffy.Form do
   end
 
   @doc false
-  def disabled?(index, node_id) do
-    MapSet.member?(disabled_control_ids(index), node_id)
-  end
-
-  @doc false
   def url_encode(fields) do
     fields
     |> Enum.map(&url_encoded_field/1)
@@ -173,15 +169,13 @@ defmodule Fluffy.Form do
   end
 
   defp successful_fields(index, properties, form, submitter, driver, owner_ids) do
-    disabled_ids = disabled_control_ids(index)
-
     index
     |> DocumentIndex.targets_by_tag(["button", "input", "select", "textarea"])
     |> Enum.filter(&owned_by_form?(&1, form, owner_ids))
-    |> Enum.flat_map(&control_fields(&1, index, properties, submitter, disabled_ids, driver))
+    |> Enum.flat_map(&control_fields(&1, index, properties, submitter, driver))
   end
 
-  defp control_fields(target, index, properties, submitter, disabled_ids, driver) do
+  defp control_fields(target, index, properties, submitter, driver) do
     name = attribute(target.attributes, "name")
 
     cond do
@@ -189,8 +183,7 @@ defmodule Fluffy.Form do
           same_target?(target, submitter) ->
         input_fields(target, properties, submitter, name, driver)
 
-      name in [nil, ""] or has_attribute?(target.attributes, "disabled") or
-          target.id in disabled_ids ->
+      name in [nil, ""] or target.disabled? ->
         []
 
       target.tag == "button" ->
@@ -446,8 +439,6 @@ defmodule Fluffy.Form do
     end
   end
 
-  defp disabled_control_ids(index), do: index.disabled_ids
-
   defp form_owner_ids(index), do: index.form_owner_ids
 
   defp option_target(target, index) do
@@ -455,7 +446,7 @@ defmodule Fluffy.Form do
       id: target.id,
       value: attribute(target.attributes, "value") || normalize_option_text(target.children),
       attributes: target.attributes,
-      disabled?: DocumentIndex.option_disabled?(index, target)
+      disabled?: Aria.option_disabled?(index, target)
     }
   end
 

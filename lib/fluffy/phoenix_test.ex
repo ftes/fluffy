@@ -24,7 +24,6 @@ defmodule Fluffy.PhoenixTest do
   alias Fluffy.Locator
   alias Fluffy.PhoenixTest.Form
   alias Fluffy.Session, as: NativeSession
-  alias Fluffy.URLMatcher
 
   @non_file_buttons "button, input:not([type=file i]), [role]:not(input)"
 
@@ -534,36 +533,23 @@ defmodule Fluffy.PhoenixTest do
     |> String.replace(["'", "\"", "`", ">"], &("\\x" <> Base.encode16(&1)))
   end
 
+  # PhoenixTest compares the path, with `*` matching one segment, and with
+  # `query_params:` the complete decoded query.
   defp path_expectation(path, options) do
     string!(path, :path)
     options = options!(options, [:query_params, :timeout])
-    components = [path: path]
-
-    components =
-      if Keyword.has_key?(options, :query_params),
-        do: Keyword.put(components, :query, query_map!(options[:query_params])),
-        else: components
-
     parts = String.split(path, "/")
+    query = if Keyword.has_key?(options, :query_params), do: options[:query_params] |> query_map!() |> Enum.sort()
 
-    expected =
-      if "*" in parts do
-        query_matcher =
-          case Keyword.fetch(components, :query) do
-            {:ok, query} -> URLMatcher.new!(query: query)
-            :error -> nil
-          end
-
-        fn uri ->
-          path_parts_match?(parts, uri.path) and
-            (is_nil(query_matcher) or URLMatcher.matches?(query_matcher, URI.to_string(uri)))
-        end
-      else
-        components
-      end
+    expected = fn %URI{} = uri ->
+      path_parts_match?(parts, uri.path) and (is_nil(query) or query == decode_query(uri.query))
+    end
 
     Expect.page_to_have_url(expected, Keyword.take(options, [:timeout]))
   end
+
+  defp decode_query(nil), do: []
+  defp decode_query(query), do: query |> URI.query_decoder() |> Enum.sort()
 
   defp path_parts_match?(expected, actual) when is_binary(actual) do
     actual = String.split(actual, "/")

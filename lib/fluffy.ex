@@ -35,33 +35,10 @@ defmodule Fluffy do
   alias Fluffy.SelectedFile
   alias Fluffy.Session
 
-  @native_values [
-    Fluffy.Request,
-    Fluffy.Response,
-    Fluffy.Route,
-    Fluffy.Dialog,
-    Fluffy.Download,
-    Fluffy.FileChooser,
-    Fluffy.Frame,
-    Fluffy.ConsoleMessage,
-    Fluffy.PageError,
-    Fluffy.Worker,
-    Fluffy.WebSocket
-  ]
+  @native_values [Fluffy.Download, Fluffy.FileChooser]
 
   @typedoc "A browser value that `unwrap_and_return/2` resolves to its PlaywrightEx counterpart."
-  @type native_value ::
-          Fluffy.Request.t()
-          | Fluffy.Route.t()
-          | Fluffy.Response.t()
-          | Fluffy.Dialog.t()
-          | Fluffy.Download.t()
-          | Fluffy.FileChooser.t()
-          | Fluffy.Frame.t()
-          | Fluffy.ConsoleMessage.t()
-          | Fluffy.PageError.t()
-          | Fluffy.Worker.t()
-          | Fluffy.WebSocket.t()
+  @type native_value :: Fluffy.Download.t() | Fluffy.FileChooser.t()
 
   @doc group: "Lifecycle and navigation"
   @doc """
@@ -103,37 +80,6 @@ defmodule Fluffy do
 
   @doc group: "Diagnostics and native access"
   @doc """
-  Groups the operations in `fun` under a named diagnostic step.
-
-  Playwright sessions with tracing enabled record a nested trace group at the
-  call site's source location. Phoenix sessions and untraced Playwright
-  sessions simply run the callback. The callback must return the updated
-  session, which is also returned by `step/3`.
-  """
-  defmacro step(session, name, fun) do
-    location = [file: Path.absname(__CALLER__.file), line: __CALLER__.line]
-
-    quote do
-      Fluffy.__step__(unquote(session), unquote(name), unquote(fun), unquote(location))
-    end
-  end
-
-  @doc false
-  def __step__(%Session{} = session, name, fun, location) when is_binary(name) and is_function(fun, 1) do
-    result = Backend.run_step(session, name, location, fn -> fun.(session) end)
-
-    case result do
-      %Session{} = updated_session ->
-        updated_session
-
-      other ->
-        raise ArgumentError,
-              "Fluffy.step/3 callback must return a Fluffy.Session, got: #{inspect(other)}"
-    end
-  end
-
-  @doc group: "Diagnostics and native access"
-  @doc """
   Opens a temporary HTML snapshot of the active page in your default browser.
 
   Returns the unchanged session so it can be used in a pipeline. Static and
@@ -170,15 +116,8 @@ defmodule Fluffy do
   end
 
   def session_for_html(:playwright, html, options) do
-    start_session =
-      if Fluffy.TestScope.current() do
-        &Backend.start_session/2
-      else
-        &Backend.start_unmanaged_session/2
-      end
-
     :playwright
-    |> start_session.(options)
+    |> Backend.start_session(options)
     |> Backend.visit("/harness")
     |> set_html(html)
   end
@@ -220,7 +159,7 @@ defmodule Fluffy do
   receive the `PlaywrightEx.Page`. Successful LiveView and Playwright callback
   return values are ignored; `unwrap_and_return/2` returns the callback's
   result instead of the session. `Fluffy.Playwright.unwrap/3` passes a native
-  locator instead. For a native value such as a `Fluffy.Response`, use
+  locator instead. For the native value of a `Fluffy.Download`, use
   `unwrap_and_return/2`.
 
   Native operations are not cross-driver compatible. Prefer the shared
@@ -254,13 +193,11 @@ defmodule Fluffy do
   page stays as it is. `Fluffy.Playwright.unwrap_and_return/3` passes a native
   locator instead.
 
-  With a `Fluffy.Request`, `Fluffy.Response`, `Fluffy.Route`, `Fluffy.Dialog`,
-  `Fluffy.Download`, `Fluffy.FileChooser`, `Fluffy.Frame`,
-  `Fluffy.ConsoleMessage`, `Fluffy.PageError`, `Fluffy.Worker` or
-  `Fluffy.WebSocket`, `fun` receives its PlaywrightEx counterpart.
-  A Phoenix download has none and raises `Fluffy.CapabilityError`.
+  With a `Fluffy.Download` or `Fluffy.FileChooser`, `fun` receives its
+  PlaywrightEx counterpart. A Phoenix download has none and raises `Fluffy.CapabilityError`.
+  Other events deliver PlaywrightEx's values themselves.
 
-      address = unwrap_and_return(response, &PlaywrightEx.Response.server_addr!/1)
+      path = unwrap_and_return(download, &PlaywrightEx.Download.path!/1)
   """
   @spec unwrap_and_return(Session.t(), (term() -> result)) :: result when result: term()
   @spec unwrap_and_return(native_value(), (term() -> result)) :: result when result: term()
@@ -277,8 +214,6 @@ defmodule Fluffy do
       detail: "a Phoenix download has no native counterpart"
   end
 
-  defp native!(%Fluffy.Frame{} = frame), do: Fluffy.Frame.native!(frame)
-
   # A value such as a download outlives its page but not its session.
   defp native!(%{native: native} = value) when is_struct(native) do
     if page = owner_page(value), do: Fluffy.Page.ensure_session!(page)
@@ -287,10 +222,8 @@ defmodule Fluffy do
 
   defp native!(value), do: raise(ArgumentError, "#{inspect(value.__struct__)} has no native counterpart")
 
-  # A popup's initial request may have no page to check.
-  defp owner_page(%Fluffy.Response{request: request}), do: request.page
-  defp owner_page(%Fluffy.Route{request: request}), do: request.page
   defp owner_page(%{page: page}), do: page
+  defp owner_page(_value), do: nil
 
   @doc group: "Events"
   @doc """
@@ -301,8 +234,8 @@ defmodule Fluffy do
 
   With a `Fluffy.Locator`, blocks until the locator reaches `state:`, by default
   `:visible`, and returns the session. This form is Playwright only, and raises
-  `Fluffy.CapabilityError` on Phoenix. It raises after the session's `timeout:` unless
-  `timeout:` is given. Prefer an `expect` when asserting what the page shows.
+  `Fluffy.CapabilityError` on Phoenix. `timeout:` defaults to the action timeout
+  ([Timeouts](installation.md#timeouts)). Prefer an `expect` when asserting what the page shows.
 
       session |> wait_for(by_role(:dialog), state: :hidden) |> click(by_role(:button))
 
@@ -629,13 +562,7 @@ defmodule Fluffy do
 
     resolve_driver_result(result)
   rescue
-    error ->
-      stacktrace = __STACKTRACE__
-      error = Backend.normalize_error(session, operation, arguments, error)
-
-      Backend.capture_failure(session, operation, error, stacktrace)
-
-      reraise(error, stacktrace)
+    error -> reraise(Backend.normalize_error(session, operation, arguments, error), __STACKTRACE__)
   end
 
   defp resolve_driver_result(%Session{} = session), do: session

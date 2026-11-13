@@ -1,16 +1,16 @@
 defmodule Fluffy.PlaywrightURLOracleTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
 
   alias Fluffy.Playwright
-  alias Fluffy.TestWeb.Endpoint
+  alias Fluffy.Support.Web.Endpoint
 
   @tag driver: :playwright
   test "pins WHATWG URL component and URLSearchParams normalization" do
     session =
       :playwright
-      |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+      |> start_session(base_url: Fluffy.Support.Server.base_url(), endpoint: Endpoint)
       |> visit(
         "/chamber?tag=a&other=1&tag=b&bare&empty=&space=hello+world&encoded=hello%20world&plus=%2B&unicode=%C3%A4#summary"
       )

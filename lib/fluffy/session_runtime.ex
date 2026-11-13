@@ -4,8 +4,26 @@ defmodule Fluffy.SessionRuntime do
 
   alias Fluffy.Page
 
-  def start(owner, scope \\ nil) do
-    DynamicSupervisor.start_child(__MODULE__.Supervisor, {__MODULE__, owner: owner, scope: scope})
+  def start(owner) do
+    DynamicSupervisor.start_child(__MODULE__.Supervisor, {__MODULE__, owner: owner})
+  end
+
+  # A session's runtime, which stops with `owner`. Started by the owner, it also stops at
+  # the end of the test it runs: ExUnit runs `on_exit` callbacks in reverse, after the test
+  # process exits and also when it fails, so sessions close before the application's
+  # sandbox owners stop, which its DataCase registered first. A Task can't register one.
+  def start!(owner) do
+    {:ok, runtime} = start(owner)
+
+    if owner == self() do
+      try do
+        ExUnit.Callbacks.on_exit(fn -> close(runtime) end)
+      rescue
+        ArgumentError -> :ok
+      end
+    end
+
+    runtime
   end
 
   def start_link(options), do: GenServer.start_link(__MODULE__, options)
@@ -34,16 +52,6 @@ defmodule Fluffy.SessionRuntime do
   # Runs `fun` in the runtime process, so the runtime owns what it creates.
   def run(runtime, fun) when is_function(fun, 0) do
     case call(runtime, {:run, fun}) do
-      {:ok, value} -> value
-      {:raise, kind, reason, stacktrace} -> :erlang.raise(kind, reason, stacktrace)
-      {:error, message} -> raise ArgumentError, message
-    end
-  end
-
-  # Like `run/2` for a `fun` returning `{value, resource, cleanup}`: the cleanup
-  # is registered in the same call, so the resource never goes unregistered.
-  def run_registered(runtime, fun) when is_function(fun, 0) do
-    case call(runtime, {:run_registered, fun}) do
       {:ok, value} -> value
       {:raise, kind, reason, stacktrace} -> :erlang.raise(kind, reason, stacktrace)
       {:error, message} -> raise ArgumentError, message
@@ -88,9 +96,7 @@ defmodule Fluffy.SessionRuntime do
   @impl true
   def init(options) do
     Process.flag(:trap_exit, true)
-    owner = Keyword.fetch!(options, :owner)
-    scope = Keyword.get(options, :scope)
-    monitors = [Process.monitor(owner)] ++ if(scope, do: [Process.monitor(scope)], else: [])
+    monitors = [Process.monitor(Keyword.fetch!(options, :owner))]
 
     {:ok,
      %{
@@ -164,13 +170,6 @@ defmodule Fluffy.SessionRuntime do
 
   def handle_call({:run, fun}, _from, state) do
     {:reply, {:ok, fun.()}, state}
-  catch
-    kind, reason -> {:reply, {:raise, kind, reason, __STACKTRACE__}, state}
-  end
-
-  def handle_call({:run_registered, fun}, _from, state) do
-    {value, resource, cleanup} = fun.()
-    {:reply, {:ok, value}, %{state | resources: [{resource, cleanup} | state.resources]}}
   catch
     kind, reason -> {:reply, {:raise, kind, reason, __STACKTRACE__}, state}
   end

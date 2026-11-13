@@ -1,9 +1,11 @@
 defmodule Fluffy.Conformance.ClearSetCheckedTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
+
+  alias Fluffy.Support.Server
 
   for driver <- [:static, :playwright] do
     @tag driver: driver
@@ -134,10 +136,10 @@ defmodule Fluffy.Conformance.ClearSetCheckedTest do
     end)
   end
 
-  defp with_html(driver, html, fun), do: fun.(session_for_html(driver, html, base_url: Fluffy.TestServer.base_url()))
+  defp with_html(driver, html, fun), do: fun.(session_for_html(driver, html, base_url: Server.base_url()))
 
   defp start_test_session(driver),
-    do: start_session(driver, base_url: Fluffy.TestServer.base_url(), endpoint: Fluffy.TestWeb.Endpoint)
+    do: start_session(driver, base_url: Server.base_url(), endpoint: Fluffy.Support.Web.Endpoint)
 
   defp phoenix_page(:live), do: :phoenix |> start_test_session() |> visit("/live/potions")
 

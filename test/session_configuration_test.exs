@@ -1,11 +1,12 @@
 defmodule Fluffy.SessionConfigurationTest do
-  use Fluffy.TestCase, async: false
+  use Fluffy.Support.Case, async: false
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.TestWeb.Endpoint
+  alias Fluffy.Support.Server
+  alias Fluffy.Support.Web.Endpoint
 
   setup do
     original_endpoint = Application.get_env(:fluffy, :endpoint)
@@ -58,7 +59,7 @@ defmodule Fluffy.SessionConfigurationTest do
     session =
       start_session(:phoenix,
         endpoint: Endpoint,
-        base_url: Fluffy.TestServer.base_url()
+        base_url: Server.base_url()
       )
 
     session
@@ -77,11 +78,11 @@ defmodule Fluffy.SessionConfigurationTest do
 
   test "a configured base URL starts Playwright without an endpoint" do
     Application.delete_env(:fluffy, :endpoint)
-    Application.put_env(:fluffy, :base_url, Fluffy.TestServer.base_url())
+    Application.put_env(:fluffy, :base_url, Server.base_url())
 
     session = start_session(:playwright)
 
-    assert Fluffy.Session.context(session).base_url == Fluffy.TestServer.base_url()
+    assert Fluffy.Session.context(session).base_url == Server.base_url()
   end
 
   test "missing global and session configuration reports the required setting" do
@@ -97,19 +98,18 @@ defmodule Fluffy.SessionConfigurationTest do
     end
   end
 
-  test "a configured Phoenix timeout must be positive, as an operation's 0 checks once" do
-    original = Application.get_env(:fluffy, :timeout)
-    on_exit(fn -> restore_env(:timeout, original) end)
-    Application.put_env(:fluffy, :timeout, 0)
-
-    assert_raise ArgumentError, ~r/config :fluffy, timeout: to be a positive integer, got: 0/, fn ->
-      start_session(:phoenix, endpoint: Endpoint)
-    end
-  end
-
   test "rejects unknown common session options" do
     assert_raise NimbleOptions.ValidationError, ~r/unknown options.*:mystery/, fn ->
       start_session(:phoenix, endpoint: Endpoint, mystery: true)
+    end
+  end
+
+  # As in Playwright Test, there is no per-session timeout.
+  test "rejects a session timeout:" do
+    for backend <- [:phoenix, :playwright] do
+      assert_raise NimbleOptions.ValidationError, ~r/unknown options.*:timeout/, fn ->
+        start_session(backend, endpoint: Endpoint, timeout: 1_000)
+      end
     end
   end
 

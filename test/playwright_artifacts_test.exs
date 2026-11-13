@@ -1,0 +1,115 @@
+defmodule Fluffy.PlaywrightArtifactsTest.TraceCase do
+  # PlaywrightEx.Test writes `trace.zip` in the `on_exit` its registration adds. A case
+  # template's `setup` runs before the `use PlaywrightEx.Test` of its `using`, so this `on_exit`
+  # is added before that one and runs after it, reading the path the test's setup puts in.
+  @moduledoc false
+  use ExUnit.CaseTemplate
+
+  using do
+    quote do
+      use PlaywrightEx.Test
+    end
+  end
+
+  setup context do
+    {:ok, path} = Agent.start(fn -> nil end)
+
+    on_exit(fn ->
+      path = Agent.get(path, & &1)
+      trace = read_trace(path)
+      File.rm_rf!(Path.dirname(path))
+      for expected <- context[:trace_has] || [], do: assert(trace =~ expected)
+      for unexpected <- context[:trace_lacks] || [], do: refute(trace =~ unexpected)
+    end)
+
+    %{trace_path: path}
+  end
+
+  # Every entry, as the archive of several contexts prefixes each one's `trace.trace`.
+  defp read_trace(path) do
+    {:ok, entries} = :zip.extract(String.to_charlist(path), [:memory])
+    Enum.map_join(entries, "\n", fn {_name, contents} -> contents end)
+  end
+end
+
+defmodule Fluffy.PlaywrightArtifactsTest do
+  # Fluffy's side of PlaywrightEx.Test's recording: the contexts of a test's sessions are
+  # the test's, and steps are its test steps.
+  use ExUnit.Case, async: true
+  use Fluffy.PlaywrightArtifactsTest.TraceCase
+
+  import Fluffy
+  import Fluffy.Expect
+  import Fluffy.Locator
+  import Fluffy.Playwright
+
+  alias Fluffy.Event
+  alias Fluffy.FilePayload
+  alias Fluffy.Playwright
+  alias Fluffy.Support.HTTPFixtures
+  alias Fluffy.Support.Server
+
+  # Derived, so the trace's copy of this source file does not contain it.
+  @secret "FLUFFY-" <> Base.encode16("upload secret of gringotts")
+
+  @moduletag trace: true
+
+  setup %{trace_path: path} do
+    trace_path = PlaywrightEx.Test.output_path("trace.zip")
+    Agent.update(path, fn _ -> trace_path end)
+  end
+
+  @tag trace_has: [
+         ~s("method":"goto"),
+         ~s(internal:role=button[name=\\"Open popup\\"i]),
+         ~s(Traced popup),
+         ~s("url":"/stage")
+       ]
+  test "records every page of every session into the test's trace" do
+    fixture =
+      HTTPFixtures.register(fn request ->
+        case request.path do
+          "/start" -> %{body: html(~s|<button onclick="window.open('popup')">Open popup</button>|)}
+          "/popup" -> %{body: html("<h1>Traced popup</h1>")}
+        end
+      end)
+
+    :playwright
+    |> start_session(base_url: Server.base_url())
+    |> visit(HTTPFixtures.path(fixture, "/start"))
+    |> then(fn session ->
+      pending = wait_for(session, Event.popup())
+      click(session, by_role(:button, name: "Open popup"))
+      switch_page(session, await(pending))
+    end)
+    |> expect("Traced popup" |> by_text() |> to_be_visible())
+
+    :playwright |> start_session(base_url: Server.base_url()) |> visit("/stage")
+  end
+
+  @tag trace_has: ["Outer workflow", "Inner operation", Path.absname(__ENV__.file)]
+  test "records steps as nested test steps with source locations" do
+    :playwright
+    |> start_session(base_url: Server.base_url())
+    |> visit("/stage")
+    |> step("Outer workflow", fn session ->
+      step(session, "Inner operation", fn session ->
+        Playwright.evaluate(session, "document.body.dataset.stepped = 'yes'")
+        session
+      end)
+    end)
+  end
+
+  @tag trace_has: ["set_input_files", "setInputFiles"], trace_lacks: [@secret]
+  test "does not copy in-memory upload contents into the trace" do
+    :playwright
+    |> session_for_html(~s(<label>Attachment <input type="file"></label>), base_url: Server.base_url())
+    |> set_input_files(by_label("Attachment"), %FilePayload{
+      name: "private.txt",
+      bytes: @secret,
+      content_type: "text/plain"
+    })
+  end
+
+  defp html(body), do: "<!doctype html><html><body>#{body}</body></html>"
+end

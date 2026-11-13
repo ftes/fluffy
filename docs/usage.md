@@ -18,10 +18,6 @@ defmodule MyAppWeb.CreatureTest do
   import Fluffy
   import Fluffy.Locator
 
-  setup context do
-    Fluffy.Test.setup(context)
-  end
-
   test "puts Fluffy to sleep" do
     start_session(:phoenix)
     |> visit("/creatures/fluffy")
@@ -81,7 +77,7 @@ For LiveView event scheduling and keyboard limitations, see
 Use `:playwright` when the behavior depends on JavaScript, browser layout,
 native-validation events or blocking, dialogs, request/response events, or
 another capability shown as unavailable on Phoenix. Choose the backend when
-starting the session:
+starting the session, in a module with `use PlaywrightEx.Test` after `use ExUnit.Case`:
 
 ```elixir
 test "updates the preview rendered by a JavaScript hook" do
@@ -96,33 +92,10 @@ See the [capability matrix](capabilities.md) for backend differences.
 
 ## Shared test case
 
-Put shared imports and session setup in an application-owned `FluffyCase`.
-Keep your ordinary `ConnCase` for fixtures, routes, and sandbox setup, then
-start the Fluffy session after it:
-
-```elixir
-# test/support/fluffy_case.ex
-defmodule MyAppWeb.FluffyCase do
-  use ExUnit.CaseTemplate
-
-  using do
-    quote do
-      use MyAppWeb.ConnCase
-      use Fluffy.Assert
-
-      import Fluffy
-      import Fluffy.Locator
-
-      alias Fluffy.Event
-
-      setup context do
-        :ok = Fluffy.Test.setup(context)
-        %{session: start_session(Map.get(context, :backend, :phoenix))}
-      end
-    end
-  end
-end
-```
+`use Fluffy.Case` after your `ConnCase` adds `use PlaywrightEx.Test`, Fluffy's imports
+and a session per test. Keep the `ConnCase` for fixtures, routes and the sandbox, and use it first: used
+after `Fluffy.Case`, its `use ExUnit.Case` imports `test` again and the module fails to
+compile on an ambiguous `test/3`.
 
 Tests receive `session` in their context and default to Phoenix. Use
 `@moduletag backend: :playwright` for an entire module, `@describetag` for a
@@ -130,7 +103,8 @@ describe block, or `@tag` for one test—without a separate browser test module:
 
 ```elixir
 defmodule MyAppWeb.PotionTest do
-  use MyAppWeb.FluffyCase, async: true
+  use MyAppWeb.ConnCase, async: true
+  use Fluffy.Case
 
   test "lists the available potions", %{session: session} do
     session
@@ -147,3 +121,6 @@ defmodule MyAppWeb.PotionTest do
   end
 end
 ```
+
+`Fluffy.Case` is a few lines; to change them, copy them into your own case template's
+`using`, keeping the session setup after `use PlaywrightEx.Test`.

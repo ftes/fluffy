@@ -1,4 +1,4 @@
-defmodule Fluffy.TestWeb.InitialConnectionAuthorization do
+defmodule Fluffy.Support.Web.InitialConnectionAuthorization do
   @moduledoc false
 
   import Plug.Conn

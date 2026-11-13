@@ -13,7 +13,7 @@ defmodule Fluffy.Driver.Playwright do
   alias Fluffy.Locator
   alias Fluffy.Locator.Playwright, as: PlaywrightLocator
   alias Fluffy.Session
-  alias Fluffy.URLMatcher
+  alias Fluffy.Timeouts
   alias PlaywrightEx.AbortController
   alias PlaywrightEx.BrowserContext
   alias PlaywrightEx.Client.Errors
@@ -53,23 +53,9 @@ defmodule Fluffy.Driver.Playwright do
       {:ok, :expectation}
     end
 
-    case navigation_aware_action(session, action) do
+    case navigation_aware_action(session, Timeouts.get(expectation.options, &Timeouts.expect/0), action) do
       {:ok, :expectation, outcome} -> outcome
       {:error, error} -> expectation_failed!(expectation, error, "")
-    end
-  end
-
-  defp execute_expectation(session, %Expect{target: :page, kind: :url, expected: expected} = expectation) do
-    page = Session.page_state(session).page
-    matcher = fn url -> URLMatcher.matches?(expected, url) != expectation.negated? end
-    timeout = Session.timeout(session, expectation.options)
-
-    case BrowserPage.wait_for_url(page, matcher, wait_until: :commit, timeout: timeout) do
-      :ok ->
-        :ok
-
-      {:error, error} ->
-        expectation_failed!(expectation, error, ", got #{inspect(BrowserPage.url(page))}")
     end
   end
 
@@ -77,7 +63,7 @@ defmodule Fluffy.Driver.Playwright do
     {target, assertion, arguments, options} = native_expectation(session, expectation)
     target = if expectation.negated?, do: BrowserExpect.not_(target), else: target
 
-    options = Keyword.put(options, :timeout, Session.timeout(session, expectation.options))
+    options = Keyword.put(options, :timeout, Timeouts.playwright_expect(expectation.options))
 
     case apply(BrowserExpect, assertion, [target | arguments] ++ [options]) do
       :ok ->
@@ -104,6 +90,9 @@ defmodule Fluffy.Driver.Playwright do
 
   defp native_expectation(session, %Expect{target: :page, kind: :title, expected: expected}),
     do: {Session.page_state(session).page, :to_have_title, [expected], []}
+
+  defp native_expectation(session, %Expect{target: :page, kind: :url, expected: {expected, options}}),
+    do: {Session.page_state(session).page, :to_have_url, [expected], options}
 
   defp native_expectation(session, %Expect{target: :page, kind: :aria_snapshot, expected: expected}) do
     {assertion, arguments, options} = locator_assertion(:aria_snapshot, expected)
@@ -405,26 +394,24 @@ defmodule Fluffy.Driver.Playwright do
   end
 
   defp read(session, operation, target, options, fun) do
-    timeout = Session.operation_timeout!(session, operation, options)
+    timeout = Timeouts.playwright_operation!(operation, options)
 
-    case navigation_aware_action(session, fn -> fun.(timeout) end) do
+    case navigation_aware_action(session, Timeouts.operation(operation, options), fn -> fun.(timeout) end) do
       {:ok, value, outcome} -> {:return, value, outcome}
       {:error, error} -> OperationFailure.raise_playwright!(operation, target, error)
     end
   end
 
-  def screenshot(session, locator, path, options) do
-    options = screenshot_options(session, path, options)
-    locator_action(session, :screenshot, locator, options, &BrowserLocator.screenshot(&1, native(options, &2)))
+  def screenshot(session, locator, options) do
+    options = resolve_mask(options, session)
+    locator_read(session, :screenshot, locator, options, &BrowserLocator.screenshot(&1, native(options, &2)))
   end
 
-  def page_screenshot(session, path, options) do
+  def page_screenshot(session, options) do
     page = Session.page_state(session).page
-    options = screenshot_options(session, path, options)
-    action(session, :screenshot, nil, options, &BrowserPage.screenshot(page, native(options, &1)))
+    options = resolve_mask(options, session)
+    read(session, :screenshot, nil, options, &BrowserPage.screenshot(page, native(options, &1)))
   end
-
-  defp screenshot_options(session, path, options), do: options |> Keyword.put(:path, path) |> resolve_mask(session)
 
   # As in Playwright, page-wide input and emulation have no timeout and wait while
   # a script blocks the page. Unlike a locator action, Playwright does not wait for
@@ -468,7 +455,8 @@ defmodule Fluffy.Driver.Playwright do
   def unwrap_and_return_locator(%Session{} = session, %Locator{} = locator, fun) when is_function(fun, 1),
     do: run_unwrapped(session, :unwrap_and_return, locator, locator(session, locator), fun)
 
-  # The callback's own errors pass through; Fluffy's adoption before it raises
+  # The callback's own errors pass through, also one it returns for a call that
+  # the close of its page or context ended; Fluffy's adoption before it raises
   # `Fluffy.OperationError`.
   defp run_unwrapped(session, operation, target, native, fun) do
     page = Session.page_state(session).page
@@ -476,11 +464,11 @@ defmodule Fluffy.Driver.Playwright do
 
     action = fn ->
       result = fun.(native)
-      validate_unwrapped!(context.browser_context, page)
+      validate_unwrapped!(context.browser_context, page, result)
       {:ok, result}
     end
 
-    case navigation_aware_action(session, action) do
+    case navigation_aware_action(session, Timeouts.action(), action) do
       {:ok, result, outcome} -> {:return, result, outcome}
       {:error, error} -> OperationFailure.raise_playwright!(operation, target, error)
     end
@@ -493,18 +481,25 @@ defmodule Fluffy.Driver.Playwright do
   def clock(%Session{} = session, operation, fun) do
     clock = BrowserPage.clock(Session.page_state(session).page)
 
-    case navigation_aware_action(session, fn -> result(fun.(clock)) end) do
+    case navigation_aware_action(session, Timeouts.action(), fn -> result(fun.(clock)) end) do
       {:ok, :ok, outcome} -> outcome
       {:error, error} -> OperationFailure.raise_playwright!(operation, nil, error)
     end
   end
 
-  defp validate_unwrapped!(browser_context, page) do
-    cond do
-      BrowserContext.is_closed(browser_context) -> invalidated!(:context)
-      BrowserPage.is_closed(page) -> invalidated!(:page)
-      true -> :ok
-    end
+  # A call the close ended, such as PlaywrightEx.Test's at the test timeout, fails
+  # with PlaywrightEx's error and its call log, as in Playwright.
+  defp validate_unwrapped!(browser_context, page, result) do
+    closed =
+      cond do
+        BrowserContext.is_closed(browser_context) -> :context
+        BrowserPage.is_closed(page) -> :page
+        true -> nil
+      end
+
+    with {:error, %TargetClosedError{} = error} when closed != nil <- result, do: raise(error)
+
+    if closed, do: invalidated!(closed), else: :ok
   end
 
   defp invalidated!(kind) do
@@ -523,9 +518,9 @@ defmodule Fluffy.Driver.Playwright do
   end
 
   defp action(session, operation, target, options, fun) do
-    timeout = Session.operation_timeout!(session, operation, options)
+    timeout = Timeouts.playwright_operation!(operation, options)
 
-    case navigation_aware_action(session, fn -> result(fun.(timeout)) end) do
+    case navigation_aware_action(session, Timeouts.operation(operation, options), fn -> result(fun.(timeout)) end) do
       {:ok, _value, outcome} -> outcome
       {:error, error} -> OperationFailure.raise_playwright!(operation, target, error)
     end
@@ -536,22 +531,24 @@ defmodule Fluffy.Driver.Playwright do
 
   # An action's own error is Playwright's; Firefox fails an action that closes its
   # own page, which Playwright leaves as a known Firefox bug.
-  defp navigation_aware_action(session, action) do
-    # Browser bookkeeping has its own budget; it must not consume a short
-    # action/assertion timeout or silently leave navigation state stale.
-    with {:ok, session, before} <- prepare_document(session) do
+  # `timeout` is the operation's own (its `timeout:` or default). Browser
+  # bookkeeping gets a budget of its own from it; it must not consume a short
+  # action/assertion timeout or silently leave navigation state stale.
+  defp navigation_aware_action(session, timeout, action) do
+    bookkeeping_timeout = Document.bookkeeping_timeout(timeout)
+
+    with {:ok, session, before} <- prepare_document(session, bookkeeping_timeout) do
       state = Session.page_state(session)
 
       with {:ok, value} <- action.(),
-           do: {:ok, value, reconcile_action_navigation(session, state, before, Document.bookkeeping_timeout(session))}
+           do: {:ok, value, reconcile_action_navigation(session, state, before, bookkeeping_timeout)}
     end
   end
 
   # Adopts a document Fluffy has not seen: a new page's first document, or a
   # navigation that happened outside Fluffy (a late one, or through unwrap/2).
-  defp prepare_document(session) do
+  defp prepare_document(session, timeout) do
     state = Session.page_state(session)
-    timeout = Document.bookkeeping_timeout(session)
     probe = open_page_probe!(session, state, timeout)
 
     if probe.document == state.document_identity do

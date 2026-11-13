@@ -1,4 +1,4 @@
-defmodule Fluffy.TestWeb.PhoenixHTMLLinkLive do
+defmodule Fluffy.Support.Web.PhoenixHTMLLinkLive do
   @moduledoc false
 
   use Phoenix.LiveView

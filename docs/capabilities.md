@@ -43,13 +43,13 @@ boundaries described below.
 | Dialogs, console, page errors, frames, workers, WebSockets, and browser network events | - | equivalent |
 | Browser request routing | - | equivalent |
 | Active-page JavaScript evaluation | - | equivalent |
+| Test steps | - | equivalent |
 | Fake page clock and timers | - | equivalent |
 | JavaScript-owned DOM and default actions | - | equivalent |
 | Native invalid, submit, and formdata event ordering | - | equivalent |
 | Hard-wrapped textarea, object, and custom-element entries | - | equivalent |
 | Per-test sessions, cleanup, and Ecto sandbox propagation | equivalent | equivalent |
-| Regex URL matching | equivalent | equivalent |
-| Structured path, query, and fragment URL matching | equivalent | equivalent |
+| URL matching | equivalent | equivalent |
 | Typed file selection and supported upload lifecycle | equivalent | equivalent |
 | Script-opened file chooser events | - | equivalent |
 <!-- capability-matrix:end -->
@@ -186,8 +186,7 @@ session
 
 Only URL expectations and `visit` back into the app work on that page; everything else raises
 `Fluffy.CapabilityError` (`:external_navigation`), as does `visit` to another origin. Use
-the string, regex or function form of `page_to_have_url`: `assert_path` and the keyword
-form ignore the host. On Playwright the browser loads the external page; stub it with
+`page_to_have_url`, since `assert_path` ignores the host. On Playwright the browser loads the external page; stub it with
 `Fluffy.Playwright.route/4`, which catches a link's or form's target but not a redirect's.
 
 ### Browser baseline
@@ -281,16 +280,14 @@ fails when PlaywrightEx adds or removes one.
   message assertions, `to_match_aria_snapshot` and `to_have_screenshot`, navigation,
   page management, cookies, storage state, including `set_storage_state`,
   `local_storage` and `session_storage`, permissions, geolocation, offline mode,
-  HTTP credentials, extra HTTP headers, request routing, including `unroute_all`
-  and `Fluffy.Route.fetch/2`,
+  HTTP credentials, extra HTTP headers, request routing, including `unroute_all`,
   tracing, page and element screenshots, page evaluation, init scripts, script and
   style tags, `wait_for_function` and `wait_for_load_state` on the page, the clock in
   `Fluffy.Playwright.Clock`, keyboard and mouse input in `Fluffy.Playwright.Keyboard`
   and `Fluffy.Playwright.Mouse`, the events in `Fluffy.Event`, and the values they
   deliver, including response bodies. Their options pass through as documented.
-  `to_have_screenshot` needs an explicit `path:` for its baseline, which Fluffy does
-  not derive from the test name; `to_match_aria_snapshot` compares an inline snapshot
-  or, with `path:`, a file written when missing.
+  `to_have_screenshot` and `to_match_aria_snapshot` (without an inline snapshot) find
+  their file by `name:` or the test's name, through `PlaywrightEx.Test`, or at `path:`.
 - **Unwrap:** everything else page-, locator-, or value-local, such as
   `aria_snapshot_json`, HAR routing, and response timing. For reads like
   `text_content`, `Fluffy.unwrap_and_return/2` and

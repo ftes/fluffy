@@ -73,29 +73,28 @@ action and the assertion to it.
 Follow [Installation and runtime](docs/installation.md) for the dependency,
 endpoint, browser, and sandbox configuration.
 
-For the native locator API, establish a lifecycle scope and import its helpers:
+For the native locator API, import its helpers; a module with browser tests also
+needs `use PlaywrightEx.Test`:
 
 ```elixir
 use ExUnit.Case, async: true
+use PlaywrightEx.Test
 use Fluffy.Assert
 
 import Fluffy
 import Fluffy.Locator
-
-setup context do
-  Fluffy.Test.setup(context)
-end
 ```
 
 Start with `start_session(:phoenix)` for in-process Static and LiveView tests.
 Use `start_session(:playwright)` when a test needs a real browser. See
 [Installation and runtime](docs/installation.md) for Playwright and Ecto sandbox
-setup, then [Usage](docs/usage.md) for writing tests and a shared `FluffyCase`.
+setup, then [Usage](docs/usage.md) for writing tests and `use Fluffy.Case`, which
+starts a session per test after your `ConnCase`.
 
 ## Coming from PhoenixTest
 
-Replace `import PhoenixTest` with `import Fluffy.PhoenixTest` and add
-`Fluffy.Test.setup/1` to your test setup. Existing pipelines keep familiar helpers
+Replace `import PhoenixTest` with `import Fluffy.PhoenixTest`, and add
+`use PlaywrightEx.Test` to modules with browser tests. Existing pipelines keep familiar helpers
 such as `fill_in`, `click_button`, and `assert_has`, and their prepared connections:
 
 ```elixir

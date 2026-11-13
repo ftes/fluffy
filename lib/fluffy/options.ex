@@ -7,13 +7,13 @@ defmodule Fluffy.Options do
     timeout: [
       type: :timeout,
       doc:
-        "Maximum time in milliseconds to wait for the operation. Defaults to the session's `timeout:`. " <>
+        "Maximum time in milliseconds to wait for the operation. As in Playwright Test, defaults to " <>
+          "the action timeout (navigations: the navigation timeout), no timeout unless set, " <>
+          "and for assertions to the expect timeout, 5 seconds ([Timeouts](installation.md#timeouts)). " <>
           "`0` checks once, unlike Playwright, where `0` disables the timeout. Playwright actions and waits " <>
           "reject `0` with an `ArgumentError`, as they cannot check once; Playwright assertions accept it. " <>
           "`:infinity` disables the timeout: Playwright waits with no timeout, LiveView retries until the test " <>
-          "times out, and Static, where nothing changes, checks once. " <>
-          "Playwright browser bookkeeping and navigation synchronization use the session timeout separately, " <>
-          "and at least 1 second."
+          "times out, and Static, where nothing changes, checks once."
     ]
   ]
 
@@ -36,115 +36,67 @@ defmodule Fluffy.Options do
     :install_clock
   ]
 
-  # The upstream call behind each cross-driver action and its options that pass through
-  # on Playwright. Fluffy owns `timeout` (its retry budget); `no_wait_after` and `signal`
-  # would bypass its navigation tracking.
+  # The upstream call behind each cross-driver action. Its options pass through on
+  # Playwright, read from PlaywrightEx's `__options__/1`, except Fluffy's own `timeout`
+  # (its retry budget) and the denied ones below.
   @native_actions [
-    click:
-      {PlaywrightEx.Locator, :click, 2,
-       [:button, :click_count, :delay, :force, :modifiers, :position, :scroll, :steps, :trial]},
-    fill: {PlaywrightEx.Locator, :fill, 3, [:force]},
-    clear: {PlaywrightEx.Locator, :clear, 2, [:force]},
-    set_checked: {PlaywrightEx.Locator, :set_checked, 3, [:force, :position, :scroll, :trial]},
-    check: {PlaywrightEx.Locator, :check, 2, [:force, :position, :scroll, :trial]},
-    uncheck: {PlaywrightEx.Locator, :uncheck, 2, [:force, :position, :scroll, :trial]},
-    select_option: {PlaywrightEx.Locator, :select_option, 3, [:force]},
-    press: {PlaywrightEx.Locator, :press, 3, [:delay]},
-    set_input_files: {PlaywrightEx.Locator, :set_input_files, 3, []},
-    reload: {PlaywrightEx.Page, :reload, 2, [:wait_until]}
+    click: {PlaywrightEx.Locator, :click, 2},
+    fill: {PlaywrightEx.Locator, :fill, 3},
+    clear: {PlaywrightEx.Locator, :clear, 2},
+    set_checked: {PlaywrightEx.Locator, :set_checked, 3},
+    check: {PlaywrightEx.Locator, :check, 2},
+    uncheck: {PlaywrightEx.Locator, :uncheck, 2},
+    select_option: {PlaywrightEx.Locator, :select_option, 3},
+    press: {PlaywrightEx.Locator, :press, 3},
+    set_input_files: {PlaywrightEx.Locator, :set_input_files, 3},
+    reload: {PlaywrightEx.Page, :reload, 2}
   ]
 
-  # Playwright-only actions, classified like the cross-driver ones.
+  # Playwright-only actions, whose options pass through the same way.
   @playwright_actions [
-    hover: {PlaywrightEx.Locator, :hover, 2, [:force, :modifiers, :position, :scroll, :trial]},
-    drag_to: {PlaywrightEx.Locator, :drag_to, 3, [:force, :scroll, :source_position, :steps, :target_position, :trial]},
-    press_sequentially: {PlaywrightEx.Locator, :press_sequentially, 3, [:delay]},
-    focus: {PlaywrightEx.Locator, :focus, 2, []},
-    blur: {PlaywrightEx.Locator, :blur, 2, []},
-    dblclick:
-      {PlaywrightEx.Locator, :dblclick, 2, [:button, :delay, :force, :modifiers, :position, :scroll, :steps, :trial]},
-    tap: {PlaywrightEx.Locator, :tap, 2, [:force, :modifiers, :position, :scroll, :trial]},
-    dispatch_event: {PlaywrightEx.Locator, :dispatch_event, 4, []},
-    select_text: {PlaywrightEx.Locator, :select_text, 2, [:force]},
-    scroll_into_view_if_needed: {PlaywrightEx.Locator, :scroll_into_view_if_needed, 2, []},
-    wait_for: {PlaywrightEx.Locator, :wait_for, 2, [:state]},
-    bounding_box: {PlaywrightEx.Locator, :bounding_box, 2, []},
-    aria_snapshot: {PlaywrightEx.Locator, :aria_snapshot, 2, [:boxes, :depth, :mode]},
-    drop: {PlaywrightEx.Locator, :drop, 3, [:position]},
-    locator_evaluate: {PlaywrightEx.Locator, :evaluate, 4, [:expose_functions]},
-    locator_wait_for_function: {PlaywrightEx.Locator, :wait_for_function, 4, []},
-    page_aria_snapshot: {PlaywrightEx.Page, :aria_snapshot, 2, [:boxes, :depth, :mode]},
-    wait_for_function: {PlaywrightEx.Page, :wait_for_function, 4, [:polling]},
-    wait_for_load_state: {PlaywrightEx.Page, :wait_for_load_state, 3, []},
-    unroute_all: {PlaywrightEx.BrowserContext, :unroute_all, 2, [:behavior]},
-    locator_screenshot:
-      {PlaywrightEx.Locator, :screenshot, 2,
-       [:animations, :caret, :mask, :mask_color, :omit_background, :quality, :scale, :style, :type]},
-    page_screenshot:
-      {PlaywrightEx.Page, :screenshot, 2,
-       [:animations, :caret, :clip, :full_page, :mask, :mask_color, :omit_background, :quality, :scale, :style, :type]},
-    to_have_screenshot:
-      {PlaywrightEx.Expect, :to_have_screenshot, 2,
-       [
-         :animations,
-         :caret,
-         :clip,
-         :full_page,
-         :mask,
-         :mask_color,
-         :max_diff_pixel_ratio,
-         :max_diff_pixels,
-         :omit_background,
-         :scale,
-         :style_path,
-         :threshold
-       ]},
-    content: {PlaywrightEx.Page, :content, 2, [:include_shadow]},
-    pdf:
-      {PlaywrightEx.Page, :pdf, 2,
-       [
-         :display_header_footer,
-         :footer_template,
-         :format,
-         :header_template,
-         :height,
-         :landscape,
-         :margin,
-         :outline,
-         :page_ranges,
-         :prefer_css_page_size,
-         :print_background,
-         :scale,
-         :tagged,
-         :width
-       ]},
-    emulate_media:
-      {PlaywrightEx.Page, :emulate_media, 2, [:color_scheme, :contrast, :forced_colors, :media, :reduced_motion]},
-    keyboard_press: {PlaywrightEx.Keyboard, :press, 3, [:delay]},
-    keyboard_type: {PlaywrightEx.Keyboard, :type, 3, [:delay]},
-    mouse_click: {PlaywrightEx.Mouse, :click, 4, [:button, :click_count, :delay]},
-    mouse_dblclick: {PlaywrightEx.Mouse, :dblclick, 4, [:button, :delay]},
-    mouse_down: {PlaywrightEx.Mouse, :down, 2, [:button, :click_count]},
-    mouse_up: {PlaywrightEx.Mouse, :up, 2, [:button, :click_count]},
-    mouse_move: {PlaywrightEx.Mouse, :move, 4, [:steps]},
-    go_back: {PlaywrightEx.Page, :go_back, 2, [:wait_until]},
-    go_forward: {PlaywrightEx.Page, :go_forward, 2, [:wait_until]},
-    install_clock: {PlaywrightEx.Clock, :install, 2, [:time]}
+    hover: {PlaywrightEx.Locator, :hover, 2},
+    drag_to: {PlaywrightEx.Locator, :drag_to, 3},
+    press_sequentially: {PlaywrightEx.Locator, :press_sequentially, 3},
+    focus: {PlaywrightEx.Locator, :focus, 2},
+    blur: {PlaywrightEx.Locator, :blur, 2},
+    dblclick: {PlaywrightEx.Locator, :dblclick, 2},
+    tap: {PlaywrightEx.Locator, :tap, 2},
+    dispatch_event: {PlaywrightEx.Locator, :dispatch_event, 4},
+    select_text: {PlaywrightEx.Locator, :select_text, 2},
+    scroll_into_view_if_needed: {PlaywrightEx.Locator, :scroll_into_view_if_needed, 2},
+    wait_for: {PlaywrightEx.Locator, :wait_for, 2},
+    bounding_box: {PlaywrightEx.Locator, :bounding_box, 2},
+    aria_snapshot: {PlaywrightEx.Locator, :aria_snapshot, 2},
+    drop: {PlaywrightEx.Locator, :drop, 3},
+    locator_evaluate: {PlaywrightEx.Locator, :evaluate, 4},
+    locator_wait_for_function: {PlaywrightEx.Locator, :wait_for_function, 4},
+    page_aria_snapshot: {PlaywrightEx.Page, :aria_snapshot, 2},
+    wait_for_function: {PlaywrightEx.Page, :wait_for_function, 4},
+    wait_for_load_state: {PlaywrightEx.Page, :wait_for_load_state, 3},
+    unroute_all: {PlaywrightEx.BrowserContext, :unroute_all, 2},
+    locator_screenshot: {PlaywrightEx.Locator, :screenshot, 2},
+    page_screenshot: {PlaywrightEx.Page, :screenshot, 2},
+    to_have_screenshot: {PlaywrightEx.Expect, :to_have_screenshot, 2},
+    content: {PlaywrightEx.Page, :content, 2},
+    pdf: {PlaywrightEx.Page, :pdf, 2},
+    emulate_media: {PlaywrightEx.Page, :emulate_media, 2},
+    keyboard_press: {PlaywrightEx.Keyboard, :press, 3},
+    keyboard_type: {PlaywrightEx.Keyboard, :type, 3},
+    mouse_click: {PlaywrightEx.Mouse, :click, 4},
+    mouse_dblclick: {PlaywrightEx.Mouse, :dblclick, 4},
+    mouse_down: {PlaywrightEx.Mouse, :down, 2},
+    mouse_up: {PlaywrightEx.Mouse, :up, 2},
+    mouse_move: {PlaywrightEx.Mouse, :move, 4},
+    go_back: {PlaywrightEx.Page, :go_back, 2},
+    go_forward: {PlaywrightEx.Page, :go_forward, 2},
+    install_clock: {PlaywrightEx.Clock, :install, 2}
   ]
 
   @fluffy_native_keys [:timeout]
-  # `path` is the positional argument of a screenshot.
-  @denied_native_keys [:no_wait_after, :signal, :path]
+  @denied_native_keys [:no_wait_after, :signal]
 
   # Upstream docs and types of a passed-through option that Fluffy's behavior completes.
   @native_option_overrides [
-    behavior: [
-      doc:
-        "*Playwright only.* What to do with route handlers already running: `:default` does not wait, and a " <>
-          "handler that fails later, such as by answering a request that went on to the server, fails as usual; " <>
-          "`:wait` waits for them to finish; `:ignore_errors` does not wait and ignores their failures, letting " <>
-          "their requests go on."
-    ],
     wait_until: [
       doc:
         "*Playwright only.* When Playwright considers the navigation done: `:commit`, `:domcontentloaded`, " <>
@@ -158,22 +110,21 @@ defmodule Fluffy.Options do
     ]
   ]
 
-  # PlaywrightEx has no test runner to name a baseline, so its `path:` is required, and
-  # nothing derives one here.
+  # These replace the upstream option of the same name: a baseline's `path:`, which
+  # PlaywrightEx requires outside a `PlaywrightEx.Test` test.
   @required_action_options [
     to_have_screenshot: [
       path: [
         type: :string,
-        required: true,
         doc:
-          "The baseline image, a `.png` or `.webp` file, resolved against the current working directory. " <>
-            "Required: Fluffy does not derive a path from the test name."
+          "*Playwright only.* The baseline image, a `.png` or `.webp` file, resolved against the current " <>
+            "working directory, in place of `:name`. Required in a module without `use PlaywrightEx.Test`."
       ]
     ]
   ]
 
-  # `path:` of a script or style tag is the file to inject, not a screenshot's positional
-  # path, so these are not classified with the upstream options above.
+  # `path:` of a script or style tag is the file to inject, not a file to write, so these
+  # are not classified with the upstream options above.
   @tag_options [
     content: [type: :string, doc: "Raw source to inject."],
     path: [type: :string, doc: "File to inject, resolved against the current working directory."],
@@ -182,13 +133,15 @@ defmodule Fluffy.Options do
 
   @action_schemas @native_actions
                   |> Kernel.++(@playwright_actions)
-                  |> Map.new(fn {action, {module, fun, arity, keys}} ->
+                  |> Map.new(fn {action, {module, fun, _arity}} ->
+                    required = Keyword.get(@required_action_options, action, [])
+                    excluded = @fluffy_native_keys ++ @denied_native_keys ++ Keyword.keys(required)
+
                     native =
-                      for {key, entry} <- Native.schema(module, fun, arity, keys) do
+                      for {key, entry} <- Native.schema(module, fun, excluded) do
                         {key, Keyword.merge(entry, Keyword.get(@native_option_overrides, key, []))}
                       end
 
-                    required = Keyword.get(@required_action_options, action, [])
                     timeout = if action in @untimed_actions, do: [], else: @timeout_options
                     {action, NimbleOptions.new!(timeout ++ required ++ native)}
                   end)
@@ -214,7 +167,7 @@ defmodule Fluffy.Options do
     to_have_accessible_name: {PlaywrightEx.Expect, :to_have_accessible_name, 3, [:ignore_case]},
     to_have_accessible_description: {PlaywrightEx.Expect, :to_have_accessible_description, 3, [:ignore_case]},
     to_have_accessible_error_message: {PlaywrightEx.Expect, :to_have_accessible_error_message, 3, [:ignore_case]},
-    to_match_aria_snapshot: {PlaywrightEx.Expect, :to_match_aria_snapshot, 3, [:path]},
+    to_match_aria_snapshot: {PlaywrightEx.Expect, :to_match_aria_snapshot, 3, [:name, :path]},
     to_be_checked: {PlaywrightEx.Expect, :to_be_checked, 2, [:checked, :indeterminate]},
     to_have_value: {PlaywrightEx.Expect, :to_have_value, 3, []},
     to_have_values: {PlaywrightEx.Expect, :to_have_values, 3, []},
@@ -286,13 +239,13 @@ defmodule Fluffy.Options do
   ]
 
   @text_or_regex [
-    type: {:or, [:string, {:struct, Regex}]},
-    type_spec: quote(do: String.t() | Regex.t()),
-    type_doc: "`t:String.t/0` | `t:Regex.t/0`"
+    type: {:custom, __MODULE__, :text_or_reg_exp, []},
+    type_spec: quote(do: String.t() | Regex.t() | PlaywrightEx.RegExp.t()),
+    type_doc: "`t:String.t/0` | `t:Regex.t/0` | `t:PlaywrightEx.RegExp.t/0`"
   ]
 
   # Fluffy compiles locator selectors itself, so it validates what PlaywrightEx would.
-  # Text options take a string or an Elixir regex, like `name:` and `has_text:`.
+  # Text options take a string or a regex, like `name:` and `has_text:`.
   @playwright_locator_types [
     checked: :boolean,
     description: @text_or_regex,
@@ -304,38 +257,20 @@ defmodule Fluffy.Options do
     selected: :boolean
   ]
 
-  {module, fun, arity, classes} = @native_locators[:by_role]
+  {module, fun, _arity, classes} = @native_locators[:by_role]
 
-  @playwright_role_locator_options Native.schema(module, fun, arity, classes[:playwright], @playwright_locator_types)
+  @playwright_role_locator_options Native.schema(module, fun, classes[:playwright], @playwright_locator_types)
 
   @playwright_locator_keys @native_locators
                            |> Enum.flat_map(fn {_, {_, _, _, classes}} -> Keyword.get(classes, :playwright, []) end)
                            |> Enum.uniq()
 
-  @playwright_option_keys @native_actions |> Enum.flat_map(fn {_, {_, _, _, keys}} -> keys end) |> Enum.uniq()
+  @playwright_option_keys @native_actions
+                          |> Enum.flat_map(fn {_, {module, fun, _}} ->
+                            Native.keys(module, fun, @fluffy_native_keys ++ @denied_native_keys)
+                          end)
+                          |> Enum.uniq()
   @expectation_schema NimbleOptions.new!(@timeout_options)
-
-  @url_matcher_schema NimbleOptions.new!(
-                        path: [
-                          type: :string,
-                          doc: "Serialized URL pathname to match exactly."
-                        ],
-                        query: [
-                          type: {:map, :string, {:or, [:string, {:list, :string}]}},
-                          type_spec: quote(do: %{String.t() => String.t() | [String.t()]}),
-                          doc: "Decoded query names and their ordered value or values."
-                        ],
-                        query_mode: [
-                          type: {:in, [:exact, :subset]},
-                          default: :exact,
-                          doc: "Require the complete query or allow unrelated parameter names."
-                        ],
-                        fragment: [
-                          type: {:or, [nil, :string]},
-                          type_spec: quote(do: String.t() | nil),
-                          doc: "Serialized fragment without `#`; nil requires no fragment."
-                        ]
-                      )
 
   @file_input_schema NimbleOptions.new!(
                        @timeout_options ++
@@ -370,14 +305,6 @@ defmodule Fluffy.Options do
                          ] ++ @playwright_role_locator_options
                        )
 
-  @test_id_locator_schema NimbleOptions.new!(
-                            attribute: [
-                              type: :string,
-                              default: "data-testid",
-                              doc: "Attribute used as the test-id source."
-                            ]
-                          )
-
   @filter_locator_schema NimbleOptions.new!(
                            visible: [
                              type: :boolean,
@@ -409,44 +336,49 @@ defmodule Fluffy.Options do
                                ]
                          )
 
-  @setup_schema NimbleOptions.new!(
-                  repos: [type: {:list, :atom}],
-                  sandbox: [type: :boolean]
-                )
-
   @session_schema NimbleOptions.new!(
                     endpoint: [type: :atom],
                     base_url: [type: :string],
                     headers: [type: {:list, {:tuple, [{:or, [:atom, :string]}, :string]}}],
                     conn: [type: {:struct, Plug.Conn}],
-                    timeout: [type: :pos_integer],
-                    browser_context: [type: :keyword_list]
+                    browser_context: [type: :keyword_list],
+                    browser: [
+                      type: {:struct, PlaywrightEx.Browser},
+                      doc:
+                        "*Playwright only.* The `PlaywrightEx.Browser` the session's context is created in. " <>
+                          "Defaults to the test's browser from `PlaywrightEx.Test.BrowserPool.browser/1`; " <>
+                          "to override launch options such as `headless: false` for one test, " <>
+                          "pass `PlaywrightEx.Test.BrowserPool.browser(launch_options: ...)` " <>
+                          "([Playwright setup](installation.md#playwright-setup))."
+                    ]
                   )
 
-  @playwright_schema NimbleOptions.new!(
-                       enabled: [type: :boolean, default: true],
-                       engine: [type: {:in, [:chromium, :firefox, :webkit]}, default: :chromium],
-                       executable: [type: :string],
-                       timeout: [type: :pos_integer, default: 15_000],
-                       launch_options: [type: :keyword_list, default: []],
-                       pool_size: [type: :pos_integer, default: 1],
-                       artifact_dir: [type: {:or, [nil, :string]}],
-                       trace_dir: [type: :string, default: "traces"],
-                       log_browser_console: [type: :boolean, default: false]
-                     )
+  # `config :fluffy`. Playwright Test's `actionTimeout`, `expect.timeout` and `testIdAttribute`
+  # are for Fluffy's sessions, over PlaywrightEx's (`config!/1`); no defaults: unset,
+  # PlaywrightEx's apply.
+  @config_schema NimbleOptions.new!(
+                   action_timeout: [type: {:custom, __MODULE__, :default_timeout, []}],
+                   # `0`: assertions check once, as with a call's `timeout: 0`.
+                   expect_timeout: [type: :timeout],
+                   test_id_attribute: [type: {:custom, __MODULE__, :test_id_attribute, []}],
+                   base_url: [type: :string],
+                   endpoint: [type: :atom],
+                   ecto_repos: [type: {:list, :atom}],
+                   file_input_max_bytes: [type: :pos_integer]
+                 )
 
-  @type setup_option :: unquote(NimbleOptions.option_typespec(@setup_schema))
+  @playwright_test_keys [:action_timeout, :expect_timeout, :test_id_attribute]
+
   @type session_option :: unquote(NimbleOptions.option_typespec(@session_schema))
-  @type playwright_option :: unquote(NimbleOptions.option_typespec(@playwright_schema))
 
   @doc false
-  def setup_schema, do: @setup_schema
+  # A string or a regex; a `Regex` becomes its `PlaywrightEx.RegExp`, raising on PCRE-only syntax.
+  def text_or_reg_exp(value) when is_binary(value) or is_struct(value, PlaywrightEx.RegExp), do: {:ok, value}
+  def text_or_reg_exp(%Regex{} = value), do: {:ok, PlaywrightEx.RegExp.new(value)}
+  def text_or_reg_exp(value), do: {:error, "expected a string or a regex, got: #{inspect(value)}"}
 
   @doc false
   def session_schema, do: @session_schema
-
-  @doc false
-  def playwright_schema, do: @playwright_schema
 
   @doc false
   def action_schema, do: @action_schema
@@ -477,7 +409,7 @@ defmodule Fluffy.Options do
 
   @doc false
   def native_reference(action) do
-    {module, fun, arity, _keys} = Keyword.fetch!(@native_actions ++ @playwright_actions, action)
+    {module, fun, arity} = Keyword.fetch!(@native_actions ++ @playwright_actions, action)
     Native.reference(module, fun, arity)
   end
 
@@ -494,9 +426,6 @@ defmodule Fluffy.Options do
   def expectation_schema, do: @expectation_schema
 
   @doc false
-  def url_matcher_schema, do: @url_matcher_schema
-
-  @doc false
   def file_input_schema, do: @file_input_schema
 
   @doc false
@@ -504,9 +433,6 @@ defmodule Fluffy.Options do
 
   @doc false
   def role_locator_schema, do: @role_locator_schema
-
-  @doc false
-  def test_id_locator_schema, do: @test_id_locator_schema
 
   @doc false
   def filter_locator_schema, do: @filter_locator_schema
@@ -534,9 +460,6 @@ defmodule Fluffy.Options do
   @spec split_expectation!(atom(), keyword()) :: {keyword(), keyword()}
   def split_expectation!(matcher, options), do: Keyword.split(validate_expectation!(matcher, options), [:timeout])
 
-  @spec validate_url_matcher!(keyword()) :: keyword()
-  def validate_url_matcher!(options), do: NimbleOptions.validate!(options, @url_matcher_schema)
-
   @spec validate_file_input!(keyword()) :: keyword()
   def validate_file_input!(options), do: NimbleOptions.validate!(options, @file_input_schema)
 
@@ -546,14 +469,8 @@ defmodule Fluffy.Options do
   @spec validate_role_locator!(keyword()) :: keyword()
   def validate_role_locator!(options), do: NimbleOptions.validate!(options, @role_locator_schema)
 
-  @spec validate_test_id_locator!(keyword()) :: keyword()
-  def validate_test_id_locator!(options), do: NimbleOptions.validate!(options, @test_id_locator_schema)
-
   @spec validate_filter_locator!(keyword()) :: keyword()
   def validate_filter_locator!(options), do: NimbleOptions.validate!(options, @filter_locator_schema)
-
-  @spec validate_setup!(keyword()) :: keyword()
-  def validate_setup!(options), do: NimbleOptions.validate!(options, @setup_schema)
 
   @spec validate_session!(atom(), keyword()) :: keyword()
   def validate_session!(backend, options) do
@@ -562,6 +479,9 @@ defmodule Fluffy.Options do
     cond do
       backend == :phoenix and Keyword.has_key?(options, :browser_context) ->
         raise ArgumentError, ":browser_context options are available only for Playwright sessions"
+
+      backend == :phoenix and Keyword.has_key?(options, :browser) ->
+        raise ArgumentError, ":browser is available only for Playwright sessions"
 
       backend == :playwright and Keyword.has_key?(options, :conn) ->
         raise ArgumentError, ":conn is available only for Phoenix sessions"
@@ -576,24 +496,82 @@ defmodule Fluffy.Options do
   end
 
   @doc false
-  # The `config :fluffy, :playwright` a session runs with, schema defaults included.
-  @spec playwright_config() :: keyword()
-  def playwright_config do
-    case :fluffy |> Application.get_env(:playwright, false) |> validate_playwright!() do
-      false -> NimbleOptions.validate!([], @playwright_schema)
-      config -> config
+  # The setting `key`: Fluffy's of `@config_schema` if set, else PlaywrightEx's resolved one
+  # (`PlaywrightEx.Test.config/0`, its defaults filled in), where `0` means no limit:
+  # `:infinity` here. `navigation_timeout` is PlaywrightEx's only.
+  @spec config!(atom()) :: term()
+  def config!(key) when key in @playwright_test_keys do
+    case Keyword.fetch(config!(), key) do
+      {:ok, value} -> value
+      :error -> playwright_ex_config(key)
     end
   end
 
-  @spec validate_playwright!(false | keyword()) :: false | keyword()
-  def validate_playwright!(false), do: false
+  def config!(:navigation_timeout), do: playwright_ex_config(:navigation_timeout)
 
-  def validate_playwright!(options) when is_list(options), do: NimbleOptions.validate!(options, @playwright_schema)
+  defp playwright_ex_config(:expect_timeout), do: no_limit(PlaywrightEx.Test.config().expect.timeout)
+  defp playwright_ex_config(:test_id_attribute), do: PlaywrightEx.Test.config().test_id_attribute
+  defp playwright_ex_config(key), do: no_limit(Map.fetch!(PlaywrightEx.Test.config(), key))
 
-  def validate_playwright!(other) do
-    raise ArgumentError,
-          "expected :fluffy, :playwright configuration to be false or a keyword list, got: #{inspect(other)}"
+  defp no_limit(0), do: :infinity
+  defp no_limit(timeout), do: timeout
+
+  @doc false
+  # `config :fluffy`, validated: a misspelt or removed key raises, as kept it would silently
+  # do nothing. A module's config (`config :fluffy, Fluffy.Sandbox, ...`) is validated by the
+  # module, which has to exist.
+  @spec config!() :: keyword()
+  def config! do
+    reject_removed_config!()
+    {modules, options} = Enum.split_with(Application.get_all_env(:fluffy), &module_key?/1)
+
+    for {module, _config} <- modules, !Code.ensure_loaded?(module) do
+      raise ArgumentError, "invalid config :fluffy, #{inspect(module)}: no such module"
+    end
+
+    case NimbleOptions.validate(options, @config_schema) do
+      {:ok, config} -> config
+      {:error, error} -> raise ArgumentError, "invalid config :fluffy: " <> Exception.message(error)
+    end
   end
+
+  defp module_key?({key, _value}), do: match?("Elixir." <> _, Atom.to_string(key))
+
+  @removed_config [
+    timeout: "set `config :fluffy, expect_timeout: ...` for assertions and `action_timeout: ...` for actions",
+    playwright:
+      "set `config :fluffy, action_timeout: ..., expect_timeout: ...` and " <>
+        "`config :playwright_ex, :test, navigation_timeout: ...` instead of `playwright: [timeout: ...]`",
+    navigation_timeout:
+      "set `config :playwright_ex, :test, navigation_timeout: ...`: only browser navigations wait, " <>
+        "Phoenix navigations are synchronous"
+  ]
+
+  defp reject_removed_config! do
+    for {key, hint} <- @removed_config, Application.fetch_env(:fluffy, key) != :error do
+      raise ArgumentError, "config :fluffy, #{key}: is removed: as in Playwright Test, #{hint}"
+    end
+
+    :ok
+  end
+
+  @doc false
+  # Playwright actions and navigations can't check once, so a default of `0` could only fail
+  # them; Playwright's no limit is `:infinity` here.
+  def default_timeout(timeout) when timeout == :infinity or (is_integer(timeout) and timeout > 0), do: {:ok, timeout}
+
+  def default_timeout(0),
+    do:
+      {:error,
+       "expected a positive integer or :infinity, got: 0. As Playwright actions and navigations " <>
+         "cannot check once, 0 is no default; for no limit, use :infinity"}
+
+  def default_timeout(timeout), do: {:error, "expected a positive integer or :infinity, got: #{inspect(timeout)}"}
+
+  @doc false
+  # As PlaywrightEx.Test's `test_id_attribute`: one attribute or a comma-separated list.
+  def test_id_attribute(name) when is_binary(name) and name != "", do: {:ok, name}
+  def test_id_attribute(name), do: {:error, "expected a non-empty string, got: #{inspect(name)}"}
 
   defp validate_conn!(nil), do: :ok
 

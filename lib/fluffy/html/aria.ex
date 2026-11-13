@@ -150,7 +150,7 @@ defmodule Fluffy.HTML.Aria do
                        summary table tbody td textarea tfoot th thead tr ul xmp
                      )
 
-  @context %{target: nil, labelled_by: nil, label: nil, native: nil}
+  @context %{target: nil, labelled_by: nil, described_by: nil, label: nil, native: nil}
 
   # The elements `DocumentIndex.entries` holds: LazyHTML.query/2 finds no HTML template
   # content, and this leaves out the rest of what the index marks inert.
@@ -216,12 +216,72 @@ defmodule Fluffy.HTML.Aria do
     end
   end
 
+  # roleUtils.ts getElementAccessibleNameText.
   def name(%__MODULE__{} = aria, node) do
     if (role(aria, node) || "") in @naming_prohibited_roles do
       ""
     else
       {text, _visited} = text_alternative(aria, node, %{@context | target: :self}, MapSet.new())
-      text
+      as_flat_string(text)
+    end
+  end
+
+  # roleUtils.ts getElementAccessibleDescription.
+  def description(%__MODULE__{} = aria, node) do
+    cond do
+      attribute?(node, "aria-describedby") ->
+        aria
+        |> references(node, "aria-describedby")
+        |> Enum.map_join(" ", fn id ->
+          reference = fetch(aria, id)
+          context = %{@context | described_by: visibility(aria, reference)}
+          {text, _visited} = text_alternative(aria, reference, context, MapSet.new())
+          text
+        end)
+        |> as_flat_string()
+
+      attribute?(node, "aria-description") ->
+        as_flat_string(attribute(node, "aria-description"))
+
+      true ->
+        as_flat_string(text_attribute(node, "title"))
+    end
+  end
+
+  # JavaScript's `\s` and `trim()`.
+  @js_white_space "[\\x{09}-\\x{0d}\\x{20}\\x{a0}\\x{1680}\\x{2000}-\\x{200a}\\x{2028}\\x{2029}\\x{202f}\\x{205f}\\x{3000}\\x{feff}]"
+
+  # roleUtils.ts asFlatString: collapses whitespace but keeps non-breaking spaces.
+  defp as_flat_string(text) do
+    text
+    |> String.split("\u00A0")
+    |> Enum.map_join("\u00A0", fn chunk ->
+      chunk
+      |> String.replace("\r\n", "\n")
+      |> String.replace(~r/[\x{200b}\x{00ad}]/u, "")
+      |> String.replace(~r/#{@js_white_space}+/u, " ")
+    end)
+    |> String.replace(~r/\A#{@js_white_space}+|#{@js_white_space}+\z/u, "")
+  end
+
+  # selectorUtils.ts getElementLabels, what Playwright's label engine (getByLabel)
+  # matches: the text of each aria-labelledby reference, else a non-blank
+  # aria-label, else the text of each label of a labelable element.
+  def element_labels(%__MODULE__{} = aria, node) do
+    aria_label = text_attribute(node, "aria-label")
+
+    cond do
+      labelled_by = aria_labelled_by_elements(aria, node) -> Enum.map(labelled_by, &Semantics.text/1)
+      not blank?(aria_label) -> [aria_label]
+      true -> aria |> labels(node) |> Enum.map(&Semantics.text(fetch(aria, &1)))
+    end
+  end
+
+  # roleUtils.ts getAriaLabelledByElements: nil unless a reference is valid.
+  defp aria_labelled_by_elements(aria, node) do
+    case references(aria, node, "aria-labelledby") do
+      [] -> nil
+      ids -> Enum.map(ids, &fetch(aria, &1))
     end
   end
 
@@ -262,7 +322,8 @@ defmodule Fluffy.HTML.Aria do
     (node.id + 1)..node.last_id//1 |> Enum.map(&fetch(aria, &1)) |> Enum.reject(& &1.inert?)
   end
 
-  defp fetch(aria, id), do: Map.fetch!(aria.index.nodes_by_id, id)
+  defp fetch(%__MODULE__{index: index}, id), do: fetch(index, id)
+  defp fetch(%DocumentIndex{nodes_by_id: nodes_by_id}, id), do: Map.fetch!(nodes_by_id, id)
 
   defp parent(_aria, %{parent_id: nil}), do: nil
   defp parent(aria, %{parent_id: parent_id}), do: fetch(aria, parent_id)
@@ -373,25 +434,121 @@ defmodule Fluffy.HTML.Aria do
     end
   end
 
-  defp natively_disabled?(aria, %{tag: tag} = node)
-       when tag in ["button", "input", "select", "textarea", "option", "optgroup"] do
-    attribute?(node, "disabled") or disabled_option?(aria, node) or disabled_field_set?(aria, node)
+  @native_form_controls ~w(button input select textarea option optgroup)
+
+  @aria_disabled_roles ~w(
+    application button composite gridcell group input link menuitem scrollbar separator tab checkbox
+    columnheader combobox grid listbox menu menubar menuitemcheckbox menuitemradio option radio radiogroup
+    row rowheader searchbox select slider spinbutton switch tablist textbox toolbar tree treegrid treeitem
+  )
+
+  # roleUtils.ts getAriaDisabled. aria-disabled applies to all descendants, so
+  # it looks up the hierarchy.
+  def aria_disabled?(%__MODULE__{} = aria, node) do
+    node = fetch(aria, node.id)
+    natively_disabled?(aria, node) or explicit_aria_disabled?(aria, node)
   end
 
-  defp natively_disabled?(_aria, _node), do: false
+  # roleUtils.ts isNativelyDisabled. Takes the model or just its index, for
+  # form submission, which honors native disabled state alone. Known difference
+  # there: HTML disables a control in any disabled ancestor fieldset outside its
+  # first legend, Playwright checks only the closest one, so a control in the
+  # legend of a disabled fieldset nested in another is submitted.
+  def natively_disabled?(aria_or_index, %{tag: tag} = node) when tag in @native_form_controls do
+    node = fetch(aria_or_index, node.id)
 
-  defp disabled_option?(aria, %{tag: "option"} = node), do: DocumentIndex.option_disabled?(aria.index, node)
-  defp disabled_option?(_aria, _node), do: false
+    attribute?(node, "disabled") or belongs_to_disabled_opt_group?(aria_or_index, node) or
+      belongs_to_disabled_field_set?(aria_or_index, node)
+  end
+
+  def natively_disabled?(_aria_or_index, _node), do: false
+
+  # HTMLOptionElement.disabled, which a select's default selection and form
+  # submission honor: unlike isNativelyDisabled, a disabled fieldset does not count.
+  def option_disabled?(aria_or_index, option) do
+    attribute?(option, "disabled") or belongs_to_disabled_opt_group?(aria_or_index, fetch(aria_or_index, option.id))
+  end
+
+  defp belongs_to_disabled_opt_group?(aria_or_index, %{tag: "option"} = node) do
+    closest(aria_or_index, node, &(&1.tag == "optgroup" and attribute?(&1, "disabled"))) != nil
+  end
+
+  defp belongs_to_disabled_opt_group?(_aria_or_index, _node), do: false
 
   # Only the closest disabled fieldset counts, as in Playwright.
-  defp disabled_field_set?(aria, node) do
-    case closest(aria, node, &(&1.tag == "fieldset" and attribute?(&1, "disabled"))) do
+  defp belongs_to_disabled_field_set?(aria_or_index, node) do
+    case closest(aria_or_index, node, &(&1.tag == "fieldset" and attribute?(&1, "disabled"))) do
       nil ->
         false
 
       field_set ->
-        legend = first_child(aria, field_set, "legend")
-        legend == nil or node.id not in legend.id..legend.last_id
+        legend = first_child(aria_or_index, field_set, "legend")
+        legend == nil or node.id not in legend.id..legend.last_id//1
+    end
+  end
+
+  @aria_checked_roles ~w(checkbox menuitemcheckbox option radio switch menuitemradio treeitem)
+
+  # roleUtils.ts getCheckedWithoutMixed, given the input's checkedness. The mixed
+  # variant stays browser-only: an input's indeterminate is a property only
+  # JavaScript sets.
+  def checked(%__MODULE__{} = aria, node, input_checked?) do
+    node = fetch(aria, node.id)
+
+    cond do
+      node.tag == "input" and Semantics.input_type(node) in ["checkbox", "radio"] -> input_checked?
+      role(aria, node) in @aria_checked_roles -> String.downcase(text_attribute(node, "aria-checked")) == "true"
+      true -> :error
+    end
+  end
+
+  @aria_readonly_roles ~w(
+    checkbox combobox grid gridcell listbox radiogroup slider spinbutton textbox columnheader rowheader
+    searchbox switch treegrid
+  )
+
+  # roleUtils.ts getReadonly.
+  def readonly(%__MODULE__{} = aria, node) do
+    node = fetch(aria, node.id)
+
+    cond do
+      node.tag in ["input", "textarea", "select"] -> attribute?(node, "readonly")
+      role(aria, node) in @aria_readonly_roles -> String.downcase(text_attribute(node, "aria-readonly")) == "true"
+      content_editable?(aria, node) -> false
+      true -> :error
+    end
+  end
+
+  # HTMLElement.isContentEditable: the closest valid contenteditable decides.
+  def content_editable?(%__MODULE__{} = aria, node), do: inherited_content_editable?(aria, fetch(aria, node.id))
+
+  defp inherited_content_editable?(_aria, nil), do: false
+
+  defp inherited_content_editable?(aria, node) do
+    case attribute(node, "contenteditable") do
+      nil ->
+        inherited_content_editable?(aria, parent(aria, node))
+
+      value ->
+        case String.downcase(value) do
+          value when value in ["", "true", "plaintext-only"] -> true
+          "false" -> false
+          _invalid -> inherited_content_editable?(aria, parent(aria, node))
+        end
+    end
+  end
+
+  defp explicit_aria_disabled?(aria, node) do
+    role(aria, node) in @aria_disabled_roles and aria_disabled_in_chain?(aria, node)
+  end
+
+  defp aria_disabled_in_chain?(_aria, nil), do: false
+
+  defp aria_disabled_in_chain?(aria, node) do
+    case String.downcase(text_attribute(node, "aria-disabled")) do
+      "true" -> true
+      "false" -> false
+      _other -> aria_disabled_in_chain?(aria, parent(aria, node))
     end
   end
 
@@ -554,7 +711,8 @@ defmodule Fluffy.HTML.Aria do
     end
   end
 
-  defp hidden_reference?(context), do: :hidden in [context.labelled_by, context.label, context.native]
+  defp hidden_reference?(context),
+    do: :hidden in [context.labelled_by, context.described_by, context.label, context.native]
 
   defp visibility(aria, node), do: if(hidden?(aria, node), do: :hidden, else: :visible)
 
@@ -631,7 +789,7 @@ defmodule Fluffy.HTML.Aria do
 
     selected_ids =
       options
-      |> Enum.map(&Map.put(&1, :disabled?, DocumentIndex.option_disabled?(aria.index, &1)))
+      |> Enum.map(&Map.put(&1, :disabled?, option_disabled?(aria, &1)))
       |> Semantics.default_selected_ids(select.attributes)
 
     case Enum.filter(options, &(&1.id in selected_ids)) do
@@ -772,6 +930,7 @@ defmodule Fluffy.HTML.Aria do
 
   defp placeholder_control?(_node), do: false
 
+  # A labelable element's `labels`, in document order.
   defp labels(aria, node), do: Map.get(aria.labels, node.id, [])
 
   defp labels_name(aria, node, visited) do
@@ -824,7 +983,7 @@ defmodule Fluffy.HTML.Aria do
   defp name_from_content?(node, role, context) do
     role in @name_from_content_roles or (context.target == :descendant and role in @name_from_content_descendant_roles) or
       (node.tag == "summary" and role not in @presentation_roles) or
-      context.labelled_by != nil or context.label != nil or context.native != nil
+      context.labelled_by != nil or context.described_by != nil or context.label != nil or context.native != nil
   end
 
   defp inner_text(aria, node, context, visited) do

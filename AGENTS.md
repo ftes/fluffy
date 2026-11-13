@@ -40,8 +40,6 @@ release-sensitive changes.
 - The block marked `usage_rules` below is generated: after updating deps run
   `mix usage_rules.sync --yes`; `mix check` fails when it's stale. On Renovate's PRs a workflow
   commits it.
-- After upgrading PlaywrightEx or adding an action or locator option, run
-  `mix fluffy.gen.native_options`; `mix check` fails if its output is stale.
 - The compatibility floor is Elixir 1.18 on OTP 27 (`.tool-versions.oldest`).
 
 The Phoenix rules below are written for applications, so in this library they mainly apply to the

@@ -38,17 +38,14 @@ in your shared case module. Import the facade on its own; mixing it with
 `import Fluffy` introduces overlapping function names.
 
 After completing [Installation and runtime](installation.md), keep your application's
-`ConnCase` and add `Fluffy.Test.setup/1` after its setup. A prepared connection can
+`ConnCase`, and add `use PlaywrightEx.Test` after it in modules with browser tests. A
+prepared connection can
 still be piped directly into `Fluffy.PhoenixTest.visit/2`:
 
 ```elixir
 defmodule MyAppWeb.PotionTest do
   use MyAppWeb.ConnCase, async: true
   import Fluffy.PhoenixTest
-
-  setup context do
-    Fluffy.Test.setup(context)
-  end
 
   test "saves a potion", %{conn: conn} do
     conn
@@ -64,10 +61,9 @@ defmodule MyAppWeb.PotionTest do
 end
 ```
 
-Keep existing fixture and authentication setup. Fluffy adopts an existing
-sandbox checkout; the required endpoint and sandbox configuration lives in
-[Installation and runtime](installation.md#ecto-sandbox). If your shared case
-already calls `Fluffy.Test.setup/1`, do not call it again in individual modules.
+Keep existing fixture and authentication setup. The `ConnCase` keeps owning the
+sandbox (`start_owner!`); the required endpoint and sandbox configuration lives in
+[Installation and runtime](installation.md#ecto-sandbox).
 
 ## Using native assertions alongside the facade
 
@@ -95,10 +91,10 @@ To choose a backend, start a session explicitly. The same facade calls work with
 ```elixir
 defmodule MyAppWeb.PotionTest do
   use ExUnit.Case, async: true
+  use PlaywrightEx.Test
   import Fluffy.PhoenixTest
 
   setup context do
-    :ok = Fluffy.Test.setup(context)
     %{session: start_session(Map.get(context, :backend, :phoenix))}
   end
 
@@ -212,8 +208,8 @@ Each call below is a pipeline step:
 | `click_link("Potions")` | `click(by_role(:link, name: "Potions"))` |
 | `refute_has("#notice")` | `refute(visible(by_css("#notice")))` |
 | `assert_has("#notice", count: 0)` | `assert(count(by_css("#notice"), 0))` |
-| `assert_path("/potions")` | `assert(page_url(path: "/potions"))` |
-| `assert_path("/potions", query_params: params)` | `assert(page_url(path: "/potions", query: params))` with string keys and values |
+| `assert_path("/potions")` | `assert(page_url(&(&1.path == "/potions")))` |
+| `assert_path("/potions", query_params: params)` | `assert(page_url("/potions?" <> URI.encode_query(params)))` when the query order is known, or a predicate |
 | `assert_has("title", text: "Potions", exact: true)` | `assert(page_title("Potions"))` |
 | `reload_page()` | `reload()` |
 | `upload("Recipe", path)` | `set_input_files(by_label("Recipe", exact: true), path)` |
@@ -229,7 +225,7 @@ When rewriting, preserve the original assertion's intent:
   [Locators](locators.md#locators).
 - Native `page_title("Potions")` is an exact normalized match. Use a regex
   for an intentional substring title assertion. Native URL strings match the
-  complete URL; use `page_url(path: ...)` to retain path-only intent. See
+  complete URL; use a predicate such as `page_url(&(&1.path == "/x"))` to retain path-only intent. See
   [Page assertions](assertions.md#page-assertions).
 - The native API does not track an active form. Select a form explicitly for
   `submit`, or click the intended submitter. The facade continues to support

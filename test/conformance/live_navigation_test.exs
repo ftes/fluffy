@@ -1,5 +1,5 @@
 defmodule Fluffy.Conformance.LiveNavigationTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
@@ -532,7 +532,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     end
 
     # Clicking the button would have redirected to /chamber.
-    expect(session, Fluffy.Expect.page_to_have_url(&(&1.path == "/live/chamber-map" and &1.query =~ "delay=600")))
+    expect(session, Fluffy.Expect.page_to_have_url(~r{/live/chamber-map\?.*delay=600}))
   end
 
   @tag driver: :phoenix
@@ -607,8 +607,8 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
 
   defp live_session(driver) do
     start_session(driver,
-      base_url: Fluffy.TestServer.base_url(),
-      endpoint: Fluffy.TestWeb.Endpoint
+      base_url: Fluffy.Support.Server.base_url(),
+      endpoint: Fluffy.Support.Web.Endpoint
     )
   end
 end

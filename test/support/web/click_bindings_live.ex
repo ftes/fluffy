@@ -1,4 +1,4 @@
-defmodule Fluffy.TestWeb.ClickBindingsComponent do
+defmodule Fluffy.Support.Web.ClickBindingsComponent do
   @moduledoc false
   use Phoenix.LiveComponent
 
@@ -18,7 +18,7 @@ defmodule Fluffy.TestWeb.ClickBindingsComponent do
   end
 end
 
-defmodule Fluffy.TestWeb.ClickBindingsTargetComponent do
+defmodule Fluffy.Support.Web.ClickBindingsTargetComponent do
   @moduledoc false
   use Phoenix.LiveComponent
 
@@ -32,7 +32,7 @@ defmodule Fluffy.TestWeb.ClickBindingsTargetComponent do
   def render(assigns), do: ~H"<div id={@id}></div>"
 end
 
-defmodule Fluffy.TestWeb.ClickBindingsLive do
+defmodule Fluffy.Support.Web.ClickBindingsLive do
   @moduledoc false
   use Phoenix.LiveView
 
@@ -77,7 +77,7 @@ defmodule Fluffy.TestWeb.ClickBindingsLive do
         <button type="button" phx-click="remove" phx-value-name="beta">Remove beta</button>
       </li>
     </ul>
-    <.live_component module={Fluffy.TestWeb.ClickBindingsComponent} id="click-bindings-component" />
+    <.live_component module={Fluffy.Support.Web.ClickBindingsComponent} id="click-bindings-component" />
     <div phx-click="outer">
       <form id="outer-form" phx-submit="save">
         <button type="submit">Save</button>
@@ -97,8 +97,8 @@ defmodule Fluffy.TestWeb.ClickBindingsLive do
       <button phx-click="track">Track and save</button>
     </form>
     <a href="/chamber" phx-click="track">Track and leave</a>
-    <.live_component module={Fluffy.TestWeb.ClickBindingsTargetComponent} id="target-a" />
-    <.live_component module={Fluffy.TestWeb.ClickBindingsTargetComponent} id="target-b" />
+    <.live_component module={Fluffy.Support.Web.ClickBindingsTargetComponent} id="target-a" />
+    <.live_component module={Fluffy.Support.Web.ClickBindingsTargetComponent} id="target-b" />
     <button type="button" phx-target="#target-a" phx-click={JS.push("ping", target: "#target-b")}>Ping b</button>
     <input aria-label="Pick value" value="rendered" phx-click="pick-value" />
     <form id="rename-form" phx-submit="save-name">

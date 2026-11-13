@@ -1,12 +1,15 @@
 defmodule Fluffy.BrowserContextConfigurationTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
 
   alias Fluffy.Playwright
+  alias Fluffy.Support.Server
+  alias Fluffy.Support.Web.Endpoint
+  alias PlaywrightEx.Test.BrowserPool
 
   test "applies typed BrowserContext options in isolated contexts on one browser" do
-    origin = Fluffy.TestServer.base_url()
+    origin = Server.base_url()
 
     configured =
       :playwright
@@ -68,22 +71,38 @@ defmodule Fluffy.BrowserContextConfigurationTest do
   test "rejects unknown session and BrowserContext options before creation" do
     assert_raise NimbleOptions.ValidationError, ~r/unknown options.*:page/, fn ->
       start_session(:playwright,
-        base_url: Fluffy.TestServer.base_url(),
+        base_url: Server.base_url(),
         page: [viewport: %{width: 100, height: 100}]
       )
     end
 
     assert_raise ArgumentError, ~r/mystery/, fn ->
-      start_session(:playwright, base_url: Fluffy.TestServer.base_url(), browser_context: [mystery: true])
+      start_session(:playwright, base_url: Server.base_url(), browser_context: [mystery: true])
     end
   end
 
   test "BrowserContext options are rejected by the Phoenix backend" do
     assert_raise ArgumentError, ~r/browser_context.*Playwright/, fn ->
       start_session(:phoenix,
-        endpoint: Fluffy.TestWeb.Endpoint,
+        endpoint: Endpoint,
         browser_context: [locale: "de-DE"]
       )
     end
+
+    assert_raise ArgumentError, ~r/browser.*Playwright/, fn ->
+      start_session(:phoenix, endpoint: Endpoint, browser: BrowserPool.browser())
+    end
+  end
+
+  test "creates the context in the browser: given, else in the test's" do
+    # Other launch options, so another worker: its own driver and browser.
+    given = BrowserPool.browser(launch_options: [timeout: 60_000])
+    session = start_session(:playwright, base_url: Server.base_url(), browser: given)
+    assert Fluffy.Session.context(session).browser_context.guid in browser_context_guids(given)
+
+    default = start_session(:playwright, base_url: Server.base_url())
+    guid = Fluffy.Session.context(default).browser_context.guid
+    assert guid in browser_context_guids(BrowserPool.browser())
+    refute guid in browser_context_guids(given)
   end
 end

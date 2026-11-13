@@ -4,18 +4,8 @@ defmodule Fluffy.Backend do
   alias Fluffy.Session
 
   def start_session(name, options) when is_list(options) do
-    if Keyword.has_key?(options, :scope) do
-      raise ArgumentError, "unknown session option :scope"
-    end
-
-    attachment = Fluffy.TestScope.attach_session()
-    start_session(name, options, attachment)
-  end
-
-  @doc false
-  def start_unmanaged_session(name, options) when is_list(options) do
-    {:ok, runtime} = Fluffy.SessionRuntime.start(self())
-    start_session(name, options, {nil, runtime, nil})
+    options = name |> Fluffy.Options.validate_session!(options) |> session_options(name)
+    Fluffy.Backend.Registry.module(name).start_session(options)
   end
 
   @doc false
@@ -44,20 +34,6 @@ defmodule Fluffy.Backend do
     dispatch(session, :close_page, [page_id])
   end
 
-  def run_step(session, name, location, fun) do
-    Session.backend(session).run_step(session, name, location, fun)
-  end
-
-  def capture_failure(session, operation, error, stacktrace) do
-    Session.backend(session).capture_failure(session, operation, error, stacktrace)
-  rescue
-    # A failed native callback may have closed the session. Diagnostics must
-    # never replace the original action error with a runtime lookup error.
-    _artifact_error -> :error
-  catch
-    :exit, _reason -> :error
-  end
-
   def absolute_url(session, path), do: Session.backend(session).absolute_url(session, path)
 
   def normalize_error(session, operation, arguments, error)
@@ -77,17 +53,6 @@ defmodule Fluffy.Backend do
 
   defp dispatch(session, operation, args) do
     apply(Session.backend(session), operation, [session | args])
-  end
-
-  defp start_session(name, options, attachment) do
-    options = name |> Fluffy.Options.validate_session!(options) |> session_options(name)
-    backend = Fluffy.Backend.Registry.module(name)
-    backend.start_session(options, attachment)
-  rescue
-    error ->
-      {_scope, runtime, _header} = attachment
-      Fluffy.SessionRuntime.close(runtime)
-      reraise error, __STACKTRACE__
   end
 
   defp session_options(options, :phoenix) do

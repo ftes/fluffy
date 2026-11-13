@@ -30,7 +30,7 @@ defmodule Fluffy.Driver.Live.Event do
     names = Map.fetch!(@bindings, kind)
 
     cond do
-      disabled?(target) ->
+      target.disabled? ->
         raise ArgumentError, "cannot #{kind} element #{inspect(target.selector)} because it is disabled"
 
       commands = kind == :click && live_link(attributes) ->
@@ -125,11 +125,6 @@ defmodule Fluffy.Driver.Live.Event do
       :error -> 0
     end
   end
-
-  defp disabled?(%{tag: tag} = target) when tag in ["button", "input", "select", "textarea"],
-    do: target.disabled? or List.keymember?(target.attributes, "disabled", 0)
-
-  defp disabled?(_target), do: false
 
   defp commands("[" <> _ = encoded), do: Phoenix.json_library().decode!(encoded)
   defp commands(event), do: [["push", %{"event" => event}]]

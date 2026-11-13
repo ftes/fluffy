@@ -1,4 +1,4 @@
-defmodule Fluffy.TestWeb.ExpectationsLive do
+defmodule Fluffy.Support.Web.ExpectationsLive do
   @moduledoc false
 
   use Phoenix.LiveView

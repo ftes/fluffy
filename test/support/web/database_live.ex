@@ -1,10 +1,10 @@
-defmodule Fluffy.TestWeb.DatabaseLive do
+defmodule Fluffy.Support.Web.DatabaseLive do
   @moduledoc false
 
   use Phoenix.LiveView
 
-  alias Fluffy.TestRepo
-  alias Fluffy.TestWeb.DatabaseComponent
+  alias Fluffy.Support.Repo
+  alias Fluffy.Support.Web.DatabaseComponent
 
   @impl true
   def mount(params, _session, socket) do
@@ -22,7 +22,7 @@ defmodule Fluffy.TestWeb.DatabaseLive do
 
   @impl true
   def handle_event("insert", _params, socket) do
-    TestRepo.query!("INSERT INTO fluffy_records (value) VALUES ('event')")
+    Repo.query!("INSERT INTO fluffy_records (value) VALUES ('event')")
     send_update(DatabaseComponent, id: "database-count")
     {:noreply, assign(socket, :values, values())}
   end
@@ -42,35 +42,35 @@ defmodule Fluffy.TestWeb.DatabaseLive do
         <:loading>Delayed count: loading</:loading>
         Delayed count: {count}
       </.async_result>
-      {live_render(@socket, Fluffy.TestWeb.DatabaseNestedLive, id: "database-nested")}
+      {live_render(@socket, Fluffy.Support.Web.DatabaseNestedLive, id: "database-nested")}
       <a href="/database">Back to database page</a>
     </main>
     """
   end
 
   defp values do
-    %{rows: rows} = TestRepo.query!("SELECT value FROM fluffy_records ORDER BY value")
+    %{rows: rows} = Repo.query!("SELECT value FROM fluffy_records ORDER BY value")
     Enum.map(rows, &hd/1)
   end
 
   defp count do
-    %{rows: [[count]]} = TestRepo.query!("SELECT count(*) FROM fluffy_records")
+    %{rows: [[count]]} = Repo.query!("SELECT count(*) FROM fluffy_records")
     count
   end
 end
 
-defmodule Fluffy.TestWeb.DatabaseNestedLive do
+defmodule Fluffy.Support.Web.DatabaseNestedLive do
   @moduledoc false
 
   use Phoenix.LiveView
 
-  alias Fluffy.TestRepo
+  alias Fluffy.Support.Repo
 
   on_mount(Fluffy.Sandbox)
 
   @impl true
   def mount(_params, _session, socket) do
-    %{rows: [[count]]} = TestRepo.query!("SELECT count(*) FROM fluffy_records")
+    %{rows: [[count]]} = Repo.query!("SELECT count(*) FROM fluffy_records")
     {:ok, assign(socket, :count, count)}
   end
 
@@ -82,16 +82,16 @@ defmodule Fluffy.TestWeb.DatabaseNestedLive do
   end
 end
 
-defmodule Fluffy.TestWeb.DatabaseComponent do
+defmodule Fluffy.Support.Web.DatabaseComponent do
   @moduledoc false
 
   use Phoenix.LiveComponent
 
-  alias Fluffy.TestRepo
+  alias Fluffy.Support.Repo
 
   @impl true
   def update(assigns, socket) do
-    %{rows: [[count]]} = TestRepo.query!("SELECT count(*) FROM fluffy_records")
+    %{rows: [[count]]} = Repo.query!("SELECT count(*) FROM fluffy_records")
     {:ok, socket |> assign(assigns) |> assign(:count, count)}
   end
 

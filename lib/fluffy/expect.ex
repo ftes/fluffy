@@ -21,12 +21,14 @@ defmodule Fluffy.Expect do
   alias Fluffy.Locator
   alias Fluffy.Options
   alias Fluffy.Session
-  alias Fluffy.URLMatcher
 
   @enforce_keys [:target, :kind]
   defstruct [:target, :kind, :expected, options: [], negated?: false]
 
   @dialyzer {:nowarn_function, expect: 3}
+
+  # An Elixir `Regex` is converted to the `PlaywrightEx.RegExp` it stands for (`text_values!/1`).
+  defguardp is_text(value) when is_binary(value) or is_struct(value, Regex) or is_struct(value, PlaywrightEx.RegExp)
 
   @type target :: {:locator, Locator.t()} | :page
 
@@ -62,7 +64,7 @@ defmodule Fluffy.Expect do
           | :values
           | :visible
 
-  @type text_expectation :: String.t() | Regex.t()
+  @type text_expectation :: String.t() | Regex.t() | PlaywrightEx.RegExp.t()
 
   @type t :: %__MODULE__{
           target: target(),
@@ -116,9 +118,7 @@ defmodule Fluffy.Expect do
   @spec expect(Session.t(), t(), [option()]) :: Session.t()
   def expect(%Session{} = session, %Expect{} = expectation, options \\ []) do
     expectation =
-      expectation
-      |> Internal.merge_options(options)
-      |> normalize_expectation(session)
+      Internal.merge_options(expectation, options)
 
     case expectation.target do
       {:locator, _locator} ->
@@ -260,10 +260,9 @@ defmodule Fluffy.Expect do
   #{NimbleOptions.docs(Options.expectation_schema(:to_have_css))}
   """
   @spec to_have_css(Locator.t(), String.t(), text_expectation(), [to_have_css_option()]) :: t()
-  def to_have_css(%Locator{} = locator, name, value, options \\ [])
-      when is_binary(name) and (is_binary(value) or is_struct(value, Regex)) do
+  def to_have_css(%Locator{} = locator, name, value, options \\ []) when is_binary(name) and is_text(value) do
     {timeout, matching} = Options.split_expectation!(:to_have_css, options)
-    Internal.new({:locator, locator}, :css, {name, value, matching}, timeout)
+    Internal.new({:locator, locator}, :css, {name, text_values!(value), matching}, timeout)
   end
 
   @doc group: "Locator assertions"
@@ -284,23 +283,21 @@ defmodule Fluffy.Expect do
   @doc group: "Locator assertions"
   @doc playwright_only: true
   @doc """
-  Asserts that a screenshot of the target matches the baseline image at the required
-  `path:`, a `.png` or `.webp` file. Requires Playwright, including when negated.
+  Asserts that a screenshot of the target matches a baseline image, a `.png` or `.webp`
+  file. Requires Playwright, including when negated.
 
-      expect(session, to_have_screenshot(by_role(:main), path: "test/screenshots/main-chromium.png"))
+      expect(session, to_have_screenshot(by_role(:main), name: "main.png"))
 
-  The baseline lives at `path:` itself; a relative path resolves against the current
-  working directory, under `mix test` the project root. Fluffy does not derive a path
-  from the test name, and leaving out `path:` raises `NimbleOptions.ValidationError`.
-  Give each baseline its own path and commit it, one per browser if you run several,
-  since renderings differ.
+  In a module with `use PlaywrightEx.Test`, `PlaywrightEx.Test` resolves `name:` (or, without
+  one, the test's name) to a file, as Playwright does; see "Snapshots" in its docs. A
+  missing baseline is written there and fails the test at the end of its body, as in
+  Playwright. A mismatch writes `-actual`, `-diff` and `-previous` images to the test's
+  output dir. `path:` names the file itself instead, relative to the current working
+  directory; elsewhere it is required. Commit the baselines.
 
-  A missing baseline is written, with a notice on stdout, and the assertion passes;
-  negated, it fails. A mismatch writes `-actual`, `-diff`, `-previous` and `-expected`
-  images next to the baseline.
   `config :playwright_ex, :expect` sets `update_snapshots:`, where `:none` fails on a
-  missing baseline and `:changed` or `:all` rewrite a mismatching one, and comparison
-  defaults such as `to_have_screenshot: %{maxDiffPixels: 10}`.
+  missing baseline, `:missing` writes it and passes, and `:changed` or `:all` rewrite a
+  mismatching one, and comparison defaults such as `to_have_screenshot: %{maxDiffPixels: 10}`.
 
   ## Options
 
@@ -317,9 +314,9 @@ defmodule Fluffy.Expect do
   end
 
   @doc group: "Locator assertions"
-  @doc playwright_only: true
   @doc """
-  Asserts the target's ARIA role, such as `:button`. Requires Playwright, including when negated.
+  Asserts the target's ARIA role, such as `:button`. Static and LiveView compute it
+  from markup, as for `Fluffy.Locator.by_role/2`.
 
   ## Options
 
@@ -331,34 +328,30 @@ defmodule Fluffy.Expect do
   end
 
   @doc group: "Locator assertions"
-  @doc playwright_only: true
   @doc """
   Asserts the target's accessible name, equal to a string or matching a regular
-  expression. Requires Playwright, including when negated.
+  expression. Static and LiveView compute it from markup, as for `Fluffy.Locator.by_role/2`.
 
   ## Options
 
   #{NimbleOptions.docs(Options.expectation_schema(:to_have_accessible_name))}
   """
   @spec to_have_accessible_name(Locator.t(), text_expectation(), [to_have_accessible_name_option()]) :: t()
-  def to_have_accessible_name(%Locator{} = locator, expected, options \\ [])
-      when is_binary(expected) or is_struct(expected, Regex) do
+  def to_have_accessible_name(%Locator{} = locator, expected, options \\ []) when is_text(expected) do
     text_expectation(:to_have_accessible_name, locator, :accessible_name, expected, options)
   end
 
   @doc group: "Locator assertions"
-  @doc playwright_only: true
   @doc """
   Asserts the target's accessible description, equal to a string or matching a regular
-  expression. Requires Playwright, including when negated.
+  expression. Static and LiveView compute it from markup, as for `Fluffy.Locator.by_role/2`.
 
   ## Options
 
   #{NimbleOptions.docs(Options.expectation_schema(:to_have_accessible_description))}
   """
   @spec to_have_accessible_description(Locator.t(), text_expectation(), [to_have_accessible_description_option()]) :: t()
-  def to_have_accessible_description(%Locator{} = locator, expected, options \\ [])
-      when is_binary(expected) or is_struct(expected, Regex) do
+  def to_have_accessible_description(%Locator{} = locator, expected, options \\ []) when is_text(expected) do
     text_expectation(:to_have_accessible_description, locator, :accessible_description, expected, options)
   end
 
@@ -374,8 +367,7 @@ defmodule Fluffy.Expect do
   """
   @spec to_have_accessible_error_message(Locator.t(), text_expectation(), [to_have_accessible_error_message_option()]) ::
           t()
-  def to_have_accessible_error_message(%Locator{} = locator, expected, options \\ [])
-      when is_binary(expected) or is_struct(expected, Regex) do
+  def to_have_accessible_error_message(%Locator{} = locator, expected, options \\ []) when is_text(expected) do
     text_expectation(:to_have_accessible_error_message, locator, :accessible_error_message, expected, options)
   end
 
@@ -383,18 +375,18 @@ defmodule Fluffy.Expect do
   @doc playwright_only: true
   @doc """
   Asserts the target's ARIA snapshot against `expected`, the snapshot as YAML text, or
-  against the file at `path:` in its place. Requires Playwright, including when negated.
+  against a snapshot file in its place. Requires Playwright, including when negated.
 
-      expect(session, to_match_aria_snapshot(by_css("body"), path: "test/snapshots/body.aria.yml"))
+      expect(session, to_match_aria_snapshot(by_css("body"), name: "body.aria.yml"))
 
   An empty `expected` fails with the current snapshot in its message, to paste in.
 
-  A relative `path:` resolves against the current working directory, as screenshot
-  baselines do, and Fluffy does not derive one from the test name. A missing file is
-  written, with a notice on stdout, and the assertion passes; negated, it fails.
-  `config :playwright_ex, :expect` sets `update_snapshots:`. Under `:none` a missing
-  file fails, comparing against an empty snapshot. Negated, a missing file passes under
-  `:none`, `:all` or `:changed`.
+  The file is found as a screenshot baseline is (see `to_have_screenshot/2`): `name:`, or
+  the test's name, resolved by `PlaywrightEx.Test` in a module with `use PlaywrightEx.Test`, or
+  `path:`, relative to the current working directory. A missing file is written and fails
+  the test at its end, or passes under `update_snapshots: :missing`; negated, it fails.
+  Under `:none` a missing file fails, comparing against an empty snapshot. Negated, a
+  missing file passes under `:none`, `:all` or `:changed`.
 
   ## Options
 
@@ -498,8 +490,7 @@ defmodule Fluffy.Expect do
   #{NimbleOptions.docs(Options.expectation_schema(:to_have_text))}
   """
   @spec to_have_text(Locator.t(), text_expectation() | [text_expectation()], [to_have_text_option()]) :: t()
-  def to_have_text(%Locator{} = locator, expected, options \\ [])
-      when is_binary(expected) or is_struct(expected, Regex) or is_list(expected) do
+  def to_have_text(%Locator{} = locator, expected, options \\ []) when is_text(expected) or is_list(expected) do
     text_expectation(:to_have_text, locator, :text, expected, options)
   end
 
@@ -516,8 +507,7 @@ defmodule Fluffy.Expect do
   #{NimbleOptions.docs(Options.expectation_schema(:to_contain_text))}
   """
   @spec to_contain_text(Locator.t(), text_expectation() | [text_expectation()], [to_contain_text_option()]) :: t()
-  def to_contain_text(%Locator{} = locator, expected, options \\ [])
-      when is_binary(expected) or is_struct(expected, Regex) or is_list(expected) do
+  def to_contain_text(%Locator{} = locator, expected, options \\ []) when is_text(expected) or is_list(expected) do
     text_expectation(:to_contain_text, locator, :contain_text, expected, options)
   end
 
@@ -542,9 +532,9 @@ defmodule Fluffy.Expect do
     do: to_have_attribute(locator, name, nil, options)
 
   def to_have_attribute(%Locator{} = locator, name, value, options)
-      when is_binary(name) and (is_nil(value) or is_binary(value) or is_struct(value, Regex)) and is_list(options) do
+      when is_binary(name) and (is_nil(value) or is_text(value)) and is_list(options) do
     {timeout, matching} = Options.split_expectation!(:to_have_attribute, options)
-    Internal.new({:locator, locator}, :attribute, {name, value, matching}, timeout)
+    Internal.new({:locator, locator}, :attribute, {name, text_values!(value), matching}, timeout)
   end
 
   @doc group: "Locator assertions"
@@ -560,8 +550,7 @@ defmodule Fluffy.Expect do
   #{NimbleOptions.docs(Options.expectation_schema(:to_have_class))}
   """
   @spec to_have_class(Locator.t(), text_expectation() | [text_expectation()], [to_have_class_option()]) :: t()
-  def to_have_class(%Locator{} = locator, expected, options \\ [])
-      when is_binary(expected) or is_struct(expected, Regex) or is_list(expected) do
+  def to_have_class(%Locator{} = locator, expected, options \\ []) when is_text(expected) or is_list(expected) do
     native_expectation(:to_have_class, {:locator, locator}, :class, text_values!(expected), options)
   end
 
@@ -597,8 +586,8 @@ defmodule Fluffy.Expect do
   #{NimbleOptions.docs(Options.expectation_schema(:to_have_id))}
   """
   @spec to_have_id(Locator.t(), text_expectation(), [to_have_id_option()]) :: t()
-  def to_have_id(%Locator{} = locator, expected, options \\ []) when is_binary(expected) or is_struct(expected, Regex) do
-    native_expectation(:to_have_id, {:locator, locator}, :id, expected, options)
+  def to_have_id(%Locator{} = locator, expected, options \\ []) when is_text(expected) do
+    native_expectation(:to_have_id, {:locator, locator}, :id, text_values!(expected), options)
   end
 
   @doc group: "Locator assertions"
@@ -666,14 +655,14 @@ defmodule Fluffy.Expect do
   end
 
   defp text_values!(expected) when is_list(expected) do
-    if Enum.all?(expected, &(is_binary(&1) or is_struct(&1, Regex))) do
-      expected
+    if Enum.all?(expected, &is_text(&1)) do
+      Enum.map(expected, &Internal.reg_exp/1)
     else
       raise ArgumentError, "expected a list of strings or regular expressions, got: #{inspect(expected)}"
     end
   end
 
-  defp text_values!(expected), do: expected
+  defp text_values!(expected), do: Internal.reg_exp(expected)
 
   @doc group: "Page assertions"
   @doc """
@@ -688,34 +677,22 @@ defmodule Fluffy.Expect do
   """
   @spec page_to_have_title(Fluffy.Page.title_expectation()) :: Expect.t()
   @spec page_to_have_title(Fluffy.Page.title_expectation(), [page_to_have_title_option()]) :: Expect.t()
-  def page_to_have_title(expected, options \\ [])
-      when (is_binary(expected) or is_struct(expected, Regex)) and is_list(options) do
-    native_expectation(:page_to_have_title, :page, :title, expected, options)
+  def page_to_have_title(expected, options \\ []) when is_text(expected) and is_list(options) do
+    native_expectation(:page_to_have_title, :page, :title, text_values!(expected), options)
   end
 
   @doc group: "Page assertions"
   @doc """
-  Expects the active page to have the requested URL.
+  Expects the active page to have the requested URL, as Playwright's `toHaveURL`.
 
-  A string matches the complete canonical absolute URL after resolving a
-  relative value against the session base URL. A regular expression matches
-  that complete serialized URL. A function receives a `%URI{}` and returns a boolean.
-  Keep predicates quick and nonblocking.
+  A string is resolved against the session's base URL and must equal the complete URL,
+  query and fragment included. A regular expression matches the URL, and a function gets the
+  URL as a `%URI{}`, as Playwright passes a `URL`, and returns whether it matches. Keep
+  predicates quick and nonblocking.
 
-  A keyword list selects structured components. `:path` and `:fragment` are
-  exact serialized component values; omit either to ignore it. `:fragment`
-  excludes the leading `#`, and `fragment: nil` requires no fragment.
-
-  `:query` is a map from decoded parameter names to one value or an ordered
-  list of repeated values. Ordering between distinct names is ignored while
-  repeated-value order is retained. Bare names and names with an empty value
-  both decode to `""`; `+` and `%20` both decode to a space. Exact mode is the
-  default. `query_mode: :subset` permits unrelated names but still requires
-  the complete ordered value list for each requested name.
-
-  ## Structured components
-
-  #{NimbleOptions.docs(Options.url_matcher_schema())}
+      expect(session, page_to_have_url("/creatures/fluffy"))
+      expect(session, page_to_have_url(~r{/creatures/[a-z]+$}))
+      expect(session, page_to_have_url(&(&1.path == "/creatures")))
 
   ## Assertion options
 
@@ -725,23 +702,16 @@ defmodule Fluffy.Expect do
   @spec page_to_have_url(Fluffy.Page.url_expectation(), [page_to_have_url_option()]) :: Expect.t()
   def page_to_have_url(expected, options \\ [])
 
-  def page_to_have_url(expected, options)
-      when (is_binary(expected) or is_struct(expected, Regex) or is_function(expected, 1)) and is_list(options) do
+  def page_to_have_url(expected, options) when (is_text(expected) or is_function(expected, 1)) and is_list(options) do
     {timeout, matching} = Options.split_expectation!(:page_to_have_url, options)
-    Internal.new(:page, :url, URLMatcher.ignore_case(expected, matching[:ignore_case]), timeout)
-  end
-
-  def page_to_have_url(components, options) when is_list(components) and is_list(options) do
-    {timeout, matching} = Options.split_expectation!(:page_to_have_url, options)
-    if matching[:ignore_case], do: raise(ArgumentError, "ignore_case: requires a string or regular expression URL")
-    Internal.new(:page, :url, URLMatcher.new!(components), timeout)
+    Internal.new(:page, :url, {Internal.reg_exp(expected), matching}, timeout)
   end
 
   @doc group: "Page assertions"
   @doc playwright_only: true
   @doc """
-  Asserts that a screenshot of the active page matches the baseline image at the required
-  `path:`, like `to_have_screenshot/2`, which also says where baselines go.
+  Asserts that a screenshot of the active page matches a baseline image, like
+  `to_have_screenshot/2`, which also says where baselines go.
 
   ## Options
 
@@ -755,8 +725,8 @@ defmodule Fluffy.Expect do
   @doc group: "Page assertions"
   @doc playwright_only: true
   @doc """
-  Asserts the active page's ARIA snapshot against `expected`, or the file at `path:` in
-  its place, like `to_match_aria_snapshot/3`, which also says how a missing file behaves.
+  Asserts the active page's ARIA snapshot against `expected`, or a snapshot file in its
+  place, like `to_match_aria_snapshot/3`, which also says how a missing file behaves.
 
   ## Options
 
@@ -805,18 +775,4 @@ defmodule Fluffy.Expect do
 
     :ok
   end
-
-  defp normalize_expectation(%Expect{target: :page, kind: :url, expected: expected} = expectation, session)
-       when is_binary(expected) do
-    %{expectation | expected: Fluffy.Backend.absolute_url(session, expected)}
-  end
-
-  defp normalize_expectation(
-         %Expect{target: :page, kind: :url, expected: {:ignore_case, expected}} = expectation,
-         session
-       ) do
-    %{expectation | expected: {:ignore_case, Fluffy.Backend.absolute_url(session, expected)}}
-  end
-
-  defp normalize_expectation(%Expect{} = expectation, _session), do: expectation
 end

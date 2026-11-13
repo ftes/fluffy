@@ -44,7 +44,7 @@ defmodule Fluffy.Capability do
         playwright: :equivalent
       },
       detail:
-        "Static and LiveView implement the documented HTML/ARIA subset from markup. They do not interpret CSS-generated content or computed visibility."
+        "Static and LiveView port Playwright's role, accessible-name and description computation to markup, for role locators, `to_have_role`, `to_have_accessible_name` and `to_have_accessible_description`. They do not interpret CSS-generated content or computed visibility."
     },
     %{
       id: :playwright_locator_options,
@@ -244,13 +244,20 @@ defmodule Fluffy.Capability do
       feature: "Browser request routing",
       drivers: %{static: :browser_only, live: :browser_only, playwright: :equivalent},
       detail:
-        "Fluffy.Playwright.route/4 fulfills, continues, aborts, or falls back matching requests of a session's context, with handlers in their own process. Phoenix raises Fluffy.CapabilityError."
+        "Fluffy.Playwright.route/4 routes matching requests of a session's context through PlaywrightEx's route handlers. Phoenix raises Fluffy.CapabilityError."
     },
     %{
       id: :javascript_evaluation,
       feature: "Active-page JavaScript evaluation",
       drivers: %{static: :browser_only, live: :browser_only, playwright: :equivalent},
       detail: "Only the Playwright driver can execute JavaScript in a real browser context."
+    },
+    %{
+      id: :steps,
+      feature: "Test steps",
+      drivers: %{static: :browser_only, live: :browser_only, playwright: :equivalent},
+      detail:
+        "Fluffy.Playwright.step/4 is PlaywrightEx.Test.step/3 in a pipeline, in the test's Playwright trace. Phoenix raises Fluffy.CapabilityError."
     },
     %{
       id: :clock,
@@ -282,21 +289,15 @@ defmodule Fluffy.Capability do
       id: :test_isolation,
       feature: "Per-test sessions, cleanup, and Ecto sandbox propagation",
       drivers: %{static: :equivalent, live: :equivalent, playwright: :equivalent},
-      detail: "One test scope owns all sessions and tears pages and LiveViews down before sandbox ownership."
+      detail:
+        "One test scope owns all sessions and tears pages and LiveViews down before the application's sandbox owner stops."
     },
     %{
-      id: :regex_url_matching,
-      feature: "Regex URL matching",
+      id: :url_matching,
+      feature: "URL matching",
       drivers: %{static: :equivalent, live: :equivalent, playwright: :equivalent},
       detail:
-        "Regex expectations run one Elixir Regex against the complete canonical serialized URL above all three drivers."
-    },
-    %{
-      id: :structured_url_matching,
-      feature: "Structured path, query, and fragment URL matching",
-      drivers: %{static: :equivalent, live: :equivalent, playwright: :equivalent},
-      detail:
-        "Fluffy.Expect.page_to_have_url/1 supports path-only and exact/subset decoded query matching. Distinct-name order is ignored, repeated-value order is retained, and every driver uses the same matcher."
+        "page_to_have_url/2 takes what Playwright's toHaveURL takes: a string resolved against the base URL that must equal the URL, a regex, or a predicate over the URL as a %URI{}. Phoenix drivers match with PlaywrightEx.Isomorphic.UrlMatch."
     },
     %{
       id: :file_uploads,

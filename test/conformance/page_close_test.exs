@@ -1,5 +1,5 @@
 defmodule Fluffy.Conformance.PageCloseTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
@@ -7,7 +7,7 @@ defmodule Fluffy.Conformance.PageCloseTest do
   import Fluffy.Playwright
 
   alias Fluffy.Event
-  alias Fluffy.TestHTTPFixtures
+  alias Fluffy.Support.HTTPFixtures
 
   # Like Playwright: Firefox fails such a click, which Playwright leaves as a known Firefox bug.
   @tag driver: :playwright
@@ -78,7 +78,7 @@ defmodule Fluffy.Conformance.PageCloseTest do
     close_script = if close == :after_click, do: "setTimeout(() => window.close())", else: "window.close()"
 
     fixture =
-      TestHTTPFixtures.register(fn request ->
+      HTTPFixtures.register(fn request ->
         case request.path do
           "/start" ->
             %{
@@ -102,8 +102,8 @@ defmodule Fluffy.Conformance.PageCloseTest do
 
     session =
       :playwright
-      |> start_session(base_url: Fluffy.TestServer.base_url())
-      |> visit(TestHTTPFixtures.path(fixture, "/start"))
+      |> start_session(base_url: Fluffy.Support.Server.base_url())
+      |> visit(HTTPFixtures.path(fixture, "/start"))
 
     pending = wait_for(session, Event.popup())
     click(session, by_role(:link, name: "Open"))

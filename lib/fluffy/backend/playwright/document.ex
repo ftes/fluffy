@@ -9,12 +9,12 @@ defmodule Fluffy.Backend.Playwright.Document do
 
   alias Fluffy.Backend.Playwright.Bounded
   alias Fluffy.Deadline
-  alias Fluffy.Session
   alias PlaywrightEx.Frame
   alias PlaywrightEx.JSHandle
 
-  # What Fluffy's own browser calls around an operation may take. A sub-second
-  # session timeout limits the operation; a merely busy browser should not fail these.
+  # What Fluffy's own browser calls around an operation may take: the operation's
+  # timeout, but at least a second. A sub-second timeout limits the operation; a
+  # merely busy browser should not fail these.
   @min_bookkeeping_timeout 1_000
 
   @state """
@@ -76,10 +76,8 @@ defmodule Fluffy.Backend.Playwright.Document do
 
   def init_script, do: @state
 
-  def bookkeeping_timeout(session) do
-    timeout = Session.context(session).timeout
-    if timeout == :infinity, do: :infinity, else: max(timeout, @min_bookkeeping_timeout)
-  end
+  def bookkeeping_timeout(:infinity), do: :infinity
+  def bookkeeping_timeout(timeout) when is_integer(timeout), do: max(timeout, @min_bookkeeping_timeout)
 
   @doc "A page listener that flags the state when its main frame navigates."
   def navigation_listener(state) do

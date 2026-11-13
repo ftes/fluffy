@@ -1,10 +1,12 @@
 defmodule Fluffy.Conformance.CheckedLocatorTest do
-  use Fluffy.TestCase, async: false
+  use Fluffy.Support.Case, async: false
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
   import Fluffy.Playwright
+
+  alias Fluffy.Support.Server
 
   for driver <- [:static, :playwright] do
     @tag driver: driver
@@ -19,7 +21,7 @@ defmodule Fluffy.Conformance.CheckedLocatorTest do
       """
 
       driver
-      |> session_for_html(html, base_url: Fluffy.TestServer.base_url())
+      |> session_for_html(html, base_url: Server.base_url())
       |> expect("input:checked" |> by_css() |> to_have_count(2))
       |> uncheck(by_css("#enabled:checked"))
       |> check(by_css("#blue:not(:checked)"))
@@ -43,7 +45,7 @@ defmodule Fluffy.Conformance.CheckedLocatorTest do
       """
 
       driver
-      |> session_for_html(html, base_url: Fluffy.TestServer.base_url())
+      |> session_for_html(html, base_url: Server.base_url())
       |> expect("option:checked" |> by_css() |> to_have_count(3))
       |> expect("Default" |> by_label() |> by_css("option:checked") |> filter(has_text: "First") |> to_have_count(1))
       |> expect("List" |> by_label() |> by_css("option:checked") |> to_have_count(0))
@@ -63,7 +65,7 @@ defmodule Fluffy.Conformance.CheckedLocatorTest do
       html = ~s(<input id="literal:checked" data-note=":checked" type="checkbox" checked>)
 
       driver
-      |> session_for_html(html, base_url: Fluffy.TestServer.base_url())
+      |> session_for_html(html, base_url: Server.base_url())
       |> expect(~s([data-note=":checked"]:checked) |> by_css() |> to_have_count(1))
       |> expect(~S(#literal\:checked:checked) |> by_css() |> to_have_count(1))
       |> uncheck(by_css(~s([data-note=":checked"])))
@@ -149,8 +151,8 @@ defmodule Fluffy.Conformance.CheckedLocatorTest do
 
   defp start_test_session(driver) do
     start_session(driver,
-      base_url: Fluffy.TestServer.base_url(),
-      endpoint: Fluffy.TestWeb.Endpoint
+      base_url: Server.base_url(),
+      endpoint: Fluffy.Support.Web.Endpoint
     )
   end
 end

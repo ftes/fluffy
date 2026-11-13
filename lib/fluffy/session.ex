@@ -41,18 +41,6 @@ defmodule Fluffy.Session do
     session
   end
 
-  # An operation's `timeout:`, else the session's, for PlaywrightEx: Fluffy's 0
-  # checks once (`Fluffy.Deadline.playwright/1`).
-  @doc false
-  def timeout(session, options \\ []),
-    do: Fluffy.Deadline.playwright(Keyword.get(options, :timeout) || context(session).timeout)
-
-  # The same for an operation that can't check once, such as an action: it
-  # rejects Fluffy's 0.
-  @doc false
-  def operation_timeout!(session, operation, options),
-    do: Fluffy.Deadline.playwright_operation!(operation, Keyword.get(options, :timeout) || context(session).timeout)
-
   @doc false
   def page_state(session), do: Page.record(handle(session)).state
   @doc false
@@ -84,15 +72,5 @@ defmodule Fluffy.Session do
   defp value!(:ok), do: :ok
   defp value!({:error, message}), do: raise(ArgumentError, message)
 
-  defp start_runtime do
-    case Fluffy.TestScope.current() do
-      scope when is_pid(scope) ->
-        {_scope, runtime, _header} = Fluffy.TestScope.attach_session(scope)
-        runtime
-
-      nil ->
-        {:ok, runtime} = SessionRuntime.start(self())
-        runtime
-    end
-  end
+  defp start_runtime, do: SessionRuntime.start!(self())
 end

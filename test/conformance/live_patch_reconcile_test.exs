@@ -1,11 +1,11 @@
 defmodule Fluffy.Conformance.LivePatchReconcileTest do
-  use Fluffy.TestCase, async: false
+  use Fluffy.Support.Case, async: false
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.TestHTTPFixtures
+  alias Fluffy.Support.HTTPFixtures
 
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
@@ -55,8 +55,8 @@ defmodule Fluffy.Conformance.LivePatchReconcileTest do
 
     @tag driver: driver
     test "a file selection does not move to a shifted id-less file input with #{driver}", %{driver: driver} do
-      fixture = TestHTTPFixtures.register(%{body: "<!doctype html><html><body><h1>Saved</h1></body></html>"})
-      action = TestHTTPFixtures.path(fixture, "/submit")
+      fixture = HTTPFixtures.register(%{body: "<!doctype html><html><body><h1>Saved</h1></body></html>"})
+      action = HTTPFixtures.path(fixture, "/submit")
 
       driver
       |> start_test_session()
@@ -67,7 +67,7 @@ defmodule Fluffy.Conformance.LivePatchReconcileTest do
       |> click(by_role(:button, name: "Save"))
       |> expect("Saved" |> by_text() |> to_be_visible())
 
-      [submission] = TestHTTPFixtures.requests(fixture)
+      [submission] = HTTPFixtures.requests(fixture)
       refute submission.body =~ ~s(filename="fluffy-upload.txt")
     end
 
@@ -259,6 +259,6 @@ defmodule Fluffy.Conformance.LivePatchReconcileTest do
   end
 
   defp start_test_session(driver) do
-    start_session(driver, base_url: Fluffy.TestServer.base_url(), endpoint: Fluffy.TestWeb.Endpoint)
+    start_session(driver, base_url: Fluffy.Support.Server.base_url(), endpoint: Fluffy.Support.Web.Endpoint)
   end
 end

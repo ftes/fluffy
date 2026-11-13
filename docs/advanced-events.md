@@ -7,7 +7,8 @@ use Fluffy.Assert
 import Fluffy
 import Fluffy.Locator
 import Fluffy.Playwright
-alias Fluffy.{Dialog, Download, Event, FileChooser, Frame, Page, Request, Response, Route}
+alias Fluffy.{Dialog, Download, Event, FileChooser, Frame, Page, Request, Response}
+alias PlaywrightEx.Route
 
 pending = wait_for(session, Event.download())
 click(session, by_role(:button, name: "Download the Marauder's Map"))
@@ -17,7 +18,8 @@ assert Download.read(download) =~ "student,house"
 ```
 
 Each wait has an independent source, predicate, and deadline. The deadline starts
-at registration, using the session timeout unless `timeout:` is supplied. Await
+at registration, using the action timeout, as Playwright's `waitForEvent`, unless
+`timeout:` is supplied. Await
 once; reuse the returned value freely. Separate waits can observe the same event.
 A settled event outcome survives subsequent timeout or source closure. A still-pending
 wait reports timeout, page closure, or session closure through `await`.
@@ -85,7 +87,7 @@ prophet = await(pending)
 session
 |> switch_page(prophet)
 |> assert(page_opener(main))
-|> assert(page_url(path: "/prophet/preview"))
+|> assert(page_url("/prophet/preview"))
 |> close_page()
 |> switch_page(main)
 ```
@@ -130,9 +132,9 @@ ignoring `target` and `formtarget`; page creation and closing require Playwright
 
 Frame locators query iframe contents without switching pages. Browser-only
 `Event.frame_navigated()` observes navigation of any frame belonging to the page bound
-at registration, including frames created later. It returns a live frame handle:
-`Fluffy.Frame.url/1`, `Fluffy.Frame.page/1`, and `Fluffy.Frame.parent_frame/1` expose
-current metadata. The main frame has no parent. Navigation events signal frame
+at registration, including frames created later. It resolves with the
+`PlaywrightEx.Frame`, whose `url/1`, `page/1` and `parent_frame/1` read current
+metadata. The main frame has no parent. Navigation events signal frame
 navigation, not loading completion.
 
 For navigation outcomes on either backend, use ordinary page assertions:
@@ -140,7 +142,7 @@ For navigation outcomes on either backend, use ordinary page assertions:
 ```elixir
 session
 |> click(by_role(:link, name: "Continue"))
-|> assert(page_url(path: "/next"))
+|> assert(page_url("/next"))
 ```
 
 `Fluffy.Playwright.go_back/2` and `Fluffy.Playwright.go_forward/2` require Playwright and accept the
@@ -160,29 +162,35 @@ Repeated registrations require repeated removal calls.
 Each listener handles matching events in delivery order. Different listeners run
 independently; relative ordering is unspecified. Handlers and predicates execute
 outside the session runtime and browser connection, linked to the registering
-caller so unhandled failures fail that caller. Registration completes before
+caller so unhandled failures fail that caller. They have that caller in `$callers`,
+so Ecto sandbox queries and mocks work there as in the test. Registration completes before
 returning. Listeners have no deadline and are cleaned up when removed or when
 their owner or session closes.
 
-Dialogs require Playwright. Handle them on arrival because an unresolved dialog
-blocks the triggering action:
+Dialogs require Playwright. As in Playwright, events other than page events,
+downloads and file choosers deliver PlaywrightEx's values, here a
+`PlaywrightEx.Dialog`. Handle them on arrival because an unresolved dialog blocks
+the triggering action:
 
 ```elixir
+alias PlaywrightEx.Dialog
+
 session
 |> once(Event.dialog(), fn dialog ->
-  assert dialog.type == :confirm
-  assert dialog.message == "Vanish this potion?"
-  Dialog.accept(dialog)
+  assert Dialog.type(dialog) == "confirm"
+  assert Dialog.message(dialog) == "Vanish this potion?"
+  Dialog.accept!(dialog)
 end)
 |> assert_event(Event.dialog(), &click(&1, by_role(:button, name: "Vanish")))
 ```
 
-Use `Dialog.accept(dialog, "prompt text")` for prompts or `Dialog.dismiss(dialog)`.
-Types are `:alert`, `:confirm`, `:prompt`, and `:beforeunload`; metadata also includes
-`message`, `default_value`, and the `page` that opened it (also `Fluffy.Dialog.page/1`). Register a persistent catch-all handler when needed:
+Use `Dialog.accept!(dialog, "prompt text")` for prompts or `Dialog.dismiss!(dialog)`.
+`Fluffy.Playwright.page/2` turns the `Dialog.page/1` that opened it, or any other
+`PlaywrightEx.Page` of the session, into a `Fluffy.Page` for `switch_page/2`. Register
+a persistent catch-all handler when needed:
 
 ```elixir
-accept_dialog = &Dialog.accept/1
+accept_dialog = &Dialog.accept!/1
 session
 |> on(Event.dialog(), accept_dialog)
 |> click(by_role(:button, name: "Vanish first potion"))
@@ -204,43 +212,34 @@ Sources remain bound when switching pages. Use the same source and scope for `of
 page events always observe the context, while all others bind to the selected page.
 
 ```elixir
+alias PlaywrightEx.Response
+
 session
 |> assert_event(
-  Event.response(&String.ends_with?(&1.url, "/api/prophet")),
+  Event.response(&String.ends_with?(Response.url(&1), "/api/prophet")),
   &click(&1, by_role(:button, name: "Refresh")),
-  fn response -> assert response.status == 200 end,
+  fn response -> assert Response.status(response) == 200 end,
   scope: :context
 )
 ```
 
 Requests signal issuance; responses signal status and headers, without waiting for
-the response body. Values are `Fluffy.Request` (URL, method, headers, resource type,
-post data, page) and `Fluffy.Response` (URL, status, status text, headers, and its
-`request`). The page can be nil when it
-is not yet known, such as for a popup's initial request. Bodies are not retained;
-read one from the browser, which waits for the response to end:
+the response body. The values are a `PlaywrightEx.Request` and a `PlaywrightEx.Response`;
+read them with PlaywrightEx's functions, which have no timeout, as in Playwright. A
+body is read from the browser, which waits for the response to end:
 
 ```elixir
-assert Response.ok?(response)
-assert Response.json(response) == %{"saved" => true}
+assert Response.ok(response)
+assert Response.json!(response) == %{"saved" => true}
 ```
 
-`Response` also has `Fluffy.Response.body/1`, `Fluffy.Response.text/1`,
-`Fluffy.Response.all_headers/1`, `Fluffy.Response.header_value/2` and
-`Fluffy.Response.header_values/2`. `Request` has `Fluffy.Request.all_headers/1`,
-`Fluffy.Request.header_value/2`, `Fluffy.Request.post_data_json/1`,
-`Fluffy.Request.failure/1`, `Fluffy.Request.redirected_from/1` and
-`Fluffy.Request.redirected_to/1`. These readers raise once the session is
-closed; as in Playwright, they have no timeout. Timing, sizes, security details
-and the server address stay on the native value.
-
-`Event.request_failed()` and `Event.request_finished()` resolve with the
-`Fluffy.Request` once it fails or its response body has downloaded. An HTTP error
-status is a finished request, not a failed one. Read the reason with
-`Fluffy.Request.failure/1`:
+`Event.request_failed()` and `Event.request_finished()` resolve with the request
+once it fails or its response body has downloaded. An HTTP error status is a
+finished request, not a failed one. Read the reason with
+`PlaywrightEx.Request.failure/1`:
 
 ```elixir
-%{errorText: reason} = Request.failure(request)
+%{errorText: reason} = PlaywrightEx.Request.failure(request)
 ```
 
 ## Console, page errors, and page lifecycle
@@ -249,68 +248,74 @@ These events require Playwright and observe the page selected at registration,
 including its child frames.
 
 ```elixir
+alias PlaywrightEx.ConsoleMessage
+
 session
 |> assert_event(
-  Event.console(&(&1.type == "error")),
+  Event.console(&(ConsoleMessage.type(&1) == "error")),
   &click(&1, by_role(:button, name: "Refresh")),
-  fn message -> assert message.text =~ "stale edition" end
+  fn message -> assert ConsoleMessage.text(message) =~ "stale edition" end
 )
 ```
 
-`Event.console()` resolves with a `Fluffy.ConsoleMessage` (`type`, `text`, `location`,
-`timestamp`, `page`) and `Event.page_error()` with a `Fluffy.PageError` for an uncaught
-exception (`name`, `message`, `stack`, `page`). Waits and listeners do not affect
-`log_browser_console: true`: messages are logged as well.
-
-`Event.worker()` resolves with a `Fluffy.Worker` and `Event.web_socket()` with a
-`Fluffy.WebSocket`, each with its `url` and `page`; `Fluffy.unwrap_and_return/2` reaches the native value
-for evaluating in a worker or listening to a socket's frames.
+`Event.console()` resolves with a `PlaywrightEx.ConsoleMessage` and
+`Event.page_error()` with the PlaywrightEx error of an uncaught exception
+(`name`, `stack` and `Exception.message/1`). `Event.worker()` resolves with a
+`PlaywrightEx.Worker` and `Event.web_socket()` with a `PlaywrightEx.WebSocket`.
 
 `Event.dom_content_loaded()` and `Event.load()` resolve with the `Fluffy.Page` when that
 page's document reaches those states, and `Event.crash()` when it crashes. A crash fails
 the page's other waits, except `Event.close()`. `Event.frame_attached()` and `Event.frame_detached()` resolve
-with a `Fluffy.Frame`, like `Event.frame_navigated()`.
+with a `PlaywrightEx.Frame`, like `Event.frame_navigated()`.
 
 ## Routing requests
 
 `Fluffy.Playwright.route/4` intercepts matching requests of the session's browser
-context, including popups, before they reach the network. Register routes before
-the action that sends the request. The handler receives a `Fluffy.Route` with the
-`Fluffy.Request` in `route.request` and answers it once:
+context, including popups, before they reach the network. It is
+`PlaywrightEx.BrowserContext.route/4`: register routes before the action that sends
+the request, and answer the `PlaywrightEx.Route` the handler receives once:
 
 ```elixir
 session
-|> route("/api/potions", fn route -> Route.fulfill(route, json: [%{name: "Felix Felicis"}]) end)
-|> route(~r{/api/owls$}, fn route -> Route.abort(route) end)
+|> route("/api/potions", fn route -> Route.fulfill!(route, json: [%{name: "Felix Felicis"}]) end)
+|> route(~r{/api/owls$}, fn route -> Route.abort!(route) end)
 |> visit("/potions")
 ```
 
-`url` accepts what `page_to_have_url` accepts: a Playwright glob string (resolved
-against `base_url:`), a regular expression, a predicate over the `URI`, or
-path, query, and fragment components.
+`url` is what Playwright's `route` takes: a glob string (resolved against
+`base_url:`), a regular expression, or a predicate over the URL as a `%URI{}`. A handler
+taking two arguments also gets the `PlaywrightEx.Request`.
 
-Answers are `Fluffy.Route.fulfill/2` (status, headers, `body:`, `json:`, `path:`),
-`Fluffy.Route.continue/2` (with optional overrides), `Fluffy.Route.abort/2`, and
-`Fluffy.Route.fallback/2`.
+Answers are `PlaywrightEx.Route.fulfill!/2` (status, headers, `body:`, `json:`,
+`path:`, `response:` from `PlaywrightEx.Route.fetch!/2`), `continue!/2` (with
+optional overrides), `abort!/2` and `fallback!/2`.
 When several routes match, the last registered wins; `fallback` hands the
 request to the route registered before it, and finally to the server.
 `times:` limits how many requests a route handles, and `Fluffy.Playwright.unroute/3` removes a route
 (for a given handler or all of them for that `url`). As in Playwright, it does not
 wait for handlers already running: removing the last route lets their requests go on
-to the server, so a late answer fails its handler. `Fluffy.Playwright.unroute_all/2`
+to the server, so a late answer fails the test. `Fluffy.Playwright.unroute_all/2`
 takes Playwright's `behavior:` to wait for them (`:wait`) or ignore their failures
 (`:ignore_errors`).
 Routing a document request, such as a `visit` or a link, works like any other:
 the page loads the fulfilled document and Fluffy keeps tracking it.
 
-Each handler runs in its own process, one per request, so a slow handler holds
-only its request; the test process is blocked in the action that caused it. That
-process has `$callers` through the process that called `Fluffy.Playwright.route/4`, so Ecto sandbox
-queries work there as in the test. A handler that raises aborts its request and
-fails the process that called `Fluffy.Playwright.route/4`, like `Fluffy.on/4` handlers. A route lasts until
-`Fluffy.Playwright.unroute/3` or the session's end, even if the process that called `Fluffy.Playwright.route/4` exits
-first, unlike a `Fluffy.on/4` listener; only while that process lives does a failure
-reach it.
+As in PlaywrightEx, each handler runs in a process of its own, since the test
+process is blocked in the action that caused the request. That process has the
+process that called `Fluffy.Playwright.route/4` in `$callers`. Don't block in a
+route handler (`receive`, `Process.sleep`, `GenServer` calls, database or Phoenix
+work); hand off to a `Task` and fulfil from it. The `Task` inherits `$callers`, so
+the Ecto sandbox works there:
+
+```elixir
+route(session, "**/owl-post/**", fn route ->
+  Task.start(fn -> Route.fulfill!(route, json: Owlery.letters_for("Harry")) end)
+end)
+```
+
+Register routes from the test, or from a process with the test in `$callers`. As in Playwright, a handler that
+raises fails the test and leaves its request pending. A route lasts until `unroute/3`,
+`unroute_all/2` or the session's end.
 
 A handler may return without answering and leave the route to another process. To
 hold a request while the test observes the page, send the route to the test
@@ -325,7 +330,7 @@ session
 |> assert("Loading" |> by_text() |> visible())
 
 assert_receive {:held, route}
-Route.fulfill(route, json: %{title: "Evening Edition"})
+Route.fulfill!(route, json: %{title: "Evening Edition"})
 ```
 
 As in Playwright, a request never answered hangs until the action waiting for it
@@ -362,10 +367,8 @@ with `start_session(:playwright, browser_context: [storage_state: state])`.
 
 ## Native values
 
-Event values keep their PlaywrightEx counterpart private; reach it with
-`Fluffy.unwrap_and_return/2` (see [Native escape hatch](debugging.md#native-escape-hatch))
-for members Fluffy does not wrap: `PlaywrightEx.Request`, `PlaywrightEx.Response`, `PlaywrightEx.Route`, `PlaywrightEx.Dialog`,
-`PlaywrightEx.Download`, `PlaywrightEx.FileChooser`, `PlaywrightEx.Frame`,
-`PlaywrightEx.ConsoleMessage`, `PlaywrightEx.Worker`, and `PlaywrightEx.WebSocket`,
-and the PlaywrightEx exception of a page error. Phoenix downloads have none and raise
+A `Fluffy.Download` and `Fluffy.FileChooser` keep their PlaywrightEx
+counterpart private; reach it with `Fluffy.unwrap_and_return/2` (see
+[Native escape hatch](debugging.md#native-escape-hatch)) for members Fluffy does not
+wrap. Other events and route handlers get PlaywrightEx's values themselves. Phoenix downloads have none and raise
 `Fluffy.CapabilityError`.

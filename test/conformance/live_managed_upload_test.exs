@@ -1,5 +1,5 @@
 defmodule Fluffy.Conformance.LiveManagedUploadTest do
-  use Fluffy.TestCase, async: false
+  use Fluffy.Support.Case, async: false
 
   import Fluffy
   import Fluffy.Expect
@@ -8,7 +8,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
   alias Fluffy.Driver.Live.UploadState
   alias Fluffy.FilePayload
   alias Fluffy.Session
-  alias Fluffy.TestScope
+  alias Fluffy.Support.Server
 
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
@@ -67,7 +67,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       |> set_input_files(by_label("Attachment"), fixture_path())
       |> click(by_role(:link, name: "Leave upload form"))
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
-      |> expect(Fluffy.Expect.page_to_have_url(Fluffy.TestServer.base_url() <> "/chamber?from=upload-link"))
+      |> expect(Fluffy.Expect.page_to_have_url(Server.base_url() <> "/chamber?from=upload-link"))
     end
 
     test "follows a Live redirect after a managed upload submit with #{driver}" do
@@ -77,7 +77,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       |> set_input_files(by_label("Attachment"), fixture_path())
       |> click(by_role(:button, name: "Save", exact: true))
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
-      |> expect(Fluffy.Expect.page_to_have_url(Fluffy.TestServer.base_url() <> "/chamber?from=upload-redirect"))
+      |> expect(Fluffy.Expect.page_to_have_url(Server.base_url() <> "/chamber?from=upload-redirect"))
     end
 
     test "follows navigation returned by an upload progress callback with #{driver}" do
@@ -86,7 +86,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       |> visit("/live/scrolls/progress-redirect")
       |> set_input_files(by_label("Attachment"), fixture_path())
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
-      |> expect(Fluffy.Expect.page_to_have_url(Fluffy.TestServer.base_url() <> "/chamber?from=upload-progress"))
+      |> expect(Fluffy.Expect.page_to_have_url(Server.base_url() <> "/chamber?from=upload-progress"))
     end
 
     @tag driver: driver
@@ -591,7 +591,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
     refute Process.alive?(upload_client)
   end
 
-  test "scope teardown releases a managed upload client after an assertion failure" do
+  test "closing the session releases a managed upload client after an assertion failure" do
     session =
       :phoenix
       |> start_test_session()
@@ -599,7 +599,6 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       |> set_input_files(by_label("Attachment"), fixture_path())
 
     [upload_client] = upload_clients(session)
-    scope = TestScope.current()
 
     assert_raise ExUnit.AssertionError, fn ->
       expect(session, "not rendered" |> by_text() |> to_be_visible(), timeout: 0)
@@ -608,7 +607,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
     trap_exits? = Process.flag(:trap_exit, true)
 
     try do
-      :ok = GenServer.stop(scope)
+      :ok = close_session(session)
       refute Process.alive?(upload_client)
     after
       Process.flag(:trap_exit, trap_exits?)
@@ -617,8 +616,8 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
 
   defp start_test_session(driver) do
     start_session(driver,
-      base_url: Fluffy.TestServer.base_url(),
-      endpoint: Fluffy.TestWeb.Endpoint
+      base_url: Server.base_url(),
+      endpoint: Fluffy.Support.Web.Endpoint
     )
   end
 

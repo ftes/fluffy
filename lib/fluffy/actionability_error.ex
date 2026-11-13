@@ -31,6 +31,11 @@ defmodule Fluffy.ActionabilityError do
 
   defp reason_label(:not_editable), do: "not editable"
   defp reason_label(:not_checkable), do: "not checkable"
+  defp reason_label(:not_checkbox_or_radio), do: "not a checkbox or radio button"
+
+  defp reason_label(:no_readonly_state),
+    do: "not an <input>, <textarea>, <select> or [contenteditable] and does not have a role allowing [aria-readonly]"
+
   defp reason_label(:not_selectable), do: "not selectable"
   defp reason_label(:not_multiple_select), do: "not a select element with a multiple attribute"
   defp reason_label(:cannot_uncheck_radio), do: "cannot uncheck a selected radio"

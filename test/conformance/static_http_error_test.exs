@@ -1,17 +1,17 @@
 defmodule Fluffy.Conformance.StaticHTTPErrorTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.TestHTTPFixtures
+  alias Fluffy.Support.HTTPFixtures
 
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
     test "renders an HTTP error response as a page with #{driver}", %{driver: driver} do
       fixture =
-        TestHTTPFixtures.register(%{
+        HTTPFixtures.register(%{
           status: 404,
           body: "<!doctype html><html><body><h1>Owl not found</h1></body></html>"
         })
@@ -19,15 +19,15 @@ defmodule Fluffy.Conformance.StaticHTTPErrorTest do
       session = start_test_session(driver)
 
       session
-      |> visit(TestHTTPFixtures.path(fixture, "/missing"))
+      |> visit(HTTPFixtures.path(fixture, "/missing"))
       |> expect("Owl not found" |> by_text() |> to_be_visible())
-      |> expect(Fluffy.Expect.page_to_have_url(TestHTTPFixtures.url(fixture, "/missing")))
+      |> expect(Fluffy.Expect.page_to_have_url(HTTPFixtures.url(fixture, "/missing")))
     end
 
     @tag driver: driver
     test "renders a redirect status without Location as a page with #{driver}", %{driver: driver} do
       fixture =
-        TestHTTPFixtures.register(%{
+        HTTPFixtures.register(%{
           status: 302,
           body: "<!doctype html><html><body><h1>No redirect target</h1></body></html>"
         })
@@ -35,9 +35,9 @@ defmodule Fluffy.Conformance.StaticHTTPErrorTest do
       session = start_test_session(driver)
 
       session
-      |> visit(TestHTTPFixtures.path(fixture, "/no-location"))
+      |> visit(HTTPFixtures.path(fixture, "/no-location"))
       |> expect("No redirect target" |> by_text() |> to_be_visible())
-      |> expect(Fluffy.Expect.page_to_have_url(TestHTTPFixtures.url(fixture, "/no-location")))
+      |> expect(Fluffy.Expect.page_to_have_url(HTTPFixtures.url(fixture, "/no-location")))
     end
   end
 
@@ -59,8 +59,8 @@ defmodule Fluffy.Conformance.StaticHTTPErrorTest do
 
   defp start_test_session(driver) do
     start_session(driver,
-      base_url: Fluffy.TestServer.base_url(),
-      endpoint: Fluffy.TestWeb.Endpoint
+      base_url: Fluffy.Support.Server.base_url(),
+      endpoint: Fluffy.Support.Web.Endpoint
     )
   end
 end

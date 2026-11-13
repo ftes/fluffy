@@ -60,10 +60,46 @@ for Fluffy's automatic LiveView connection wait.
 
 ## Timeouts
 
-Phoenix sessions wait up to 1 second by default. Set `config :fluffy, timeout: 2_000`
-to change that, or pass `timeout:` to `Fluffy.start_session/2` for one session. Playwright
-sessions ignore it and use the `timeout` under `config :fluffy, playwright:` (default
-`15_000`), also overridden by `Fluffy.start_session/2`.
+The defaults are Playwright Test's, set in PlaywrightEx's config for the whole suite, Fluffy
+sessions and raw PlaywrightEx tests alike:
+
+```elixir
+config :playwright_ex, :test,
+  # Actions, locator waits and event waits; `:infinity` (none) by default.
+  action_timeout: 15_000,
+  # `visit`, `reload`, `go_back`, `go_forward` and `wait_for_load_state`; `:infinity` by default.
+  navigation_timeout: 15_000,
+  # `by_test_id`'s attribute; `data-testid` by default.
+  test_id_attribute: "data-owl"
+
+# Assertions; 5 seconds by default.
+config :playwright_ex, :expect, timeout: 5_000
+```
+
+Fluffy's three keys override them for Fluffy sessions on every driver; a suite without browser
+tests can set just those:
+
+| Setting | Fluffy sessions | Raw PlaywrightEx tests |
+| --- | --- | --- |
+| Actions | `config :fluffy, action_timeout:`, else PlaywrightEx's `action_timeout` | PlaywrightEx's |
+| Assertions | `config :fluffy, expect_timeout:`, else PlaywrightEx's `:expect` `timeout` | PlaywrightEx's |
+| Test id | `config :fluffy, test_id_attribute:`, else PlaywrightEx's `test_id_attribute` | PlaywrightEx's |
+| Navigations | PlaywrightEx's `navigation_timeout` | PlaywrightEx's |
+
+A forgotten Fluffy key keeps overriding a newer PlaywrightEx value. A value means what its
+source says: PlaywrightEx's `0` is no limit, as in Playwright. Fluffy's are Elixir timeouts, a
+positive integer or `:infinity`, and for `expect_timeout` also `0`, which checks once, as a
+call's `timeout: 0`; `action_timeout` rejects `0`, as Playwright actions cannot check once. A
+Playwright session sets the action and navigation timeouts on its browser context, so native
+calls in an `unwrap` callback get them too.
+
+With no action or navigation timeout, the test's timeout bounds them (ExUnit's default
+is 60 seconds). On Playwright, PlaywrightEx.Test closes the test's contexts just before,
+so a call that hangs fails with "Test timeout of 60000ms exceeded." and its call log. In a
+test with `Fluffy.Case`, a LiveView action that never finds its element, or a Phoenix event
+wait, fails at the same moment with Fluffy's error and the same reason. Phoenix-only tests
+without `Fluffy.Case` have no such backstop and fail with ExUnit's timeout, so set an
+`action_timeout` there. There is no per-session timeout; pass `timeout:` to a call.
 
 An operation's `timeout: 0` checks once, unlike Playwright, where `0` disables the timeout.
 Playwright assertions check once too, but Playwright actions and waits reject 0 with an
@@ -73,18 +109,19 @@ For no timeout, pass `timeout: :infinity`, never Playwright's `0`. Playwright th
 with no timeout, and LiveView retries and event waits go on until the test times out; Static
 checks once, as with any timeout, since nothing on its page changes.
 
-A Playwright timeout under a second limits the operation only. Fluffy's own reads of the page
-around it still get a full second, so a page whose main thread is blocked takes a second to
-report, not the shorter timeout.
+Fluffy's own reads of the page around a Playwright operation share its timeout, but get
+at least a second: a page whose main thread is blocked takes a second to report, not a
+shorter timeout. Its waits for a LiveView to connect after a navigation share the
+navigation timeout.
 
 As in Playwright, calls that have no timeout there have none in Fluffy and take no
 `timeout:`: page `evaluate`, `content` and `title`, page-wide keyboard and mouse input,
 clock calls, context setters, closing a page, `unroute_all`, and reading a download or a
 response body. Page `evaluate`, context setters, closing a page, `unroute_all`, stopping a
 trace, network and download reads, and the PhoenixTest facade's link lookup in
-`click_link/4` wait on a blocked page until the test times out (ExUnit's default is 60
-seconds). The others first check the page's document, so on a page that is already blocked
-they fail after the session timeout, or a second if that is shorter.
+`click_link/4` wait on a blocked page until the test times out. The others first check the
+page's document, so on a page that is already blocked they fail after the action timeout,
+or a second if that is shorter, and with none at the test's timeout.
 
 ## Playwright setup
 
@@ -96,54 +133,94 @@ mix playwright_ex.install -- chromium
 ```
 
 On Linux CI runners, add `--with-deps` to install the browser's system packages too:
-`mix playwright_ex.install -- chromium --with-deps`.
+`mix playwright_ex.install -- chromium --with-deps`. See
+[GitHub Actions](`e:playwright_ex:debugging-and-ci.md#github-actions`) for a workflow.
+For annotations of failed tests, run the first `mix test` with
+`--formatter ExUnit.CLIFormatter --formatter PlaywrightEx.Test.GitHubFormatter` (see
+`PlaywrightEx.Test.GitHubFormatter`), listing every formatter you use, since `--formatter`
+replaces the default list.
 
-Configure the backend in `config/test.exs`:
+Configure the backend in `config/test.exs`. The browser and its driver are
+`PlaywrightEx.Test`'s, as are the [timeouts](#timeouts) unless Fluffy's config overrides them:
 
 ```elixir
-config :fluffy,
-  playwright: [
-    enabled: true,
-    engine: :chromium,
-    timeout: 15_000,
-    launch_options: [headless: true],
-    pool_size: 1,
-    artifact_dir: System.get_env("FLUFFY_ARTIFACT_DIR"),
-    trace_dir: System.get_env("FLUFFY_TRACE_DIR", "traces")
-  ]
+config :playwright_ex, :test,
+  browser_name: :chromium,
+  launch_options: [headless: true],
+  # Traces, screenshots and videos of failed tests, under test-results/.
+  trace: :retain_on_failure,
+  screenshot: :only_on_failure
 ```
 
-`executable` optionally points at a Playwright 1.65 CLI such as
+`driver: [executable: ...]` optionally points at a Playwright 1.65 CLI such as
 `node_modules/.bin/playwright`, not `cli.js`; by default the pinned driver is used.
 
 `launch_options` are passed to `PlaywrightEx.BrowserType.launch/2` unchanged. Set
 `launch_options: [timeout: 10_000]` to limit browser launch; otherwise Playwright's
-default of 3 minutes applies. To use a system browser, set
-`launch_options: [executable_path: System.find_executable("google-chrome-stable")]`.
-`mix playwright_ex.install --no-browsers` installs only the driver for an existing browser.
+default of 3 minutes applies.
 
-Setting `artifact_dir` is recommended for every project that runs Playwright
-tests. Fluffy writes HTML, a full-page screenshot, and the formatted error
-there when a public browser operation fails. Use a writable per-run directory
-locally and configure CI to upload it when the test job fails; artifact capture
-does not run for successful operations.
+`mix playwright_ex.install --no-browsers` installs only the driver. That is enough in
+Microsoft's Playwright image, `mcr.microsoft.com/playwright:v<version>-noble` with the
+driver's version (`PlaywrightEx.Driver.version/0`): the driver finds the image's browsers at
+`PLAYWRIGHT_BROWSERS_PATH`. For a system browser, as on Nix, also set
+`launch_options: [executable_path: System.find_executable("google-chrome-stable")]` or
+`channel:`.
+
+A module that starts Playwright sessions needs `use PlaywrightEx.Test` after
+`use ExUnit.Case` (or in your case template's `using`). It records every Playwright
+session of the test: one `trace.zip` of all its sessions, a screenshot of each page as
+its session closes, and videos, each `:off` by default, and a failed test's
+`error-context.md`. The `*_on_failure` modes record every test and drop the files of
+passing ones. Each test writes to its own dir under `output_dir` (`test-results`);
+ignore it in git and configure CI to upload it when the test job fails. To override the
+config for a module or test, tag it, such as `@tag trace: true`. See `PlaywrightEx.Test`
+for the modes and file names.
 
 As in Playwright, browser `console` messages and uncaught page errors are not
-printed; set `log_browser_console: true` to send them to Elixir's `Logger`. Trace files are created only when a test
-calls `Fluffy.Playwright.trace/1` or `Fluffy.Playwright.trace/2`.
+printed; the trace has them. To log them, register a listener, such as
+`on(session, Event.console(), &Logger.info(PlaywrightEx.ConsoleMessage.text(&1)))`.
 
-Set `engine: :firefox` or `engine: :webkit` after installing the corresponding
-browser (`mix playwright_ex.install -- firefox`).
+Set `browser_name: :firefox` or `browser_name: :webkit` after installing the
+corresponding browser (`mix playwright_ex.install -- firefox`).
 See [Browser baseline](capabilities.md#browser-baseline) for conformance coverage.
-Fluffy creates a fresh isolated `BrowserContext` for each session, in a pool of
-`pool_size` browsers (default `1`). No driver or browser starts until a session
-needs one. Sessions go to the least-loaded browser, ties to the lowest slot, so
-sequential sessions reuse one browser and only concurrent sessions launch more.
-A lost browser is launched again for the next session that needs it, and the
-others keep running. ExUnit `max_cases` remains the concurrency bound; lower it
-when browser startup or the host becomes resource-constrained. Firefox dispatches
-input for all of a browser's pages in one queue and times out under load, so set
-`pool_size` to about half the logical cores for Firefox suites.
+Fluffy creates a fresh isolated `BrowserContext` for each session, in the browser of
+its `browser:` option, else in the test's browser from
+`PlaywrightEx.Test.BrowserPool.browser/1`, Playwright Test's worker-scoped `browser`. The
+test holds that browser until it ends, and a test that starts no Playwright session takes
+none. At most `workers` tests hold one at once (`config :playwright_ex, :test`, half the
+schedulers by default), others wait for one; see
+[Workers](`e:playwright_ex:testing-with-exunit.md#workers`). No driver or browser starts
+until a session needs one, a lost browser is launched again for the next session, and the
+drivers stop after the suite. For more users in a test, start more sessions: each gets its
+own browser context.
+
+To debug one test headed or slowed down, pass it a browser with its own `launch_options:`,
+merged over the config:
+
+```elixir
+browser = PlaywrightEx.Test.BrowserPool.browser(launch_options: [headless: false, slow_mo: 500])
+
+:playwright
+|> start_session(browser: browser)
+|> visit("/creatures")
+```
+
+Call it in `setup_all` to cover a module; `browser_name:` and `driver:` override the same
+way. Other options get a worker of their own, a driver and its browser, which counts toward
+`workers` unless the test or module holds one already; at `workers`, the longest idle worker of
+other options restarts its driver for them. See
+[Debugging one test](`e:playwright_ex:testing-with-exunit.md#debugging-one-test`).
+
+To run the browsers on a Playwright server, such as Playwright's Docker image, set
+`connect_options: [ws_endpoint: "ws://localhost:3000/", expose_network: "<loopback>"]` in
+`config :playwright_ex, :test`, or give one session
+`browser: PlaywrightEx.Test.BrowserPool.browser(connect_options: [...])`. The remote browser
+must reach your app, as pages, the Ecto sandbox header and the LiveView socket go to `base_url`:
+`expose_network: "<loopback>"` tunnels `localhost` and `127.0.0.1` to your machine, so
+`base_url` stays as it is. Otherwise `base_url` must be an address the container reaches, such as
+`http://host.docker.internal:4002`, and the endpoint's `check_origin` must allow it. See
+[Remote browsers](`e:playwright_ex:testing-with-exunit.md#remote-browsers`) for the options and
+an env-var switch.
 
 ## Ecto sandbox
 
@@ -198,27 +275,28 @@ live_session :require_authenticated_user,
 end
 ```
 
-Name the application's repositories once, then establish one scope in every
-Fluffy test through the same callback used by applications without Ecto:
+The application owns the sandbox, as with `Phoenix.ConnTest`: keep the generated
+DataCase setup, which starts an owner for each test and stops it in `on_exit`, and use
+your `ConnCase` (or `DataCase`) before `use PlaywrightEx.Test` or `use Fluffy.Case`:
+
+```elixir
+def setup_sandbox(tags) do
+  pid = Ecto.Adapters.SQL.Sandbox.start_owner!(MyApp.Repo, shared: not tags[:async])
+  on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(pid) end)
+end
+```
+
+Name the repositories once, and Fluffy adds their sandbox metadata for the test
+process to every browser session's requests:
 
 ```elixir
 config :fluffy, ecto_repos: [MyApp.Repo]
 ```
 
-```elixir
-setup context do
-  Fluffy.Test.setup(context)
-end
-```
-
-The scope adopts an existing DataCase/ConnCase checkout when present. It
-closes browser contexts and in-process LiveViews before stopping sandbox
-owners, including when the owner test process fails. Sessions also close when
-their owning process exits. Call setup once per test, whether or not Ecto is used.
-
-Use `Fluffy.Test.setup(context, sandbox: false)` for a test that deliberately
-needs lifecycle management without the configured repositories, or pass
-`repos: [...]` to override them in an umbrella or multi-repository test.
+Sessions close in their own `on_exit`, registered after the DataCase's, so browser
+contexts and in-process LiveViews close before the owner stops. A plain
+`Ecto.Adapters.SQL.Sandbox.checkout/1` in the test process is not supported for browser
+tests: its connection goes with the test process, before the browser closes.
 
 The defaults are the `x-fluffy-sandbox` header and
 `Ecto.Adapters.SQL.Sandbox`. Applications that already use Phoenix Ecto's
@@ -246,6 +324,10 @@ defmodule MyApp.TestSandbox do
   end
 end
 ```
+
+Only browser requests carry the metadata. Phoenix sessions run requests in the test
+process and LiveViews with it in `$callers`, as `Phoenix.ConnTest` does, so they use its
+connection and mocks without an allowance.
 
 Fluffy validates this configuration when its application starts. With the
 `user-agent` header, list `:user_agent` in the socket's `connect_info` in place of

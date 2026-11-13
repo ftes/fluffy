@@ -6,32 +6,69 @@ defmodule Fluffy.Expect.Internal do
   alias Fluffy.Expect
   alias Fluffy.Locator
   alias Fluffy.Options
-  alias Fluffy.URLMatcher
+  # StringUtils is internal to PlaywrightEx, which is pinned.
+  alias PlaywrightEx.Isomorphic.StringUtils
+  alias PlaywrightEx.Isomorphic.UrlMatch
+  alias PlaywrightEx.RegExp
 
-  @doc "Whether `actual` equals `expected` or matches its regular expression."
-  def matches?(%Regex{} = expected, actual) when is_binary(actual), do: Regex.match?(expected, actual)
+  @doc """
+  An expected text value as every driver matches it: an Elixir `Regex` becomes the
+  `PlaywrightEx.RegExp` that Playwright runs, raising `ArgumentError` on PCRE-only syntax.
+  """
+  def reg_exp(%Regex{} = expected), do: RegExp.new(expected)
+  def reg_exp(expected), do: expected
+
+  @doc "Whether `actual` equals `expected` or matches its regular expression, with JS semantics."
+  def matches?(%RegExp{} = expected, actual) when is_binary(actual),
+    do: expected |> RegExp.compile!() |> Regex.match?(actual)
 
   def matches?(expected, actual), do: actual == expected
 
+  @doc """
+  Whether `url` matches a `page_to_have_url/2` expectation on the Phoenix drivers, as in
+  PlaywrightEx's `toHaveURL`: a string resolved against `base_url` equals the URL, a
+  regular expression matches it, and a predicate gets it as a `%URI{}`. `ignore_case:` compares
+  strings and predicate URLs in lower case and overrides a regular expression's `i` flag.
+  """
+  def url_matches?({expected, options}, base_url, url) when is_binary(url) do
+    ignore_case = options[:ignore_case]
+
+    cond do
+      is_binary(expected) ->
+        expected = UrlMatch.construct_url_based_on_base_url(base_url, expected)
+        if ignore_case, do: String.downcase(expected) == String.downcase(url), else: expected == url
+
+      is_struct(expected, RegExp) ->
+        matches?(ignore_case(expected, ignore_case), url)
+
+      true ->
+        url = if ignore_case, do: String.downcase(url), else: url
+        !!UrlMatch.url_matches(nil, base_url, url, expected)
+    end
+  end
+
+  def url_matches?(_expected, _base_url, _url), do: false
+
+  @doc """
+  Applies `ignore_case:` to a regular expression. It takes precedence over the expression's
+  own `i` flag, as in PlaywrightEx.
+  """
+  def ignore_case(%RegExp{} = expected, nil), do: expected
+
+  def ignore_case(%RegExp{flags: flags} = expected, ignore_case),
+    do: RegExp.new(expected, String.replace(flags, "i", "") <> if(ignore_case, do: "i", else: ""))
+
   @doc "Whether a page title matches `expected`, comparing normalized whitespace."
   def title_matches?(expected, actual) when is_binary(actual) do
-    actual = normalize_text(actual)
+    actual = StringUtils.normalize_white_space(actual)
 
     case expected do
-      %Regex{} -> matches?(expected, actual)
-      expected when is_binary(expected) -> normalize_text(expected) == actual
+      %RegExp{} -> matches?(expected, actual)
+      expected when is_binary(expected) -> StringUtils.normalize_white_space(expected) == actual
     end
   end
 
   def title_matches?(_expected, _actual), do: false
-
-  @doc "`text` with Playwright's whitespace normalization."
-  def normalize_text(text) do
-    text
-    |> String.replace(["\u200B", "\u00AD"], "")
-    |> String.replace(~r/\s+/u, " ")
-    |> String.trim()
-  end
 
   @doc "An expectation with validated shared options."
   def new(target, kind, expected, options \\ []) when is_atom(kind) and is_list(options) do
@@ -66,8 +103,8 @@ defmodule Fluffy.Expect.Internal do
     "#{Locator.Internal.describe(locator)} #{locator_matcher_description(kind, expected)}"
   end
 
-  defp positive_description(%Expect{target: :page, kind: :url, expected: expected}) do
-    "active page to have URL #{URLMatcher.describe(expected)}"
+  defp positive_description(%Expect{target: :page, kind: :url, expected: {expected, options}}) do
+    "active page to have URL #{inspect(expected)}#{ignoring_case(options)}"
   end
 
   defp positive_description(%Expect{target: :page, kind: :title, expected: expected}) do
@@ -98,6 +135,7 @@ defmodule Fluffy.Expect.Internal do
   defp locator_matcher_description(:in_viewport, ratio: ratio), do: "to be in viewport with ratio #{ratio}"
   defp locator_matcher_description(:css, {name, value, _options}), do: "to have CSS #{name} #{inspect(value)}"
   defp locator_matcher_description(:js_property, {name, value}), do: "to have JS property #{name} #{inspect(value)}"
+
   defp locator_matcher_description(:screenshot, options), do: "to match the screenshot at #{inspect(options[:path])}"
 
   defp locator_matcher_description(:aria_snapshot, {nil, path: path}),

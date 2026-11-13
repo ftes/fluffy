@@ -1,18 +1,18 @@
 defmodule Fluffy.Conformance.LiveFileInputTest do
-  use Fluffy.TestCase, async: false
+  use Fluffy.Support.Case, async: false
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.TestHTTPFixtures
+  alias Fluffy.Support.HTTPFixtures
 
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
     test "submits one selected file through an ordinary Live form navigation with #{driver}" do
-      fixture = TestHTTPFixtures.register(%{body: html("<h1>Uploaded from Live</h1>")})
+      fixture = HTTPFixtures.register(%{body: html("<h1>Uploaded from Live</h1>")})
       file = fixture_path()
-      action = TestHTTPFixtures.path(fixture, "/submit")
+      action = HTTPFixtures.path(fixture, "/submit")
 
       session = start_test_session(unquote(driver))
 
@@ -22,7 +22,7 @@ defmodule Fluffy.Conformance.LiveFileInputTest do
       |> click(by_role(:button, name: "Save"))
       |> expect("Uploaded from Live" |> by_text() |> to_be_visible())
 
-      [submission] = TestHTTPFixtures.requests(fixture)
+      [submission] = HTTPFixtures.requests(fixture)
 
       assert submission.method == "POST"
       assert submission.body =~ "filename=\"fluffy-upload.txt\""
@@ -31,9 +31,9 @@ defmodule Fluffy.Conformance.LiveFileInputTest do
     end
 
     test "submits multiple selected files through an ordinary Live form navigation with #{driver}" do
-      fixture = TestHTTPFixtures.register(%{body: html("<h1>Uploaded from Live</h1>")})
+      fixture = HTTPFixtures.register(%{body: html("<h1>Uploaded from Live</h1>")})
       files = [fixture_path(), invalid_fixture_path()]
-      action = TestHTTPFixtures.path(fixture, "/submit")
+      action = HTTPFixtures.path(fixture, "/submit")
 
       unquote(driver)
       |> start_test_session()
@@ -42,7 +42,7 @@ defmodule Fluffy.Conformance.LiveFileInputTest do
       |> click(by_role(:button, name: "Save"))
       |> expect("Uploaded from Live" |> by_text() |> to_be_visible())
 
-      [submission] = TestHTTPFixtures.requests(fixture)
+      [submission] = HTTPFixtures.requests(fixture)
 
       assert submission.body =~ ~s(name="attachment"; filename="fluffy-upload.txt")
       assert submission.body =~ ~s(name="attachment"; filename="fluffy-upload.invalid")
@@ -53,8 +53,8 @@ defmodule Fluffy.Conformance.LiveFileInputTest do
     end
 
     test "clears a selected file before ordinary Live form navigation with #{driver}" do
-      fixture = TestHTTPFixtures.register(%{body: html("<h1>Uploaded from Live</h1>")})
-      action = TestHTTPFixtures.path(fixture, "/submit")
+      fixture = HTTPFixtures.register(%{body: html("<h1>Uploaded from Live</h1>")})
+      action = HTTPFixtures.path(fixture, "/submit")
 
       unquote(driver)
       |> start_test_session()
@@ -64,7 +64,7 @@ defmodule Fluffy.Conformance.LiveFileInputTest do
       |> click(by_role(:button, name: "Save"))
       |> expect("Uploaded from Live" |> by_text() |> to_be_visible())
 
-      [submission] = TestHTTPFixtures.requests(fixture)
+      [submission] = HTTPFixtures.requests(fixture)
       assert submission.body =~ ~s(name="attachment"; filename="")
       refute submission.body =~ "fluffy-upload.txt"
     end
@@ -84,8 +84,8 @@ defmodule Fluffy.Conformance.LiveFileInputTest do
 
   defp start_test_session(driver) do
     start_session(driver,
-      base_url: Fluffy.TestServer.base_url(),
-      endpoint: Fluffy.TestWeb.Endpoint
+      base_url: Fluffy.Support.Server.base_url(),
+      endpoint: Fluffy.Support.Web.Endpoint
     )
   end
 

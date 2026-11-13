@@ -4,9 +4,9 @@ Fluffy runs Phoenix feature tests through one Playwright-shaped API, in-process 
 
 ## Setup
 
-- `config :fluffy, endpoint: MyAppWeb.Endpoint` in `config/test.exs`. With Ecto, also `config :fluffy, ecto_repos: [MyApp.Repo]` and the sandbox plug and mount hook from `docs/installation.md`, behind an `Application.compile_env` flag set in `config/test.exs` because Fluffy is not in production.
-- Call `Fluffy.Test.setup(context)` exactly once per test, with or without Ecto, ideally in a shared case module.
-- Browser tests need `server: true` on the endpoint, a `config :fluffy, playwright: [...]` block and `mix playwright_ex.install -- chromium`. For a system browser, install with `--no-browsers` and set `launch_options: [executable_path: ...]`.
+- `config :fluffy, endpoint: MyAppWeb.Endpoint` in `config/test.exs`. With Ecto, also `config :fluffy, ecto_repos: [MyApp.Repo]` and the sandbox plug and mount hook from `docs/installation.md`, behind an `Application.compile_env` flag set in `config/test.exs` because Fluffy is not in production. The app's DataCase/ConnCase owns the sandbox (`Sandbox.start_owner!` and `stop_owner` in `on_exit`), used before `use PlaywrightEx.Test`; Fluffy only sends its metadata from browser sessions. A plain `Sandbox.checkout` does not work for browser tests.
+- Add `use Fluffy.Case` after the app's `ConnCase` (never before it: the `test/3` imports clash), or `use PlaywrightEx.Test` after `use ExUnit.Case` in modules with browser tests (Phoenix-only modules need nothing). `Fluffy.Case` adds `use PlaywrightEx.Test`, `use Fluffy.Assert`, `import Fluffy`, `import Fluffy.Locator` and a `session` per test from the `backend` tag (`:phoenix` by default). A second `use PlaywrightEx.Test` in a module does nothing.
+- Browser tests need `server: true` on the endpoint, `config :playwright_ex, :test` for the browser (`browser_name`, `launch_options`) and `mix playwright_ex.install -- chromium`. In Microsoft's Playwright image, tagged with `PlaywrightEx.Driver.version/0`, `mix playwright_ex.install --no-browsers` is enough; for a system browser, as on Nix, also set `launch_options: [executable_path: ...]` or `channel:`. Sessions use the test's browser from `PlaywrightEx.Test.BrowserPool.browser()`, Playwright Test's worker: at most `workers` tests hold one at once, and a test without a Playwright session takes none; pass `browser:` for another, such as `BrowserPool.browser(launch_options: [headless: false])`. For more users, start more sessions, each in its own browser context. For a remote Playwright server, set `connect_options: [ws_endpoint: ..., expose_network: "<loopback>"]`, so the browser reaches the app at `base_url`.
 - The browser opens the endpoint listener's address, such as `127.0.0.1`. Set `check_origin: false` on the endpoint only when its `url` host differs from that address, as a stock `localhost` does.
 
 ## Choosing an API and a backend
@@ -16,7 +16,7 @@ Fluffy runs Phoenix feature tests through one Playwright-shaped API, in-process 
 - `start_session(:phoenix)` is the default choice. Its first visit picks the Static or LiveView driver, and later navigations pick again. There is nothing to select between those two.
 - `start_session(:playwright)` is for JavaScript, computed style and layout, native validation, dialogs, network events, tabs or focus.
 - In the facade, `conn |> visit(path)` always starts a Phoenix session; use `start_session(:playwright) |> visit(path)` for a browser.
-- Fluffy does not read test tags. To switch with `@tag backend: :playwright`, have the shared case call `start_session(Map.get(context, :backend, :phoenix))`.
+- Only `Fluffy.Case` reads a test tag: `@tag`, `@describetag` or `@moduletag backend: :playwright` picks the backend of its `session`.
 
 ```elixir
 start_session(:phoenix)
@@ -24,12 +24,12 @@ start_session(:phoenix)
 |> fill(by_label("Name"), "Basilisk")
 |> click(by_role(:button, name: "Register"))
 |> assert(visible(by_text("Creature registered")))
-|> assert(page_url(path: "/creatures"))
+|> assert(page_url("/creatures"))
 ```
 
 ## Locators
 
-- Prefer, in order: `by_label` for form controls, `by_role(:button, name: ...)`, `by_text`, `by_test_id`, and `by_css` when nothing user-facing identifies the element.
+- Prefer, in order: `by_label` for form controls, `by_role(:button, name: ...)`, `by_text`, `by_test_id`, and `by_css` when nothing user-facing identifies the element. `by_test_id(id)` takes no options: set the attribute with `config :playwright_ex, :test, test_id_attribute: ...` (or `config :fluffy`, which overrides it), or use `by_css("[data-owl=\"hedwig\"]")` for another attribute.
 - Text, role-name and label matching is substring by default; pass `exact: true` for a complete match.
 - Locators are values. Scope with `by_role(parent, :row, name: "x")`, refine with `filter(has: ...)`, `first`, `last`, zero-based `nth`, `and_`, `or_`. Use `frame_locator` for iframes on Playwright.
 - Single-target actions and native `visible` are strict and fail on several matches. Narrow the locator, or assert `count(locator, n)` when several are intended. Facade `assert_has` accepts any visible match.
@@ -37,11 +37,12 @@ start_session(:phoenix)
 ## Assertions and waiting
 
 - Do not assert readiness before acting. Playwright waits natively, LiveView retries actions and assertions until the timeout, and Static checks immediately. Pass `timeout:` to change a deadline.
+- Default timeouts are Playwright Test's, on every driver: `config :playwright_ex, :test, action_timeout:, navigation_timeout:` (`:infinity` by default: the test's timeout bounds them) and `config :playwright_ex, :expect, timeout:` (5 s). `config :fluffy, action_timeout:, expect_timeout:` override them for Fluffy sessions (a forgotten one overrides a newer PlaywrightEx value); `config :fluffy, navigation_timeout:` is removed. PlaywrightEx's `0` means no limit, Fluffy's `expect_timeout: 0` checks once. There is no `start_session(timeout:)` or `config :fluffy, timeout:`. With `Fluffy.Case`, a LiveView action on a missing element fails with Fluffy's error at the test timeout; Phoenix-only tests without it fail with ExUnit's timeout unless an `action_timeout` is set.
 - `timeout: 0` checks once, unlike Playwright's no timeout; Playwright actions and waits reject it. For no timeout, pass `timeout: :infinity`, never Playwright's `0`.
 - A Playwright `visit` already waits for LiveViews to connect, so do not assert `.phx-connected`.
 - `use Fluffy.Assert` gives `assert(visible(l))` and `refute(visible(l))`, and ordinary ExUnit asserts still work. `import Fluffy.Expect` gives `expect(to_be_visible(l))` and `expect(not_(to_be_visible(l)))`. Both return the session.
 - `refute(visible(l))` passes for an absent or invisible element. Use `assert(count(l, 0))` to require DOM absence.
-- URL strings match the complete URL, including query and fragment. Use `page_url(path: "/x")` when only the path matters.
+- URL strings match the complete URL, including query and fragment. When only the path matters, use a regex or a predicate, which gets a `%URI{}`: `page_url(&(&1.path == "/x"))`.
 - There is no page status assertion. On Playwright, assert on `Event.response` instead.
 - Static and LiveView check structural visibility (`hidden`, `type="hidden"`) and do not compute CSS, so `display: none` alone counts as visible there. `aria-hidden="true"` does not affect visibility; only `by_role` excludes it. Use `:playwright` to test rendered visibility.
 - Text matching skips `<script>` and `<style>`, as in Playwright, so `assert_has("script", text: ...)` fails even with `count:`. Match attributes with `count:`, or read the text natively: `unwrap` on Static passes the conn (`conn.resp_body`), and on Playwright use `Fluffy.Playwright.evaluate(session, locator, "el => el.textContent")`.
@@ -65,8 +66,8 @@ start_session(:phoenix)
 
 - Register before the action. `pending = wait_for(session, Event.download())`, act, then `await(pending)`, once. In a pipeline, `assert_event(Event.download(), &click(&1, button), fn download -> ... end)`, or `expect_event` with `Fluffy.Expect`.
 - Downloads work on every driver: `Download.read/2`, `Download.save_as/2`. Other events require Playwright.
-- `Fluffy.Playwright.route/4` registers before the request and hands the handler a `Fluffy.Route`. Answer once with `Route.fulfill/2`, `continue/2`, `abort/2` or `fallback/2`; an unanswered request hangs until its action times out.
-- `&` captures cannot nest, not even `&fun/1` inside another capture. `&on(&1, Event.dialog(), &Dialog.accept/1)` does not compile: bind `accept = &Dialog.accept/1` first.
+- `Fluffy.Playwright.route/4` registers before the request and hands the handler a `PlaywrightEx.Route`. Answer once with `PlaywrightEx.Route.fulfill!/2`, `continue!/2`, `abort!/2` or `fallback!/2`; an unanswered request hangs until its action times out. Don't block in a route handler (`receive`, `Process.sleep`, `GenServer` calls, database or Phoenix work); hand off to a `Task` and fulfil from it: `fn route -> Task.start(fn -> Route.fulfill!(route, json: Owlery.letters_for("Harry")) end) end`. The `Task` inherits `$callers`, so the Ecto sandbox works there.
+- `&` captures cannot nest, not even `&fun/1` inside another capture. `&on(&1, Event.dialog(), &Dialog.accept!/1)` does not compile: bind `accept = &Dialog.accept!/1` first.
 
 ## Dropping to PlaywrightEx
 
@@ -74,7 +75,7 @@ Prefer the shared API. For what it does not cover:
 
 - `Fluffy.unwrap(session, fun)` passes a `%Plug.Conn{}` (Static, return the updated conn), `%Phoenix.LiveViewTest.View{}` (LiveView) or `%PlaywrightEx.Page{}` (Playwright), and returns the session. It raises on a Phoenix session before its first visit.
 - `Fluffy.Playwright.unwrap(session, locator, fun)` passes the `%PlaywrightEx.Locator{}` for a Fluffy locator, resolved in the active page and through frame locators. A navigation it causes is adopted. It raises `Fluffy.CapabilityError` on Phoenix.
-- `unwrap_and_return(response, &PlaywrightEx.Response.server_addr!/1)` reaches an event value's native counterpart and returns the callback's result.
+- Events other than page events, downloads and file choosers deliver PlaywrightEx's values, as in Playwright: read a response with `PlaywrightEx.Response.status/1`, accept a dialog with `PlaywrightEx.Dialog.accept!/1`. `Fluffy.Playwright.page(session, native_page)` turns their page into a `Fluffy.Page` for `switch_page`.
 - Use bang functions inside the callback so failures stop the test.
 - Do not natively close the page or context, call `remove_all_listeners`, `set_default_timeout`, `set_default_navigation_timeout` or `set_content`, stop tracing, or pass `no_wait_after:` or `signal:`. Those break Fluffy's tracking.
 - In a LiveView callback, do not consume `assert_patch` or `assert_redirect`; assert the resulting page after `unwrap`.
@@ -82,5 +83,4 @@ Prefer the shared API. For what it does not cover:
 ## Debugging
 
 - Element actions fail with `Fluffy.OperationError`, whose `cause` holds the driver's error. Failed assertions are `ExUnit.AssertionError`.
-- Set `artifact_dir` in the Playwright config to keep HTML and a screenshot of failures.
-- `Fluffy.Playwright.trace(session, open: false)` records a trace, and `Fluffy.step/3` names a group of steps in it. `Fluffy.open_browser/1` opens the current page on any driver.
+- Traces, screenshots and videos are PlaywrightEx.Test's: `config :playwright_ex, :test, trace: :retain_on_failure, screenshot: :only_on_failure`, or a tag such as `@tag trace: true`. A failed test gets `error-context.md` in its `test-results/` dir. `Fluffy.Playwright.step/4` names a step of the test in its trace (Playwright only). `Fluffy.open_browser/1` opens the current page on any driver.

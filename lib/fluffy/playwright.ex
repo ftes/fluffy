@@ -23,29 +23,11 @@ defmodule Fluffy.Playwright do
   alias Fluffy.Backend.Playwright.Document
   alias Fluffy.CapabilityError
   alias Fluffy.Options
-  alias Fluffy.Playwright.Trace
-  alias Fluffy.Route
   alias Fluffy.Session
   alias PlaywrightEx.BrowserContext
   alias PlaywrightEx.WebStorage
 
-  @trace_schema NimbleOptions.new!(
-                  directory: [
-                    type: :string,
-                    doc: "Directory in which to save the trace archive."
-                  ],
-                  name: [
-                    type: :string,
-                    doc: "Human-readable trace name and artifact filename prefix."
-                  ],
-                  open: [
-                    type: :boolean,
-                    default: true,
-                    doc: "Open Playwright Trace Viewer after saving the trace."
-                  ]
-                )
-
-  @trace_capture [screenshots: true, snapshots: true, sources: true]
+  require PlaywrightEx.Test
 
   @route_schema NimbleOptions.new!(
                   times: [
@@ -54,15 +36,10 @@ defmodule Fluffy.Playwright do
                   ]
                 )
 
-  @typedoc "Fluffy's trace options, and the capture options of `PlaywrightEx.Tracing.start/2`."
-  @type trace_option ::
-          unquote(NimbleOptions.option_typespec(@trace_schema))
-          | {:screenshots, boolean()}
-          | {:snapshots, boolean() | map()}
-          | {:sources, boolean()}
-          | {:live, boolean()}
-
   @type route_option :: unquote(NimbleOptions.option_typespec(@route_schema))
+  @typedoc "A `route/4` handler: as for `PlaywrightEx.BrowserContext.route/4`."
+  @type route_handler ::
+          (PlaywrightEx.Route.t() -> term()) | (PlaywrightEx.Route.t(), PlaywrightEx.Request.t() -> term())
 
   @type go_back_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:go_back)))
   @type go_forward_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:go_forward)))
@@ -142,6 +119,26 @@ defmodule Fluffy.Playwright do
   @doc group: "Lifecycle and navigation"
   @doc playwright_only: true
   @doc """
+  Returns the handle of a `PlaywrightEx.Page` of the session's browser context, for
+  `switch_page/2`. Events other than page events deliver PlaywrightEx's values, so this
+  turns the page of a dialog or console message into one Fluffy can act on:
+
+      dialog = await(pending)
+      PlaywrightEx.Dialog.dismiss!(dialog)
+      switch_page(session, page(session, PlaywrightEx.Dialog.page(dialog)))
+
+  A page that has closed returns its closed handle. A page of another browser context
+  raises `ArgumentError`.
+  """
+  @spec page(Session.t(), PlaywrightEx.Page.t()) :: Fluffy.Page.t()
+  def page(%Session{} = session, %PlaywrightEx.Page{} = page) do
+    ensure_playwright_backend!(session, :pages)
+    PlaywrightBackend.Events.page(session, page)
+  end
+
+  @doc group: "Lifecycle and navigation"
+  @doc playwright_only: true
+  @doc """
   Creates a blank page in the session's browser context and returns its handle.
 
   The session keeps its current page selection. Use `switch_page/2` to select
@@ -201,8 +198,8 @@ defmodule Fluffy.Playwright do
   Waits for the active page to reach a load state and returns the session.
 
   `state` is `:load` (the default), `:domcontentloaded` or `:networkidle`, and the
-  options may take its place. The call raises after the session's `timeout:` unless
-  `timeout:` is given. Phoenix sessions raise `Fluffy.CapabilityError`.
+  options may take its place. As in Playwright, `timeout:` defaults to the navigation
+  timeout ([Timeouts](installation.md#timeouts)). Phoenix sessions raise `Fluffy.CapabilityError`.
 
   ## Options
 
@@ -391,8 +388,8 @@ defmodule Fluffy.Playwright do
   or `nil` if the element is not visible.
 
   Coordinates are in CSS pixels relative to the main frame's viewport. As in
-  Playwright, finding the element raises after the session's `timeout:` unless
-  `timeout:` is given; reading its box has no timeout. Phoenix sessions raise
+  Playwright, `timeout:` (by default the action timeout) limits finding the element;
+  reading its box has no timeout. Phoenix sessions raise
   `Fluffy.CapabilityError`.
 
   ## Options
@@ -411,7 +408,7 @@ defmodule Fluffy.Playwright do
   @doc """
   Returns the ARIA snapshot of the active page, or of a locator, as YAML text.
 
-  The call raises after the session's `timeout:` unless `timeout:` is given. Phoenix
+  `timeout:` defaults to the action timeout ([Timeouts](installation.md#timeouts)). Phoenix
   sessions raise `Fluffy.CapabilityError`.
 
   ## Options
@@ -475,7 +472,10 @@ defmodule Fluffy.Playwright do
   @doc group: "Diagnostics and native access"
   @doc playwright_only: true
   @doc """
-  Saves the active page as a PDF and returns the session.
+  Returns the active page as a PDF binary, as Playwright's `page.pdf()`. With `path:`,
+  it also writes the file.
+
+      pdf = Fluffy.Playwright.pdf(session, path: "tmp/half-blood-prince.pdf")
 
   Browsers other than Chromium cannot generate one and raise. Phoenix sessions raise
   `Fluffy.CapabilityError`.
@@ -486,12 +486,11 @@ defmodule Fluffy.Playwright do
 
   #{NimbleOptions.docs(Options.action_schema(:pdf))}
   """
-  @spec pdf(Session.t(), Path.t(), [pdf_option()]) :: Session.t()
-  def pdf(%Session{} = session, path, options \\ []) when is_binary(path) do
+  @spec pdf(Session.t(), [pdf_option()]) :: binary()
+  def pdf(%Session{} = session, options \\ []) do
     ensure_playwright_backend!(session, :pdf)
     native = Options.validate_action!(:pdf, options)
-    native = Keyword.put(native, :path, path)
-    page_action(session, :pdf, &PlaywrightEx.Page.pdf(&1, native))
+    page_read(session, :pdf, &PlaywrightEx.Page.pdf(&1, native))
   end
 
   @doc group: "Lifecycle and navigation"
@@ -615,37 +614,42 @@ defmodule Fluffy.Playwright do
   @doc playwright_only: true
   @doc """
   Intercepts matching browser requests in the session's context, so popups and
-  new pages are covered too, and returns the session.
+  new pages are covered too, and returns the session. It is
+  `PlaywrightEx.BrowserContext.route/4` on the session's context.
 
-  `url` is what `Fluffy.Expect.page_to_have_url/2` accepts: a string, a regular
-  expression, a unary predicate over the `URI`, or path, query and fragment
-  components. A string is a Playwright glob, resolved against the session's
-  `base_url:`, such as `"**/api/*"` or `"/api/potions"`.
+  `url` is what Playwright's `route` takes: a glob string, resolved against the
+  session's `base_url:` (such as `"**/api/*"` or `"/api/potions"`), a regular
+  expression, or a predicate over the URL as a `%URI{}`.
 
-  `handler` receives a `Fluffy.Route` and must answer it with
-  `Fluffy.Route.fulfill/2`, `continue/2`, `abort/2` or `fallback/2`:
+  `handler` receives the `PlaywrightEx.Route` (and its `PlaywrightEx.Request`, if it
+  takes two arguments) and answers it with `PlaywrightEx.Route.fulfill!/2`,
+  `continue!/2`, `abort!/2` or `fallback!/2`:
 
       import Fluffy.Playwright
-      alias Fluffy.Route
+      alias PlaywrightEx.Route
 
       session
-      |> route("/api/potions", fn route -> Route.fulfill(route, json: [%{name: "Felix Felicis"}]) end)
+      |> route("/api/potions", fn route -> Route.fulfill!(route, json: [%{name: "Felix Felicis"}]) end)
       |> visit("/potions")
 
-  The handler runs in its own process, since the test process is blocked in the
-  action that caused the request. That process is a `$callers` descendant of
-  this call's process, so the Ecto sandbox allows its queries. Requests run
-  concurrently.
+  As in PlaywrightEx, the handler runs in a process of its own, with this call's
+  process and its `$callers` in `$callers`. Call it from the test, or from a process
+  with the test in `$callers`. Don't block in a route handler (`receive`,
+  `Process.sleep`, `GenServer` calls, database or Phoenix work); hand off to a `Task`
+  and fulfil from it. The `Task` inherits `$callers`, so the Ecto sandbox works there:
 
-  When several routes match, the last registered wins; `Fluffy.Route.fallback/2`
-  hands the request to the one registered before it.
+      route(session, "**/owl-post/**", fn route ->
+        Task.start(fn -> Route.fulfill!(route, json: Owlery.letters_for("Harry")) end)
+      end)
 
-  A handler that raises aborts its request and fails this call's process, like a
-  `Fluffy.on/4` handler. A handler may return without answering and leave the
-  route to another process, such as the test; a request never answered hangs until
-  the action waiting for it times out, as in Playwright. The route lasts until
-  `unroute/3` or the session's end, even if this call's process exits first, unlike
-  an `on/4` listener. Like Playwright, routing disables the browser's HTTP cache. See
+  When several routes match, the last registered wins; `fallback!/2` hands the
+  request to the one registered before it.
+
+  As in Playwright, a handler that raises fails the test and leaves its request
+  pending, and a request never answered hangs until the action waiting for it times
+  out. A handler may leave the route to another process, such as the test. The
+  route lasts until `unroute/3`, `unroute_all/2` or the session's end. Like
+  Playwright, routing disables the browser's HTTP cache. See
   [Routing requests](advanced-events.md#routing-requests).
 
   Phoenix sessions raise `Fluffy.CapabilityError`.
@@ -654,11 +658,10 @@ defmodule Fluffy.Playwright do
 
   #{NimbleOptions.docs(@route_schema)}
   """
-  @spec route(Session.t(), Fluffy.Page.url_expectation(), (Route.t() -> term()), [route_option()]) :: Session.t()
-  def route(%Session{} = session, url, handler, options \\ []) when is_function(handler, 1) and is_list(options) do
-    ensure_playwright_backend!(session, :routing)
+  @spec route(Session.t(), Fluffy.Page.url_expectation(), route_handler(), [route_option()]) :: Session.t()
+  def route(%Session{} = session, url, handler, options \\ []) when is_function(handler) and is_list(options) do
     options = NimbleOptions.validate!(options, @route_schema)
-    Route.Registration.start(session, url, handler, options)
+    _disposable = session |> browser_context!(:routing) |> BrowserContext.route!(url, handler, options)
     session
   end
 
@@ -666,30 +669,28 @@ defmodule Fluffy.Playwright do
   @doc playwright_only: true
   @doc """
   Removes the routes registered for `url` by `route/4`, or only those of `handler`,
-  and returns the session.
+  and returns the session. It is `PlaywrightEx.BrowserContext.unroute/3`.
 
-  `url` must be the matcher given to `route/4`. As in Playwright, this does not
-  wait for handlers already running. Removing the last route lets their requests go
-  on to the server, so a late answer raises in its handler and fails this call's
-  process; `unroute_all/2` with `behavior:` avoids that. Phoenix sessions raise
-  `Fluffy.CapabilityError`.
+  `url` must equal the matcher given to `route/4`. As in Playwright, this does not
+  wait for handlers already running; `unroute_all/2` with `behavior:` does.
+  Phoenix sessions raise `Fluffy.CapabilityError`.
   """
-  @spec unroute(Session.t(), Fluffy.Page.url_expectation(), (Route.t() -> term()) | nil) :: Session.t()
-  def unroute(%Session{} = session, url, handler \\ nil) when is_nil(handler) or is_function(handler, 1) do
-    ensure_playwright_backend!(session, :routing)
-    Route.Registration.remove(session, url, handler)
+  @spec unroute(Session.t(), Fluffy.Page.url_expectation(), route_handler() | nil) :: Session.t()
+  def unroute(%Session{} = session, url, handler \\ nil) when is_nil(handler) or is_function(handler) do
+    :ok = session |> browser_context!(:routing) |> BrowserContext.unroute!(url, handler)
     session
   end
 
   @doc group: "Network"
   @doc playwright_only: true
   @doc """
-  Removes every route on the browser context and returns the session.
+  Removes every route on the browser context and returns the session. It is
+  `PlaywrightEx.BrowserContext.unroute_all/2`.
 
-  As in Playwright, this includes routes set up natively and HAR routers, not only
-  those registered by `route/4`. `behavior:` decides what happens to handlers
-  already running, and there is no timeout, as in Playwright. Phoenix sessions
-  raise `Fluffy.CapabilityError`.
+  As in Playwright, this includes routes set up natively and HAR routers, and there
+  is no timeout. `behavior: :ignore_errors` lets handlers still running fail
+  nothing, such as at the end of a test. Phoenix sessions raise
+  `Fluffy.CapabilityError`.
 
   ## Options
 
@@ -697,8 +698,8 @@ defmodule Fluffy.Playwright do
   """
   @spec unroute_all(Session.t(), [unroute_all_option()]) :: Session.t()
   def unroute_all(%Session{} = session, options \\ []) do
-    ensure_playwright_backend!(session, :routing)
-    Route.Registration.remove_all(session, Options.validate_action!(:unroute_all, options))
+    options = Options.validate_action!(:unroute_all, options)
+    :ok = session |> browser_context!(:routing) |> BrowserContext.unroute_all!(options)
     session
   end
 
@@ -746,44 +747,12 @@ defmodule Fluffy.Playwright do
   @doc group: "Diagnostics and native access"
   @doc playwright_only: true
   @doc """
-  Starts a Playwright trace for this session's BrowserContext.
+  Returns a screenshot of the active page as a binary, as Playwright's
+  `page.screenshot()`. With `path:`, it also writes the file.
 
-  The trace includes every page in the session and is saved when the test's
-  lifecycle scope shuts down. Because an explicit trace is primarily a local
-  debugging request, its viewer opens by default; pass `open: false` in CI. A
-  session may start one trace.
+      png = Fluffy.Playwright.screenshot(session, path: "tmp/marauders-map.png", full_page: true)
 
-  ## Options
-
-  #{NimbleOptions.docs(@trace_schema)}
-
-  Other options go to `PlaywrightEx.Tracing.start/2`. Fluffy defaults
-  `screenshots:`, `snapshots:` and `sources:` to `true`.
-  """
-  @spec trace(Session.t(), [trace_option()]) :: Session.t()
-  def trace(session, options \\ []) when is_list(options) do
-    ensure_playwright_backend!(session, :tracing)
-    {fluffy_options, capture_options} = Keyword.split(options, Keyword.keys(@trace_schema.schema))
-    fluffy_options = NimbleOptions.validate!(fluffy_options, @trace_schema)
-    context = Session.context(session)
-
-    if context.trace do
-      raise ArgumentError, "this Playwright session is already tracing"
-    end
-
-    trace = Trace.start(context, fluffy_options, Keyword.merge(@trace_capture, capture_options))
-
-    :ok = Fluffy.SessionRuntime.register(session.runtime, {:trace, trace}, fn -> Trace.stop(trace) end)
-
-    Session.put_context(session, Map.put(context, :trace, Trace.public_state(trace)))
-  end
-
-  @doc group: "Diagnostics and native access"
-  @doc playwright_only: true
-  @doc """
-  Saves a screenshot of the active page and returns the session.
-
-  Pass a locator and a path to capture one element, see `screenshot/4`.
+  Pass a locator to capture one element, see `screenshot/3`.
 
   ## Options
 
@@ -791,23 +760,23 @@ defmodule Fluffy.Playwright do
 
   #{NimbleOptions.docs(Options.action_schema(:page_screenshot))}
   """
-  @spec screenshot(Session.t(), Path.t(), [page_screenshot_option()]) :: Session.t()
-  @spec screenshot(Session.t(), Fluffy.Locator.t(), Path.t()) :: Session.t()
-  def screenshot(session, target, path_or_options \\ [])
+  @spec screenshot(Session.t(), [page_screenshot_option()]) :: binary()
+  @spec screenshot(Session.t(), Fluffy.Locator.t()) :: binary()
+  def screenshot(session, locator_or_options \\ [])
 
-  def screenshot(session, path, options) when is_binary(path) and is_list(options) do
+  def screenshot(%Session{} = session, options) when is_list(options) do
     ensure_playwright_backend!(session, :screenshot)
     options = Options.validate_action!(:page_screenshot, options)
-    Fluffy.__dispatch_driver__(session, :page_screenshot, [path, options])
+    Fluffy.__dispatch_driver__(session, :page_screenshot, [options])
   end
 
-  def screenshot(session, %Fluffy.Locator{} = locator, path) when is_binary(path),
-    do: screenshot(session, locator, path, [])
+  def screenshot(session, %Fluffy.Locator{} = locator), do: screenshot(session, locator, [])
 
   @doc group: "Diagnostics and native access"
   @doc playwright_only: true
   @doc """
-  Saves a screenshot of one element and returns the session.
+  Returns a screenshot of one element as a binary, as Playwright's
+  `locator.screenshot()`. With `path:`, it also writes the file.
 
   ## Options
 
@@ -815,11 +784,11 @@ defmodule Fluffy.Playwright do
 
   #{NimbleOptions.docs(Options.action_schema(:locator_screenshot))}
   """
-  @spec screenshot(Session.t(), Fluffy.Locator.t(), Path.t(), [locator_screenshot_option()]) :: Session.t()
-  def screenshot(%Session{} = session, %Fluffy.Locator{} = locator, path, options) when is_binary(path) do
+  @spec screenshot(Session.t(), Fluffy.Locator.t(), [locator_screenshot_option()]) :: binary()
+  def screenshot(%Session{} = session, %Fluffy.Locator{} = locator, options) when is_list(options) do
     ensure_playwright_backend!(session, :screenshot)
     options = Options.validate_action!(:locator_screenshot, options)
-    Fluffy.__dispatch_driver__(session, :screenshot, [locator, path, options])
+    Fluffy.__dispatch_driver__(session, :screenshot, [locator, options])
   end
 
   @doc group: "JavaScript"
@@ -962,8 +931,8 @@ defmodule Fluffy.Playwright do
 
   The expression is JavaScript source, either an expression or a function that
   receives `arg`, as in `evaluate/3`. It is re-evaluated until it is truthy, across
-  navigations of the page; a navigation meanwhile is adopted. The call raises
-  after the session's `timeout:` unless `timeout:` is given:
+  navigations of the page; a navigation meanwhile is adopted. `timeout:` defaults to
+  the action timeout ([Timeouts](installation.md#timeouts)):
 
       session
       |> Fluffy.Playwright.wait_for_function("window.editor?.ready === true")
@@ -1311,6 +1280,50 @@ defmodule Fluffy.Playwright do
 
   @doc false
   def __ensure_playwright_backend__!(session, capability), do: ensure_playwright_backend!(session, capability)
+
+  @doc group: "Diagnostics and native access"
+  @doc playwright_only: true
+  @doc """
+  Runs `fun` with the session as a step of the test, titled `title`, and returns the
+  session `fun` returns, for a pipeline:
+
+      session
+      |> visit("/potions/polyjuice")
+      |> step("Brew Polyjuice Potion", fn session ->
+        session
+        |> fill(by_label("Boomslang skin"), "3")
+        |> click(by_role(:button, name: "Brew"))
+      end)
+
+  It is `PlaywrightEx.Test.step/3` at this call's location: the step, with the operations
+  in it, is in the test's trace (`test.trace` in `trace.zip`), and steps nest. It needs a
+  module with `use PlaywrightEx.Test`.
+
+  ## Options
+
+    * `:box` - reports an error inside the step at the step's call instead of inside it.
+  """
+  defmacro step(session, title, fun, options \\ []) do
+    location = Macro.escape(%{file: __CALLER__.file, line: __CALLER__.line, column: 0})
+
+    quote do
+      Fluffy.Playwright.__step__(unquote(session), unquote(title), unquote(fun), unquote(options), unquote(location))
+    end
+  end
+
+  @doc false
+  def __step__(%Session{} = session, title, fun, options, location) when is_binary(title) and is_function(fun, 1) do
+    ensure_playwright_backend!(session, :steps)
+    options = Keyword.validate!(options, [:box])
+
+    case PlaywrightEx.Test.step(title, fn -> fun.(session) end, [location: location] ++ options) do
+      %Session{} = updated_session ->
+        updated_session
+
+      other ->
+        raise ArgumentError, "Fluffy.Playwright.step/4 callback must return a Fluffy.Session, got: #{inspect(other)}"
+    end
+  end
 
   defp ensure_playwright_backend!(session, capability) do
     if Session.backend(session) != PlaywrightBackend do

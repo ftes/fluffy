@@ -1,5 +1,5 @@
 defmodule Fluffy.Conformance.PageCleanupTest do
-  use Fluffy.TestCase, async: false
+  use Fluffy.Support.Case, async: false
 
   import Fluffy
   import Fluffy.Expect
@@ -9,15 +9,14 @@ defmodule Fluffy.Conformance.PageCleanupTest do
   alias Fluffy.Backend
   alias Fluffy.Event
   alias Fluffy.Session
-  alias Fluffy.TestHTTPFixtures
-  alias Fluffy.TestScope
+  alias Fluffy.Support.HTTPFixtures
 
   @down_tag Fluffy.Driver.Live.State.down_tag()
 
   @tag driver: :playwright
-  test "closing the test scope closes every page left in its BrowserContext" do
+  test "closing the session closes every page left in its BrowserContext" do
     fixture =
-      TestHTTPFixtures.register(fn request ->
+      HTTPFixtures.register(fn request ->
         case request.path do
           "/start" ->
             %{body: html(~s(<a href="child" target="_blank">Open child</a>))}
@@ -29,15 +28,16 @@ defmodule Fluffy.Conformance.PageCleanupTest do
 
     session =
       :playwright
-      |> start_session(base_url: Fluffy.TestServer.base_url())
-      |> visit(TestHTTPFixtures.path(fixture, "/start"))
+      |> start_session(base_url: Fluffy.Support.Server.base_url())
+      |> visit(HTTPFixtures.path(fixture, "/start"))
       |> expect_event(Event.popup(), &click(&1, by_role(:link, name: "Open child")))
 
     assert map_size(Session.pages(session)) == 2
     browser_context = Session.context(session).browser_context
-    :ok = GenServer.stop(TestScope.current())
+    browser = PlaywrightEx.BrowserContext.browser(browser_context)
+    :ok = close_session(session)
 
-    refute browser_context.guid in browser_context_guids()
+    refute browser_context.guid in browser_context_guids(browser)
   end
 
   @tag driver: :playwright

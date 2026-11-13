@@ -71,8 +71,8 @@ defmodule Fluffy.MixProject do
       {:lazy_html, ">= 0.1.0 and < 1.0.0"},
       {:phoenix, "~> 1.7"},
       {:phoenix_live_view, "~> 1.0"},
-      # Until a release includes ftes/playwright_ex#191.
-      {:playwright_ex, github: "ftes/playwright_ex", branch: "main"},
+      # Prototype on the unreleased PlaywrightEx.Test.
+      {:playwright_ex, github: "ftes/playwright_ex", branch: "test-runner", override: true},
       {:phoenix_ecto, "~> 4.7", optional: true},
       {:ecto_sql, "~> 3.10", optional: true},
       {:ex_doc, "~> 0.40.3", only: :dev, runtime: false},
@@ -106,7 +106,7 @@ defmodule Fluffy.MixProject do
       groups_for_modules: [
         "Core API": [
           Fluffy,
-          Fluffy.Test,
+          Fluffy.Case,
           Fluffy.Locator,
           Fluffy.FrameLocator,
           Fluffy.Expect,
@@ -127,17 +127,8 @@ defmodule Fluffy.MixProject do
           Fluffy.Session,
           Fluffy.PhoenixTest.Session,
           Fluffy.Download,
-          Fluffy.Dialog,
           Fluffy.FileChooser,
-          Fluffy.FilePayload,
-          Fluffy.Request,
-          Fluffy.Response,
-          Fluffy.Route,
-          Fluffy.Frame,
-          Fluffy.ConsoleMessage,
-          Fluffy.PageError,
-          Fluffy.Worker,
-          Fluffy.WebSocket
+          Fluffy.FilePayload
         ],
         "Capabilities and errors": [
           Fluffy.Capability,
@@ -185,9 +176,7 @@ defmodule Fluffy.MixProject do
       "assets.build": ["esbuild.install --if-missing", "esbuild test_browser"],
       lint: [
         "format --check-formatted",
-        # Compiles strictly first: the generator's own compile would satisfy it.
         "compile --warnings-as-errors",
-        "fluffy.gen.native_options --check",
         "usage_rules.sync --check",
         "credo --format oneline"
       ],

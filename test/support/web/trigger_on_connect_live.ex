@@ -1,4 +1,4 @@
-defmodule Fluffy.TestWeb.TriggerOnConnectLive do
+defmodule Fluffy.Support.Web.TriggerOnConnectLive do
   @moduledoc false
 
   use Phoenix.LiveView

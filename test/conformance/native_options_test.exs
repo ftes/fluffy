@@ -1,38 +1,18 @@
 defmodule Fluffy.Conformance.NativeOptionsTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
 
   alias Fluffy.Options
-  alias Fluffy.Options.NativeGenerated
   alias Fluffy.Playwright.Keyboard
   alias Fluffy.Playwright.Mouse
-  alias Fluffy.TestWeb.Endpoint
-  alias Mix.Tasks.Fluffy.Gen.NativeOptions
+  alias Fluffy.Support.Server
+  alias Fluffy.Support.Web.Endpoint
 
   @button ~s(<button onclick="this.textContent = event.shiftKey ? 'shift' : 'plain'">Cast</button>)
   @states ~s(<button disabled>Locked</button><input aria-label="Sealed" readonly><p hidden>Secret</p>)
-
-  # Compares data, not source, so older Elixir formatters agree; CI also runs `--check`.
-  test "the generated upstream options are fresh" do
-    for {module, fun, arity} <- NativeOptions.calls() do
-      assert normalize(NativeGenerated.options(module, fun, arity)) ==
-               normalize(NativeOptions.options(module, fun, arity)),
-             "run `mix fluffy.gen.native_options` (#{inspect(module)}.#{fun}/#{arity} is stale)"
-    end
-  end
-
-  # Classification reads the installed PlaywrightEx's `__options__/1`, not the generated file.
-  test "every upstream option of an action is classified" do
-    for {action, {module, fun, _arity, playwright}} <- Options.native_actions() ++ Options.playwright_actions() do
-      fluffy = Options.fluffy_native_keys() ++ Options.denied_native_keys()
-
-      assert Enum.sort(upstream_keys(module, fun) -- fluffy) == Enum.sort(playwright),
-             "classify the upstream options of #{inspect(action)} in Fluffy.Options"
-    end
-  end
 
   test "every upstream option of an expectation is classified" do
     for {matcher, {module, fun, _arity, mirrored}} <- Options.native_expectations() do
@@ -68,7 +48,7 @@ defmodule Fluffy.Conformance.NativeOptionsTest do
     @tag driver: driver
     test "state flags and ignore_case mirror Playwright with #{driver}" do
       unquote(driver)
-      |> session_for_html(@states, base_url: Fluffy.TestServer.base_url())
+      |> session_for_html(@states, base_url: Server.base_url())
       |> expect(to_be_enabled(by_role(:button, name: "Locked"), enabled: false))
       |> expect(to_be_editable(by_label("Sealed"), editable: false))
       |> expect(to_be_visible(by_text("Secret"), visible: false))
@@ -79,28 +59,20 @@ defmodule Fluffy.Conformance.NativeOptionsTest do
       |> expect(page_to_have_url("/STAGE", ignore_case: true))
       |> expect(page_to_have_url(~r/STAGE$/, ignore_case: true))
       |> expect(not_(page_to_have_url(~r/STAGE$/i, ignore_case: false)))
-      |> expect(page_to_have_url(~r/(*UCP)\bSTAGE$/, ignore_case: true))
-      |> expect(not_(page_to_have_url(~r/(*UCP)\bSTAGE$/i, ignore_case: false)))
     end
   end
 
   for driver <- [:static, :live, :playwright] do
     @tag driver: driver
-    test "ignore_case: false leaves a predicate or structured URL unchanged with #{driver}" do
+    test "ignore_case: hands a predicate the URL in lower case with #{driver}" do
       path = if unquote(driver) == :live, do: "/live/nested", else: "/stage"
+      upper = String.upcase(path)
 
       unquote(driver)
       |> visited_session(path)
-      |> expect(page_to_have_url(&(&1.path == path), ignore_case: false))
-      |> expect(page_to_have_url([path: path], ignore_case: false))
-    end
-  end
-
-  test "ignore_case requires a string or regular expression URL" do
-    assert_raise ArgumentError, ~r/ignore_case: requires/, fn -> page_to_have_url([path: "/"], ignore_case: true) end
-
-    assert_raise ArgumentError, ~r/ignore_case: requires/, fn ->
-      page_to_have_url(&(&1.path == "/"), ignore_case: true)
+      |> expect(page_to_have_url(&String.ends_with?(&1.path, path), ignore_case: true))
+      |> expect(not_(page_to_have_url(&String.ends_with?(&1.path, upper), ignore_case: true)))
+      |> expect(page_to_have_url(&String.ends_with?(&1.path, path), ignore_case: false))
     end
   end
 
@@ -123,7 +95,7 @@ defmodule Fluffy.Conformance.NativeOptionsTest do
     pad_locator = by_css("#pad")
 
     :playwright
-    |> session_for_html(pad, base_url: Fluffy.TestServer.base_url())
+    |> session_for_html(pad, base_url: Server.base_url())
     |> click(pad_locator)
     |> expect(to_have_text(pad_locator, "40,20"))
     |> click(pad_locator, position: %{x: 5, y: 7})
@@ -174,8 +146,8 @@ defmodule Fluffy.Conformance.NativeOptionsTest do
             &Fluffy.Playwright.dispatch_event(session, button, "click", nil, &1),
             &Fluffy.Playwright.select_text(session, button, &1),
             &Fluffy.Playwright.scroll_into_view_if_needed(session, button, &1),
-            &Fluffy.Playwright.screenshot(session, button, "/tmp/x.png", &1),
-            &Fluffy.Playwright.screenshot(session, "/tmp/x.png", &1),
+            &Fluffy.Playwright.screenshot(session, button, &1),
+            &Fluffy.Playwright.screenshot(session, &1),
             &Fluffy.Playwright.set_viewport_size(session, %{width: 1, height: 1}, &1),
             &Fluffy.Playwright.emulate_media(session, &1),
             &Keyboard.press(session, "a", &1),
@@ -191,9 +163,6 @@ defmodule Fluffy.Conformance.NativeOptionsTest do
     end)
   end
 
-  defp normalize(options),
-    do: for({key, {type_doc, doc, spec}} <- options, do: {key, type_doc, doc, Macro.to_string(spec)})
-
   defp upstream_keys(module, fun), do: fun |> module.__options__() |> Keyword.keys()
 
   # `__options__/1` has no clause for a factory without options.
@@ -204,16 +173,14 @@ defmodule Fluffy.Conformance.NativeOptionsTest do
   end
 
   defp locator_schema(:by_role), do: Options.role_locator_schema()
-  defp locator_schema(:by_test_id), do: Options.test_id_locator_schema()
   defp locator_schema(:filter), do: Options.filter_locator_schema()
-  defp locator_schema(:by_css), do: NimbleOptions.new!([])
+  defp locator_schema(locator) when locator in [:by_css, :by_test_id], do: NimbleOptions.new!([])
   defp locator_schema(_text_locator), do: Options.exact_locator_schema()
 
   defp visited_session(driver, path) when driver in [:static, :live],
     do: :phoenix |> start_session(endpoint: Endpoint) |> visit(path)
 
-  defp visited_session(:playwright, path),
-    do: :playwright |> start_session(base_url: Fluffy.TestServer.base_url()) |> visit(path)
+  defp visited_session(:playwright, path), do: :playwright |> start_session(base_url: Server.base_url()) |> visit(path)
 
   # Options are validated before the target is resolved.
   defp with_session(:live, fun) do
@@ -221,6 +188,6 @@ defmodule Fluffy.Conformance.NativeOptionsTest do
   end
 
   defp with_session(driver, fun) do
-    fun.(session_for_html(driver, @button, base_url: Fluffy.TestServer.base_url()))
+    fun.(session_for_html(driver, @button, base_url: Server.base_url()))
   end
 end

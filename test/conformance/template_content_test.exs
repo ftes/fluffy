@@ -1,5 +1,5 @@
 defmodule Fluffy.Conformance.TemplateContentTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
@@ -26,7 +26,7 @@ defmodule Fluffy.Conformance.TemplateContentTest do
     @tag driver: driver
     test "ignores template content with #{driver}" do
       unquote(driver)
-      |> session_for_html(@html, base_url: Fluffy.TestServer.base_url())
+      |> session_for_html(@html, base_url: Fluffy.Support.Server.base_url())
       |> expect("Shown" |> by_text(exact: true) |> to_have_count(1))
       |> expect("Outer" |> by_text(exact: true) |> to_have_count(1))
       |> expect("Inner" |> by_text() |> to_have_count(0))

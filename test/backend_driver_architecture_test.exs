@@ -1,5 +1,5 @@
 defmodule Fluffy.BackendDriverArchitectureTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
@@ -62,8 +62,8 @@ defmodule Fluffy.BackendDriverArchitectureTest do
 
   defp phoenix_session do
     start_session(:phoenix,
-      base_url: Fluffy.TestServer.base_url(),
-      endpoint: Fluffy.TestWeb.Endpoint
+      base_url: Fluffy.Support.Server.base_url(),
+      endpoint: Fluffy.Support.Web.Endpoint
     )
   end
 end

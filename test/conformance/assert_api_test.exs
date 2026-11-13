@@ -1,9 +1,11 @@
 defmodule Fluffy.Conformance.AssertAPITest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
   use Fluffy.Assert
 
   import Fluffy
   import Fluffy.Locator
+
+  alias Fluffy.Support.Server
 
   test "element assertions delegate to their expectations, without clashing with Fluffy or Fluffy.Locator" do
     session =
@@ -51,7 +53,7 @@ defmodule Fluffy.Conformance.AssertAPITest do
           <p id="hidden" hidden>Hidden</p>
           <input aria-label="Join the Quidditch team" type="checkbox" checked>
           """,
-          base_url: Fluffy.TestServer.base_url()
+          base_url: Server.base_url()
         )
 
       expectation = visible(by_css("#visible"))
@@ -92,7 +94,7 @@ defmodule Fluffy.Conformance.AssertAPITest do
   @tag driver: :playwright
   test "immediate browser assertions return a usable session" do
     :playwright
-    |> session_for_html("<p>Saved</p>", base_url: Fluffy.TestServer.base_url())
+    |> session_for_html("<p>Saved</p>", base_url: Server.base_url())
     |> assert(visible(by_text("Saved")), timeout: 0)
     |> refute(page_title("Error"), timeout: 0)
     |> assert(visible(by_text("Saved")))
@@ -102,11 +104,11 @@ defmodule Fluffy.Conformance.AssertAPITest do
     @tag driver: driver
     test "assertions retry Live changes and return a usable session with #{driver}" do
       unquote(driver)
-      |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Fluffy.TestWeb.Endpoint)
+      |> start_session(base_url: Server.base_url(), endpoint: Fluffy.Support.Web.Endpoint)
       |> visit("/live/async?delay=40")
       |> refute_has(by_text("Status: waiting"), timeout: 1_000)
       |> assert_has(by_text("Status: ready"), timeout: 1_000)
-      |> assert(page_url(path: "/live/async"))
+      |> assert(page_url("/live/async?delay=40"))
       |> click(by_role(:button, name: "Appeared"))
       |> assert(visible(by_text("Activated")))
     end
