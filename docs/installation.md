@@ -189,7 +189,8 @@ browser = PlaywrightEx.Test.BrowserPool.browser(launch_options: [headless: false
 
 Call it in `setup_all` to cover a module; `browser_name:` and `driver:` override the same
 way. Other options get a worker of their own, a driver and its browser, which counts toward
-`workers` unless the test or module holds one already. See
+`workers` unless the test or module holds one already; at `workers`, the longest idle worker of
+other options restarts its driver for them. See
 [Debugging one test](`e:playwright_ex:testing-with-exunit.md#debugging-one-test`).
 
 To run the browsers on a Playwright server, such as Playwright's Docker image, set
