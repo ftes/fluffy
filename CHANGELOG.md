@@ -14,6 +14,7 @@ Upgrading from 0.8? The [upgrade guide](docs/upgrading.md) lists the net changes
 
 ### Changed
 
+- **Breaking:** `config :fluffy` is validated at startup: an unknown key, such as a misspelt one, raises, as does the config of a module that doesn't exist (`config :fluffy, Fluffy.Sanbox, ...`). `playwright: false` raises too, as it does nothing.
 - **Breaking:** `log_browser_console` is removed, as Playwright logs nothing either; register a listener with `on(session, Event.console(), ...)` to log messages.
 - **Breaking:** `Fluffy.step/3` is `Fluffy.Playwright.step/4`, a pipeline form of `PlaywrightEx.Test.step/3`: the step is a test step in the trace, it takes `box:`, and Phoenix sessions raise `Fluffy.CapabilityError`.
 - `to_have_screenshot`, `page_to_have_screenshot` and the snapshot-file form of `to_match_aria_snapshot` take upstream's `name:`, or derive the name from the test, in a module with `use PlaywrightEx.Test`; `path:` is optional there. As in Playwright, a missing baseline written there fails the test at its end, unless `update_snapshots: :missing`.

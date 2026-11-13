@@ -353,16 +353,21 @@ defmodule Fluffy.Options do
                     ]
                   )
 
-  # Playwright Test's `actionTimeout`, `expect.timeout` and `testIdAttribute` for Fluffy's
-  # sessions, over PlaywrightEx's (`config!/1`). No defaults: unset, PlaywrightEx's apply.
+  # `config :fluffy`. Playwright Test's `actionTimeout`, `expect.timeout` and `testIdAttribute`
+  # are for Fluffy's sessions, over PlaywrightEx's (`config!/1`); no defaults: unset,
+  # PlaywrightEx's apply.
   @config_schema NimbleOptions.new!(
                    action_timeout: [type: {:custom, __MODULE__, :default_timeout, []}],
                    # `0`: assertions check once, as with a call's `timeout: 0`.
                    expect_timeout: [type: :timeout],
-                   test_id_attribute: [type: {:custom, __MODULE__, :test_id_attribute, []}]
+                   test_id_attribute: [type: {:custom, __MODULE__, :test_id_attribute, []}],
+                   base_url: [type: :string],
+                   endpoint: [type: :atom],
+                   ecto_repos: [type: {:list, :atom}],
+                   file_input_max_bytes: [type: :pos_integer]
                  )
 
-  @config_keys Keyword.keys(@config_schema.schema)
+  @playwright_test_keys [:action_timeout, :expect_timeout, :test_id_attribute]
 
   @type session_option :: unquote(NimbleOptions.option_typespec(@session_schema))
 
@@ -495,7 +500,7 @@ defmodule Fluffy.Options do
   # (`PlaywrightEx.Test.config/0`, its defaults filled in), where `0` means no limit:
   # `:infinity` here. `navigation_timeout` is PlaywrightEx's only.
   @spec config!(atom()) :: term()
-  def config!(key) when key in @config_keys do
+  def config!(key) when key in @playwright_test_keys do
     case Keyword.fetch(config!(), key) do
       {:ok, value} -> value
       :error -> playwright_ex_config(key)
@@ -512,21 +517,25 @@ defmodule Fluffy.Options do
   defp no_limit(timeout), do: timeout
 
   @doc false
-  # Fluffy's settings of `@config_schema` that are set, validated. Fluffy's removed config
-  # raises: kept, it would silently stop limiting anything.
+  # `config :fluffy`, validated: a misspelt or removed key raises, as kept it would silently
+  # do nothing. A module's config (`config :fluffy, Fluffy.Sandbox, ...`) is validated by the
+  # module, which has to exist.
   @spec config!() :: keyword()
   def config! do
     reject_removed_config!()
+    {modules, options} = Enum.split_with(Application.get_all_env(:fluffy), &module_key?/1)
 
-    :fluffy
-    |> Application.get_all_env()
-    |> Keyword.take(@config_keys)
-    |> NimbleOptions.validate(@config_schema)
-    |> case do
+    for {module, _config} <- modules, !Code.ensure_loaded?(module) do
+      raise ArgumentError, "invalid config :fluffy, #{inspect(module)}: no such module"
+    end
+
+    case NimbleOptions.validate(options, @config_schema) do
       {:ok, config} -> config
       {:error, error} -> raise ArgumentError, "invalid config :fluffy: " <> Exception.message(error)
     end
   end
+
+  defp module_key?({key, _value}), do: match?("Elixir." <> _, Atom.to_string(key))
 
   @removed_config [
     timeout: "set `config :fluffy, expect_timeout: ...` for assertions and `action_timeout: ...` for actions",
@@ -539,7 +548,7 @@ defmodule Fluffy.Options do
   ]
 
   defp reject_removed_config! do
-    for {key, hint} <- @removed_config, Application.get_env(:fluffy, key) not in [nil, false] do
+    for {key, hint} <- @removed_config, Application.fetch_env(:fluffy, key) != :error do
       raise ArgumentError, "config :fluffy, #{key}: is removed: as in Playwright Test, #{hint}"
     end
 

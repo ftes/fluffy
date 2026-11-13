@@ -55,6 +55,8 @@ matched once can now match twice.
 Timeouts follow Playwright Test, and Elixir for `timeout:`: `0` checks once and `:infinity`
 means no limit; see [Timeouts](installation.md#timeouts).
 
+- `config :fluffy` is validated at startup: an unknown key, or the config of a module that
+  doesn't exist, raises. Remove `playwright: false`, which does nothing.
 - `start_session(timeout:)`, `config :fluffy, timeout:` and `config :fluffy, :playwright`
   are removed; the old config raises at startup. Set Playwright Test's defaults instead, in
   PlaywrightEx's config for the whole suite:

@@ -5,7 +5,17 @@ defmodule Fluffy.PlaywrightConfigurationTest do
   alias Fluffy.Options
   alias Fluffy.Timeouts
 
-  @keys [:timeout, :playwright, :action_timeout, :navigation_timeout, :expect_timeout, :test_id_attribute]
+  @keys [
+    :timeout,
+    :playwright,
+    :action_timeout,
+    :navigation_timeout,
+    :expect_timeout,
+    :test_id_attribute,
+    :expect_timout,
+    :file_input_max_bytes,
+    Fluffy.Sanbox
+  ]
 
   setup do
     originals = for key <- @keys, do: {key, Application.fetch_env(:fluffy, key)}
@@ -46,7 +56,21 @@ defmodule Fluffy.PlaywrightConfigurationTest do
                  &Options.config!/0
 
     put_env(playwright: false)
-    assert Options.config!()
+    assert_raise ArgumentError, ~r/config :fluffy, playwright: is removed/, &Options.config!/0
+  end
+
+  # Kept, a misspelt key would silently do nothing.
+  test "rejects unknown keys and the config of modules that don't exist" do
+    put_env(expect_timout: 1_000)
+    assert_raise ArgumentError, ~r/invalid config :fluffy: unknown options \[:expect_timout\]/, &Options.config!/0
+    Application.delete_env(:fluffy, :expect_timout)
+
+    put_env([{Fluffy.Sanbox, [header: "user-agent"]}])
+    assert_raise ArgumentError, ~r/invalid config :fluffy, Fluffy.Sanbox: no such module/, &Options.config!/0
+    Application.delete_env(:fluffy, Fluffy.Sanbox)
+
+    put_env(file_input_max_bytes: 0)
+    assert_raise ArgumentError, ~r/invalid config :fluffy: .*file_input_max_bytes/, &Options.config!/0
   end
 
   # Only browsers wait for navigations, so the navigation timeout is PlaywrightEx's.

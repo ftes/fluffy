@@ -1,6 +1,6 @@
 alias Ecto.Adapters.SQL.Sandbox
 
-Application.put_env(:fluffy, :playwright_boot_state, %{pool: Process.whereis(PlaywrightEx.Test.Pool)})
+:persistent_term.put({Fluffy.ApplicationTest, :boot_state}, %{pool: Process.whereis(PlaywrightEx.Test.Pool)})
 
 # As many modules at once as Playwright runs workers (half the logical cores), not ExUnit's
 # twice the cores. `FLUFFY_MAX_CASES` or `--max-cases` overrides it.

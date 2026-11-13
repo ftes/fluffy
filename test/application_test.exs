@@ -6,6 +6,6 @@ defmodule Fluffy.ApplicationTest do
   end
 
   test "starts no Playwright driver or browser before the first browser session" do
-    assert %{pool: nil} = Application.fetch_env!(:fluffy, :playwright_boot_state)
+    assert %{pool: nil} = :persistent_term.get({Fluffy.ApplicationTest, :boot_state})
   end
 end
