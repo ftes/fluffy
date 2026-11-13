@@ -1,8 +1,42 @@
+defmodule Fluffy.PlaywrightArtifactsTest.TraceCase do
+  # PlaywrightEx.Test writes `trace.zip` in the `on_exit` its registration adds. A case
+  # template's `setup` runs before the `use PlaywrightEx.Test` of its `using`, so this `on_exit`
+  # is added before that one and runs after it, reading the path the test's setup puts in.
+  @moduledoc false
+  use ExUnit.CaseTemplate
+
+  using do
+    quote do
+      use PlaywrightEx.Test
+    end
+  end
+
+  setup context do
+    {:ok, path} = Agent.start(fn -> nil end)
+
+    on_exit(fn ->
+      path = Agent.get(path, & &1)
+      trace = read_trace(path)
+      File.rm_rf!(Path.dirname(path))
+      for expected <- context[:trace_has] || [], do: assert(trace =~ expected)
+      for unexpected <- context[:trace_lacks] || [], do: refute(trace =~ unexpected)
+    end)
+
+    %{trace_path: path}
+  end
+
+  # Every entry, as the archive of several contexts prefixes each one's `trace.trace`.
+  defp read_trace(path) do
+    {:ok, entries} = :zip.extract(String.to_charlist(path), [:memory])
+    Enum.map_join(entries, "\n", fn {_name, contents} -> contents end)
+  end
+end
+
 defmodule Fluffy.PlaywrightArtifactsTest do
   # Fluffy's side of PlaywrightEx.Test's recording: the contexts of a test's sessions are
   # the test's, and steps are its test steps.
   use ExUnit.Case, async: true
-  use PlaywrightEx.Test
+  use Fluffy.PlaywrightArtifactsTest.TraceCase
 
   import Fluffy
   import Fluffy.Expect
@@ -19,22 +53,6 @@ defmodule Fluffy.PlaywrightArtifactsTest do
   @secret "FLUFFY-" <> Base.encode16("upload secret of gringotts")
 
   @moduletag trace: true
-
-  # PlaywrightEx.Test writes `trace.zip` in the `on_exit` its registration adds. One added
-  # before that runs after it, and reads the path the test's setup puts in.
-  setup context do
-    {:ok, path} = Agent.start(fn -> nil end)
-
-    on_exit(fn ->
-      path = Agent.get(path, & &1)
-      trace = read_trace(path)
-      File.rm_rf!(Path.dirname(path))
-      for expected <- context[:trace_has] || [], do: assert(trace =~ expected)
-      for unexpected <- context[:trace_lacks] || [], do: refute(trace =~ unexpected)
-    end)
-
-    %{trace_path: path}
-  end
 
   setup %{trace_path: path} do
     trace_path = PlaywrightEx.Test.output_path("trace.zip")
@@ -91,12 +109,6 @@ defmodule Fluffy.PlaywrightArtifactsTest do
       bytes: @secret,
       content_type: "text/plain"
     })
-  end
-
-  # Every entry, as the archive of several contexts prefixes each one's `trace.trace`.
-  defp read_trace(path) do
-    {:ok, entries} = :zip.extract(String.to_charlist(path), [:memory])
-    Enum.map_join(entries, "\n", fn {_name, contents} -> contents end)
   end
 
   defp html(body), do: "<!doctype html><html><body>#{body}</body></html>"
