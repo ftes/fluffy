@@ -135,6 +135,10 @@ mix playwright_ex.install -- chromium
 On Linux CI runners, add `--with-deps` to install the browser's system packages too:
 `mix playwright_ex.install -- chromium --with-deps`. See
 [GitHub Actions](`e:playwright_ex:debugging-and-ci.md#github-actions`) for a workflow.
+For annotations of failed tests, run the first `mix test` with
+`--formatter ExUnit.CLIFormatter --formatter PlaywrightEx.Test.GitHubFormatter` (see
+`PlaywrightEx.Test.GitHubFormatter`), listing every formatter you use, since `--formatter`
+replaces the default list.
 
 Configure the backend in `config/test.exs`. The browser and its driver are
 `PlaywrightEx.Test`'s, as are the [timeouts](#timeouts) unless Fluffy's config overrides them:
