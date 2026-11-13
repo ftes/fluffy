@@ -163,16 +163,6 @@ defmodule Fluffy.Conformance.NetworkValueTest do
     assert Response.ok?(response)
   end
 
-  defp assert_eventually(fun, attempts \\ 100)
-  defp assert_eventually(fun, 0), do: assert(fun.())
-
-  defp assert_eventually(fun, attempts) do
-    if !fun.() do
-      Process.sleep(10)
-      assert_eventually(fun, attempts - 1)
-    end
-  end
-
   defp response(session, button, suffix) do
     pending = wait_for(session, Event.response(&String.ends_with?(&1.url, suffix)))
     click(session, by_role(:button, name: button, exact: true))

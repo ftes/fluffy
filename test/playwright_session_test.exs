@@ -83,7 +83,8 @@ defmodule Fluffy.PlaywrightSessionTest do
       |> Fluffy.fill(Fluffy.Locator.by_label("Map step"), "patched")
 
     frame = Session.page_state(session).frame
-    assert eventually(fn -> frame_handles(frame) == [] end)
+    # Handles are disposed without awaiting the reply.
+    assert_eventually(fn -> frame_handles(frame) == [] end, 50)
   end
 
   # The handles PlaywrightEx tracks whose results live in the frame.
@@ -94,21 +95,6 @@ defmodule Fluffy.PlaywrightSessionTest do
         Heap.get(object, :_type) == "JSHandle",
         Heap.get(object, :_parent).guid == frame.guid,
         do: object.guid
-  end
-
-  # Handles are disposed without awaiting the reply.
-  defp eventually(fun, attempts \\ 50) do
-    cond do
-      fun.() ->
-        true
-
-      attempts == 0 ->
-        false
-
-      true ->
-        Process.sleep(10)
-        eventually(fun, attempts - 1)
-    end
   end
 
   defp assert_live_view_connected(session) do
