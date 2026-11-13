@@ -95,7 +95,7 @@ defmodule Fluffy.BrowserContextConfigurationTest do
   end
 
   test "creates the context in the browser: given, else in the test's" do
-    # Other launch options, so another browser on the test's driver.
+    # Other launch options, so another worker: its own driver and browser.
     given = BrowserPool.browser(launch_options: [timeout: 60_000])
     session = start_session(:playwright, base_url: Server.base_url(), browser: given)
     assert Fluffy.Session.context(session).browser_context.guid in browser_context_guids(given)
