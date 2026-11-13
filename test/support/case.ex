@@ -8,6 +8,8 @@ defmodule Fluffy.TestCase do
       import Fluffy.TestCase,
         only: [
           assert_action_error: 4,
+          assert_eventually: 1,
+          assert_eventually: 2,
           browser_context_guids: 0,
           freeze_page: 1,
           monitor_running: 1,
@@ -44,6 +46,17 @@ defmodule Fluffy.TestCase do
     monitor = Process.monitor(pid)
     :sys.get_state(pid)
     monitor
+  end
+
+  # Polls `fun` every 10ms until it returns truthy, asserting on the last attempt.
+  def assert_eventually(fun, attempts \\ 100)
+  def assert_eventually(fun, 0), do: ExUnit.Assertions.assert(fun.())
+
+  def assert_eventually(fun, attempts) do
+    if !fun.() do
+      Process.sleep(10)
+      assert_eventually(fun, attempts - 1)
+    end
   end
 
   # Every context open across the pool: a session's context may be in any of its browsers.

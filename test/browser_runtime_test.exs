@@ -148,7 +148,7 @@ defmodule Fluffy.BrowserRuntimeTest do
     {:os_pid, os_pid} = Port.info(port, :os_pid)
     {_, 0} = System.cmd("kill", ["-9", to_string(os_pid)])
 
-    assert_eventually(fn -> BrowserRuntime.status(runtime).browser == nil end)
+    assert_eventually(fn -> BrowserRuntime.status(runtime).browser == nil end, 500)
     browser = BrowserRuntime.browser(runtime)
     refute PlaywrightEx.Browser.is_connected(lost)
     assert PlaywrightEx.Browser.is_connected(browser)
@@ -201,7 +201,7 @@ defmodule Fluffy.BrowserRuntimeTest do
       {_owner, _second} = start_owner(runtime_name)
       Process.unlink(owner)
       Process.exit(owner, :kill)
-      assert_eventually(fn -> loads(runtime_name) == [0, 1] end)
+      assert_eventually(fn -> loads(runtime_name) == [0, 1] end, 500)
 
       assert {_owner, ^first} = start_owner(runtime_name)
       assert BrowserRuntime.status(runtime_name).launch_count == 2
@@ -292,7 +292,7 @@ defmodule Fluffy.BrowserRuntimeTest do
 
       PlaywrightEx.Browser.close(first)
 
-      assert_eventually(fn -> Enum.map(BrowserRuntime.status(runtime).slots, & &1.browser) == [nil, second] end)
+      assert_eventually(fn -> Enum.map(BrowserRuntime.status(runtime).slots, & &1.browser) == [nil, second] end, 500)
       assert PlaywrightEx.Browser.is_connected(second)
     end
 
@@ -325,7 +325,7 @@ defmodule Fluffy.BrowserRuntimeTest do
 
       Process.exit(owner, :kill)
 
-      assert_eventually(fn -> not assigned?(session.runtime) end)
+      assert_eventually(fn -> not assigned?(session.runtime) end, 500)
     end
   end
 
@@ -382,16 +382,6 @@ defmodule Fluffy.BrowserRuntimeTest do
 
     assert config[:timeout] == 4_000
     assert config[:launch_options] == [timeout: 10_000, channel: "chrome"]
-  end
-
-  defp assert_eventually(fun, attempts \\ 500)
-  defp assert_eventually(fun, 0), do: assert(fun.())
-
-  defp assert_eventually(fun, attempts) do
-    if !fun.() do
-      Process.sleep(10)
-      assert_eventually(fun, attempts - 1)
-    end
   end
 
   defp start_runtime(test_process), do: start_runtime(test_process, counting_launch())

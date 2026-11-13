@@ -123,14 +123,4 @@ defmodule Fluffy.PlaywrightEventCaptureTest do
   end
 
   defp response_listeners(page), do: EventEmitter.listener_count(page, "response")
-
-  defp assert_eventually(fun, attempts \\ 100)
-  defp assert_eventually(fun, 0), do: assert(fun.())
-
-  defp assert_eventually(fun, attempts) do
-    if !fun.() do
-      Process.sleep(10)
-      assert_eventually(fun, attempts - 1)
-    end
-  end
 end

@@ -213,14 +213,4 @@ defmodule Fluffy.Conformance.SessionRuntimeTest do
       refute browser_context.guid in browser_context_guids()
     end
   end
-
-  defp assert_eventually(fun, attempts \\ 100)
-  defp assert_eventually(fun, 0), do: assert(fun.())
-
-  defp assert_eventually(fun, attempts) do
-    if !fun.() do
-      Process.sleep(10)
-      assert_eventually(fun, attempts - 1)
-    end
-  end
 end
