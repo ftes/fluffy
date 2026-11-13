@@ -1,11 +1,12 @@
 defmodule Fluffy.Timeouts do
   @moduledoc false
 
-  # The defaults of an operation without `timeout:`, Playwright Test's on every driver, from
-  # Fluffy's config (`Fluffy.Options.config!/1`): `action_timeout` and `navigation_timeout`
-  # (none by default, so the test's timeout bounds them), which the Playwright backend sets on
-  # each context, and `expect_timeout` (5 s by default). A configured `expect_timeout: 0`
-  # checks once, as an operation's own `timeout: 0`.
+  # The defaults of an operation without `timeout:`, Playwright Test's on every driver
+  # (`Fluffy.Options.config!/1`): `config :fluffy, action_timeout:, expect_timeout:` if set, else
+  # PlaywrightEx.Test's `action_timeout` and `expect: [timeout:]`, and PlaywrightEx.Test's
+  # `navigation_timeout`, which only browsers wait for. The Playwright backend sets the action
+  # and navigation timeouts on each context. Fluffy's `expect_timeout: 0` checks once, as an
+  # operation's own `timeout: 0`; PlaywrightEx's `0` means no limit, `:infinity` here.
 
   @doc "The action timeout: actions, locator reads, `wait_for_function` and event waits."
   @spec action() :: timeout()

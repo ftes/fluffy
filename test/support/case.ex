@@ -24,8 +24,7 @@ defmodule Fluffy.Support.Case do
 
   # A plain function, compiled before the tests, so `@tag skip:` can call it at compile time.
   # Read at call time, as the config can differ between runs (FLUFFY_BROWSER).
-  def playwright_engine?(engine),
-    do: engine == Keyword.get(Application.get_env(:playwright_ex, :test, []), :browser_name, :chromium)
+  def playwright_engine?(engine), do: engine == PlaywrightEx.Test.config().browser_name
 
   # The application's sandbox owners, as a generated DataCase starts them: Fluffy only
   # passes the test's sandbox to browser sessions. `setup {Fluffy.Support.Case, :start_sandbox}`.
@@ -41,12 +40,12 @@ defmodule Fluffy.Support.Case do
   end
 
   # Puts `options` in `config :fluffy`, such as the default timeouts, until the module
-  # (`setup_all`) or test (`setup`) ends. The config is global, so only in an `async: false`
-  # module. A Playwright session sets its context's timeouts when it starts.
+  # (`setup_all`) or test (`setup`) ends; `nil` unsets a key. The config is global, so only in an
+  # `async: false` module. A Playwright session sets its context's timeouts when it starts.
   def put_fluffy_config(options) do
     for {key, value} <- options do
       original = Application.fetch_env(:fluffy, key)
-      Application.put_env(:fluffy, key, value)
+      if value == nil, do: Application.delete_env(:fluffy, key), else: Application.put_env(:fluffy, key, value)
 
       ExUnit.Callbacks.on_exit(fn ->
         case original do
@@ -61,7 +60,7 @@ defmodule Fluffy.Support.Case do
 
   # Merges `options` into `config :playwright_ex, key` (`:test` or `:expect`), as
   # `put_fluffy_config/1`. PlaywrightEx.Test reads `:test` when a test registers, in its
-  # `setup`: set the context timeouts in `setup_all`.
+  # `setup`, and Fluffy when a session starts: set the context timeouts in `setup_all`.
   def put_playwright_ex_config(key, options) when key in [:test, :expect] do
     original = Application.get_env(:playwright_ex, key)
     Application.put_env(:playwright_ex, key, Keyword.merge(original || [], options))

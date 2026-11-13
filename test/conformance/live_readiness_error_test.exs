@@ -33,8 +33,8 @@ defmodule Fluffy.Conformance.LiveReadinessErrorTest do
 end
 
 defmodule Fluffy.Conformance.LiveReadinessTimeoutTest do
-  # The readiness waits after a navigation share its timeout, `navigation_timeout`, which is
-  # global config.
+  # The readiness waits after a navigation share its timeout, PlaywrightEx's `navigation_timeout`,
+  # which is global config.
   use Fluffy.Support.Case, async: false
 
   import Fluffy
@@ -43,7 +43,7 @@ defmodule Fluffy.Conformance.LiveReadinessTimeoutTest do
   alias Fluffy.Support.Server
 
   setup_all do
-    put_fluffy_config(navigation_timeout: 1_000)
+    put_playwright_ex_config(:test, navigation_timeout: 1_000)
   end
 
   @tag driver: :playwright

@@ -85,8 +85,8 @@ defmodule Fluffy.Locator.Static do
     end)
   end
 
-  # Playwright's test id engine: any of the comma-separated names of `test_id_attribute`,
-  # Fluffy's config, which the Playwright driver's locators get too.
+  # Playwright's test id engine: any of the comma-separated names of the resolved
+  # `test_id_attribute` (`Fluffy.Options.config!/1`), which the Playwright driver's locators get too.
   defp apply_operation({:test_id, test_id}, scopes) do
     names = test_id_attribute_names()
 

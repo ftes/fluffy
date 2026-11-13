@@ -30,9 +30,7 @@ defmodule Fluffy.Backend.Playwright do
 
     # Merged over the config's, which `extra_http_headers:` would replace as a whole.
     headers =
-      :playwright_ex
-      |> Application.get_env(:test, [])
-      |> Access.get(:context_options, [])
+      PlaywrightEx.Test.config().context_options
       |> Access.get(:extra_http_headers, %{})
       |> Enum.concat(Keyword.get(browser_context_options, :extra_http_headers, %{}))
       |> Enum.concat(Keyword.get(options, :headers, []))
@@ -65,8 +63,8 @@ defmodule Fluffy.Backend.Playwright do
         end)
 
       SessionRuntime.run(runtime, fn ->
-        # Fluffy's action and navigation timeouts, over PlaywrightEx.Test's: native calls in
-        # `unwrap` default to them too, as Fluffy's own calls do.
+        # The resolved action and navigation timeouts (`Fluffy.Timeouts`), over PlaywrightEx.Test's
+        # own: native calls in `unwrap` default to them too, as Fluffy's own calls do.
         :ok = BrowserContext.set_default_timeout(browser_context, Timeouts.action())
         :ok = BrowserContext.set_default_navigation_timeout(browser_context, Timeouts.navigation())
         _disposable = BrowserContext.add_init_script!(browser_context, Document.init_script())

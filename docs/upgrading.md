@@ -56,18 +56,21 @@ Timeouts follow Playwright Test, and Elixir for `timeout:`: `0` checks once and 
 means no limit; see [Timeouts](installation.md#timeouts).
 
 - `start_session(timeout:)`, `config :fluffy, timeout:` and `config :fluffy, :playwright`
-  are removed; the old config raises at startup. Set Playwright Test's defaults instead:
+  are removed; the old config raises at startup. Set Playwright Test's defaults instead, in
+  PlaywrightEx's config for the whole suite:
 
   ```diff
   -config :fluffy, timeout: 2_000, playwright: [timeout: 15_000]
-  +config :fluffy, action_timeout: 15_000, navigation_timeout: 15_000, expect_timeout: 5_000
+  +config :playwright_ex, :test, action_timeout: 15_000, navigation_timeout: 15_000
+  +config :playwright_ex, :expect, timeout: 5_000
   ```
 
-  Without them, actions and navigations have no timeout, so the test's timeout bounds them:
-  with `Fluffy.Case`, a LiveView action on a missing element fails with Fluffy's error at the
-  test timeout, and without it with ExUnit's timeout. Assertions default to 5 seconds on
-  every driver; Phoenix used to wait 1 second. PlaywrightEx's own timeout config doesn't
-  affect Fluffy sessions.
+  `config :fluffy, action_timeout:, expect_timeout:` override them for Fluffy sessions, as for
+  a suite without browser tests; the navigation timeout is PlaywrightEx's only
+  ([Timeouts](installation.md#timeouts)). Without them, actions and navigations have no
+  timeout, so the test's timeout bounds them: with `Fluffy.Case`, a LiveView action on a
+  missing element fails with Fluffy's error at the test timeout, and without it with ExUnit's
+  timeout. Assertions default to 5 seconds on every driver; Phoenix used to wait 1 second.
 - Playwright actions, waits, `reload`, `go_back` and `go_forward` raise `ArgumentError`
   for `timeout: 0` instead of timing out after 1ms; pass a positive timeout. Assertions
   and Phoenix actions still check once.
@@ -122,7 +125,8 @@ means no limit; see [Timeouts](installation.md#timeouts).
 - `Fluffy.step/3` is `Fluffy.Playwright.step/4`, `PlaywrightEx.Test.step/3` in a pipeline.
   It raises `Fluffy.CapabilityError` on Phoenix, where it used to just run the callback.
 - `by_test_id/2` takes no `attribute:`, as Playwright's `getByTestId`: every driver reads
-  `config :fluffy, test_id_attribute:` (`data-testid` by default). For another
+  `config :playwright_ex, :test, test_id_attribute:` (`data-testid` by default), or
+  `config :fluffy, test_id_attribute:` over it. For another
   attribute in one place, replace `by_test_id("hedwig", attribute: "data-owl")` with
   `by_css("[data-owl=\"hedwig\"]")`.
 - `filter/2` takes no `exact:`, as in Playwright. Match a whole text with a regex, such as

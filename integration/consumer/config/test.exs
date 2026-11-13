@@ -3,10 +3,9 @@ import Config
 config :fluffy,
   ecto_repos: [],
   endpoint: FluffyConsumerWeb.Endpoint,
-  action_timeout: 15_000,
-  navigation_timeout: 15_000
+  action_timeout: 15_000
 
-config :playwright_ex, :test, launch_options: [headless: true]
+config :playwright_ex, :test, launch_options: [headless: true], navigation_timeout: 15_000
 
 # We don't run a server during test. If one is required,
 # you can enable the server option below.

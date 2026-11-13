@@ -60,24 +60,38 @@ for Fluffy's automatic LiveView connection wait.
 
 ## Timeouts
 
-Fluffy's config sets the defaults on every driver, with Playwright Test's names and defaults:
+The defaults are Playwright Test's, set in PlaywrightEx's config for the whole suite, Fluffy
+sessions and raw PlaywrightEx tests alike:
 
 ```elixir
-config :fluffy,
+config :playwright_ex, :test,
   # Actions, locator waits and event waits; `:infinity` (none) by default.
   action_timeout: 15_000,
   # `visit`, `reload`, `go_back`, `go_forward` and `wait_for_load_state`; `:infinity` by default.
   navigation_timeout: 15_000,
-  # Assertions; 5 seconds by default.
-  expect_timeout: 5_000
+  # `by_test_id`'s attribute; `data-testid` by default.
+  test_id_attribute: "data-owl"
+
+# Assertions; 5 seconds by default.
+config :playwright_ex, :expect, timeout: 5_000
 ```
 
-They are Elixir timeouts: a positive integer or `:infinity`, and for `expect_timeout` also `0`,
-which checks once, as a call's `timeout: 0`. `action_timeout` and `navigation_timeout` reject
-`0`, as Playwright actions and navigations cannot check once. A Playwright session sets them
-on its browser context, so native calls in an `unwrap` callback get them too.
-PlaywrightEx's own `action_timeout` and `navigation_timeout` apply only to raw PlaywrightEx
-tests and don't affect Fluffy sessions.
+Fluffy's three keys override them for Fluffy sessions on every driver; a suite without browser
+tests can set just those:
+
+| Setting | Fluffy sessions | Raw PlaywrightEx tests |
+| --- | --- | --- |
+| Actions | `config :fluffy, action_timeout:`, else PlaywrightEx's `action_timeout` | PlaywrightEx's |
+| Assertions | `config :fluffy, expect_timeout:`, else PlaywrightEx's `:expect` `timeout` | PlaywrightEx's |
+| Test id | `config :fluffy, test_id_attribute:`, else PlaywrightEx's `test_id_attribute` | PlaywrightEx's |
+| Navigations | PlaywrightEx's `navigation_timeout` | PlaywrightEx's |
+
+A forgotten Fluffy key keeps overriding a newer PlaywrightEx value. A value means what its
+source says: PlaywrightEx's `0` is no limit, as in Playwright. Fluffy's are Elixir timeouts, a
+positive integer or `:infinity`, and for `expect_timeout` also `0`, which checks once, as a
+call's `timeout: 0`; `action_timeout` rejects `0`, as Playwright actions cannot check once. A
+Playwright session sets the action and navigation timeouts on its browser context, so native
+calls in an `unwrap` callback get them too.
 
 With no action or navigation timeout, the test's timeout bounds them (ExUnit's default
 is 60 seconds). On Playwright, PlaywrightEx.Test closes the test's contexts just before,
@@ -123,7 +137,7 @@ On Linux CI runners, add `--with-deps` to install the browser's system packages 
 [GitHub Actions](`e:playwright_ex:debugging-and-ci.md#github-actions`) for a workflow.
 
 Configure the backend in `config/test.exs`. The browser and its driver are
-`PlaywrightEx.Test`'s; the [timeouts](#timeouts) are Fluffy's:
+`PlaywrightEx.Test`'s, as are the [timeouts](#timeouts) unless Fluffy's config overrides them:
 
 ```elixir
 config :playwright_ex, :test,

@@ -212,9 +212,10 @@ defmodule Fluffy.Locator do
   @doc """
   Matches elements whose test id equals `test_id`, as Playwright's `getByTestId`.
 
-  The attribute is `config :fluffy, test_id_attribute: "data-owl"`, Playwright Test's
-  `testIdAttribute`, on every driver; `data-testid` by default. For another attribute in one
-  place, use `by_css("[data-owl=\\"hedwig\\"]")`.
+  The attribute is Playwright Test's `testIdAttribute`, on every driver:
+  `config :fluffy, test_id_attribute: "data-owl"` if set, else PlaywrightEx's
+  `test_id_attribute` (`data-testid` by default; [Timeouts](installation.md#timeouts) has the
+  precedence). For another attribute in one place, use `by_css("[data-owl=\\"hedwig\\"]")`.
 
   Pass a locator or frame scope first to match inside it.
 
@@ -235,7 +236,8 @@ defmodule Fluffy.Locator do
   def by_test_id(test_id, options) when is_binary(test_id) and is_list(options) do
     raise ArgumentError,
           "by_test_id/2 takes no options, as Playwright's getByTestId: set the attribute with " <>
-            ~s{`config :fluffy, test_id_attribute: ...`, or use by_css("[data-owl=\\"hedwig\\"]"), } <>
+            ~s{`config :playwright_ex, :test, test_id_attribute: ...` (or `config :fluffy`), } <>
+            ~s{or use by_css("[data-owl=\\"hedwig\\"]"), } <>
             "got: #{inspect(options)}"
   end
 

@@ -8,8 +8,8 @@ defmodule Fluffy.Options do
       type: :timeout,
       doc:
         "Maximum time in milliseconds to wait for the operation. As in Playwright Test, defaults to " <>
-          "`config :fluffy, action_timeout:` (navigations: `navigation_timeout`), no timeout unless set, " <>
-          "and for assertions to `expect_timeout`, 5 seconds ([Timeouts](installation.md#timeouts)). " <>
+          "the action timeout (navigations: the navigation timeout), no timeout unless set, " <>
+          "and for assertions to the expect timeout, 5 seconds ([Timeouts](installation.md#timeouts)). " <>
           "`0` checks once, unlike Playwright, where `0` disables the timeout. Playwright actions and waits " <>
           "reject `0` with an `ArgumentError`, as they cannot check once; Playwright assertions accept it. " <>
           "`:infinity` disables the timeout: Playwright waits with no timeout, LiveView retries until the test " <>
@@ -353,17 +353,13 @@ defmodule Fluffy.Options do
                     ]
                   )
 
-  # Playwright Test's `actionTimeout`, `navigationTimeout`, `expect.timeout` and `testIdAttribute`,
-  # Fluffy's for its sessions on every driver.
+  # Playwright Test's `actionTimeout`, `expect.timeout` and `testIdAttribute` for Fluffy's
+  # sessions, over PlaywrightEx's (`config!/1`). No defaults: unset, PlaywrightEx's apply.
   @config_schema NimbleOptions.new!(
-                   action_timeout: [type: {:custom, __MODULE__, :default_timeout, []}, default: :infinity],
-                   navigation_timeout: [
-                     type: {:custom, __MODULE__, :default_timeout, []},
-                     default: :infinity
-                   ],
+                   action_timeout: [type: {:custom, __MODULE__, :default_timeout, []}],
                    # `0`: assertions check once, as with a call's `timeout: 0`.
-                   expect_timeout: [type: :timeout, default: 5_000],
-                   test_id_attribute: [type: {:custom, __MODULE__, :test_id_attribute, []}, default: "data-testid"]
+                   expect_timeout: [type: :timeout],
+                   test_id_attribute: [type: {:custom, __MODULE__, :test_id_attribute, []}]
                  )
 
   @config_keys Keyword.keys(@config_schema.schema)
@@ -495,13 +491,29 @@ defmodule Fluffy.Options do
   end
 
   @doc false
-  # One of Fluffy's settings of `@config_schema`, validated, its default if unset.
+  # The setting `key`: Fluffy's of `@config_schema` if set, else PlaywrightEx's resolved one
+  # (`PlaywrightEx.Test.config/0`, its defaults filled in), where `0` means no limit:
+  # `:infinity` here. `navigation_timeout` is PlaywrightEx's only.
   @spec config!(atom()) :: term()
-  def config!(key) when key in @config_keys, do: Keyword.fetch!(config!(), key)
+  def config!(key) when key in @config_keys do
+    case Keyword.fetch(config!(), key) do
+      {:ok, value} -> value
+      :error -> playwright_ex_config(key)
+    end
+  end
+
+  def config!(:navigation_timeout), do: playwright_ex_config(:navigation_timeout)
+
+  defp playwright_ex_config(:expect_timeout), do: no_limit(PlaywrightEx.Test.config().expect.timeout)
+  defp playwright_ex_config(:test_id_attribute), do: PlaywrightEx.Test.config().test_id_attribute
+  defp playwright_ex_config(key), do: no_limit(Map.fetch!(PlaywrightEx.Test.config(), key))
+
+  defp no_limit(0), do: :infinity
+  defp no_limit(timeout), do: timeout
 
   @doc false
-  # Fluffy's settings of `@config_schema`, validated, with their defaults. Fluffy's old timeout
-  # config raises: kept, it would silently stop limiting anything.
+  # Fluffy's settings of `@config_schema` that are set, validated. Fluffy's removed config
+  # raises: kept, it would silently stop limiting anything.
   @spec config!() :: keyword()
   def config! do
     reject_removed_config!()
@@ -517,15 +529,18 @@ defmodule Fluffy.Options do
   end
 
   @removed_config [
-    timeout: "`config :fluffy, expect_timeout: ...` for assertions and `action_timeout: ...` for actions",
+    timeout: "set `config :fluffy, expect_timeout: ...` for assertions and `action_timeout: ...` for actions",
     playwright:
-      "`config :fluffy, action_timeout: ..., navigation_timeout: ..., expect_timeout: ...` " <>
-        "instead of `playwright: [timeout: ...]`"
+      "set `config :fluffy, action_timeout: ..., expect_timeout: ...` and " <>
+        "`config :playwright_ex, :test, navigation_timeout: ...` instead of `playwright: [timeout: ...]`",
+    navigation_timeout:
+      "set `config :playwright_ex, :test, navigation_timeout: ...`: only browser navigations wait, " <>
+        "Phoenix navigations are synchronous"
   ]
 
   defp reject_removed_config! do
     for {key, hint} <- @removed_config, Application.get_env(:fluffy, key) not in [nil, false] do
-      raise ArgumentError, "config :fluffy, #{key}: is removed: as in Playwright Test, set #{hint}"
+      raise ArgumentError, "config :fluffy, #{key}: is removed: as in Playwright Test, #{hint}"
     end
 
     :ok
