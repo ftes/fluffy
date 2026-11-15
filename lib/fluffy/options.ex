@@ -564,10 +564,14 @@ defmodule Fluffy.Options do
   defp module_key?({key, _value}), do: match?("Elixir." <> _, Atom.to_string(key))
 
   @removed_config [
-    timeout: "set `config :fluffy, expect_timeout: ...` for assertions and `action_timeout: ...` for actions",
+    timeout:
+      "set `config :playwright_ex, :expect, timeout: ...` for assertions and " <>
+        "`config :playwright_ex, :test, action_timeout: ...` for actions; " <>
+        "`config :fluffy, expect_timeout: ..., action_timeout: ...` override them for Fluffy sessions",
     playwright:
-      "set `config :fluffy, action_timeout: ..., expect_timeout: ...` and " <>
-        "`config :playwright_ex, :test, navigation_timeout: ...` instead of `playwright: [timeout: ...]`",
+      "set `config :playwright_ex, :test, action_timeout: ..., navigation_timeout: ...` instead of " <>
+        "`playwright: [timeout: ...]`; `config :fluffy, action_timeout: ...` overrides the action timeout " <>
+        "for Fluffy sessions",
     navigation_timeout:
       "set `config :playwright_ex, :test, navigation_timeout: ...`: only browser navigations wait, " <>
         "Phoenix navigations are synchronous"

@@ -44,7 +44,7 @@ defmodule Fluffy.PlaywrightConfigurationTest do
     put_env(timeout: 2_000)
 
     assert_raise ArgumentError,
-                 ~r/config :fluffy, timeout: is removed.*expect_timeout.*action_timeout/,
+                 ~r/config :fluffy, timeout: is removed.*`config :playwright_ex, :expect, timeout: \.\.\.`.*:test, action_timeout/,
                  &Options.config!/0
 
     Application.delete_env(:fluffy, :timeout)
@@ -52,7 +52,7 @@ defmodule Fluffy.PlaywrightConfigurationTest do
     put_env(playwright: [timeout: 15_000])
 
     assert_raise ArgumentError,
-                 ~r/config :fluffy, playwright: is removed.*action_timeout.*expect_timeout.*:playwright_ex, :test, navigation_timeout/,
+                 ~r/config :fluffy, playwright: is removed.*`config :playwright_ex, :test, action_timeout: \.\.\., navigation_timeout/,
                  &Options.config!/0
 
     put_env(playwright: false)
