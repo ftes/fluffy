@@ -452,23 +452,37 @@ defmodule Fluffy.HTML.Aria do
     natively_disabled?(aria, node) or explicit_aria_disabled?(aria, node)
   end
 
-  # roleUtils.ts isNativelyDisabled. Takes the model or just its index.
-  def natively_disabled?(aria_or_index, %{tag: tag} = node) when tag in @native_form_controls do
-    node = fetch(aria_or_index, node.id)
-
-    attribute?(node, "disabled") or belongs_to_disabled_opt_group?(aria_or_index, node) or
-      belongs_to_disabled_field_set?(aria_or_index, node)
-  end
-
-  def natively_disabled?(_aria_or_index, _node), do: false
+  # roleUtils.ts isNativelyDisabled. Takes the model or just its index, which holds it for
+  # each node (`DocumentIndex.new/1`, by `resolve_natively_disabled?/2`).
+  def natively_disabled?(aria_or_index, node), do: MapSet.member?(index(aria_or_index).natively_disabled_ids, node.id)
 
   # HTML's disabled form control, which form submission honors: any disabled
   # ancestor fieldset counts unless the control is in its first legend, where
-  # isNativelyDisabled checks only the closest one.
-  def form_control_disabled?(aria_or_index, node) do
-    node = fetch(aria_or_index, node.id)
-    attribute?(node, "disabled") or in_disabled_field_set?(aria_or_index, parent(aria_or_index, node), node)
+  # isNativelyDisabled checks only the closest one. Held by the index, as above.
+  def form_control_disabled?(aria_or_index, node),
+    do: MapSet.member?(index(aria_or_index).form_control_disabled_ids, node.id)
+
+  @doc false
+  def native_form_controls, do: @native_form_controls
+
+  @doc false
+  def resolve_natively_disabled?(index, %{tag: tag} = node) when tag in @native_form_controls do
+    node = fetch(index, node.id)
+
+    attribute?(node, "disabled") or belongs_to_disabled_opt_group?(index, node) or
+      belongs_to_disabled_field_set?(index, node)
   end
+
+  def resolve_natively_disabled?(_index, _node), do: false
+
+  @doc false
+  def resolve_form_control_disabled?(index, node) do
+    node = fetch(index, node.id)
+    attribute?(node, "disabled") or in_disabled_field_set?(index, parent(index, node), node)
+  end
+
+  defp index(%__MODULE__{index: index}), do: index
+  defp index(%DocumentIndex{} = index), do: index
 
   defp in_disabled_field_set?(_aria_or_index, nil, _node), do: false
 

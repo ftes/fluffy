@@ -11,7 +11,9 @@ defmodule Fluffy.HTML.DocumentIndex do
     :nodes_by_id,
     :nodes_by_path,
     :nodes_by_tag,
-    :form_owner_ids
+    :form_owner_ids,
+    :natively_disabled_ids,
+    :form_control_disabled_ids
   ]
   defstruct [
     :document,
@@ -19,7 +21,9 @@ defmodule Fluffy.HTML.DocumentIndex do
     :nodes_by_id,
     :nodes_by_path,
     :nodes_by_tag,
-    :form_owner_ids
+    :form_owner_ids,
+    :natively_disabled_ids,
+    :form_control_disabled_ids
   ]
 
   @type path :: [{String.t(), pos_integer()}]
@@ -44,7 +48,9 @@ defmodule Fluffy.HTML.DocumentIndex do
           nodes_by_id: %{non_neg_integer() => entry()},
           nodes_by_path: %{path() => entry()},
           nodes_by_tag: %{String.t() => [entry()]},
-          form_owner_ids: %{non_neg_integer() => non_neg_integer()}
+          form_owner_ids: %{non_neg_integer() => non_neg_integer()},
+          natively_disabled_ids: MapSet.t(non_neg_integer()),
+          form_control_disabled_ids: MapSet.t(non_neg_integer())
         }
 
   @spec new(LazyHTML.t()) :: t()
@@ -56,15 +62,28 @@ defmodule Fluffy.HTML.DocumentIndex do
     nodes_by_path = Map.new(all_entries, &{&1.path, &1})
     elements_by_html_id = elements_by_html_id(entries)
 
-    %__MODULE__{
+    index = %__MODULE__{
       document: document,
       entries: entries,
       nodes_by_id: nodes_by_id,
       nodes_by_path: nodes_by_path,
       nodes_by_tag: Enum.group_by(entries, & &1.tag),
-      form_owner_ids: form_owner_ids(entries, elements_by_html_id)
+      form_owner_ids: form_owner_ids(entries, elements_by_html_id),
+      natively_disabled_ids: MapSet.new(),
+      form_control_disabled_ids: MapSet.new()
+    }
+
+    # Each walks the control's ancestors, so once per index, not per target.
+    controls = Enum.filter(all_entries, &(&1.tag in Aria.native_form_controls()))
+
+    %{
+      index
+      | natively_disabled_ids: ids(controls, &Aria.resolve_natively_disabled?(index, &1)),
+        form_control_disabled_ids: ids(controls, &Aria.resolve_form_control_disabled?(index, &1))
     }
   end
+
+  defp ids(entries, fun), do: for(entry <- entries, fun.(entry), into: MapSet.new(), do: entry.id)
 
   @spec path(LazyHTML.t()) :: path()
   def path(%LazyHTML{} = element), do: path(element, [])
