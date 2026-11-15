@@ -232,7 +232,7 @@ defmodule Fluffy.ClientDOM do
   end
 
   def fill(%__MODULE__{} = client_dom, %Locator{} = locator, value, driver, action \\ :fill) when is_binary(value) do
-    target = target!(client_dom, locator)
+    target = control!(client_dom, locator)
     ensure_target_enabled!(client_dom, target, action, locator)
     ensure_target_editable!(client_dom, target, action, locator)
 
@@ -267,7 +267,7 @@ defmodule Fluffy.ClientDOM do
   end
 
   def set_input_files(%__MODULE__{} = client_dom, %Locator{} = locator, selected_files) when is_list(selected_files) do
-    target = target!(client_dom, locator)
+    target = control!(client_dom, locator)
 
     Actionability.ensure_file_input_files!(
       target.element,
@@ -283,17 +283,17 @@ defmodule Fluffy.ClientDOM do
   end
 
   def live_managed_form?(%__MODULE__{} = client_dom, %Locator{} = locator) do
-    target = target!(client_dom, locator)
+    target = control!(client_dom, locator)
     Fluffy.Form.live_managed_form?(index(client_dom), target)
   end
 
   def live_change_form?(%__MODULE__{} = client_dom, %Locator{} = locator) do
-    target = target!(client_dom, locator)
+    target = control!(client_dom, locator)
     Fluffy.Form.live_change_form?(index(client_dom), target)
   end
 
   def set_checked(%__MODULE__{} = client_dom, %Locator{} = locator, desired) when is_boolean(desired) do
-    target = target!(client_dom, locator)
+    target = control!(client_dom, locator)
     Actionability.ensure_checkable!(target.element, checked_action(desired), locator)
     current = checked_target?(client_dom, target)
 
@@ -318,7 +318,7 @@ defmodule Fluffy.ClientDOM do
   end
 
   def select_option(%__MODULE__{} = client_dom, %Locator{} = locator, requested) do
-    target = target!(client_dom, locator)
+    target = control!(client_dom, locator)
     ensure_target_enabled!(client_dom, target, :select_option, locator)
     Actionability.ensure_selectable!(target.element, :select_option, locator)
 
@@ -355,7 +355,7 @@ defmodule Fluffy.ClientDOM do
 
   # Playwright's checked state, which raises for an element without one.
   def checked?(%__MODULE__{} = client_dom, %Locator{} = locator) do
-    target = follow_label(client_dom, target!(client_dom, locator))
+    target = control!(client_dom, locator)
 
     case Aria.checked(aria(client_dom), target, checked_target?(client_dom, target)) do
       :error -> raise Fluffy.ActionabilityError, action: :read_checked, reason: :not_checkbox_or_radio, locator: locator
@@ -364,7 +364,7 @@ defmodule Fluffy.ClientDOM do
   end
 
   def value(%__MODULE__{} = client_dom, %Locator{} = locator) do
-    target = target!(client_dom, locator)
+    target = control!(client_dom, locator)
 
     if target.tag == "select" do
       client_dom |> selected_values_for_target(target) |> List.first() || ""
@@ -377,7 +377,7 @@ defmodule Fluffy.ClientDOM do
 
   # As in Playwright, only a multiple select has values, enabled or not.
   def selected_values(%__MODULE__{} = client_dom, %Locator{} = locator) do
-    target = target!(client_dom, locator)
+    target = control!(client_dom, locator)
 
     if target.tag != "select" or not has_attribute?(target.attributes, "multiple") do
       raise Fluffy.ActionabilityError, action: :read_value, reason: :not_multiple_select, locator: locator
@@ -399,7 +399,7 @@ defmodule Fluffy.ClientDOM do
   # state from the closest button, so text inside a disabled button is disabled.
   # Unlike Playwright's retarget(..., "follow-label"), a label doesn't take its
   # control's enabled state, as a click on it doesn't activate the control (#134);
-  # its checked and editable states follow the label (`follow_label/2`).
+  # the other actions and states follow the label (`control!/2`).
   defp state_target(_client_dom, %Target{tag: tag} = target) when tag in ["input", "textarea", "select"], do: target
 
   defp state_target(client_dom, target) do
@@ -412,8 +412,12 @@ defmodule Fluffy.ClientDOM do
     end
   end
 
-  # The rest of retarget(..., "follow-label"), for the checked and editable states: an
-  # element in a label takes its control's.
+  # Playwright's retarget(..., "follow-label"), which fill, clear, select_option,
+  # set_input_files, set_checked, the value and the checked and editable states use:
+  # an element in a label acts as its control.
+  @doc false
+  def control!(%__MODULE__{} = client_dom, locator), do: follow_label(client_dom, target!(client_dom, locator))
+
   @no_follow_label_tags ~w(a input textarea button select option optgroup)
 
   defp follow_label(client_dom, target) do
@@ -435,7 +439,7 @@ defmodule Fluffy.ClientDOM do
   # Playwright's editable state, which raises for an element without a readonly state.
   @doc false
   def editable?(%__MODULE__{} = client_dom, %Locator{} = locator) do
-    target = follow_label(client_dom, target!(client_dom, locator))
+    target = control!(client_dom, locator)
 
     case Aria.readonly(aria(client_dom), target) do
       :error -> raise Fluffy.ActionabilityError, action: :read_editable, reason: :no_readonly_state, locator: locator

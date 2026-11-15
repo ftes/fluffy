@@ -1094,7 +1094,7 @@ defmodule Fluffy.Driver.Live do
         detail: "LiveView-managed file uploads require a phx-change form"
     end
 
-    target = ClientDOM.target!(state.client_dom, locator)
+    target = ClientDOM.control!(state.client_dom, locator)
 
     with {:ok, event_context} <- owning_view_context(session, target) do
       if is_nil(event_context.root_id) do

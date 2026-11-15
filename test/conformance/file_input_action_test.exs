@@ -87,6 +87,20 @@ defmodule Fluffy.Conformance.FileInputActionTest do
                  "\r\n"
     end
 
+    test "set_input_files follows a label to its file input with #{driver}" do
+      fixture = upload_fixture()
+
+      unquote(driver)
+      |> start_test_session()
+      |> visit(HTTPFixtures.path(fixture, "/upload/start"))
+      |> set_input_files(by_text("Attachment"), fixture_path())
+      |> click(by_role(:button, name: "Save"))
+      |> expect("Uploaded" |> by_text() |> to_be_visible())
+
+      [_source, submission] = HTTPFixtures.requests(fixture)
+      assert submission.body =~ ~s(name="attachment"; filename="fluffy-upload.txt")
+    end
+
     test "infers an in-memory payload content type from its filename with #{driver}" do
       fixture = upload_fixture()
       payload = %FilePayload{name: "generated.csv", bytes: "id\n42\n"}
