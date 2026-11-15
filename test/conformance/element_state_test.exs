@@ -12,17 +12,17 @@ defmodule Fluffy.Conformance.ElementStateTest do
     @tag driver: driver
     test "disabled follows native, optgroup, fieldset and ARIA state with #{driver}" do
       html = """
-      <button data-testid="plain">Hi</button>
-      <button data-testid="native" disabled="yes">Bye</button>
-      <button data-testid="aria" aria-disabled="TRUE">Hello</button>
-      <button data-testid="aria-false" aria-disabled="false">Oh</button>
-      <div data-testid="div" disabled>Div</div>
-      <div data-testid="role-button" role="button" aria-disabled="true">Role</div>
+      <button data-testid="plain">Lumos</button>
+      <button data-testid="native" disabled="yes">Nox</button>
+      <button data-testid="aria" aria-disabled="TRUE">Alohomora</button>
+      <button data-testid="aria-false" aria-disabled="false">Accio</button>
+      <div data-testid="div" disabled>Pensieve</div>
+      <div data-testid="role-button" role="button" aria-disabled="true">Portkey</div>
       <select aria-label="Spells">
-        <optgroup disabled><option data-testid="grouped">one</option></optgroup>
-        <optgroup><option data-testid="open">two</option></optgroup>
-        <option data-testid="option" disabled>three</option>
-        <option data-testid="aria-option" aria-disabled="true">four</option>
+        <optgroup disabled><option data-testid="grouped">Expelliarmus</option></optgroup>
+        <optgroup><option data-testid="open">Stupefy</option></optgroup>
+        <option data-testid="option" disabled>Riddikulus</option>
+        <option data-testid="aria-option" aria-disabled="true">Obliviate</option>
       </select>
       """
 
@@ -41,9 +41,9 @@ defmodule Fluffy.Conformance.ElementStateTest do
     test "aria-disabled applies to descendants with a role that takes it with #{driver}" do
       html = """
       <span aria-disabled="true">
-        <button data-testid="inherited">Click me</button>
-        <h1 data-testid="heading">Heading</h1>
-        <div aria-disabled="false"><button data-testid="reenabled">Again</button></div>
+        <button data-testid="inherited">Open the Chamber</button>
+        <h1 data-testid="heading">Hogwarts</h1>
+        <div aria-disabled="false"><button data-testid="reenabled">Reparo</button></div>
       </span>
       """
 
@@ -60,18 +60,18 @@ defmodule Fluffy.Conformance.ElementStateTest do
       html = """
       <fieldset disabled>
         <input aria-label="Inside">
-        <legend><button data-testid="inside-legend">legend</button></legend>
+        <legend><button data-testid="inside-legend">Deathly Hallows</button></legend>
       </fieldset>
       <fieldset disabled>
-        <legend><div><button data-testid="nested-in-legend">x</button></div></legend>
+        <legend><div><button data-testid="nested-in-legend">Elder Wand</button></div></legend>
       </fieldset>
       <fieldset disabled>
         <div></div>
-        <legend><button data-testid="first-legend">x</button></legend>
-        <legend><button data-testid="second-legend">x</button></legend>
+        <legend><button data-testid="first-legend">Resurrection Stone</button></legend>
+        <legend><button data-testid="second-legend">Invisibility Cloak</button></legend>
       </fieldset>
       <fieldset disabled>
-        <fieldset><button data-testid="deep">x</button></fieldset>
+        <fieldset><button data-testid="deep">Horcrux</button></fieldset>
       </fieldset>
       """
 
@@ -90,7 +90,7 @@ defmodule Fluffy.Conformance.ElementStateTest do
     test "fill and select_option reject an inherited or option aria-disabled with #{driver}" do
       html = """
       <div aria-disabled="true"><input aria-label="Name"></div>
-      <select aria-label="Plan"><option>Free</option><option aria-disabled="true">Pro</option></select>
+      <select aria-label="Broomstick"><option>Cleansweep</option><option aria-disabled="true">Firebolt</option></select>
       """
 
       with_html(unquote(driver), html, fn session ->
@@ -99,7 +99,7 @@ defmodule Fluffy.Conformance.ElementStateTest do
         end)
 
         assert_action_error(session, Fluffy.ActionabilityError, ~r/disabled option/, fn ->
-          select_option(session, by_label("Plan"), "Pro", timeout: 5)
+          select_option(session, by_label("Broomstick"), "Firebolt", timeout: 5)
         end)
       end)
     end

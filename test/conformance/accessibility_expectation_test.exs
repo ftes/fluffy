@@ -13,9 +13,9 @@ defmodule Fluffy.Conformance.AccessibilityExpectationTest do
     @tag driver: driver
     test "to_have_role reads explicit and implicit roles with #{driver}" do
       html = """
-      <div data-testid="explicit" role="button">Button!</div>
+      <div data-testid="explicit" role="button">Alohomora!</div>
       <a data-testid="link" href="/hogwarts">Hogwarts</a>
-      <a data-testid="anchor">Anchor</a>
+      <a data-testid="anchor">Diagon Alley</a>
       <input data-testid="search" type="search">
       """
 
@@ -32,28 +32,28 @@ defmodule Fluffy.Conformance.AccessibilityExpectationTest do
     @tag driver: driver
     test "to_have_accessible_name matches the flat name with #{driver}" do
       html = """
-      <div data-testid="labelled" role="button" aria-label="Hello"></div>
-      <button data-testid="content">foo&nbsp;bar
-      baz</button>
-      <select><option data-testid="option">&nbsp;HTML</option></select>
+      <div data-testid="labelled" role="button" aria-label="Hedwig"></div>
+      <button data-testid="content">Wingardium&nbsp;Leviosa
+      feather</button>
+      <select><option data-testid="option">&nbsp;Gryffindor</option></select>
       <span id="first">Expecto</span><span id="second">Patronum</span>
       <button data-testid="referenced" aria-labelledby="first second">Cast</button>
       <label for="wand">Wand</label><input data-testid="wand" id="wand">
-      <p data-testid="paragraph" aria-label="Prohibited">Text</p>
+      <p data-testid="paragraph" aria-label="Prohibited">Daily Prophet</p>
       """
 
       with_html(unquote(driver), html, fn session ->
         labelled = by_test_id("labelled")
 
         session
-        |> expect(to_have_accessible_name(labelled, "Hello"))
-        |> expect(labelled |> to_have_accessible_name("hello") |> not_())
-        |> expect(to_have_accessible_name(labelled, "hello", ignore_case: true))
-        |> expect(to_have_accessible_name(labelled, ~r/ell\w/))
-        |> expect(labelled |> to_have_accessible_name(~r/hello/) |> not_())
-        |> expect(to_have_accessible_name(labelled, ~r/hello/, ignore_case: true))
-        |> expect("content" |> by_test_id() |> to_have_accessible_name("foo bar baz"))
-        |> expect("option" |> by_test_id() |> to_have_accessible_name("HTML"))
+        |> expect(to_have_accessible_name(labelled, "Hedwig"))
+        |> expect(labelled |> to_have_accessible_name("hedwig") |> not_())
+        |> expect(to_have_accessible_name(labelled, "hedwig", ignore_case: true))
+        |> expect(to_have_accessible_name(labelled, ~r/edw\w/))
+        |> expect(labelled |> to_have_accessible_name(~r/hedwig/) |> not_())
+        |> expect(to_have_accessible_name(labelled, ~r/hedwig/, ignore_case: true))
+        |> expect("content" |> by_test_id() |> to_have_accessible_name("Wingardium Leviosa feather"))
+        |> expect("option" |> by_test_id() |> to_have_accessible_name("Gryffindor"))
         |> expect("referenced" |> by_test_id() |> to_have_accessible_name("Expecto Patronum"))
         |> expect("wand" |> by_test_id() |> to_have_accessible_name("Wand"))
         |> expect("paragraph" |> by_test_id() |> to_have_accessible_name(""))
@@ -63,10 +63,10 @@ defmodule Fluffy.Conformance.AccessibilityExpectationTest do
     @tag driver: driver
     test "to_have_accessible_description follows describedby, description and title with #{driver}" do
       html = """
-      <div data-testid="described" role="button" aria-description="Hello"></div>
+      <div data-testid="described" role="button" aria-description="Hedwig"></div>
       <div data-testid="referenced" role="button" aria-describedby="desc missing"></div>
-      <span id="desc">foo&nbsp;bar
-      baz</span>
+      <span id="desc">Solemnly&nbsp;swear
+      mischief</span>
       <span id="hidden" hidden>Under the <b>cloak</b></span>
       <input data-testid="hidden-reference" aria-describedby="hidden" title="Ignored">
       <button data-testid="titled" title="Lumos">Light</button>
@@ -77,11 +77,11 @@ defmodule Fluffy.Conformance.AccessibilityExpectationTest do
         described = by_test_id("described")
 
         session
-        |> expect(to_have_accessible_description(described, "Hello"))
-        |> expect(described |> to_have_accessible_description("hello") |> not_())
-        |> expect(to_have_accessible_description(described, "hello", ignore_case: true))
-        |> expect(to_have_accessible_description(described, ~r/ell\w/))
-        |> expect("referenced" |> by_test_id() |> to_have_accessible_description("foo bar baz"))
+        |> expect(to_have_accessible_description(described, "Hedwig"))
+        |> expect(described |> to_have_accessible_description("hedwig") |> not_())
+        |> expect(to_have_accessible_description(described, "hedwig", ignore_case: true))
+        |> expect(to_have_accessible_description(described, ~r/edw\w/))
+        |> expect("referenced" |> by_test_id() |> to_have_accessible_description("Solemnly swear mischief"))
         |> expect("hidden-reference" |> by_test_id() |> to_have_accessible_description("Under the cloak"))
         |> expect("titled" |> by_test_id() |> to_have_accessible_description("Lumos"))
         |> expect("invalid" |> by_test_id() |> to_have_accessible_description(""))
