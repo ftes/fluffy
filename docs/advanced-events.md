@@ -186,7 +186,8 @@ end)
 
 Use `Dialog.accept!(dialog, "prompt text")` for prompts or `Dialog.dismiss!(dialog)`.
 `Fluffy.Playwright.page/2` turns the `Dialog.page/1` that opened it, or any other
-`PlaywrightEx.Page` of the session, into a `Fluffy.Page` for `switch_page/2`. Register
+`PlaywrightEx.Page` of the session, into a `Fluffy.Page` for `switch_page/2`; a dialog
+without a page gives `nil`, which it returns. Register
 a persistent catch-all handler when needed:
 
 ```elixir

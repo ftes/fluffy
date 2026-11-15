@@ -128,12 +128,13 @@ defmodule Fluffy.Playwright do
       switch_page(session, page(session, PlaywrightEx.Dialog.page(dialog)))
 
   A page that has closed returns its closed handle. A page of another browser context
-  raises `ArgumentError`.
+  raises `ArgumentError`. A dialog or console message may have no page, as in Playwright,
+  and `nil` returns `nil`.
   """
-  @spec page(Session.t(), PlaywrightEx.Page.t()) :: Fluffy.Page.t()
-  def page(%Session{} = session, %PlaywrightEx.Page{} = page) do
+  @spec page(Session.t(), PlaywrightEx.Page.t() | nil) :: Fluffy.Page.t() | nil
+  def page(%Session{} = session, page) when is_struct(page, PlaywrightEx.Page) or is_nil(page) do
     ensure_playwright_backend!(session, :pages)
-    PlaywrightBackend.Events.page(session, page)
+    if page, do: PlaywrightBackend.Events.page(session, page)
   end
 
   @doc group: "Lifecycle and navigation"

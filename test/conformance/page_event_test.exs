@@ -14,6 +14,8 @@ defmodule Fluffy.Conformance.PageEventTest do
   @tag driver: :playwright
   test "page/2 turns a PlaywrightEx page of the session into its handle, and rejects another context's" do
     session = session_for_html(:playwright, "<h1>Main</h1>")
+    # A dialog or console message without a page.
+    assert page(session, nil) == nil
     other = new_page(session)
     native = unwrap_and_return(switch_page(session, other), & &1)
     assert page(session, native) == other
