@@ -47,7 +47,8 @@ defmodule Fluffy.Driver.Static do
 
       %Expect{target: :page, kind: :url, expected: expected} ->
         actual = Session.current_page(session).url
-        base_url = Session.context(session).http.base_url
+        # A session for HTML has no server, so no base URL.
+        base_url = with %{base_url: base_url} <- Session.context(session).http, do: base_url
         assert_truth!(expectation, Expect.Internal.url_matches?(expected, base_url, actual), actual)
 
       %Expect{target: :page, kind: :title, expected: expected} ->
