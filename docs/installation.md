@@ -87,7 +87,9 @@ tests can set just those:
 | Navigations | PlaywrightEx's `navigation_timeout` | PlaywrightEx's |
 
 A forgotten Fluffy key keeps overriding a newer PlaywrightEx value. A value means what its
-source says: PlaywrightEx's `0` is no limit, as in Playwright. Fluffy's are Elixir timeouts, a
+source says: PlaywrightEx's `0` is no limit, as in Playwright. PlaywrightEx's config also
+takes `:infinity`, so write that for no limit: it reads the same there and in Fluffy's config,
+where `0` checks once or is rejected. Fluffy's are Elixir timeouts, a
 positive integer or `:infinity`, and for `expect_timeout` also `0`, which checks once, as a
 call's `timeout: 0`; `action_timeout` rejects `0`, as Playwright actions cannot check once. A
 Playwright session sets the action and navigation timeouts on its browser context, so native
@@ -100,6 +102,10 @@ test with `Fluffy.Case`, a LiveView action that never finds its element, or a Ph
 wait, fails at the same moment with Fluffy's error and the same reason. Phoenix-only tests
 without `Fluffy.Case` have no such backstop and fail with ExUnit's timeout, so set an
 `action_timeout` there. There is no per-session timeout; pass `timeout:` to a call.
+ExUnit's default test timeout is 60 seconds, against Playwright Test's 30, so with no action
+or navigation timeout a failing action takes twice as long to fail; for faster failures, set
+`action_timeout` and `navigation_timeout` (Fluffy's own suite uses 15 seconds), or lower
+ExUnit's `timeout:`.
 
 An operation's `timeout: 0` checks once, unlike Playwright, where `0` disables the timeout.
 Playwright assertions check once too, but Playwright actions and waits reject 0 with an
