@@ -1,6 +1,16 @@
 defmodule FluffyConsumer.AdoptionTest do
   use FluffyConsumerWeb.ConnCase, async: true
   use Fluffy.Case
+  use Fluffy.Assert
+
+  import Fluffy
+  import Fluffy.Locator
+
+  alias Fluffy.Event
+
+  setup context do
+    %{session: start_session(context[:backend] || :phoenix)}
+  end
 
   for backend <- [:phoenix, :playwright] do
     @tag backend: backend
