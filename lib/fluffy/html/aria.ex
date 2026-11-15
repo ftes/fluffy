@@ -303,6 +303,9 @@ defmodule Fluffy.HTML.Aria do
     |> Enum.group_by(&labeled_control_id(aria, &1), & &1.id)
   end
 
+  # HTMLLabelElement.control's id, or nil.
+  def label_control_id(%__MODULE__{} = aria, label), do: labeled_control_id(aria, fetch(aria, label.id))
+
   defp labeled_control_id(aria, label) do
     case attribute(label, "for") do
       nil -> aria |> descendants(label) |> Enum.find(&Semantics.labelable?/1) |> then(&(&1 && &1.id))

@@ -355,7 +355,7 @@ defmodule Fluffy.ClientDOM do
 
   # Playwright's checked state, which raises for an element without one.
   def checked?(%__MODULE__{} = client_dom, %Locator{} = locator) do
-    target = state_target(client_dom, target!(client_dom, locator))
+    target = follow_label(client_dom, target!(client_dom, locator))
 
     case Aria.checked(aria(client_dom), target, checked_target?(client_dom, target)) do
       :error -> raise Fluffy.ActionabilityError, action: :read_checked, reason: :not_checkbox_or_radio, locator: locator
@@ -398,7 +398,8 @@ defmodule Fluffy.ClientDOM do
   # Like Playwright, an element other than a form control takes its enabled
   # state from the closest button, so text inside a disabled button is disabled.
   # Unlike Playwright's retarget(..., "follow-label"), a label doesn't take its
-  # control's state, as a click on it doesn't activate the control (#134).
+  # control's enabled state, as a click on it doesn't activate the control (#134);
+  # its checked and editable states follow the label (`follow_label/2`).
   defp state_target(_client_dom, %Target{tag: tag} = target) when tag in ["input", "textarea", "select"], do: target
 
   defp state_target(client_dom, target) do
@@ -411,10 +412,30 @@ defmodule Fluffy.ClientDOM do
     end
   end
 
+  # The rest of retarget(..., "follow-label"), for the checked and editable states: an
+  # element in a label takes its control's.
+  @no_follow_label_tags ~w(a input textarea button select option optgroup)
+
+  defp follow_label(client_dom, target) do
+    target = state_target(client_dom, target)
+    aria = aria(client_dom)
+
+    with false <-
+           target.tag in @no_follow_label_tags or
+             attribute(target.attributes, "role") in ["link", "button", "checkbox", "radio"] or
+             Aria.content_editable?(aria, target),
+         %Target{} = label <- closest(client_dom, target, &(&1.tag == "label")),
+         id when is_integer(id) <- Aria.label_control_id(aria, label) do
+      DocumentIndex.target_by_id(index(client_dom), id)
+    else
+      _no_control -> target
+    end
+  end
+
   # Playwright's editable state, which raises for an element without a readonly state.
   @doc false
   def editable?(%__MODULE__{} = client_dom, %Locator{} = locator) do
-    target = state_target(client_dom, target!(client_dom, locator))
+    target = follow_label(client_dom, target!(client_dom, locator))
 
     case Aria.readonly(aria(client_dom), target) do
       :error -> raise Fluffy.ActionabilityError, action: :read_editable, reason: :no_readonly_state, locator: locator

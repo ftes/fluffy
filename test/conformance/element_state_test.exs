@@ -165,6 +165,20 @@ defmodule Fluffy.Conformance.ElementStateTest do
     end
 
     @tag driver: driver
+    test "checked and editable follow a label to its control with #{driver}" do
+      html = """
+      <label><input type="checkbox" checked> Join Dumbledore's Army</label>
+      <label for="password">Password to the common room</label><input id="password" readonly>
+      """
+
+      with_html(unquote(driver), html, fn session ->
+        session
+        |> expect("Join Dumbledore's Army" |> by_text() |> to_be_checked())
+        |> expect("Password to the common room" |> by_text() |> to_be_editable(editable: false))
+      end)
+    end
+
+    @tag driver: driver
     test "checked raises for an element that is not a checkbox or radio with #{driver}" do
       with_html(unquote(driver), ~s(<div role="button" aria-checked="true">Not a checkbox</div>), fn session ->
         for expectation <- [to_be_checked(by_role(:button)), not_(to_be_checked(by_role(:button)))] do
