@@ -354,12 +354,12 @@ defmodule Fluffy.PhoenixTest do
   `query_params:` is supplied; fragments are always ignored.
   """
   @spec assert_path(session(), String.t(), keyword()) :: session()
-  def assert_path(session, path, options \\ []), do: execute(session, path_expectation(path, options), false)
+  def assert_path(session, path, options \\ []), do: execute_path(session, path, options, false)
 
   @doc group: "Assertions"
   @doc "Negates the combined path and optional query expectation."
   @spec refute_path(session(), String.t(), keyword()) :: session()
-  def refute_path(session, path, options \\ []), do: execute(session, path_expectation(path, options), true)
+  def refute_path(session, path, options \\ []), do: execute_path(session, path, options, true)
 
   defp role_locator(session, role, text) do
     string!(text, :text)
@@ -531,6 +531,21 @@ defmodule Fluffy.PhoenixTest do
     text
     |> String.replace(~r/[\\^$.*+?()[\]{}|]/, "\\\\\\0")
     |> String.replace(["'", "\"", "`", ">"], &("\\x" <> Base.encode16(&1)))
+  end
+
+  # The expectation's predicate would read as `#Function<...>` in a failure, so
+  # the message names the path and query instead.
+  defp execute_path(session, path, options, negated?) do
+    %Expect{expected: {predicate, _matching}} = expectation = path_expectation(path, options)
+
+    try do
+      execute(session, expectation, negated?)
+    rescue
+      error in ExUnit.AssertionError ->
+        query = if Keyword.has_key?(options, :query_params), do: " with query params #{inspect(options[:query_params])}"
+        message = String.replace(error.message, "URL #{inspect(predicate)}", "path #{inspect(path)}#{query}")
+        reraise %{error | message: message}, __STACKTRACE__
+    end
   end
 
   # PhoenixTest compares the path, with `*` matching one segment, and with

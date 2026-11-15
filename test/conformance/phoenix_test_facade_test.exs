@@ -812,15 +812,17 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
         |> refute_path(pattern <> "/extra", query_params: query)
         |> within("main", &assert_path(&1, pattern))
 
-      assert_raise ExUnit.AssertionError, fn -> refute_path(session, pattern, timeout: 0) end
+      assert_raise ExUnit.AssertionError,
+                   ~r/Expected not active page to have path "#{Regex.escape(pattern)}"/,
+                   fn -> refute_path(session, pattern, timeout: 0) end
 
       assert_raise ExUnit.AssertionError, fn ->
         refute_path(session, pattern, query_params: query, timeout: 0)
       end
 
-      assert_raise ExUnit.AssertionError, fn ->
-        assert_path(session, pattern, query_params: %{page: 2}, timeout: 0)
-      end
+      assert_raise ExUnit.AssertionError,
+                   ~r/Expected active page to have path "#{Regex.escape(pattern)}" with query params %\{page: 2\}/,
+                   fn -> assert_path(session, pattern, query_params: %{page: 2}, timeout: 0) end
 
       session
       |> visit(HTTPFixtures.path(fixture, "/projects//send/drafts/abc/edit"))
