@@ -568,9 +568,9 @@ defmodule Fluffy.Options do
         "`config :playwright_ex, :test, action_timeout: ...` for actions; " <>
         "`config :fluffy, expect_timeout: ..., action_timeout: ...` override them for Fluffy sessions",
     playwright:
-      "set `config :playwright_ex, :test, action_timeout: ..., navigation_timeout: ...` instead of " <>
-        "`playwright: [timeout: ...]`; `config :fluffy, action_timeout: ...` overrides the action timeout " <>
-        "for Fluffy sessions",
+      "set `config :playwright_ex, :test` instead, with `action_timeout:` and `navigation_timeout:` for " <>
+        "`timeout:`, `browser_name:` for `engine:`, `launch_options:`, `driver: [executable: ...]`, " <>
+        "`workers:` for `pool_size:`, and `output_dir:` with `trace:` for `artifact_dir:` and `trace_dir:`",
     navigation_timeout:
       "set `config :playwright_ex, :test, navigation_timeout: ...`: only browser navigations wait, " <>
         "Phoenix navigations are synchronous"
