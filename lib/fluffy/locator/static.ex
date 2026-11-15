@@ -91,7 +91,7 @@ defmodule Fluffy.Locator.Static do
     names = test_id_attribute_names()
 
     scopes
-    |> query_scopes(Enum.map_join(names, ",", &"[#{&1}]"))
+    |> query_scopes(Enum.map_join(names, ",", &"[#{escape_identifier(&1)}]"))
     |> Enum.filter(fn element -> Enum.any?(names, &(element_attribute(element, &1) == test_id)) end)
   end
 
@@ -199,6 +199,14 @@ defmodule Fluffy.Locator.Static do
 
   defp test_id_attribute_names,
     do: :test_id_attribute |> Fluffy.Options.config!() |> LocatorUtils.split_test_id_attribute_names()
+
+  # The names are CSS identifiers (`Fluffy.Options.test_id_attribute/1`), but LazyHTML rejects
+  # non-ASCII characters in a selector's identifier unless they are escaped.
+  defp escape_identifier(name) do
+    for <<char::utf8 <- name>>, into: "" do
+      if char < 0x80, do: <<char::utf8>>, else: "\\#{Integer.to_string(char, 16)} "
+    end
+  end
 
   defp element_attribute(element, name) do
     case LazyHTML.attribute(element, name) do

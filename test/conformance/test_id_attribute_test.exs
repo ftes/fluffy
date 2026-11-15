@@ -36,6 +36,16 @@ defmodule Fluffy.Conformance.TestIdAttributeTest do
       |> expect("hedwig" |> by_test_id() |> to_have_text("Hedwig"))
       |> expect("errol" |> by_test_id() |> to_have_text("Errol"))
     end
+
+    # A name is any CSS identifier, non-ASCII characters included.
+    @tag driver: driver
+    test "#{driver} matches a non-ASCII attribute", %{driver: driver} do
+      put_fluffy_config(test_id_attribute: "data-élève,data-owl")
+
+      driver
+      |> session_for_html(~s(<p data-élève="hermione">Hermione</p>), base_url: Server.base_url())
+      |> expect("hermione" |> by_test_id() |> to_have_text("Hermione"))
+    end
   end
 
   # Fluffy's unset (the suite's config): PlaywrightEx's, on every driver.

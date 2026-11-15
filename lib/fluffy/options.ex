@@ -535,7 +535,14 @@ defmodule Fluffy.Options do
   end
 
   defp playwright_ex_config(config, :expect_timeout), do: no_limit(config.expect.timeout)
-  defp playwright_ex_config(config, :test_id_attribute), do: config.test_id_attribute
+
+  defp playwright_ex_config(config, :test_id_attribute) do
+    case test_id_attribute(config.test_id_attribute) do
+      {:ok, names} -> names
+      {:error, message} -> raise ArgumentError, "invalid config :playwright_ex, :test: test_id_attribute: " <> message
+    end
+  end
+
   defp playwright_ex_config(config, key), do: no_limit(Map.fetch!(config, key))
 
   defp no_limit(0), do: :infinity
@@ -606,21 +613,25 @@ defmodule Fluffy.Options do
 
   @doc false
   # As PlaywrightEx.Test's `test_id_attribute`: one attribute or a comma-separated list.
-  # Each name goes into a CSS attribute selector unescaped, as upstream's, so it must be
-  # a CSS identifier of the characters upstream's attribute selector parser reads unquoted.
+  # Upstream's test id engine puts each name into a CSS attribute selector unescaped, so
+  # it must be a CSS identifier; other names make each `by_test_id` fail in the browser.
   def test_id_attribute(names) when is_binary(names) and names != "" do
-    case Enum.reject(String.split(names, ","), &Regex.match?(~r/\A-?[A-Za-z_][A-Za-z0-9_-]*\z/, &1)) do
+    case Enum.reject(String.split(names, ","), &css_identifier?/1) do
       [] ->
         {:ok, names}
 
       invalid ->
         {:error,
-         ~s(expected attribute names of letters, digits, "-" and "_", separated by commas without spaces, ) <>
+         "expected attribute names that are CSS identifiers, separated by commas without spaces, " <>
            "got: #{inspect(names)} (invalid: #{Enum.map_join(invalid, ", ", &inspect/1)})"}
     end
   end
 
   def test_id_attribute(names), do: {:error, "expected a non-empty string, got: #{inspect(names)}"}
+
+  # CSS Syntax's ident-token without escapes; name characters include any non-ASCII one.
+  defp css_identifier?(name),
+    do: Regex.match?(~r/\A(?:--|-?[A-Za-z_\x{80}-\x{10FFFF}])[A-Za-z0-9_\x{80}-\x{10FFFF}-]*\z/u, name)
 
   defp validate_conn!(nil), do: :ok
 

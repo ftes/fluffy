@@ -150,13 +150,22 @@ defmodule Fluffy.PlaywrightConfigurationTest do
       Application.delete_env(:fluffy, key)
     end
 
-    for name <- ["data-owl, data-hedwig", "data-owl]", "data:owl", "data-owl,"] do
+    # Upstream's test id engine fails on a name that is not a CSS identifier.
+    for name <- ["data-owl, data-hedwig", "data-owl]", "data:owl", "data-qa.id", "1owl", "data-owl,"] do
       put_env(test_id_attribute: name)
       assert_raise ArgumentError, ~r/invalid config :fluffy: .*test_id_attribute.*attribute names/, &Options.config!/0
+
+      Application.delete_env(:fluffy, :test_id_attribute)
+      put_playwright_ex(test: [test_id_attribute: name])
+
+      assert_raise ArgumentError,
+                   ~r/invalid config :playwright_ex, :test: test_id_attribute: .*attribute names/,
+                   fn -> Options.config!(:test_id_attribute) end
     end
 
-    put_env(test_id_attribute: "data-owl,data_hedwig")
-    assert Options.config!(:test_id_attribute) == "data-owl,data_hedwig"
+    Application.delete_env(:playwright_ex, :test)
+    put_env(test_id_attribute: "data-owl,data_hedwig,data-élève,--owl")
+    assert Options.config!(:test_id_attribute) == "data-owl,data_hedwig,data-élève,--owl"
     Application.delete_env(:fluffy, :test_id_attribute)
 
     put_playwright_ex(test: [navigation_timeout: -1])
