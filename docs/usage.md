@@ -163,11 +163,11 @@ defmodule MyAppWeb.FeatureCase do
 end
 ```
 
-When the template's own `setup` starts the session, also make `use Fluffy.Case` the first
-line of its body. A template's own `setup` callbacks run before those its `using` brings
-in, so the test is then registered before them (a Playwright session started before the
-registration makes it raise). The line in `using` stays, as it brings the `test` macro to
-each module; there it registers nothing again:
+When the template's own `setup` starts the session, also put `use Fluffy.Case` right after
+`use ExUnit.CaseTemplate`. A template's own `setup` callbacks run before those its `using`
+brings in, so the test is then registered before them (a Playwright session started before
+the registration makes it raise). The line in `using` stays, as it brings the `test` macro
+to each module; there it registers nothing again:
 
 ```elixir
 defmodule MyAppWeb.FeatureCase do
