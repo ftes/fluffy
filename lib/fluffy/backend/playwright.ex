@@ -36,30 +36,30 @@ defmodule Fluffy.Backend.Playwright do
       |> Enum.concat(List.wrap(Fluffy.Sandbox.metadata_header(test_pid)))
       |> Map.new(fn {name, value} -> {String.downcase(to_string(name)), value} end)
 
-    # PlaywrightEx.Test records the context for the test and gives it Playwright Test's
-    # defaults, also from a process with the test in `$callers`; the runtime closes it with
-    # the session. As in Playwright, closing has
-    # no timeout. A browser lost to a dead driver still refuses contexts until its
-    # disconnect arrives; as in Playwright Test, that session fails. The default browser is
-    # the test's lease of the pool, taken here so a test without a Playwright session takes none.
-    browser_context =
-      options
-      |> Keyword.get_lazy(:browser, &PlaywrightEx.Test.BrowserPool.browser/0)
-      |> PlaywrightEx.Browser.new_context!(browser_context_options ++ [base_url: base_url, extra_http_headers: headers])
-
-    context = %Context{
-      browser_context: browser_context,
-      base_url: base_url,
-      extra_http_headers: headers
-    }
-
     runtime = SessionRuntime.start!(test_pid)
 
     try do
+      # PlaywrightEx.Test records the context for the test and gives it Playwright Test's
+      # defaults, also from a process with the test in `$callers`; the runtime closes it with
+      # the session. As in Playwright, closing has
+      # no timeout. A browser lost to a dead driver still refuses contexts until its
+      # disconnect arrives; as in Playwright Test, that session fails. The default browser is
+      # the test's lease of the pool, taken here so a test without a Playwright session takes none.
+      browser_context =
+        options
+        |> Keyword.get_lazy(:browser, &PlaywrightEx.Test.BrowserPool.browser/0)
+        |> PlaywrightEx.Browser.new_context!(browser_context_options ++ [base_url: base_url, extra_http_headers: headers])
+
       :ok =
         SessionRuntime.register(runtime, {:browser_context, browser_context.guid}, fn ->
           BrowserContext.close(browser_context)
         end)
+
+      context = %Context{
+        browser_context: browser_context,
+        base_url: base_url,
+        extra_http_headers: headers
+      }
 
       SessionRuntime.run(runtime, fn ->
         # The resolved action and navigation timeouts (`Fluffy.Timeouts`), over PlaywrightEx.Test's
