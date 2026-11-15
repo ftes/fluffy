@@ -89,6 +89,8 @@ defmodule Fluffy.Conformance.PlaywrightTestTimeoutTest do
   import Fluffy.Expect
   import Fluffy.Locator
 
+  alias Fluffy.Event
+
   @moduletag timeout: 2_000
   @missing by_role(:button, name: "Missing")
 
@@ -108,6 +110,17 @@ defmodule Fluffy.Conformance.PlaywrightTestTimeoutTest do
     error = assert_raise(ExUnit.AssertionError, fn -> expect(session, to_be_visible(@missing), timeout: :infinity) end)
 
     assert error.message =~ "Test timeout of 2000ms exceeded."
+    assert_at_test_timeout()
+  end
+
+  # Fluffy's own wait, as Playwright Test's `waitForEvent`, not the page close it sees then.
+  @tag driver: :playwright
+  test "an event wait that outlasts the test fails at the test timeout with playwright" do
+    session = start_session(:playwright)
+    error = assert_raise(ExUnit.AssertionError, fn -> session |> wait_for(Event.download()) |> await() end)
+
+    assert error.message =~ "Test timeout of 2000ms exceeded."
+    assert error.message =~ "no matching download event"
     assert_at_test_timeout()
   end
 

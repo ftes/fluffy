@@ -1,9 +1,9 @@
 defmodule Fluffy.TestTimeout do
   @moduledoc false
 
-  # The backstop of a Phoenix session's waits (LiveView retries, event waits): an operation
-  # without a timeout fails with Fluffy's error just before ExUnit kills the test, at the moment
-  # PlaywrightEx.Test closes the test's contexts, so a Playwright one fails. That's
+  # The backstop of Fluffy's own waits (LiveView retries, event waits on every driver): an
+  # operation without a timeout fails with Fluffy's error just before ExUnit kills the test, at
+  # the moment PlaywrightEx.Test closes the test's contexts, so a Playwright call fails. That's
   # `min(1000, timeout / 20)` ms before ExUnit's deadline (`PlaywrightEx.Test.info/0`), which
   # counts from the test's first setup callback. It comes from the test's registration
   # (`use Fluffy.Case`), also in its Tasks, through `$callers`. Without one, as in a process

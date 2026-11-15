@@ -107,20 +107,19 @@ defmodule Fluffy.Event.Subscription do
   def handle_info({:DOWN, _ref, :process, _pid, _reason}, state), do: {:stop, :normal, state}
 
   def handle_info({:source_closed, reason} = message, state) do
-    if is_nil(state.outcome) and match?({:ok, _value}, state.decode.(message)),
-      do: deliver_last(message, reason, state),
-      else: fail(state, reason)
+    cond do
+      is_nil(state.outcome) and match?({:ok, _value}, state.decode.(message)) -> deliver_last(message, reason, state)
+      # PlaywrightEx.Test closes the test's pages at its timeout, the wait's backstop.
+      expired?(state) -> fail_timeout(state)
+      true -> fail(state, reason)
+    end
   end
 
   def handle_info(:timeout, state), do: fail_timeout(state)
   def handle_info(_message, %{outcome: outcome} = state) when not is_nil(outcome), do: {:noreply, state}
 
   def handle_info(message, state) do
-    if state.deadline && Deadline.expired?(state.deadline) do
-      fail_timeout(state)
-    else
-      deliver(message, state)
-    end
+    if expired?(state), do: fail_timeout(state), else: deliver(message, state)
   end
 
   @impl true
@@ -128,6 +127,8 @@ defmodule Fluffy.Event.Subscription do
     if state.task, do: Task.shutdown(state.task, :brutal_kill)
     release(state)
   end
+
+  defp expired?(state), do: state.deadline != nil and Deadline.expired?(state.deadline)
 
   defp fail_timeout(state) do
     message = "no matching #{state.event.type} event occurred before the timeout"
