@@ -1,48 +1,49 @@
 defmodule Fluffy.TestTimeoutTest do
   # The test timeout's backstop on its own, without waiting one out: the conformance tests
-  # (`Fluffy.Conformance.TestTimeoutTest`) do that, once per driver class. The registration is
-  # the test process's, so the tests run at once.
+  # (`Fluffy.Conformance.TestTimeoutTest`) do that, once per driver class. The backstop comes
+  # from PlaywrightEx.Test's registration of the test, so the tests run at once.
   use ExUnit.Case, async: true
+  use Fluffy.Case
 
   alias Fluffy.TestTimeout
   alias PlaywrightEx.Test.Recorder
 
-  # 5% of the timeout, at most 1 s: the moment PlaywrightEx.Test closes a Playwright session's
-  # context.
-  for {timeout, margin} <- [{500, 25}, {2_000, 100}, {60_000, 1_000}] do
-    test "a #{timeout}ms test's backstop is #{margin}ms before its timeout" do
+  # 5% of the timeout, at most 1 s, before ExUnit's deadline: the moment PlaywrightEx.Test
+  # closes the test's contexts.
+  for {timeout, margin} <- [{2_000, 100}, {10_000, 500}, {60_000, 1_000}] do
+    @tag timeout: timeout
+    test "a #{timeout}ms test's backstop is #{margin}ms before its deadline" do
       timeout = unquote(timeout)
       margin = unquote(margin)
       assert Recorder.test_timeout_margin(timeout) == margin
 
-      before = System.monotonic_time(:millisecond)
-      :ok = TestTimeout.put(%{timeout: timeout})
-      later = System.monotonic_time(:millisecond)
-
-      assert {^timeout, backstop} = TestTimeout.fetch()
-      assert backstop in (before + timeout - margin)..(later + timeout - margin)
+      %{timeout: ^timeout, deadline: deadline} = PlaywrightEx.Test.info()
+      assert TestTimeout.fetch() == {timeout, deadline - margin}
     end
   end
 
+  @tag timeout: :infinity
   test "a test without a timeout has no backstop" do
-    :ok = TestTimeout.put(%{timeout: :infinity})
     assert TestTimeout.fetch() == nil
+    assert TestTimeout.bound(:infinity) == :infinity
   end
 
   test "a Task of the test gets the test's backstop" do
-    :ok = TestTimeout.put(%{timeout: 2_000})
-    assert {2_000, _backstop} = test_timeout = TestTimeout.fetch()
+    assert {_timeout, _backstop} = test_timeout = TestTimeout.fetch()
     assert Task.await(Task.async(&TestTimeout.fetch/0)) == test_timeout
   end
 
-  test "without a backstop, a deadline stays as it is" do
-    assert TestTimeout.bound(:infinity) == :infinity
-    assert TestTimeout.bound(42) == 42
-    assert TestTimeout.explain("no matching download event", 42) == "no matching download event"
+  test "a process outside the test has no backstop, so a deadline stays as it is" do
+    test = self()
+
+    spawn(fn ->
+      send(test, {:outside, TestTimeout.fetch(), TestTimeout.bound(:infinity), TestTimeout.bound(42)})
+    end)
+
+    assert_receive {:outside, nil, :infinity, 42}
   end
 
   test "the backstop bounds a later deadline and none" do
-    :ok = TestTimeout.put(%{timeout: 2_000})
     {_timeout, backstop} = TestTimeout.fetch()
 
     assert TestTimeout.bound(:infinity) == backstop
@@ -50,8 +51,8 @@ defmodule Fluffy.TestTimeoutTest do
     assert TestTimeout.bound(backstop - 1) == backstop - 1
   end
 
+  @tag timeout: 2_000
   test "a failure at the backstop says the test timed out, as Playwright's" do
-    :ok = TestTimeout.put(%{timeout: 2_000})
     {_timeout, backstop} = TestTimeout.fetch()
 
     assert TestTimeout.explain("no matching download event", backstop) ==

@@ -15,32 +15,31 @@ defmodule Fluffy.Conformance.TestTimeoutTest do
   @moduletag timeout: 2_000
   @missing by_role(:button, name: "Missing")
 
-  setup {Fluffy.Case, :put_test_timeout}
   setup do: %{started: System.monotonic_time(:millisecond)}
 
   # Static checks once, so only LiveView waits.
   @tag driver: :live
-  test "an action that outlasts the test fails at the test timeout with live", %{started: started} do
+  test "an action that outlasts the test fails at the test timeout with live" do
     session = missing_session()
     error = assert_raise(Fluffy.OperationError, fn -> click(session, @missing) end)
 
     assert error.message =~ "Test timeout of 2000ms exceeded."
     assert error.message =~ ~s|name: "Missing"|
-    assert_at_test_timeout(started)
+    assert_at_test_timeout()
   end
 
   @tag driver: :live
-  test "an expectation with timeout: :infinity fails at the test timeout with live", %{started: started} do
+  test "an expectation with timeout: :infinity fails at the test timeout with live" do
     session = missing_session()
     error = assert_raise(ExUnit.AssertionError, fn -> expect(session, to_be_visible(@missing), timeout: :infinity) end)
 
     assert error.message =~ "Test timeout of 2000ms exceeded."
-    assert_at_test_timeout(started)
+    assert_at_test_timeout()
   end
 
   # LiveViewTest runs LiveViews only from the test process: the Task waits on a static page.
   @tag driver: :static
-  test "a session a Task of the test starts gets the test timeout", %{started: started} do
+  test "a session a Task of the test starts gets the test timeout" do
     error =
       fn ->
         session =
@@ -55,7 +54,7 @@ defmodule Fluffy.Conformance.TestTimeoutTest do
 
     assert error.message =~ "Test timeout of 2000ms exceeded."
     assert error.message =~ "no matching download event"
-    assert_at_test_timeout(started)
+    assert_at_test_timeout()
   end
 
   @tag driver: :live
@@ -73,8 +72,11 @@ defmodule Fluffy.Conformance.TestTimeoutTest do
     |> visit("/live/chamber-map")
   end
 
-  # The backstop is 1900ms after Fluffy.Case's setup, ExUnit's kill 2000ms after the test's start.
-  defp assert_at_test_timeout(started), do: assert((System.monotonic_time(:millisecond) - started) in 1_800..2_000)
+  # The backstop is 100ms before ExUnit's deadline, which counts from the test's first setup.
+  defp assert_at_test_timeout do
+    %{deadline: deadline} = PlaywrightEx.Test.info()
+    assert System.monotonic_time(:millisecond) in (deadline - 100)..deadline
+  end
 end
 
 defmodule Fluffy.Conformance.PlaywrightTestTimeoutTest do
@@ -90,34 +92,71 @@ defmodule Fluffy.Conformance.PlaywrightTestTimeoutTest do
   @moduletag timeout: 2_000
   @missing by_role(:button, name: "Missing")
 
-  setup {Fluffy.Case, :put_test_timeout}
-  setup do: %{started: System.monotonic_time(:millisecond)}
-
   @tag driver: :playwright
-  test "an action that outlasts the test fails at the test timeout with playwright", %{started: started} do
+  test "an action that outlasts the test fails at the test timeout with playwright" do
     session = start_session(:playwright)
     error = assert_raise(Fluffy.OperationError, fn -> click(session, @missing) end)
 
     assert error.message =~ "Test timeout of 2000ms exceeded."
     assert error.message =~ ~s|name: "Missing"|
-    assert_at_test_timeout(started)
+    assert_at_test_timeout()
   end
 
   @tag driver: :playwright
-  test "an expectation with timeout: :infinity fails at the test timeout with playwright", %{started: started} do
+  test "an expectation with timeout: :infinity fails at the test timeout with playwright" do
     session = start_session(:playwright)
     error = assert_raise(ExUnit.AssertionError, fn -> expect(session, to_be_visible(@missing), timeout: :infinity) end)
 
     assert error.message =~ "Test timeout of 2000ms exceeded."
-    assert_at_test_timeout(started)
+    assert_at_test_timeout()
   end
 
-  defp assert_at_test_timeout(started), do: assert((System.monotonic_time(:millisecond) - started) in 1_800..2_000)
+  # The backstop is 100ms before ExUnit's deadline, which counts from the test's first setup.
+  defp assert_at_test_timeout do
+    %{deadline: deadline} = PlaywrightEx.Test.info()
+    assert System.monotonic_time(:millisecond) in (deadline - 100)..deadline
+  end
+end
+
+defmodule Fluffy.Conformance.SlowSetupTestTimeoutTest do
+  # ExUnit's timeout counts from the test's first setup, and so does the backstop: after a slow
+  # setup before the test's registration, such as a ConnCase's, a hanging LiveView action still
+  # fails with Fluffy's error before ExUnit kills the test.
+  use ExUnit.Case, async: true
+  use Fluffy.Case
+
+  import Fluffy
+  import Fluffy.Locator
+
+  alias Fluffy.Support.Server
+  alias Fluffy.Support.Web.Endpoint
+
+  @moduletag timeout: 2_000
+
+  # Counted from here, the backstop would come 500ms after ExUnit's kill.
+  setup do
+    Process.sleep(500)
+  end
+
+  @tag driver: :live
+  test "a slow first setup leaves the backstop before ExUnit's timeout with live" do
+    session =
+      :phoenix
+      |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+      # Without a registered test (no `use Fluffy.Case`), nothing bounds a Phoenix operation but
+      # ExUnit's timeout.
+      |> visit("/live/chamber-map")
+
+    error = assert_raise(Fluffy.OperationError, fn -> click(session, by_role(:button, name: "Missing")) end)
+
+    assert error.message =~ "Test timeout of 2000ms exceeded."
+    %{deadline: deadline} = PlaywrightEx.Test.info()
+    assert System.monotonic_time(:millisecond) in (deadline - 100)..deadline
+  end
 end
 
 defmodule Fluffy.Conformance.NoTestTimeoutTest do
-  # Without Fluffy.Case's setup, nothing bounds a Phoenix operation but ExUnit's timeout.
-  use Fluffy.Support.Case, async: true
+  use ExUnit.Case, async: true
 
   test "a test without Fluffy.Case has no test timeout" do
     assert Fluffy.TestTimeout.fetch() == nil

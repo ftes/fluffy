@@ -11,7 +11,7 @@ defmodule Fluffy.CaseTest do
   end
 
   @tag timeout: 30_000
-  test "records the test's timeout" do
+  test "bounds Phoenix waits by the test's timeout" do
     assert {30_000, _backstop} = Fluffy.TestTimeout.fetch()
   end
 
@@ -123,7 +123,7 @@ defmodule Fluffy.CaseTemplateTest do
     assert Fluffy.Session.current_driver(session) == :playwright
   end
 
-  test "records the test's timeout once, before the template's setups", %{test_timeout: test_timeout} do
+  test "the template's setups see the test's backstop", %{test_timeout: test_timeout} do
     assert {_timeout, _backstop} = test_timeout
     assert Fluffy.TestTimeout.fetch() == test_timeout
   end

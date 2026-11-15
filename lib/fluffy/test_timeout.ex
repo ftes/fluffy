@@ -1,43 +1,34 @@
 defmodule Fluffy.TestTimeout do
   @moduledoc false
 
-  # The test's ExUnit timeout, recorded in its setup by `Fluffy.Case.put_test_timeout/1`. Phoenix
-  # sessions bound their waits by it (LiveView retries, event waits), so an operation without a
-  # timeout fails with Fluffy's error just before ExUnit kills the test, at the moment PlaywrightEx.Test closes a Playwright
-  # session's context (`PlaywrightEx.Test.Recorder.test_timeout_margin/1`, the same formula).
-  # Kept by the test process, so its Tasks find it through `$callers` and it goes with the test.
-
-  # ExUnit's clock started at the test process's spawn, before the setups: as PlaywrightEx.Test,
-  # count from this one.
-  @spec put(map()) :: :ok
-  def put(context) do
-    case timeout(context) do
-      :infinity ->
-        :ok
-
-      timeout ->
-        backstop = System.monotonic_time(:millisecond) + timeout - min(1000, div(timeout, 20))
-        Registry.unregister(__MODULE__, self())
-        {:ok, _owner} = Registry.register(__MODULE__, self(), {timeout, backstop})
-        :ok
-    end
-  end
-
-  # ExUnit's `get_timeout/2`: none under `--trace`, else the test's `timeout` tag or the config's.
-  defp timeout(context) do
-    config = ExUnit.configuration()
-    if config[:trace], do: :infinity, else: Map.get(context, :timeout, config[:timeout])
-  end
+  # The backstop of a Phoenix session's waits (LiveView retries, event waits): an operation
+  # without a timeout fails with Fluffy's error just before ExUnit kills the test, at the moment
+  # PlaywrightEx.Test closes the test's contexts, so a Playwright one fails. That's
+  # `min(1000, timeout / 20)` ms before ExUnit's deadline (`PlaywrightEx.Test.info/0`), which
+  # counts from the test's first setup callback. It comes from the test's registration
+  # (`use Fluffy.Case`), also in its Tasks, through `$callers`. Without one, as in a process
+  # outside a registered test, there is no backstop.
 
   @doc "The calling test's `{timeout, backstop}`, `nil` without one."
   @spec fetch() :: {pos_integer(), integer()} | nil
   def fetch do
-    Enum.find_value([self() | Process.get(:"$callers", [])], fn pid ->
-      case Registry.lookup(__MODULE__, pid) do
-        [{_owner, value}] -> value
-        [] -> nil
-      end
-    end)
+    case info() do
+      %{timeout: timeout, deadline: deadline} when is_integer(timeout) and is_integer(deadline) ->
+        {timeout, deadline - min(1000, div(timeout, 20))}
+
+      _none ->
+        nil
+    end
+  end
+
+  # `PlaywrightEx.Test.info/0` raises this outside a registered test, its only error.
+  defp info do
+    PlaywrightEx.Test.info()
+  rescue
+    error in RuntimeError ->
+      if String.starts_with?(error.message, "PlaywrightEx.Test.info() can only be called while a test is running"),
+        do: nil,
+        else: reraise(error, __STACKTRACE__)
   end
 
   @doc "`deadline`, bounded by the test's backstop."

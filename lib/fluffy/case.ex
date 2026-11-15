@@ -5,10 +5,10 @@ defmodule Fluffy.Case do
 
   It adds `use PlaywrightEx.Test`, so Playwright sessions work: a test takes a browser from
   `PlaywrightEx.Test.BrowserPool.browser/1` only when it starts one (see
-  [Playwright setup](installation.md#playwright-setup)). It also records the test's timeout, so
-  a Phoenix operation that would outlast it, such as a LiveView action that never finds its
-  element, fails with Fluffy's error and "Test timeout of 60000ms exceeded." just before ExUnit
-  kills the test, as a Playwright one does.
+  [Playwright setup](installation.md#playwright-setup)). It also bounds Phoenix operations by
+  the test's timeout, so one that would outlast it, such as a LiveView action that never finds
+  its element, fails with Fluffy's error and "Test timeout of 60000ms exceeded." just before
+  ExUnit kills the test, as a Playwright one does.
 
   The imports and the session are yours. With the native API:
 
@@ -121,21 +121,6 @@ defmodule Fluffy.Case do
 
     quote do
       use PlaywrightEx.Test
-
-      setup {Fluffy.Case, :put_test_timeout}
-    end
-  end
-
-  # Records the test's ExUnit timeout, so a Phoenix operation that would outlast it fails
-  # with Fluffy's error just before ExUnit kills the test, as PlaywrightEx.Test makes a
-  # Playwright one fail then. Sessions started from a `Task` of the test get it too. Once per
-  # test, at its registration: a template's body and its `using` may both bring it.
-  @doc false
-  @spec put_test_timeout(map()) :: :ok
-  def put_test_timeout(context) do
-    case Registry.lookup(Fluffy.TestTimeout, self()) do
-      [] -> Fluffy.TestTimeout.put(context)
-      _recorded -> :ok
     end
   end
 end

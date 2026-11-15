@@ -6,7 +6,7 @@ Upgrading from 0.8? The [upgrade guide](docs/upgrading.md) lists the net changes
 
 ### Added
 
-- `Fluffy.Case`, the one line every Fluffy test module writes after its `ConnCase` (or in its case template): it registers the test with `PlaywrightEx.Test`, so Playwright sessions work, and records the test's timeout, so a hanging Phoenix operation fails with Fluffy's error at it. The imports and sessions stay the module's own.
+- `Fluffy.Case`, the one line every Fluffy test module writes after its `ConnCase` (or in its case template): it registers the test with `PlaywrightEx.Test`, so Playwright sessions work, and so a hanging Phoenix operation fails with Fluffy's error at the test's timeout, as a Playwright one. The imports and sessions stay the module's own.
 - `start_session(:playwright, browser: browser)` creates the session's context in `browser`, such as `PlaywrightEx.Test.BrowserPool.browser(launch_options: [headless: false])`.
 - `Fluffy.Playwright.page/2` turns a `PlaywrightEx.Page` of the session, such as a dialog's or console message's page, into a `Fluffy.Page` for `switch_page/2`.
 - Static and LiveView match a regex in a locator's `name:`, `has_text:` and `has_not_text:`, as Playwright does, instead of raising `Fluffy.CapabilityError`.
