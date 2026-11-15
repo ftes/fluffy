@@ -594,8 +594,21 @@ defmodule Fluffy.Options do
 
   @doc false
   # As PlaywrightEx.Test's `test_id_attribute`: one attribute or a comma-separated list.
-  def test_id_attribute(name) when is_binary(name) and name != "", do: {:ok, name}
-  def test_id_attribute(name), do: {:error, "expected a non-empty string, got: #{inspect(name)}"}
+  # Each name goes into a CSS attribute selector unescaped, as upstream's, so it must be
+  # a CSS identifier of the characters upstream's attribute selector parser reads unquoted.
+  def test_id_attribute(names) when is_binary(names) and names != "" do
+    case Enum.reject(String.split(names, ","), &Regex.match?(~r/\A-?[A-Za-z_][A-Za-z0-9_-]*\z/, &1)) do
+      [] ->
+        {:ok, names}
+
+      invalid ->
+        {:error,
+         ~s(expected attribute names of letters, digits, "-" and "_", separated by commas without spaces, ) <>
+           "got: #{inspect(names)} (invalid: #{Enum.map_join(invalid, ", ", &inspect/1)})"}
+    end
+  end
+
+  def test_id_attribute(names), do: {:error, "expected a non-empty string, got: #{inspect(names)}"}
 
   defp validate_conn!(nil), do: :ok
 
