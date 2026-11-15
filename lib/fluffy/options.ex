@@ -577,7 +577,8 @@ defmodule Fluffy.Options do
     playwright:
       "set `config :playwright_ex, :test` instead, with `action_timeout:` and `navigation_timeout:` for " <>
         "`timeout:`, `browser_name:` for `engine:`, `launch_options:`, `driver: [executable: ...]`, " <>
-        "`workers:` for `pool_size:`, and `output_dir:` with `trace:` for `artifact_dir:` and `trace_dir:`",
+        "`workers:` for `pool_size:`, and `output_dir:` with `trace:` for `artifact_dir:` and `trace_dir:`; " <>
+        "for `log_browser_console:`, log from `on(session, Event.console(), ...)` and `Event.page_error()` listeners",
     navigation_timeout:
       "set `config :playwright_ex, :test, navigation_timeout: ...`: only browser navigations wait, " <>
         "Phoenix navigations are synchronous"
