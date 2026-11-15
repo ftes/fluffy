@@ -58,6 +58,16 @@ defmodule Fluffy.Conformance.SessionRuntimeTest do
     end
 
     @tag driver: driver
+    test "a #{driver} session started in a Task belongs to the test" do
+      # LiveViewTest starts LiveViews only from the test process, so the Task visits a static page.
+      session = Task.await(Task.async(fn -> unquote(driver) |> start_session() |> visit("/chamber") end))
+      expect(session, "The guardian sleeps" |> by_text() |> to_be_visible())
+      visit(session, "/live/three-heads")
+      click(session, by_role(:button, name: "Play the flute"))
+      expect(session, "Sleeping heads: 1" |> by_text() |> to_be_visible())
+    end
+
+    @tag driver: driver
     test "closing one #{driver} session leaves another usable" do
       first = unquote(driver) |> start_session() |> visit("/live/three-heads")
       second = unquote(driver) |> start_session() |> visit("/live/three-heads")
