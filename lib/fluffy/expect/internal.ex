@@ -19,10 +19,23 @@ defmodule Fluffy.Expect.Internal do
   def reg_exp(expected), do: expected
 
   @doc "Whether `actual` equals `expected` or matches its regular expression, with JS semantics."
-  def matches?(%RegExp{} = expected, actual) when is_binary(actual),
-    do: expected |> RegExp.compile!() |> Regex.match?(actual)
+  def matches?(%RegExp{} = expected, actual) when is_binary(actual), do: expected |> compile!() |> Regex.match?(actual)
 
   def matches?(expected, actual), do: actual == expected
+
+  @doc """
+  `expected` compiled once per process, as an expectation retries its check and may
+  match each element.
+  """
+  def compile!(%RegExp{} = expected) do
+    key = {__MODULE__, :reg_exp, expected}
+
+    with nil <- Process.get(key) do
+      regex = RegExp.compile!(expected)
+      Process.put(key, regex)
+      regex
+    end
+  end
 
   @doc """
   Whether `url` matches a `page_to_have_url/2` expectation on the Phoenix drivers, as in
