@@ -12,23 +12,13 @@ defmodule Fluffy.TestTimeout do
   @doc "The calling test's `{timeout, backstop}`, `nil` without one."
   @spec fetch() :: {pos_integer(), integer()} | nil
   def fetch do
-    case info() do
-      %{timeout: timeout, deadline: deadline} when is_integer(timeout) and is_integer(deadline) ->
+    case Fluffy.TestInfo.fetch() do
+      {:ok, %{timeout: timeout, deadline: deadline}} when is_integer(timeout) and is_integer(deadline) ->
         {timeout, deadline - min(1000, div(timeout, 20))}
 
       _none ->
         nil
     end
-  end
-
-  # `PlaywrightEx.Test.info/0` raises this outside a registered test, its only error.
-  defp info do
-    PlaywrightEx.Test.info()
-  rescue
-    error in RuntimeError ->
-      if String.starts_with?(error.message, "PlaywrightEx.Test.info() can only be called while a test is running"),
-        do: nil,
-        else: reraise(error, __STACKTRACE__)
   end
 
   @doc "`deadline`, bounded by the test's backstop."

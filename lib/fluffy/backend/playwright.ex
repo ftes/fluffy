@@ -79,20 +79,22 @@ defmodule Fluffy.Backend.Playwright do
     end
   end
 
-  # Listeners only forward. The runtime does the work, and receives each
-  # message before the reply of the call that caused it.
   # PlaywrightEx.Test's error says to add `use PlaywrightEx.Test`; Fluffy's modules get it
   # from `use Fluffy.Case`.
   defp test_pid! do
-    PlaywrightEx.Test.info().test_pid
-  rescue
-    RuntimeError ->
-      reraise RuntimeError,
+    case Fluffy.TestInfo.fetch() do
+      {:ok, info} ->
+        info.test_pid
+
+      :error ->
+        raise RuntimeError,
               "a Playwright session can only start while a test is running: in a test of a module with " <>
-                "`use Fluffy.Case` (its process, or one with it in $callers)",
-              __STACKTRACE__
+                "`use Fluffy.Case` (its process, or one with it in $callers)"
+    end
   end
 
+  # Listeners only forward. The runtime does the work, and receives each
+  # message before the reply of the call that caused it.
   defp listen(browser_context, runtime) do
     forward = fn kind -> fn native -> send(runtime, {:fluffy_playwright, kind, native}) end end
 

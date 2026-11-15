@@ -78,8 +78,9 @@ defmodule Fluffy.Session do
   # so one started in a Task outlives it. An unregistered test has no `info`: its process is
   # the first in `$callers`' chain, the one with no callers.
   defp test_pid do
-    PlaywrightEx.Test.info().test_pid
-  rescue
-    RuntimeError -> List.last([self() | Process.get(:"$callers", [])])
+    case Fluffy.TestInfo.fetch() do
+      {:ok, info} -> info.test_pid
+      :error -> List.last([self() | Process.get(:"$callers", [])])
+    end
   end
 end
