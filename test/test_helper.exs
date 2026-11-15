@@ -16,9 +16,7 @@ ExUnit.start(
   max_cases: max_cases,
   assert_receive_timeout: 2_000,
   # Added to the configured list; `mix test --formatter` replaces it, so CI names them all.
-  formatters:
-    ExUnit.configuration()[:formatters] ++
-      [Fluffy.Support.FailuresFormatter, Fluffy.Support.ModuleTimesFormatter]
+  formatters: ExUnit.configuration()[:formatters] ++ [Fluffy.Support.ModuleTimesFormatter]
 )
 
 {:ok, _test_server} = Fluffy.Support.Server.start_link()

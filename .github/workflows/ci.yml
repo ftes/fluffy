@@ -191,9 +191,9 @@ jobs:
       # Test failures (exit 2) are retried once, only the failed tests (`mix test --failed`);
       # compile errors are not. The retry takes no --partitions: the failures manifest holds this
       # partition's failures only, and --partitions would split those files again. The first run's
-      # failures are annotated by PlaywrightEx.Test.GitHubFormatter and listed in the job summary
-      # (Fluffy.Support.FailuresFormatter), so a green retry does not hide them; the retry has no
-      # annotations, so a test failing twice is annotated once. `--formatter` replaces test_helper's
+      # failures are annotated by PlaywrightEx.Test.GitHubFormatter, with a notice summing up the
+      # run, so a green retry does not hide them; the retry has no annotations, so a test failing
+      # twice is annotated once. `--formatter` replaces test_helper's
       # list, so the first run names every formatter. The retry writes each test's artifacts to
       # `<dir>-retry1`, next to the first run's, as Playwright Test's retries do. The 10 slowest modules
       # (Fluffy.Support.ModuleTimesFormatter) are the floor of a partition's time. Warnings fail the
@@ -201,7 +201,6 @@ jobs:
       - name: Run tests with one retry
         id: tests
         env:
-          FLUFFY_FAILURES_FILE: ${{ runner.temp }}/first-run-failures.txt
           FLUFFY_MODULE_TIMES_FILE: ${{ runner.temp }}/module-times.txt
           LANE: ${{ matrix.lane }}
         run: |
@@ -212,20 +211,13 @@ jobs:
           status=0
           formatters=(
             --formatter ExUnit.CLIFormatter --formatter PlaywrightEx.Test.GitHubFormatter
-            --formatter Fluffy.Support.FailuresFormatter --formatter Fluffy.Support.ModuleTimesFormatter
+            --formatter Fluffy.Support.ModuleTimesFormatter
           )
           mix test "${strict[@]}" "${formatters[@]}" --seed "$fluffy_test_seed" --partitions "$TEST_PARTITIONS" || status=$?
 
           if [[ -s "$FLUFFY_MODULE_TIMES_FILE" ]]; then
             echo "Slowest modules ($label), wall ms, setup_all included:"
             sort -rn "$FLUFFY_MODULE_TIMES_FILE" | head -n 10
-          fi
-          if [[ -s "$FLUFFY_FAILURES_FILE" ]]; then
-            {
-              echo "### First-run failures ($label)"
-              echo
-              while IFS=$'\t' read -r location name; do echo "- \`$location\` $name"; done < "$FLUFFY_FAILURES_FILE"
-            } >> "$GITHUB_STEP_SUMMARY"
           fi
           if [[ $status != 2 ]]; then
             exit "$status"
