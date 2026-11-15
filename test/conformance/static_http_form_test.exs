@@ -579,6 +579,35 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
     end
 
     @tag driver: driver
+    test "a legend in a disabled fieldset nested in another is not submitted with #{driver}", %{driver: driver} do
+      fixture =
+        HTTPFixtures.register_sequence([
+          %{
+            body:
+              html("""
+              <form method="post" action="submit">
+                <input type="hidden" name="password" value="caput-draconis">
+                <fieldset disabled>
+                  <fieldset disabled><legend><input name="house" value="gryffindor"></legend></fieldset>
+                </fieldset>
+                <button>Enter the common room</button>
+              </form>
+              """)
+          },
+          %{body: html("<h1>Common room</h1>")}
+        ])
+
+      driver
+      |> start_test_session()
+      |> visit(HTTPFixtures.path(fixture, "/forms/start"))
+      |> click(by_role(:button, name: "Enter the common room"))
+      |> expect("Common room" |> by_text() |> to_be_visible())
+
+      [_source, submission] = HTTPFixtures.requests(fixture)
+      assert submission.body == "password=caput-draconis"
+    end
+
+    @tag driver: driver
     test "a single select with every option deselected is not submitted with #{driver}", %{driver: driver} do
       fixture =
         HTTPFixtures.register_sequence([

@@ -449,11 +449,7 @@ defmodule Fluffy.HTML.Aria do
     natively_disabled?(aria, node) or explicit_aria_disabled?(aria, node)
   end
 
-  # roleUtils.ts isNativelyDisabled. Takes the model or just its index, for
-  # form submission, which honors native disabled state alone. Known difference
-  # there: HTML disables a control in any disabled ancestor fieldset outside its
-  # first legend, Playwright checks only the closest one, so a control in the
-  # legend of a disabled fieldset nested in another is submitted.
+  # roleUtils.ts isNativelyDisabled. Takes the model or just its index.
   def natively_disabled?(aria_or_index, %{tag: tag} = node) when tag in @native_form_controls do
     node = fetch(aria_or_index, node.id)
 
@@ -462,6 +458,27 @@ defmodule Fluffy.HTML.Aria do
   end
 
   def natively_disabled?(_aria_or_index, _node), do: false
+
+  # HTML's disabled form control, which form submission honors: any disabled
+  # ancestor fieldset counts unless the control is in its first legend, where
+  # isNativelyDisabled checks only the closest one.
+  def form_control_disabled?(aria_or_index, node) do
+    node = fetch(aria_or_index, node.id)
+    attribute?(node, "disabled") or in_disabled_field_set?(aria_or_index, parent(aria_or_index, node), node)
+  end
+
+  defp in_disabled_field_set?(_aria_or_index, nil, _node), do: false
+
+  defp in_disabled_field_set?(aria_or_index, ancestor, node) do
+    disabled? =
+      ancestor.tag == "fieldset" and attribute?(ancestor, "disabled") and
+        case first_child(aria_or_index, ancestor, "legend") do
+          nil -> true
+          legend -> node.id not in legend.id..legend.last_id//1
+        end
+
+    disabled? or in_disabled_field_set?(aria_or_index, parent(aria_or_index, ancestor), node)
+  end
 
   # HTMLOptionElement.disabled, which a select's default selection and form
   # submission honor: unlike isNativelyDisabled, a disabled fieldset does not count.

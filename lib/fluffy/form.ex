@@ -183,7 +183,7 @@ defmodule Fluffy.Form do
           same_target?(target, submitter) ->
         input_fields(target, properties, submitter, name, driver)
 
-      name in [nil, ""] or target.disabled? ->
+      name in [nil, ""] or Aria.form_control_disabled?(index, target) ->
         []
 
       target.tag == "button" ->
