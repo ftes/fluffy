@@ -45,7 +45,7 @@ defmodule Fluffy.ClientDOM.Expectation do
 
   def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :text, expected: {expected, options}} = expectation) do
     match = &text_matches?(&1, &2, normalize: true, ignore_case: options[:ignore_case])
-    evaluate_text(client_dom, locator, expectation, expected, match, true)
+    evaluate_text(client_dom, locator, expectation, compile(expected, options[:ignore_case]), match, true)
   end
 
   def evaluate(
@@ -53,7 +53,7 @@ defmodule Fluffy.ClientDOM.Expectation do
         %Expect{target: {:locator, locator}, kind: :contain_text, expected: {expected, options}} = expectation
       ) do
     match = &text_matches?(&1, &2, normalize: true, ignore_case: options[:ignore_case], contains: true)
-    evaluate_text(client_dom, locator, expectation, expected, match, false)
+    evaluate_text(client_dom, locator, expectation, compile(expected, options[:ignore_case]), match, false)
   end
 
   def evaluate(
@@ -72,7 +72,7 @@ defmodule Fluffy.ClientDOM.Expectation do
   end
 
   def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :class, expected: expected} = expectation) do
-    evaluate_class(client_dom, locator, expectation, expected, &text_matches?(&1, &2, []))
+    evaluate_class(client_dom, locator, expectation, compile(expected, nil), &text_matches?(&1, &2, []))
   end
 
   def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :contain_class, expected: expected} = expectation) do
@@ -204,6 +204,16 @@ defmodule Fluffy.ClientDOM.Expectation do
       matches_sequentially?(values, remaining, match)
     end
   end
+
+  # A regular expression compiled once per check, not once per element.
+  defp compile(expected, ignore_case) when is_list(expected), do: Enum.map(expected, &compile(&1, ignore_case))
+
+  defp compile(%PlaywrightEx.RegExp{} = expected, ignore_case),
+    do: expected |> Expect.Internal.ignore_case(ignore_case) |> PlaywrightEx.RegExp.compile!()
+
+  defp compile(expected, _ignore_case), do: expected
+
+  defp text_matches?(%Regex{} = expected, actual, _options), do: is_binary(actual) and Regex.match?(expected, actual)
 
   defp text_matches?(%PlaywrightEx.RegExp{} = expected, actual, options) do
     expected |> Expect.Internal.ignore_case(options[:ignore_case]) |> Expect.Internal.matches?(actual)

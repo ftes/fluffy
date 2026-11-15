@@ -103,6 +103,12 @@ defmodule Fluffy.Locator.Static do
   end
 
   defp filter_candidates(candidates, aria, options) do
+    options =
+      Enum.map(options, fn
+        {key, text} when key in [:has_text, :has_not_text] -> {key, compile(text)}
+        option -> option
+      end)
+
     Enum.filter(candidates, fn candidate ->
       Enum.all?(options, fn
         {:has_text, text} -> contains_text?(text(aria, candidate), text)
@@ -116,7 +122,7 @@ defmodule Fluffy.Locator.Static do
 
   defp role_matches(scopes, aria, role, options) do
     role = role |> to_string() |> String.downcase()
-    expected_name = Keyword.get(options, :name)
+    expected_name = options |> Keyword.get(:name) |> compile()
     exact? = Keyword.get(options, :exact, false)
 
     scopes
@@ -132,6 +138,8 @@ defmodule Fluffy.Locator.Static do
   # matches: those without a matching descendant. Ids are preorder, so a match's
   # descendants are the matches up to its last_id.
   defp text_matches(scopes, aria, text, exact?) do
+    text = compile(text)
+
     scopes
     |> Enum.flat_map(&self_and_scoped_nodes(aria, &1))
     |> Enum.uniq_by(fn {node, _element} -> node.id end)
@@ -151,6 +159,7 @@ defmodule Fluffy.Locator.Static do
   # getElementLabels. A label or reference may be anywhere in the document.
   defp label_matches(scopes, aria, text, options) do
     exact? = Keyword.get(options, :exact, false)
+    text = compile(text)
 
     scopes
     |> scoped_nodes(aria)
@@ -170,8 +179,8 @@ defmodule Fluffy.Locator.Static do
   defp accessible_name_matches?(_aria, _node, nil, _exact?), do: true
 
   # As upstream, a regular expression sees the normalized accessible name.
-  defp accessible_name_matches?(aria, node, %RegExp{} = expected, _exact?),
-    do: expected |> RegExp.compile!() |> Regex.match?(aria |> Aria.name(node) |> StringUtils.normalize_white_space())
+  defp accessible_name_matches?(aria, node, %Regex{} = expected, _exact?),
+    do: Regex.match?(expected, aria |> Aria.name(node) |> StringUtils.normalize_white_space())
 
   defp accessible_name_matches?(aria, node, expected, exact?) do
     aria |> Aria.name(node) |> text_matches?(expected, exact?)
@@ -204,7 +213,7 @@ defmodule Fluffy.Locator.Static do
   defp text_matches?(nil, _expected, _exact?), do: false
 
   # As upstream, a regular expression ignores `exact?` and sees the text as is.
-  defp text_matches?(actual, %RegExp{} = expected, _exact?), do: expected |> RegExp.compile!() |> Regex.match?(actual)
+  defp text_matches?(actual, %Regex{} = expected, _exact?), do: Regex.match?(expected, actual)
 
   defp text_matches?(actual, expected, true),
     do: StringUtils.normalize_white_space(actual) == StringUtils.normalize_white_space(expected)
@@ -215,6 +224,10 @@ defmodule Fluffy.Locator.Static do
     |> String.downcase()
     |> String.contains?(expected |> StringUtils.normalize_white_space() |> String.downcase())
   end
+
+  # Once per query, not per element.
+  defp compile(%RegExp{} = expected), do: RegExp.compile!(expected)
+  defp compile(expected), do: expected
 
   defp attribute_matches?(nil, _expected, _exact?), do: false
   defp attribute_matches?(actual, expected, true), do: actual == expected
