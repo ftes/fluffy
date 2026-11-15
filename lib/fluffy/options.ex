@@ -508,10 +508,11 @@ defmodule Fluffy.Options do
   def config!(key) when key in [:navigation_timeout | @playwright_test_keys], do: Map.fetch!(resolved_config!(), key)
 
   # Read on every timeout, so resolved once per env, as PlaywrightEx's
-  # `Matchers.Expect.app_env_expect_config/0`; an invalid env raises on each read.
+  # `Matchers.Expect.app_env_expect_config/0`: keyed on the values it resolves from, and
+  # validated in full (`config!/0`) on a miss, so an invalid value raises on each read.
   defp resolved_config! do
     env =
-      {Enum.sort(Application.get_all_env(:fluffy)), Application.get_env(:playwright_ex, :test),
+      {Enum.map(@playwright_test_keys, &Application.get_env(:fluffy, &1)), Application.get_env(:playwright_ex, :test),
        Application.get_env(:playwright_ex, :expect)}
 
     case :persistent_term.get({__MODULE__, :config}, nil) do
