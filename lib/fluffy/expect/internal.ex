@@ -116,7 +116,7 @@ defmodule Fluffy.Expect.Internal do
   end
 
   defp positive_description(%Expect{target: :page, kind: :screenshot, expected: options}) do
-    "active page to match the screenshot at #{inspect(options[:path])}"
+    "active page to match the screenshot#{snapshot_file(options)}"
   end
 
   defp positive_description(%Expect{target: :page, kind: :aria_snapshot, expected: expected}) do
@@ -136,10 +136,10 @@ defmodule Fluffy.Expect.Internal do
   defp locator_matcher_description(:css, {name, value, _options}), do: "to have CSS #{name} #{inspect(value)}"
   defp locator_matcher_description(:js_property, {name, value}), do: "to have JS property #{name} #{inspect(value)}"
 
-  defp locator_matcher_description(:screenshot, options), do: "to match the screenshot at #{inspect(options[:path])}"
+  defp locator_matcher_description(:screenshot, options), do: "to match the screenshot#{snapshot_file(options)}"
 
-  defp locator_matcher_description(:aria_snapshot, {nil, path: path}),
-    do: "to match the ARIA snapshot at #{inspect(path)}"
+  defp locator_matcher_description(:aria_snapshot, {nil, options}),
+    do: "to match the ARIA snapshot#{snapshot_file(options)}"
 
   defp locator_matcher_description(:aria_snapshot, {expected, _options}),
     do: "to match the ARIA snapshot #{inspect(expected)}"
@@ -175,6 +175,15 @@ defmodule Fluffy.Expect.Internal do
 
   defp locator_matcher_description(:attribute, {name, value, options}),
     do: "to have attribute #{inspect(name)} with value #{inspect(value)}#{ignoring_case(options)}"
+
+  # A file derived from the test's name is not known here.
+  defp snapshot_file(options) do
+    cond do
+      options[:path] -> " at #{inspect(options[:path])}"
+      options[:name] -> " named #{inspect(options[:name])}"
+      true -> ""
+    end
+  end
 
   defp ignoring_case(options), do: if(options[:ignore_case], do: ", ignoring case", else: "")
 

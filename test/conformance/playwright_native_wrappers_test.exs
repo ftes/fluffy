@@ -244,6 +244,23 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
       ExUnit.CaptureIO.capture_io(fn -> expect(session, to_have_screenshot(by_css("#box"), name: "fluffy-box.png")) end)
       assert File.exists?(path)
       expect(session, to_have_screenshot(by_css("#box"), name: "fluffy-box.png"))
+      paint(session, "rgb(200, 0, 0)")
+
+      assert_raise ExUnit.AssertionError, ~r/to match the screenshot named "fluffy-box.png"/, fn ->
+        expect(session, to_have_screenshot(by_css("#box"), name: "fluffy-box.png"))
+      end
+    end
+
+    test "describes a screenshot named after the test without a file" do
+      session = session_for_html(:playwright, @html)
+
+      error =
+        assert_raise ExUnit.AssertionError, fn ->
+          expect(session, not_(to_have_screenshot(by_css("#box"))))
+        end
+
+      assert error.message =~ "to match the screenshot"
+      refute error.message =~ "nil"
     end
 
     test "rejects options that bypass tracking" do
@@ -339,6 +356,14 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
 
     test "to_match_aria_snapshot fails naming the expectation" do
       session = session_for_html(:playwright, @html)
+      path = PlaywrightEx.Test.snapshot_path("fluffy-panel.aria.yml", kind: :aria)
+      on_exit(fn -> File.rm_rf!(Path.dirname(path)) end)
+      File.mkdir_p!(Path.dirname(path))
+      File.write!(path, ~s(- button "Other"))
+
+      assert_raise ExUnit.AssertionError, ~r/to match the ARIA snapshot named "fluffy-panel.aria.yml"/, fn ->
+        expect(session, to_match_aria_snapshot(by_css("#panel"), name: "fluffy-panel.aria.yml", timeout: 100))
+      end
 
       assert_raise ExUnit.AssertionError, ~r/to match the ARIA snapshot/, fn ->
         expect(session, to_match_aria_snapshot(by_css("#panel"), ~s(- button "Other"), timeout: 100))

@@ -187,11 +187,15 @@ defmodule Fluffy.Options do
   @denied_expectation_keys [:signal]
 
   @mirrored_expectation_options [
+    name: [
+      type: :string,
+      doc: "The snapshot file's name, in place of `expected`, resolved by `PlaywrightEx.Test`."
+    ],
     path: [
       type: :string,
       doc:
-        "The snapshot file, in place of `expected`, resolved against the current working directory. " <>
-          "Fluffy does not derive a path from the test name."
+        "The snapshot file, in place of `expected`, resolved against the current working directory, " <>
+          "in place of `:name`. Required in a module without `use PlaywrightEx.Test`."
     ],
     visible: [type: :boolean, doc: "Set to false to expect a hidden target, like `not_/1`."],
     editable: [type: :boolean, doc: "Set to false to expect a read-only target, like `not_/1`."],
