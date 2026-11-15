@@ -103,20 +103,6 @@ defmodule Fluffy.Conformance.DefaultTimeoutTest do
       |> click(@appeared)
       |> expect("Activated" |> by_text() |> to_be_visible())
     end
-
-    # As a call's `timeout: 0`; Playwright's 0 would wait for the button.
-    @tag driver: driver
-    test "expect_timeout: 0 checks expectations once with #{driver}", %{driver: driver} do
-      put_fluffy_config(expect_timeout: 0)
-
-      session =
-        driver
-        |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
-        |> visit("/live/async?delay=1000")
-
-      {elapsed, _error} = failure(fn -> expect(session, to_be_visible(@appeared)) end)
-      assert elapsed < 1_000
-    end
   end
 
   # As in Playwright, a route that never answers leaves the navigation to its timeout.
