@@ -301,9 +301,12 @@ config :fluffy, ecto_repos: [MyApp.Repo]
 ```
 
 Sessions close in their own `on_exit`, registered after the DataCase's, so browser
-contexts and in-process LiveViews close before the owner stops. A plain
-`Ecto.Adapters.SQL.Sandbox.checkout/1` in the test process is not supported for browser
-tests: its connection goes with the test process, before the browser closes.
+contexts and in-process LiveViews close before the owner stops. Start sessions in the test
+process or its `setup`: a Phoenix session started from a `Task` belongs to the test too, but
+closes when the test process exits, alongside the `on_exit` callbacks, so maybe after the
+owner stops. A plain `Ecto.Adapters.SQL.Sandbox.checkout/1` in the test process is not
+supported for browser tests: its connection goes with the test process, before the browser
+closes.
 
 The defaults are the `x-fluffy-sandbox` header and
 `Ecto.Adapters.SQL.Sandbox`. Applications that already use Phoenix Ecto's

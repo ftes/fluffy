@@ -11,7 +11,8 @@ defmodule Fluffy.SessionRuntime do
   # A session's runtime, which stops with `owner`. Started by the owner, it also stops at
   # the end of the test it runs: ExUnit runs `on_exit` callbacks in reverse, after the test
   # process exits and also when it fails, so sessions close before the application's
-  # sandbox owners stop, which its DataCase registered first. A Task can't register one.
+  # sandbox owners stop, which its DataCase registered first. A Task can't register one, so
+  # a runtime it starts stops when the test process exits, concurrently with `on_exit`.
   def start!(owner) do
     {:ok, runtime} = start(owner)
 
