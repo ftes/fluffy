@@ -504,18 +504,38 @@ defmodule Fluffy.Options do
   # (`PlaywrightEx.Test.config/0`, its defaults filled in), where `0` means no limit:
   # `:infinity` here. `navigation_timeout` is PlaywrightEx's only.
   @spec config!(atom()) :: term()
-  def config!(key) when key in @playwright_test_keys do
-    case Keyword.fetch(config!(), key) do
-      {:ok, value} -> value
-      :error -> playwright_ex_config(key)
+  def config!(key) when key in [:navigation_timeout | @playwright_test_keys], do: Map.fetch!(resolved_config!(), key)
+
+  # Read on every timeout, so resolved once per env, as PlaywrightEx's
+  # `Matchers.Expect.app_env_expect_config/0`; an invalid env raises on each read.
+  defp resolved_config! do
+    env =
+      {Enum.sort(Application.get_all_env(:fluffy)), Application.get_env(:playwright_ex, :test),
+       Application.get_env(:playwright_ex, :expect)}
+
+    case :persistent_term.get({__MODULE__, :config}, nil) do
+      {^env, config} ->
+        config
+
+      _stale ->
+        config = resolve_config!()
+        :persistent_term.put({__MODULE__, :config}, {env, config})
+        config
     end
   end
 
-  def config!(:navigation_timeout), do: playwright_ex_config(:navigation_timeout)
+  defp resolve_config! do
+    fluffy = config!()
+    playwright_ex = PlaywrightEx.Test.config()
 
-  defp playwright_ex_config(:expect_timeout), do: no_limit(PlaywrightEx.Test.config().expect.timeout)
-  defp playwright_ex_config(:test_id_attribute), do: PlaywrightEx.Test.config().test_id_attribute
-  defp playwright_ex_config(key), do: no_limit(Map.fetch!(PlaywrightEx.Test.config(), key))
+    Map.new([:navigation_timeout | @playwright_test_keys], fn key ->
+      {key, Keyword.get_lazy(fluffy, key, fn -> playwright_ex_config(playwright_ex, key) end)}
+    end)
+  end
+
+  defp playwright_ex_config(config, :expect_timeout), do: no_limit(config.expect.timeout)
+  defp playwright_ex_config(config, :test_id_attribute), do: config.test_id_attribute
+  defp playwright_ex_config(config, key), do: no_limit(Map.fetch!(config, key))
 
   defp no_limit(0), do: :infinity
   defp no_limit(timeout), do: timeout

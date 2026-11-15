@@ -109,6 +109,17 @@ defmodule Fluffy.PlaywrightConfigurationTest do
     assert {Timeouts.action(), Timeouts.expect()} == {:infinity, :infinity}
   end
 
+  test "a cached setting follows a later change of either app's env" do
+    put_playwright_ex(expect: [timeout: 1_000])
+    assert Timeouts.expect() == 1_000
+
+    put_playwright_ex(expect: [timeout: 2_000])
+    assert Timeouts.expect() == 2_000
+
+    put_env(expect_timeout: 500)
+    assert Timeouts.expect() == 500
+  end
+
   # PlaywrightEx's `0` means no limit, as Playwright's; Fluffy's keep Fluffy's meaning.
   test "PlaywrightEx's 0 is no limit" do
     put_playwright_ex(test: [action_timeout: 0, navigation_timeout: 0], expect: [timeout: 0])
