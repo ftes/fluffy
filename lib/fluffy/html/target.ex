@@ -10,7 +10,8 @@ defmodule Fluffy.HTML.Target do
     :tag,
     :ancestors,
     :selector,
-    disabled?: false
+    disabled?: false,
+    form_control_disabled?: false
   ]
 
   @type t :: %__MODULE__{
@@ -22,6 +23,8 @@ defmodule Fluffy.HTML.Target do
           ancestors: [t()] | nil,
           selector: String.t() | nil,
           # Natively disabled, by `Fluffy.HTML.Aria.natively_disabled?/2`.
-          disabled?: boolean()
+          disabled?: boolean(),
+          # HTML's disabled form control, by `Fluffy.HTML.Aria.form_control_disabled?/2`.
+          form_control_disabled?: boolean()
         }
 end

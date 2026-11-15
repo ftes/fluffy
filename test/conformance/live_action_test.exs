@@ -257,6 +257,35 @@ defmodule Fluffy.Conformance.LiveActionTest do
       |> expect(to_have_text(log, ~s(Log: inspect:name="div" inspect:value=3 inspect:key="custom",value="typed")))
     end
 
+    # HTML disables a control in the first legend of a disabled fieldset nested
+    # in another, so the browser sends it no click, though Playwright's
+    # actionability finds it enabled. A disabled fieldset leaves other elements' clicks alone.
+    @tag driver: driver
+    if driver == :playwright, do: @tag(:webkit_difference)
+
+    test "a legend in a disabled fieldset nested in another gets no click with #{driver}", %{driver: driver} do
+      log = by_css("#log")
+      feed = by_role(:button, name: "Feed Fluffy", exact: true)
+      session = driver |> live_session() |> visit("/live/click-bindings")
+
+      cond do
+        clicks_nested_disabled_legend?(driver) ->
+          session |> click(feed) |> expect(to_have_text(log, "Log: feed"))
+
+        driver == :playwright ->
+          click(session, feed)
+
+        true ->
+          assert_raise ArgumentError, ~r/because it is disabled/, fn -> click(session, feed) end
+      end
+
+      session
+      |> click(by_text("Soothe Fluffy", exact: true))
+      |> expect(
+        to_have_text(log, if(clicks_nested_disabled_legend?(driver), do: "Log: feed soothe", else: "Log: soothe"))
+      )
+    end
+
     @tag driver: driver
     test "a click on text inside a submit button or link takes its default action with #{driver}", %{driver: driver} do
       session = driver |> live_session() |> visit("/live/click-bindings")
@@ -390,6 +419,10 @@ defmodule Fluffy.Conformance.LiveActionTest do
       |> expect(to_have_text(last, "Last: note-save note=meta"))
     end
   end
+
+  # WebKit dispatches the click, as it submits such a control; Phoenix keeps HTML's rule.
+  defp clicks_nested_disabled_legend?(:playwright), do: playwright_engine?(:webkit)
+  defp clicks_nested_disabled_legend?(_driver), do: false
 
   defp live_session(driver) do
     start_session(driver,

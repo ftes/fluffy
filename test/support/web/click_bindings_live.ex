@@ -54,6 +54,8 @@ defmodule Fluffy.Support.Web.ClickBindingsLive do
   def handle_event("track", _params, socket), do: {:noreply, log(socket, "track")}
   def handle_event("pick-value", %{"value" => value}, socket), do: {:noreply, log(socket, "pick-value:#{value}")}
   def handle_event("rename", _params, socket), do: {:noreply, socket |> assign(name: "Fido") |> log("rename")}
+  def handle_event("feed", _params, socket), do: {:noreply, log(socket, "feed")}
+  def handle_event("soothe", _params, socket), do: {:noreply, log(socket, "soothe")}
   def handle_event("save-name", %{"name" => name}, socket), do: {:noreply, log(socket, "save-name:#{name}")}
 
   # Logs the whole payload, with each value's JSON type.
@@ -109,6 +111,12 @@ defmodule Fluffy.Support.Web.ClickBindingsLive do
     <ol>
       <li id="valued-item" value="3" phx-click="inspect">Inspect item</li>
     </ol>
+    <fieldset disabled>
+      <fieldset disabled>
+        <legend><button type="button" phx-click="feed">Feed Fluffy</button></legend>
+      </fieldset>
+      <div phx-click="soothe">Soothe Fluffy</div>
+    </fieldset>
     <input aria-label="Keyed" value="typed" phx-keydown="inspect" phx-value-key="custom" />
     <p id="log">Log: {Enum.join(@log, " ")}</p>
     <p id="tab">Tab: {@tab}</p>

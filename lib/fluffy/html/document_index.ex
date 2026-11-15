@@ -246,6 +246,7 @@ defmodule Fluffy.HTML.DocumentIndex do
       children: entry.children,
       disabled?: Aria.natively_disabled?(index, entry),
       element: element,
+      form_control_disabled?: Aria.form_control_disabled?(index, entry),
       id: entry.id,
       selector: selector(entry.selector_path),
       tag: entry.tag
@@ -257,6 +258,7 @@ defmodule Fluffy.HTML.DocumentIndex do
       attributes: entry.attributes,
       children: entry.children,
       disabled?: Aria.natively_disabled?(index, entry),
+      form_control_disabled?: Aria.form_control_disabled?(index, entry),
       id: entry.id,
       tag: entry.tag
     }
