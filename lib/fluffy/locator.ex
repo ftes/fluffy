@@ -228,10 +228,12 @@ defmodule Fluffy.Locator do
   @doc group: "Constructors"
   @doc "Like `by_test_id/1`, inside `parent`, a locator or frame scope."
   @spec by_test_id(scope(), String.t()) :: t()
-  @spec by_test_id(String.t(), keyword()) :: no_return()
+  @spec by_test_id(String.t(), keyword()) :: t()
   def by_test_id(parent, test_id)
       when is_binary(test_id) and (is_struct(parent, __MODULE__) or is_struct(parent, FrameLocator)),
       do: child_query(parent, {:test_id, test_id})
+
+  def by_test_id(test_id, []) when is_binary(test_id), do: by_test_id(test_id)
 
   def by_test_id(test_id, options) when is_binary(test_id) and is_list(options) do
     raise ArgumentError,

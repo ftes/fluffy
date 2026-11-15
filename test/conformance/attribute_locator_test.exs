@@ -41,7 +41,9 @@ defmodule Fluffy.Conformance.AttributeLocatorTest do
     end
   end
 
-  test "by_test_id takes no options, as Playwright's getByTestId" do
+  test "by_test_id takes no options but an empty list, as Playwright's getByTestId" do
+    assert by_test_id("hedwig", []) == by_test_id("hedwig")
+
     assert_raise ArgumentError, ~r/by_test_id\/2 takes no options.*test_id_attribute.*by_css/, fn ->
       by_test_id("hedwig", attribute: "data-owl")
     end
