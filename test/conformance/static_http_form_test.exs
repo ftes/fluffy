@@ -579,6 +579,8 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
     end
 
     @tag driver: driver
+    if driver == :playwright, do: @tag(:webkit_difference)
+
     test "a legend in a disabled fieldset nested in another is not submitted with #{driver}", %{driver: driver} do
       fixture =
         HTTPFixtures.register_sequence([
@@ -604,7 +606,10 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       |> expect("Common room" |> by_text() |> to_be_visible())
 
       [_source, submission] = HTTPFixtures.requests(fixture)
-      assert submission.body == "password=caput-draconis"
+
+      if submits_nested_disabled_legend?(driver),
+        do: assert(submission.body == "password=caput-draconis&house=gryffindor"),
+        else: assert(submission.body == "password=caput-draconis")
     end
 
     @tag driver: driver
@@ -849,6 +854,11 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
     assert_receive {:answering, server}
     send(server, :finish)
   end
+
+  # WebKit submits the controls in the first legend of a disabled fieldset nested in another
+  # disabled one, which HTML disables with the outer fieldset; Phoenix keeps HTML's rule.
+  defp submits_nested_disabled_legend?(:playwright), do: playwright_engine?(:webkit)
+  defp submits_nested_disabled_legend?(_driver), do: false
 
   defp start_test_session(driver) do
     start_session(driver,

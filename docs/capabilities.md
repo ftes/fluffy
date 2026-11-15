@@ -193,7 +193,8 @@ Only URL expectations and `visit` back into the app work on that page; everythin
 
 Fluffy's conformance suite runs against Playwright's pinned Chromium, Firefox,
 and WebKit. Known engine differences: WebKit does not send `Secure` cookies to
-`http://` loopback origins. Firefox never completes or fails an interrupted
+`http://` loopback origins, and submits the controls in the legend of a disabled
+`<fieldset>` nested in another disabled one. Firefox never completes or fails an interrupted
 download, and with Playwright 1.65 a file chooser awaited right after an earlier
 one occasionally opens a native dialog instead.
 Playwright's `set_input_files` checks only that the target is an `<input>`:
