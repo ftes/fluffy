@@ -16,6 +16,7 @@ assertions, pattern bindings, custom messages, and other helpers remain availabl
 
 ```elixir
 use ExUnit.Case, async: true
+use Fluffy.Case
 use Fluffy.Assert
 
 import Fluffy
@@ -46,7 +47,7 @@ session
 ```
 
 See [Shared test case](usage.md#shared-test-case) to centralize these imports
-and lifecycle setup.
+and the session setup.
 
 ## Expect style
 
@@ -55,6 +56,7 @@ keep their names; assertion constructors use `to_be_*` and `to_have_*`.
 
 ```elixir
 use ExUnit.Case, async: true
+use Fluffy.Case
 
 import Fluffy
 import Fluffy.Expect

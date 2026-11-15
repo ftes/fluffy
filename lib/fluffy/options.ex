@@ -119,7 +119,7 @@ defmodule Fluffy.Options do
         type: :string,
         doc:
           "*Playwright only.* The baseline image, a `.png` or `.webp` file, resolved against the current " <>
-            "working directory, in place of `:name`. Required in a module without `use PlaywrightEx.Test`."
+            "working directory, in place of `:name`. Required in a module without `use Fluffy.Case`."
       ]
     ]
   ]
@@ -196,7 +196,7 @@ defmodule Fluffy.Options do
       type: :string,
       doc:
         "The snapshot file, in place of `expected`, resolved against the current working directory, " <>
-          "in place of `:name`. Required in a module without `use PlaywrightEx.Test`."
+          "in place of `:name`. Required in a module without `use Fluffy.Case`."
     ],
     visible: [type: :boolean, doc: "Set to false to expect a hidden target, like `not_/1`."],
     editable: [type: :boolean, doc: "Set to false to expect a read-only target, like `not_/1`."],

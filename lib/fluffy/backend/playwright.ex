@@ -22,9 +22,8 @@ defmodule Fluffy.Backend.Playwright do
 
   @impl true
   def start_session(options) do
-    # Raises outside a test, saying to add `use PlaywrightEx.Test`. The session belongs to
-    # the test, also when a Task of it starts the session.
-    %{test_pid: test_pid} = PlaywrightEx.Test.info()
+    # The session belongs to the test, also when a Task of it starts the session.
+    test_pid = test_pid!()
     base_url = Keyword.fetch!(options, :base_url)
     browser_context_options = Keyword.get(options, :browser_context, [])
 
@@ -82,6 +81,18 @@ defmodule Fluffy.Backend.Playwright do
 
   # Listeners only forward. The runtime does the work, and receives each
   # message before the reply of the call that caused it.
+  # PlaywrightEx.Test's error says to add `use PlaywrightEx.Test`; Fluffy's modules get it
+  # from `use Fluffy.Case`.
+  defp test_pid! do
+    PlaywrightEx.Test.info().test_pid
+  rescue
+    RuntimeError ->
+      reraise RuntimeError,
+              "a Playwright session can only start while a test is running: in a test of a module with " <>
+                "`use Fluffy.Case` (its process, or one with it in $callers)",
+              __STACKTRACE__
+  end
+
   defp listen(browser_context, runtime) do
     forward = fn kind -> fn native -> send(runtime, {:fluffy_playwright, kind, native}) end end
 

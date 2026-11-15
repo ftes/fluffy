@@ -38,13 +38,13 @@ in your shared case module. Import the facade on its own; mixing it with
 `import Fluffy` introduces overlapping function names.
 
 After completing [Installation and runtime](installation.md), keep your application's
-`ConnCase`, and add `use PlaywrightEx.Test` after it in modules with browser tests. A
-prepared connection can
-still be piped directly into `Fluffy.PhoenixTest.visit/2`:
+`ConnCase`, and add `use Fluffy.Case` after it. A prepared connection can still be piped
+directly into `Fluffy.PhoenixTest.visit/2`:
 
 ```elixir
 defmodule MyAppWeb.PotionTest do
   use MyAppWeb.ConnCase, async: true
+  use Fluffy.Case
   import Fluffy.PhoenixTest
 
   test "saves a potion", %{conn: conn} do
@@ -90,12 +90,12 @@ To choose a backend, start a session explicitly. The same facade calls work with
 
 ```elixir
 defmodule MyAppWeb.PotionTest do
-  use ExUnit.Case, async: true
-  use PlaywrightEx.Test
+  use MyAppWeb.ConnCase, async: true
+  use Fluffy.Case
   import Fluffy.PhoenixTest
 
   setup context do
-    %{session: start_session(Map.get(context, :backend, :phoenix))}
+    %{session: start_session(context[:backend] || :phoenix)}
   end
 
   test "lists the available potions", %{session: session} do
@@ -115,9 +115,9 @@ end
 ```
 
 The setup above interprets the tag; Fluffy does not select a backend from tags
-by itself. Move this setup and the facade import into your application's case
-module when sharing it across tests. Module and describe tags work with the
-same setup. See [Choosing a backend](usage.md#choosing-a-backend) for guidance
+by itself. To share it across tests, move `use Fluffy.Case`, the facade import and this
+setup into your case template's `using` (see [Shared test case](usage.md#shared-test-case)).
+Module and describe tags work with the same setup. See [Choosing a backend](usage.md#choosing-a-backend) for guidance
 and [Playwright setup](installation.md#playwright-setup) for browser installation.
 
 ## What stays familiar, and what to check

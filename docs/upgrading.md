@@ -109,13 +109,13 @@ means no limit; see [Timeouts](installation.md#timeouts).
 - `Fluffy.Playwright.trace/2`, `artifact_dir` and `trace_dir` are removed. Traces,
   screenshots and videos come from `PlaywrightEx.Test`: set
   `config :playwright_ex, :test, trace: :retain_on_failure, screenshot: :only_on_failure`
-  and replace `setup context do Fluffy.Test.setup(context) end` with `use PlaywrightEx.Test`
-  in modules with browser tests or their case templates (Phoenix-only modules need nothing);
+  and replace `setup context do Fluffy.Test.setup(context) end` with `use Fluffy.Case` after
+  your `ConnCase` (or in your case template, see `Fluffy.Case`);
   tag a module or test with `trace: true` (or `screenshot:`, `video:`) to record it. Files go to
   `test-results/<test>/`; a failed operation no longer writes HTML or the error text.
 - Fluffy no longer starts or adopts Ecto sandbox owners: keep the generated DataCase
   setup (`Sandbox.start_owner!(repo, shared: not tags[:async])` and `stop_owner` in
-  `on_exit`) and use it before `use PlaywrightEx.Test`. Drop `sandbox: false` and `repos:`;
+  `on_exit`) and use it before `use Fluffy.Case`. Drop `sandbox: false` and `repos:`;
   Fluffy adds the metadata of `config :fluffy, ecto_repos:` to browser sessions. A plain
   `Sandbox.checkout` in the test process does not work for browser tests.
 - `Fluffy.Playwright.screenshot` and `pdf` return the image or PDF, as in Playwright,

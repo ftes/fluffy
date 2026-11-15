@@ -173,12 +173,12 @@ driver's version (`PlaywrightEx.Driver.version/0`): the driver finds the image's
 `launch_options: [executable_path: System.find_executable("google-chrome-stable")]` or
 `channel:`.
 
-A module that starts Playwright sessions needs `use PlaywrightEx.Test` after
-`use ExUnit.Case` (or in your case template's `using`). It records every Playwright
-session of the test: one `trace.zip` of all its sessions, a screenshot of each page as
-its session closes, and videos, each `:off` by default, and a failed test's
-`error-context.md`. The `*_on_failure` modes record every test and drop the files of
-passing ones. Each test writes to its own dir under `output_dir` (`test-results`);
+Test modules have `use Fluffy.Case` after your `ConnCase` or `use ExUnit.Case` (or in
+your case template's `using`). It adds `use PlaywrightEx.Test`, which Playwright sessions
+need, and which records every Playwright session of the test: one `trace.zip` of all its
+sessions, a screenshot of each page as its session closes, and videos, each `:off` by
+default, and a failed test's `error-context.md`. The `*_on_failure` modes record every
+test and drop the files of passing ones. Each test writes to its own dir under `output_dir` (`test-results`);
 ignore it in git and configure CI to upload it when the test job fails. To override the
 config for a module or test, tag it, such as `@tag trace: true`. See `PlaywrightEx.Test`
 for the modes and file names.
@@ -284,7 +284,7 @@ end
 
 The application owns the sandbox, as with `Phoenix.ConnTest`: keep the generated
 DataCase setup, which starts an owner for each test and stops it in `on_exit`, and use
-your `ConnCase` (or `DataCase`) before `use PlaywrightEx.Test` or `use Fluffy.Case`:
+your `ConnCase` (or `DataCase`) before `use Fluffy.Case`:
 
 ```elixir
 def setup_sandbox(tags) do
