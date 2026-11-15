@@ -263,6 +263,19 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
       refute error.message =~ "nil"
     end
 
+    @tag :tmp_dir
+    test "rejects timeout: 0, as a screenshot can't be taken at once", %{tmp_dir: tmp_dir} do
+      path = Path.join(tmp_dir, "marauders-map.png")
+      session = session_for_html(:playwright, @html)
+      ExUnit.CaptureIO.capture_io(fn -> expect(session, to_have_screenshot(by_css("#box"), path: path)) end)
+
+      for expectation <- [to_have_screenshot(by_css("#box"), path: path), page_to_have_screenshot(path: path)] do
+        assert_raise ArgumentError, ~r/to_have_screenshot: timeout: 0 means check once/, fn ->
+          expect(session, expectation, timeout: 0)
+        end
+      end
+    end
+
     test "rejects options that bypass tracking" do
       assert_raise NimbleOptions.ValidationError, ~r/unknown options.*:signal/, fn ->
         to_have_screenshot(by_css("#box"), path: "x.png", signal: :none)

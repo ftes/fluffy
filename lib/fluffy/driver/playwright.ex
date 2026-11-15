@@ -63,7 +63,7 @@ defmodule Fluffy.Driver.Playwright do
     {target, assertion, arguments, options} = native_expectation(session, expectation)
     target = if expectation.negated?, do: BrowserExpect.not_(target), else: target
 
-    options = Keyword.put(options, :timeout, Timeouts.playwright_expect(expectation.options))
+    options = Keyword.put(options, :timeout, expect_timeout(expectation))
 
     case apply(BrowserExpect, assertion, [target | arguments] ++ [options]) do
       :ok ->
@@ -73,6 +73,13 @@ defmodule Fluffy.Driver.Playwright do
         expectation_failed!(expectation, error, "")
     end
   end
+
+  # Upstream's expectScreenshot takes each screenshot under the expect timeout, so a
+  # screenshot assertion can't check once at 1ms, as an action can't.
+  defp expect_timeout(%Expect{kind: :screenshot} = expectation),
+    do: Deadline.playwright_operation!(:to_have_screenshot, Timeouts.get(expectation.options, &Timeouts.expect/0))
+
+  defp expect_timeout(expectation), do: Timeouts.playwright_expect(expectation.options)
 
   # As in Playwright, where the client's `_expect` turns every `PlaywrightError`
   # (timeouts, closed targets and aborts included) into a failed matcher, any

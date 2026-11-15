@@ -103,7 +103,8 @@ without `Fluffy.Case` have no such backstop and fail with ExUnit's timeout, so s
 
 An operation's `timeout: 0` checks once, unlike Playwright, where `0` disables the timeout.
 Playwright assertions check once too, but Playwright actions and waits reject 0 with an
-`ArgumentError`, as they cannot check once; pass a positive timeout.
+`ArgumentError`, as they cannot check once; pass a positive timeout. So do screenshot
+assertions, which take each screenshot within the timeout.
 
 For no timeout, pass `timeout: :infinity`, never Playwright's `0`. Playwright then waits
 with no timeout, and LiveView retries and event waits go on until the test times out; Static

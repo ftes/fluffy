@@ -11,7 +11,8 @@ defmodule Fluffy.Options do
           "the action timeout (navigations: the navigation timeout), no timeout unless set, " <>
           "and for assertions to the expect timeout, 5 seconds ([Timeouts](installation.md#timeouts)). " <>
           "`0` checks once, unlike Playwright, where `0` disables the timeout. Playwright actions and waits " <>
-          "reject `0` with an `ArgumentError`, as they cannot check once; Playwright assertions accept it. " <>
+          "reject `0` with an `ArgumentError`, as they cannot check once; so do screenshot assertions, which " <>
+          "take each screenshot within the timeout, while other Playwright assertions accept it. " <>
           "`:infinity` disables the timeout: Playwright waits with no timeout, LiveView retries until the test " <>
           "times out, and Static, where nothing changes, checks once."
     ]
