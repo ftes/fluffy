@@ -205,11 +205,11 @@ defmodule Fluffy.ClientDOM.Expectation do
     end
   end
 
-  # A regular expression compiled once per check, not once per element.
+  # `ignore_case:` overrides a regular expression's `i` flag.
   defp compile(expected, ignore_case) when is_list(expected), do: Enum.map(expected, &compile(&1, ignore_case))
 
   defp compile(%PlaywrightEx.RegExp{} = expected, ignore_case),
-    do: expected |> Expect.Internal.ignore_case(ignore_case) |> Expect.Internal.compile!()
+    do: expected |> Expect.Internal.ignore_case(ignore_case) |> Expect.Internal.compile()
 
   defp compile(expected, _ignore_case), do: expected
 

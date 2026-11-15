@@ -1,13 +1,13 @@
 defmodule Fluffy.Locator.Static do
   @moduledoc false
 
+  alias Fluffy.Expect.Internal
   alias Fluffy.HTML.Aria
   alias Fluffy.HTML.Semantics
   alias Fluffy.Locator
   # StringUtils is internal to PlaywrightEx, which is pinned.
   alias PlaywrightEx.Isomorphic.LocatorUtils
   alias PlaywrightEx.Isomorphic.StringUtils
-  alias PlaywrightEx.RegExp
 
   # Operations that search inside each candidate. As in Playwright's chains, they
   # find descendants only, except that its text engine also matches the scope itself.
@@ -105,7 +105,7 @@ defmodule Fluffy.Locator.Static do
   defp filter_candidates(candidates, aria, options) do
     options =
       Enum.map(options, fn
-        {key, text} when key in [:has_text, :has_not_text] -> {key, compile(text)}
+        {key, text} when key in [:has_text, :has_not_text] -> {key, Internal.compile(text)}
         option -> option
       end)
 
@@ -122,7 +122,7 @@ defmodule Fluffy.Locator.Static do
 
   defp role_matches(scopes, aria, role, options) do
     role = role |> to_string() |> String.downcase()
-    expected_name = options |> Keyword.get(:name) |> compile()
+    expected_name = options |> Keyword.get(:name) |> Internal.compile()
     exact? = Keyword.get(options, :exact, false)
 
     scopes
@@ -138,7 +138,7 @@ defmodule Fluffy.Locator.Static do
   # matches: those without a matching descendant. Ids are preorder, so a match's
   # descendants are the matches up to its last_id.
   defp text_matches(scopes, aria, text, exact?) do
-    text = compile(text)
+    text = Internal.compile(text)
 
     scopes
     |> Enum.flat_map(&self_and_scoped_nodes(aria, &1))
@@ -159,7 +159,7 @@ defmodule Fluffy.Locator.Static do
   # getElementLabels. A label or reference may be anywhere in the document.
   defp label_matches(scopes, aria, text, options) do
     exact? = Keyword.get(options, :exact, false)
-    text = compile(text)
+    text = Internal.compile(text)
 
     scopes
     |> scoped_nodes(aria)
@@ -232,10 +232,6 @@ defmodule Fluffy.Locator.Static do
     |> String.downcase()
     |> String.contains?(expected |> StringUtils.normalize_white_space() |> String.downcase())
   end
-
-  # Once per query, not per element.
-  defp compile(%RegExp{} = expected), do: RegExp.compile!(expected)
-  defp compile(expected), do: expected
 
   defp attribute_matches?(nil, _expected, _exact?), do: false
   defp attribute_matches?(actual, expected, true), do: actual == expected
