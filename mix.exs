@@ -97,6 +97,8 @@ defmodule Fluffy.MixProject do
         if metadata[:playwright_only], do: ["Playwright only"], else: []
       end,
       source_ref: "v#{@version}",
+      # They name functions that later releases removed.
+      skip_undefined_reference_warnings_on: ["CHANGELOG.md", "docs/upgrading.md"],
       extras: ["README.md"] ++ @doc_files,
       groups_for_extras: [
         Guides: @guides,
