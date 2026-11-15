@@ -135,7 +135,10 @@ defmodule Fluffy.Conformance.ElementStateTest do
       with_html(unquote(driver), ~s(<button>Accio</button><p contenteditable="false">Off</p>), fn session ->
         for locator <- [by_role(:button), by_text("Off")] do
           error = assert_raise ExUnit.AssertionError, fn -> expect(session, to_be_editable(locator)) end
-          assert error.message =~ "not an <input>, <textarea>, <select> or [contenteditable]"
+
+          assert error.message =~
+                   "Error: Element is not an <input>, <textarea>, <select> or [contenteditable] and does not " <>
+                     "have a role allowing [aria-readonly]"
         end
       end)
     end
@@ -183,7 +186,8 @@ defmodule Fluffy.Conformance.ElementStateTest do
       with_html(unquote(driver), ~s(<div role="button" aria-checked="true">Not a checkbox</div>), fn session ->
         for expectation <- [to_be_checked(by_role(:button)), not_(to_be_checked(by_role(:button)))] do
           error = assert_raise ExUnit.AssertionError, fn -> expect(session, expectation) end
-          assert error.message =~ ~r/not a checkbox or radio button/i
+          assert error.message =~ ~r/\AExpected (not )?by_role\(:button\) to be checked\n/
+          assert error.message =~ "Error: Not a checkbox or radio button"
         end
       end)
     end

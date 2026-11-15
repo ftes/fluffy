@@ -10,6 +10,13 @@ defmodule Fluffy.Internal.OperationFailure do
 
   def normalize(_session, _operation, _arguments, cause), do: cause
 
+  # As Playwright's expectation shows an injected script error.
+  defp wrap_operation(_session, :expect, [%Fluffy.Expect{} = expectation], %Fluffy.ActionabilityError{} = cause) do
+    ExUnit.AssertionError.exception(
+      message: "Expected #{Fluffy.Expect.Internal.describe(expectation)}\nError: #{Exception.message(cause)}"
+    )
+  end
+
   defp wrap_operation(_session, :expect, _arguments, cause) do
     ExUnit.AssertionError.exception(message: Exception.message(cause))
   end
