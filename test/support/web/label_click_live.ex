@@ -3,6 +3,8 @@ defmodule Fluffy.Support.Web.LabelClickLive do
 
   use Phoenix.LiveView
 
+  alias Phoenix.LiveView.JS
+
   # Logs every event in arrival order, so a test sees which events a click on a
   # label sends through its control.
   @impl true
@@ -60,7 +62,13 @@ defmodule Fluffy.Support.Web.LabelClickLive do
       <button id="summon" type="button" phx-click="summon">Summon</button>
       <label for="save">Mischief managed</label>
       <button id="save">Save</button>
+      <a href="#" phx-click={JS.toggle(to: "#spellbook")}>
+        <label><input type="checkbox" name="broom" value="yes" /> Nimbus 2000</label>
+      </a>
+      <label for="lumos">Cast lumos</label>
+      <a href="#" phx-click="sort"><button id="lumos">Lumos</button></a>
     </form>
+    <p id="spellbook">Spellbook</p>
     <p id="log">Log: {Enum.join(@log, " ")}</p>
     """
   end

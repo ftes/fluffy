@@ -108,10 +108,12 @@ defmodule Fluffy.ClientDOM do
 
     Actionability.ensure_clickable!(target.element, :click, locator)
 
-    client_dom = maybe_toggle_checked(client_dom, label_control(client_dom, target) || target)
-
-    {client_dom, target}
+    {click_target(client_dom, target), target}
   end
+
+  # A click's own effect on its target: it toggles a checkbox or selects a radio.
+  @doc false
+  def click_target(%__MODULE__{} = client_dom, %Target{} = target), do: maybe_toggle_checked(client_dom, target)
 
   @doc false
   def phoenix_html_submission(%__MODULE__{} = _client_dom, target) do
@@ -153,18 +155,16 @@ defmodule Fluffy.ClientDOM do
   end
 
   # A click's default action: `{:link, link}` to follow a link,
-  # `{:submit, submitter, submission}` to submit a submit button's form, or nil.
+  # `{:submit, submitter, submission}` to submit a submit button's form,
+  # `{:click, control}` to click a label's control, or nil.
   @doc false
   def default_action(%__MODULE__{} = client_dom, %Target{} = target, driver \\ :static) do
     case activation_target(client_dom, target) do
       nil ->
         nil
 
-      %{tag: "label"} ->
-        case label_control(client_dom, target) do
-          nil -> nil
-          control -> default_action(client_dom, control, driver)
-        end
+      {:label, control} ->
+        {:click, control}
 
       %{tag: tag} = link when tag in ["a", "area"] ->
         {:link, link}
@@ -180,28 +180,40 @@ defmodule Fluffy.ClientDOM do
   # Like a browser's click dispatch, the default action belongs to the closest
   # inclusive ancestor with activation behavior. Actionability already rejects
   # a click inside a disabled control.
-  defp activation_target(client_dom, target), do: closest(client_dom, target, &activation_behavior?/1)
+  defp activation_target(client_dom, target) do
+    aria = aria(client_dom)
+    index = index(client_dom)
+
+    [target | Enum.reverse(target.ancestors)]
+    |> Enum.reduce_while([], fn element, inside ->
+      cond do
+        activation_behavior?(element) -> {:halt, {:element, element}}
+        id = label_control_id(aria, element, inside) -> {:halt, {:label, id}}
+        true -> {:cont, [element | inside]}
+      end
+    end)
+    |> case do
+      {:element, %{id: id}} when id == target.id -> target
+      {:element, element} -> DocumentIndex.target_by_id(index, element.id)
+      {:label, id} -> {:label, DocumentIndex.target_by_id(index, id)}
+      _none -> nil
+    end
+  end
 
   defp activation_behavior?(%{tag: tag, attributes: attributes}) when tag in ["a", "area"],
     do: has_attribute?(attributes, "href")
 
-  defp activation_behavior?(%{tag: tag}), do: tag in ["button", "input", "label"]
+  defp activation_behavior?(%{tag: tag}), do: tag in ["button", "input"]
 
-  # HTML's label activation behavior: a click on a label, outside its control and
-  # any interactive content in it, clicks the label's control, which toggles a
-  # checkbox or radio and takes the control's own activation, such as a button's.
-  # Returns that control, or nil.
-  @doc false
-  def label_control(%__MODULE__{} = client_dom, %Target{} = target) do
-    with %Target{tag: "label"} = label <- activation_target(client_dom, target),
-         id when is_integer(id) <- Aria.label_control_id(aria(client_dom), label),
-         [_label | inside] = Enum.drop_while(target.ancestors ++ [target], &(&1.id != label.id)),
-         false <- Enum.any?(inside, &(&1.id == id or interactive_content?(&1))) do
-      DocumentIndex.target_by_id(index(client_dom), id)
-    else
-      _no_control -> nil
-    end
+  # HTML's label activation behavior: a label clicks its labelled control,
+  # unless the click is on that control or on interactive content in the label.
+  # A label without a control has none, so the click goes on to its ancestors.
+  defp label_control_id(aria, %{tag: "label"} = label, inside) do
+    id = Aria.label_control_id(aria, label)
+    if id && not Enum.any?(inside, &(&1.id == id or interactive_content?(&1))), do: id
   end
+
+  defp label_control_id(_aria, _element, _inside), do: nil
 
   # Interactive content other than the elements with activation behavior, which
   # take a click before an enclosing label does.

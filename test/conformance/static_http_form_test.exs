@@ -143,6 +143,40 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       assert [_source, %{query: "scope=forbidden&commit=on"}] = HTTPFixtures.requests(fixture)
     end
 
+    # A label without a control has no activation of its own, so a click on it
+    # goes on to the enclosing link or submit button.
+    @tag driver: driver
+    test "a click on a label without a control follows its link or submits its button with #{driver}", %{
+      driver: driver
+    } do
+      start_page =
+        html("""
+        <a href="houses"><label>Gryffindor</label></a>
+        <form method="get" action="search">
+          <button name="commit" value="on"><label>Alohomora</label></button>
+        </form>
+        """)
+
+      fixture =
+        HTTPFixtures.register_sequence([
+          %{body: start_page},
+          %{body: html("<h1>Houses</h1>")},
+          %{body: start_page},
+          %{body: html("<h1>Search results</h1>")}
+        ])
+
+      driver
+      |> start_test_session()
+      |> visit(HTTPFixtures.path(fixture, "/forms/start"))
+      |> click(by_text("Gryffindor", exact: true))
+      |> expect(:heading |> by_role(name: "Houses") |> to_be_visible())
+      |> visit(HTTPFixtures.path(fixture, "/forms/start"))
+      |> click(by_text("Alohomora", exact: true))
+      |> expect(:heading |> by_role(name: "Search results") |> to_be_visible())
+
+      assert [_source, %{path: "/forms/houses"}, _again, %{query: "commit=on"}] = HTTPFixtures.requests(fixture)
+    end
+
     @tag driver: driver
     test "submit returns once the server has received the submission using #{driver}", %{driver: driver} do
       fixture =

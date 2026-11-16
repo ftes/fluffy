@@ -62,9 +62,13 @@ defmodule Fluffy.Driver.Static do
   @impl true
   def click(%Session{} = session, %Locator{} = locator, options \\ []) do
     Keyword.validate!(options, [:timeout])
-    state = Session.page_state(session)
-    client_dom = Map.fetch!(state, :client_dom)
+    client_dom = session |> Session.page_state() |> Map.fetch!(:client_dom)
     {client_dom, target} = ClientDOM.click(client_dom, locator)
+    commit_click(session, client_dom, target)
+  end
+
+  defp commit_click(session, client_dom, target) do
+    state = Session.page_state(session)
     session = Session.put_page_state(session, %{state | client_dom: client_dom})
 
     case ClientDOM.phoenix_html_submission(client_dom, target) do
@@ -82,6 +86,9 @@ defmodule Fluffy.Driver.Static do
 
           {:submit, _submitter, submission} ->
             {:navigate, session, Navigation.submission(submission)}
+
+          {:click, control} ->
+            commit_click(session, ClientDOM.click_target(client_dom, control), control)
         end
     end
   end

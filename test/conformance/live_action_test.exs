@@ -250,6 +250,25 @@ defmodule Fluffy.Conformance.LiveActionTest do
       |> expect(to_have_text(log, ~r/ summon save$/))
     end
 
+    # LiveView prevents the default of a click on an href="#" binding, even a
+    # JS-only one, so a label in it doesn't click its control, and a control in
+    # it doesn't take its default action.
+    @tag driver: driver
+    test "an href=\"#\" binding stops a label's click from activating its control, with #{driver}", %{driver: driver} do
+      log = by_css("#log")
+
+      driver
+      |> live_session()
+      |> visit("/live/label-clicks")
+      |> click(by_text("Nimbus 2000", exact: true))
+      |> expect(:checkbox |> by_role(name: "Nimbus 2000") |> to_be_checked(checked: false))
+      |> expect(page_to_have_url(~r{/label-clicks$}))
+      |> click(by_text("Cast lumos", exact: true))
+      |> expect(to_have_text(log, "Log: sort"))
+      |> click(by_text("Accio", exact: true))
+      |> expect(to_have_text(log, "Log: sort summon"))
+    end
+
     @tag driver: driver
     test "a click reaches the closest phx-click, and an inner binding wins, with #{driver}", %{driver: driver} do
       log = by_css("#log")
