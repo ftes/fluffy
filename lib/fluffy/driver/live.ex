@@ -90,25 +90,25 @@ defmodule Fluffy.Driver.Live do
   # click's default action are settled from the pages the clicks left, before
   # any is sent, and pushed in order, each reply committing on the page the
   # last one left. A view found gone meanwhile navigated before the click.
-  # `verify` checks the page the clicks leave.
-  defp commit_user_click(session, {clicks, default}, verify \\ fn _client_dom -> :ok end) do
+  defp commit_user_click(session, {clicks, default}) do
     with {:ok, clicked_dom, steps} <- prepare_clicks(session, clicks, default, []) do
-      verify.(clicked_dom)
-      state = Session.page_state(session)
-      run_steps(Session.put_page_state(session, %{state | client_dom: clicked_dom}), steps)
+      run_steps(session, clicked_dom, steps)
     end
   end
 
   # Phoenix.HTML's handler takes the click before LiveView's client.
-  defp prepare_clicks(_session, [{target, client_dom, _client_dom}], {:phoenix_html, submission}, _pending) do
-    if competing_live_click_binding?(target) do
-      raise Fluffy.CapabilityError,
-        capability: :phoenix_html_live_action_conflict,
-        driver: :live,
-        detail: "a data-method/data-to link with a competing phx-click or LiveView navigation action requires Playwright"
-    end
+  defp prepare_clicks(session, [{target, client_dom, _client_dom}], {:phoenix_html, submission}, _pending) do
+    with {:ok, _event_context} <- owning_view_context(session, target) do
+      if competing_live_click_binding?(target) do
+        raise Fluffy.CapabilityError,
+          capability: :phoenix_html_live_action_conflict,
+          driver: :live,
+          detail:
+            "a data-method/data-to link with a competing phx-click or LiveView navigation action requires Playwright"
+      end
 
-    {:ok, client_dom, [&{:navigate, &1, Navigation.submission(submission)}]}
+      {:ok, client_dom, [&{:navigate, &1, Navigation.submission(submission)}]}
+    end
   end
 
   # Each click event reaches its binding before the click's default action
@@ -144,8 +144,10 @@ defmodule Fluffy.Driver.Live do
     end
   end
 
-  defp run_steps(session, steps) do
-    Enum.reduce_while(steps, session, fn step, session ->
+  defp run_steps(session, clicked_dom, steps) do
+    state = Session.page_state(session)
+
+    Enum.reduce_while(steps, Session.put_page_state(session, %{state | client_dom: clicked_dom}), fn step, session ->
       case step.(session) do
         %Session{} = session -> {:cont, session}
         navigation -> {:halt, navigation}
@@ -202,9 +204,20 @@ defmodule Fluffy.Driver.Live do
             dispatch_live_change(session, clicked_dom, clicked, sent)
 
           nil ->
-            push_found_change(session, client_dom, sent, event_context)
+            push_removed_change(session, client_dom, sent, event_context)
         end
       end
+    end
+  end
+
+  # A nested view the reply removed with the control gets nothing.
+  defp push_removed_change(session, client_dom, sent, event_context) do
+    state = Session.page_state(session)
+
+    case read_view(session, fn -> with {:ok, view} <- find_view(state.view, event_context.view.id), do: view end) do
+      {:ok, nil} -> session
+      {:ok, _view} -> push_found_change(session, client_dom, sent, event_context)
+      redirected -> redirected
     end
   end
 
@@ -352,12 +365,22 @@ defmodule Fluffy.Driver.Live do
           session
 
         {%Session{} = session, {click, control}} ->
-          commit_user_click(session, click, &ClientDOM.ensure_checked!(&1, control, desired, locator))
+          commit_set_checked(session, click, control, desired, locator)
 
         navigation ->
           navigation
       end
     end)
+  end
+
+  # Like Playwright, check the control's state once the click's events went,
+  # on the page the click left, as a browser's check runs before any reply.
+  defp commit_set_checked(session, {clicks, default}, control, desired, locator) do
+    with {:ok, clicked_dom, steps} <- prepare_clicks(session, clicks, default, []) do
+      committed = run_steps(session, clicked_dom, steps)
+      ClientDOM.ensure_checked!(clicked_dom, control, desired, locator)
+      committed
+    end
   end
 
   defp node_identity(client_dom, target), do: Map.fetch!(ClientDOM.index(client_dom).nodes_by_id, target.id).identity

@@ -20,7 +20,7 @@ defmodule Fluffy.Actionability do
     "week"
   ]
 
-  # The click's enabled check follows the label, see `Fluffy.ClientDOM.click/2`.
+  # The click's enabled check follows the label, see `Fluffy.ClientDOM.click/3`.
   def ensure_clickable!(element, action, locator) do
     if LazyHTML.attribute(element, "hidden") != [] do
       raise_error(action, :hidden, locator)

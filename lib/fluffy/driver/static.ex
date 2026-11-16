@@ -134,8 +134,14 @@ defmodule Fluffy.Driver.Static do
     Keyword.validate!(options, [:timeout])
 
     case session |> Session.page_state() |> Map.fetch!(:client_dom) |> ClientDOM.set_checked(locator, desired) do
-      nil -> session
-      {click, _control} -> commit_click(session, click)
+      nil ->
+        session
+
+      # Like Playwright, check the control's state on the page the click left.
+      {{clicks, _default} = click, control} ->
+        {_target, _page, clicked_dom} = List.last(clicks)
+        ClientDOM.ensure_checked!(clicked_dom, control, desired, locator)
+        commit_click(session, click)
     end
   end
 

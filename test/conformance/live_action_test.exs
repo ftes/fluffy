@@ -324,9 +324,12 @@ defmodule Fluffy.Conformance.LiveActionTest do
         |> uncheck(owl)
         |> expect(to_have_text(log, "Log: label click:yes change:-,yes,-,- label click:- change:-,-,-,-"))
 
+      # The label's click still sends its phx-click before the check fails.
       assert_action_error(session, Fluffy.ActionabilityError, "did not change its state", fn ->
         check(session, by_text("Sorting hat", exact: true))
       end)
+
+      expect(session, to_have_text(log, ~r/ sort$/))
     end
 
     # Like a browser, a label that is already clicking its control doesn't

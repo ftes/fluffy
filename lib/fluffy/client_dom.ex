@@ -368,29 +368,27 @@ defmodule Fluffy.ClientDOM do
 
   # Like Playwright's setChecked: nil when the control is already in the
   # state, or else the clicks of a click on the element the locator resolves
-  # to, such as the control's label, which must leave the control in it, and
-  # the control.
+  # to, such as the control's label, and the control. The drivers check the
+  # control's state once the click took effect (`ensure_checked!/4`).
   def set_checked(%__MODULE__{} = client_dom, %Locator{} = locator, desired, driver \\ :static)
       when is_boolean(desired) do
-    target = control!(client_dom, locator)
-    Actionability.ensure_checkable!(target.element, checked_action(desired), locator)
+    target = target!(client_dom, locator)
+    control = follow_label(client_dom, target)
+    Actionability.ensure_checkable!(control.element, checked_action(desired), locator)
 
     cond do
-      checked_target?(client_dom, target) == desired ->
+      checked_target?(client_dom, control) == desired ->
         nil
 
-      input_type(target) == "radio" and not desired ->
+      input_type(control) == "radio" and not desired ->
         raise Fluffy.ActionabilityError,
           action: :uncheck,
           reason: :cannot_uncheck_radio,
           locator: locator
 
       true ->
-        ensure_target_enabled!(client_dom, target, checked_action(desired), locator)
-        {clicks, _default} = click = clicks(client_dom, target!(client_dom, locator), driver)
-        {_target, _page, clicked_dom} = List.last(clicks)
-        ensure_checked!(clicked_dom, target, desired, locator)
-        {click, target}
+        ensure_target_enabled!(client_dom, control, checked_action(desired), locator)
+        {clicks(client_dom, target, driver), control}
     end
   end
 
