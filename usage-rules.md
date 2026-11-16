@@ -30,7 +30,7 @@ start_session(:phoenix)
 
 ## Locators
 
-- Choose locators as the `:playwright` usage rules say; Fluffy's `by_role`, `by_label`, `by_placeholder`, `by_text`, `by_alt_text`, `by_title` and `by_test_id` are its `get_by_*`.
+- Choose locators as the "Locators and assertions" section of the `:playwright` usage rules says; Fluffy's `by_role`, `by_label`, `by_placeholder`, `by_text`, `by_alt_text`, `by_title` and `by_test_id` are its `get_by_*`.
 - This overrides Phoenix's usage rule that the DOM ids templates give key elements are for tests. Keep the ids (streams, hooks and forms need them), but locate as users do; an existing id (`by_css("#owl-form")`) is the fallback before adding a test id. `by_test_id(id)` takes no options: set the attribute with `config :playwright, :test, test_id_attribute: ...` (or `config :fluffy`, which overrides it), or use `by_css("[data-owl=\"hedwig\"]")` for another attribute.
 - Text, role-name and label matching is substring by default; pass `exact: true` for a complete match.
 - Locators are values. Scope with `by_role(parent, :row, name: "x")`, refine with `filter(has: ...)`, `first`, `last`, zero-based `nth`, `and_`, `or_`. Use `frame_locator` for iframes on Playwright.
