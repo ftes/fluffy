@@ -117,6 +117,13 @@ resets nothing. Checkboxes and radios reset even with focus or during their own
 `phx-change`; selects reset because Playwright's `select_option` does not focus
 them. A form during its `phx-trigger-action` handoff and content under
 `phx-update="ignore"` keep all of their local state.
+The browser also keeps the typed value of a focused input or textarea through
+any render that reaches it, its own `phx-change` reply or a later `handle_info`
+alike, unless it has `phx-patch-focused` (LiveView's `mergeFocusedInput`, which
+still applies the other attributes, such as `checked`). Static and LiveView don't
+track focus, so they reset it to the rendered value. Keep the latest submitted
+params in assigns and render the form from them (`to_form(params)`) so both
+agree, or use Playwright for such a test.
 Checkbox/radio state carries only to a control with the same type, name, and
 value; a radio the server renders as newly checked clears its group. Files
 survive while the matched control remains a file input with the same name. Elements
