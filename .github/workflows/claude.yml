@@ -59,7 +59,7 @@ jobs:
           PR: ${{ github.event.pull_request.number || (github.event.issue.pull_request && github.event.issue.number) }}
         run: |
           if [ -z "$PR" ] || [ "$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json isCrossRepository --jq .isCrossRepository)" = false ]; then
-            echo 'mix=,Bash(mix format:*),Bash(mix compile:*),Bash(mix fluffy.gen.native_options:*),Bash(mix credo:*),Bash(mix usage_rules.docs:*),Bash(mix usage_rules.search_docs:*)' >> "$GITHUB_OUTPUT"
+            echo 'mix=,Bash(mix format:*),Bash(mix compile:*),Bash(mix credo:*),Bash(mix usage_rules.docs:*),Bash(mix usage_rules.search_docs:*)' >> "$GITHUB_OUTPUT"
           fi
 
       - name: Run Claude Code
