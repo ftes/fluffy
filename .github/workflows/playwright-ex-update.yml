@@ -52,16 +52,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           EVENT: ${{ github.event_name }}
-        # Hex's latest_version is the highest release, pre-releases included. A git dep waits for a
-        # release that contains its commit: on main, the locked one; on another branch, its PR's
-        # merge commit, as squash and rebase merges drop the branch's commits. The branch, or a PR
-        # from it, means the release is handled; a dispatch retries one whose PR was closed (delete
-        # the branch first).
+        # Hex's latest_version is the highest release, pre-releases included. A git dep on
+        # PlaywrightEx's main waits for a release that contains the locked commit. The branch, or a
+        # PR from it, means the release is handled; a dispatch retries one whose PR was closed
+        # (delete the branch first).
         run: |
           out() { echo "$1=$2" | tee -a "$GITHUB_OUTPUT"; }
           lock=$(sed -nE 's/^  "playwright_ex": \{:(hex|git), [^,]+, "([^"]+)".*/\1 \2/p' mix.lock)
           read -r kind from <<< "$lock"
-          pin=$(sed -nE 's/^  "playwright_ex": \{:git, .*\[branch: "([^"]+)"\].*/\1/p' mix.lock)
           to=$(curl -fsSL --retry 3 https://hex.pm/api/packages/playwright_ex | jq -r .latest_version)
           [[ -n $from && -n $to ]] || { echo "::error::cannot read mix.lock or Hex"; exit 1; }
           out from "$from"
@@ -69,14 +67,7 @@ jobs:
           if [[ $kind == hex ]]; then
             newer=$([[ $to != "$from" ]] && echo true || echo false)
           else
-            commit=$from status=
-            if [[ -n $pin && $pin != main ]]; then
-              commit=$(gh pr list --repo ftes/playwright_ex --head "$pin" --state merged \
-                --json mergeCommit --jq '.[0].mergeCommit.oid // empty')
-            fi
-            if [[ -n $commit ]]; then
-              status=$(gh api "repos/ftes/playwright_ex/compare/$commit...v$to" --jq .status)
-            fi
+            status=$(gh api "repos/ftes/playwright_ex/compare/$from...v$to" --jq .status)
             newer=$([[ $status == ahead || $status == identical ]] && echo true || echo false)
           fi
           branch="claude/playwright-ex-$to"
@@ -84,7 +75,7 @@ jobs:
           states=$([[ $EVENT == workflow_dispatch ]] && echo open || echo all)
           prs=$(gh pr list --head "$branch" --state "$states" --json url --jq 'map(.url) | join(" ")')
           if [[ $newer != true ]]; then
-            echo "::notice::$to doesn't update the locked $from${pin:+ ($pin)}"
+            echo "::notice::$to doesn't update the locked $from"
             out update false
           elif [[ -n $prs ]]; then
             echo "::notice::PR exists: $prs"
@@ -141,12 +132,12 @@ jobs:
       - run: git switch -c "$BRANCH"
       - name: Run Claude
         id: claude
-        uses: anthropics/claude-code-action@61a9c274fa7110a66dfafc1bbbced03833eb25fe # v1.0.269
+        uses: anthropics/claude-code-action@f3b070c88125d33dbae5653df5f143101d4ea9dc # v1.0.276
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
             REPO: ${{ github.repository }}
-            FROM: ${{ needs.check.outputs.from }} (in mix.lock: a Hex version, or a commit of mix.exs's `github:` branch)
+            FROM: ${{ needs.check.outputs.from }} (in mix.lock: a Hex version, or a commit of PlaywrightEx's main)
             TO: ${{ needs.check.outputs.to }}
             BRANCH: ${{ env.BRANCH }} (already checked out, from main)
 
