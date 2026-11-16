@@ -1,207 +1,106 @@
-# Changelog
+# Changelog for v0.9
 
-Upgrading from 0.8? The [upgrade guide](docs/upgrading.md) lists the net changes.
+Fluffy 0.9 follows Playwright more closely on every driver. Upgrading from 0.8: the
+[upgrade guide](docs/upgrading.md) lists what a suite must change, as one step.
 
-## 0.9.0-rc.3 — 2026-11-16
+## Built on the Playwright port
+
+Fluffy runs on Playwright (Hex package `playwright_ex`), a port of the official JavaScript
+client with a pinned Playwright 1.65 driver. `mix playwright.install` installs it; Node.js and
+the npm package are no longer needed. Where Fluffy hands you Playwright's values, such as
+events, routes, `unwrap` callbacks, regexes and URLs, they are the port's, as in Playwright.
+
+## Playwright Test in ExUnit
+
+`use Fluffy.Case` registers each test with `Playwright.Test`. Browsers come from its pool,
+and timeouts, traces, screenshots, videos, steps and snapshot names follow Playwright Test on
+every driver. `:infinity` means no limit; `timeout: 0` checks once on assertions and Phoenix
+actions, while Playwright actions and waits reject it.
+
+## Phoenix drivers that act like a browser
+
+Static and LiveView act like a browser running LiveView's client. A click takes the default
+action of its button, link or label, events carry the form's current values, and roles,
+accessible names, visibility and enabled state follow Playwright's rules. The app owns the Ecto
+sandbox, as generated `DataCase` and `ConnCase` do.
+
+## Backwards-incompatible changes
+
+The 0.9.0 entry lists them under Breaking; the upgrade guide shows how to move a 0.8 suite.
+
+## 0.9.0
+
+Changes since 0.8.0.
+
+### Breaking
+
+- Fluffy runs on Playwright (Hex package `playwright_ex`) with a pinned Playwright 1.65 driver, installed by `mix playwright.install`. The npm `playwright` package, `assets_dir` and Node.js are no longer needed; `executable:` names a Playwright CLI. Playwright 1.65's own breaking changes apply: actions wait for an element to be not inert, cookie matching follows RFC 6265, and text the browser does not render is not part of accessible names.
+- PlaywrightEx is renamed `Playwright`: the app is `:playwright` and its modules `Playwright.*`, while the Hex package stays `playwright_ex`. If you list it, write the dependency line from the installation guide (`hex: :playwright_ex` is required), rename `config :playwright_ex` to `config :playwright`, and port `PlaywrightEx.*` calls in `unwrap` callbacks with Playwright's upgrade guide. `alias Fluffy.Playwright` now shadows `Playwright.*`, so don't alias it where you call the dependency.
+- `use Fluffy.Case` after your `ConnCase` replaces `Fluffy.Test.setup`, which is removed. It registers the test with `Playwright.Test`, whose traces, screenshots, videos and `error-context.md` replace `Fluffy.Playwright.trace/2`, `artifact_dir` and `trace_dir`; a failed operation no longer writes HTML or the error text.
+- The application owns the Ecto sandbox, as generated `DataCase` and `ConnCase` do: Fluffy no longer starts, adopts or stops owners, and `sandbox:` and `repos:` are gone. It adds the metadata of `config :fluffy, ecto_repos:` to browser sessions.
+- Browsers come from `Playwright.Test.BrowserPool`, configured by `config :playwright, :test` (`browser_name`, `launch_options`, `driver: [executable: ...]`), at most `workers` at once. `config :fluffy, :playwright` and `pool_size` are removed.
+- Timeouts follow Playwright Test on every driver: `config :playwright, :test, action_timeout:, navigation_timeout:` (no limit by default, so the test's timeout bounds them) and `config :playwright, :expect, timeout:` (5 seconds; Phoenix waited 1). `config :fluffy, action_timeout:, expect_timeout:` override them for Fluffy sessions. `start_session(timeout:)` and `config :fluffy, timeout:` are removed. `timeout: 0` checks once and `:infinity` means no limit; Playwright actions and waits reject `0`. Calls that have no timeout in Playwright, such as `evaluate`, `cookies` and download reads, take none.
+- `config :fluffy` is validated at startup: an unknown key or the config of a missing module raises.
+- Browser console messages are no longer logged, as in Playwright; `js_logger:` and `Fluffy.Playwright.ConsoleLogger` are removed. Register an `Event.console()` listener instead.
+- Playwright sessions use Playwright's defaults: the `en-US` locale and a 3-minute browser launch timeout.
+- `browser_context:`, `launch_options:` and the options of screenshots, `storage_state` and cookies pass through to Playwright, which validates them.
+- Events deliver Playwright's values: a `Playwright.Request`, `Playwright.Response`, `Playwright.Dialog`, `Playwright.ConsoleMessage` and so on. `Fluffy.HTTPEvent` is removed. Page events, `Fluffy.Download` and `Fluffy.FileChooser` stay.
+- `unwrap/2` passes a `%Playwright.Page{}` on Playwright and returns the session; `Fluffy.Playwright.Handle` is removed. Use `unwrap_and_return/2` for the callback's result.
+- `Fluffy.Playwright.evaluate(session, expression, arg)` replaces `is_function:` and `arg:`; JavaScript `null` returns `:null`. `cookies(session, urls)` takes the URL list, cookie maps use Playwright's camelCase keys, and `storage_state/2` returns atom keys.
+- `Fluffy.Playwright.screenshot` and `pdf` return the image or PDF instead of the session; the path is the optional `path:`.
+- `Fluffy.Download`'s `read!` and `save_as!` are `read` and `save_as`; only its documented fields remain public.
+- `page_status`, `page_to_have_status` and `Fluffy.Page.status` are removed, as in Playwright; assert on `Event.response` instead.
+- URLs are matched as Playwright does, by a string, a regex or a predicate, in `page_url`/`page_to_have_url` and `route`/`unroute`; the `path:`, `query:` and `fragment:` forms are removed.
+- A regex is a JavaScript `RegExp` on every driver: PCRE-only syntax raises `ArgumentError`, and `$` no longer matches before a final newline.
+- `by_test_id/2` takes no `attribute:`; set `test_id_attribute` in `config :playwright, :test` or `config :fluffy`. `filter/2` takes no `exact:`; use a regex.
+- On Playwright, a failed `visit`, `reload`, `go_back` or `go_forward` raises `Fluffy.OperationError` with Playwright's exception as `cause`, as actions do.
+- On Phoenix, `go_back` and `go_forward` raise `Fluffy.CapabilityError` with `capability: :browser_history`.
+- The `Fluffy.Expect.checked_option` type is `to_be_checked_option`; `Fluffy.Locator.describe`, `new` and `append` are internal.
+- The Phoenix drivers act like a browser running LiveView's client:
+  - `click` sends the closest `phx-click`, then takes the default action of the closest button, link or label: it submits the form, follows the link, or clicks the label's control, sending its `phx-click` and `phx-change`. A label takes its control's enabled state, and `check`/`uncheck` on a label click it.
+  - `disabled` disables only native form controls, and text inside a disabled button is disabled.
+  - Events carry what the browser sends: the form's current serialization, a control's current `value` and a `JS.push` `target:`. Clicking a checkbox or radio sends its form's `phx-change`.
+  - `by_role` follows Playwright's role and name rules: landmarks, lists, list items and dialogs take no name from their content.
+  - Chained locators, `filter(has:)` and `within/3` search descendants only.
+  - Visibility ignores `aria-hidden`, and `<input type="hidden">`, `hidden` descendants, `<title>`, `<script>`, `<template>` and similar content count as hidden. Text matching skips `<script>`, `<style>` and `<template>`.
+  - A `select` in a disabled `fieldset` keeps its default option, and the facade's `exact: true` no longer ignores soft hyphens and zero-width spaces.
+  - Controls inside `<noscript>` are not submitted, `press` raises in layout content without key bindings, and a render resets local field state only in the views it changed.
+  - `select_option` with `[]` deselects every option and rejects a list mixing values with option maps; `to_have_values` requires a multiple select; the facade's `click_button` no longer matches file inputs; LiveView `set_input_files` needs the upload's form to have an id.
 
 ### Added
 
-- `Fluffy.Case`, the one line every Fluffy test module writes after its `ConnCase` (or in its case template): it registers the test with `Playwright.Test`, so Playwright sessions work, and so a hanging Phoenix operation fails with Fluffy's error at the test's timeout, as a Playwright one. It takes `use Playwright.Test`'s options, such as `use Fluffy.Case, trace: :on`. The imports and sessions stay the module's own.
-- `start_session(:playwright, browser: browser)` creates the session's context in `browser`, such as `Playwright.Test.BrowserPool.browser(launch_options: [headless: false])`.
-- `Fluffy.Playwright.page/2` turns a `Playwright.Page` of the session, such as a dialog's or console message's page, into a `Fluffy.Page` for `switch_page/2`.
-- Static and LiveView match a regex in a locator's `name:`, `has_text:` and `has_not_text:`, as Playwright does, instead of raising `Fluffy.CapabilityError`.
-- Static and LiveView support `to_have_role`, `to_have_accessible_name` and `to_have_accessible_description`, computed from markup by their port of Playwright's `roleUtils`, instead of raising `Fluffy.CapabilityError`.
+- `start_session(:playwright, browser: browser)` uses another browser, such as `BrowserPool.browser(launch_options: [headless: false])`.
+- Actions, `reload` and expectations accept the options of their Playwright call, such as `modifiers:`, `force:`, `wait_until:`, `visible:` and `ignore_case:`; Phoenix raises `Fluffy.CapabilityError` for Playwright-only ones. `by_role` accepts Playwright's `checked:`, `disabled:`, `expanded:`, `include_hidden:`, `level:`, `pressed:`, `selected:` and `description:`.
+- A regex in a locator's `name:`, `has_text:` and `has_not_text:`, on every driver.
+- `Fluffy.Expect` gains `to_have_text`, `to_contain_text`, `to_have_attribute`, `to_have_class`, `to_contain_class`, `to_have_id`, `to_be_attached`, `to_be_hidden`, `to_be_empty`, `to_have_role`, `to_have_accessible_name` and `to_have_accessible_description` on every driver, and `to_have_css`, `to_have_js_property`, `to_have_accessible_error_message`, `to_be_in_viewport` (`Fluffy.Assert.in_viewport/2`), screenshot and aria snapshot assertions on Playwright. Snapshot names derive from the test, as in Playwright.
+- `by_role` on Phoenix knows Playwright's implicit roles, landmarks included.
+- `Fluffy.Locator.within/2`, `Fluffy.clear/3` and `Fluffy.set_checked/4` on every driver; the facade's `assert_has` and `refute_has` accept a locator.
+- `Fluffy.wait_for/3` takes a locator on Playwright.
+- `Fluffy.step/3` is `Playwright.Test.step/3`, on every driver.
+- `Fluffy.Playwright` gains `route/4`, `unroute/3` and `unroute_all/2` (handlers get a `Playwright.Route`), `unwrap/3` for a locator, `page/2`, `add_init_script`, `wait_for_function`, `wait_for_load_state`, `evaluate` on a locator and `evaluate_all`, `dblclick`, `tap`, `drop`, `dispatch_event`, `select_text`, `scroll_into_view_if_needed`, element `screenshot`, `bounding_box`, `aria_snapshot`, `set_viewport_size`, `viewport_size`, `emulate_media`, permissions, geolocation, offline mode, HTTP credentials, extra HTTP headers, script and style tags, `bring_to_front`, `set_storage_state`, `all`, `content`, `title`, `local_storage` and `session_storage`, plus `Fluffy.Playwright.Keyboard`, `Mouse` and `Clock`.
+- More Playwright events: `console`, `page_error`, `worker`, `web_socket`, `request_failed`, `request_finished`, `load`, `dom_content_loaded`, `crash`, `frame_attached` and `frame_detached`, and `Event.close()`.
+- `unwrap_and_return/2` (and `Fluffy.Playwright.unwrap_and_return/3`, facade `unwrap_and_return/2`) returns a native callback's result. A document navigated natively in a callback is adopted.
+- `Fluffy.Download.path`, `Fluffy.Download.page/1` and `Fluffy.FileChooser.page/1`.
+- On Phoenix, a link, form or redirect to another origin ends at a page with that URL, so a test can assert where the app sent it.
 
 ### Changed
 
-- **Breaking:** as in a browser, a click on a `<label>` on Static and LiveView clicks its control (nested or by `for`): it toggles a checkbox, selects a radio or clicks a button, and sends the control's `phx-click` and `phx-change` right after the label's own `phx-click`, as the label's click found the page, unless a LiveView link, `href="#"` binding or Phoenix.HTML link around the label prevents the click's default. A test that clicked a label expecting nothing to happen now toggles its control. As in Playwright, a label takes its control's enabled state, so `to_be_enabled` and `to_be_disabled` on a label follow its control, and a click on the label of a disabled control waits for it. `check` and `uncheck` on a label click the label, as Playwright's do, so they send its `phx-click` too, and fail when the click leaves the control's state. On LiveView, an `href="#"` element whose `phx-click` only runs JS commands no longer follows its link, and a click on a checkbox or radio inside such a binding or a LiveView link no longer toggles it or sends `phx-change`, as the browser reverts it. A click on a `<summary>` still doesn't toggle its `<details>` on Phoenix.
-- **Breaking:** Fluffy requires PlaywrightEx's rename to `Playwright` (app `:playwright`, modules `Playwright.*`, Hex package still `playwright_ex`). If you list it, write `{:playwright, "~> ...", hex: :playwright_ex, only: [:dev, :test]}` (`hex:` is required: `playwright` on Hex is another library). Rename `config :playwright_ex` to `config :playwright`, `mix playwright_ex.install` to `mix playwright.install`, `PlaywrightEx.*` to `Playwright.*` and `usage_rules: [:playwright_ex]` to `[:playwright]`, then run `mix deps.unlock --unused`. The `PLAYWRIGHT_EX_CACHE_DIR`, `PLAYWRIGHT_EX_EXECUTABLE` and `PLAYWRIGHT_NODEJS_PATH` env vars are gone: use `config :playwright, :driver, cache_dir:, executable:, node:` in `config/config.exs`. The driver cache moves to `<user cache>/playwright`, so the driver downloads again (update CI cache paths). `alias Fluffy.Playwright` shadows the dependency (`Playwright.Page` then means `Fluffy.Playwright.Page`), so don't alias it in modules that use `Playwright.*`.
-- **Breaking:** `config :fluffy` is validated at startup: an unknown key, such as a misspelt one, raises, as does the config of a module that doesn't exist (`config :fluffy, Fluffy.Sanbox, ...`). `playwright: false` raises too, as it does nothing.
-- **Breaking:** `log_browser_console` is removed, as Playwright logs nothing either; register listeners with `on(session, Event.console(), ...)` and `Event.page_error()` to log messages and page errors.
-- `Fluffy.step/3` is `Playwright.Test.step/3` in a pipeline, on every driver: the step is a test step in the test's trace, steps nest, and it takes `box:`. Outside a module with `use Fluffy.Case` it just runs the callback.
-- `to_have_screenshot`, `page_to_have_screenshot` and the snapshot-file form of `to_match_aria_snapshot` take upstream's `name:`, or derive the name from the test, in a module with `use Fluffy.Case`; `path:` is optional there. As in Playwright, a missing baseline written there fails the test at its end, unless `update_snapshots: :missing`.
-- **Breaking:** `Fluffy.Test` is removed: replace `setup context do Fluffy.Test.setup(context) end` with `use Fluffy.Case` after your case template. A session belongs to the test, also when a `Task` of it starts the session. Traces, screenshots and videos are `Playwright.Test`'s: configure them with `config :playwright, :test, trace: :retain_on_failure, screenshot: :only_on_failure`, `use Fluffy.Case, trace: :on` for a module, or a `trace:`, `screenshot:` or `video:` tag on a module or test, instead of the setup's options. Each test gets one trace of all its sessions under `output_dir` (`test-results`), and a failed one `error-context.md`. `Fluffy.Playwright.trace/2`, `artifact_dir` and `trace_dir` are removed, and with them the HTML and error text of a failed operation; a trace's DOM snapshots show the page instead.
-- **Breaking:** browsers come from `Playwright.Test.BrowserPool`, configured by `config :playwright, :test` (`browser_name`, `launch_options`, `driver: [executable: ...]`): by default the test's from `BrowserPool.browser/1`, as Playwright Test's worker-scoped `browser`, or the session's `browser:`. A test takes its browser at its first Playwright session and holds it until it ends; at most `workers` tests hold one at once (half the schedulers by default). `config :fluffy, :playwright` and its `pool_size` are removed (see the timeouts entry). A session that starts in the moment a lost browser still looks connected fails instead of relaunching it, as in Playwright Test.
-- **Breaking:** the application owns the Ecto sandbox, as generated DataCase and ConnCase do with `Sandbox.start_owner!` and `stop_owner` in `on_exit`; use it before `use Fluffy.Case`. Fluffy no longer starts, adopts or stops owners, and `Fluffy.Test.setup`'s `repos:` and `sandbox:` options go with it; it only adds the sandbox metadata of `config :fluffy, ecto_repos:` for the test process to browser sessions. A plain `Sandbox.checkout` in the test process does not work for browser tests, as its connection goes with the test process before the browser closes.
-- Phoenix ends a link, form or redirect to another origin, including a LiveView external redirect, at a page with that URL instead of raising `Fluffy.CapabilityError`, so a test can assert where the app sent it, such as an OAuth hand-off. Everything else there, `unwrap` included, still raises `:external_navigation`.
-- **Breaking:** `page_to_have_url`/`page_url`, `Fluffy.Playwright.route/4` and `unroute/3` take URLs as Playwright does: a string, a regex or a predicate, which gets a `%URI{}` as Playwright passes a `URL`. The keyword form (`path:`, `query:`, `query_mode:`, `fragment:`) is removed; use a regex or a predicate such as `&(&1.path == "/potions")`. `ignore_case: true` now also applies to a predicate, which gets the URL in lower case. The facade's `assert_path` keeps `query_params:`.
-- **Breaking:** as in Playwright, events deliver Playwright's values: `request`, `response`, `request_failed` and `request_finished` a `Playwright.Request` or `Playwright.Response`, `dialog` a `Playwright.Dialog`, `console` a `Playwright.ConsoleMessage`, frame events a `Playwright.Frame`, `worker` and `web_socket` theirs, and `page_error` the Playwright error. `Fluffy.Request`, `Fluffy.Response`, `Fluffy.Dialog`, `Fluffy.ConsoleMessage`, `Fluffy.PageError`, `Fluffy.Frame`, `Fluffy.Worker` and `Fluffy.WebSocket` are removed; read the values with Playwright's functions, such as `Playwright.Response.status/1` or `Playwright.Dialog.accept!/1`. Page events, `Fluffy.Download` and `Fluffy.FileChooser` stay.
-- **Breaking:** `Fluffy.Route` is removed: `Fluffy.Playwright.route/4` is `Playwright.BrowserContext.route/4`, so its handler gets a `Playwright.Route` (and the `Playwright.Request` if it takes two arguments) to answer with `Playwright.Route.fulfill!/2`, `continue!/2`, `abort!/2`, `fallback!/2` or `fetch!/2`. As in Playwright, a handler that raises fails the test and leaves its request pending, instead of aborting it and exiting the registering process, and a handler must not block (`receive`, `Process.sleep`, `GenServer` calls, database or Phoenix work): hand off to a `Task`, which inherits `$callers`, and fulfil from it. Register routes from the test or a process with it in `$callers`.
-- **Breaking:** as in Playwright, `Fluffy.Playwright.screenshot/2,3` and `pdf/2` return the image or PDF binary instead of the session, and the path is the optional `path:`: `screenshot(session, path: path)`, `screenshot(session, locator, path: path)` and `pdf(session, path: path)`.
-- **Breaking:** regexes are JavaScript `RegExp`s on every driver. Wherever Fluffy takes a regex (text and URL expectations, `name:`, `has_text:`), it takes a `Regex` or a `Playwright.RegExp`, and converts a `Regex` with `Playwright.RegExp.new/1`, which raises `ArgumentError` on PCRE-only syntax (`\A`, `\z`, `(?i)`, the `x` modifier) on Static and LiveView too. Those drivers match with JavaScript semantics, so `$` no longer matches before a final newline there. Failure messages show it as `#Playwright.RegExp</source/flags>`.
-- **Breaking:** `filter/2` drops `exact:`, which Playwright's `filter` does not have. Use a regex instead, such as `has_text: ~r/^Pro$/`. The facade's `exact: true` keeps its meaning, except that soft hyphens and zero-width spaces in the page text are no longer ignored.
-- **Breaking:** timeouts follow Playwright Test on every driver, with its names and defaults, from Playwright's config: `config :playwright, :test, action_timeout:, navigation_timeout:` (`:infinity`, so the test's timeout bounds them: with `Fluffy.Case`, a LiveView action on a missing element fails with Fluffy's error and "Test timeout of 60000ms exceeded." just before ExUnit's timeout, as on Playwright; Phoenix-only tests without `Fluffy.Case` fail with ExUnit's timeout) and `config :playwright, :expect, timeout:` (5 seconds). `config :fluffy, action_timeout:, expect_timeout:` override them for Fluffy sessions; Playwright's `0` means no limit, Fluffy's `expect_timeout: 0` checks once, as a call's `timeout: 0` (a screenshot assertion then needs its own `timeout:`), and its `action_timeout` rejects `0`. `start_session(timeout:)`, `config :fluffy, timeout:` and `config :fluffy, :playwright` are removed and raise at startup: replace `playwright: [timeout: 15_000]` with `config :playwright, :test, action_timeout: 15_000, navigation_timeout: 15_000`. Native calls in `unwrap` get the session's action and navigation timeouts.
-- **Breaking:** `by_test_id/2` takes no `attribute:`, as Playwright's `getByTestId`: every driver uses Playwright Test's `testIdAttribute`, `config :playwright, :test, test_id_attribute:` (`data-testid` by default) or `config :fluffy, test_id_attribute:` over it, and matches any attribute of a comma-separated list, as Playwright does. For another attribute in one place, use `by_css("[data-owl=\"hedwig\"]")`. Inside `Fluffy.Playwright.unwrap`, native `get_by_test_id` uses Playwright's attribute.
-- An `unwrap` callback that returns the `Playwright.TargetClosedError` of a call its page or context's close ended, such as Playwright.Test's at the test timeout, raises that error and its call log, as in Playwright, instead of `ArgumentError` "Playwright unwrap invalidated the tracked context".
+- Playwright `submit` waits like a Playwright action, for its navigation to commit.
 
 ### Fixed
 
-- Static and LiveView compute `to_be_editable` and `to_be_checked` with Playwright's `getReadonly` and `getChecked`: checkable roles read `aria-checked`, textbox-like roles `aria-readonly`, any `input` or `select` is editable unless `readonly`, `contenteditable` is inherited, and an element with no such state raises, as in Playwright, instead of reading false.
-- Static and LiveView compute disabled state with Playwright's `getAriaDisabled`: `aria-disabled` disables descendants too, but only elements whose role takes it, and `select_option` rejects an `aria-disabled` option.
-- Static and LiveView find `by_label` controls with Playwright's `getElementLabels`: a blank `aria-label` or an `aria-labelledby` without a valid reference falls back to the next source, and duplicate ids resolve to the first element.
-- Phoenix requests no longer carry the sandbox header, as with `Phoenix.ConnTest`: they and in-process LiveViews already use the test's connection through `$callers`. The endpoint's sandbox plug ran the allowance in the test process, so it set `trap_exit` there and a custom allowance calling `Mox.allow/3` raised because owner and child were the same.
-- Handlers of `on`/`once` and `wait_for` predicates run with the registering process in `$callers`, as a `Task` does, so they can use the test's Ecto sandbox connection and mocks in async tests.
-- On Phoenix, a form a LiveView renders with `phx-trigger-action` as it connects, such as from `connected?(socket)` in `mount`, is submitted as LiveView's client does, instead of leaving the page on the LiveView. The submission counts toward the redirect limit like a mount redirect.
-- On Phoenix, a `phx-trigger-action` form is also submitted from a render the server pushes, such as from `handle_info` or after `push_patch`, as LiveView's client does; a triggered form that downloads leaves the page inert.
-- The browsers and the Playwright driver close before `mix test` halts the VM, and Fluffy waits for the driver to exit. The driver used to exit afterwards and could leave the shell's terminal in the wrong mode, so ↑ printed `OA` ([#213](https://github.com/ftes/fluffy/issues/213)).
-
-## 0.9.0-rc.2 — 2026-11-11
-
-### Added
-
-- `timeout: :infinity` disables the timeout on every call that takes `timeout:`. It is Fluffy's spelling of Playwright's `timeout: 0`, since Fluffy's `0` checks once.
-
-### Changed
-
-- **Breaking:** Playwright actions, locator waits, `reload`, `go_back`, `go_forward`, `wait_for_function`, `wait_for_load_state` and `Fluffy.Route.fetch/2` raise `ArgumentError` for `timeout: 0`, which they cannot check once, instead of timing out after 1ms. Assertions and Phoenix actions still check once. `config :fluffy, timeout:` must be positive.
-- **Breaking:** as in Playwright, calls that have no timeout there no longer end at the session's `timeout:` or accept `timeout:`: page `evaluate`, `evaluate_all`, `content`, `title`, `local_storage`, `session_storage`, `bring_to_front`, `set_viewport_size`, `emulate_media`, `pdf`, `add_script_tag`, `add_style_tag`, `Keyboard`, `Mouse` and `Clock` calls. Context setters, `close_page`, request, response and download reads, stopping a trace and the facade's link probe lose their limit too, and an unfinished download is no longer canceled; see the installation guide for blocked pages. Locator `evaluate` and `bounding_box` keep `timeout:` for finding the element.
-- **Breaking:** `Fluffy.Playwright.screenshot/3` of the page runs like the element's `screenshot/4`: its options are validated, `mask:` takes Fluffy locators, failures raise `Fluffy.OperationError`, and `timeout: 0` raises `ArgumentError` instead of disabling the timeout.
-- `Fluffy.Playwright.unroute_all/2` takes Playwright's `behavior:` (`:default`, `:wait`, `:ignore_errors`) instead of `timeout:`. As in Playwright, a handler that answers after its last route was removed, or fails on a closed page, now fails the test unless `behavior: :ignore_errors` stopped it.
-- On Playwright, `visit`, `reload`, `go_back`, `go_forward`, clock calls, `open_browser`, download reads and the page handling around an `unwrap` callback raise `Fluffy.OperationError` with PlaywrightEx's exception as `cause`, as actions do.
-- Playwright `check` and `uncheck` again fail, as in Playwright, with "Clicking the checkbox did not change its state" when page code such as a LiveView patch reverts the box first, mostly in Firefox and WebKit.
-- On Firefox, an action that closes its own page raises `Fluffy.OperationError` again, as in Playwright.
-- Playwright `submit` waits like a Playwright action, for its navigation to commit rather than for the final response; a blocked submit reports Playwright's navigation timeout.
-- Playwright sessions follow Playwright's defaults: the `en-US` locale instead of `en`, a 3-minute browser launch timeout instead of the global `timeout:` (set `launch_options: [timeout: ...]`).
-- `select_option` raises `ArgumentError` for a list mixing values or labels with option maps, on every driver; Playwright never accepted one.
-- `click` on Phoenix acts like a browser click with LiveView's client: it sends the closest `phx-click`, the target's or an ancestor's, then takes the default action of the closest button or link, submitting the form as the click found it or following the link. Only `href="#"` and LiveView links prevent it, and a click inside a LiveView link patches or navigates even past a closer `phx-click`. Before, it sent only the target's own `phx-click`, like `render_click`, and a click on text inside a button or link did nothing. As in Playwright, text inside a disabled button is disabled, so clicking it fails, while a `disabled` attribute or fieldset no longer disables anything but a native form control.
-- `press` on Phoenix raises for an element without keyboard bindings in root layout or portal content too, as inside the LiveView.
-- `Fluffy.Route.fetch/2` validates `timeout:` like other Playwright operations: a negative or non-integer one, such as `1500.0`, raises `NimbleOptions.ValidationError` instead of reaching PlaywrightEx.
-- As in Playwright, an argument error in a Playwright expectation, such as `to_match_aria_snapshot` with both a snapshot and `path:`, raises unchanged instead of as `ExUnit.AssertionError`.
-- Requires PlaywrightEx 0.17.0-rc.6, whose listener removal no longer fails once the driver is lost.
-
-### Fixed
-
-- On Playwright, a session `timeout:` under a second no longer limits Fluffy's own reads around an operation; they get at least a second, so a busy browser is far less likely to fail such a session with a `RuntimeError` about a blocked script, and a blocked page reports after that second.
-- A Playwright page that closes while Fluffy adopts its document fails the operation with `Fluffy.OperationError`, or `ExUnit.AssertionError` for an expectation, instead of a `RuntimeError` about the LiveView connection. A close after an operation succeeded does not fail it.
-- `Fluffy.Playwright.wait_for_load_state/3` and `wait_for_function/4` time out with Playwright's error, even on a blocked page.
-- Phoenix events send what LiveView's client sends: the browser's form serialization, so an unchecked checkbox or deselected option no longer comes back with its server-rendered value, with the form's `phx-value-*` winning over fields; on `click` and `press`, a form control's current `value` instead of its rendered attribute, a list item's number and no `value` for other elements, such as a `div`, and `phx-value-key` over the pressed key; and a `JS.push` `target:` instead of the element's `phx-target`. Some clicks inside the LiveView no longer fail with LiveViewTest's "to return a single element".
-- `click` on a checkbox or radio on Phoenix sends its form's `phx-change` after any `phx-click`, with the form as the click left it; a click on a selected radio sends no change.
-- `select_option` with `[]` deselects every option on Phoenix, as on Playwright; a single select then submits nothing.
-- On Phoenix, a LiveView render resets local text, select choices and checkbox/radio state only in the views and components whose rendering changed, including their portal content, as LiveView's client does; content under `phx-update="ignore"` keeps its state. Before, any change, even to the title, reset text everywhere, while choices and checks survived until their options or `checked` attribute changed.
-- On Phoenix, an upload entry the view cancels, from an event or `handle_info`, is no longer uploaded on submit.
-- `to_have_values` on Phoenix requires a multiple select, enabled or not, as on Playwright.
-- `by_text`, `by_label` and `filter(has_text:)` on Phoenix no longer match text inside a `<template>`, such as a LiveView portal's, which the browser keeps out of the document; as with `to_have_text`, script and style text no longer counts either.
-
-## 0.9.0-rc.1 — 2026-11-09
-
-### Added
-
-- `by_role` on Phoenix knows Playwright's implicit roles for everything markup can decide, landmarks included: `article`, `banner`, `complementary`, `contentinfo`, `form`, `main`, `navigation`, `region` and `search`, plus the likes of `paragraph`, `group`, `dialog`, `searchbox` and `status`. The usage guide has the full list.
-- `Fluffy.Expect.to_be_in_viewport/2` and `Fluffy.Assert.in_viewport/2`, with `ratio:` from 0 to 1, for Playwright; Phoenix raises `Fluffy.CapabilityError`.
-- `Fluffy.Playwright.add_init_script/3` runs a script in every later document of the session's browser context.
-- `Fluffy.Playwright.wait_for_function/4` waits on the active page and returns the session, within the session's `timeout:` unless `timeout:` is given. A non-empty keyword list in the argument position is options, so `wait_for_function(session, expression, timeout: 100)` works; `[]` stays a JavaScript array.
-- `Fluffy.Playwright.evaluate/4` accepts `timeout:`, overriding the session's, as `evaluate(session, expression, timeout: 100)` or `evaluate(session, expression, arg, timeout: 100)`.
-- `Fluffy.Expect.to_have_css/4`, `to_have_js_property/4`, `to_have_role/3`, `to_have_accessible_name/3`, `to_have_accessible_description/3` and `to_have_accessible_error_message/3` for Playwright; Phoenix raises `Fluffy.CapabilityError`.
-- `Fluffy.Expect.to_have_screenshot/2` and `page_to_have_screenshot/1` compare against the baseline at a required `path:`; Fluffy does not derive one from the test name. `to_match_aria_snapshot/3` and `page_to_match_aria_snapshot/2` compare an inline snapshot. Playwright only.
-- `to_match_aria_snapshot/2` and `page_to_match_aria_snapshot/1` also take `path:` in place of the expected snapshot, a file resolved against the current working directory and written when missing unless `update_snapshots:` is `:none`. Needs PlaywrightEx 0.17.0-rc.4.
-- `Fluffy.Playwright` gains `set_extra_http_headers/2`, which keeps the session's starting headers and Ecto sandbox header, `add_script_tag/2`, `add_style_tag/2`, `wait_for_load_state/3` and `unroute_all/2`, all returning the session, and `bounding_box/3`, `aria_snapshot/3` and `viewport_size/1`, returning the value. Phoenix raises `Fluffy.CapabilityError`.
-- `Fluffy.wait_for/3` also takes a locator on Playwright, with `state:`: it blocks and returns the session, while an event still returns a pending handle. Phoenix raises `Fluffy.CapabilityError` for a locator.
-- `Fluffy.Playwright.evaluate` and `wait_for_function` take a locator, and `evaluate_all/5` runs on all its elements, with the same options-or-argument matching.
-- `Fluffy.Playwright` gains `drop/4`, `pdf/3`, `bring_to_front/2` and `set_storage_state/2`, returning the session, and `all/2`, `content/2`, `title/2`, `local_storage/2` and `session_storage/2`, returning the value.
-- `Fluffy.Locator.within/2` scopes a locator to each match of another, with `nth/2` and `first/1` resolved per parent, on every driver.
-- `Fluffy.Route.fetch/2` performs a routed request and returns the response for `Fluffy.Route.fulfill/2`.
-- The facade's `assert_has` and `refute_has` accept a `%Fluffy.Locator{}` with the same options as a selector, inside the current `within/3` scope.
-- `Fluffy.unwrap_and_return/2`, `Fluffy.Playwright.unwrap_and_return/3` and `Fluffy.PhoenixTest.unwrap_and_return/2` run a native callback and return its result. They reconcile like `unwrap`; a Static callback may return anything and leaves the page alone.
-
-### Changed
-
-- **Breaking:** `Fluffy.unwrap/2` takes only a session and returns it. Use `Fluffy.unwrap_and_return/2` for native values such as `Fluffy.Response`.
-- Stricter name matching can stop Phoenix locators that only matched by content: `by_role(name:)` now takes a name from content only for the roles Playwright does. `<div role="navigation">Menu</div>` no longer matches `by_role(:navigation, name: "Menu")`, nor do other landmarks, `list`, `listitem` or `dialog`; a button or link no longer picks up text from a landmark inside it. Name those elements with `aria-labelledby`, `aria-label`, `title` or a native `legend`, `caption` or `figcaption`.
-- `by_role` on Phoenix follows Playwright's other role and name rules too: it uses the first valid `role` token in any case and keeps the implicit role for an invalid one; `none` and `presentation` give way on focusable elements or with global ARIA attributes, and pass to list items and table parts; a blank `aria-label` or dangling `aria-labelledby` falls through to the next name source; and the implicit roles of `th`, `img` and `input` changed to match.
-- A scoped `by_role` on Phoenix no longer matches its scope element, and sees hidden ancestors, labels and `aria-labelledby` targets outside its scope. A `datalist` counts as hidden. Phoenix locators do not model `details`, `dialog`, `popover` and dropdown `select` open state: content inside them stays visible on Phoenix, as on 0.9.0-rc.0, while Playwright needs them opened first.
-- Controls inside `<noscript>` are no longer submitted on Phoenix, as in a browser with scripting on, and a form inside `<noscript>` no longer owns its controls.
-- A `select` in a disabled `fieldset` keeps its default option on Phoenix, as in a browser, so `to_have_value` reports it. The control is still left out of form submissions.
-- Phoenix visibility checks (`to_be_visible`, `to_be_hidden`, `filter(visible:)` and the facade's `assert_has` and `refute_has`) now share one rendered rule with `by_role`. `aria-hidden` no longer counts, as in Playwright: a `to_be_visible` on an `aria-hidden` element passes and a `refute` on it fails, while `by_role` still excludes it. Elements a browser never displays, such as `<title>`, `<script>`, `<style>`, `<template>` or `<datalist>`, or fallback content inside `<video>` and the like, now count as invisible.
-- The PhoenixTest-style `click_button(session, text)` no longer matches `<input type="file">`, so a file input labelled like a button is no longer ambiguous. `by_role(:button)` still matches file inputs, as in Playwright.
-
-### Fixed
-
-- Static and LiveView chained locators, `filter(has:)` and `within/3` search descendants only, as on Playwright, so a scoped locator no longer matches its own parent. `by_text` under a parent still matches the parent, as on Playwright. A Phoenix test that relied on matching the parent must drop the scope.
-- The facade's `submit/2` resolves a `%Fluffy.Locator{}` inside the current `within/3` scope instead of the whole page.
-- Playwright `check` and `uncheck` no longer pass on a box that stayed unchanged after an earlier activation of the same element, or when the target refuses the click and its handler calls `el.click()` on another checkbox.
-
-## 0.9.0-rc.0 — 2026-11-09
-
-Fluffy now runs on PlaywrightEx 0.17, a port of the official Playwright client with a pinned Playwright 1.65 driver.
-
-### Upgrading from 0.8
-
-Later release candidates change some of these again; the [upgrade guide](docs/upgrading.md) lists the net changes from 0.8.
-
-- Install the driver and browsers with `MIX_ENV=test mix playwright_ex.install -- chromium`; drop the npm `playwright` package and the `assets_dir` config.
-- Node.js is no longer required, for tests or for developing Fluffy: the driver brings its own.
-- Playwright 1.65 is required. Its breaking changes apply: actions wait for an element to be not inert, and text the browser does not render is no longer part of accessible names.
-- Replace `js_logger:` with `log_browser_console: true | false`; `Fluffy.Playwright.ConsoleLogger` is removed and custom `PlaywrightEx.JsLogger` modules are not supported.
-- Browser `console.warn` messages log at `:warning` instead of `:info`.
-- `executable:` now names a Playwright driver executable instead of the npm `cli.js`; drop it if it pointed at npm `playwright`.
-- `unwrap/2` passes a `%PlaywrightEx.Page{}`; `Fluffy.Playwright.Handle` is removed.
-- `Fluffy.HTTPEvent` is replaced by `Fluffy.Request` and `Fluffy.Response` (`response.request` is the request).
-- `Fluffy.Playwright.evaluate(session, expression, arg \\ nil, options \\ [])` replaces the `is_function:` and `arg:` options, which now raise `NimbleOptions.ValidationError`, and raises after `timeout:` or the session's `timeout:`; JavaScript `null` returns `:null`.
-- `Fluffy.Playwright.cookies(session, urls)` takes the URL list directly; the `urls:` and `timeout:` options now raise `ArgumentError`.
-- Cookie maps of `add_cookies/2` and `cookies/2` use Playwright's camelCase atom keys: `%{name: "a", value: "b", url: url, http_only: true}` becomes `%{name: "a", value: "b", url: url, httpOnly: true}`, likewise `sameSite:` and `partitionKey:`; `add_cookies/2` raises on the old keys. `storage_state/2` returns atom keys instead of strings: `state["cookies"]` becomes `state.cookies`, likewise `:origins`, `:localStorage` and `:httpOnly`. Saved state files and string-keyed maps still load.
-- `browser_context:`, `launch_options:`, and the options of `screenshot`, `storage_state`, cookies and `trace` pass through to PlaywrightEx, which validates them.
-- `go_back`/`go_forward`, `hover`, `drag_to` and `press_sequentially` accept the options of their PlaywrightEx call except `no_wait_after:` and `signal:`, which would bypass navigation tracking.
-- On Phoenix, `go_back`/`go_forward` raise `Fluffy.CapabilityError` with `capability: :browser_history` instead of `:pages`.
-- On Playwright, a failed `visit`, `reload`, `go_back` or `go_forward` raises PlaywrightEx's exception, such as `PlaywrightEx.TimeoutError` or `PlaywrightEx.PlaywrightError`, instead of a `RuntimeError`.
-- `trace(coverage:)` is removed.
-- `Fluffy.Dialog.accept/2` and `dismiss/1` take no timeout; `Fluffy.Dialog` loses its `connection`, `id` and `timeout` fields, and `Fluffy.Download` its `timeout` field; `read!` and `save_as!` are renamed `read` and `save_as`, still raise after the session's `timeout:`, and now cancel the download so a pending save no longer writes the file later.
-- `page_status`, `page_to_have_status` and `Fluffy.Page.status` are removed, as in Playwright; on Playwright, assert on `Event.response` instead.
-- `OperationError.cause` and Playwright assertion messages carry native PlaywrightEx exceptions.
-- `Fluffy.Expect.checked_option` is now `to_be_checked_option`.
-- `Fluffy.Download` loses its `source` and `runtime` fields; its other fields besides `suggested_filename`, `url` and `page` are private. On Playwright, `unwrap_and_return(download, fun)` passes the `PlaywrightEx.Download`.
-- `Fluffy.Locator.describe`, `new` and `append` are internal; `inspect/1` renders a locator.
-- LiveView `set_input_files` on an upload input whose form has no id raises, saying to give the form an id, which LiveView's form recovery needs anyway.
-
-### Added
-
-- `click`, `fill`, `check`, `uncheck`, `select_option` and `press` accept the options of their PlaywrightEx call on Playwright (e.g. `modifiers: [:shift]`, `force: true`); Phoenix raises `Fluffy.CapabilityError` for them.
-- `reload` accepts `wait_until:` on Playwright; Phoenix raises `Fluffy.CapabilityError` for it.
-- `by_role` accepts Playwright's `checked:`, `disabled:`, `expanded:`, `include_hidden:`, `level:`, `pressed:`, `selected:` and `description:`, and `name:`, `has_text:` and `has_not_text:` accept a regex. These are Playwright only; Phoenix raises `Fluffy.CapabilityError` when it resolves such a locator.
-- Expectations accept the options of their PlaywrightEx assertion on every driver: `visible:`, `enabled:` and `editable:` (`false` asserts the opposite state) and `ignore_case:` for `page_to_have_url`. Options and types are generated per constructor.
-- A document navigated natively (inside or after `unwrap/2`) is adopted before the next action.
-- Fluffy relaunches the browser after it disconnects.
-- `Fluffy.Playwright.unwrap/3` runs a callback with the `PlaywrightEx.Locator` of a Fluffy locator, resolved through frame locators, and adopts the navigation it causes.
-- `unwrap/2` accepts a `Fluffy.Request`, `Fluffy.Response`, `Fluffy.Dialog`, `Fluffy.Download`, `Fluffy.FileChooser` or `Fluffy.Frame` and returns the callback's result with its PlaywrightEx counterpart, such as a response body.
-- `Fluffy.FileChooser.page/1`, and `Fluffy.Dialog.page/1` with a `page` field.
-- `Fluffy.Download.page/1` with a `page` field; on Phoenix, the page that started the download.
-- `Fluffy.Event.close()` resolves with the selected page's handle when it closes.
-- Playwright clock control in `Fluffy.Playwright.Clock`: `install`, `pause_at`, `run_for`, `fast_forward`, `resume`, `set_fixed_time` and `set_system_time`. Fluffy's waits work with a paused clock.
-- `Fluffy.Expect` gains `to_have_text`, `to_contain_text`, `to_have_attribute`, `to_have_class`, `to_contain_class`, `to_have_id`, `to_be_attached`, `to_be_hidden` and `to_be_empty` on every driver, following Playwright's whitespace normalization, regular expressions, per-element lists and strictness. `use_inner_text:` is Playwright only; Phoenix raises `Fluffy.CapabilityError` for it.
-- `Fluffy.clear/3` and `Fluffy.set_checked/4` work on every driver.
-- `Fluffy.Playwright` gains `dblclick`, `tap`, `dispatch_event`, `select_text`, `scroll_into_view_if_needed`, element `screenshot`, `set_viewport_size` and `emulate_media`; `Fluffy.Playwright.Keyboard` and `Fluffy.Playwright.Mouse` send page-wide input. As in Playwright, page-wide input and `dispatch_event` do not wait for a navigation they start; `expect` on the new page before the next action. They accept their PlaywrightEx options except `no_wait_after:` and `signal:`, and raise `Fluffy.CapabilityError` on Phoenix.
-- `Fluffy.Response` reads bodies and headers: `body`, `text`, `json`, `ok?`, `all_headers`, `header_value` and `header_values`, without `unwrap/2`. `Fluffy.Request` adds `all_headers`, `header_value`, `post_data_json`, `failure`, `redirected_from` and `redirected_to`. Reads raise after the session's `timeout:`.
-- `Fluffy.Download.path`, which raises `Fluffy.CapabilityError` on Phoenix.
-- `Fluffy.Playwright` changes the browser context at runtime with `grant_permissions`, `clear_permissions`, `set_geolocation`, `set_offline` and `set_http_credentials`, returning the session and raising after its `timeout:`; Phoenix raises `Fluffy.CapabilityError` for them.
-- More Playwright events on `Fluffy.Event`: `console`, `page_error`, `worker` and `web_socket` (new values `Fluffy.ConsoleMessage`, `Fluffy.PageError`, `Fluffy.Worker` and `Fluffy.WebSocket`), `request_failed` and `request_finished` (a `Fluffy.Request`, with `scope:`), `load`, `dom_content_loaded` and `crash` (a `Fluffy.Page`), and `frame_attached` and `frame_detached` (a `Fluffy.Frame`). Phoenix raises `Fluffy.CapabilityError` for them.
-- `Fluffy.Playwright.route/4` and `unroute/3` intercept the requests of a session's browser context, with a new `Fluffy.Route` to `fulfill`, `continue`, `abort` or `fallback` them. A handler runs in its own process, allowed by the Ecto sandbox through `$callers`; a raising handler aborts the request and fails the test.
-- `config :fluffy, :playwright, pool_size: n` runs a pool of browsers (default `1`). Sessions go to the least-loaded browser, ties to the lowest slot; each browser launches on first need, and a lost browser is launched again for the next session that needs it.
-
-### Fixed
-
-- `check` and `uncheck` on Playwright succeed when page code reverts the click in a frame that loaded after the action started.
-- A LiveView `press` sends its keyup to the binding its target had when the press started, as a browser does: a keydown that removes, moves, or rebinds its target no longer drops the keyup or sends it to another element, even with `first()`, `last()`, or an input without an id. A keydown that removes the LiveComponent handling the key loses the keyup with `phx-target={@myself}`, and sends it to the view with a CSS selector, since LiveViewTest has destroyed the component by then.
-- LiveView cancels an upload whose form a render shifted, still submits a form whose last upload moved it, keeps an upload whose input a render removed for that submit to consume, and uploads through a `live_file_input` linked to its form with `form=`.
+- LiveView follows navigation as a browser does: a `push_navigate` or `redirect` from a connected mount, a redirect while Fluffy reads the view, an action on a view that navigated away, a patch partway through an action, and `phx-mounted={JS.patch(...)}` on a new view. Redirects count toward a 20-redirect limit, so a loop fails instead of hanging.
+- On Phoenix, a `phx-trigger-action` form is submitted as LiveView's client does, from mount or a pushed render.
+- On Phoenix, a `204 No Content` or `205 Reset Content` answer keeps the current page; on Chromium, a `204` no longer leaves later actions waiting.
+- LiveView uploads survive renders that move or remove their form or input, follow navigations from progress callbacks, and work through a `live_file_input` linked with `form=`; `submit` and `set_input_files` wait for their target.
+- A LiveView `press` sends its keyup to the binding its target had when the press started.
+- On Playwright, an action that closes its own page succeeds, an event of a page that closed at once resolves, and a navigation into a client-side redirect chain is followed.
+- Playwright `check` and `uncheck` no longer pass on a box that stayed unchanged.
+- Static and LiveView compute editable, checked and disabled state and find labels as Playwright does.
+- Phoenix requests no longer carry the sandbox header, and `on`/`once` handlers and `wait_for` predicates run with the test in `$callers`, so they can use its sandbox connection and mocks.
+- The facade's `submit/2` resolves a locator inside the current `within/3` scope.
+- The browsers and the driver close before `mix test` halts the VM, so the terminal is no longer left in the wrong mode ([#213](https://github.com/ftes/fluffy/issues/213)).
 - No unused-function warning when Fluffy is compiled without Ecto.
-- A Playwright session starts when `config :fluffy, :playwright` leaves out `timeout:`, using its 15 seconds default instead of raising `KeyError`.
-- Playwright actions and expectations default to the session's `timeout:`, like LiveView.
-- Playwright `reload(timeout:)` bounds the reload only; the LiveView connection wait after it uses the session's `timeout:`, as after other actions.
-- An action that closes its own page, such as a popup's `window.close()`, succeeds instead of raising `PlaywrightEx.TargetClosedError`.
-- An event of a page that closed before Fluffy saw it, such as a popup that closes at once, resolves with that page's closed handle instead of raising; a request's page is nil.
-- A browser that fails to launch raises in the session that needed it, instead of restarting every running session.
-- Playwright `check` and `uncheck` succeed once the click sets the requested state, as on Phoenix, even if page code such as a LiveView patch changes it before Playwright reads it back (common in Firefox and WebKit).
-- Playwright `submit` waits for the server to answer the navigation it starts, following its redirects, so it no longer returns before WebKit has sent the form. A submission the browser handles within the document (a GET to a fragment of the current URL, a Navigation API `intercept()`) ends the wait, as does a `beforeunload` prompt.
-- On Phoenix, a link, form submission or redirect answered with `204 No Content` or `205 Reset Content` keeps the current page, URL and form state instead of showing an empty document; a LiveView page stays, disconnected, as in a browser. `visit` to such a response raises, like Playwright's.
-- On Chromium, a link or form submission answered with `204 No Content` no longer leaves later actions waiting on the aborted navigation.
-- On Playwright, a LiveView navigation whose new view patches as it mounts (`phx-mounted={JS.patch(...)}`) is followed as a navigation instead of a patch, so Fluffy awaits the new view and the PhoenixTest facade drops the old page's active form.
-- A Playwright action whose navigation lands on pages that navigate again on load (a client-side redirect chain) follows them instead of raising "Execution context was destroyed".
-- LiveView follows a redirect that lands while Fluffy reads the view after mount, an event or a retry, instead of crashing in `LazyHTML.from_fragment/1` or on a `GenServer.call` exit.
-- LiveView follows a `push_navigate` or `redirect` from a view's connected mount, as a browser does, instead of raising "LiveView navigation failed". Mount redirects count toward the 20-redirect limit, so a loop fails instead of hanging. A connection LiveView rejects as stale or unauthorized, such as across live_sessions, still raises "LiveView navigation failed" with that cause.
-- A LiveView action on a view that navigated away since Fluffy last read it follows the navigation and acts on the new page, as Playwright does, instead of failing with a LiveView error. A target missing there fails like any missing target, and an action whose timeout ran out before it reached the view fails as having navigated away, without acting on the new page. An action whose page navigates partway, such as between a press's keydown and keyup, ends on the new page without repeating there. A patch the view pushed meanwhile applies in place, so the action acts on the patched document instead of the one before. Pages that keep navigating before the action reaches them, such as views that navigate to each other as they connect, fail the action at the 20-redirect limit instead of retrying it until its timeout, and the redirects of a page it follows count toward the same limit. An expectation on such pages fails there too instead of retrying without end.
-- A LiveView action goes on after one of its steps patches the URL, as in a browser: a patching keydown still sends keyup, a patching checkbox click its `phx-change`, and a patching upload progress or change handler lets the upload and submit finish. A form that patches after consuming its uploads can be submitted again.
-- A LiveView upload survives a render that inserts content before its form, instead of failing at submit with "cannot consume uploaded files when entries are still in progress".
-- LiveView `set_input_files` and upload submits follow a navigation from an upload progress callback right away instead of treating it as an entry error.
-- LiveView `submit` and `set_input_files` wait for their target within the action's timeout, like `click`.
-- On Phoenix, `to_be_visible`, `filter(visible:)` and `assert_has` treat a descendant of a `hidden` element and an `<input type="hidden">` as invisible, as Playwright does.
 
 ## 0.8.0 — 2026-11-04
 

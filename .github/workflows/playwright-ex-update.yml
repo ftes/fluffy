@@ -161,7 +161,8 @@ jobs:
                AGENTS.md. Don't weaken or skip a test to get it green. Rerun failed tests once with
                `mix test --failed`; one that still fails and that the update didn't cause is
                reported in the PR body, not hidden.
-            6. Under `## Unreleased` in CHANGELOG.md, in the style of the existing entries:
+            6. Under `## Unreleased` in CHANGELOG.md (add it below the overview, above the newest
+               release, if it's missing), in the style of the existing entries:
                "Requires PlaywrightEx TO", and anything else users see change.
 
             If the update needs a decision beyond this, like a breaking PlaywrightEx change or a
