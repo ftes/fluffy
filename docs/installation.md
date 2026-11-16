@@ -37,17 +37,37 @@ dependencies `mix.exs` lists:
 Fluffy ships `usage-rules.md`, rules for coding agents: setup, choosing a backend, locators,
 assertions and waiting, capabilities, events and dropping to Playwright. They build on
 Playwright's usage rules, which cover its API, locators in Playwright's recommended order and
-web-first assertions, so sync both. Fluffy's rules override Phoenix's "LiveView tests" rules for
-feature tests, which recommend `Phoenix.LiveViewTest` and locating by element ids. With the
-[`usage_rules`](https://hexdocs.pm/usage_rules) package, list both in its config and run
-`mix usage_rules.sync` to copy them into your `AGENTS.md`; sync again after upgrading.
+web-first assertions. Sync them with the [`usage_rules`](https://hexdocs.pm/usage_rules)
+package as one skill, so an agent loads both when it writes a feature test and other work
+doesn't carry them. Run `mix usage_rules.sync`, and sync again after upgrading.
+
+Fluffy's rules override Phoenix's "LiveView tests" rules, which recommend
+`Phoenix.LiveViewTest` and locating by element ids. Move `phoenix:liveview` into a skill too:
+in an always-loaded `AGENTS.md` those rules would reach every agent, while Fluffy's override
+reaches only the ones that load its skill.
+
+A skill's description defaults to the package's Hex description, so write descriptions that
+say when to use each skill:
 
 ```elixir
 # mix.exs
 def project do
   [
     # ...
-    usage_rules: [file: "AGENTS.md", usage_rules: [:fluffy, :playwright]]
+    usage_rules: [
+      skills: [
+        build: [
+          "phoenix-feature-tests": [
+            description: "Use when writing or debugging Phoenix feature tests with Fluffy.",
+            usage_rules: [:fluffy, :playwright]
+          ],
+          "phoenix-liveview": [
+            description: "Use when writing LiveViews, components or templates.",
+            usage_rules: ["phoenix:liveview"]
+          ]
+        ]
+      ]
+    ]
   ]
 end
 ```
