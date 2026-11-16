@@ -332,16 +332,19 @@ defmodule Fluffy.Conformance.LiveActionTest do
       expect(session, to_have_text(log, ~r/ sort$/))
     end
 
-    # Like a browser, a label that is already clicking its control doesn't
-    # click it again, so labels that contain each other's control click each
-    # once.
+    # Like Chromium and WebKit, a label that is already clicking its control
+    # doesn't click it again, so labels that contain each other's control click
+    # each once. Firefox stops at the first label's control.
     @tag driver: driver
     test "labels containing each other's control click each once, with #{driver}", %{driver: driver} do
+      expected =
+        if driver == :playwright and playwright_engine?(:firefox), do: "Log: mirror:b", else: "Log: mirror:b mirror:a"
+
       driver
       |> live_session()
       |> visit("/live/label-clicks")
       |> click(by_text("Mirror A", exact: true))
-      |> expect(to_have_text(by_css("#log"), "Log: mirror:b mirror:a"))
+      |> expect(to_have_text(by_css("#log"), expected))
     end
 
     @tag driver: driver
