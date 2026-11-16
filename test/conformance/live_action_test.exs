@@ -221,6 +221,35 @@ defmodule Fluffy.Conformance.LiveActionTest do
       |> expect(to_be_checked(notify))
     end
 
+    # Like a browser, a click on a label clicks its control too. Each click
+    # reaches its closest phx-click, and one both reach fires once.
+    @tag driver: driver
+    test "clicking a label clicks its control, with #{driver}", %{driver: driver} do
+      log = by_css("#log")
+
+      driver
+      |> live_session()
+      |> visit("/live/label-clicks")
+      |> click(by_text("Invisibility cloak", exact: true))
+      |> expect(to_have_text(log, "Log: click:yes change:yes,-,-,-"))
+      |> expect(:checkbox |> by_role(name: "Invisibility cloak") |> to_be_checked())
+      |> click(by_text("Gryffindor", exact: true))
+      |> expect(to_have_text(log, ~r/ change:yes,-,-,gryffindor$/))
+      |> expect(:radio |> by_role(name: "Gryffindor") |> to_be_checked())
+      |> click(by_text("Owl post", exact: true))
+      |> expect(to_have_text(log, ~r/gryffindor label click:yes change:yes,yes,-,gryffindor$/))
+      |> click(by_text("Elder wand", exact: true))
+      |> expect(to_have_text(log, ~r/gryffindor pick change:yes,yes,yes,gryffindor$/))
+      # An href="#" binding prevents the label's click from reaching the box.
+      |> click(by_text("Sorting hat", exact: true))
+      |> expect(to_have_text(log, ~r/gryffindor sort$/))
+      |> expect(:checkbox |> by_role(name: "Sorting hat") |> to_be_checked(checked: false))
+      |> click(by_text("Accio", exact: true))
+      |> expect(to_have_text(log, ~r/ sort summon$/))
+      |> click(by_text("Mischief managed", exact: true))
+      |> expect(to_have_text(log, ~r/ summon save$/))
+    end
+
     @tag driver: driver
     test "a click reaches the closest phx-click, and an inner binding wins, with #{driver}", %{driver: driver} do
       log = by_css("#log")

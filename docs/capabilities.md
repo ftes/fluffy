@@ -65,7 +65,8 @@ visibility; see [Visibility and DOM presence](assertions.md#visibility-and-dom-p
 for the distinction from browser rendering and DOM absence.
 
 Phoenix locators do not model `<details>`, `<dialog>`, `popover` and dropdown
-`<select>` open state, which a Phoenix test has no way to change. Content inside
+`<select>` open state, which a Phoenix test has no way to change: a click on a
+`<summary>` doesn't toggle its `<details>` there, nor its `open` attribute. Content inside
 a closed `<details>`, `<dialog>` or `popover`, and the options of a closed
 `<select>`, count as visible on Phoenix, so a test can reach them without opening
 them; on Playwright they must be opened first. A `refute` on that

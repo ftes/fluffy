@@ -114,6 +114,35 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       assert [_source, %{query: "query=fluffy&commit=on"}] = HTTPFixtures.requests(fixture)
     end
 
+    # A click on a label clicks its control: it checks the checkbox, and the
+    # submit button then submits as the form's submitter.
+    @tag driver: driver
+    test "a click on a label checks its checkbox or submits through its button with #{driver}", %{driver: driver} do
+      fixture =
+        HTTPFixtures.register_sequence([
+          %{
+            body:
+              html("""
+              <form method="get" action="search">
+                <label><input type="checkbox" name="scope" value="forbidden"> Restricted section</label>
+                <label for="commit">Alohomora</label>
+                <button id="commit" name="commit" value="on">Search</button>
+              </form>
+              """)
+          },
+          %{body: html("<h1>Search results</h1>")}
+        ])
+
+      driver
+      |> start_test_session()
+      |> visit(HTTPFixtures.path(fixture, "/forms/start"))
+      |> click(by_text("Restricted section", exact: true))
+      |> click(by_text("Alohomora", exact: true))
+      |> expect("Search results" |> by_text() |> to_be_visible())
+
+      assert [_source, %{query: "scope=forbidden&commit=on"}] = HTTPFixtures.requests(fixture)
+    end
+
     @tag driver: driver
     test "submit returns once the server has received the submission using #{driver}", %{driver: driver} do
       fixture =

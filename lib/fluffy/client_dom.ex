@@ -102,13 +102,13 @@ defmodule Fluffy.ClientDOM do
   def click(%__MODULE__{} = client_dom, %Locator{} = locator) do
     target = target!(client_dom, locator)
 
-    if target_disabled?(client_dom, state_target(client_dom, target)) do
+    if target_disabled?(client_dom, follow_label(client_dom, target)) do
       raise Fluffy.ActionabilityError, action: :click, reason: :disabled, locator: locator
     end
 
     Actionability.ensure_clickable!(target.element, :click, locator)
 
-    client_dom = maybe_toggle_checked(client_dom, target)
+    client_dom = maybe_toggle_checked(client_dom, label_control(client_dom, target) || target)
 
     {client_dom, target}
   end
@@ -160,6 +160,12 @@ defmodule Fluffy.ClientDOM do
       nil ->
         nil
 
+      %{tag: "label"} ->
+        case label_control(client_dom, target) do
+          nil -> nil
+          control -> default_action(client_dom, control, driver)
+        end
+
       %{tag: tag} = link when tag in ["a", "area"] ->
         {:link, link}
 
@@ -179,7 +185,33 @@ defmodule Fluffy.ClientDOM do
   defp activation_behavior?(%{tag: tag, attributes: attributes}) when tag in ["a", "area"],
     do: has_attribute?(attributes, "href")
 
-  defp activation_behavior?(%{tag: tag}), do: tag in ["button", "input"]
+  defp activation_behavior?(%{tag: tag}), do: tag in ["button", "input", "label"]
+
+  # HTML's label activation behavior: a click on a label, outside its control and
+  # any interactive content in it, clicks the label's control, which toggles a
+  # checkbox or radio and takes the control's own activation, such as a button's.
+  # Returns that control, or nil.
+  @doc false
+  def label_control(%__MODULE__{} = client_dom, %Target{} = target) do
+    with %Target{tag: "label"} = label <- activation_target(client_dom, target),
+         id when is_integer(id) <- Aria.label_control_id(aria(client_dom), label),
+         [_label | inside] = Enum.drop_while(target.ancestors ++ [target], &(&1.id != label.id)),
+         false <- Enum.any?(inside, &(&1.id == id or interactive_content?(&1))) do
+      DocumentIndex.target_by_id(index(client_dom), id)
+    else
+      _no_control -> nil
+    end
+  end
+
+  # Interactive content other than the elements with activation behavior, which
+  # take a click before an enclosing label does.
+  defp interactive_content?(%{tag: tag}) when tag in ~w(details embed iframe select textarea), do: true
+
+  defp interactive_content?(%{tag: tag, attributes: attributes}) when tag in ~w(audio video),
+    do: has_attribute?(attributes, "controls")
+
+  defp interactive_content?(%{tag: "img", attributes: attributes}), do: has_attribute?(attributes, "usemap")
+  defp interactive_content?(_element), do: false
 
   @doc false
   def submit_form(%__MODULE__{} = client_dom, target, driver \\ :static) do
@@ -388,7 +420,7 @@ defmodule Fluffy.ClientDOM do
 
   @doc false
   def disabled?(%__MODULE__{} = client_dom, %Locator{} = locator) do
-    target_disabled?(client_dom, state_target(client_dom, target!(client_dom, locator)))
+    target_disabled?(client_dom, control!(client_dom, locator))
   end
 
   defp target_disabled?(client_dom, target), do: Aria.aria_disabled?(aria(client_dom), target)
@@ -397,9 +429,7 @@ defmodule Fluffy.ClientDOM do
 
   # Like Playwright, an element other than a form control takes its enabled
   # state from the closest button, so text inside a disabled button is disabled.
-  # Unlike Playwright's retarget(..., "follow-label"), a label doesn't take its
-  # control's enabled state, as a click on it doesn't activate the control (#134);
-  # the other actions and states follow the label (`control!/2`).
+  # `follow_label/2` goes on to a label's control.
   defp state_target(_client_dom, %Target{tag: tag} = target) when tag in ["input", "textarea", "select"], do: target
 
   defp state_target(client_dom, target) do
@@ -413,8 +443,9 @@ defmodule Fluffy.ClientDOM do
   end
 
   # Playwright's retarget(..., "follow-label"), which fill, clear, select_option,
-  # set_input_files, set_checked, the value and the checked and editable states use:
-  # an element in a label acts as its control.
+  # set_input_files, set_checked, the value and the enabled, checked and editable
+  # states use, as does click's enabled check: an element in a label acts as its
+  # control.
   @doc false
   def control!(%__MODULE__{} = client_dom, locator), do: follow_label(client_dom, target!(client_dom, locator))
 

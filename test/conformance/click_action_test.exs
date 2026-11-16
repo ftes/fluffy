@@ -111,25 +111,69 @@ defmodule Fluffy.Conformance.ClickActionTest do
       end)
     end
 
-    # Known difference: Playwright follows a label to its control, for the
-    # enabled state as for the click's activation. Phoenix treats a label as a
-    # plain element, so its text is enabled and clicking it does nothing (#134).
+    # Like a browser, a click on a label clicks its control, nested or by `for`.
     @tag driver: driver
-    test "a label takes its control's state and activation only on Playwright with #{driver}" do
+    test "clicking a label toggles its checkbox and selects its radio with #{driver}" do
       html = """
-      <label><input type="checkbox" disabled> Accept</label>
       <label for="permission">Hogsmeade permission</label><input id="permission" type="checkbox">
+      <label><input type="radio" name="house" checked> Slytherin</label>
+      <label><input type="radio" name="house"> <span>Gryffindor</span></label>
+      <label>Patronus <input type="text" value="Stag"></label>
       """
 
-      playwright? = unquote(driver) == :playwright
+      permission = by_role(:checkbox, name: "Hogsmeade permission")
 
       with_html(unquote(driver), html, fn session ->
-        accept = by_text("Accept", exact: true)
-
         session
-        |> expect(if(playwright?, do: to_be_disabled(accept), else: to_be_enabled(accept)))
         |> click(by_text("Hogsmeade permission", exact: true))
-        |> expect(:checkbox |> by_role(name: "Hogsmeade permission") |> to_be_checked(checked: playwright?))
+        |> expect(to_be_checked(permission))
+        |> click(by_text("Hogsmeade permission", exact: true))
+        |> expect(not_(to_be_checked(permission)))
+        |> click(by_text("Gryffindor", exact: true))
+        |> expect(:radio |> by_role(name: "Gryffindor") |> to_be_checked())
+        |> expect(:radio |> by_role(name: "Slytherin") |> to_be_checked(checked: false))
+        |> click(by_text("Patronus"))
+        |> expect(:textbox |> by_role(name: "Patronus") |> to_have_value("Stag"))
+      end)
+    end
+
+    # Like Playwright's retarget(..., "follow-label"), a label takes its
+    # control's enabled state, so a click on it waits for the control.
+    @tag driver: driver
+    test "a label takes its control's enabled state with #{driver}" do
+      html = """
+      <label><input type="checkbox" disabled> Accept</label>
+      <label for="cloak">Cloak</label><fieldset disabled><input id="cloak" type="checkbox"></fieldset>
+      """
+
+      with_html(unquote(driver), html, fn session ->
+        for text <- ["Accept", "Cloak"] do
+          label = by_text(text, exact: true)
+          expect(session, to_be_disabled(label))
+
+          assert_action_error(session, Fluffy.ActionabilityError, ~r/disabled|not enabled/, fn ->
+            click(session, label, timeout: 5)
+          end)
+        end
+      end)
+    end
+
+    # A click on a label's control, or on interactive content in the label,
+    # stays there.
+    @tag driver: driver
+    test "a click inside a label's control or other content stays there with #{driver}" do
+      html = """
+      <label for="owl">Owl <select><option>Hedwig</option></select></label>
+      <input id="owl" type="checkbox">
+      <label><input type="checkbox" checked> Broom</label>
+      """
+
+      with_html(unquote(driver), html, fn session ->
+        session
+        |> click(by_role(:combobox))
+        |> expect(:checkbox |> by_role(name: "Owl") |> to_be_checked(checked: false))
+        |> click(by_role(:checkbox, name: "Broom"))
+        |> expect(:checkbox |> by_role(name: "Broom") |> to_be_checked(checked: false))
       end)
     end
 
