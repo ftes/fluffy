@@ -250,6 +250,25 @@ defmodule Fluffy.Conformance.LiveActionTest do
       |> expect(to_have_text(log, ~r/ summon save$/))
     end
 
+    # The browser clicks the control at once, before the label's phx-click
+    # replies, so the control's click and change go as the click found them,
+    # though the reply checks the box or removes it.
+    @tag driver: driver
+    test "a label's control clicks as the label's click found it, with #{driver}", %{driver: driver} do
+      log = by_css("#log")
+      familiar = by_role(:checkbox, name: "Familiar")
+
+      driver
+      |> live_session()
+      |> visit("/live/label-clicks")
+      |> click(by_text("Familiar", exact: true))
+      |> expect(to_have_text(log, "Log: adopt familiar:yes,-"))
+      |> expect(to_be_checked(familiar))
+      |> click(by_text("Patronus", exact: true))
+      |> expect(to_have_text(log, "Log: adopt familiar:yes,- banish click:yes familiar:yes,yes"))
+      |> expect(:checkbox |> by_role(name: "Patronus") |> to_have_count(0))
+    end
+
     # LiveView prevents the default of a click on an href="#" binding, even a
     # JS-only one, so a label in it doesn't click its control, and a control in
     # it doesn't take its default action.

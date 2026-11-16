@@ -9,7 +9,8 @@ defmodule Fluffy.Support.Web.LabelClickLive do
   # label sends through its control.
   @impl true
   def mount(_params, _session, socket) do
-    {:ok, assign(socket, log: [], cloak?: false, owl?: false, wand?: false, house: nil)}
+    {:ok,
+     assign(socket, log: [], cloak?: false, owl?: false, wand?: false, house: nil, familiar?: false, banished?: false)}
   end
 
   @impl true
@@ -19,6 +20,13 @@ defmodule Fluffy.Support.Web.LabelClickLive do
   def handle_event("summon", _params, socket), do: {:noreply, log(socket, "summon")}
   def handle_event("sort", _params, socket), do: {:noreply, log(socket, "sort")}
   def handle_event("save", _params, socket), do: {:noreply, log(socket, "save")}
+  def handle_event("adopt", _params, socket), do: {:noreply, socket |> assign(familiar?: true) |> log("adopt")}
+  def handle_event("banish", _params, socket), do: {:noreply, socket |> assign(banished?: true) |> log("banish")}
+
+  def handle_event("familiar", params, socket) do
+    socket = assign(socket, familiar?: params["familiar"] == "yes")
+    {:noreply, log(socket, "familiar:#{params["familiar"] || "-"},#{params["patronus"] || "-"}")}
+  end
 
   def handle_event("change", params, socket) do
     socket =
@@ -67,6 +75,19 @@ defmodule Fluffy.Support.Web.LabelClickLive do
       </a>
       <label for="lumos">Cast lumos</label>
       <a href="#" phx-click="sort"><button id="lumos">Lumos</button></a>
+    </form>
+    <form id="familiar-form" phx-change="familiar">
+      <label for="familiar" phx-click="adopt">Familiar</label>
+      <input id="familiar" type="checkbox" name="familiar" value="yes" checked={@familiar?} />
+      <label for="patronus" phx-click="banish">Patronus</label>
+      <input
+        :if={!@banished?}
+        id="patronus"
+        type="checkbox"
+        name="patronus"
+        value="yes"
+        phx-click="clicked"
+      />
     </form>
     <p id="spellbook">Spellbook</p>
     <p id="log">Log: {Enum.join(@log, " ")}</p>

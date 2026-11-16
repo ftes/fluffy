@@ -64,10 +64,11 @@ defmodule Fluffy.Driver.Static do
     Keyword.validate!(options, [:timeout])
     client_dom = session |> Session.page_state() |> Map.fetch!(:client_dom)
     {client_dom, target} = ClientDOM.click(client_dom, locator)
-    commit_click(session, client_dom, target)
+    commit_click(session, client_dom, target, [])
   end
 
-  defp commit_click(session, client_dom, target) do
+  # `clicking` lists the controls labels are already clicking in this click.
+  defp commit_click(session, client_dom, target, clicking) do
     state = Session.page_state(session)
     session = Session.put_page_state(session, %{state | client_dom: client_dom})
 
@@ -76,7 +77,7 @@ defmodule Fluffy.Driver.Static do
         {:navigate, session, Navigation.submission(submission)}
 
       nil ->
-        case ClientDOM.default_action(client_dom, target) do
+        case ClientDOM.default_action(client_dom, target, :static, clicking) do
           nil ->
             session
 
@@ -88,7 +89,7 @@ defmodule Fluffy.Driver.Static do
             {:navigate, session, Navigation.submission(submission)}
 
           {:click, control} ->
-            commit_click(session, ClientDOM.click_target(client_dom, control), control)
+            commit_click(session, ClientDOM.click_target(client_dom, control), control, [control.id | clicking])
         end
     end
   end

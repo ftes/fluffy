@@ -149,18 +149,26 @@ defmodule Fluffy.ClientDOM do
   def closest(%__MODULE__{} = client_dom, %Target{} = target, fun) do
     case Enum.find([target | Enum.reverse(target.ancestors)], fun) do
       nil -> nil
-      %{id: id} when id == target.id -> target
-      element -> DocumentIndex.target_by_id(index(client_dom), element.id)
+      element -> inclusive_ancestor(client_dom, target, element)
     end
   end
 
+  defp inclusive_ancestor(_client_dom, %Target{id: id} = target, %{id: id}), do: target
+  defp inclusive_ancestor(client_dom, _target, element), do: DocumentIndex.target_by_id(index(client_dom), element.id)
+
   # A click's default action: `{:link, link}` to follow a link,
   # `{:submit, submitter, submission}` to submit a submit button's form,
-  # `{:click, control}` to click a label's control, or nil.
+  # `{:click, control}` to click a label's control, or nil. `clicking` lists
+  # the ids of the controls labels are already clicking in this click.
   @doc false
-  def default_action(%__MODULE__{} = client_dom, %Target{} = target, driver \\ :static) do
-    case activation_target(client_dom, target) do
+  def default_action(%__MODULE__{} = client_dom, %Target{} = target, driver \\ :static, clicking \\ []) do
+    case activation_target(client_dom, target, clicking) do
       nil ->
+        nil
+
+      # A browser dispatches no click to a disabled form control, though the
+      # click's enabled check may pass on an enclosing button, as in Playwright.
+      {:label, %Target{form_control_disabled?: true}} ->
         nil
 
       {:label, control} ->
@@ -180,22 +188,20 @@ defmodule Fluffy.ClientDOM do
   # Like a browser's click dispatch, the default action belongs to the closest
   # inclusive ancestor with activation behavior. Actionability already rejects
   # a click inside a disabled control.
-  defp activation_target(client_dom, target) do
+  defp activation_target(client_dom, target, clicking) do
     aria = aria(client_dom)
-    index = index(client_dom)
 
     [target | Enum.reverse(target.ancestors)]
     |> Enum.reduce_while([], fn element, inside ->
       cond do
         activation_behavior?(element) -> {:halt, {:element, element}}
-        id = label_control_id(aria, element, inside) -> {:halt, {:label, id}}
+        id = label_control_id(aria, element, inside, clicking) -> {:halt, {:label, id}}
         true -> {:cont, [element | inside]}
       end
     end)
     |> case do
-      {:element, %{id: id}} when id == target.id -> target
-      {:element, element} -> DocumentIndex.target_by_id(index, element.id)
-      {:label, id} -> {:label, DocumentIndex.target_by_id(index, id)}
+      {:element, element} -> inclusive_ancestor(client_dom, target, element)
+      {:label, id} -> {:label, DocumentIndex.target_by_id(index(client_dom), id)}
       _none -> nil
     end
   end
@@ -208,12 +214,15 @@ defmodule Fluffy.ClientDOM do
   # HTML's label activation behavior: a label clicks its labelled control,
   # unless the click is on that control or on interactive content in the label.
   # A label without a control has none, so the click goes on to its ancestors.
-  defp label_control_id(aria, %{tag: "label"} = label, inside) do
+  # Like Chromium's processing_click_, a label doesn't click a control it is
+  # already clicking, so labels that contain each other's control stop.
+  defp label_control_id(aria, %{tag: "label"} = label, inside, clicking) do
     id = Aria.label_control_id(aria, label)
-    if id && not Enum.any?(inside, &(&1.id == id or interactive_content?(&1))), do: id
+
+    if id && id not in clicking && not Enum.any?(inside, &(&1.id == id or interactive_content?(&1))), do: id
   end
 
-  defp label_control_id(_aria, _element, _inside), do: nil
+  defp label_control_id(_aria, _element, _inside, _clicking), do: nil
 
   # Interactive content other than the elements with activation behavior, which
   # take a click before an enclosing label does.
@@ -439,33 +448,27 @@ defmodule Fluffy.ClientDOM do
 
   defp aria(client_dom), do: Aria.for_document(client_dom.document)
 
-  # Like Playwright, an element other than a form control takes its enabled
-  # state from the closest button, so text inside a disabled button is disabled.
-  # `follow_label/2` goes on to a label's control.
-  defp state_target(_client_dom, %Target{tag: tag} = target) when tag in ["input", "textarea", "select"], do: target
-
-  defp state_target(client_dom, target) do
-    if Aria.content_editable?(aria(client_dom), target) do
-      target
-    else
-      closest(client_dom, target, fn %{tag: tag, attributes: attributes} ->
-        tag == "button" or attribute(attributes, "role") in ["button", "checkbox", "radio"]
-      end) || target
-    end
-  end
-
   # Playwright's retarget(..., "follow-label"), which fill, clear, select_option,
   # set_input_files, set_checked, the value and the enabled, checked and editable
-  # states use, as does click's enabled check: an element in a label acts as its
-  # control.
+  # states use, as does click's enabled check. An element other than a form
+  # control first goes to the closest button, so text inside a disabled button
+  # is disabled, and an element in a label then acts as its control.
   @doc false
   def control!(%__MODULE__{} = client_dom, locator), do: follow_label(client_dom, target!(client_dom, locator))
 
   @no_follow_label_tags ~w(a input textarea button select option optgroup)
 
   defp follow_label(client_dom, target) do
-    target = state_target(client_dom, target)
     aria = aria(client_dom)
+
+    target =
+      if target.tag in ["input", "textarea", "select"] or Aria.content_editable?(aria, target) do
+        target
+      else
+        closest(client_dom, target, fn %{tag: tag, attributes: attributes} ->
+          tag == "button" or attribute(attributes, "role") in ["button", "checkbox", "radio"]
+        end) || target
+      end
 
     with false <-
            target.tag in @no_follow_label_tags or

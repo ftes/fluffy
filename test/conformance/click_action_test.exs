@@ -158,6 +158,41 @@ defmodule Fluffy.Conformance.ClickActionTest do
       end)
     end
 
+    # A label in a button takes the button's enabled state, as in Playwright,
+    # and its click reaches a disabled control, which a browser doesn't click.
+    @tag driver: driver
+    test "a label's click doesn't click its disabled control with #{driver}" do
+      html = """
+      <button type="button"><label for="vow">Unbreakable vow</label></button>
+      <input id="vow" type="checkbox" disabled>
+      """
+
+      with_html(unquote(driver), html, fn session ->
+        label = by_text("Unbreakable vow", exact: true)
+
+        session
+        |> expect(to_be_enabled(label))
+        |> click(label)
+        |> expect(:checkbox |> by_role(name: "Unbreakable vow") |> to_be_checked(checked: false))
+      end)
+    end
+
+    # Like a browser, a label that is already clicking its control doesn't
+    # click it again, so labels that contain each other's control stop.
+    @tag driver: driver
+    test "labels containing each other's control click each once with #{driver}" do
+      html = """
+      <label for="mirror-b">Mirror A <output id="mirror-a">a</output></label>
+      <label for="mirror-a">Mirror B <output id="mirror-b">b</output></label>
+      """
+
+      with_html(unquote(driver), html, fn session ->
+        session
+        |> click(by_text("Mirror A"))
+        |> expect("Mirror B" |> by_text() |> to_be_visible())
+      end)
+    end
+
     # A click on a label's control, or on interactive content in the label,
     # stays there.
     @tag driver: driver
