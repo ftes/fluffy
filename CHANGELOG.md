@@ -66,7 +66,7 @@ Upgrading from 0.8? The [upgrade guide](docs/upgrading.md) lists the net changes
 - `press` on Phoenix raises for an element without keyboard bindings in root layout or portal content too, as inside the LiveView.
 - `Fluffy.Route.fetch/2` validates `timeout:` like other Playwright operations: a negative or non-integer one, such as `1500.0`, raises `NimbleOptions.ValidationError` instead of reaching PlaywrightEx.
 - As in Playwright, an argument error in a Playwright expectation, such as `to_match_aria_snapshot` with both a snapshot and `path:`, raises unchanged instead of as `ExUnit.AssertionError`.
-- Requires PlaywrightEx 0.17.0-rc.5, whose listener removal no longer fails once the driver is lost.
+- Requires PlaywrightEx 0.17.0-rc.6, whose listener removal no longer fails once the driver is lost.
 
 ### Fixed
 
