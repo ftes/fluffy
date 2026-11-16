@@ -176,7 +176,7 @@ Most `unwrap` callbacks that called Playwright with the handle's `frame_id`,
   label stands for its input.
 
 The other callbacks get a `%Playwright.Page{}`; see Playwright's
-[upgrade guide](https://hexdocs.pm/playwright_ex/migration.html).
+[upgrade guide](https://hexdocs.pm/playwright_ex/upgrading.html).
 
 On Phoenix, `by_role` knows the landmark roles, so a `by_css("nav")` stand-in becomes
 `by_role(:navigation)`, and a named `<section>` is `by_role(:region, name: "...")`.
