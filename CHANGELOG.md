@@ -1,6 +1,32 @@
-# Changelog
+# Changelog for v0.9
 
-Upgrading from 0.8? The [upgrade guide](docs/upgrading.md) lists the net changes.
+Fluffy 0.9 follows Playwright more closely on every driver. Upgrading from 0.8: the
+[upgrade guide](docs/upgrading.md) lists what a suite must change, as one step.
+
+## Built on the Playwright port
+
+Fluffy runs on Playwright (Hex package `playwright_ex`), a port of the official JavaScript
+client with a pinned Playwright 1.65 driver. `mix playwright.install` installs it; Node.js and
+the npm package are no longer needed. Where Fluffy hands you Playwright's values, such as
+events, routes, `unwrap` callbacks, regexes and URLs, they are the port's, as in Playwright.
+
+## Playwright Test in ExUnit
+
+`use Fluffy.Case` registers each test with `Playwright.Test`. Browsers come from its pool,
+and timeouts, traces, screenshots, videos, steps and snapshot names follow Playwright Test on
+every driver. `timeout: 0` checks once and `:infinity` means no limit.
+
+## Phoenix drivers that act like a browser
+
+Static and LiveView act like a browser running LiveView's client. A click takes the default
+action of its button, link or label, events carry the form's current values, and roles,
+accessible names, visibility and enabled state follow Playwright's rules. The app owns the Ecto
+sandbox, as generated `DataCase` and `ConnCase` do.
+
+## Backwards-incompatible changes
+
+Each release below marks them **Breaking**. Later release candidates change some earlier ones
+again; the upgrade guide has the net changes from 0.8.
 
 ## 0.9.0-rc.3 — 2026-11-16
 
