@@ -25,12 +25,32 @@ in `:dev`, where Fluffy needs no config and starts no driver or browser. Mix req
 dependency you list to cover every environment Fluffy needs it in, so widen the
 `lazy_html` line `phx.new` generates, if your app has it.
 Playwright comes with Fluffy in the same environments, so `mix playwright.install`
-works without listing it. List it anyway if you use usage rules, and sync both
-(`usage_rules: [:fluffy, :playwright]`): Fluffy's locator advice builds on Playwright's,
-and `usage_rules.sync` reads only the dependencies `mix.exs` lists:
+works without listing it. List it anyway if you use
+[usage rules](#usage-rules-for-coding-agents), as `usage_rules.sync` reads only the
+dependencies `mix.exs` lists:
 `{:playwright, "~> 0.17.0-rc.6", hex: :playwright_ex, only: [:dev, :test]}`. The app is
 `:playwright` and the Hex package `playwright_ex`; `hex: :playwright_ex` is required, since
 `playwright` on Hex is another library.
+
+## Usage rules for coding agents
+
+Fluffy ships `usage-rules.md`, rules for coding agents: setup, choosing a backend, locators,
+assertions and waiting, capabilities, events and dropping to Playwright. They build on
+Playwright's usage rules, which cover its API, locators in Playwright's recommended order and
+web-first assertions, so sync both. Fluffy's rules override Phoenix's "LiveView tests" rules for
+feature tests, which recommend `Phoenix.LiveViewTest` and locating by element ids. With the
+[`usage_rules`](https://hexdocs.pm/usage_rules) package, list both in its config and run
+`mix usage_rules.sync` to copy them into your `AGENTS.md`; sync again after upgrading.
+
+```elixir
+# mix.exs
+def project do
+  [
+    # ...
+    usage_rules: [file: "AGENTS.md", usage_rules: [:fluffy, :playwright]]
+  ]
+end
+```
 
 ## Phoenix endpoint
 
