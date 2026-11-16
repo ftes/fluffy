@@ -76,8 +76,15 @@ defmodule Fluffy.Driver.Playwright do
 
   # Upstream's expectScreenshot takes each screenshot under the expect timeout, so a
   # screenshot assertion can't check once at 1ms, as an action can't.
-  defp expect_timeout(%Expect{kind: :screenshot} = expectation),
-    do: Deadline.playwright_operation!(:to_have_screenshot, Timeouts.get(expectation.options, &Timeouts.expect/0))
+  defp expect_timeout(%Expect{kind: :screenshot, options: options}) do
+    if not Keyword.has_key?(options, :timeout) and Timeouts.expect() == 0 do
+      raise ArgumentError,
+            "to_have_screenshot: config :fluffy, expect_timeout: 0 means check once, which a screenshot " <>
+              "assertion can't do, as it takes screenshots until two match; pass it a positive timeout:"
+    end
+
+    Deadline.playwright_operation!(:to_have_screenshot, Timeouts.get(options, &Timeouts.expect/0))
+  end
 
   defp expect_timeout(expectation), do: Timeouts.playwright_expect(expectation.options)
 

@@ -362,8 +362,9 @@ defmodule Fluffy.Options do
   # are for Fluffy's sessions, over PlaywrightEx's (`config!/1`); no defaults: unset,
   # PlaywrightEx's apply.
   @config_schema NimbleOptions.new!(
-                   action_timeout: [type: {:custom, __MODULE__, :default_timeout, [:action_timeout]}],
-                   expect_timeout: [type: {:custom, __MODULE__, :default_timeout, [:expect_timeout]}],
+                   action_timeout: [type: {:custom, __MODULE__, :default_timeout, []}],
+                   # `0`: assertions check once, as with a call's `timeout: 0`.
+                   expect_timeout: [type: :timeout],
                    test_id_attribute: [type: {:custom, __MODULE__, :test_id_attribute, []}],
                    base_url: [type: :string],
                    endpoint: [type: :atom],
@@ -593,24 +594,17 @@ defmodule Fluffy.Options do
   end
 
   @doc false
-  # A default of `0` can't check once: Playwright actions, navigations and screenshot
-  # assertions can't. Playwright's no limit is `:infinity` here.
-  def default_timeout(timeout, _key) when timeout == :infinity or (is_integer(timeout) and timeout > 0),
-    do: {:ok, timeout}
+  # Playwright actions and navigations can't check once, so a default of `0` could only fail
+  # them; Playwright's no limit is `:infinity` here.
+  def default_timeout(timeout) when timeout == :infinity or (is_integer(timeout) and timeout > 0), do: {:ok, timeout}
 
-  def default_timeout(0, :action_timeout),
+  def default_timeout(0),
     do:
       {:error,
        "expected a positive integer or :infinity, got: 0. As Playwright actions and navigations " <>
          "cannot check once, 0 is no default; for no limit, use :infinity"}
 
-  def default_timeout(0, :expect_timeout),
-    do:
-      {:error,
-       "expected a positive integer or :infinity, got: 0. Fluffy's 0 checks once, which an " <>
-         "assertion's `timeout: 0` can but a default cannot; for no limit, use :infinity"}
-
-  def default_timeout(timeout, _key), do: {:error, "expected a positive integer or :infinity, got: #{inspect(timeout)}"}
+  def default_timeout(timeout), do: {:error, "expected a positive integer or :infinity, got: #{inspect(timeout)}"}
 
   @doc false
   # As PlaywrightEx.Test's `test_id_attribute`: one attribute or a comma-separated list.

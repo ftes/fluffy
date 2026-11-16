@@ -89,9 +89,10 @@ tests can set just those:
 A forgotten Fluffy key keeps overriding a newer PlaywrightEx value. A value means what its
 source says: PlaywrightEx's `0` is no limit, as in Playwright. PlaywrightEx's config also
 takes `:infinity`, so write that for no limit: it reads the same there and in Fluffy's config,
-where `0` is rejected. Fluffy's are a positive integer or `:infinity`: `0` would check once,
-which an assertion's `timeout: 0` can, but not a default, as Playwright actions and screenshot
-assertions cannot check once. A
+where `0` checks once or is rejected. Fluffy's are Elixir timeouts: `expect_timeout: 0`
+checks every assertion once, as a call's `timeout: 0`, which suits a suite without browser
+tests; `action_timeout` rejects `0`, as Playwright actions cannot check once. A screenshot
+assertion cannot either, so with `expect_timeout: 0` it needs its own `timeout:`. A
 Playwright session sets the action and navigation timeouts on its browser context, so native
 calls in an `unwrap` callback get them too.
 

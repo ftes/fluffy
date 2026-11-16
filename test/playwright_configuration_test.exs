@@ -126,20 +126,16 @@ defmodule Fluffy.PlaywrightConfigurationTest do
     assert {Timeouts.action(), Timeouts.navigation(), Timeouts.expect()} == {:infinity, :infinity, :infinity}
   end
 
-  # Fluffy's `0` checks once, which Playwright actions and screenshot assertions can't, so a
-  # default rejects it; an assertion's own `timeout: 0` still checks once.
-  test "Fluffy's 0 is rejected as a default" do
+  # As a call's `timeout: 0`, `expect_timeout: 0` checks once; Playwright actions can't, so
+  # their default rejects it.
+  test "Fluffy's 0 checks assertions once and is rejected for actions" do
+    put_env(expect_timeout: 0)
+    assert Timeouts.expect() == 0
+
     put_env(action_timeout: 0)
 
     assert_raise ArgumentError, ~r/invalid config :fluffy: .*action_timeout.*got: 0.*use :infinity/, fn ->
       Options.config!(:action_timeout)
-    end
-
-    Application.delete_env(:fluffy, :action_timeout)
-    put_env(expect_timeout: 0)
-
-    assert_raise ArgumentError, ~r/invalid config :fluffy: .*expect_timeout.*got: 0.*checks once.*use :infinity/, fn ->
-      Options.config!(:expect_timeout)
     end
   end
 

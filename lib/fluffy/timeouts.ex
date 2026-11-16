@@ -5,8 +5,8 @@ defmodule Fluffy.Timeouts do
   # (`Fluffy.Options.config!/1`): `config :fluffy, action_timeout:, expect_timeout:` if set, else
   # PlaywrightEx.Test's `action_timeout` and `expect: [timeout:]`, and PlaywrightEx.Test's
   # `navigation_timeout`, which only browsers wait for. The Playwright backend sets the action
-  # and navigation timeouts on each context. Fluffy's config rejects `0`; PlaywrightEx's `0`
-  # means no limit, `:infinity` here.
+  # and navigation timeouts on each context. Fluffy's `expect_timeout: 0` checks once, as an
+  # operation's own `timeout: 0`; PlaywrightEx's `0` means no limit, `:infinity` here.
 
   @doc "The action timeout: actions, locator reads, `wait_for_function` and event waits."
   @spec action() :: timeout()

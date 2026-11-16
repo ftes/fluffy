@@ -103,6 +103,30 @@ defmodule Fluffy.Conformance.DefaultTimeoutTest do
       |> click(@appeared)
       |> expect("Activated" |> by_text() |> to_be_visible())
     end
+
+    # As a call's `timeout: 0`; Playwright's 0 would wait for the button.
+    @tag driver: driver
+    test "expect_timeout: 0 checks expectations once with #{driver}", %{driver: driver} do
+      put_fluffy_config(expect_timeout: 0)
+
+      session =
+        driver
+        |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+        |> visit("/live/async?delay=1000")
+
+      {elapsed, _error} = failure(fn -> expect(session, to_be_visible(@appeared)) end)
+      assert elapsed < 1_000
+    end
+  end
+
+  # A screenshot assertion takes screenshots until two match, so it can't check once.
+  test "a screenshot assertion rejects an inherited expect_timeout: 0" do
+    put_fluffy_config(expect_timeout: 0)
+    session = session_for_html(:playwright, "<p>Mischief managed</p>")
+
+    assert_raise ArgumentError, ~r/config :fluffy, expect_timeout: 0 .* pass it a positive timeout:/, fn ->
+      expect(session, page_to_have_screenshot(path: "unused.png"))
+    end
   end
 
   # As in Playwright, a route that never answers leaves the navigation to its timeout.
