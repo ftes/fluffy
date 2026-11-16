@@ -1,13 +1,13 @@
 defmodule Fluffy.PlaywrightArtifactsTest.TraceCase do
   # PlaywrightEx.Test writes `trace.zip` in the `on_exit` its registration adds. A case
-  # template's `setup` runs before the `use PlaywrightEx.Test` of its `using`, so this `on_exit`
-  # is added before that one and runs after it, reading the path the test's setup puts in.
+  # template's `setup` runs before the `use Fluffy.Case` of its `using`, so this `on_exit` is
+  # added before that one and runs after it, reading the path the test's setup puts in.
   @moduledoc false
   use ExUnit.CaseTemplate
 
-  using do
+  using opts do
     quote do
-      use PlaywrightEx.Test
+      use Fluffy.Case, unquote(opts)
     end
   end
 
@@ -121,4 +121,21 @@ defmodule Fluffy.PlaywrightArtifactsTest do
   end
 
   defp html(body), do: "<!doctype html><html><body>#{body}</body></html>"
+end
+
+defmodule Fluffy.PlaywrightArtifactsTest.UseOptionsTest do
+  # `use Fluffy.Case, trace: :on`, forwarded from a template's `using`, records with no tag.
+  use Fluffy.PlaywrightArtifactsTest.TraceCase, async: true, trace: :on
+
+  import Fluffy
+
+  setup %{trace_path: path} do
+    trace_path = PlaywrightEx.Test.output_path("trace.zip")
+    Agent.update(path, fn _ -> trace_path end)
+  end
+
+  @tag trace_has: [~s("method":"goto")]
+  test "records the trace of its option" do
+    :playwright |> start_session(base_url: Fluffy.Support.Server.base_url()) |> visit("/stage")
+  end
 end

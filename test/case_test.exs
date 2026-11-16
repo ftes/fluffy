@@ -15,16 +15,18 @@ defmodule Fluffy.CaseTest do
     assert {30_000, _backstop} = Fluffy.TestTimeout.fetch()
   end
 
-  test "comes after use ExUnit.Case and takes no options" do
+  test "comes after use ExUnit.Case" do
     assert_raise CompileError, ~r/use Fluffy.Case must come after use ExUnit.Case/, fn ->
       Code.compile_string("defmodule Fluffy.CaseTest.Misplaced, do: use(Fluffy.Case)")
     end
+  end
 
-    assert_raise ArgumentError, ~r/use Fluffy.Case takes no options/, fn ->
+  test "rejects an unknown option at compile time" do
+    assert_raise ArgumentError, ~r/unknown options \[:invisibility_cloak\] for use PlaywrightEx.Test/, fn ->
       Code.compile_string("""
-      defmodule Fluffy.CaseTest.Standalone do
+      defmodule Fluffy.CaseTest.UnknownOption do
         use ExUnit.Case
-        use Fluffy.Case, async: true
+        use Fluffy.Case, invisibility_cloak: true
       end
       """)
     end

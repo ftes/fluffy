@@ -136,15 +136,16 @@ end
 
 To share this across modules, put `use Fluffy.Case` in your own case template's
 `using`, with the imports and the session setup after it there; the template's own
-`setup`, here the sandbox owner's, runs before them:
+`setup`, here the sandbox owner's, runs before them. It forwards the module's options, so
+`use MyAppWeb.FeatureCase, async: true, trace: :on` works:
 
 ```elixir
 defmodule MyAppWeb.FeatureCase do
   use ExUnit.CaseTemplate
 
-  using do
+  using opts do
     quote do
-      use Fluffy.Case
+      use Fluffy.Case, unquote(opts)
       use Fluffy.Assert
 
       import Fluffy
@@ -167,16 +168,17 @@ When the template's own `setup` starts the session, also put `use Fluffy.Case` r
 `use ExUnit.CaseTemplate`. A template's own `setup` callbacks run before those its `using`
 brings in, so the test is then registered before them (a Playwright session started before
 the registration makes it raise). The line in `using` stays, as it brings the `test` macro
-to each module; there it registers nothing again:
+to each module and takes the options; there it registers nothing again. The one in the body
+takes none:
 
 ```elixir
 defmodule MyAppWeb.FeatureCase do
   use ExUnit.CaseTemplate
   use Fluffy.Case
 
-  using do
+  using opts do
     quote do
-      use Fluffy.Case
+      use Fluffy.Case, unquote(opts)
       use Fluffy.Assert
 
       import Fluffy

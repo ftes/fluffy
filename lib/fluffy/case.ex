@@ -48,17 +48,27 @@ defmodule Fluffy.Case do
   it, the template's `use ExUnit.Case` imports `test` again, and the first test fails to
   compile on a `test/3` imported from both `ExUnit.Case` and `PlaywrightEx.Test`.
 
+  ## Options
+
+  The options are `use PlaywrightEx.Test`'s: `trace:`, `screenshot:` and `video:` for the
+  module, over the config and under its tags, and `tags: false`, so tags don't set them (see
+  `PlaywrightEx.Test`). An unknown option fails to compile. ExUnit.Case's options such as
+  `async:` belong on `use ExUnit.Case`; `use Fluffy.Case` ignores them.
+
+      use Fluffy.Case, trace: :on
+
   ## Your own case template
 
   Put `use Fluffy.Case` in your template's `using`, with your imports and session setup
-  after it there; the template's own `setup`, here the sandbox owner's, runs before them:
+  after it there; the template's own `setup`, here the sandbox owner's, runs before them. It
+  forwards the module's options, so `use MyAppWeb.FeatureCase, async: true, trace: :on` works:
 
       defmodule MyAppWeb.FeatureCase do
         use ExUnit.CaseTemplate
 
-        using do
+        using opts do
           quote do
-            use Fluffy.Case
+            use Fluffy.Case, unquote(opts)
             use Fluffy.Assert
 
             import Fluffy
@@ -80,15 +90,16 @@ defmodule Fluffy.Case do
   `use ExUnit.CaseTemplate`. A template's own `setup` callbacks run before those its `using`
   brings in, so the test is then registered before them (a Playwright session started before
   the registration makes it raise). The line in `using` stays, as it brings the `test` macro
-  to each module; there it registers nothing again:
+  to each module and takes the options; there it registers nothing again. The one in the body
+  takes none:
 
       defmodule MyAppWeb.FeatureCase do
         use ExUnit.CaseTemplate
         use Fluffy.Case
 
-        using do
+        using opts do
           quote do
-            use Fluffy.Case
+            use Fluffy.Case, unquote(opts)
             use Fluffy.Assert
 
             import Fluffy
@@ -104,10 +115,6 @@ defmodule Fluffy.Case do
   """
 
   defmacro __using__(opts) do
-    if opts != [] do
-      raise ArgumentError, "use Fluffy.Case takes no options, got: #{Macro.to_string(opts)}"
-    end
-
     macros = __CALLER__.macros
 
     if not ({:test, 3} in Keyword.get(macros, ExUnit.Case, []) or
@@ -120,7 +127,7 @@ defmodule Fluffy.Case do
     end
 
     quote do
-      use PlaywrightEx.Test
+      use PlaywrightEx.Test, unquote(opts)
     end
   end
 end
