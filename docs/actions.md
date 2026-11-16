@@ -161,7 +161,7 @@ required option list, so `import Fluffy.Playwright` leaves `Kernel.tap/2` usable
 
 `Fluffy.Playwright.hover/3`, `Fluffy.Playwright.drag_to/4`, and
 `Fluffy.Playwright.press_sequentially/4` also require Playwright. They accept `timeout:`
-and the options of the matching `PlaywrightEx.Locator` action, and reconcile navigation
+and the options of the matching `Playwright.Locator` action, and reconcile navigation
 the action causes. Sequential typing emits keyboard events for each character and appends
 at the current caret position. Drag source and target must belong to the same frame.
 
@@ -239,7 +239,7 @@ end)
 
 `Fluffy.Playwright.evaluate/3` returns the JavaScript result, not the session. Use
 `then/2`, as above, to continue a pipeline. A function expression receives the
-optional third argument, as in `PlaywrightEx.Frame.evaluate/3`. Phoenix sessions raise a capability error because
+optional third argument, as in `Playwright.Frame.evaluate/3`. Phoenix sessions raise a capability error because
 Phoenix does not execute client code.
 
 ## Controlling time

@@ -29,8 +29,8 @@ defmodule Fluffy.Driver.Live do
   alias Fluffy.Page
   alias Fluffy.Session
   alias Fluffy.Timeouts
-  # StringUtils is internal to PlaywrightEx, which is pinned.
-  alias PlaywrightEx.Isomorphic.StringUtils
+  # StringUtils is internal to Playwright, which is pinned.
+  alias Playwright.Isomorphic.StringUtils
 
   @retry_interval 10
 

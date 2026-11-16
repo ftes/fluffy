@@ -10,8 +10,8 @@ handle), and `cause` for details. This includes `submit` and file selection, and
 Playwright also `visit`, `reload`, history navigation, clock calls, and the page
 handling around an `unwrap` callback, whose own errors pass through.
 
-For Playwright, `cause` is the native PlaywrightEx exception (such as
-`PlaywrightEx.TimeoutError`), including its call log. For Phoenix, it retains `Fluffy.StrictnessError` or
+For Playwright, `cause` is the native Playwright exception (such as
+`Playwright.TimeoutError`), including its call log. For Phoenix, it retains `Fluffy.StrictnessError` or
 `Fluffy.ActionabilityError`, including structural reasons and candidates. LiveView
 finishes its action retries before wrapping the final failure. Browser failures
 are not classified by parsing messages or inspecting a later DOM snapshot.
@@ -41,9 +41,9 @@ end
 ```
 
 The test's one `trace.zip` covers every page of all its sessions; open it with
-`mix playwright_ex.cli show-trace test-results/<test>/trace.zip`. A failed test also gets
+`mix playwright.cli show-trace test-results/<test>/trace.zip`. A failed test also gets
 `error-context.md` there: its errors, source and an aria snapshot of its page. Steps nest and link to
-their source; they are `PlaywrightEx.Test.step/3`'s, on every driver. A Phoenix-only
+their source; they are `Playwright.Test.step/3`'s, on every driver. A Phoenix-only
 trace has the steps but no pages.
 
 As in Playwright, `Fluffy.Playwright.screenshot/2` returns the PNG, and `path:` also
@@ -92,37 +92,37 @@ html = unwrap_and_return(session, &Phoenix.LiveViewTest.render/1)
 
 The callback receives the current `%Plug.Conn{}` on a Static page, a
 `%Phoenix.LiveViewTest.View{}` on a LiveView page, or a
-`%PlaywrightEx.Page{}` on a Playwright page.
+`%Playwright.Page{}` on a Playwright page.
 
 A Static `Fluffy.unwrap/2` callback must return its updated `Plug.Conn` because
 connections are immutable, while a Static `Fluffy.unwrap_and_return/2` callback may
 return anything and leaves the conn alone. LiveView and Playwright `Fluffy.unwrap/2`
 callback results are ignored: Fluffy retains and reconciles the original View or Page. Exceptions, throws, and exits pass
-through unchanged. Prefer PlaywrightEx bang functions inside the callback when
+through unchanged. Prefer Playwright bang functions inside the callback when
 failure should stop the test.
 
 Do not consume `assert_patch` or `assert_redirect` notifications inside a LiveView
 callback: Fluffy uses them to reconcile navigation. Assert the resulting page or URL
 after `Fluffy.unwrap/2`.
 
-Reach the context and frame with `PlaywrightEx.Page.context/1` and
-`PlaywrightEx.Page.main_frame/1`. A document navigated natively, inside or after the
+Reach the context and frame with `Playwright.Page.context/1` and
+`Playwright.Page.main_frame/1`. A document navigated natively, inside or after the
 callback, is adopted before the next Fluffy action. Do not close the page or
 context natively; use the [event and page APIs](advanced-events.md) for lifecycle
 operations and registrations that must precede an action.
 
-`Fluffy.Playwright.unwrap/3` passes the `%PlaywrightEx.Locator{}` for a Fluffy
+`Fluffy.Playwright.unwrap/3` passes the `%Playwright.Locator{}` for a Fluffy
 locator instead, resolved in the active page and through its frame locators, with
 the same navigation handling. `Fluffy.Playwright.unwrap_and_return/3` returns the
 callback's result instead:
 
 ```elixir
 session
-|> Fluffy.Playwright.unwrap(by_role(:button, name: "Rename"), &PlaywrightEx.Locator.dblclick!/1)
+|> Fluffy.Playwright.unwrap(by_role(:button, name: "Rename"), &Playwright.Locator.dblclick!/1)
 |> assert(visible(by_label("Name")))
 ```
 
-A `Fluffy.Download` or `Fluffy.FileChooser` reaches its PlaywrightEx
+A `Fluffy.Download` or `Fluffy.FileChooser` reaches its Playwright
 counterpart through `Fluffy.unwrap_and_return/2`; see [Native values](advanced-events.md#native-values). See
-[PlaywrightEx coverage](capabilities.md#playwrightex-coverage) for which native
+[Playwright coverage](capabilities.md#playwright-coverage) for which native
 calls are safe.

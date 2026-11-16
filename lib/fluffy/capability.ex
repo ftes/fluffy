@@ -58,7 +58,7 @@ defmodule Fluffy.Capability do
       feature: "Playwright action options",
       drivers: %{static: :browser_only, live: :browser_only, playwright: :equivalent},
       detail:
-        "Options such as `force:`, `modifiers:`, and `wait_until:` pass through to the PlaywrightEx call behind `click`, `reload`, and other actions. Static and LiveView raise when an action receives one."
+        "Options such as `force:`, `modifiers:`, and `wait_until:` pass through to the Playwright call behind `click`, `reload`, and other actions. Static and LiveView raise when an action receives one."
     },
     %{
       id: :dom_assertions,
@@ -244,7 +244,7 @@ defmodule Fluffy.Capability do
       feature: "Browser request routing",
       drivers: %{static: :browser_only, live: :browser_only, playwright: :equivalent},
       detail:
-        "Fluffy.Playwright.route/4 routes matching requests of a session's context through PlaywrightEx's route handlers. Phoenix raises Fluffy.CapabilityError."
+        "Fluffy.Playwright.route/4 routes matching requests of a session's context through Playwright's route handlers. Phoenix raises Fluffy.CapabilityError."
     },
     %{
       id: :javascript_evaluation,
@@ -290,7 +290,7 @@ defmodule Fluffy.Capability do
       feature: "URL matching",
       drivers: %{static: :equivalent, live: :equivalent, playwright: :equivalent},
       detail:
-        "page_to_have_url/2 takes what Playwright's toHaveURL takes: a string resolved against the base URL that must equal the URL, a regex, or a predicate over the URL as a %URI{}. Phoenix drivers match with PlaywrightEx.Isomorphic.UrlMatch."
+        "page_to_have_url/2 takes what Playwright's toHaveURL takes: a string resolved against the base URL that must equal the URL, a regex, or a predicate over the URL as a %URI{}. Phoenix drivers match with Playwright.Isomorphic.UrlMatch."
     },
     %{
       id: :file_uploads,

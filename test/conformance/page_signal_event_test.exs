@@ -7,13 +7,14 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
   import Fluffy.Playwright
 
   alias Fluffy.Event
-  alias Fluffy.Playwright
   alias Fluffy.Session
   alias Fluffy.Support.HTTPFixtures
   alias Fluffy.Support.Server
-  alias PlaywrightEx.ConsoleMessage
-  alias PlaywrightEx.Frame
-  alias PlaywrightEx.Request
+  alias Playwright.ConsoleMessage
+  alias Playwright.Frame
+  alias Playwright.Request
+  alias Playwright.WebSocket
+  alias Playwright.Worker
 
   describe "console" do
     @tag driver: :playwright
@@ -22,7 +23,7 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
       pending = wait_for(session, Event.console(&(ConsoleMessage.text(&1) == "from button")))
       other = wait_for(session, Event.console(&(ConsoleMessage.type(&1) == "warning")))
 
-      Playwright.evaluate(session, "console.log('skipped')")
+      Fluffy.Playwright.evaluate(session, "console.log('skipped')")
       click(session, by_role(:button, name: "Log"))
 
       assert %ConsoleMessage{} = message = await(pending)
@@ -31,7 +32,7 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
       assert is_number(ConsoleMessage.timestamp(message))
       assert ConsoleMessage.location(message).url == HTTPFixtures.url(fixture, "/start")
 
-      Playwright.evaluate(session, "console.warn('warned')")
+      Fluffy.Playwright.evaluate(session, "console.warn('warned')")
       assert ConsoleMessage.text(await(other)) == "warned"
     end
 
@@ -42,17 +43,17 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
       handler = fn message -> send(owner, {:console, ConsoleMessage.text(message)}) end
 
       on(session, Event.console(), handler)
-      Playwright.evaluate(session, "console.log('heard')")
+      Fluffy.Playwright.evaluate(session, "console.log('heard')")
       assert_receive {:console, "heard"}, 5_000
 
       off(session, Event.console(), handler)
-      Playwright.evaluate(session, "console.log('unheard')")
+      Fluffy.Playwright.evaluate(session, "console.log('unheard')")
       refute_receive {:console, "unheard"}, 200
 
       assert expect_event(
                session,
                Event.console(&(ConsoleMessage.text(&1) == "expected")),
-               &Playwright.evaluate(&1, "console.log('expected')"),
+               &Fluffy.Playwright.evaluate(&1, "console.log('expected')"),
                fn message -> send(owner, {:expected, ConsoleMessage.type(message)}) end
              ) == session
 
@@ -64,8 +65,8 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
       {session, _fixture} = session()
       pending = wait_for(session, Event.console())
       other = switch_page(session, new_page(session))
-      Playwright.evaluate(other, "console.log('other page')")
-      Playwright.evaluate(session, "console.log('main page')")
+      Fluffy.Playwright.evaluate(other, "console.log('other page')")
+      Fluffy.Playwright.evaluate(session, "console.log('main page')")
       assert ConsoleMessage.text(await(pending)) == "main page"
     end
   end
@@ -75,7 +76,7 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
     test "an uncaught Error resolves with its name, message and stack" do
       {session, _fixture} = session()
       pending = wait_for(session, Event.page_error())
-      Playwright.evaluate(session, "setTimeout(() => { throw new RangeError('boom') }, 0); 1")
+      Fluffy.Playwright.evaluate(session, "setTimeout(() => { throw new RangeError('boom') }, 0); 1")
 
       assert %{name: "RangeError"} = error = await(pending)
       assert Exception.message(error) =~ "boom"
@@ -86,7 +87,7 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
     test "a thrown value that is not an Error resolves with its text as message" do
       {session, _fixture} = session()
       pending = wait_for(session, Event.page_error())
-      Playwright.evaluate(session, "setTimeout(() => { throw 'thrown string' }, 0); 1")
+      Fluffy.Playwright.evaluate(session, "setTimeout(() => { throw 'thrown string' }, 0); 1")
 
       assert Exception.message(await(pending)) =~ "thrown string"
     end
@@ -98,12 +99,12 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
       handler = fn error -> send(owner, {:page_error, Exception.message(error)}) end
 
       on(session, Event.page_error(&(Exception.message(&1) =~ "first")), handler)
-      Playwright.evaluate(session, "setTimeout(() => { throw new Error('first') }, 0); 1")
+      Fluffy.Playwright.evaluate(session, "setTimeout(() => { throw new Error('first') }, 0); 1")
       assert_receive {:page_error, message}, 5_000
       assert message =~ "first"
 
       off(session, Event.page_error(), handler)
-      Playwright.evaluate(session, "setTimeout(() => { throw new Error('first again') }, 0); 1")
+      Fluffy.Playwright.evaluate(session, "setTimeout(() => { throw new Error('first again') }, 0); 1")
       refute_receive {:page_error, _message}, 200
     end
   end
@@ -118,7 +119,7 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
       context = wait_for(session, Event.request_failed(match), scope: :context)
       finished = wait_for(session, Event.request_finished(match), timeout: 200)
 
-      Playwright.evaluate(session, "url => { fetch(url).catch(() => {}); return true }", url)
+      Fluffy.Playwright.evaluate(session, "url => { fetch(url).catch(() => {}); return true }", url)
 
       assert %Request{} = request = await(pending)
       assert {Request.method(request), Request.resource_type(request)} == {"GET", "fetch"}
@@ -137,11 +138,11 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
       context = wait_for(session, Event.request_finished(match), scope: :context)
       failed = wait_for(session, Event.request_failed(match), timeout: 200)
 
-      Playwright.evaluate(session, "fetch('missing'); true")
+      Fluffy.Playwright.evaluate(session, "fetch('missing'); true")
 
       assert Request.method(request = await(pending)) == "GET"
       assert await(context) == request
-      assert {:ok, %PlaywrightEx.Response{}} = Request.response(request)
+      assert {:ok, %Playwright.Response{}} = Request.response(request)
       assert_raise ExUnit.AssertionError, ~r/no matching request_failed event/, fn -> await(failed) end
     end
 
@@ -152,12 +153,12 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
       handler = fn request -> send(owner, {:finished, URI.parse(Request.url(request)).path}) end
 
       on(session, Event.request_finished(&String.ends_with?(Request.url(&1), "/api")), handler)
-      Playwright.evaluate(session, "fetch('api'); true")
+      Fluffy.Playwright.evaluate(session, "fetch('api'); true")
       assert_receive {:finished, path}, 5_000
       assert String.ends_with?(path, "/api")
 
       off(session, Event.request_finished(), handler)
-      Playwright.evaluate(session, "fetch('api'); true")
+      Fluffy.Playwright.evaluate(session, "fetch('api'); true")
       refute_receive {:finished, _path}, 200
     end
   end
@@ -201,7 +202,7 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
       other = wait_for(session, Event.console())
       browser_page = Session.page_state(session).page
 
-      {:ok, _pid} = Task.start(fn -> PlaywrightEx.Page.goto(browser_page, "chrome://crash") end)
+      {:ok, _pid} = Task.start(fn -> Playwright.Page.goto(browser_page, "chrome://crash") end)
 
       assert await(crashed) == page
       assert_raise ExUnit.AssertionError, ~r/event source crashed/, fn -> await(other) end
@@ -215,13 +216,13 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
       attached = wait_for(session, Event.frame_attached(&Frame.parent_frame/1))
       detached = wait_for(session, Event.frame_detached())
 
-      Playwright.evaluate(session, "document.body.appendChild(document.createElement('iframe')); true")
+      Fluffy.Playwright.evaluate(session, "document.body.appendChild(document.createElement('iframe')); true")
 
       frame = await(attached)
       assert page(session, Frame.page(frame)) == current_page(session)
       assert %Frame{} = Frame.parent_frame(frame)
 
-      Playwright.evaluate(session, "document.querySelector('iframe').remove(); true")
+      Fluffy.Playwright.evaluate(session, "document.querySelector('iframe').remove(); true")
 
       assert %Frame{} = gone = await(detached)
       assert Frame.is_detached(gone)
@@ -235,55 +236,55 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
       handler = fn frame -> send(owner, {:attached, frame}) end
 
       on(session, Event.frame_attached(), handler)
-      Playwright.evaluate(session, "document.body.appendChild(document.createElement('iframe')); true")
+      Fluffy.Playwright.evaluate(session, "document.body.appendChild(document.createElement('iframe')); true")
       assert_receive {:attached, %Frame{}}, 5_000
 
       off(session, Event.frame_attached(), handler)
-      Playwright.evaluate(session, "document.body.appendChild(document.createElement('iframe')); true")
+      Fluffy.Playwright.evaluate(session, "document.body.appendChild(document.createElement('iframe')); true")
       refute_receive {:attached, _frame}, 200
     end
   end
 
   describe "worker and web_socket" do
     @tag driver: :playwright
-    test "a worker resolves with the PlaywrightEx worker" do
+    test "a worker resolves with the Playwright worker" do
       {session, _fixture} = session()
-      pending = wait_for(session, Event.worker(&String.starts_with?(PlaywrightEx.Worker.url(&1), "blob:")))
+      pending = wait_for(session, Event.worker(&String.starts_with?(Worker.url(&1), "blob:")))
 
-      Playwright.evaluate(
+      Fluffy.Playwright.evaluate(
         session,
         "window.w = new Worker(URL.createObjectURL(new Blob(['1'], {type: 'application/javascript'}))); true"
       )
 
-      assert PlaywrightEx.Worker.evaluate!(await(pending), "1 + 1") == 2
+      assert Worker.evaluate!(await(pending), "1 + 1") == 2
     end
 
     @tag driver: :playwright
     test "on observes a worker and off removes the listener" do
       {session, _fixture} = session()
       owner = self()
-      handler = fn worker -> send(owner, {:worker, PlaywrightEx.Worker.url(worker)}) end
+      handler = fn worker -> send(owner, {:worker, Worker.url(worker)}) end
       spawn_worker = "window.w = new Worker(URL.createObjectURL(new Blob(['1'], {type: 'text/javascript'}))); true"
 
       on(session, Event.worker(), handler)
-      Playwright.evaluate(session, spawn_worker)
+      Fluffy.Playwright.evaluate(session, spawn_worker)
       assert_receive {:worker, "blob:" <> _url}, 5_000
 
       off(session, Event.worker(), handler)
-      Playwright.evaluate(session, spawn_worker)
+      Fluffy.Playwright.evaluate(session, spawn_worker)
       refute_receive {:worker, _url}, 200
     end
 
     @tag driver: :playwright
-    test "a web socket resolves with the PlaywrightEx web socket" do
+    test "a web socket resolves with the Playwright web socket" do
       {session, _fixture} = session()
       url = String.replace_prefix(Server.base_url(), "http", "ws") <> "/live/websocket?vsn=2.0.0"
-      pending = wait_for(session, Event.web_socket(&(PlaywrightEx.WebSocket.url(&1) == url)))
+      pending = wait_for(session, Event.web_socket(&(WebSocket.url(&1) == url)))
 
-      Playwright.evaluate(session, "url => { window.s = new WebSocket(url); return true }", url)
+      Fluffy.Playwright.evaluate(session, "url => { window.s = new WebSocket(url); return true }", url)
 
-      assert %PlaywrightEx.WebSocket{} = socket = await(pending)
-      assert PlaywrightEx.WebSocket.url(socket) == url
+      assert %WebSocket{} = socket = await(pending)
+      assert WebSocket.url(socket) == url
     end
   end
 

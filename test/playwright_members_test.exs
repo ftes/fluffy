@@ -4,27 +4,27 @@ defmodule Fluffy.Support.PlaywrightMembersTest do
   alias Fluffy.Options
   alias Fluffy.Support.PlaywrightMembers
 
-  # Like `mix playwright_ex.parity`, for Fluffy's coverage of the PlaywrightEx facade.
+  # Like `mix playwright.parity`, for Fluffy's coverage of the Playwright facade.
   @modules [
-    PlaywrightEx.Locator,
-    PlaywrightEx.Expect,
-    PlaywrightEx.Page,
-    PlaywrightEx.Frame,
-    PlaywrightEx.FrameLocator,
-    PlaywrightEx.BrowserContext,
-    PlaywrightEx.Keyboard,
-    PlaywrightEx.Mouse,
-    PlaywrightEx.Touchscreen,
-    PlaywrightEx.Dialog,
-    PlaywrightEx.Download,
-    PlaywrightEx.FileChooser,
-    PlaywrightEx.Request,
-    PlaywrightEx.Response,
-    PlaywrightEx.Route,
-    PlaywrightEx.ConsoleMessage,
-    PlaywrightEx.WebError,
-    PlaywrightEx.Clock,
-    PlaywrightEx.Tracing
+    Playwright.Locator,
+    Playwright.Expect,
+    Playwright.Page,
+    Playwright.Frame,
+    Playwright.FrameLocator,
+    Playwright.BrowserContext,
+    Playwright.Keyboard,
+    Playwright.Mouse,
+    Playwright.Touchscreen,
+    Playwright.Dialog,
+    Playwright.Download,
+    Playwright.FileChooser,
+    Playwright.Request,
+    Playwright.Response,
+    Playwright.Route,
+    Playwright.ConsoleMessage,
+    Playwright.WebError,
+    Playwright.Clock,
+    Playwright.Tracing
   ]
 
   test "the table covers exactly the facade modules" do
@@ -154,7 +154,7 @@ defmodule Fluffy.Support.PlaywrightMembersTest do
     end
   end
 
-  defp negated_expectation?(PlaywrightEx.Expect, fun), do: fun |> Atom.to_string() |> String.starts_with?("not_")
+  defp negated_expectation?(Playwright.Expect, fun), do: fun |> Atom.to_string() |> String.starts_with?("not_")
   defp negated_expectation?(_module, _fun), do: false
 
   # A documented function or macro, or a field of a value struct.

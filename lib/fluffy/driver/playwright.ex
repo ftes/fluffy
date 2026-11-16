@@ -14,18 +14,18 @@ defmodule Fluffy.Driver.Playwright do
   alias Fluffy.Locator.Playwright, as: PlaywrightLocator
   alias Fluffy.Session
   alias Fluffy.Timeouts
-  alias PlaywrightEx.AbortController
-  alias PlaywrightEx.BrowserContext
-  alias PlaywrightEx.Client.Errors
-  alias PlaywrightEx.Dialog
-  alias PlaywrightEx.Expect, as: BrowserExpect
-  alias PlaywrightEx.ExpectError
-  alias PlaywrightEx.Frame
-  alias PlaywrightEx.Locator, as: BrowserLocator
-  alias PlaywrightEx.Page, as: BrowserPage
-  alias PlaywrightEx.Promise
-  alias PlaywrightEx.TargetClosedError
-  alias PlaywrightEx.TimeoutError
+  alias Playwright.AbortController
+  alias Playwright.BrowserContext
+  alias Playwright.Client.Errors
+  alias Playwright.Dialog
+  alias Playwright.Expect, as: BrowserExpect
+  alias Playwright.ExpectError
+  alias Playwright.Frame
+  alias Playwright.Locator, as: BrowserLocator
+  alias Playwright.Page, as: BrowserPage
+  alias Playwright.Promise
+  alias Playwright.TargetClosedError
+  alias Playwright.TimeoutError
 
   @impl true
   def open_browser(%Session{} = session, open_fun) do
@@ -90,7 +90,7 @@ defmodule Fluffy.Driver.Playwright do
 
   # As in Playwright, where the client's `_expect` turns every `PlaywrightError`
   # (timeouts, closed targets and aborts included) into a failed matcher, any
-  # PlaywrightEx error fails the expectation, a close while Fluffy adopts the page
+  # Playwright error fails the expectation, a close while Fluffy adopts the page
   # too. Other errors, such as a bad argument, pass through.
   @spec expectation_failed!(Expect.t(), Exception.t(), String.t()) :: no_return()
   defp expectation_failed!(expectation, error, received) do
@@ -281,7 +281,7 @@ defmodule Fluffy.Driver.Playwright do
     files = files(source)
 
     action(session, :set_input_files, chooser, options, fn remaining ->
-      PlaywrightEx.FileChooser.set_files(chooser.native, files, timeout: remaining)
+      Playwright.FileChooser.set_files(chooser.native, files, timeout: remaining)
     end)
   end
 
@@ -501,8 +501,8 @@ defmodule Fluffy.Driver.Playwright do
     end
   end
 
-  # A call the close ended, such as PlaywrightEx.Test's at the test timeout, fails
-  # with PlaywrightEx's error and its call log, as in Playwright.
+  # A call the close ended, such as Playwright.Test's at the test timeout, fails
+  # with Playwright's error and its call log.
   defp validate_unwrapped!(browser_context, page, result) do
     closed =
       cond do
@@ -523,7 +523,7 @@ defmodule Fluffy.Driver.Playwright do
 
   defp locator(session, locator), do: PlaywrightLocator.locator(Session.page_state(session).frame, locator)
 
-  # Fluffy's own options stay here; the rest pass through to the PlaywrightEx call.
+  # Fluffy's own options stay here; the rest pass through to the Playwright call.
   defp native(options, remaining), do: Keyword.put(options, :timeout, remaining)
 
   defp locator_action(session, operation, locator, options, fun) do

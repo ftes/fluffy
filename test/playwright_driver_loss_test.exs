@@ -1,14 +1,14 @@
 defmodule Fluffy.PlaywrightDriverLossTest do
-  # Kills the test's own driver, which PlaywrightEx.Test's pool replaces.
+  # Kills the test's own driver, which Playwright.Test's pool replaces.
   use ExUnit.Case, async: true
-  use PlaywrightEx.Test
+  use Playwright.Test
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
   import Fluffy.Support.Case, only: [monitor_running: 1]
 
-  alias PlaywrightEx.Test.BrowserPool
+  alias Playwright.Test.BrowserPool
 
   @moduletag driver: :playwright, capture_log: true
 
@@ -47,10 +47,10 @@ defmodule Fluffy.PlaywrightDriverLossTest do
     end
   end
 
-  # The driver of the test's browser in PlaywrightEx.Test's pool.
+  # The driver of the test's browser in Playwright.Test's pool.
   defp kill_driver do
     playwright = BrowserPool.playwright(BrowserPool.browser())
-    driver = PlaywrightEx.Runtime.Heap.get(playwright, :driverProcess)
+    driver = Playwright.Runtime.Heap.get(playwright, :driverProcess)
     %{port: port} = :sys.get_state(driver)
     {:os_pid, os_pid} = Port.info(port, :os_pid)
     {_, 0} = System.cmd("kill", ["-9", to_string(os_pid)])

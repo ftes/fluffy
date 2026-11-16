@@ -115,7 +115,7 @@ defmodule Fluffy.Conformance.ClockTest do
 
     # The call runs in a task, which logs the crash.
     @tag :capture_log
-    test "a clock call that PlaywrightEx rejects raises its exception" do
+    test "a clock call that Playwright rejects raises its exception" do
       session = session_for_html(:playwright, @dates, base_url: Server.base_url())
 
       assert_raise FunctionClauseError, fn -> Clock.install(session, time: :bogus) end

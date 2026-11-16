@@ -7,8 +7,7 @@ defmodule Fluffy.Conformance.DialogEventTest do
   import Fluffy.Playwright
 
   alias Fluffy.Event
-  alias Fluffy.Playwright
-  alias PlaywrightEx.Dialog
+  alias Playwright.Dialog
 
   @tag driver: :playwright
   test "a one-shot handler asserts metadata and accepts while a separate wait requires the dialog" do
@@ -86,10 +85,10 @@ defmodule Fluffy.Conformance.DialogEventTest do
     on(session, Event.dialog(fn _ -> false end), handler)
     pending = wait_for(session, Event.dialog())
     # Schedule outside the evaluated call so the test can inspect the unresolved dialog.
-    Playwright.evaluate(session, "setTimeout(() => { window.dialogResult = confirm('Proceed?') }, 0); true")
+    Fluffy.Playwright.evaluate(session, "setTimeout(() => { window.dialogResult = confirm('Proceed?') }, 0); true")
     dialog = await(pending)
     assert Dialog.accept!(dialog) == :ok
-    assert Playwright.evaluate(session, "window.dialogResult") == true
+    assert Fluffy.Playwright.evaluate(session, "window.dialogResult") == true
     off(session, Event.dialog(), handler)
   end
 
@@ -110,7 +109,7 @@ defmodule Fluffy.Conformance.DialogEventTest do
     on(original, Event.dialog(), handler)
     other = switch_page(original, new_page(original))
     off(other, Event.dialog(), handler)
-    assert Playwright.evaluate(other, "confirm('Other')") == false
+    assert Fluffy.Playwright.evaluate(other, "confirm('Other')") == false
     original |> click(by_role(:button, name: "Confirm")) |> expect("accepted" |> by_text(exact: true) |> to_be_visible())
     off(original, Event.dialog(), handler)
   end

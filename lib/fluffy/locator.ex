@@ -12,8 +12,8 @@ defmodule Fluffy.Locator do
   uses one.
 
   A regular expression in `name:`, `has_text:` or `has_not_text:` is a JavaScript
-  `RegExp` on every driver: a `Regex` becomes one with `PlaywrightEx.RegExp.new/1`,
-  which raises `ArgumentError` on PCRE-only syntax, or pass a `PlaywrightEx.RegExp`.
+  `RegExp` on every driver: a `Regex` becomes one with `Playwright.RegExp.new/1`,
+  which raises `ArgumentError` on PCRE-only syntax, or pass a `Playwright.RegExp`.
 
   Role locators accept these options:
 
@@ -213,7 +213,7 @@ defmodule Fluffy.Locator do
   Matches elements whose test id equals `test_id`, as Playwright's `getByTestId`.
 
   The attribute is Playwright Test's `testIdAttribute`, on every driver:
-  `config :fluffy, test_id_attribute: "data-owl"` if set, else PlaywrightEx's
+  `config :fluffy, test_id_attribute: "data-owl"` if set, else Playwright's
   `test_id_attribute` (`data-testid` by default; [Timeouts](installation.md#timeouts) has the
   precedence). For another attribute in one place, use `by_css("[data-owl=\\"hedwig\\"]")`.
 
@@ -238,7 +238,7 @@ defmodule Fluffy.Locator do
   def by_test_id(test_id, options) when is_binary(test_id) and is_list(options) do
     raise ArgumentError,
           "by_test_id/2 takes no options, as Playwright's getByTestId: set the attribute with " <>
-            ~s{`config :playwright_ex, :test, test_id_attribute: ...` (or `config :fluffy`), } <>
+            ~s{`config :playwright, :test, test_id_attribute: ...` (or `config :fluffy`), } <>
             ~s{or use by_css("[data-owl=\\"hedwig\\"]"), } <>
             "got: #{inspect(options)}"
   end

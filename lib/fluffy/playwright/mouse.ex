@@ -15,7 +15,7 @@ defmodule Fluffy.Playwright.Mouse do
 
   alias Fluffy.Options
   alias Fluffy.Session
-  alias PlaywrightEx.Mouse, as: BrowserMouse
+  alias Playwright.Mouse, as: BrowserMouse
 
   @type click_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:mouse_click)))
   @type dblclick_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:mouse_dblclick)))
@@ -104,7 +104,7 @@ defmodule Fluffy.Playwright.Mouse do
   end
 
   @doc playwright_only: true
-  @doc "Scrolls by `delta_x`, `delta_y` with the wheel. See `PlaywrightEx.Mouse.wheel/3`."
+  @doc "Scrolls by `delta_x`, `delta_y` with the wheel. See `Playwright.Mouse.wheel/3`."
   @spec wheel(Session.t(), number(), number(), []) :: Session.t()
   def wheel(%Session{} = session, delta_x, delta_y, options \\ []) when is_number(delta_x) and is_number(delta_y) do
     Options.validate_untimed!(options)
@@ -112,5 +112,5 @@ defmodule Fluffy.Playwright.Mouse do
   end
 
   defp input(session, operation, fun),
-    do: Fluffy.Playwright.__page_input__(session, &PlaywrightEx.Page.mouse/1, operation, fun)
+    do: Fluffy.Playwright.__page_input__(session, &Playwright.Page.mouse/1, operation, fun)
 end

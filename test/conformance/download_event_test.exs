@@ -34,7 +34,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
 
       if driver == :playwright do
         assert Download.page(download) == Fluffy.Playwright.current_page(session)
-        assert unwrap_and_return(download, &PlaywrightEx.Download.suggested_filename/1) == "marauders_map.csv"
+        assert unwrap_and_return(download, &Playwright.Download.suggested_filename/1) == "marauders_map.csv"
       else
         assert_raise Fluffy.CapabilityError, ~r/no native counterpart/, fn -> unwrap_and_return(download, & &1) end
       end
@@ -264,14 +264,14 @@ defmodule Fluffy.Conformance.DownloadEventTest do
     send(server, :abort)
 
     error = assert_raise Fluffy.OperationError, fn -> Download.read(download) end
-    assert %{operation: :read, cause: %PlaywrightEx.PlaywrightError{}} = error
+    assert %{operation: :read, cause: %Playwright.PlaywrightError{}} = error
     assert error.cause.message =~ "download.saveAs"
 
     error = assert_raise Fluffy.OperationError, fn -> Download.save_as(download, Path.join(tmp_dir, "copy.txt")) end
-    assert %{operation: :save_as, cause: %PlaywrightEx.PlaywrightError{}} = error
+    assert %{operation: :save_as, cause: %Playwright.PlaywrightError{}} = error
     assert error.cause.message =~ "download.saveAs"
 
-    assert %{operation: :path, cause: %PlaywrightEx.PlaywrightError{}} =
+    assert %{operation: :path, cause: %Playwright.PlaywrightError{}} =
              assert_raise(Fluffy.OperationError, fn -> Download.path(download) end)
   end
 

@@ -28,7 +28,7 @@ defmodule Fluffy.Conformance.NativeOptionsTest do
     for {locator, {module, fun, _arity, classes}} <- Options.native_locators() do
       classified = classes |> Keyword.values() |> List.flatten()
 
-      for factory <- [module, PlaywrightEx.Page, PlaywrightEx.Frame, PlaywrightEx.FrameLocator],
+      for factory <- [module, Playwright.Page, Playwright.Frame, Playwright.FrameLocator],
           Keyword.has_key?(factory.__info__(:functions), fun) do
         assert Enum.sort(locator_keys(factory, fun)) == Enum.sort(classified),
                "classify the upstream options of #{inspect(factory)}.#{fun} for #{inspect(locator)} in Fluffy.Options"

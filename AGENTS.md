@@ -11,10 +11,10 @@ LiveView needs (waiting for LiveViews to connect, following their navigations, f
 adding a timeout budget, retry, extra check or browser workaround, check what Playwright does and
 match it; the pinned source is in `tmp/playwright-<version>` (`mix setup` or
 `mix fluffy.playwright_source` fetches it) and dependency code in `deps/`, both gitignored, so
-Grep needs their path. Don't work around Playwright, PlaywrightEx or browser bugs (upstream
+Grep needs their path. Don't work around Playwright, its Elixir client or browser bugs (upstream
 `fixme` tests mark the known ones); let Playwright's behavior show through. Only as a last resort,
 when LiveView support can't work without it, add a workaround, and say why in a comment. Build
-Playwright selectors through PlaywrightEx (its `Frame`/`Locator`/`FrameLocator` API,
+Playwright selectors through the Elixir client (its `Frame`/`Locator`/`FrameLocator` API,
 `Isomorphic.LocatorUtils` and `SelectorParser`); don't write selector strings in Fluffy, since
 `internal:*` engine syntax changes between Playwright versions.
 Timeouts follow Elixir: `0` means check once and `:infinity` means no limit;
@@ -179,10 +179,10 @@ mix usage_rules.search_docs "Enum.zip" --query-by title
 ## phoenix:liveview usage
 [phoenix:liveview usage rules](deps/phoenix/usage-rules/liveview.md)
 <!-- phoenix:liveview-end -->
-<!-- playwright_ex-start -->
-## playwright_ex usage
+<!-- playwright-start -->
+## playwright usage
 _Elixir client for Playwright: a port of the official JavaScript client._
 
-[playwright_ex usage rules](deps/playwright_ex/usage-rules.md)
-<!-- playwright_ex-end -->
+[playwright usage rules](deps/playwright/usage-rules.md)
+<!-- playwright-end -->
 <!-- usage-rules-end -->

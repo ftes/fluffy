@@ -9,8 +9,8 @@ defmodule Fluffy.Backend.Playwright.Events do
   alias Fluffy.Page
   alias Fluffy.Session
   alias Fluffy.SessionRuntime
-  alias PlaywrightEx.BrowserContext
-  alias PlaywrightEx.Page, as: BrowserPage
+  alias Playwright.BrowserContext
+  alias Playwright.Page, as: BrowserPage
 
   def event_source(session, type, scope) do
     if type == :page or (is_network_type(type) and scope == :context) do
@@ -70,9 +70,9 @@ defmodule Fluffy.Backend.Playwright.Events do
 
   defp value(session, :download, download) do
     %Download{
-      suggested_filename: PlaywrightEx.Download.suggested_filename(download),
-      url: PlaywrightEx.Download.url(download),
-      page: page_handle(session, PlaywrightEx.Download.page(download)),
+      suggested_filename: Playwright.Download.suggested_filename(download),
+      url: Playwright.Download.url(download),
+      page: page_handle(session, Playwright.Download.page(download)),
       native: download
     }
   end
@@ -83,12 +83,12 @@ defmodule Fluffy.Backend.Playwright.Events do
   defp value(session, :file_chooser, chooser) do
     %FileChooser{
       native: chooser,
-      page: page_handle(session, PlaywrightEx.FileChooser.page(chooser)),
-      multiple?: PlaywrightEx.FileChooser.is_multiple(chooser)
+      page: page_handle(session, Playwright.FileChooser.page(chooser)),
+      multiple?: Playwright.FileChooser.is_multiple(chooser)
     }
   end
 
-  # As in Playwright, other events deliver PlaywrightEx's values.
+  # As in Playwright, other events deliver Playwright's values.
   defp value(_session, _type, native), do: native
 
   @doc false

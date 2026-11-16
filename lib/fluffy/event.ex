@@ -12,7 +12,7 @@ defmodule Fluffy.Event do
   the event. Predicates inspect event metadata; use ordinary assertions on the
   awaited value to check its contents.
 
-      Fluffy.Event.response(&String.ends_with?(PlaywrightEx.Response.url(&1), "/owls"))
+      Fluffy.Event.response(&String.ends_with?(Playwright.Response.url(&1), "/owls"))
 
   Download events support both backends. Other events require Playwright.
   Network events (`request`, `response`, `request_failed` and `request_finished`)
@@ -25,11 +25,11 @@ defmodule Fluffy.Event do
 
   `load`, `dom_content_loaded`, `crash`, `popup`, `page` and `close` resolve with
   a `Fluffy.Page`, `download` with a `Fluffy.Download` and `file_chooser` with a
-  `Fluffy.FileChooser`. The other events resolve with PlaywrightEx's values, as in
-  Playwright: a `PlaywrightEx.Request`, `PlaywrightEx.Response`, `PlaywrightEx.Dialog`,
-  `PlaywrightEx.ConsoleMessage`, `PlaywrightEx.Frame`, `PlaywrightEx.Worker`,
-  `PlaywrightEx.WebSocket`, or the error of a `page_error`. Read them with
-  PlaywrightEx's functions, such as `PlaywrightEx.Response.status/1`, and turn
+  `Fluffy.FileChooser`. The other events resolve with Playwright's values, as in
+  Playwright: a `Playwright.Request`, `Playwright.Response`, `Playwright.Dialog`,
+  `Playwright.ConsoleMessage`, `Playwright.Frame`, `Playwright.Worker`,
+  `Playwright.WebSocket`, or the error of a `page_error`. Read them with
+  Playwright's functions, such as `Playwright.Response.status/1`, and turn
   their page into a `Fluffy.Page` with `Fluffy.Playwright.page/2`. A crash resolves
   `crash` and fails the page's other waits, except `close`.
   """

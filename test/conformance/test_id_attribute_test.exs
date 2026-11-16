@@ -1,5 +1,5 @@
 defmodule Fluffy.Conformance.TestIdAttributeTest do
-  # Playwright Test's `testIdAttribute`, `config :fluffy, test_id_attribute:` over PlaywrightEx's,
+  # Playwright Test's `testIdAttribute`, `config :fluffy, test_id_attribute:` over Playwright's,
   # is global config.
   use Fluffy.Support.Case, async: false
 
@@ -10,7 +10,7 @@ defmodule Fluffy.Conformance.TestIdAttributeTest do
 
   alias Fluffy.Session
   alias Fluffy.Support.Server
-  alias PlaywrightEx.Isomorphic.LocatorUtils
+  alias Playwright.Isomorphic.LocatorUtils
 
   @owlery ~s(<section id="owlery"><p data-owl="hedwig">Hedwig</p><p data-testid="errol">Errol</p></section>)
 
@@ -48,11 +48,11 @@ defmodule Fluffy.Conformance.TestIdAttributeTest do
     end
   end
 
-  # Fluffy's unset (the suite's config): PlaywrightEx's, on every driver.
+  # Fluffy's unset (the suite's config): Playwright's, on every driver.
   for driver <- [:static, :playwright] do
     @tag driver: driver
-    test "#{driver} falls back to PlaywrightEx's attribute", %{driver: driver} do
-      put_playwright_ex_config(:test, test_id_attribute: "data-owl")
+    test "#{driver} falls back to Playwright's attribute", %{driver: driver} do
+      put_playwright_config(:test, test_id_attribute: "data-owl")
 
       driver
       |> session_for_html(@owlery, base_url: Server.base_url())
@@ -62,9 +62,9 @@ defmodule Fluffy.Conformance.TestIdAttributeTest do
   end
 
   @tag driver: :static
-  test "Fluffy's attribute wins over PlaywrightEx's" do
+  test "Fluffy's attribute wins over Playwright's" do
     put_fluffy_config(test_id_attribute: "data-testid")
-    put_playwright_ex_config(:test, test_id_attribute: "data-owl")
+    put_playwright_config(:test, test_id_attribute: "data-owl")
 
     :static
     |> session_for_html(@owlery, base_url: Server.base_url())
@@ -72,7 +72,7 @@ defmodule Fluffy.Conformance.TestIdAttributeTest do
     |> expect("hedwig" |> by_test_id() |> to_have_count(0))
   end
 
-  # Not the client's VM-global `selectors.setTestIdAttribute`, which PlaywrightEx.Test sets from
+  # Not the client's VM-global `selectors.setTestIdAttribute`, which Playwright.Test sets from
   # its own config: `get_by_test_id`'s selector with Fluffy's attribute.
   @tag driver: :playwright
   test "Playwright builds get_by_test_id's selector from Fluffy's attribute" do
@@ -81,15 +81,15 @@ defmodule Fluffy.Conformance.TestIdAttributeTest do
     frame = Session.page_state(session).frame
 
     assert unwrap_and_return(session, by_test_id("hedwig"), & &1) ==
-             PlaywrightEx.Frame.locator(frame, LocatorUtils.get_by_test_id_selector("data-owl", "hedwig"))
+             Playwright.Frame.locator(frame, LocatorUtils.get_by_test_id_selector("data-owl", "hedwig"))
   end
 
-  # With only PlaywrightEx's attribute, the suite's default, as its own native `get_by_test_id`.
+  # With only Playwright's attribute, the suite's default, as its own native `get_by_test_id`.
   @tag driver: :playwright
-  test "Playwright's locator equals PlaywrightEx's native get_by_test_id without Fluffy's attribute" do
+  test "Playwright's locator equals Playwright's native get_by_test_id without Fluffy's attribute" do
     session = session_for_html(:playwright, @owlery, base_url: Server.base_url())
     frame = Session.page_state(session).frame
 
-    assert unwrap_and_return(session, by_test_id("errol"), & &1) == PlaywrightEx.Frame.get_by_test_id(frame, "errol")
+    assert unwrap_and_return(session, by_test_id("errol"), & &1) == Playwright.Frame.get_by_test_id(frame, "errol")
   end
 end

@@ -1,5 +1,5 @@
 defmodule Fluffy.PlaywrightArtifactsTest.TraceCase do
-  # PlaywrightEx.Test writes `trace.zip` in the `on_exit` its registration adds. A case
+  # Playwright.Test writes `trace.zip` in the `on_exit` its registration adds. A case
   # template's `setup` runs before the `use Fluffy.Case` of its `using`, so this `on_exit` is
   # added before that one and runs after it, reading the path the test's setup puts in.
   @moduledoc false
@@ -33,7 +33,7 @@ defmodule Fluffy.PlaywrightArtifactsTest.TraceCase do
 end
 
 defmodule Fluffy.PlaywrightArtifactsTest do
-  # Fluffy's side of PlaywrightEx.Test's recording: the contexts of a test's sessions are
+  # Fluffy's side of Playwright.Test's recording: the contexts of a test's sessions are
   # the test's, and steps are its test steps.
   use ExUnit.Case, async: true
   use Fluffy.PlaywrightArtifactsTest.TraceCase
@@ -45,7 +45,6 @@ defmodule Fluffy.PlaywrightArtifactsTest do
 
   alias Fluffy.Event
   alias Fluffy.FilePayload
-  alias Fluffy.Playwright
   alias Fluffy.Support.HTTPFixtures
   alias Fluffy.Support.Server
 
@@ -55,7 +54,7 @@ defmodule Fluffy.PlaywrightArtifactsTest do
   @moduletag trace: true
 
   setup %{trace_path: path} do
-    trace_path = PlaywrightEx.Test.output_path("trace.zip")
+    trace_path = Playwright.Test.output_path("trace.zip")
     Agent.update(path, fn _ -> trace_path end)
   end
 
@@ -94,7 +93,7 @@ defmodule Fluffy.PlaywrightArtifactsTest do
     |> visit("/stage")
     |> step("Outer workflow", fn session ->
       step(session, "Inner operation", fn session ->
-        Playwright.evaluate(session, "document.body.dataset.stepped = 'yes'")
+        Fluffy.Playwright.evaluate(session, "document.body.dataset.stepped = 'yes'")
         session
       end)
     end)
@@ -130,7 +129,7 @@ defmodule Fluffy.PlaywrightArtifactsTest.UseOptionsTest do
   import Fluffy
 
   setup %{trace_path: path} do
-    trace_path = PlaywrightEx.Test.output_path("trace.zip")
+    trace_path = Playwright.Test.output_path("trace.zip")
     Agent.update(path, fn _ -> trace_path end)
   end
 

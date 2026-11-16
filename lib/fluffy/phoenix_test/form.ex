@@ -19,7 +19,7 @@ defmodule Fluffy.PhoenixTest.Form do
   defp state_owner(%Driver.Playwright.State{frame: frame}, locator) do
     case frame
          |> Fluffy.Locator.Playwright.locator(locator)
-         |> PlaywrightEx.Locator.evaluate(
+         |> Playwright.Locator.evaluate(
            """
            element => {
              const form = element.form;

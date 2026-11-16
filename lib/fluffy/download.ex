@@ -4,11 +4,11 @@ defmodule Fluffy.Download do
 
   `suggested_filename`, `url` and `page` are available to event predicates. Read
   or save the contents separately; those operations wait for completion and raise
-  on download failure, on Playwright a `Fluffy.OperationError` with PlaywrightEx's
+  on download failure, on Playwright a `Fluffy.OperationError` with Playwright's
   exception as its `cause`. As in Playwright, they have no timeout: a download that
   never completes, such as an interrupted one on Firefox, waits until the test times
   out. Handles belong to their session; saved files outlive it. On Playwright, reach
-  `failure`, `cancel` and the rest of the `PlaywrightEx.Download` with
+  `failure`, `cancel` and the rest of the `Playwright.Download` with
   `Fluffy.unwrap_and_return/2`.
 
   `path/1` also waits for completion and raises the same way. A Phoenix download is
@@ -74,9 +74,9 @@ defmodule Fluffy.Download do
 
   defp save_source!(%{body: bytes}, destination, _operation) when is_binary(bytes), do: File.write!(destination, bytes)
 
-  # As for an action, PlaywrightEx's error becomes the cause of a `Fluffy.OperationError`.
-  defp save_source!(%{native: %PlaywrightEx.Download{} = native}, destination, operation) do
-    with {:error, error} <- PlaywrightEx.Download.save_as(native, destination),
+  # As for an action, Playwright's error becomes the cause of a `Fluffy.OperationError`.
+  defp save_source!(%{native: %Playwright.Download{} = native}, destination, operation) do
+    with {:error, error} <- Playwright.Download.save_as(native, destination),
          do: OperationFailure.raise_playwright!(operation, nil, error)
   end
 
@@ -88,7 +88,7 @@ defmodule Fluffy.Download do
   end
 
   defp source_path!(%{native: native}) do
-    case PlaywrightEx.Download.path(native) do
+    case Playwright.Download.path(native) do
       {:ok, path} -> path
       {:error, error} -> OperationFailure.raise_playwright!(:path, nil, error)
     end

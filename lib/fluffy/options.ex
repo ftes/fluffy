@@ -38,59 +38,59 @@ defmodule Fluffy.Options do
   ]
 
   # The upstream call behind each cross-driver action. Its options pass through on
-  # Playwright, read from PlaywrightEx's `__options__/1`, except Fluffy's own `timeout`
+  # Playwright, read from Playwright's `__options__/1`, except Fluffy's own `timeout`
   # (its retry budget) and the denied ones below.
   @native_actions [
-    click: {PlaywrightEx.Locator, :click, 2},
-    fill: {PlaywrightEx.Locator, :fill, 3},
-    clear: {PlaywrightEx.Locator, :clear, 2},
-    set_checked: {PlaywrightEx.Locator, :set_checked, 3},
-    check: {PlaywrightEx.Locator, :check, 2},
-    uncheck: {PlaywrightEx.Locator, :uncheck, 2},
-    select_option: {PlaywrightEx.Locator, :select_option, 3},
-    press: {PlaywrightEx.Locator, :press, 3},
-    set_input_files: {PlaywrightEx.Locator, :set_input_files, 3},
-    reload: {PlaywrightEx.Page, :reload, 2}
+    click: {Playwright.Locator, :click, 2},
+    fill: {Playwright.Locator, :fill, 3},
+    clear: {Playwright.Locator, :clear, 2},
+    set_checked: {Playwright.Locator, :set_checked, 3},
+    check: {Playwright.Locator, :check, 2},
+    uncheck: {Playwright.Locator, :uncheck, 2},
+    select_option: {Playwright.Locator, :select_option, 3},
+    press: {Playwright.Locator, :press, 3},
+    set_input_files: {Playwright.Locator, :set_input_files, 3},
+    reload: {Playwright.Page, :reload, 2}
   ]
 
   # Playwright-only actions, whose options pass through the same way.
   @playwright_actions [
-    hover: {PlaywrightEx.Locator, :hover, 2},
-    drag_to: {PlaywrightEx.Locator, :drag_to, 3},
-    press_sequentially: {PlaywrightEx.Locator, :press_sequentially, 3},
-    focus: {PlaywrightEx.Locator, :focus, 2},
-    blur: {PlaywrightEx.Locator, :blur, 2},
-    dblclick: {PlaywrightEx.Locator, :dblclick, 2},
-    tap: {PlaywrightEx.Locator, :tap, 2},
-    dispatch_event: {PlaywrightEx.Locator, :dispatch_event, 4},
-    select_text: {PlaywrightEx.Locator, :select_text, 2},
-    scroll_into_view_if_needed: {PlaywrightEx.Locator, :scroll_into_view_if_needed, 2},
-    wait_for: {PlaywrightEx.Locator, :wait_for, 2},
-    bounding_box: {PlaywrightEx.Locator, :bounding_box, 2},
-    aria_snapshot: {PlaywrightEx.Locator, :aria_snapshot, 2},
-    drop: {PlaywrightEx.Locator, :drop, 3},
-    locator_evaluate: {PlaywrightEx.Locator, :evaluate, 4},
-    locator_wait_for_function: {PlaywrightEx.Locator, :wait_for_function, 4},
-    page_aria_snapshot: {PlaywrightEx.Page, :aria_snapshot, 2},
-    wait_for_function: {PlaywrightEx.Page, :wait_for_function, 4},
-    wait_for_load_state: {PlaywrightEx.Page, :wait_for_load_state, 3},
-    unroute_all: {PlaywrightEx.BrowserContext, :unroute_all, 2},
-    locator_screenshot: {PlaywrightEx.Locator, :screenshot, 2},
-    page_screenshot: {PlaywrightEx.Page, :screenshot, 2},
-    to_have_screenshot: {PlaywrightEx.Expect, :to_have_screenshot, 2},
-    content: {PlaywrightEx.Page, :content, 2},
-    pdf: {PlaywrightEx.Page, :pdf, 2},
-    emulate_media: {PlaywrightEx.Page, :emulate_media, 2},
-    keyboard_press: {PlaywrightEx.Keyboard, :press, 3},
-    keyboard_type: {PlaywrightEx.Keyboard, :type, 3},
-    mouse_click: {PlaywrightEx.Mouse, :click, 4},
-    mouse_dblclick: {PlaywrightEx.Mouse, :dblclick, 4},
-    mouse_down: {PlaywrightEx.Mouse, :down, 2},
-    mouse_up: {PlaywrightEx.Mouse, :up, 2},
-    mouse_move: {PlaywrightEx.Mouse, :move, 4},
-    go_back: {PlaywrightEx.Page, :go_back, 2},
-    go_forward: {PlaywrightEx.Page, :go_forward, 2},
-    install_clock: {PlaywrightEx.Clock, :install, 2}
+    hover: {Playwright.Locator, :hover, 2},
+    drag_to: {Playwright.Locator, :drag_to, 3},
+    press_sequentially: {Playwright.Locator, :press_sequentially, 3},
+    focus: {Playwright.Locator, :focus, 2},
+    blur: {Playwright.Locator, :blur, 2},
+    dblclick: {Playwright.Locator, :dblclick, 2},
+    tap: {Playwright.Locator, :tap, 2},
+    dispatch_event: {Playwright.Locator, :dispatch_event, 4},
+    select_text: {Playwright.Locator, :select_text, 2},
+    scroll_into_view_if_needed: {Playwright.Locator, :scroll_into_view_if_needed, 2},
+    wait_for: {Playwright.Locator, :wait_for, 2},
+    bounding_box: {Playwright.Locator, :bounding_box, 2},
+    aria_snapshot: {Playwright.Locator, :aria_snapshot, 2},
+    drop: {Playwright.Locator, :drop, 3},
+    locator_evaluate: {Playwright.Locator, :evaluate, 4},
+    locator_wait_for_function: {Playwright.Locator, :wait_for_function, 4},
+    page_aria_snapshot: {Playwright.Page, :aria_snapshot, 2},
+    wait_for_function: {Playwright.Page, :wait_for_function, 4},
+    wait_for_load_state: {Playwright.Page, :wait_for_load_state, 3},
+    unroute_all: {Playwright.BrowserContext, :unroute_all, 2},
+    locator_screenshot: {Playwright.Locator, :screenshot, 2},
+    page_screenshot: {Playwright.Page, :screenshot, 2},
+    to_have_screenshot: {Playwright.Expect, :to_have_screenshot, 2},
+    content: {Playwright.Page, :content, 2},
+    pdf: {Playwright.Page, :pdf, 2},
+    emulate_media: {Playwright.Page, :emulate_media, 2},
+    keyboard_press: {Playwright.Keyboard, :press, 3},
+    keyboard_type: {Playwright.Keyboard, :type, 3},
+    mouse_click: {Playwright.Mouse, :click, 4},
+    mouse_dblclick: {Playwright.Mouse, :dblclick, 4},
+    mouse_down: {Playwright.Mouse, :down, 2},
+    mouse_up: {Playwright.Mouse, :up, 2},
+    mouse_move: {Playwright.Mouse, :move, 4},
+    go_back: {Playwright.Page, :go_back, 2},
+    go_forward: {Playwright.Page, :go_forward, 2},
+    install_clock: {Playwright.Clock, :install, 2}
   ]
 
   @fluffy_native_keys [:timeout]
@@ -112,7 +112,7 @@ defmodule Fluffy.Options do
   ]
 
   # These replace the upstream option of the same name: a baseline's `path:`, which
-  # PlaywrightEx requires outside a `PlaywrightEx.Test` test.
+  # Playwright requires outside a `Playwright.Test` test.
   @required_action_options [
     to_have_screenshot: [
       path: [
@@ -155,34 +155,34 @@ defmodule Fluffy.Options do
   # The upstream assertion behind each expectation and the options Fluffy mirrors on
   # every driver. No assertion option passes through to the browser.
   @native_expectations [
-    to_have_count: {PlaywrightEx.Expect, :to_have_count, 3, []},
-    to_be_visible: {PlaywrightEx.Expect, :to_be_visible, 2, [:visible]},
-    to_be_disabled: {PlaywrightEx.Expect, :to_be_disabled, 2, []},
-    to_be_editable: {PlaywrightEx.Expect, :to_be_editable, 2, [:editable]},
-    to_be_enabled: {PlaywrightEx.Expect, :to_be_enabled, 2, [:enabled]},
-    to_be_focused: {PlaywrightEx.Expect, :to_be_focused, 2, []},
-    to_be_in_viewport: {PlaywrightEx.Expect, :to_be_in_viewport, 2, [:ratio]},
-    to_have_css: {PlaywrightEx.Expect, :to_have_css, 4, [:pseudo]},
-    to_have_js_property: {PlaywrightEx.Expect, :to_have_js_property, 4, []},
-    to_have_role: {PlaywrightEx.Expect, :to_have_role, 3, []},
-    to_have_accessible_name: {PlaywrightEx.Expect, :to_have_accessible_name, 3, [:ignore_case]},
-    to_have_accessible_description: {PlaywrightEx.Expect, :to_have_accessible_description, 3, [:ignore_case]},
-    to_have_accessible_error_message: {PlaywrightEx.Expect, :to_have_accessible_error_message, 3, [:ignore_case]},
-    to_match_aria_snapshot: {PlaywrightEx.Expect, :to_match_aria_snapshot, 3, [:name, :path]},
-    to_be_checked: {PlaywrightEx.Expect, :to_be_checked, 2, [:checked, :indeterminate]},
-    to_have_value: {PlaywrightEx.Expect, :to_have_value, 3, []},
-    to_have_values: {PlaywrightEx.Expect, :to_have_values, 3, []},
-    to_have_text: {PlaywrightEx.Expect, :to_have_text, 3, [:ignore_case, :use_inner_text]},
-    to_contain_text: {PlaywrightEx.Expect, :to_contain_text, 3, [:ignore_case, :use_inner_text]},
-    to_have_attribute: {PlaywrightEx.Expect, :to_have_attribute, 4, [:ignore_case]},
-    to_have_class: {PlaywrightEx.Expect, :to_have_class, 3, []},
-    to_contain_class: {PlaywrightEx.Expect, :to_contain_class, 3, []},
-    to_have_id: {PlaywrightEx.Expect, :to_have_id, 3, []},
-    to_be_attached: {PlaywrightEx.Expect, :to_be_attached, 2, [:attached]},
-    to_be_hidden: {PlaywrightEx.Expect, :to_be_hidden, 2, []},
-    to_be_empty: {PlaywrightEx.Expect, :to_be_empty, 2, []},
-    page_to_have_title: {PlaywrightEx.Expect, :to_have_title, 3, []},
-    page_to_have_url: {PlaywrightEx.Expect, :to_have_url, 3, [:ignore_case]}
+    to_have_count: {Playwright.Expect, :to_have_count, 3, []},
+    to_be_visible: {Playwright.Expect, :to_be_visible, 2, [:visible]},
+    to_be_disabled: {Playwright.Expect, :to_be_disabled, 2, []},
+    to_be_editable: {Playwright.Expect, :to_be_editable, 2, [:editable]},
+    to_be_enabled: {Playwright.Expect, :to_be_enabled, 2, [:enabled]},
+    to_be_focused: {Playwright.Expect, :to_be_focused, 2, []},
+    to_be_in_viewport: {Playwright.Expect, :to_be_in_viewport, 2, [:ratio]},
+    to_have_css: {Playwright.Expect, :to_have_css, 4, [:pseudo]},
+    to_have_js_property: {Playwright.Expect, :to_have_js_property, 4, []},
+    to_have_role: {Playwright.Expect, :to_have_role, 3, []},
+    to_have_accessible_name: {Playwright.Expect, :to_have_accessible_name, 3, [:ignore_case]},
+    to_have_accessible_description: {Playwright.Expect, :to_have_accessible_description, 3, [:ignore_case]},
+    to_have_accessible_error_message: {Playwright.Expect, :to_have_accessible_error_message, 3, [:ignore_case]},
+    to_match_aria_snapshot: {Playwright.Expect, :to_match_aria_snapshot, 3, [:name, :path]},
+    to_be_checked: {Playwright.Expect, :to_be_checked, 2, [:checked, :indeterminate]},
+    to_have_value: {Playwright.Expect, :to_have_value, 3, []},
+    to_have_values: {Playwright.Expect, :to_have_values, 3, []},
+    to_have_text: {Playwright.Expect, :to_have_text, 3, [:ignore_case, :use_inner_text]},
+    to_contain_text: {Playwright.Expect, :to_contain_text, 3, [:ignore_case, :use_inner_text]},
+    to_have_attribute: {Playwright.Expect, :to_have_attribute, 4, [:ignore_case]},
+    to_have_class: {Playwright.Expect, :to_have_class, 3, []},
+    to_contain_class: {Playwright.Expect, :to_contain_class, 3, []},
+    to_have_id: {Playwright.Expect, :to_have_id, 3, []},
+    to_be_attached: {Playwright.Expect, :to_be_attached, 2, [:attached]},
+    to_be_hidden: {Playwright.Expect, :to_be_hidden, 2, []},
+    to_be_empty: {Playwright.Expect, :to_be_empty, 2, []},
+    page_to_have_title: {Playwright.Expect, :to_have_title, 3, []},
+    page_to_have_url: {Playwright.Expect, :to_have_url, 3, [:ignore_case]}
   ]
 
   @denied_expectation_keys [:signal]
@@ -190,7 +190,7 @@ defmodule Fluffy.Options do
   @mirrored_expectation_options [
     name: [
       type: :string,
-      doc: "The snapshot file's name, in place of `expected`, resolved by `PlaywrightEx.Test`."
+      doc: "The snapshot file's name, in place of `expected`, resolved by `Playwright.Test`."
     ],
     path: [
       type: :string,
@@ -230,26 +230,26 @@ defmodule Fluffy.Options do
   # replacement. `by_css` takes no options; chain `filter/2` instead.
   @native_locators [
     by_role:
-      {PlaywrightEx.Locator, :get_by_role, 3,
+      {Playwright.Locator, :get_by_role, 3,
        fluffy: [:exact, :name],
        playwright: [:checked, :description, :disabled, :expanded, :include_hidden, :level, :pressed, :selected]},
-    by_text: {PlaywrightEx.Locator, :get_by_text, 3, fluffy: [:exact]},
-    by_label: {PlaywrightEx.Locator, :get_by_label, 3, fluffy: [:exact]},
-    by_placeholder: {PlaywrightEx.Locator, :get_by_placeholder, 3, fluffy: [:exact]},
-    by_alt_text: {PlaywrightEx.Locator, :get_by_alt_text, 3, fluffy: [:exact]},
-    by_title: {PlaywrightEx.Locator, :get_by_title, 3, fluffy: [:exact]},
-    by_test_id: {PlaywrightEx.Locator, :get_by_test_id, 2, []},
-    by_css: {PlaywrightEx.Locator, :locator, 3, denied: [:has, :has_not, :has_not_text, :has_text]},
-    filter: {PlaywrightEx.Locator, :filter, 2, fluffy: [:has, :has_not, :has_not_text, :has_text, :visible]}
+    by_text: {Playwright.Locator, :get_by_text, 3, fluffy: [:exact]},
+    by_label: {Playwright.Locator, :get_by_label, 3, fluffy: [:exact]},
+    by_placeholder: {Playwright.Locator, :get_by_placeholder, 3, fluffy: [:exact]},
+    by_alt_text: {Playwright.Locator, :get_by_alt_text, 3, fluffy: [:exact]},
+    by_title: {Playwright.Locator, :get_by_title, 3, fluffy: [:exact]},
+    by_test_id: {Playwright.Locator, :get_by_test_id, 2, []},
+    by_css: {Playwright.Locator, :locator, 3, denied: [:has, :has_not, :has_not_text, :has_text]},
+    filter: {Playwright.Locator, :filter, 2, fluffy: [:has, :has_not, :has_not_text, :has_text, :visible]}
   ]
 
   @text_or_regex [
     type: {:custom, __MODULE__, :text_or_reg_exp, []},
-    type_spec: quote(do: String.t() | Regex.t() | PlaywrightEx.RegExp.t()),
-    type_doc: "`t:String.t/0` | `t:Regex.t/0` | `t:PlaywrightEx.RegExp.t/0`"
+    type_spec: quote(do: String.t() | Regex.t() | Playwright.RegExp.t()),
+    type_doc: "`t:String.t/0` | `t:Regex.t/0` | `t:Playwright.RegExp.t/0`"
   ]
 
-  # Fluffy compiles locator selectors itself, so it validates what PlaywrightEx would.
+  # Fluffy compiles locator selectors itself, so it validates what Playwright would.
   # Text options take a string or a regex, like `name:` and `has_text:`.
   @playwright_locator_types [
     checked: :boolean,
@@ -348,19 +348,19 @@ defmodule Fluffy.Options do
                     conn: [type: {:struct, Plug.Conn}],
                     browser_context: [type: :keyword_list],
                     browser: [
-                      type: {:struct, PlaywrightEx.Browser},
+                      type: {:struct, Playwright.Browser},
                       doc:
-                        "*Playwright only.* The `PlaywrightEx.Browser` the session's context is created in. " <>
-                          "Defaults to the test's browser from `PlaywrightEx.Test.BrowserPool.browser/1`; " <>
+                        "*Playwright only.* The `Playwright.Browser` the session's context is created in. " <>
+                          "Defaults to the test's browser from `Playwright.Test.BrowserPool.browser/1`; " <>
                           "to override launch options such as `headless: false` for one test, " <>
-                          "pass `PlaywrightEx.Test.BrowserPool.browser(launch_options: ...)` " <>
+                          "pass `Playwright.Test.BrowserPool.browser(launch_options: ...)` " <>
                           "([Playwright setup](installation.md#playwright-setup))."
                     ]
                   )
 
   # `config :fluffy`. Playwright Test's `actionTimeout`, `expect.timeout` and `testIdAttribute`
-  # are for Fluffy's sessions, over PlaywrightEx's (`config!/1`); no defaults: unset,
-  # PlaywrightEx's apply.
+  # are for Fluffy's sessions, over Playwright's (`config!/1`); no defaults: unset,
+  # Playwright's apply.
   @config_schema NimbleOptions.new!(
                    action_timeout: [type: {:custom, __MODULE__, :default_timeout, []}],
                    # `0`: assertions check once, as with a call's `timeout: 0`.
@@ -377,9 +377,9 @@ defmodule Fluffy.Options do
   @type session_option :: unquote(NimbleOptions.option_typespec(@session_schema))
 
   @doc false
-  # A string or a regex; a `Regex` becomes its `PlaywrightEx.RegExp`, raising on PCRE-only syntax.
-  def text_or_reg_exp(value) when is_binary(value) or is_struct(value, PlaywrightEx.RegExp), do: {:ok, value}
-  def text_or_reg_exp(%Regex{} = value), do: {:ok, PlaywrightEx.RegExp.new(value)}
+  # A string or a regex; a `Regex` becomes its `Playwright.RegExp`, raising on PCRE-only syntax.
+  def text_or_reg_exp(value) when is_binary(value) or is_struct(value, Playwright.RegExp), do: {:ok, value}
+  def text_or_reg_exp(%Regex{} = value), do: {:ok, Playwright.RegExp.new(value)}
   def text_or_reg_exp(value), do: {:error, "expected a string or a regex, got: #{inspect(value)}"}
 
   @doc false
@@ -501,19 +501,19 @@ defmodule Fluffy.Options do
   end
 
   @doc false
-  # The setting `key`: Fluffy's of `@config_schema` if set, else PlaywrightEx's resolved one
-  # (`PlaywrightEx.Test.config/0`, its defaults filled in), where `0` means no limit:
-  # `:infinity` here. `navigation_timeout` is PlaywrightEx's only.
+  # The setting `key`: Fluffy's of `@config_schema` if set, else Playwright's resolved one
+  # (`Playwright.Test.config/0`, its defaults filled in), where `0` means no limit:
+  # `:infinity` here. `navigation_timeout` is Playwright's only.
   @spec config!(atom()) :: term()
   def config!(key) when key in [:navigation_timeout | @playwright_test_keys], do: Map.fetch!(resolved_config!(), key)
 
-  # Read on every timeout, so resolved once per env, as PlaywrightEx's
+  # Read on every timeout, so resolved once per env, as Playwright's
   # `Matchers.Expect.app_env_expect_config/0`: keyed on the values it resolves from, and
   # validated in full (`config!/0`) on a miss, so an invalid value raises on each read.
   defp resolved_config! do
     env =
-      {Enum.map(@playwright_test_keys, &Application.get_env(:fluffy, &1)), Application.get_env(:playwright_ex, :test),
-       Application.get_env(:playwright_ex, :expect)}
+      {Enum.map(@playwright_test_keys, &Application.get_env(:fluffy, &1)), Application.get_env(:playwright, :test),
+       Application.get_env(:playwright, :expect)}
 
     case :persistent_term.get({__MODULE__, :config}, nil) do
       {^env, config} ->
@@ -528,23 +528,23 @@ defmodule Fluffy.Options do
 
   defp resolve_config! do
     fluffy = config!()
-    playwright_ex = PlaywrightEx.Test.config()
+    playwright = Playwright.Test.config()
 
     Map.new([:navigation_timeout | @playwright_test_keys], fn key ->
-      {key, Keyword.get_lazy(fluffy, key, fn -> playwright_ex_config(playwright_ex, key) end)}
+      {key, Keyword.get_lazy(fluffy, key, fn -> playwright_config(playwright, key) end)}
     end)
   end
 
-  defp playwright_ex_config(config, :expect_timeout), do: no_limit(config.expect.timeout)
+  defp playwright_config(config, :expect_timeout), do: no_limit(config.expect.timeout)
 
-  defp playwright_ex_config(config, :test_id_attribute) do
+  defp playwright_config(config, :test_id_attribute) do
     case test_id_attribute(config.test_id_attribute) do
       {:ok, names} -> names
-      {:error, message} -> raise ArgumentError, "invalid config :playwright_ex, :test: test_id_attribute: " <> message
+      {:error, message} -> raise ArgumentError, "invalid config :playwright, :test: test_id_attribute: " <> message
     end
   end
 
-  defp playwright_ex_config(config, key), do: no_limit(Map.fetch!(config, key))
+  defp playwright_config(config, key), do: no_limit(Map.fetch!(config, key))
 
   defp no_limit(0), do: :infinity
   defp no_limit(timeout), do: timeout
@@ -572,16 +572,16 @@ defmodule Fluffy.Options do
 
   @removed_config [
     timeout:
-      "set `config :playwright_ex, :expect, timeout: ...` for assertions and " <>
-        "`config :playwright_ex, :test, action_timeout: ...` for actions; " <>
+      "set `config :playwright, :expect, timeout: ...` for assertions and " <>
+        "`config :playwright, :test, action_timeout: ...` for actions; " <>
         "`config :fluffy, expect_timeout: ..., action_timeout: ...` override them for Fluffy sessions",
     playwright:
-      "set `config :playwright_ex, :test` instead, with `action_timeout:` and `navigation_timeout:` for " <>
+      "set `config :playwright, :test` instead, with `action_timeout:` and `navigation_timeout:` for " <>
         "`timeout:`, `browser_name:` for `engine:`, `launch_options:`, `driver: [executable: ...]`, " <>
         "`workers:` for `pool_size:`, and `output_dir:` with `trace:` for `artifact_dir:` and `trace_dir:`; " <>
         "for `log_browser_console:`, log from `on(session, Event.console(), ...)` and `Event.page_error()` listeners",
     navigation_timeout:
-      "set `config :playwright_ex, :test, navigation_timeout: ...`: only browser navigations wait, " <>
+      "set `config :playwright, :test, navigation_timeout: ...`: only browser navigations wait, " <>
         "Phoenix navigations are synchronous"
   ]
 
@@ -607,7 +607,7 @@ defmodule Fluffy.Options do
   def default_timeout(timeout), do: {:error, "expected a positive integer or :infinity, got: #{inspect(timeout)}"}
 
   @doc false
-  # As PlaywrightEx.Test's `test_id_attribute`: one attribute or a comma-separated list.
+  # As Playwright.Test's `test_id_attribute`: one attribute or a comma-separated list.
   # Upstream's test id engine puts each name into a CSS attribute selector unescaped, so
   # it must be a CSS identifier; other names make each `by_test_id` fail in the browser.
   def test_id_attribute(names) when is_binary(names) and names != "" do

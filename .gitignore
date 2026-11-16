@@ -18,5 +18,5 @@ erl_crash.dump
 /node_modules/
 /.pnpm-store/
 
-# PlaywrightEx.Test output_dir
+# Playwright.Test output_dir
 /test-results/

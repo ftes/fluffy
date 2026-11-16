@@ -7,12 +7,14 @@ defmodule Fluffy.Conformance.RouteTest do
   import Fluffy.Playwright
 
   alias Fluffy.Event
-  alias Fluffy.Playwright
   alias Fluffy.Support.HTTPFixtures
   alias Fluffy.Support.Server
   alias Fluffy.Support.Web.Endpoint
-  alias PlaywrightEx.Route
-  alias PlaywrightEx.Test.TestInfo
+  alias Playwright.PlaywrightError
+  alias Playwright.Request
+  alias Playwright.Route
+  alias Playwright.TargetClosedError
+  alias Playwright.Test.TestInfo
 
   @fetch "url => fetch(url).then(response => response.text(), () => 'rejected')"
   @pending "Promise.race([window.result, new Promise(resolve => setTimeout(() => resolve('pending'), 200))])"
@@ -28,15 +30,15 @@ defmodule Fluffy.Conformance.RouteTest do
         Route.fulfill!(route, status: 201, headers: %{"x-routed" => "yes"}, json: %{name: "routed"})
       end)
 
-      assert Playwright.evaluate(
+      assert Fluffy.Playwright.evaluate(
                session,
                "url => fetch(url, {method: 'POST', body: 'payload'}).then(async r => [r.status, r.headers.get('x-routed'), await r.json()])",
                url(fixture, "/api")
              ) == [201, "yes", %{"name" => "routed"}]
 
-      assert_receive {:request, %PlaywrightEx.Request{} = request}
-      assert {PlaywrightEx.Request.method(request), PlaywrightEx.Request.post_data(request)} == {"POST", "payload"}
-      assert PlaywrightEx.Request.url(request) == url(fixture, "/api")
+      assert_receive {:request, %Request{} = request}
+      assert {Request.method(request), Request.post_data(request)} == {"POST", "payload"}
+      assert Request.url(request) == url(fixture, "/api")
       assert fixture |> HTTPFixtures.requests() |> Enum.count(&(&1.path == "/api")) == 0
     end
 
@@ -46,7 +48,7 @@ defmodule Fluffy.Conformance.RouteTest do
 
       route(session, "**/api", fn route ->
         Route.continue!(route,
-          headers: Map.put(PlaywrightEx.Request.headers(Route.request(route)), "x-fluffy-routed", "yes")
+          headers: Map.put(Request.headers(Route.request(route)), "x-fluffy-routed", "yes")
         )
       end)
 
@@ -126,12 +128,12 @@ defmodule Fluffy.Conformance.RouteTest do
       owner = self()
 
       route(session, "**/api", fn route ->
-        send(owner, {:first, PlaywrightEx.Request.headers(Route.request(route))["x-fallback"]})
+        send(owner, {:first, Request.headers(Route.request(route))["x-fallback"]})
         Route.fulfill!(route, body: "first")
       end)
 
       route(session, "**/api", fn route ->
-        Route.fallback!(route, headers: Map.put(PlaywrightEx.Request.headers(Route.request(route)), "x-fallback", "yes"))
+        Route.fallback!(route, headers: Map.put(Request.headers(Route.request(route)), "x-fallback", "yes"))
       end)
 
       assert fetch(session, fixture) == "first"
@@ -194,7 +196,7 @@ defmodule Fluffy.Conformance.RouteTest do
 
       route(session, "**/fast", fn route -> Route.fulfill!(route, body: "fast") end)
 
-      Playwright.evaluate(
+      Fluffy.Playwright.evaluate(
         session,
         "url => { window.slow = fetch(url).then(r => r.text()); return true }",
         url(fixture, "/slow")
@@ -203,7 +205,7 @@ defmodule Fluffy.Conformance.RouteTest do
       assert_receive {:held, server}, 5_000
       assert fetch(session, fixture, "/fast") == "fast"
       send(server, :release)
-      assert Playwright.evaluate(session, "window.slow") == "held"
+      assert Fluffy.Playwright.evaluate(session, "window.slow") == "held"
     end
 
     @tag driver: :playwright
@@ -213,7 +215,7 @@ defmodule Fluffy.Conformance.RouteTest do
       start_held_fetch(session, fixture)
 
       assert [{:error, %RuntimeError{message: "boom"}, [_ | _]}] = take_test_errors()
-      assert Playwright.evaluate(session, @pending) == "pending"
+      assert Fluffy.Playwright.evaluate(session, @pending) == "pending"
     end
 
     @tag driver: :playwright
@@ -223,11 +225,11 @@ defmodule Fluffy.Conformance.RouteTest do
       # Two simultaneous answers: the second comes back from the server like this.
       route(session, "**/api", fn route ->
         Route.fulfill!(route, body: "first")
-        raise %PlaywrightEx.PlaywrightError{message: "route.fulfill: Route is already handled!"}
+        raise %PlaywrightError{message: "route.fulfill: Route is already handled!"}
       end)
 
       assert fetch(session, fixture) == "first"
-      assert [{:error, %PlaywrightEx.PlaywrightError{}, [_ | _]}] = take_test_errors()
+      assert [{:error, %PlaywrightError{}, [_ | _]}] = take_test_errors()
     end
 
     @tag driver: :playwright
@@ -236,11 +238,11 @@ defmodule Fluffy.Conformance.RouteTest do
 
       # Raised by a call on a page or context closed under the handler.
       route(session, "**/api", fn _route ->
-        raise %PlaywrightEx.TargetClosedError{message: "Target page, context or browser has been closed"}
+        raise %TargetClosedError{message: "Target page, context or browser has been closed"}
       end)
 
       start_held_fetch(session, fixture)
-      assert [{:error, %PlaywrightEx.TargetClosedError{message: message}, [_ | _]}] = take_test_errors()
+      assert [{:error, %TargetClosedError{message: message}, [_ | _]}] = take_test_errors()
       assert message =~ ~s("Target page, context or browser has been closed" while running route callback.)
       assert message =~ "unrouteAll({ behavior: 'ignoreErrors' })"
     end
@@ -253,7 +255,7 @@ defmodule Fluffy.Conformance.RouteTest do
       test = self()
       route(session, "**/api", &send(test, {:route, &1}))
 
-      Playwright.evaluate(session, "url => { fetch(url).catch(() => {}); return true }", url(fixture, "/api"))
+      Fluffy.Playwright.evaluate(session, "url => { fetch(url).catch(() => {}); return true }", url(fixture, "/api"))
       assert_receive {:route, route}, 5_000
 
       close_session(session)
@@ -280,7 +282,7 @@ defmodule Fluffy.Conformance.RouteTest do
       route(session, "**/api", handler)
 
       # Queue requests behind the removal; each is answered, by whichever route it reaches.
-      Playwright.evaluate(
+      Fluffy.Playwright.evaluate(
         session,
         "url => { window.results = Promise.all([...Array(20)].map(() => fetch(url).then(r => r.text()))); return true }",
         url(fixture, "/api")
@@ -288,7 +290,10 @@ defmodule Fluffy.Conformance.RouteTest do
 
       unroute(session, "**/api", handler)
 
-      assert session |> Playwright.evaluate("window.results") |> Enum.uniq() |> Enum.all?(&(&1 in ["earlier", "removed"]))
+      assert session
+             |> Fluffy.Playwright.evaluate("window.results")
+             |> Enum.uniq()
+             |> Enum.all?(&(&1 in ["earlier", "removed"]))
     end
 
     @tag driver: :playwright
@@ -301,8 +306,8 @@ defmodule Fluffy.Conformance.RouteTest do
       assert_receive {:route, route}, 5_000
       unroute(session, "**/api")
 
-      assert Playwright.evaluate(session, "window.result") == ~s({"name":"server"})
-      assert_raise PlaywrightEx.PlaywrightError, ~r/Route is already handled!/, fn -> Route.fulfill!(route) end
+      assert Fluffy.Playwright.evaluate(session, "window.result") == ~s({"name":"server"})
+      assert_raise PlaywrightError, ~r/Route is already handled!/, fn -> Route.fulfill!(route) end
     end
 
     @tag driver: :playwright
@@ -313,12 +318,12 @@ defmodule Fluffy.Conformance.RouteTest do
 
       start_held_fetch(session, fixture)
       assert_receive {:route, route}, 5_000
-      unrouting = Task.async(fn -> Playwright.unroute_all(session, behavior: :wait) end)
+      unrouting = Task.async(fn -> Fluffy.Playwright.unroute_all(session, behavior: :wait) end)
       refute Task.yield(unrouting, 200)
 
       Route.fulfill!(route, body: "finished")
       assert Task.await(unrouting) == session
-      assert Playwright.evaluate(session, "window.result") == "finished"
+      assert Fluffy.Playwright.evaluate(session, "window.result") == "finished"
     end
 
     @tag driver: :playwright
@@ -332,10 +337,10 @@ defmodule Fluffy.Conformance.RouteTest do
 
       start_held_fetch(session, fixture)
       assert_receive {:held, server}, 5_000
-      assert Playwright.unroute_all(session, behavior: :ignore_errors) == session
+      assert Fluffy.Playwright.unroute_all(session, behavior: :ignore_errors) == session
 
       send(server, :release)
-      assert Playwright.evaluate(session, "window.result") == ~s({"name":"server"})
+      assert Fluffy.Playwright.evaluate(session, "window.result") == ~s({"name":"server"})
       refute_test_errors()
     end
   end
@@ -383,7 +388,7 @@ defmodule Fluffy.Conformance.RouteTest do
       route(session, "**/blocked", fn route -> Route.abort!(route) end)
 
       error = assert_raise Fluffy.OperationError, fn -> visit(session, HTTPFixtures.path(fixture, "/blocked")) end
-      assert %PlaywrightEx.PlaywrightError{} = error.cause
+      assert %PlaywrightError{} = error.cause
     end
 
     @tag driver: :playwright
@@ -451,7 +456,7 @@ defmodule Fluffy.Conformance.RouteTest do
   defp url(fixture, suffix), do: HTTPFixtures.url(fixture, suffix)
 
   defp start_held_fetch(session, fixture) do
-    Playwright.evaluate(
+    Fluffy.Playwright.evaluate(
       session,
       "url => { window.result = fetch(url).then(r => r.text()); return true }",
       url(fixture, "/api")
@@ -459,7 +464,7 @@ defmodule Fluffy.Conformance.RouteTest do
   end
 
   defp fetch(session, fixture, suffix \\ "/api") do
-    Playwright.evaluate(session, @fetch, url(fixture, suffix))
+    Fluffy.Playwright.evaluate(session, @fetch, url(fixture, suffix))
   end
 
   defp session do

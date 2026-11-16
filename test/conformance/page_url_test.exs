@@ -47,7 +47,7 @@ defmodule Fluffy.Conformance.PageURLTest do
         driver
         |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
         |> visit("/chamber")
-        |> expect(page_to_have_url(PlaywrightEx.RegExp.new("/CHAMBER$", "i")))
+        |> expect(page_to_have_url(Playwright.RegExp.new("/CHAMBER$", "i")))
         |> expect(page_to_have_url(~r{/CHAMBER$}, ignore_case: true))
         |> expect(not_(page_to_have_url(~r{/CHAMBER$}i, ignore_case: false)))
 

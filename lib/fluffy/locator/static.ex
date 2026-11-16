@@ -5,9 +5,9 @@ defmodule Fluffy.Locator.Static do
   alias Fluffy.HTML.Aria
   alias Fluffy.HTML.Semantics
   alias Fluffy.Locator
-  # StringUtils is internal to PlaywrightEx, which is pinned.
-  alias PlaywrightEx.Isomorphic.LocatorUtils
-  alias PlaywrightEx.Isomorphic.StringUtils
+  # StringUtils is internal to Playwright, which is pinned.
+  alias Playwright.Isomorphic.LocatorUtils
+  alias Playwright.Isomorphic.StringUtils
 
   # Operations that search inside each candidate. As in Playwright's chains, they
   # find descendants only, except that its text engine also matches the scope itself.

@@ -5,8 +5,9 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.Playwright
   alias Fluffy.Support.HTTPFixtures
+  alias Playwright.TargetClosedError
+  alias Playwright.Test
 
   @moduletag driver: :playwright
 
@@ -17,46 +18,48 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
 
       for options <- [[timeout: 1_000], [signal: :none]] do
         assert_raise NimbleOptions.ValidationError, ~r/unknown options/, fn ->
-          Playwright.evaluate(session, "1", options)
+          Fluffy.Playwright.evaluate(session, "1", options)
         end
 
         assert_raise NimbleOptions.ValidationError, ~r/unknown options/, fn ->
-          Playwright.evaluate(session, "1", nil, options)
+          Fluffy.Playwright.evaluate(session, "1", nil, options)
         end
       end
 
-      assert Playwright.evaluate(session, "value => value", "arg", []) == "arg"
+      assert Fluffy.Playwright.evaluate(session, "value => value", "arg", []) == "arg"
     end
 
     test "evaluate keeps other lists as JavaScript arrays" do
       session = session_for_html(:playwright, "<p>Harness</p>")
 
-      assert Playwright.evaluate(session, "value => Array.isArray(value) && value.length === 0", []) == true
-      assert Playwright.evaluate(session, "value => value", [1, "two"]) == [1, "two"]
-      assert Playwright.evaluate(session, "value => value", [%{a: 1}]) == [%{"a" => 1}]
-      assert Playwright.evaluate(session, "value => Array.isArray(value)", [], []) == true
+      assert Fluffy.Playwright.evaluate(session, "value => Array.isArray(value) && value.length === 0", []) == true
+      assert Fluffy.Playwright.evaluate(session, "value => value", [1, "two"]) == [1, "two"]
+      assert Fluffy.Playwright.evaluate(session, "value => value", [%{a: 1}]) == [%{"a" => 1}]
+      assert Fluffy.Playwright.evaluate(session, "value => Array.isArray(value)", [], []) == true
     end
 
     test "wait_for_function takes options in place of the argument" do
       session = session_for_html(:playwright, "<p>Harness</p>")
 
-      assert Playwright.wait_for_function(session, "() => true", timeout: 1_000) == session
-      assert Playwright.wait_for_function(session, "() => true", nil, timeout: 1_000) == session
+      assert Fluffy.Playwright.wait_for_function(session, "() => true", timeout: 1_000) == session
+      assert Fluffy.Playwright.wait_for_function(session, "() => true", nil, timeout: 1_000) == session
 
       assert_raise Fluffy.OperationError, ~r/wait_for_function.*[Tt]imeout/s, fn ->
-        Playwright.wait_for_function(session, "() => false", timeout: 100)
+        Fluffy.Playwright.wait_for_function(session, "() => false", timeout: 100)
       end
 
       assert_raise NimbleOptions.ValidationError, ~r/unknown options.*:signal/, fn ->
-        Playwright.wait_for_function(session, "() => true", signal: :none)
+        Fluffy.Playwright.wait_for_function(session, "() => true", signal: :none)
       end
     end
 
     test "wait_for_function keeps other lists as JavaScript arrays" do
       session = session_for_html(:playwright, "<p>Harness</p>")
 
-      assert Playwright.wait_for_function(session, "value => Array.isArray(value) && value.length === 0", []) == session
-      assert Playwright.wait_for_function(session, "value => value[1] === 'two'", [1, "two"]) == session
+      assert Fluffy.Playwright.wait_for_function(session, "value => Array.isArray(value) && value.length === 0", []) ==
+               session
+
+      assert Fluffy.Playwright.wait_for_function(session, "value => value[1] === 'two'", [1, "two"]) == session
     end
   end
 
@@ -101,7 +104,7 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
       |> expect(not_(to_have_js_property(field, "value", "other")))
       |> expect(to_have_js_property(field, "disabled", false))
 
-    Playwright.evaluate(session, "document.querySelector('#field').settings = {depth: 2}")
+    Fluffy.Playwright.evaluate(session, "document.querySelector('#field').settings = {depth: 2}")
     expect(session, to_have_js_property(field, "settings", %{depth: 2}))
 
     assert_raise ExUnit.AssertionError, ~r/to have JS property value "other"/, fn ->
@@ -236,8 +239,8 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
       expect(session, to_have_screenshot(box, path: path, mask: [box]))
     end
 
-    test "resolves name: through PlaywrightEx.Test's snapshot path" do
-      path = PlaywrightEx.Test.snapshot_path("fluffy-box.png", kind: :screenshot)
+    test "resolves name: through Playwright.Test's snapshot path" do
+      path = Test.snapshot_path("fluffy-box.png", kind: :screenshot)
       on_exit(fn -> File.rm_rf!(Path.dirname(path)) end)
       session = session_for_html(:playwright, @html)
 
@@ -283,7 +286,7 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
     end
 
     defp paint(session, color) do
-      Playwright.evaluate(session, "color => { document.querySelector('#box').style.background = color }", color)
+      Fluffy.Playwright.evaluate(session, "color => { document.querySelector('#box').style.background = color }", color)
     end
   end
 
@@ -293,21 +296,21 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
     test "aria_snapshot returns the snapshot of the page or a locator" do
       session = session_for_html(:playwright, @html)
 
-      assert Playwright.aria_snapshot(session) =~ ~s(button "Cast")
-      assert Playwright.aria_snapshot(session, timeout: 2_000) =~ ~s(heading "Potions")
-      assert Playwright.aria_snapshot(session, by_role(:button)) =~ ~s(button "Cast")
-      refute Playwright.aria_snapshot(session, by_role(:button), timeout: 2_000) =~ "heading"
+      assert Fluffy.Playwright.aria_snapshot(session) =~ ~s(button "Cast")
+      assert Fluffy.Playwright.aria_snapshot(session, timeout: 2_000) =~ ~s(heading "Potions")
+      assert Fluffy.Playwright.aria_snapshot(session, by_role(:button)) =~ ~s(button "Cast")
+      refute Fluffy.Playwright.aria_snapshot(session, by_role(:button), timeout: 2_000) =~ "heading"
     end
 
     test "aria_snapshot raises for a missing locator and rejects unknown options" do
       session = session_for_html(:playwright, @html)
 
       assert_raise Fluffy.OperationError, ~r/aria_snapshot.*[Tt]imeout/s, fn ->
-        Playwright.aria_snapshot(session, by_css("#missing"), timeout: 100)
+        Fluffy.Playwright.aria_snapshot(session, by_css("#missing"), timeout: 100)
       end
 
       assert_raise NimbleOptions.ValidationError, ~r/unknown options.*:signal/, fn ->
-        Playwright.aria_snapshot(session, signal: :none)
+        Fluffy.Playwright.aria_snapshot(session, signal: :none)
       end
     end
 
@@ -369,7 +372,7 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
 
     test "to_match_aria_snapshot fails naming the expectation" do
       session = session_for_html(:playwright, @html)
-      path = PlaywrightEx.Test.snapshot_path("fluffy-panel.aria.yml", kind: :aria)
+      path = Test.snapshot_path("fluffy-panel.aria.yml", kind: :aria)
       on_exit(fn -> File.rm_rf!(Path.dirname(path)) end)
       File.mkdir_p!(Path.dirname(path))
       File.write!(path, ~s(- button "Other"))
@@ -392,7 +395,7 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
     session = session_for_html(:playwright, "<p>Harness</p>")
     size = %{width: 420, height: 300}
 
-    assert session |> Playwright.set_viewport_size(size) |> Playwright.viewport_size() == size
+    assert session |> Fluffy.Playwright.set_viewport_size(size) |> Fluffy.Playwright.viewport_size() == size
   end
 
   describe "set_extra_http_headers" do
@@ -400,11 +403,11 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
       fixture = HTTPFixtures.register(fn _request -> %{body: "<p>Page</p>"} end)
       session = start_session(:playwright, headers: [{"x-session", "kept"}])
 
-      assert Playwright.set_extra_http_headers(session, %{"X-First" => "1"}) == session
+      assert Fluffy.Playwright.set_extra_http_headers(session, %{"X-First" => "1"}) == session
       visit(session, HTTPFixtures.path(fixture, "/first"))
 
       session
-      |> Playwright.set_extra_http_headers(%{"x-second" => "2"})
+      |> Fluffy.Playwright.set_extra_http_headers(%{"x-second" => "2"})
       |> visit(HTTPFixtures.path(fixture, "/second"))
 
       first = headers(fixture, "/first")
@@ -422,7 +425,7 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
 
       :playwright
       |> start_session(headers: [{"x-session", "start"}])
-      |> Playwright.set_extra_http_headers(%{"X-Session" => "changed"})
+      |> Fluffy.Playwright.set_extra_http_headers(%{"X-Session" => "changed"})
       |> visit(HTTPFixtures.path(fixture, "/page"))
 
       assert {"x-session", "changed"} in headers(fixture, "/page")
@@ -447,11 +450,11 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
       session =
         :playwright
         |> session_for_html("<p>Harness</p>")
-        |> Playwright.add_script_tag(content: "window.fromContent = 'content'")
-        |> Playwright.add_script_tag(path: file)
-        |> Playwright.add_script_tag(url: HTTPFixtures.url(fixture, "/script.js"))
+        |> Fluffy.Playwright.add_script_tag(content: "window.fromContent = 'content'")
+        |> Fluffy.Playwright.add_script_tag(path: file)
+        |> Fluffy.Playwright.add_script_tag(url: HTTPFixtures.url(fixture, "/script.js"))
 
-      assert Playwright.evaluate(session, "[window.fromContent, window.fromFile, window.fromUrl]") ==
+      assert Fluffy.Playwright.evaluate(session, "[window.fromContent, window.fromFile, window.fromUrl]") ==
                ["content", "file", "url"]
     end
 
@@ -462,8 +465,8 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
 
       :playwright
       |> session_for_html(~s(<p id="content">Content</p><p id="file">File</p>))
-      |> Playwright.add_style_tag(content: "#content { color: rgb(1, 2, 3) }")
-      |> Playwright.add_style_tag(path: file)
+      |> Fluffy.Playwright.add_style_tag(content: "#content { color: rgb(1, 2, 3) }")
+      |> Fluffy.Playwright.add_style_tag(path: file)
       |> expect(to_have_css(by_css("#content"), "color", "rgb(1, 2, 3)"))
       |> expect(to_have_css(by_css("#file"), "color", "rgb(4, 5, 6)"))
     end
@@ -471,7 +474,7 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
     test "reject unknown options" do
       session = session_for_html(:playwright, "<p>Harness</p>")
 
-      for call <- [&Playwright.add_script_tag(session, &1), &Playwright.add_style_tag(session, &1)] do
+      for call <- [&Fluffy.Playwright.add_script_tag(session, &1), &Fluffy.Playwright.add_style_tag(session, &1)] do
         assert_raise NimbleOptions.ValidationError, ~r/unknown options.*:signal/, fn -> call.(signal: :none) end
       end
     end
@@ -481,18 +484,18 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
     test "waits for a state, with options in its place, and is pipeable" do
       session = session_for_html(:playwright, "<p>Harness</p>")
 
-      assert Playwright.wait_for_load_state(session) == session
-      assert Playwright.wait_for_load_state(session, :domcontentloaded) == session
-      assert Playwright.wait_for_load_state(session, :load, timeout: 1_000) == session
-      assert Playwright.wait_for_load_state(session, timeout: 1_000) == session
-      assert Playwright.wait_for_load_state(session, []) == session
+      assert Fluffy.Playwright.wait_for_load_state(session) == session
+      assert Fluffy.Playwright.wait_for_load_state(session, :domcontentloaded) == session
+      assert Fluffy.Playwright.wait_for_load_state(session, :load, timeout: 1_000) == session
+      assert Fluffy.Playwright.wait_for_load_state(session, timeout: 1_000) == session
+      assert Fluffy.Playwright.wait_for_load_state(session, []) == session
     end
 
     test "rejects unknown options" do
       session = session_for_html(:playwright, "<p>Harness</p>")
 
       assert_raise NimbleOptions.ValidationError, ~r/unknown options.*:signal/, fn ->
-        Playwright.wait_for_load_state(session, :load, signal: :none)
+        Fluffy.Playwright.wait_for_load_state(session, :load, signal: :none)
       end
     end
   end
@@ -502,7 +505,7 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
       session =
         session_for_html(:playwright, ~s(<p id="here">Here</p><p id="gone">Gone</p><p id="hidden" hidden>Hidden</p>))
 
-      Playwright.evaluate(
+      Fluffy.Playwright.evaluate(
         session,
         "setTimeout(() => { document.querySelector('#gone').remove(); document.body.append(Object.assign(document.createElement('p'), {id: 'late', textContent: 'Late'})) }, 100); true"
       )
@@ -542,23 +545,23 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
     end
 
     test "evaluate runs on the locator's element and returns the value", %{session: session} do
-      assert Playwright.evaluate(session, by_css("#one"), "element => element.textContent") == "One"
-      assert Playwright.evaluate(session, by_css("#one"), "(element, arg) => element.id + arg", "!") == "one!"
-      assert Playwright.evaluate(session, by_css("#one"), "(_, arg) => arg", [], timeout: 1_000) == []
-      assert Playwright.evaluate(session, by_css("#one"), "element => element.id", timeout: 1_000) == "one"
+      assert Fluffy.Playwright.evaluate(session, by_css("#one"), "element => element.textContent") == "One"
+      assert Fluffy.Playwright.evaluate(session, by_css("#one"), "(element, arg) => element.id + arg", "!") == "one!"
+      assert Fluffy.Playwright.evaluate(session, by_css("#one"), "(_, arg) => arg", [], timeout: 1_000) == []
+      assert Fluffy.Playwright.evaluate(session, by_css("#one"), "element => element.id", timeout: 1_000) == "one"
     end
 
     test "evaluate on a string target still evaluates on the page", %{session: session} do
-      assert Playwright.evaluate(session, "1 + 1") == 2
-      assert Playwright.evaluate(session, "value => value", "arg") == "arg"
-      assert Playwright.evaluate(session, "value => value", [], []) == []
+      assert Fluffy.Playwright.evaluate(session, "1 + 1") == 2
+      assert Fluffy.Playwright.evaluate(session, "value => value", "arg") == "arg"
+      assert Fluffy.Playwright.evaluate(session, "value => value", [], []) == []
     end
 
     test "wait_for_function on a locator raises when the page closes during the wait" do
       popup = closing_popup(~s(<p id="one">One</p>))
 
       assert_raise Fluffy.OperationError, ~r/wait_for_function.*closed/is, fn ->
-        Playwright.wait_for_function(popup, by_css("#one"), "() => false", timeout: 10_000)
+        Fluffy.Playwright.wait_for_function(popup, by_css("#one"), "() => false", timeout: 10_000)
       end
     end
 
@@ -566,52 +569,58 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
       popup = closing_popup(~s(<p id="one">One</p>))
 
       assert_raise Fluffy.OperationError, ~r/evaluate.*closed/is, fn ->
-        Playwright.evaluate(popup, by_css("#one"), "() => new Promise(() => {})", timeout: 10_000)
+        Fluffy.Playwright.evaluate(popup, by_css("#one"), "() => new Promise(() => {})", timeout: 10_000)
       end
     end
 
     test "evaluate on a locator is strict and bounded", %{session: session} do
       assert_raise Fluffy.OperationError, ~r/evaluate.*[Tt]imeout/s, fn ->
-        Playwright.evaluate(session, by_css("#missing"), "element => element.id", timeout: 100)
+        Fluffy.Playwright.evaluate(session, by_css("#missing"), "element => element.id", timeout: 100)
       end
 
       assert_raise Fluffy.OperationError, ~r/strict mode/, fn ->
-        Playwright.evaluate(session, by_css("li"), "element => element.id", timeout: 1_000)
+        Fluffy.Playwright.evaluate(session, by_css("li"), "element => element.id", timeout: 1_000)
       end
     end
 
     test "evaluate_all sees every element, or none", %{session: session} do
-      assert Playwright.evaluate_all(session, by_css("li"), "items => items.map(item => item.id)") == ["one", "two"]
-      assert Playwright.evaluate_all(session, by_css("li"), "(items, arg) => items.length + arg", 1) == 3
-      assert Playwright.evaluate_all(session, by_css("li"), "(_, arg) => arg", [], []) == []
-      assert Playwright.evaluate_all(session, by_css("#missing"), "items => items.length") == 0
+      assert Fluffy.Playwright.evaluate_all(session, by_css("li"), "items => items.map(item => item.id)") == [
+               "one",
+               "two"
+             ]
+
+      assert Fluffy.Playwright.evaluate_all(session, by_css("li"), "(items, arg) => items.length + arg", 1) == 3
+      assert Fluffy.Playwright.evaluate_all(session, by_css("li"), "(_, arg) => arg", [], []) == []
+      assert Fluffy.Playwright.evaluate_all(session, by_css("#missing"), "items => items.length") == 0
     end
 
     # As in Playwright, evaluate_all has no timeout.
     test "evaluate_all rejects options, timeout: included", %{session: session} do
       for options <- [[timeout: 1_000], [signal: :none]] do
         assert_raise NimbleOptions.ValidationError, ~r/unknown options/, fn ->
-          Playwright.evaluate_all(session, by_css("li"), "items => items.length", options)
+          Fluffy.Playwright.evaluate_all(session, by_css("li"), "items => items.length", options)
         end
       end
     end
 
     test "wait_for_function on a locator waits and returns the session", %{session: session} do
-      Playwright.evaluate(
+      Fluffy.Playwright.evaluate(
         session,
         "setTimeout(() => { document.querySelector('#one').dataset.ready = 'yes' }, 100); true"
       )
 
       one = by_css("#one")
 
-      assert Playwright.wait_for_function(session, one, "element => element.dataset.ready === 'yes'") == session
-      assert Playwright.wait_for_function(session, one, "(element, n) => element.dataset.n === n", "1") == session
-      assert Playwright.wait_for_function(session, one, "element => element.id === 'one'", timeout: 1_000) == session
+      assert Fluffy.Playwright.wait_for_function(session, one, "element => element.dataset.ready === 'yes'") == session
+      assert Fluffy.Playwright.wait_for_function(session, one, "(element, n) => element.dataset.n === n", "1") == session
+
+      assert Fluffy.Playwright.wait_for_function(session, one, "element => element.id === 'one'", timeout: 1_000) ==
+               session
     end
 
     test "wait_for_function on a locator is bounded", %{session: session} do
       assert_raise Fluffy.OperationError, ~r/wait_for_function.*[Tt]imeout/s, fn ->
-        Playwright.wait_for_function(session, by_css("#one"), "() => false", timeout: 100)
+        Fluffy.Playwright.wait_for_function(session, by_css("#one"), "() => false", timeout: 100)
       end
     end
   end
@@ -620,7 +629,7 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
     test "returns one locator per current match, usable on its own" do
       session = session_for_html(:playwright, "<ul><li>One</li><li>Two</li></ul>")
 
-      assert [first, second] = Playwright.all(session, by_css("li"))
+      assert [first, second] = Fluffy.Playwright.all(session, by_css("li"))
       assert %Fluffy.Locator{} = first
 
       session
@@ -631,7 +640,7 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
     test "does not wait, and returns [] without a match" do
       session = session_for_html(:playwright, "<p>Harness</p>")
 
-      assert Playwright.all(session, by_css("li")) == []
+      assert Fluffy.Playwright.all(session, by_css("li")) == []
     end
   end
 
@@ -642,7 +651,7 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
 
       zone = by_css("#zone")
 
-      Playwright.evaluate(session, zone, """
+      Fluffy.Playwright.evaluate(session, zone, """
       zone => {
         zone.addEventListener("dragover", event => event.preventDefault());
         zone.addEventListener("drop", event => {
@@ -652,7 +661,7 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
       }
       """)
 
-      assert Playwright.drop(session, zone, %{data: %{"text/plain" => "dropped"}}) == session
+      assert Fluffy.Playwright.drop(session, zone, %{data: %{"text/plain" => "dropped"}}) == session
       expect(session, to_have_text(zone, "dropped"))
     end
 
@@ -660,7 +669,7 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
       session = session_for_html(:playwright, "<p>Harness</p>")
 
       assert_raise Fluffy.OperationError, ~r/drop.*[Tt]imeout/s, fn ->
-        Playwright.drop(session, by_css("#missing"), %{data: %{"text/plain" => "x"}}, timeout: 100)
+        Fluffy.Playwright.drop(session, by_css("#missing"), %{data: %{"text/plain" => "x"}}, timeout: 100)
       end
     end
   end
@@ -678,7 +687,7 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
       popup = closing_popup("<p>Harness</p>", "setInterval(() => fetch(location.href), 100)")
 
       assert_raise Fluffy.OperationError, ~r/wait_for_load_state.*closed/is, fn ->
-        Playwright.wait_for_load_state(popup, :networkidle, timeout: 10_000)
+        Fluffy.Playwright.wait_for_load_state(popup, :networkidle, timeout: 10_000)
       end
     end
 
@@ -695,7 +704,7 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
       for {operation, call} <- [
             wait_for: &wait_for(&1, by_css("#never"), timeout: 10_000),
             click: &click(&1, by_css("#never"), timeout: 10_000),
-            evaluate_all: &Playwright.evaluate_all(&1, by_css("#never"), "() => 1")
+            evaluate_all: &Fluffy.Playwright.evaluate_all(&1, by_css("#never"), "() => 1")
           ] do
         popup = popup_showing(@closes_on_adoption)
         assert_raise Fluffy.OperationError, ~r/#{operation}.*closed/is, fn -> call.(popup) end
@@ -730,7 +739,7 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
           ] do
         popup = popup_showing(@closes_on_adoption)
         error = assert_raise Fluffy.OperationError, fn -> call.(popup) end
-        assert %Fluffy.OperationError{operation: ^operation, cause: %PlaywrightEx.TargetClosedError{}} = error
+        assert %Fluffy.OperationError{operation: ^operation, cause: %TargetClosedError{}} = error
       end
     end
 
@@ -762,12 +771,13 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
       for {operation, call} <- [
             visit: &visit(&1, closes_on.("navigate")),
             reload: &(&1 |> visit(closes_on.("reload")) |> reload()),
-            go_back: &(&1 |> visit(closes_on.("back_forward")) |> visit(plain) |> Playwright.go_back()),
-            go_forward: &(&1 |> visit(closes_on.("back_forward")) |> Playwright.go_back() |> Playwright.go_forward())
+            go_back: &(&1 |> visit(closes_on.("back_forward")) |> visit(plain) |> Fluffy.Playwright.go_back()),
+            go_forward:
+              &(&1 |> visit(closes_on.("back_forward")) |> Fluffy.Playwright.go_back() |> Fluffy.Playwright.go_forward())
           ] do
         popup = popup_showing("<p>Start</p>")
         error = assert_raise Fluffy.OperationError, fn -> call.(popup) end
-        assert %Fluffy.OperationError{operation: ^operation, cause: %PlaywrightEx.TargetClosedError{}} = error
+        assert %Fluffy.OperationError{operation: ^operation, cause: %TargetClosedError{}} = error
       end
     end
   end
@@ -776,21 +786,21 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
     test "content returns the page's HTML" do
       session = session_for_html(:playwright, "<p id='here'>Harness</p>")
 
-      assert Playwright.content(session) =~ "Harness"
-      assert Playwright.content(session, include_shadow: true) =~ ~s(id="here")
+      assert Fluffy.Playwright.content(session) =~ "Harness"
+      assert Fluffy.Playwright.content(session, include_shadow: true) =~ ~s(id="here")
     end
 
     test "title returns the page's title" do
       session = session_for_html(:playwright, "<p>Harness</p>")
-      Playwright.evaluate(session, "document.title = 'A title'")
+      Fluffy.Playwright.evaluate(session, "document.title = 'A title'")
 
-      assert Playwright.title(session) == "A title"
+      assert Fluffy.Playwright.title(session) == "A title"
     end
 
     test "bring_to_front returns the session" do
       session = session_for_html(:playwright, "<p>Harness</p>")
 
-      assert Playwright.bring_to_front(session) == session
+      assert Fluffy.Playwright.bring_to_front(session) == session
     end
 
     @tag :tmp_dir
@@ -799,8 +809,8 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
       session = session_for_html(:playwright, "<p>Harness</p>")
       path = Path.join([tmp_dir, "nested", "page.pdf"])
 
-      assert <<"%PDF", _rest::binary>> = Playwright.pdf(session)
-      assert <<"%PDF", _rest::binary>> = pdf = Playwright.pdf(session, path: path, landscape: true)
+      assert <<"%PDF", _rest::binary>> = Fluffy.Playwright.pdf(session)
+      assert <<"%PDF", _rest::binary>> = pdf = Fluffy.Playwright.pdf(session, path: path, landscape: true)
       assert File.read!(path) == pdf
     end
 
@@ -810,17 +820,17 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
 
       for option <- [signal: :none, timeout: 1_000],
           call <- [
-            &Playwright.content(session, &1),
-            &Playwright.title(session, &1),
-            &Playwright.bring_to_front(session, &1),
-            &Playwright.local_storage(session, &1),
-            &Playwright.session_storage(session, &1),
-            &Playwright.set_viewport_size(session, %{width: 100, height: 100}, &1),
-            &Playwright.emulate_media(session, &1),
-            &Playwright.add_script_tag(session, [content: "1"] ++ &1),
-            &Playwright.add_style_tag(session, [content: "p {}"] ++ &1),
-            &Playwright.unroute_all(session, &1),
-            &Playwright.pdf(session, [path: "/tmp/fluffy-never-written.pdf"] ++ &1)
+            &Fluffy.Playwright.content(session, &1),
+            &Fluffy.Playwright.title(session, &1),
+            &Fluffy.Playwright.bring_to_front(session, &1),
+            &Fluffy.Playwright.local_storage(session, &1),
+            &Fluffy.Playwright.session_storage(session, &1),
+            &Fluffy.Playwright.set_viewport_size(session, %{width: 100, height: 100}, &1),
+            &Fluffy.Playwright.emulate_media(session, &1),
+            &Fluffy.Playwright.add_script_tag(session, [content: "1"] ++ &1),
+            &Fluffy.Playwright.add_style_tag(session, [content: "p {}"] ++ &1),
+            &Fluffy.Playwright.unroute_all(session, &1),
+            &Fluffy.Playwright.pdf(session, [path: "/tmp/fluffy-never-written.pdf"] ++ &1)
           ] do
         assert_raise NimbleOptions.ValidationError, ~r/unknown options/, fn -> call.([option]) end
       end
@@ -830,20 +840,20 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
   describe "storage" do
     test "local_storage and session_storage read the page's origin" do
       session = session_for_html(:playwright, "<p>Harness</p>")
-      Playwright.evaluate(session, "localStorage.setItem('l', '1'); sessionStorage.setItem('s', '2')")
+      Fluffy.Playwright.evaluate(session, "localStorage.setItem('l', '1'); sessionStorage.setItem('s', '2')")
 
-      assert Playwright.local_storage(session) == [%{name: "l", value: "1"}]
-      assert Playwright.session_storage(session) == [%{name: "s", value: "2"}]
+      assert Fluffy.Playwright.local_storage(session) == [%{name: "l", value: "1"}]
+      assert Fluffy.Playwright.session_storage(session) == [%{name: "s", value: "2"}]
     end
 
     test "set_storage_state replaces storage with a saved state" do
       session = session_for_html(:playwright, "<p>Harness</p>")
-      Playwright.evaluate(session, "localStorage.setItem('kept', 'yes')")
-      state = Playwright.storage_state(session)
-      Playwright.evaluate(session, "localStorage.clear(); localStorage.setItem('other', 'x')")
+      Fluffy.Playwright.evaluate(session, "localStorage.setItem('kept', 'yes')")
+      state = Fluffy.Playwright.storage_state(session)
+      Fluffy.Playwright.evaluate(session, "localStorage.clear(); localStorage.setItem('other', 'x')")
 
-      assert Playwright.set_storage_state(session, state) == session
-      assert Playwright.local_storage(session) == [%{name: "kept", value: "yes"}]
+      assert Fluffy.Playwright.set_storage_state(session, state) == session
+      assert Fluffy.Playwright.local_storage(session) == [%{name: "kept", value: "yes"}]
     end
   end
 
@@ -855,20 +865,20 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
 
       session = session_for_html(:playwright, html)
 
-      assert %{x: x, y: y, width: width, height: height} = Playwright.bounding_box(session, by_css("#box"))
+      assert %{x: x, y: y, width: width, height: height} = Fluffy.Playwright.bounding_box(session, by_css("#box"))
       assert {x, y, width, height} == {10, 20, 30, 40}
-      assert Playwright.bounding_box(session, by_css("#hidden"), timeout: 1_000) == nil
+      assert Fluffy.Playwright.bounding_box(session, by_css("#hidden"), timeout: 1_000) == nil
     end
 
     test "raises for a missing locator and rejects unknown options" do
       session = session_for_html(:playwright, "<p>Harness</p>")
 
       assert_raise Fluffy.OperationError, ~r/bounding_box.*[Tt]imeout/s, fn ->
-        Playwright.bounding_box(session, by_css("#missing"), timeout: 100)
+        Fluffy.Playwright.bounding_box(session, by_css("#missing"), timeout: 100)
       end
 
       assert_raise NimbleOptions.ValidationError, ~r/unknown options.*:signal/, fn ->
-        Playwright.bounding_box(session, by_css("p"), signal: :none)
+        Fluffy.Playwright.bounding_box(session, by_css("p"), signal: :none)
       end
     end
   end
@@ -882,27 +892,27 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
       visit(session, HTTPFixtures.path(fixture, "/page"))
       url = HTTPFixtures.url(fixture, "/api")
       other = HTTPFixtures.url(fixture, "/other")
-      handler = fn route -> PlaywrightEx.Route.fulfill!(route, body: "routed") end
+      handler = fn route -> Playwright.Route.fulfill!(route, body: "routed") end
 
-      session = session |> Playwright.route("**/api", handler) |> Playwright.route("**/other", handler)
-      assert Playwright.evaluate(session, @fetch, url) == "routed"
+      session = session |> Fluffy.Playwright.route("**/api", handler) |> Fluffy.Playwright.route("**/other", handler)
+      assert Fluffy.Playwright.evaluate(session, @fetch, url) == "routed"
 
-      assert Playwright.unroute_all(session) == session
-      assert Playwright.evaluate(session, @fetch, url) == "server"
-      assert Playwright.evaluate(session, @fetch, other) == "server"
+      assert Fluffy.Playwright.unroute_all(session) == session
+      assert Fluffy.Playwright.evaluate(session, @fetch, url) == "server"
+      assert Fluffy.Playwright.evaluate(session, @fetch, other) == "server"
 
-      assert Playwright.unroute(session, "**/api") == session
-      Playwright.route(session, "**/api", handler)
-      assert Playwright.evaluate(session, @fetch, url) == "routed"
+      assert Fluffy.Playwright.unroute(session, "**/api") == session
+      Fluffy.Playwright.route(session, "**/api", handler)
+      assert Fluffy.Playwright.evaluate(session, @fetch, url) == "routed"
     end
 
     test "works without routes and rejects unknown options" do
       session = session_for_html(:playwright, "<p>Harness</p>")
 
-      assert Playwright.unroute_all(session) == session
+      assert Fluffy.Playwright.unroute_all(session) == session
 
       assert_raise NimbleOptions.ValidationError, ~r/unknown options.*:signal/, fn ->
-        Playwright.unroute_all(session, signal: :none)
+        Fluffy.Playwright.unroute_all(session, signal: :none)
       end
     end
   end
@@ -941,30 +951,30 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
     p = by_css("p")
 
     for operation <- [
-          fn -> Playwright.evaluate(session, "1") end,
-          fn -> Playwright.wait_for_function(session, "true", timeout: 100) end,
-          fn -> Playwright.set_extra_http_headers(session, %{"x-a" => "1"}) end,
-          fn -> Playwright.add_script_tag(session, content: "1") end,
-          fn -> Playwright.add_style_tag(session, content: "p {}") end,
-          fn -> Playwright.wait_for_load_state(session) end,
-          fn -> Playwright.unroute_all(session) end,
+          fn -> Fluffy.Playwright.evaluate(session, "1") end,
+          fn -> Fluffy.Playwright.wait_for_function(session, "true", timeout: 100) end,
+          fn -> Fluffy.Playwright.set_extra_http_headers(session, %{"x-a" => "1"}) end,
+          fn -> Fluffy.Playwright.add_script_tag(session, content: "1") end,
+          fn -> Fluffy.Playwright.add_style_tag(session, content: "p {}") end,
+          fn -> Fluffy.Playwright.wait_for_load_state(session) end,
+          fn -> Fluffy.Playwright.unroute_all(session) end,
           fn -> wait_for(session, p) end,
-          fn -> Playwright.evaluate(session, p, "1") end,
-          fn -> Playwright.evaluate_all(session, p, "1") end,
-          fn -> Playwright.wait_for_function(session, p, "true") end,
-          fn -> Playwright.all(session, p) end,
-          fn -> Playwright.drop(session, p, %{data: %{"text/plain" => "x"}}) end,
-          fn -> Playwright.pdf(session) end,
-          fn -> Playwright.bring_to_front(session) end,
-          fn -> Playwright.content(session) end,
-          fn -> Playwright.title(session) end,
-          fn -> Playwright.set_storage_state(session, %{}) end,
-          fn -> Playwright.local_storage(session) end,
-          fn -> Playwright.session_storage(session) end,
-          fn -> Playwright.bounding_box(session, p) end,
-          fn -> Playwright.aria_snapshot(session) end,
-          fn -> Playwright.aria_snapshot(session, p) end,
-          fn -> Playwright.viewport_size(session) end
+          fn -> Fluffy.Playwright.evaluate(session, p, "1") end,
+          fn -> Fluffy.Playwright.evaluate_all(session, p, "1") end,
+          fn -> Fluffy.Playwright.wait_for_function(session, p, "true") end,
+          fn -> Fluffy.Playwright.all(session, p) end,
+          fn -> Fluffy.Playwright.drop(session, p, %{data: %{"text/plain" => "x"}}) end,
+          fn -> Fluffy.Playwright.pdf(session) end,
+          fn -> Fluffy.Playwright.bring_to_front(session) end,
+          fn -> Fluffy.Playwright.content(session) end,
+          fn -> Fluffy.Playwright.title(session) end,
+          fn -> Fluffy.Playwright.set_storage_state(session, %{}) end,
+          fn -> Fluffy.Playwright.local_storage(session) end,
+          fn -> Fluffy.Playwright.session_storage(session) end,
+          fn -> Fluffy.Playwright.bounding_box(session, p) end,
+          fn -> Fluffy.Playwright.aria_snapshot(session) end,
+          fn -> Fluffy.Playwright.aria_snapshot(session, p) end,
+          fn -> Fluffy.Playwright.viewport_size(session) end
         ] do
       assert_raise Fluffy.CapabilityError, operation
     end
@@ -977,23 +987,23 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
     session = session_for_html(:playwright, "<p>Opener</p>")
     pending = wait_for(session, Fluffy.Event.popup())
 
-    Playwright.evaluate(
+    Fluffy.Playwright.evaluate(
       session,
       "url => new Promise(resolve => { window.addEventListener('message', resolve); window.open(url) }).then(() => true)",
       HTTPFixtures.path(fixture)
     )
 
-    Playwright.switch_page(session, await(pending))
+    Fluffy.Playwright.switch_page(session, await(pending))
   end
 
   # A popup showing `html` that closes itself soon, which its opener's page does not allow.
   defp closing_popup(html, script \\ "1") do
     session = session_for_html(:playwright, "<p>Opener</p>")
     pending = wait_for(session, Fluffy.Event.popup())
-    Playwright.evaluate(session, "window.open('/harness'); true")
-    popup = Playwright.switch_page(session, await(pending))
+    Fluffy.Playwright.evaluate(session, "window.open('/harness'); true")
+    popup = Fluffy.Playwright.switch_page(session, await(pending))
 
-    Playwright.evaluate(popup, """
+    Fluffy.Playwright.evaluate(popup, """
     document.body.innerHTML = #{JSON.encode!(html)}
     #{script}
     true
@@ -1001,7 +1011,7 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
 
     # Adopted first, so the close races only the wait under test.
     popup = wait_for(popup, by_css("body"), state: :attached)
-    Playwright.evaluate(popup, "setTimeout(() => window.close(), 500); true")
+    Fluffy.Playwright.evaluate(popup, "setTimeout(() => window.close(), 500); true")
     popup
   end
 end

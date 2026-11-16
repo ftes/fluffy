@@ -20,16 +20,16 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
     assert %Fluffy.Locator{} = nested
     assert nested |> :erlang.term_to_binary() |> :erlang.binary_to_term() == nested
 
-    playwright_frame = %PlaywrightEx.Frame{guid: "frame"}
+    playwright_frame = %Playwright.Frame{guid: "frame"}
 
     assert Fluffy.Locator.Playwright.locator(playwright_frame, nested) ==
              playwright_frame
-             |> PlaywrightEx.Frame.locator("css=section")
-             |> PlaywrightEx.Locator.get_by_title("Gringotts")
-             |> PlaywrightEx.Locator.nth(1)
-             |> PlaywrightEx.Locator.content_frame()
-             |> PlaywrightEx.FrameLocator.frame_locator("css=#vault")
-             |> PlaywrightEx.FrameLocator.get_by_role(:button, name: "Withdraw")
+             |> Playwright.Frame.locator("css=section")
+             |> Playwright.Locator.get_by_title("Gringotts")
+             |> Playwright.Locator.nth(1)
+             |> Playwright.Locator.content_frame()
+             |> Playwright.FrameLocator.frame_locator("css=#vault")
+             |> Playwright.FrameLocator.get_by_role(:button, name: "Withdraw")
 
     for locator <- [
           by_css(frame, "input"),
@@ -106,7 +106,7 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
       end
 
     assert error.operation == :click
-    assert %PlaywrightEx.TimeoutError{} = error.cause
+    assert %Playwright.TimeoutError{} = error.cause
     assert error.locator == by_role(frame, :button, name: "Save")
     assert error.message =~ "content_frame()"
     assert error.message =~ "playwright click"
@@ -239,7 +239,7 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
     assert error.locator == locator
     assert error.backend == :playwright
     assert error.driver == :playwright
-    assert %PlaywrightEx.PlaywrightError{message: message} = error.cause
+    assert %Playwright.PlaywrightError{message: message} = error.cause
     assert message =~ "strict mode violation"
 
     selected_frame = "iframe" |> by_css() |> nth(0) |> content_frame()
@@ -276,7 +276,7 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
 
         assert error.operation == unquote(action)
         assert error.locator == locator
-        assert %PlaywrightEx.PlaywrightError{message: message} = error.cause
+        assert %Playwright.PlaywrightError{message: message} = error.cause
         assert message =~ "strict mode violation"
       end
     end

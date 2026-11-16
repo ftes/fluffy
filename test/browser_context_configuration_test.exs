@@ -3,10 +3,9 @@ defmodule Fluffy.BrowserContextConfigurationTest do
 
   import Fluffy
 
-  alias Fluffy.Playwright
   alias Fluffy.Support.Server
   alias Fluffy.Support.Web.Endpoint
-  alias PlaywrightEx.Test.BrowserPool
+  alias Playwright.Test.BrowserPool
 
   test "applies typed BrowserContext options in isolated contexts on one browser" do
     origin = Server.base_url()
@@ -49,7 +48,7 @@ defmodule Fluffy.BrowserContextConfigurationTest do
              "timezone" => "Europe/Berlin",
              "width" => 900
            } =
-             Playwright.evaluate(
+             Fluffy.Playwright.evaluate(
                configured,
                """
                async () => ({
@@ -65,7 +64,7 @@ defmodule Fluffy.BrowserContextConfigurationTest do
              )
 
     # Playwright Test's default locale.
-    assert Playwright.evaluate(defaults, "navigator.language") == "en-US"
+    assert Fluffy.Playwright.evaluate(defaults, "navigator.language") == "en-US"
   end
 
   test "rejects unknown session and BrowserContext options before creation" do

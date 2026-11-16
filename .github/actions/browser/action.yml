@@ -22,15 +22,15 @@ runs:
     - name: Restore Playwright driver
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
       with:
-        path: ~/.cache/playwright_ex
-        key: playwright-driver-${{ runner.os }}-${{ hashFiles('deps/playwright_ex/DRIVER_VERSION', 'deps/playwright_ex/NODE_VERSION') }}
+        path: ~/.cache/playwright
+        key: playwright-driver-${{ runner.os }}-${{ hashFiles('deps/playwright/DRIVER_VERSION', 'deps/playwright/NODE_VERSION') }}
     # Browsers depend on the driver version only, not its bundled Node.js.
     - name: Restore Playwright browser
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
       with:
         path: ~/.cache/ms-playwright
-        key: playwright-browser-${{ runner.os }}-${{ hashFiles('deps/playwright_ex/DRIVER_VERSION') }}-${{ inputs.browser }}
-    # As in PlaywrightEx's CI: --with-deps runs apt-get against the runner's Azure mirror, which
+        key: playwright-browser-${{ runner.os }}-${{ hashFiles('deps/playwright/DRIVER_VERSION') }}-${{ inputs.browser }}
+    # As in playwright_ex's CI: --with-deps runs apt-get against the runner's Azure mirror, which
     # can stall. The .debs are cached per browser and driver version, so a warm run installs
     # offline; archive.ubuntu.com is a fallback mirror, apt times out stalled fetches, and each
     # attempt is capped (a killed attempt's apt-get, out of timeout's reach under sudo, is killed
@@ -40,8 +40,8 @@ runs:
       id: apt-cache
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
       with:
-        key: apt-${{ inputs.browser }}-${{ hashFiles('deps/playwright_ex/DRIVER_VERSION') }}-${{ steps.image.outputs.os }}-${{ steps.image.outputs.day }}
-        restore-keys: apt-${{ inputs.browser }}-${{ hashFiles('deps/playwright_ex/DRIVER_VERSION') }}-${{ steps.image.outputs.os }}
+        key: apt-${{ inputs.browser }}-${{ hashFiles('deps/playwright/DRIVER_VERSION') }}-${{ steps.image.outputs.os }}-${{ steps.image.outputs.day }}
+        restore-keys: apt-${{ inputs.browser }}-${{ hashFiles('deps/playwright/DRIVER_VERSION') }}-${{ steps.image.outputs.os }}
         path: ~/apt-cache
     - name: Install driver, browser and system packages
       shell: bash
@@ -52,7 +52,7 @@ runs:
         if [[ -f /etc/apt/apt-mirrors.txt ]]; then echo "http://archive.ubuntu.com/ubuntu/" | sudo tee -a /etc/apt/apt-mirrors.txt; fi
         if compgen -G ~/apt-cache/'*.deb' > /dev/null; then sudo cp ~/apt-cache/*.deb /var/cache/apt/archives/; fi
         for attempt in 1 2 3; do
-          if timeout 300 mix playwright_ex.install -- --with-deps "$BROWSER"; then
+          if timeout 300 mix playwright.install -- --with-deps "$BROWSER"; then
             sudo apt-get autoclean -qq
             rm -rf ~/apt-cache && mkdir -p ~/apt-cache && cp /var/cache/apt/archives/*.deb ~/apt-cache/ 2>/dev/null || true
             exit 0

@@ -145,7 +145,7 @@ A string compares normalized whitespace in the text; a regular expression sees
 it as is. LiveView text can differ in whitespace-only nodes between elements:
 `<b>a</b> <i>b</i>` reads "ab" there. A regular expression is a JavaScript
 `RegExp` on every driver, as in [Locators](locators.md): PCRE-only syntax raises
-`ArgumentError`, and a `PlaywrightEx.RegExp` takes JavaScript-only syntax.
+`ArgumentError`, and a `Playwright.RegExp` takes JavaScript-only syntax.
 `ignore_case:` takes precedence over a regular expression's own flag.
 A list checks each matched element in order, while any other form requires
 exactly one match. `use_inner_text: true` reads rendered text and requires
@@ -240,8 +240,8 @@ navigation's response instead:
 ```elixir
 session
 |> assert_event(
-  Fluffy.Event.response(&String.ends_with?(PlaywrightEx.Response.url(&1), "/potions")),
+  Fluffy.Event.response(&String.ends_with?(Playwright.Response.url(&1), "/potions")),
   &click(&1, by_role(:link, name: "Potions")),
-  fn response -> assert PlaywrightEx.Response.status(response) == 200 end
+  fn response -> assert Playwright.Response.status(response) == 200 end
 )
 ```

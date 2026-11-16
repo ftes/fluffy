@@ -1,16 +1,16 @@
 defmodule Fluffy.Locator.Playwright do
   @moduledoc false
-  # Builds a PlaywrightEx locator from a `Fluffy.Locator`, one call per operation; it never writes selector strings.
+  # Builds a Playwright locator from a `Fluffy.Locator`, one call per operation; it never writes selector strings.
 
   alias Fluffy.Locator
   alias Fluffy.Locator.Internal
-  alias PlaywrightEx.FrameLocator
-  alias PlaywrightEx.Isomorphic.LocatorUtils
-  alias PlaywrightEx.Isomorphic.SelectorParser
-  alias PlaywrightEx.Locator, as: Native
+  alias Playwright.FrameLocator
+  alias Playwright.Isomorphic.LocatorUtils
+  alias Playwright.Isomorphic.SelectorParser
+  alias Playwright.Locator, as: Native
 
   # Nested locators (`has:`, `and_/2`, `or_/2`, `within/2`) are built from `frame` too, as
-  # PlaywrightEx requires them to belong to the same frame.
+  # Playwright requires them to belong to the same frame.
   def locator(frame, %Locator{} = locator) do
     locator.operations
     |> Enum.reduce({:root, frame}, &apply_operation(frame, &1, &2))
@@ -27,7 +27,7 @@ defmodule Fluffy.Locator.Playwright do
   end
 
   # `get_by_role` takes only the roles of Playwright's `AriaRole` type, which lacks some that
-  # the browser matches, such as `mark`. PlaywrightEx's selector builder takes any role.
+  # the browser matches, such as `mark`. Playwright's selector builder takes any role.
   defp apply_operation(_frame, {:role, role, options}, scope) do
     options =
       Map.new(options, fn
@@ -51,8 +51,8 @@ defmodule Fluffy.Locator.Playwright do
     do: call(scope, :get_by_title, [text, options])
 
   # `get_by_test_id`'s selector with the resolved `test_id_attribute` (Fluffy's, else
-  # PlaywrightEx.Test's), not the client's VM-global `selectors.setTestIdAttribute`, which
-  # PlaywrightEx.Test sets from its own config. With only PlaywrightEx's set, they agree.
+  # Playwright.Test's), not the client's VM-global `selectors.setTestIdAttribute`, which
+  # Playwright.Test sets from its own config. With only Playwright's set, they agree.
   defp apply_operation(_frame, {:test_id, test_id}, scope) do
     attribute = Fluffy.Options.config!(:test_id_attribute)
     call(scope, :locator, [LocatorUtils.get_by_test_id_selector(attribute, test_id)])
@@ -84,7 +84,7 @@ defmodule Fluffy.Locator.Playwright do
 
   defp apply_operation(_frame, {:nth, index}, scope), do: scope |> native() |> Native.nth(index)
 
-  defp call({:root, frame}, function, arguments), do: apply(PlaywrightEx.Frame, function, [frame | arguments])
+  defp call({:root, frame}, function, arguments), do: apply(Playwright.Frame, function, [frame | arguments])
   defp call(%FrameLocator{} = scope, function, arguments), do: apply(FrameLocator, function, [scope | arguments])
   defp call(%Native{} = scope, function, arguments), do: apply(Native, function, [scope | arguments])
 

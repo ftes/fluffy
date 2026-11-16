@@ -37,7 +37,7 @@ defmodule Fluffy do
 
   @native_values [Fluffy.Download, Fluffy.FileChooser]
 
-  @typedoc "A browser value that `unwrap_and_return/2` resolves to its PlaywrightEx counterpart."
+  @typedoc "A browser value that `unwrap_and_return/2` resolves to its Playwright counterpart."
   @type native_value :: Fluffy.Download.t() | Fluffy.FileChooser.t()
 
   @doc group: "Lifecycle and navigation"
@@ -111,25 +111,25 @@ defmodule Fluffy do
         |> click(by_role(:button, name: "Brew"))
       end)
 
-  It is `PlaywrightEx.Test.step/3` at this call, on every driver: the step, with the operations
+  It is `Playwright.Test.step/3` at this call, on every driver: the step, with the operations
   in it, is in the test's trace (`test.trace` in `trace.zip`), and steps nest. Only a test of a
   module with `use Fluffy.Case` records steps; elsewhere `fun` just runs.
 
   ## Options
 
     * `:box` - reports an error inside the step at the call of the function the step is in,
-      as `PlaywrightEx.Test.step/3`'s `box:`.
+      as `Playwright.Test.step/3`'s `box:`.
   """
   defmacro step(session, title, fun, options \\ []) do
     location = Macro.escape(%{file: __CALLER__.file, line: __CALLER__.line, column: 0})
 
-    # `PlaywrightEx.Test.step/3` expands in the caller, so its call site, where `box:` cuts the
+    # `Playwright.Test.step/3` expands in the caller, so its call site, where `box:` cuts the
     # stack, is the caller's.
     quote do
-      require PlaywrightEx.Test
+      require Playwright.Test
 
       case Fluffy.__step__(unquote(session), unquote(title), unquote(fun), unquote(options), unquote(location)) do
-        {:record, title, body, options} -> PlaywrightEx.Test.step(title, body, options)
+        {:record, title, body, options} -> Playwright.Test.step(title, body, options)
         {:run, body} -> body.()
       end
     end
@@ -210,7 +210,7 @@ defmodule Fluffy do
   and returns the reconciled session. Static callbacks receive the current
   `Plug.Conn` and must return an updated `Plug.Conn`. LiveView callbacks
   receive the current `Phoenix.LiveViewTest.View`, and Playwright callbacks
-  receive the `PlaywrightEx.Page`. Successful LiveView and Playwright callback
+  receive the `Playwright.Page`. Successful LiveView and Playwright callback
   return values are ignored; `unwrap_and_return/2` returns the callback's
   result instead of the session. `Fluffy.Playwright.unwrap/3` passes a native
   locator instead. For the native value of a `Fluffy.Download`, use
@@ -239,7 +239,7 @@ defmodule Fluffy do
   the callback's result instead of the session.
 
       html = unwrap_and_return(session, &Phoenix.LiveViewTest.render/1)
-      title = unwrap_and_return(session, &PlaywrightEx.Page.title!/1)
+      title = unwrap_and_return(session, &Playwright.Page.title!/1)
 
   LiveView and Playwright reconcile as `unwrap/2` does, following redirects and
   navigation the callback causes, so keep using the same session afterwards. A
@@ -248,10 +248,10 @@ defmodule Fluffy do
   locator instead.
 
   With a `Fluffy.Download` or `Fluffy.FileChooser`, `fun` receives its
-  PlaywrightEx counterpart. A Phoenix download has none and raises `Fluffy.CapabilityError`.
-  Other events deliver PlaywrightEx's values themselves.
+  Playwright counterpart. A Phoenix download has none and raises `Fluffy.CapabilityError`.
+  Other events deliver Playwright's values themselves.
 
-      path = unwrap_and_return(download, &PlaywrightEx.Download.path!/1)
+      path = unwrap_and_return(download, &Playwright.Download.path!/1)
   """
   @spec unwrap_and_return(Session.t(), (term() -> result)) :: result when result: term()
   @spec unwrap_and_return(native_value(), (term() -> result)) :: result when result: term()

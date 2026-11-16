@@ -6,8 +6,8 @@ defmodule Fluffy.ClientDOM.Expectation do
   alias Fluffy.HTML.Aria
   alias Fluffy.HTML.Semantics
   alias Fluffy.Locator.Static
-  # StringUtils is internal to PlaywrightEx, which is pinned.
-  alias PlaywrightEx.Isomorphic.StringUtils
+  # StringUtils is internal to Playwright, which is pinned.
+  alias Playwright.Isomorphic.StringUtils
 
   # Evaluate one DOM snapshot. Drivers own retries, negation, and diagnostics.
   def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :count, expected: expected}) do
@@ -208,14 +208,14 @@ defmodule Fluffy.ClientDOM.Expectation do
   # `ignore_case:` overrides a regular expression's `i` flag.
   defp compile(expected, ignore_case) when is_list(expected), do: Enum.map(expected, &compile(&1, ignore_case))
 
-  defp compile(%PlaywrightEx.RegExp{} = expected, ignore_case),
+  defp compile(%Playwright.RegExp{} = expected, ignore_case),
     do: expected |> Expect.Internal.ignore_case(ignore_case) |> Expect.Internal.compile()
 
   defp compile(expected, _ignore_case), do: expected
 
   defp text_matches?(%Regex{} = expected, actual, _options), do: is_binary(actual) and Regex.match?(expected, actual)
 
-  defp text_matches?(%PlaywrightEx.RegExp{} = expected, actual, options) do
+  defp text_matches?(%Playwright.RegExp{} = expected, actual, options) do
     expected |> Expect.Internal.ignore_case(options[:ignore_case]) |> Expect.Internal.matches?(actual)
   end
 

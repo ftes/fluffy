@@ -7,7 +7,7 @@ defmodule Fluffy.Support.Case do
 
   using do
     quote do
-      use PlaywrightEx.Test
+      use Playwright.Test
 
       import Fluffy.Support.Case,
         only: [
@@ -17,14 +17,14 @@ defmodule Fluffy.Support.Case do
           monitor_running: 1,
           playwright_engine?: 1,
           put_fluffy_config: 1,
-          put_playwright_ex_config: 2
+          put_playwright_config: 2
         ]
     end
   end
 
   # A plain function, compiled before the tests, so `@tag skip:` can call it at compile time.
   # Read at call time, as the config can differ between runs (FLUFFY_BROWSER).
-  def playwright_engine?(engine), do: engine == PlaywrightEx.Test.config().browser_name
+  def playwright_engine?(engine), do: engine == Playwright.Test.config().browser_name
 
   # The application's sandbox owners, as a generated DataCase starts them: Fluffy only
   # passes the test's sandbox to browser sessions. `setup {Fluffy.Support.Case, :start_sandbox}`.
@@ -58,17 +58,17 @@ defmodule Fluffy.Support.Case do
     :ok
   end
 
-  # Merges `options` into `config :playwright_ex, key` (`:test` or `:expect`), as
-  # `put_fluffy_config/1`. PlaywrightEx.Test reads `:test` when a test registers, in its
+  # Merges `options` into `config :playwright, key` (`:test` or `:expect`), as
+  # `put_fluffy_config/1`. Playwright.Test reads `:test` when a test registers, in its
   # `setup`, and Fluffy when a session starts: set the context timeouts in `setup_all`.
-  def put_playwright_ex_config(key, options) when key in [:test, :expect] do
-    original = Application.get_env(:playwright_ex, key)
-    Application.put_env(:playwright_ex, key, Keyword.merge(original || [], options))
+  def put_playwright_config(key, options) when key in [:test, :expect] do
+    original = Application.get_env(:playwright, key)
+    Application.put_env(:playwright, key, Keyword.merge(original || [], options))
 
     ExUnit.Callbacks.on_exit(fn ->
       if original,
-        do: Application.put_env(:playwright_ex, key, original),
-        else: Application.delete_env(:playwright_ex, key)
+        do: Application.put_env(:playwright, key, original),
+        else: Application.delete_env(:playwright, key)
     end)
 
     :ok
@@ -92,9 +92,9 @@ defmodule Fluffy.Support.Case do
   end
 
   # The contexts open in `browser`, which a test reads from a context while it's open
-  # (`PlaywrightEx.BrowserContext.browser/1`).
+  # (`Playwright.BrowserContext.browser/1`).
   def browser_context_guids(browser) do
-    for browser_context <- PlaywrightEx.Browser.contexts(browser), do: browser_context.guid
+    for browser_context <- Playwright.Browser.contexts(browser), do: browser_context.guid
   end
 
   def assert_action_error(session, structural_exception, structural_message, action) do
@@ -107,7 +107,7 @@ defmodule Fluffy.Support.Case do
       ExUnit.Assertions.assert(error.backend == :playwright)
 
       ExUnit.Assertions.assert(
-        is_exception(error.cause) and error.cause.__struct__ |> Module.split() |> hd() == "PlaywrightEx"
+        is_exception(error.cause) and error.cause.__struct__ |> Module.split() |> hd() == "Playwright"
       )
     else
       ExUnit.Assertions.assert(error.backend == :phoenix)

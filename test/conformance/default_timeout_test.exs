@@ -2,7 +2,7 @@ defmodule Fluffy.Conformance.DefaultTimeoutTest do
   # As in Playwright Test, the defaults are config, which is global: only what needs other
   # defaults than the suite's is here, the rest passes `timeout:`
   # (`Fluffy.Conformance.TimeoutOptionTest`). Fluffy's `action_timeout` and `expect_timeout` win
-  # over PlaywrightEx's; unset, PlaywrightEx's apply, and its navigation timeout always does.
+  # over Playwright's; unset, Playwright's apply, and its navigation timeout always does.
   use Fluffy.Support.Case, async: false
 
   import Fluffy
@@ -15,28 +15,28 @@ defmodule Fluffy.Conformance.DefaultTimeoutTest do
   alias Fluffy.Support.Web.Endpoint
 
   # Short, as the tests wait them out, and apart, so the time a failure took tells which one
-  # applied. PlaywrightEx's are shorter than Fluffy's.
+  # applied. Playwright's are shorter than Fluffy's.
   @action_timeout 600
   @expect_timeout 200
   @navigation_timeout 400
-  @playwright_ex_timeout 100
+  @playwright_timeout 100
   # A failure comes at its timeout or later, give or take a timer's precision.
   @early 50
   @missing by_role(:button, name: "Missing")
   @appeared by_role(:button, name: "Appeared")
 
   # `visit` takes no `timeout:`: the visits of these tests get a long default, and the
-  # navigation tests set theirs. PlaywrightEx.Test sets its timeouts on each context when a test
+  # navigation tests set theirs. Playwright.Test sets its timeouts on each context when a test
   # registers, in its `setup`, and a Fluffy session the resolved ones when it starts.
   setup_all do
     put_fluffy_config(action_timeout: @action_timeout, expect_timeout: @expect_timeout)
-    put_playwright_ex_config(:test, action_timeout: @playwright_ex_timeout, navigation_timeout: 5_000)
-    put_playwright_ex_config(:expect, timeout: @playwright_ex_timeout)
+    put_playwright_config(:test, action_timeout: @playwright_timeout, navigation_timeout: 5_000)
+    put_playwright_config(:expect, timeout: @playwright_timeout)
   end
 
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
-    test "actions default to Fluffy's action_timeout and expectations to its expect_timeout, over PlaywrightEx's, with #{driver}",
+    test "actions default to Fluffy's action_timeout and expectations to its expect_timeout, over Playwright's, with #{driver}",
          %{driver: driver} do
       session = missing_session(driver)
 
@@ -51,30 +51,30 @@ defmodule Fluffy.Conformance.DefaultTimeoutTest do
     end
 
     @tag driver: driver
-    test "unset, Fluffy's timeouts fall back to PlaywrightEx's with #{driver}", %{driver: driver} do
+    test "unset, Fluffy's timeouts fall back to Playwright's with #{driver}", %{driver: driver} do
       put_fluffy_config(action_timeout: nil, expect_timeout: nil)
       session = missing_session(driver)
 
       {elapsed, error} = failure(fn -> expect(session, to_be_visible(@missing)) end)
-      assert elapsed in (@playwright_ex_timeout - @early)..5_000
-      if driver == :playwright, do: assert(error.message =~ "Timeout: #{@playwright_ex_timeout}ms")
+      assert elapsed in (@playwright_timeout - @early)..5_000
+      if driver == :playwright, do: assert(error.message =~ "Timeout: #{@playwright_timeout}ms")
 
       {elapsed, error} = failure(fn -> click(session, @missing) end)
-      assert elapsed in (@playwright_ex_timeout - @early)..5_000
-      if driver == :playwright, do: assert(error.message =~ "Timeout #{@playwright_ex_timeout}ms exceeded.")
+      assert elapsed in (@playwright_timeout - @early)..5_000
+      if driver == :playwright, do: assert(error.message =~ "Timeout #{@playwright_timeout}ms exceeded.")
     end
 
-    # PlaywrightEx's `0` means no limit, as in Playwright, not Fluffy's check once: the button
-    # renders after PlaywrightEx's other timeouts.
+    # Playwright's `0` means no limit, not Fluffy's check once: the button
+    # renders after Playwright's other timeouts.
     @tag driver: driver
-    test "PlaywrightEx's timeouts of 0 mean no limit with #{driver}", %{driver: driver} do
+    test "Playwright's timeouts of 0 mean no limit with #{driver}", %{driver: driver} do
       put_fluffy_config(action_timeout: nil, expect_timeout: nil)
-      put_playwright_ex_config(:test, action_timeout: 0)
-      put_playwright_ex_config(:expect, timeout: 0)
+      put_playwright_config(:test, action_timeout: 0)
+      put_playwright_config(:expect, timeout: 0)
 
       driver
       |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
-      |> visit("/live/async?delay=#{@playwright_ex_timeout + 300}")
+      |> visit("/live/async?delay=#{@playwright_timeout + 300}")
       |> expect(to_be_visible(@appeared))
       |> click(@appeared)
       |> expect("Activated" |> by_text() |> to_be_visible())
@@ -131,33 +131,33 @@ defmodule Fluffy.Conformance.DefaultTimeoutTest do
 
   # As in Playwright, a route that never answers leaves the navigation to its timeout.
   @tag driver: :playwright
-  test "navigations default to PlaywrightEx's navigation_timeout" do
-    put_playwright_ex_config(:test, navigation_timeout: @navigation_timeout)
+  test "navigations default to Playwright's navigation_timeout" do
+    put_playwright_config(:test, navigation_timeout: @navigation_timeout)
     session = start_session(:playwright, base_url: Server.base_url())
     fixture = HTTPFixtures.register(fn _request -> %{body: "<h1>Never</h1>"} end)
     Fluffy.Playwright.route(session, "**/never", fn _route -> :ok end)
 
     {elapsed, error} = failure(fn -> visit(session, HTTPFixtures.path(fixture, "/never")) end)
-    assert %PlaywrightEx.TimeoutError{message: message} = error.cause
+    assert %Playwright.TimeoutError{message: message} = error.cause
     assert message =~ "Timeout #{@navigation_timeout}ms exceeded."
     assert elapsed >= @navigation_timeout - @early
   end
 
-  # The session sets the resolved ones on its context, over what PlaywrightEx.Test set at
+  # The session sets the resolved ones on its context, over what Playwright.Test set at
   # registration: a native call gets them too.
   @tag driver: :playwright
   test "native calls default to the resolved action and navigation timeouts" do
-    put_playwright_ex_config(:test, navigation_timeout: @navigation_timeout)
+    put_playwright_config(:test, navigation_timeout: @navigation_timeout)
     session = start_session(:playwright)
 
     {elapsed, error} =
-      native_failure(fn -> Fluffy.Playwright.unwrap_and_return(session, @missing, &PlaywrightEx.Locator.click/1) end)
+      native_failure(fn -> Fluffy.Playwright.unwrap_and_return(session, @missing, &Playwright.Locator.click/1) end)
 
     assert error.message =~ "Timeout #{@action_timeout}ms exceeded."
     assert elapsed >= @action_timeout - @early
 
     {elapsed, error} =
-      native_failure(fn -> Fluffy.unwrap_and_return(session, &PlaywrightEx.Page.wait_for_url(&1, "**/never")) end)
+      native_failure(fn -> Fluffy.unwrap_and_return(session, &Playwright.Page.wait_for_url(&1, "**/never")) end)
 
     assert error.message =~ "Timeout #{@navigation_timeout}ms exceeded."
     assert elapsed >= @navigation_timeout - @early
@@ -188,7 +188,7 @@ defmodule Fluffy.Conformance.DefaultTimeoutTest do
 
   defp native_failure(operation) do
     timed(fn ->
-      assert {:error, %PlaywrightEx.TimeoutError{} = error} = operation.()
+      assert {:error, %Playwright.TimeoutError{} = error} = operation.()
       error
     end)
   end

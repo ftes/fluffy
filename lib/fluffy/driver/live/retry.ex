@@ -8,7 +8,7 @@ defmodule Fluffy.Driver.Live.Retry do
   # The deadline of an operation's timeout, its `timeout:` or its default
   # (`Fluffy.Timeouts`), bounded by the test's (`Fluffy.TestTimeout`): a retry without a limit
   # fails with Fluffy's error before ExUnit's timeout, as a Playwright call does when
-  # PlaywrightEx.Test closes its context then. Without either, it goes on until ExUnit's.
+  # Playwright.Test closes its context then. Without either, it goes on until ExUnit's.
   def deadline(timeout), do: timeout |> Deadline.new() |> TestTimeout.bound()
 
   def run(%Session{} = session, deadline, attempt, refresh, wait_for_retry)
