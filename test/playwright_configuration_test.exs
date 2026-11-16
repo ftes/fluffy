@@ -1,5 +1,5 @@
 defmodule Fluffy.PlaywrightConfigurationTest do
-  # Changes Fluffy's and PlaywrightEx's global config.
+  # Changes Fluffy's and Playwright's global config.
   use ExUnit.Case, async: false
 
   alias Fluffy.Options
@@ -20,8 +20,8 @@ defmodule Fluffy.PlaywrightConfigurationTest do
   setup do
     originals = for key <- @keys, do: {key, Application.fetch_env(:fluffy, key)}
     Enum.each(@keys, &Application.delete_env(:fluffy, &1))
-    playwright_ex = for key <- [:test, :expect], do: {key, Application.fetch_env(:playwright_ex, key)}
-    Enum.each([:test, :expect], &Application.delete_env(:playwright_ex, &1))
+    playwright = for key <- [:test, :expect], do: {key, Application.fetch_env(:playwright, key)}
+    Enum.each([:test, :expect], &Application.delete_env(:playwright, &1))
 
     on_exit(fn ->
       for {key, original} <- originals do
@@ -31,10 +31,10 @@ defmodule Fluffy.PlaywrightConfigurationTest do
         end
       end
 
-      for {key, original} <- playwright_ex do
+      for {key, original} <- playwright do
         case original do
-          {:ok, value} -> Application.put_env(:playwright_ex, key, value)
-          :error -> Application.delete_env(:playwright_ex, key)
+          {:ok, value} -> Application.put_env(:playwright, key, value)
+          :error -> Application.delete_env(:playwright, key)
         end
       end
     end)
@@ -44,7 +44,7 @@ defmodule Fluffy.PlaywrightConfigurationTest do
     put_env(timeout: 2_000)
 
     assert_raise ArgumentError,
-                 ~r/config :fluffy, timeout: is removed.*`config :playwright_ex, :expect, timeout: \.\.\.`.*:test, action_timeout/,
+                 ~r/config :fluffy, timeout: is removed.*`config :playwright, :expect, timeout: \.\.\.`.*:test, action_timeout/,
                  &Options.config!/0
 
     Application.delete_env(:fluffy, :timeout)
@@ -52,7 +52,7 @@ defmodule Fluffy.PlaywrightConfigurationTest do
     put_env(playwright: [timeout: 15_000])
 
     assert_raise ArgumentError,
-                 ~r/config :fluffy, playwright: is removed.*`config :playwright_ex, :test` instead, with `action_timeout:`.*`browser_name:` for `engine:`.*`log_browser_console:`.*Event.console\(\)/,
+                 ~r/config :fluffy, playwright: is removed.*`config :playwright, :test` instead, with `action_timeout:`.*`browser_name:` for `engine:`.*`log_browser_console:`.*Event.console\(\)/,
                  &Options.config!/0
 
     put_env(playwright: false)
@@ -73,20 +73,20 @@ defmodule Fluffy.PlaywrightConfigurationTest do
     assert_raise ArgumentError, ~r/invalid config :fluffy: .*file_input_max_bytes/, &Options.config!/0
   end
 
-  # Only browsers wait for navigations, so the navigation timeout is PlaywrightEx's.
-  test "rejects config :fluffy, navigation_timeout: for PlaywrightEx's" do
+  # Only browsers wait for navigations, so the navigation timeout is Playwright's.
+  test "rejects config :fluffy, navigation_timeout: for Playwright's" do
     put_env(navigation_timeout: 15_000)
 
     assert_raise ArgumentError,
-                 ~r/config :fluffy, navigation_timeout: is removed.*`config :playwright_ex, :test, navigation_timeout: ...`/,
+                 ~r/config :fluffy, navigation_timeout: is removed.*`config :playwright, :test, navigation_timeout: ...`/,
                  &Options.config!/0
   end
 
-  test "unset, Fluffy's settings are PlaywrightEx's, with its defaults" do
+  test "unset, Fluffy's settings are Playwright's, with its defaults" do
     assert {Timeouts.action(), Timeouts.navigation(), Timeouts.expect()} == {:infinity, :infinity, 5_000}
     assert Options.config!(:test_id_attribute) == "data-testid"
 
-    put_playwright_ex(
+    put_playwright(
       test: [action_timeout: 2_000, navigation_timeout: 3_000, test_id_attribute: "data-owl"],
       expect: [timeout: 1_000]
     )
@@ -95,8 +95,8 @@ defmodule Fluffy.PlaywrightConfigurationTest do
     assert Options.config!(:test_id_attribute) == "data-owl"
   end
 
-  test "Fluffy's settings win over PlaywrightEx's" do
-    put_playwright_ex(
+  test "Fluffy's settings win over Playwright's" do
+    put_playwright(
       test: [action_timeout: 2_000, navigation_timeout: 3_000, test_id_attribute: "data-owl"],
       expect: [timeout: 1_000]
     )
@@ -110,19 +110,19 @@ defmodule Fluffy.PlaywrightConfigurationTest do
   end
 
   test "a cached setting follows a later change of either app's env" do
-    put_playwright_ex(expect: [timeout: 1_000])
+    put_playwright(expect: [timeout: 1_000])
     assert Timeouts.expect() == 1_000
 
-    put_playwright_ex(expect: [timeout: 2_000])
+    put_playwright(expect: [timeout: 2_000])
     assert Timeouts.expect() == 2_000
 
     put_env(expect_timeout: 500)
     assert Timeouts.expect() == 500
   end
 
-  # PlaywrightEx's `0` means no limit, as Playwright's; Fluffy's keep Fluffy's meaning.
-  test "PlaywrightEx's 0 is no limit" do
-    put_playwright_ex(test: [action_timeout: 0, navigation_timeout: 0], expect: [timeout: 0])
+  # Playwright's `0` means no limit; Fluffy's keep Fluffy's meaning.
+  test "Playwright's 0 is no limit" do
+    put_playwright(test: [action_timeout: 0, navigation_timeout: 0], expect: [timeout: 0])
     assert {Timeouts.action(), Timeouts.navigation(), Timeouts.expect()} == {:infinity, :infinity, :infinity}
   end
 
@@ -152,24 +152,23 @@ defmodule Fluffy.PlaywrightConfigurationTest do
       assert_raise ArgumentError, ~r/invalid config :fluffy: .*test_id_attribute.*attribute names/, &Options.config!/0
 
       Application.delete_env(:fluffy, :test_id_attribute)
-      put_playwright_ex(test: [test_id_attribute: name])
+      put_playwright(test: [test_id_attribute: name])
 
       assert_raise ArgumentError,
-                   ~r/invalid config :playwright_ex, :test: test_id_attribute: .*attribute names/,
+                   ~r/invalid config :playwright, :test: test_id_attribute: .*attribute names/,
                    fn -> Options.config!(:test_id_attribute) end
     end
 
-    Application.delete_env(:playwright_ex, :test)
+    Application.delete_env(:playwright, :test)
     put_env(test_id_attribute: "data-owl,data_hedwig,data-élève,--owl")
     assert Options.config!(:test_id_attribute) == "data-owl,data_hedwig,data-élève,--owl"
     Application.delete_env(:fluffy, :test_id_attribute)
 
-    put_playwright_ex(test: [navigation_timeout: -1])
+    put_playwright(test: [navigation_timeout: -1])
     assert_raise ArgumentError, ~r/invalid navigation_timeout/, &Timeouts.navigation/0
   end
 
   defp put_env(config), do: Enum.each(config, fn {key, value} -> Application.put_env(:fluffy, key, value) end)
 
-  defp put_playwright_ex(config),
-    do: Enum.each(config, fn {key, value} -> Application.put_env(:playwright_ex, key, value) end)
+  defp put_playwright(config), do: Enum.each(config, fn {key, value} -> Application.put_env(:playwright, key, value) end)
 end

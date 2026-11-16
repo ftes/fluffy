@@ -109,7 +109,7 @@ defmodule Fluffy.Event.Subscription do
   def handle_info({:source_closed, reason} = message, state) do
     cond do
       is_nil(state.outcome) and match?({:ok, _value}, state.decode.(message)) -> deliver_last(message, reason, state)
-      # PlaywrightEx.Test closes the test's pages at its timeout, the wait's backstop.
+      # Playwright.Test closes the test's pages at its timeout, the wait's backstop.
       expired?(state) -> fail_timeout(state)
       true -> fail(state, reason)
     end

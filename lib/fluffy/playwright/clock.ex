@@ -25,7 +25,7 @@ defmodule Fluffy.Playwright.Clock do
   then flows normally.
 
   The clock replaces `Date`, `setTimeout`, `setInterval`, `requestAnimationFrame`,
-  `performance` and the other timer functions of `PlaywrightEx.Clock.install/2` in
+  `performance` and the other timer functions of `Playwright.Clock.install/2` in
   every page of the session, including documents loaded later. Install it before
   visiting the page whose timers a test controls. The other clock functions
   install it if needed.
@@ -40,7 +40,7 @@ defmodule Fluffy.Playwright.Clock do
   def install(%Session{} = session, options \\ []) do
     Fluffy.Playwright.__ensure_playwright_backend__!(session, :clock)
     native = Options.validate_action!(:install_clock, options)
-    clock(session, :"Clock.install", &PlaywrightEx.Clock.install(&1, native))
+    clock(session, :"Clock.install", &Playwright.Clock.install(&1, native))
   end
 
   @doc playwright_only: true
@@ -52,13 +52,13 @@ defmodule Fluffy.Playwright.Clock do
   `phx-debounce` or a `JS.transition/2`, which defers LiveView's DOM updates
   until it finishes. Fluffy's actions and waits do not rely on page timers.
   Install the clock at an earlier time and visit first, so the page loads with
-  running timers. See `PlaywrightEx.Clock.pause_at/2`.
+  running timers. See `Playwright.Clock.pause_at/2`.
 
   As in Playwright, clock calls have no timeout and take no options.
   """
   @spec pause_at(Session.t(), time(), []) :: Session.t()
   def pause_at(%Session{} = session, time, options \\ []) do
-    clock_call(session, :"Clock.pause_at", options, &PlaywrightEx.Clock.pause_at(&1, time))
+    clock_call(session, :"Clock.pause_at", options, &Playwright.Clock.pause_at(&1, time))
   end
 
   @doc playwright_only: true
@@ -67,7 +67,7 @@ defmodule Fluffy.Playwright.Clock do
 
   `ticks` is milliseconds or a string such as `"30"` (seconds), `"01:30"` or
   `"02:34:10"`. A navigation the timers start is adopted, as after an action.
-  See `PlaywrightEx.Clock.run_for/2`.
+  See `Playwright.Clock.run_for/2`.
 
       session
       |> Clock.install(time: ~U[2024-02-02 09:00:00Z])
@@ -79,7 +79,7 @@ defmodule Fluffy.Playwright.Clock do
   """
   @spec run_for(Session.t(), ticks(), []) :: Session.t()
   def run_for(%Session{} = session, ticks, options \\ []) do
-    clock_call(session, :"Clock.run_for", options, &PlaywrightEx.Clock.run_for(&1, ticks))
+    clock_call(session, :"Clock.run_for", options, &Playwright.Clock.run_for(&1, ticks))
   end
 
   @doc playwright_only: true
@@ -87,33 +87,33 @@ defmodule Fluffy.Playwright.Clock do
   Jumps the clock forward by `ticks`, firing due timers at most once, like a laptop
   waking from sleep.
 
-  Takes `ticks` like `run_for/3`. See `PlaywrightEx.Clock.fast_forward/2`.
+  Takes `ticks` like `run_for/3`. See `Playwright.Clock.fast_forward/2`.
   """
   @spec fast_forward(Session.t(), ticks(), []) :: Session.t()
   def fast_forward(%Session{} = session, ticks, options \\ []) do
-    clock_call(session, :"Clock.fast_forward", options, &PlaywrightEx.Clock.fast_forward(&1, ticks))
+    clock_call(session, :"Clock.fast_forward", options, &Playwright.Clock.fast_forward(&1, ticks))
   end
 
   @doc playwright_only: true
   @doc """
   Resumes a paused clock; time flows and timers fire again.
 
-  See `PlaywrightEx.Clock.resume/1`.
+  See `Playwright.Clock.resume/1`.
   """
   @spec resume(Session.t(), []) :: Session.t()
   def resume(%Session{} = session, options \\ []) do
-    clock_call(session, :"Clock.resume", options, &PlaywrightEx.Clock.resume/1)
+    clock_call(session, :"Clock.resume", options, &Playwright.Clock.resume/1)
   end
 
   @doc playwright_only: true
   @doc """
   Makes `Date` always return `time`, while timers keep running.
 
-  See `PlaywrightEx.Clock.set_fixed_time/2`.
+  See `Playwright.Clock.set_fixed_time/2`.
   """
   @spec set_fixed_time(Session.t(), time(), []) :: Session.t()
   def set_fixed_time(%Session{} = session, time, options \\ []) do
-    clock_call(session, :"Clock.set_fixed_time", options, &PlaywrightEx.Clock.set_fixed_time(&1, time))
+    clock_call(session, :"Clock.set_fixed_time", options, &Playwright.Clock.set_fixed_time(&1, time))
   end
 
   @doc playwright_only: true
@@ -121,11 +121,11 @@ defmodule Fluffy.Playwright.Clock do
   Sets the clock's current time without firing timers, such as to test a time-zone
   or daylight saving shift.
 
-  See `PlaywrightEx.Clock.set_system_time/2`.
+  See `Playwright.Clock.set_system_time/2`.
   """
   @spec set_system_time(Session.t(), time(), []) :: Session.t()
   def set_system_time(%Session{} = session, time, options \\ []) do
-    clock_call(session, :"Clock.set_system_time", options, &PlaywrightEx.Clock.set_system_time(&1, time))
+    clock_call(session, :"Clock.set_system_time", options, &Playwright.Clock.set_system_time(&1, time))
   end
 
   defp clock_call(session, operation, options, fun) do

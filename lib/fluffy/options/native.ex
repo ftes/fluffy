@@ -1,7 +1,7 @@
 defmodule Fluffy.Options.Native do
   @moduledoc false
-  # Playwright-only options follow PlaywrightEx's option docs and types, read at compile
-  # time from its facade's `__options__/1` (not a stable contract: playwright_ex is pinned).
+  # Playwright-only options follow Playwright's option docs and types, read at compile
+  # time from its facade's `__options__/1` (not a stable contract: Playwright is pinned).
 
   @doc "A doc reference to `module.fun/arity`."
   def reference(module, fun, arity), do: "`#{inspect(module)}.#{fun}/#{arity}`"

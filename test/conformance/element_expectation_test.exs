@@ -62,8 +62,8 @@ defmodule Fluffy.Conformance.ElementExpectationTest do
       # `[^]` is JS-only syntax.
       driver
       |> session()
-      |> expect(to_have_text(spaced, PlaywrightEx.RegExp.new("sleeping[^]+dragon", "i")))
-      |> expect(to_have_count(filter(by_css("p"), has_text: PlaywrightEx.RegExp.new("Sleeping[^]+dragon")), 1))
+      |> expect(to_have_text(spaced, Playwright.RegExp.new("sleeping[^]+dragon", "i")))
+      |> expect(to_have_count(filter(by_css("p"), has_text: Playwright.RegExp.new("Sleeping[^]+dragon")), 1))
       |> expect(to_have_count(by_role(:button, name: ~r/^Send$/), 1))
     end
 

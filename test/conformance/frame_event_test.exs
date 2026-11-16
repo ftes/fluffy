@@ -5,19 +5,18 @@ defmodule Fluffy.Conformance.FrameEventTest do
   import Fluffy.Playwright
 
   alias Fluffy.Event
-  alias Fluffy.Playwright
-  alias PlaywrightEx.Frame
+  alias Playwright.Frame
 
   @tag driver: :playwright
-  test "main-frame events deliver the PlaywrightEx frame, with its page and no parent" do
+  test "main-frame events deliver the Playwright frame, with its page and no parent" do
     session = session_for_html(:playwright, "<h1>Main</h1>")
     pending = wait_for(session, Event.frame_navigated())
-    Playwright.evaluate(session, "location.hash = 'first'; true")
+    Fluffy.Playwright.evaluate(session, "location.hash = 'first'; true")
     frame = await(pending)
     assert Frame.url(frame) =~ "#first"
     assert page(session, Frame.page(frame)) == current_page(session)
     assert Frame.parent_frame(frame) == nil
-    Playwright.evaluate(session, "location.hash = 'second'; true")
+    Fluffy.Playwright.evaluate(session, "location.hash = 'second'; true")
     assert Frame.url(frame) =~ "#second"
   end
 
@@ -26,7 +25,7 @@ defmodule Fluffy.Conformance.FrameEventTest do
     session = session_for_html(:playwright, "<h1>Main</h1>")
     pending = wait_for(session, Event.frame_navigated(&(Frame.url(&1) == "about:srcdoc")))
 
-    Playwright.evaluate(session, """
+    Fluffy.Playwright.evaluate(session, """
     (() => {
       const frame = document.createElement('iframe');
       frame.srcdoc = '<p>Child</p>';
@@ -44,8 +43,8 @@ defmodule Fluffy.Conformance.FrameEventTest do
 
     pending = wait_for(session, Event.frame_navigated())
     other = switch_page(session, new_page(session))
-    Playwright.evaluate(other, "location.hash = 'other'; true")
-    Playwright.evaluate(session, "document.querySelector('iframe').contentWindow.location.hash = 'updated'; true")
+    Fluffy.Playwright.evaluate(other, "location.hash = 'other'; true")
+    Fluffy.Playwright.evaluate(session, "document.querySelector('iframe').contentWindow.location.hash = 'updated'; true")
     assert await(pending) == child
     assert Frame.url(child) == "about:srcdoc#updated"
   end

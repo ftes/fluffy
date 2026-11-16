@@ -3,8 +3,8 @@ defmodule Fluffy.TestTimeout do
 
   # The backstop of Fluffy's own waits (LiveView retries, event waits on every driver): an
   # operation without a timeout fails with Fluffy's error just before ExUnit kills the test, at
-  # the moment PlaywrightEx.Test closes the test's contexts, so a Playwright call fails
-  # (`close_deadline` of `PlaywrightEx.Test.info/0`). It comes from the test's registration
+  # the moment Playwright.Test closes the test's contexts, so a Playwright call fails
+  # (`close_deadline` of `Playwright.Test.info/0`). It comes from the test's registration
   # (`use Fluffy.Case`), also in its Tasks, through `$callers`. Without one, as in a process
   # outside a registered test, there is no backstop.
 

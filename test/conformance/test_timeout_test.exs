@@ -74,13 +74,13 @@ defmodule Fluffy.Conformance.TestTimeoutTest do
 
   # The backstop is 100ms before ExUnit's deadline, which counts from the test's first setup.
   defp assert_at_test_timeout do
-    %{deadline: deadline} = PlaywrightEx.Test.info()
+    %{deadline: deadline} = Playwright.Test.info()
     assert System.monotonic_time(:millisecond) in (deadline - 100)..deadline
   end
 end
 
 defmodule Fluffy.Conformance.PlaywrightTestTimeoutTest do
-  # PlaywrightEx.Test closes a Playwright session's context at the test timeout's backstop
+  # Playwright.Test closes a Playwright session's context at the test timeout's backstop
   # (`Fluffy.TestTimeout`), with "Test timeout of ...ms exceeded.". A module of its own, so these
   # wait alongside the LiveView ones.
   use Fluffy.Support.Case, async: true
@@ -126,7 +126,7 @@ defmodule Fluffy.Conformance.PlaywrightTestTimeoutTest do
 
   # The backstop is 100ms before ExUnit's deadline, which counts from the test's first setup.
   defp assert_at_test_timeout do
-    %{deadline: deadline} = PlaywrightEx.Test.info()
+    %{deadline: deadline} = Playwright.Test.info()
     assert System.monotonic_time(:millisecond) in (deadline - 100)..deadline
   end
 end
@@ -163,7 +163,7 @@ defmodule Fluffy.Conformance.SlowSetupTestTimeoutTest do
     error = assert_raise(Fluffy.OperationError, fn -> click(session, by_role(:button, name: "Missing")) end)
 
     assert error.message =~ "Test timeout of 2000ms exceeded."
-    %{deadline: deadline} = PlaywrightEx.Test.info()
+    %{deadline: deadline} = Playwright.Test.info()
     assert System.monotonic_time(:millisecond) in (deadline - 100)..deadline
   end
 end

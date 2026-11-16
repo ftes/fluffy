@@ -3,7 +3,7 @@ defmodule Fluffy.Application do
 
   use Application
 
-  # Browsers come from PlaywrightEx.Test's pool, which starts on first use and stops its
+  # Browsers come from Playwright.Test's pool, which starts on first use and stops its
   # drivers after the suite.
   @impl true
   def start(_type, _args) do

@@ -263,10 +263,10 @@ because application JavaScript opens the chooser.
 `Fluffy.unwrap/2` and `Fluffy.unwrap_and_return/2` reach driver-native APIs; see
 [Native escape hatch](debugging.md#native-escape-hatch) for callback behavior.
 
-### PlaywrightEx coverage
+### Playwright coverage
 
-Fluffy classifies every member of the PlaywrightEx facade it builds on, and a test
-fails when PlaywrightEx adds or removes one.
+Fluffy classifies every member of the Playwright facade it builds on, and a test
+fails when Playwright adds or removes one.
 
 - **Wrapped:** locator builders (`get_by_role` as `by_role`, and so on), the
   cross-driver actions, including `clear` and `set_checked`, `hover`, `drag_to`,
@@ -287,7 +287,7 @@ fails when PlaywrightEx adds or removes one.
   and `Fluffy.Playwright.Mouse`, the events in `Fluffy.Event`, and the values they
   deliver, including response bodies. Their options pass through as documented.
   `to_have_screenshot` and `to_match_aria_snapshot` (without an inline snapshot) find
-  their file by `name:` or the test's name, through `PlaywrightEx.Test`, or at `path:`.
+  their file by `name:` or the test's name, through `Playwright.Test`, or at `path:`.
 - **Unwrap:** everything else page-, locator-, or value-local, such as
   `aria_snapshot_json`, HAR routing, and response timing. For reads like
   `text_content`, `Fluffy.unwrap_and_return/2` and

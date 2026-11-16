@@ -6,10 +6,10 @@ defmodule Fluffy.PlaywrightEventCaptureTest do
 
   alias Fluffy.Event
   alias Fluffy.Event.Subscription
-  alias Fluffy.Playwright
   alias Fluffy.Session
   alias Fluffy.Support.HTTPFixtures
-  alias PlaywrightEx.Client.EventEmitter
+  alias Playwright.Client.EventEmitter
+  alias Playwright.Response
 
   @moduletag driver: :playwright
 
@@ -19,13 +19,13 @@ defmodule Fluffy.PlaywrightEventCaptureTest do
     pending = wait_for(session, Event.response())
     visit(session, HTTPFixtures.url(fixture, "/first"))
     visit(session, HTTPFixtures.url(fixture, "/second"))
-    assert String.ends_with?(PlaywrightEx.Response.url(await(pending)), "/first")
+    assert String.ends_with?(Response.url(await(pending)), "/first")
   end
 
   test "a wait expires independently of await or later actions" do
     session = session_for_html(:playwright, "<h1>Events</h1>")
     pending = wait_for(session, Event.frame_navigated(), timeout: 0)
-    Playwright.evaluate(session, "location.hash = 'too-late'; true")
+    Fluffy.Playwright.evaluate(session, "location.hash = 'too-late'; true")
     assert_raise ExUnit.AssertionError, ~r/timeout/, fn -> await(pending) end
   end
 
@@ -63,7 +63,7 @@ defmodule Fluffy.PlaywrightEventCaptureTest do
     Subscription.cancel(first.pid)
     Subscription.cancel(first.pid)
     visit(session, HTTPFixtures.url(fixture))
-    assert PlaywrightEx.Response.status(await(second)) == 200
+    assert Response.status(await(second)) == 200
   end
 
   test "settled response metadata survives source closure before await" do
@@ -73,7 +73,7 @@ defmodule Fluffy.PlaywrightEventCaptureTest do
     visit(session, HTTPFixtures.url(fixture))
     assert_eventually(fn -> :sys.get_state(pending.pid).outcome != nil end)
     close_page(session)
-    assert PlaywrightEx.Response.status(await(pending)) == 201
+    assert Response.status(await(pending)) == 201
   end
 
   test "source closure and crash resolve outstanding waits" do
@@ -105,7 +105,7 @@ defmodule Fluffy.PlaywrightEventCaptureTest do
   test "page discovery and event decoding retain one page subscription" do
     fixture = HTTPFixtures.register(%{body: "ok"})
     session = session_for_html(:playwright, "<h1>Main</h1>")
-    # PlaywrightEx keeps a close listener of its own; compare against the first page.
+    # Playwright keeps a close listener of its own; compare against the first page.
     close_listeners = EventEmitter.listener_count(Session.page_state(session).page, "close")
     page_wait = wait_for(session, Event.page())
     page = new_page(session)
@@ -124,7 +124,7 @@ defmodule Fluffy.PlaywrightEventCaptureTest do
   end
 
   defp response_page(session, response) do
-    page(session, response |> PlaywrightEx.Response.frame() |> PlaywrightEx.Frame.page())
+    page(session, response |> Response.frame() |> Playwright.Frame.page())
   end
 
   defp response_listeners(page), do: EventEmitter.listener_count(page, "response")

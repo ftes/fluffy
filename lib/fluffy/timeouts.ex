@@ -3,10 +3,10 @@ defmodule Fluffy.Timeouts do
 
   # The defaults of an operation without `timeout:`, Playwright Test's on every driver
   # (`Fluffy.Options.config!/1`): `config :fluffy, action_timeout:, expect_timeout:` if set, else
-  # PlaywrightEx.Test's `action_timeout` and `expect: [timeout:]`, and PlaywrightEx.Test's
+  # Playwright.Test's `action_timeout` and `expect: [timeout:]`, and Playwright.Test's
   # `navigation_timeout`, which only browsers wait for. The Playwright backend sets the action
   # and navigation timeouts on each context. Fluffy's `expect_timeout: 0` checks once, as an
-  # operation's own `timeout: 0`; PlaywrightEx's `0` means no limit, `:infinity` here.
+  # operation's own `timeout: 0`; Playwright's `0` means no limit, `:infinity` here.
 
   @doc "The action timeout: actions, locator reads, `wait_for_function` and event waits."
   @spec action() :: timeout()
@@ -34,14 +34,14 @@ defmodule Fluffy.Timeouts do
   def operation(_operation, options), do: get(options, &action/0)
 
   @doc """
-  The PlaywrightEx timeout of an action, wait or navigation: it can't check once, so it rejects
+  The Playwright timeout of an action, wait or navigation: it can't check once, so it rejects
   `0` (`Fluffy.Deadline.playwright_operation!/2`).
   """
   @spec playwright_operation!(atom(), keyword()) :: pos_integer() | :infinity
   def playwright_operation!(operation, options),
     do: Fluffy.Deadline.playwright_operation!(operation, operation(operation, options))
 
-  @doc "The PlaywrightEx timeout of an expectation: its `0` checks once (`Fluffy.Deadline.playwright/1`)."
+  @doc "The Playwright timeout of an expectation: its `0` checks once (`Fluffy.Deadline.playwright/1`)."
   @spec playwright_expect(keyword()) :: pos_integer() | :infinity
   def playwright_expect(options), do: Fluffy.Deadline.playwright(get(options, &expect/0))
 end

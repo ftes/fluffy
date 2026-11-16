@@ -15,7 +15,7 @@ defmodule Fluffy.Playwright.Keyboard do
 
   alias Fluffy.Options
   alias Fluffy.Session
-  alias PlaywrightEx.Keyboard, as: BrowserKeyboard
+  alias Playwright.Keyboard, as: BrowserKeyboard
 
   @type press_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:keyboard_press)))
   @type type_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:keyboard_type)))
@@ -53,7 +53,7 @@ defmodule Fluffy.Playwright.Keyboard do
   end
 
   @doc playwright_only: true
-  @doc "Holds `key` down until `up/3`. See `PlaywrightEx.Keyboard.down/2`."
+  @doc "Holds `key` down until `up/3`. See `Playwright.Keyboard.down/2`."
   @spec down(Session.t(), String.t(), []) :: Session.t()
   def down(%Session{} = session, key, options \\ []) when is_binary(key) do
     Options.validate_untimed!(options)
@@ -61,7 +61,7 @@ defmodule Fluffy.Playwright.Keyboard do
   end
 
   @doc playwright_only: true
-  @doc "Releases `key`. See `PlaywrightEx.Keyboard.up/2`."
+  @doc "Releases `key`. See `Playwright.Keyboard.up/2`."
   @spec up(Session.t(), String.t(), []) :: Session.t()
   def up(%Session{} = session, key, options \\ []) when is_binary(key) do
     Options.validate_untimed!(options)
@@ -71,7 +71,7 @@ defmodule Fluffy.Playwright.Keyboard do
   @doc playwright_only: true
   @doc """
   Inserts `text` without key events, as an input method does.
-  See `PlaywrightEx.Keyboard.insert_text/2`.
+  See `Playwright.Keyboard.insert_text/2`.
   """
   @spec insert_text(Session.t(), String.t(), []) :: Session.t()
   def insert_text(%Session{} = session, text, options \\ []) when is_binary(text) do
@@ -80,5 +80,5 @@ defmodule Fluffy.Playwright.Keyboard do
   end
 
   defp input(session, operation, fun),
-    do: Fluffy.Playwright.__page_input__(session, &PlaywrightEx.Page.keyboard/1, operation, fun)
+    do: Fluffy.Playwright.__page_input__(session, &Playwright.Page.keyboard/1, operation, fun)
 end

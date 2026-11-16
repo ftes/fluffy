@@ -1,6 +1,6 @@
 # Upgrading to 0.9
 
-Fluffy 0.9 runs on PlaywrightEx 0.17, a port of the official Playwright client with
+Fluffy 0.9 runs on Playwright 0.17, a port of the official Playwright client with
 a pinned Playwright 1.65 driver. It follows Playwright more closely, and its Phoenix
 drivers follow LiveView's client. This guide lists what a 0.8 suite must change, as one
 step from 0.8; the [changelog](../CHANGELOG.md) has the details.
@@ -11,21 +11,21 @@ matched once can now match twice.
 
 ## Setup
 
-- Install the pinned driver and a browser with `mix playwright_ex.install -- chromium`.
+- Install the pinned driver and a browser with `mix playwright.install -- chromium`.
   Drop the npm `playwright` package and the `assets_dir` config; Node.js is no longer
   needed. `executable:` now takes a Playwright 1.65 CLI such as
-  `node_modules/.bin/playwright`, not `cli.js`; usually drop it and let PlaywrightEx
+  `node_modules/.bin/playwright`, not `cli.js`; usually drop it and let Playwright
   install the driver.
 - Run the install in CI too, with `-- chromium --with-deps` on Linux runners; the driver
   would install itself in the first browser test, but browsers do not; see
-  [GitHub Actions](`e:playwright_ex:debugging-and-ci.md#github-actions`). In Microsoft's
-  Playwright image, whose tag must match `PlaywrightEx.Driver.version/0`, `--no-browsers`
+  [GitHub Actions](`e:playwright:debugging-and-ci.md#github-actions`). In Microsoft's
+  Playwright image, whose tag must match `Playwright.Driver.version/0`, `--no-browsers`
   is enough: the driver finds the image's browsers. For a system browser, as on Nix, pass
   `--no-browsers` and set `launch_options: [executable_path: ...]` or `channel:`; see
   [Playwright setup](installation.md#playwright-setup).
-- Prefer `only: [:dev, :test]` to `only: :test`, so PlaywrightEx's Mix tasks and
+- Prefer `only: [:dev, :test]` to `only: :test`, so Playwright's Mix tasks and
   `mix usage_rules.sync` work in `:dev`, and widen the `lazy_html` line `phx.new`
-  generates to match. List PlaywrightEx too for its usage rules; see
+  generates to match. List Playwright too for its usage rules; see
   [Elixir dependency](installation.md#elixir-dependency).
 
   ```diff
@@ -39,14 +39,14 @@ matched once can now match twice.
   longer part of accessible names.
 - Browser console messages are no longer logged, as in Playwright, and `js_logger:`,
   custom loggers and `Fluffy.Playwright.ConsoleLogger` are gone. To log them, register
-  a listener: `on(session, Event.console(), &Logger.info(PlaywrightEx.ConsoleMessage.text(&1)))`.
+  a listener: `on(session, Event.console(), &Logger.info(Playwright.ConsoleMessage.text(&1)))`.
 - Playwright sessions use Playwright's `en-US` locale instead of `en`; set
   `browser_context: [locale: "en"]` to keep it.
 - Browser launch gets Playwright's 3-minute default instead of `timeout:`. A
   `launch_options: [timeout: ...]` that raised the limit on 0.8 now shortens it and can
   fail a loaded machine with `browserType.launch: Timeout ... exceeded`, so drop it.
 - `browser_context:`, `launch_options:` and the options of `storage_state` and cookies
-  pass through to PlaywrightEx, which rejects unknown ones. Page screenshots
+  pass through to Playwright, which rejects unknown ones. Page screenshots
   validate their options as element screenshots do: `mask:` takes Fluffy locators
   and `timeout: 0` raises.
 
@@ -59,16 +59,16 @@ means no limit; see [Timeouts](installation.md#timeouts).
   doesn't exist, raises. Remove `playwright: false`, which does nothing.
 - `start_session(timeout:)`, `config :fluffy, timeout:` and `config :fluffy, :playwright`
   are removed; the old config raises at startup. Set Playwright Test's defaults instead, in
-  PlaywrightEx's config for the whole suite:
+  Playwright's config for the whole suite:
 
   ```diff
   -config :fluffy, timeout: 2_000, playwright: [timeout: 15_000]
-  +config :playwright_ex, :test, action_timeout: 15_000, navigation_timeout: 15_000
-  +config :playwright_ex, :expect, timeout: 5_000
+  +config :playwright, :test, action_timeout: 15_000, navigation_timeout: 15_000
+  +config :playwright, :expect, timeout: 5_000
   ```
 
   `config :fluffy, action_timeout:, expect_timeout:` override them for Fluffy sessions, as for
-  a suite without browser tests; the navigation timeout is PlaywrightEx's only
+  a suite without browser tests; the navigation timeout is Playwright's only
   ([Timeouts](installation.md#timeouts)). Without them, actions and navigations have no
   timeout, so the test's timeout bounds them: with `Fluffy.Case`, a LiveView action on a
   missing element fails with Fluffy's error at the test timeout, and without it with ExUnit's
@@ -83,7 +83,7 @@ means no limit; see [Timeouts](installation.md#timeouts).
 
 ## Renamed and removed APIs
 
-- `Fluffy.unwrap/2` passes a `%PlaywrightEx.Page{}` on Playwright instead of a
+- `Fluffy.unwrap/2` passes a `%Playwright.Page{}` on Playwright instead of a
   `Fluffy.Playwright.Handle`, which is removed. The new `Fluffy.unwrap_and_return/2`
   returns the callback's result.
 - `Fluffy.Playwright.evaluate(session, expression, arg)` replaces the `is_function:`
@@ -92,23 +92,23 @@ means no limit; see [Timeouts](installation.md#timeouts).
   Playwright's camelCase keys (`httpOnly:`, `sameSite:`, `partitionKey:`), and
   `storage_state/2` returns atom keys: `state["cookies"]` becomes `state.cookies`.
 - `Fluffy.HTTPEvent` is gone: request and response events deliver a
-  `PlaywrightEx.Request` and `PlaywrightEx.Response`, as do the other browser events
-  (dialog, console, page error, frame, worker and WebSocket) their PlaywrightEx values,
-  as in Playwright. Read them with PlaywrightEx's functions, such as
-  `PlaywrightEx.Response.status/1` and `PlaywrightEx.Dialog.accept!/1`, and turn their
+  `Playwright.Request` and `Playwright.Response`, as do the other browser events
+  (dialog, console, page error, frame, worker and WebSocket) their Playwright values,
+  as in Playwright. Read them with Playwright's functions, such as
+  `Playwright.Response.status/1` and `Playwright.Dialog.accept!/1`, and turn their
   page into a `Fluffy.Page` with `Fluffy.Playwright.page/2`.
 - `Fluffy.Download`'s `read!` and `save_as!` are `read` and `save_as`. Only the
   documented fields of `Fluffy.Download` remain public.
 - `page_status`, `page_to_have_status` and `Fluffy.Page.status` are removed, as in
   Playwright; on Playwright, assert on `Fluffy.Event.response/1` instead.
-- Configure the browser with `config :playwright_ex, :test, browser_name: ..., launch_options:
+- Configure the browser with `config :playwright, :test, browser_name: ..., launch_options:
   ...` (`driver: [executable: ...]` for a CLI) instead of `config :fluffy, :playwright`,
   which is removed. `pool_size` goes too: each test takes its own browser from
-  `PlaywrightEx.Test.BrowserPool.browser/1`, at most `workers` at once
-  ([Workers](`e:playwright_ex:testing-with-exunit.md#workers`)).
+  `Playwright.Test.BrowserPool.browser/1`, at most `workers` at once
+  ([Workers](`e:playwright:testing-with-exunit.md#workers`)).
 - `Fluffy.Playwright.trace/2`, `artifact_dir` and `trace_dir` are removed. Traces,
-  screenshots and videos come from `PlaywrightEx.Test`: set
-  `config :playwright_ex, :test, trace: :retain_on_failure, screenshot: :only_on_failure`
+  screenshots and videos come from `Playwright.Test`: set
+  `config :playwright, :test, trace: :retain_on_failure, screenshot: :only_on_failure`
   and replace `setup context do Fluffy.Test.setup(context) end` with `use Fluffy.Case` after
   your `ConnCase` (or in your case template, see `Fluffy.Case`);
   tag a module or test with `trace: true` (or `screenshot:`, `video:`) to record it. Files go to
@@ -125,7 +125,7 @@ means no limit; see [Timeouts](installation.md#timeouts).
   `screenshot(session, locator, [path: path] ++ options)` and `pdf(session, path)` becomes
   `pdf(session, path: path)`.
 - `by_test_id/2` takes no `attribute:`, as Playwright's `getByTestId`: every driver reads
-  `config :playwright_ex, :test, test_id_attribute:` (`data-testid` by default), or
+  `config :playwright, :test, test_id_attribute:` (`data-testid` by default), or
   `config :fluffy, test_id_attribute:` over it. For another
   attribute in one place, replace `by_test_id("hedwig", attribute: "data-owl")` with
   `by_css("[data-owl=\"hedwig\"]")`.
@@ -138,18 +138,18 @@ means no limit; see [Timeouts](installation.md#timeouts).
   `fragment:` forms become a regex or a predicate too.
 - A regex is a JavaScript `RegExp` on every driver: PCRE-only syntax such as `\A`, `\z`,
   `(?i)` or the `x` modifier raises `ArgumentError` on Static and LiveView too. Use `^`, `$`
-  and the `i` modifier, or a `PlaywrightEx.RegExp` for JavaScript-only syntax.
+  and the `i` modifier, or a `Playwright.RegExp` for JavaScript-only syntax.
 - The `Fluffy.Expect.checked_option` type is `to_be_checked_option`.
   `Fluffy.Locator.describe`, `new` and `append` are internal; `inspect/1` renders a locator.
 - On Playwright, a failed `visit`, `reload`, `go_back` or `go_forward` raises
   `Fluffy.OperationError` instead of a `RuntimeError`. Its `cause`, like that of a
-  failed action, is PlaywrightEx's exception.
+  failed action, is Playwright's exception.
 - On Phoenix, `go_back` and `go_forward` raise `Fluffy.CapabilityError` with
   `capability: :browser_history` instead of `:pages`.
 
 ## Workarounds that can go
 
-Most `unwrap` callbacks that called PlaywrightEx with the handle's `frame_id`,
+Most `unwrap` callbacks that called Playwright with the handle's `frame_id`,
 `context_id` or `page_id` have a Fluffy function now. Replace them rather than port them:
 
 - `add_init_script`: `Fluffy.Playwright.add_init_script/3`.
@@ -159,7 +159,7 @@ Most `unwrap` callbacks that called PlaywrightEx with the handle's `frame_id`,
   `Fluffy.Playwright.evaluate(session, locator, "el => el.dataset.state")`.
 - `Frame.expect(expression: "to.be.in.viewport")`: `Fluffy.Assert.in_viewport/2` or
   `Fluffy.Expect.to_be_in_viewport/2`.
-- `Page.route`: `Fluffy.Playwright.route/4`, whose handler gets the `PlaywrightEx.Route`.
+- `Page.route`: `Fluffy.Playwright.route/4`, whose handler gets the `Playwright.Route`.
 - `BrowserContext.clock_install` and `clock_fast_forward`:
   `Fluffy.Playwright.Clock.install/2` and `fast_forward/3`.
 - `Frame.press`: `Fluffy.press/4`, which takes any Playwright key.
@@ -170,7 +170,7 @@ Most `unwrap` callbacks that called PlaywrightEx with the handle's `frame_id`,
   `Fluffy.set_checked(session, by_css("label[for=terms]"), true)`. As in Playwright, the
   label stands for its input.
 
-The other callbacks get a `%PlaywrightEx.Page{}`; see PlaywrightEx's
+The other callbacks get a `%Playwright.Page{}`; see Playwright's
 [migration guide](https://hexdocs.pm/playwright_ex/migration.html).
 
 On Phoenix, `by_role` knows the landmark roles, so a `by_css("nav")` stand-in becomes

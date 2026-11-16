@@ -37,10 +37,10 @@ precedence: `aria-labelledby`, then `aria-label`, then native labels and
 captions, then content for the roles Playwright names from content, then
 `title`. Landmarks, lists, list items and dialogs are not named by their content.
 `by_test_id` reads Playwright Test's `testIdAttribute` on every driver,
-`config :playwright_ex, :test, test_id_attribute: "data-owl"` (`data-testid` by default), or
+`config :playwright, :test, test_id_attribute: "data-owl"` (`data-testid` by default), or
 `config :fluffy, test_id_attribute:` over it ([Timeouts](installation.md#timeouts)), or any of a
 comma-separated list. Inside `Fluffy.Playwright.unwrap/3`, native `get_by_test_id` uses
-PlaywrightEx's.
+Playwright's.
 Explicit ARIA roles override implicit roles. See `Fluffy.Locator.by_role/2` for the
 implicit roles the Phoenix backend knows. Phoenix computes these from markup, so
 computed CSS and live input state stay browser-only. CSS must be valid browser
@@ -55,9 +55,9 @@ when they resolve such a locator.
 Playwright: `name:` tests it against the normalized accessible name, and the text
 filters against the element's raw text, so `~r/^Pro$/` does not match
 `<li> Pro </li>`. A regex is a JavaScript `RegExp` on every driver: an Elixir
-`Regex` becomes one with `PlaywrightEx.RegExp.new/1`, which raises `ArgumentError`
+`Regex` becomes one with `Playwright.RegExp.new/1`, which raises `ArgumentError`
 on PCRE-only syntax such as `\A` or `(?i)`, and Static and LiveView match it as
-the browser does. Pass a `PlaywrightEx.RegExp` for JavaScript-only syntax. Two
+the browser does. Pass a `Playwright.RegExp` for JavaScript-only syntax. Two
 differences stay: without the `u` modifier the browser matches UTF-16 code units and
 Static and LiveView match code points, so `~r/^.$/` matches an emoji only on Phoenix.
 And on OTP 27, Static and LiveView let `\w` and `\b` also match Latin-1 letters such as

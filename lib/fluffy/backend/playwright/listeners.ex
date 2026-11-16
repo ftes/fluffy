@@ -2,7 +2,7 @@ defmodule Fluffy.Backend.Playwright.Listeners do
   @moduledoc false
 
   # Native listeners as `{module, target, event, listener}`, such as
-  # `{PlaywrightEx.Page, page, :close, fun}`.
+  # `{Playwright.Page, page, :close, fun}`.
 
   @doc "Registers listeners and returns them."
   def register(listeners) do

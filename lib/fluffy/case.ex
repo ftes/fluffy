@@ -3,8 +3,8 @@ defmodule Fluffy.Case do
   Registers the test for Fluffy, for every kind of test: Phoenix-only, browser or both, with
   the native API or the `Fluffy.PhoenixTest` facade.
 
-  It adds `use PlaywrightEx.Test`, so Playwright sessions work: a test takes a browser from
-  `PlaywrightEx.Test.BrowserPool.browser/1` only when it starts one (see
+  It adds `use Playwright.Test`, so Playwright sessions work: a test takes a browser from
+  `Playwright.Test.BrowserPool.browser/1` only when it starts one (see
   [Playwright setup](installation.md#playwright-setup)). It also bounds Phoenix operations by
   the test's timeout, so one that would outlast it, such as a LiveView action that never finds
   its element, fails with Fluffy's error and "Test timeout of 60000ms exceeded." just before
@@ -46,13 +46,13 @@ defmodule Fluffy.Case do
   `DataCase`), or after `use ExUnit.Case, async: true` without one, so the template's setup,
   such as the Ecto sandbox owner, runs first and stops after the sessions close. Used before
   it, the template's `use ExUnit.Case` imports `test` again, and the first test fails to
-  compile on a `test/3` imported from both `ExUnit.Case` and `PlaywrightEx.Test`.
+  compile on a `test/3` imported from both `ExUnit.Case` and `Playwright.Test`.
 
   ## Options
 
-  The options are `use PlaywrightEx.Test`'s: `trace:`, `screenshot:` and `video:` for the
+  The options are `use Playwright.Test`'s: `trace:`, `screenshot:` and `video:` for the
   module, over the config and under its tags, and `tags: false`, so tags don't set them (see
-  `PlaywrightEx.Test`). An unknown option fails to compile. ExUnit.Case's options such as
+  `Playwright.Test`). An unknown option fails to compile. ExUnit.Case's options such as
   `async:` belong on `use ExUnit.Case`; `use Fluffy.Case` ignores them.
 
       use Fluffy.Case, trace: :on
@@ -118,7 +118,7 @@ defmodule Fluffy.Case do
     macros = __CALLER__.macros
 
     if not ({:test, 3} in Keyword.get(macros, ExUnit.Case, []) or
-              {:test, 3} in Keyword.get(macros, PlaywrightEx.Test, []) or
+              {:test, 3} in Keyword.get(macros, Playwright.Test, []) or
               {:using, 1} in Keyword.get(macros, ExUnit.CaseTemplate, [])) do
       raise CompileError,
         file: __CALLER__.file,
@@ -127,7 +127,7 @@ defmodule Fluffy.Case do
     end
 
     quote do
-      use PlaywrightEx.Test, unquote(opts)
+      use Playwright.Test, unquote(opts)
     end
   end
 end

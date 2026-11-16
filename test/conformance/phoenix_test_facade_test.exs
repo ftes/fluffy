@@ -586,7 +586,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
     test "returns the callback's result from a Playwright page" do
       session = Fluffy.session_for_html(:playwright, "<p>Page</p>")
 
-      assert unwrap_and_return(%Session{session: session}, &PlaywrightEx.Page.title!/1) == "Fluffy test stage"
+      assert unwrap_and_return(%Session{session: session}, &Playwright.Page.title!/1) == "Fluffy test stage"
     end
   end
 
@@ -1045,8 +1045,8 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
       |> fill_in("Name", with: "Hermione")
 
     assert_received {:page, page}
-    PlaywrightEx.Page.evaluate!(page, "setTimeout(() => location.assign('?next'))")
-    :ok = PlaywrightEx.Page.wait_for_url(page, &(&1.query == "next"), wait_until: :commit, timeout: 10_000)
+    Playwright.Page.evaluate!(page, "setTimeout(() => location.assign('?next'))")
+    :ok = Playwright.Page.wait_for_url(page, &(&1.query == "next"), wait_until: :commit, timeout: 10_000)
 
     assert_raise ArgumentError, ~r/no active form/, fn -> submit(session) end
   end

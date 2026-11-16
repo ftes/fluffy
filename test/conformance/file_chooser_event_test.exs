@@ -9,7 +9,6 @@ defmodule Fluffy.Conformance.FileChooserEventTest do
   alias Fluffy.Event
   alias Fluffy.FileChooser
   alias Fluffy.FilePayload
-  alias Fluffy.Playwright
 
   @tag driver: :playwright
   test "captures a scripted chooser before the click and selects an in-memory file through it" do
@@ -20,10 +19,10 @@ defmodule Fluffy.Conformance.FileChooserEventTest do
     chooser = await(pending)
     set_input_files(session, chooser, %FilePayload{name: "chosen.txt", bytes: "chosen", content_type: "text/plain"})
     refute FileChooser.multiple?(chooser)
-    refute unwrap_and_return(chooser, &PlaywrightEx.FileChooser.is_multiple/1)
+    refute unwrap_and_return(chooser, &Playwright.FileChooser.is_multiple/1)
 
     assert %{"contents" => "chosen", "name" => "chosen.txt", "type" => "text/plain"} =
-             Playwright.evaluate(
+             Fluffy.Playwright.evaluate(
                session,
                """
                async () => {
@@ -56,7 +55,7 @@ defmodule Fluffy.Conformance.FileChooserEventTest do
     assert error.locator == chooser
     assert error.cause
 
-    assert Playwright.evaluate(
+    assert Fluffy.Playwright.evaluate(
              session,
              "document.querySelector('#attachment').files.length"
            ) == 0
@@ -76,7 +75,7 @@ defmodule Fluffy.Conformance.FileChooserEventTest do
         %FilePayload{name: "second.txt", bytes: "second"}
       ])
 
-    assert Playwright.evaluate(
+    assert Fluffy.Playwright.evaluate(
              session,
              "Array.from(document.querySelector('#attachment').files, file => file.name)"
            ) == ["first.txt", "second.txt"]
@@ -99,7 +98,7 @@ defmodule Fluffy.Conformance.FileChooserEventTest do
       set_input_files(session, await(pending), selection)
     end
 
-    assert Playwright.evaluate(
+    assert Fluffy.Playwright.evaluate(
              session,
              "document.querySelector('#attachment').files.length"
            ) ==
@@ -135,7 +134,7 @@ defmodule Fluffy.Conformance.FileChooserEventTest do
     chooser = await(pending)
     other = switch_page(original, new_page(original))
     assert set_input_files(other, chooser, %FilePayload{name: "original.txt", bytes: "original"}) == other
-    assert Playwright.evaluate(original, "document.querySelector('#attachment').files[0].name") == "original.txt"
+    assert Fluffy.Playwright.evaluate(original, "document.querySelector('#attachment').files[0].name") == "original.txt"
   end
 
   for navigation <- [:patch, :document] do
@@ -144,7 +143,7 @@ defmodule Fluffy.Conformance.FileChooserEventTest do
       original = playwright_session()
       destination = if unquote(navigation) == :patch, do: "#selected", else: "/chamber"
 
-      Playwright.evaluate(
+      Fluffy.Playwright.evaluate(
         original,
         "destination => { document.querySelector('#attachment').onchange = () => { location.href = destination } }",
         destination

@@ -7,8 +7,8 @@ defmodule Fluffy.PlaywrightSessionTest do
   alias Fluffy.Driver.Registry, as: DriverRegistry
   alias Fluffy.Session
   alias Fluffy.Support.Server
-  alias PlaywrightEx.Frame
-  alias PlaywrightEx.Runtime.Heap
+  alias Playwright.Frame
+  alias Playwright.Runtime.Heap
 
   test "loads the harness page and its built JavaScript asset" do
     session = Fluffy.start_session(:playwright)
@@ -35,9 +35,9 @@ defmodule Fluffy.PlaywrightSessionTest do
 
   test "subscribing an already closed page reports it and leaves no close listener" do
     session = Fluffy.start_session(:playwright)
-    browser_page = PlaywrightEx.BrowserContext.new_page!(Session.context(session).browser_context)
-    :ok = PlaywrightEx.Page.close!(browser_page)
-    listeners = fn -> PlaywrightEx.Client.EventEmitter.listener_count(browser_page, "close") end
+    browser_page = Playwright.BrowserContext.new_page!(Session.context(session).browser_context)
+    :ok = Playwright.Page.close!(browser_page)
+    listeners = fn -> Playwright.Client.EventEmitter.listener_count(browser_page, "close") end
     before = listeners.()
 
     assert {:error, "page nil is closed"} =
@@ -48,11 +48,11 @@ defmodule Fluffy.PlaywrightSessionTest do
 
   test "a failed adopted document read keeps the page flagged as navigated" do
     session = Fluffy.start_session(:playwright)
-    browser_page = PlaywrightEx.BrowserContext.new_page!(Session.context(session).browser_context)
+    browser_page = Playwright.BrowserContext.new_page!(Session.context(session).browser_context)
     state = PlaywrightBackend.page_record(browser_page).state
-    :ok = PlaywrightEx.Page.close!(browser_page)
+    :ok = Playwright.Page.close!(browser_page)
 
-    assert_raise PlaywrightEx.TargetClosedError, fn -> Document.adopted_probe!(state, nil, 1_000) end
+    assert_raise Playwright.TargetClosedError, fn -> Document.adopted_probe!(state, nil, 1_000) end
     assert Document.navigated?(state)
   end
 
@@ -78,7 +78,7 @@ defmodule Fluffy.PlaywrightSessionTest do
     assert eventually(fn -> frame_handles(frame) == [] end)
   end
 
-  # The handles PlaywrightEx tracks whose results live in the frame.
+  # The handles Playwright tracks whose results live in the frame.
   defp frame_handles(frame) do
     connection = Heap.get(frame, :_connection)
 

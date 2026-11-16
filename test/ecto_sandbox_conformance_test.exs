@@ -1,6 +1,6 @@
 defmodule Fluffy.EctoSandboxConformanceTest do
   use ExUnit.Case, async: true
-  use PlaywrightEx.Test
+  use Playwright.Test
 
   import Fluffy
   import Fluffy.Expect
@@ -27,7 +27,7 @@ defmodule Fluffy.EctoSandboxConformanceTest do
 
     Fluffy.Playwright.route(session, "**/fluffy-sandbox-route", fn route ->
       %{rows: [[read]]} = Repo.query!("SELECT value FROM fluffy_records")
-      PlaywrightEx.Route.fulfill!(route, json: %{value: read})
+      Playwright.Route.fulfill!(route, json: %{value: read})
     end)
 
     session = visit(session, "/database")
@@ -48,7 +48,7 @@ defmodule Fluffy.EctoSandboxConformanceTest do
     wait = wait_for(session, Event.console(fn _message -> read.() == [[value]] end))
     Fluffy.Playwright.evaluate(session, "() => console.log('Hedwig')")
 
-    assert %PlaywrightEx.ConsoleMessage{} = await(wait)
+    assert %Playwright.ConsoleMessage{} = await(wait)
     assert_receive {:handled, [[^value]]}
   end
 

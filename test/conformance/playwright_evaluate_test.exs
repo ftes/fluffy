@@ -4,7 +4,6 @@ defmodule Fluffy.Conformance.PlaywrightEvaluateTest do
   import Fluffy
 
   alias Fluffy.CapabilityError
-  alias Fluffy.Playwright
   alias Fluffy.Support.Server
 
   test "evaluates JavaScript in the active Playwright page and returns the value" do
@@ -14,10 +13,10 @@ defmodule Fluffy.Conformance.PlaywrightEvaluateTest do
       )
 
     assert "Lumos" ==
-             Playwright.evaluate(session, "document.querySelector('h1').textContent")
+             Fluffy.Playwright.evaluate(session, "document.querySelector('h1').textContent")
 
     assert %{"count" => 1, "state" => "ready"} ==
-             Playwright.evaluate(session, """
+             Fluffy.Playwright.evaluate(session, """
              ({
                count: document.querySelectorAll('h1').length,
                state: document.querySelector('[data-state]').dataset.state
@@ -30,7 +29,7 @@ defmodule Fluffy.Conformance.PlaywrightEvaluateTest do
       session_for_html(:playwright, "<main><p id=status>Ready</p></main>", base_url: Server.base_url())
 
     assert "Ready!" ==
-             Playwright.evaluate(
+             Fluffy.Playwright.evaluate(
                session,
                "suffix => document.querySelector('#status').textContent + suffix",
                "!"
@@ -41,11 +40,11 @@ defmodule Fluffy.Conformance.PlaywrightEvaluateTest do
     session = session_for_html(:playwright, "<main>Options</main>", base_url: Server.base_url())
 
     assert_raise NimbleOptions.ValidationError, ~r/unknown options.*:is_function.*:arg/, fn ->
-      Playwright.evaluate(session, "suffix => suffix", is_function: true, arg: "!")
+      Fluffy.Playwright.evaluate(session, "suffix => suffix", is_function: true, arg: "!")
     end
 
     assert_raise NimbleOptions.ValidationError, ~r/unknown options.*:arg/, fn ->
-      Playwright.evaluate(session, "suffix => suffix", "!", arg: "!")
+      Fluffy.Playwright.evaluate(session, "suffix => suffix", "!", arg: "!")
     end
   end
 
@@ -54,7 +53,7 @@ defmodule Fluffy.Conformance.PlaywrightEvaluateTest do
     session = session_for_html(:playwright, "<main>Options</main>", base_url: Server.base_url())
 
     assert_raise NimbleOptions.ValidationError, ~r/unknown options.*:timeout/, fn ->
-      Playwright.evaluate(session, "1 + 1", timeout: 1_000)
+      Fluffy.Playwright.evaluate(session, "1 + 1", timeout: 1_000)
     end
   end
 
@@ -68,7 +67,7 @@ defmodule Fluffy.Conformance.PlaywrightEvaluateTest do
       |> visit("/chamber")
 
     assert_raise CapabilityError, ~r/:static does not support :javascript_evaluation/, fn ->
-      Playwright.evaluate(session, "document.title")
+      Fluffy.Playwright.evaluate(session, "document.title")
     end
   end
 
@@ -76,8 +75,8 @@ defmodule Fluffy.Conformance.PlaywrightEvaluateTest do
     session =
       session_for_html(:playwright, "<main>Failure</main>", base_url: Server.base_url())
 
-    assert_raise PlaywrightEx.PlaywrightError, ~r/boom/, fn ->
-      Playwright.evaluate(session, "(() => { throw new Error('boom') })()")
+    assert_raise Playwright.PlaywrightError, ~r/boom/, fn ->
+      Fluffy.Playwright.evaluate(session, "(() => { throw new Error('boom') })()")
     end
   end
 end

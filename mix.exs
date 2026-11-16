@@ -71,8 +71,8 @@ defmodule Fluffy.MixProject do
       {:lazy_html, ">= 0.1.0 and < 1.0.0"},
       {:phoenix, "~> 1.7"},
       {:phoenix_live_view, "~> 1.0"},
-      # Prototype on the unreleased PlaywrightEx.Test.
-      {:playwright_ex, github: "ftes/playwright_ex", branch: "main", override: true},
+      # Prototype on the unreleased Playwright.Test.
+      {:playwright, github: "ftes/playwright_ex", branch: "main", override: true},
       {:phoenix_ecto, "~> 4.7", optional: true},
       {:ecto_sql, "~> 3.10", optional: true},
       {:ex_doc, "~> 0.40.3", only: :dev, runtime: false},
@@ -97,6 +97,9 @@ defmodule Fluffy.MixProject do
         if metadata[:playwright_only], do: ["Playwright only"], else: []
       end,
       source_ref: "v#{@version}",
+      # The `:playwright` app's Hex package is `playwright_ex`; ex_doc would link the app name,
+      # the other library `playwright` on Hex.
+      deps: [playwright: "https://hexdocs.pm/playwright_ex"],
       # They name functions that later releases removed.
       skip_undefined_reference_warnings_on: ["CHANGELOG.md", "docs/upgrading.md"],
       extras: ["README.md"] ++ @doc_files,
@@ -161,7 +164,7 @@ defmodule Fluffy.MixProject do
         {:usage_rules, sub_rules: []},
         "phoenix:html",
         {"phoenix:liveview", link: :markdown},
-        {:playwright_ex, link: :markdown}
+        {:playwright, link: :markdown}
       ]
     ]
   end
@@ -171,7 +174,7 @@ defmodule Fluffy.MixProject do
       setup: [
         "deps.get",
         "assets.build",
-        "playwright_ex.install -- chromium",
+        "playwright.install -- chromium",
         "fluffy.playwright_source"
       ],
       "consumer.regenerate": "run --no-start integration/regenerate_consumer.exs",

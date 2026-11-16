@@ -1,6 +1,6 @@
 defmodule Fluffy.EctoSandboxLifecycleTest do
   use ExUnit.Case, async: true
-  use PlaywrightEx.Test
+  use Playwright.Test
 
   import Fluffy
   import Fluffy.Expect
@@ -57,7 +57,7 @@ defmodule Fluffy.EctoSandboxLifecycleTest do
     watch_exits(
       observer,
       %{browser.runtime => :browser, live_view => :live_view, owner => :owner},
-      {browser_context, PlaywrightEx.BrowserContext.browser(browser_context)}
+      {browser_context, Playwright.BrowserContext.browser(browser_context)}
     )
   end
 
@@ -96,7 +96,7 @@ end
 
 defmodule Fluffy.EctoSandboxSharedModeTest do
   use ExUnit.Case, async: false
-  use PlaywrightEx.Test
+  use Playwright.Test
 
   import Fluffy
   import Fluffy.Expect

@@ -6,8 +6,8 @@ defmodule Fluffy.OperationErrorTest do
   import Fluffy.Locator
 
   alias Fluffy.OperationError
-  alias Fluffy.Playwright
   alias Fluffy.Support.Server
+  alias Playwright.TimeoutError
 
   test "retains structured error names and the complete original error" do
     locator = by_role(:button, name: "Save")
@@ -42,7 +42,7 @@ defmodule Fluffy.OperationErrorTest do
       error = assert_raise OperationError, fn -> submit(session, locator) end
       assert error.operation == :submit
       assert error.locator == locator
-      assert %PlaywrightEx.PlaywrightError{} = error.cause
+      assert %Playwright.PlaywrightError{} = error.cause
       assert error.message =~ message
     end
   end
@@ -51,7 +51,7 @@ defmodule Fluffy.OperationErrorTest do
   test "assertion diagnostics retain received state and do not clone custom elements" do
     session = browser_html("<section><review-element></review-element></section>")
 
-    Playwright.evaluate(
+    Fluffy.Playwright.evaluate(
       session,
       """
       () => {
@@ -63,7 +63,7 @@ defmodule Fluffy.OperationErrorTest do
       """
     )
 
-    before = Playwright.evaluate(session, "window.constructions")
+    before = Fluffy.Playwright.evaluate(session, "window.constructions")
 
     error =
       assert_raise ExUnit.AssertionError, fn ->
@@ -74,14 +74,14 @@ defmodule Fluffy.OperationErrorTest do
     assert error.message =~ "Received: 1"
     assert error.message =~ "Timeout:"
     assert error.message =~ "Call log:"
-    assert Playwright.evaluate(session, "window.constructions") == before
+    assert Fluffy.Playwright.evaluate(session, "window.constructions") == before
   end
 
   @tag driver: :playwright
   test "action errors need no second read of the document" do
     session = browser_html("<button disabled>Save</button>")
 
-    Playwright.evaluate(
+    Fluffy.Playwright.evaluate(
       session,
       """
       () => {
@@ -94,7 +94,7 @@ defmodule Fluffy.OperationErrorTest do
     error = assert_raise OperationError, fn -> click(session, locator, timeout: 200) end
     assert error.operation == :click
     assert error.locator == locator
-    assert %PlaywrightEx.TimeoutError{} = error.cause
+    assert %TimeoutError{} = error.cause
     assert error.message =~ "Call log:"
     refute error.message =~ "unexpected diagnostic clone"
   end
@@ -123,7 +123,7 @@ defmodule Fluffy.OperationErrorTest do
 
         if unquote(driver) == :playwright do
           assert error.backend == :playwright
-          assert %PlaywrightEx.TimeoutError{log: [_ | _]} = error.cause
+          assert %TimeoutError{log: [_ | _]} = error.cause
         else
           assert error.backend == :phoenix
           assert %Fluffy.ActionabilityError{reason: :disabled, locator: ^locator} = error.cause

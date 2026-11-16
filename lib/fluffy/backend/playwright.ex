@@ -16,9 +16,9 @@ defmodule Fluffy.Backend.Playwright do
   alias Fluffy.Session
   alias Fluffy.SessionRuntime
   alias Fluffy.Timeouts
-  alias PlaywrightEx.BrowserContext
-  alias PlaywrightEx.Page, as: BrowserPage
-  alias PlaywrightEx.TargetClosedError
+  alias Playwright.BrowserContext
+  alias Playwright.Page, as: BrowserPage
+  alias Playwright.TargetClosedError
 
   @impl true
   def start_session(options) do
@@ -29,7 +29,7 @@ defmodule Fluffy.Backend.Playwright do
 
     # Merged over the config's, which `extra_http_headers:` would replace as a whole.
     headers =
-      PlaywrightEx.Test.config().context_options
+      Playwright.Test.config().context_options
       |> Access.get(:extra_http_headers, %{})
       |> Enum.concat(Keyword.get(browser_context_options, :extra_http_headers, %{}))
       |> Enum.concat(Keyword.get(options, :headers, []))
@@ -39,7 +39,7 @@ defmodule Fluffy.Backend.Playwright do
     runtime = SessionRuntime.start!(test_pid)
 
     try do
-      # PlaywrightEx.Test records the context for the test and gives it Playwright Test's
+      # Playwright.Test records the context for the test and gives it Playwright Test's
       # defaults, also from a process with the test in `$callers`; the runtime closes it with
       # the session. As in Playwright, closing has
       # no timeout. A browser lost to a dead driver still refuses contexts until its
@@ -47,8 +47,8 @@ defmodule Fluffy.Backend.Playwright do
       # the test's lease of the pool, taken here so a test without a Playwright session takes none.
       browser_context =
         options
-        |> Keyword.get_lazy(:browser, &PlaywrightEx.Test.BrowserPool.browser/0)
-        |> PlaywrightEx.Browser.new_context!(browser_context_options ++ [base_url: base_url, extra_http_headers: headers])
+        |> Keyword.get_lazy(:browser, &Playwright.Test.BrowserPool.browser/0)
+        |> Playwright.Browser.new_context!(browser_context_options ++ [base_url: base_url, extra_http_headers: headers])
 
       :ok =
         SessionRuntime.register(runtime, {:browser_context, browser_context.guid}, fn ->
@@ -62,7 +62,7 @@ defmodule Fluffy.Backend.Playwright do
       }
 
       SessionRuntime.run(runtime, fn ->
-        # The resolved action and navigation timeouts (`Fluffy.Timeouts`), over PlaywrightEx.Test's
+        # The resolved action and navigation timeouts (`Fluffy.Timeouts`), over Playwright.Test's
         # own: native calls in `unwrap` default to them too, as Fluffy's own calls do.
         :ok = BrowserContext.set_default_timeout(browser_context, Timeouts.action())
         :ok = BrowserContext.set_default_navigation_timeout(browser_context, Timeouts.navigation())
@@ -79,7 +79,7 @@ defmodule Fluffy.Backend.Playwright do
     end
   end
 
-  # PlaywrightEx.Test's error says to add `use PlaywrightEx.Test`; Fluffy's modules get it
+  # Playwright.Test's error says to add `use Playwright.Test`; Fluffy's modules get it
   # from `use Fluffy.Case`.
   defp test_pid! do
     case Fluffy.TestInfo.fetch() do
@@ -115,13 +115,13 @@ defmodule Fluffy.Backend.Playwright do
   # Actions adopt the document they find. One that page code navigated to
   # since is read from the page; a closed or unresponsive page keeps the
   # adopted identity. The probe raises a `RuntimeError` when the page does not
-  # respond and PlaywrightEx's error when the page is closed or the read fails.
+  # respond and Playwright's error when the page is closed or the read fails.
   defp document_identity(state) do
     if Document.navigated?(state),
       do: Document.probe!(state.frame, nil, @snapshot_probe_timeout).document,
       else: state.document_identity
   rescue
-    _error in [RuntimeError, PlaywrightEx.PlaywrightError, PlaywrightEx.TimeoutError, TargetClosedError] ->
+    _error in [RuntimeError, Playwright.PlaywrightError, Playwright.TimeoutError, TargetClosedError] ->
       state.document_identity
   end
 
@@ -285,12 +285,12 @@ defmodule Fluffy.Backend.Playwright do
   defp navigation_options(operation, options),
     do: Keyword.put(options, :timeout, Timeouts.playwright_operation!(operation, options))
 
-  # As for an action, PlaywrightEx's error, which keeps Playwright's call log,
+  # As for an action, Playwright's error, which keeps Playwright's call log,
   # becomes the cause of a `Fluffy.OperationError`.
   defp navigation!(operation, fun) do
     fun.()
   rescue
-    error in [PlaywrightEx.PlaywrightError, PlaywrightEx.TimeoutError, TargetClosedError] ->
+    error in [Playwright.PlaywrightError, Playwright.TimeoutError, TargetClosedError] ->
       reraise OperationFailure.playwright(operation, nil, error), __STACKTRACE__
   end
 

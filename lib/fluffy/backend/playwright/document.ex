@@ -9,8 +9,8 @@ defmodule Fluffy.Backend.Playwright.Document do
 
   alias Fluffy.Backend.Playwright.Bounded
   alias Fluffy.Deadline
-  alias PlaywrightEx.Frame
-  alias PlaywrightEx.JSHandle
+  alias Playwright.Frame
+  alias Playwright.JSHandle
 
   # What Fluffy's own browser calls around an operation may take: the operation's
   # timeout, but at least a second. A sub-second timeout limits the operation; a
@@ -152,7 +152,7 @@ defmodule Fluffy.Backend.Playwright.Document do
       {:ok, handle} ->
         release(handle)
 
-      {:error, %PlaywrightEx.TargetClosedError{} = error} ->
+      {:error, %Playwright.TargetClosedError{} = error} ->
         raise error
 
       {:error, error} ->
@@ -172,7 +172,7 @@ defmodule Fluffy.Backend.Playwright.Document do
       {:ok, handle} ->
         release(handle)
 
-      {:error, %PlaywrightEx.TargetClosedError{} = error} ->
+      {:error, %Playwright.TargetClosedError{} = error} ->
         raise error
 
       {:error, error} ->
@@ -189,7 +189,7 @@ defmodule Fluffy.Backend.Playwright.Document do
 
     case Frame.wait_for_function(frame, expression, cursor, timeout: timeout) do
       {:ok, handle} -> release(handle)
-      {:error, %PlaywrightEx.TargetClosedError{} = error} -> raise error
+      {:error, %Playwright.TargetClosedError{} = error} -> raise error
       {:error, error} -> raise "LiveView browser navigation did not complete: " <> Exception.message(error)
     end
   end

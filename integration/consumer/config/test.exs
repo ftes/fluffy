@@ -5,7 +5,7 @@ config :fluffy,
   endpoint: FluffyConsumerWeb.Endpoint,
   action_timeout: 15_000
 
-config :playwright_ex, :test, launch_options: [headless: true], navigation_timeout: 15_000
+config :playwright, :test, launch_options: [headless: true], navigation_timeout: 15_000
 
 # We don't run a server during test. If one is required,
 # you can enable the server option below.

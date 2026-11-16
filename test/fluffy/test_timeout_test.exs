@@ -1,15 +1,15 @@
 defmodule Fluffy.TestTimeoutTest do
   # The test timeout's backstop on its own, without waiting one out: the conformance tests
   # (`Fluffy.Conformance.TestTimeoutTest`) do that, once per driver class. The backstop comes
-  # from PlaywrightEx.Test's registration of the test, so the tests run at once.
+  # from Playwright.Test's registration of the test, so the tests run at once.
   use ExUnit.Case, async: true
   use Fluffy.Case
 
   alias Fluffy.TestTimeout
 
   @tag timeout: 10_000
-  test "a test's backstop is when PlaywrightEx.Test closes its contexts" do
-    %{timeout: 10_000, close_deadline: close_deadline} = PlaywrightEx.Test.info()
+  test "a test's backstop is when Playwright.Test closes its contexts" do
+    %{timeout: 10_000, close_deadline: close_deadline} = Playwright.Test.info()
     assert TestTimeout.fetch() == {10_000, close_deadline}
   end
 

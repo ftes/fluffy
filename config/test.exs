@@ -46,7 +46,7 @@ config :fluffy, RepoTwo,
   username: System.get_env("FLUFFY_DB_USER", "postgres")
 
 # A failing action or navigation fails in 15 s, not at the test's timeout, as a loaded machine
-# may take long but not that long. The navigation timeout is PlaywrightEx's, as only browsers
+# may take long but not that long. The navigation timeout is Playwright's, as only browsers
 # wait for navigations.
 config :fluffy,
   ecto_repos: [Repo, RepoTwo],
@@ -54,9 +54,9 @@ config :fluffy,
   action_timeout: 15_000
 
 # The tests write their baselines on first use: written and passed, not failed at the test's end.
-config :playwright_ex, :expect, update_snapshots: :missing
+config :playwright, :expect, update_snapshots: :missing
 
-config :playwright_ex, :test,
+config :playwright, :test,
   browser_name: browser_engine,
   launch_options: [headless: true],
   navigation_timeout: 15_000
@@ -64,7 +64,7 @@ config :playwright_ex, :test,
 # CI keeps a screenshot of each failed test's pages in FLUFFY_ARTIFACT_DIR, and traces the
 # `--failed` retry, as Playwright's CI default (`trace: 'on-first-retry'`).
 if artifact_dir = System.get_env("FLUFFY_ARTIFACT_DIR") do
-  config :playwright_ex, :test, output_dir: artifact_dir, screenshot: :only_on_failure, trace: :on_first_retry
+  config :playwright, :test, output_dir: artifact_dir, screenshot: :only_on_failure, trace: :on_first_retry
 end
 
 config :logger, level: :warning

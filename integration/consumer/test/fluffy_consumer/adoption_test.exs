@@ -54,8 +54,8 @@ defmodule FluffyConsumer.AdoptionTest do
                 )
           }
 
-        %PlaywrightEx.Page{} = page ->
-          PlaywrightEx.Page.evaluate!(
+        %Playwright.Page{} = page ->
+          Playwright.Page.evaluate!(
             page,
             "document.querySelector('h1').textContent = 'Mischief managed'"
           )

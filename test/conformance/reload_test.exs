@@ -80,7 +80,7 @@ defmodule Fluffy.Conformance.ReloadTest do
   end
 
   @tag driver: :playwright
-  test "a Playwright reload that never loads raises PlaywrightEx's timeout error" do
+  test "a Playwright reload that never loads raises Playwright's timeout error" do
     owner = self()
 
     fixture =
@@ -105,7 +105,7 @@ defmodule Fluffy.Conformance.ReloadTest do
 
     try do
       error = assert_raise Fluffy.OperationError, ~r/reload/, fn -> reload(session, timeout: 500) end
-      assert %Fluffy.OperationError{operation: :reload, locator: nil, cause: %PlaywrightEx.TimeoutError{}} = error
+      assert %Fluffy.OperationError{operation: :reload, locator: nil, cause: %Playwright.TimeoutError{}} = error
     after
       receive do
         {:stream, server} -> send(server, :finish)

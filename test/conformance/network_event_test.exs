@@ -7,15 +7,15 @@ defmodule Fluffy.Conformance.NetworkEventTest do
   import Fluffy.Playwright
 
   alias Fluffy.Event
-  alias Fluffy.Playwright
   alias Fluffy.SessionRuntime
   alias Fluffy.Support.HTTPFixtures
   alias Fluffy.Support.Server
-  alias PlaywrightEx.Request
-  alias PlaywrightEx.Response
+  alias Playwright.Frame
+  alias Playwright.Request
+  alias Playwright.Response
 
   @tag driver: :playwright
-  test "request and response events deliver PlaywrightEx's values" do
+  test "request and response events deliver Playwright's values" do
     {session, fixture} = session()
     request_wait = wait_for(session, Event.request(&String.ends_with?(url(&1), "/api?source=button")))
     response_wait = wait_for(session, Event.response(&String.ends_with?(url(&1), "/api?source=button")))
@@ -40,7 +40,7 @@ defmodule Fluffy.Conformance.NetworkEventTest do
     {session, fixture} = session()
     request_wait = wait_for(session, Event.request(&String.ends_with?(url(&1), "/api?source=bytes")))
 
-    Playwright.evaluate(
+    Fluffy.Playwright.evaluate(
       session,
       "url => { fetch(url, {method: 'POST', body: new Uint8Array([0xff, 0x00, 0x89, 0x50])}); return true }",
       HTTPFixtures.url(fixture, "/api?source=bytes")
@@ -53,9 +53,9 @@ defmodule Fluffy.Conformance.NetworkEventTest do
   test "page and context waits observe the same request, including child-frame requests" do
     {session, fixture} = session()
     frame_url = HTTPFixtures.url(fixture, "/child")
-    frame_wait = wait_for(session, Event.frame_navigated(&(PlaywrightEx.Frame.url(&1) == frame_url)))
+    frame_wait = wait_for(session, Event.frame_navigated(&(Frame.url(&1) == frame_url)))
 
-    Playwright.evaluate(
+    Fluffy.Playwright.evaluate(
       session,
       "url => { const f = document.createElement('iframe'); f.src = url; document.body.appendChild(f) }",
       frame_url
@@ -66,7 +66,7 @@ defmodule Fluffy.Conformance.NetworkEventTest do
     page_wait = wait_for(session, event)
     context_wait = wait_for(session, event, scope: :context)
 
-    Playwright.evaluate(
+    Fluffy.Playwright.evaluate(
       session,
       "url => { document.querySelector('iframe').contentWindow.fetch(url); return true }",
       HTTPFixtures.url(fixture, "/api")
@@ -125,7 +125,7 @@ defmodule Fluffy.Conformance.NetworkEventTest do
     assert_receive :held
 
     assert {:ok, nil} =
-             PlaywrightEx.Frame.evaluate(frame, """
+             Frame.evaluate(frame, """
              async () => {
                const popup = window.open('closing')
                while (!popup.closed) await new Promise(resolve => setTimeout(resolve, 20))
@@ -202,7 +202,7 @@ defmodule Fluffy.Conformance.NetworkEventTest do
 
     try do
       assert Response.status(await(pending)) == 200
-      refute Playwright.evaluate(session, "window.bodyComplete === true")
+      refute Fluffy.Playwright.evaluate(session, "window.bodyComplete === true")
     after
       send(server, :finish)
     end
@@ -222,7 +222,7 @@ defmodule Fluffy.Conformance.NetworkEventTest do
   defp url(%Request{} = request), do: Request.url(request)
   defp url(%Response{} = response), do: Response.url(response)
 
-  defp request_page(session, request), do: page(session, PlaywrightEx.Frame.page(Request.frame(request)))
+  defp request_page(session, request), do: page(session, Frame.page(Request.frame(request)))
 
   defp session do
     fixture =

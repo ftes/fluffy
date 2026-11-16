@@ -8,8 +8,8 @@ defmodule Fluffy.Driver.Playwright.State do
   defstruct [:page, :frame, :document_identity, :navigated]
 
   @type t :: %__MODULE__{
-          page: PlaywrightEx.Page.t(),
-          frame: PlaywrightEx.Frame.t(),
+          page: Playwright.Page.t(),
+          frame: Playwright.Frame.t(),
           document_identity: String.t() | nil,
           navigated: :atomics.atomics_ref()
         }

@@ -6,14 +6,14 @@ defmodule Fluffy.Expect.Internal do
   alias Fluffy.Expect
   alias Fluffy.Locator
   alias Fluffy.Options
-  # StringUtils is internal to PlaywrightEx, which is pinned.
-  alias PlaywrightEx.Isomorphic.StringUtils
-  alias PlaywrightEx.Isomorphic.UrlMatch
-  alias PlaywrightEx.RegExp
+  # StringUtils is internal to Playwright, which is pinned.
+  alias Playwright.Isomorphic.StringUtils
+  alias Playwright.Isomorphic.UrlMatch
+  alias Playwright.RegExp
 
   @doc """
   An expected text value as every driver matches it: an Elixir `Regex` becomes the
-  `PlaywrightEx.RegExp` that Playwright runs, raising `ArgumentError` on PCRE-only syntax.
+  `Playwright.RegExp` that Playwright runs, raising `ArgumentError` on PCRE-only syntax.
   """
   def reg_exp(%Regex{} = expected), do: RegExp.new(expected)
   def reg_exp(expected), do: expected
@@ -24,7 +24,7 @@ defmodule Fluffy.Expect.Internal do
   def matches?(expected, actual), do: actual == expected
 
   @doc """
-  A `PlaywrightEx.RegExp` compiled once per process, as locators and expectations retry
+  A `Playwright.RegExp` compiled once per process, as locators and expectations retry
   and match each element; any other value as it is.
   """
   def compile(%RegExp{} = expected) do
@@ -41,7 +41,7 @@ defmodule Fluffy.Expect.Internal do
 
   @doc """
   Whether `url` matches a `page_to_have_url/2` expectation on the Phoenix drivers, as in
-  PlaywrightEx's `toHaveURL`: a string resolved against `base_url` equals the URL, a
+  Playwright's `toHaveURL`: a string resolved against `base_url` equals the URL, a
   regular expression matches it, and a predicate gets it as a `%URI{}`. `ignore_case:` compares
   strings and predicate URLs in lower case and overrides a regular expression's `i` flag.
   """
@@ -66,7 +66,7 @@ defmodule Fluffy.Expect.Internal do
 
   @doc """
   Applies `ignore_case:` to a regular expression. It takes precedence over the expression's
-  own `i` flag, as in PlaywrightEx.
+  own `i` flag, as in Playwright.
   """
   def ignore_case(%RegExp{} = expected, nil), do: expected
 

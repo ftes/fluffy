@@ -74,7 +74,7 @@ defmodule Fluffy.Session do
 
   defp start_runtime, do: SessionRuntime.start!(test_pid())
 
-  # The session belongs to the test, as a Playwright one does (`PlaywrightEx.Test.info/0`),
+  # The session belongs to the test, as a Playwright one does (`Playwright.Test.info/0`),
   # so one started in a Task outlives it. An unregistered test has no `info`: its process is
   # the first in `$callers`' chain, the one with no callers.
   defp test_pid do

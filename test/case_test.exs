@@ -7,7 +7,7 @@ defmodule Fluffy.CaseTest do
     refute Map.has_key?(context, :session)
     refute Keyword.has_key?(__ENV__.functions, Fluffy)
     refute Keyword.has_key?(__ENV__.functions, Fluffy.Locator)
-    assert PlaywrightEx.Test.info().test_pid == self()
+    assert Playwright.Test.info().test_pid == self()
   end
 
   @tag timeout: 30_000
@@ -22,7 +22,7 @@ defmodule Fluffy.CaseTest do
   end
 
   test "rejects an unknown option at compile time" do
-    assert_raise ArgumentError, ~r/unknown options \[:invisibility_cloak\] for use PlaywrightEx.Test/, fn ->
+    assert_raise ArgumentError, ~r/unknown options \[:invisibility_cloak\] for use Playwright.Test/, fn ->
       Code.compile_string("""
       defmodule Fluffy.CaseTest.UnknownOption do
         use ExUnit.Case
@@ -132,7 +132,7 @@ defmodule Fluffy.CaseTemplateTest do
 end
 
 defmodule Fluffy.CaseBrowserLeaseTest do
-  # A test takes a browser from PlaywrightEx.Test's pool, and with it one of `workers`
+  # A test takes a browser from Playwright.Test's pool, and with it one of `workers`
   # seats, only for a Playwright session. The pool has no public view of its seats, so this
   # reads its state: the scopes that hold seats, here the test process, until the test's `on_exit`.
   use ExUnit.Case, async: true
@@ -161,7 +161,7 @@ defmodule Fluffy.CaseBrowserLeaseTest do
   end
 
   defp holds_lease? do
-    pool = Process.whereis(PlaywrightEx.Test.Pool)
+    pool = Process.whereis(Playwright.Test.Pool)
     pool != nil and Map.has_key?(:sys.get_state(pool).scopes, self())
   end
 end
@@ -169,10 +169,10 @@ end
 defmodule Fluffy.CaseWithPlaywrightExTestTest do
   use ExUnit.Case, async: true
   use Fluffy.Case
-  use PlaywrightEx.Test
+  use Playwright.Test
 
   test "registers the test once" do
-    assert PlaywrightEx.Test.info().test_pid == self()
+    assert Playwright.Test.info().test_pid == self()
   end
 end
 

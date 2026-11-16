@@ -110,7 +110,7 @@ defmodule Fluffy.Conformance.SessionRuntimeTest do
     session = start_session(:playwright)
     other = switch_page(session, new_page(session))
     closed = current_page(other)
-    assert :ok = PlaywrightEx.Page.close(Session.page_state(other).page)
+    assert :ok = Playwright.Page.close(Session.page_state(other).page)
     assert_raise ArgumentError, ~r/closed/, fn -> Page.url(closed) end
     visit(session, "/chamber")
     expect(session, "The guardian sleeps" |> by_text() |> to_be_visible())
@@ -140,7 +140,7 @@ defmodule Fluffy.Conformance.SessionRuntimeTest do
           close_page(session)
 
         :native ->
-          assert :ok = PlaywrightEx.Page.close(Session.page_state(session).page)
+          assert :ok = Playwright.Page.close(Session.page_state(session).page)
       end
 
       assert_eventually(fn -> Page.opener(current_page(child)) == nil end)
@@ -169,7 +169,7 @@ defmodule Fluffy.Conformance.SessionRuntimeTest do
   test "native browser pages are discovered without a Fluffy event wait" do
     session = start_session(:playwright)
     main = current_page(session)
-    assert {:ok, browser_page} = PlaywrightEx.BrowserContext.new_page(Session.context(session).browser_context)
+    assert {:ok, browser_page} = Playwright.BrowserContext.new_page(Session.context(session).browser_context)
 
     assert_eventually(fn -> length(pages(session)) == 2 end)
     [discovered] = pages(session) -- [main]
@@ -182,7 +182,7 @@ defmodule Fluffy.Conformance.SessionRuntimeTest do
     assert Page.url(discovered) =~ "/chamber"
     assert current_page(session) == main
 
-    assert :ok = PlaywrightEx.Page.close(browser_page)
+    assert :ok = Playwright.Page.close(browser_page)
 
     assert_eventually(fn -> pages(session) == [main] end)
     assert_raise ArgumentError, ~r/closed/, fn -> Page.url(discovered) end
@@ -194,7 +194,7 @@ defmodule Fluffy.Conformance.SessionRuntimeTest do
     runtime = session.runtime
     monitor = monitor_running(runtime)
 
-    assert :ok = PlaywrightEx.BrowserContext.close(Session.context(session).browser_context)
+    assert :ok = Playwright.BrowserContext.close(Session.context(session).browser_context)
 
     assert_receive {:DOWN, ^monitor, :process, ^runtime, :normal}, 5_000
     assert_raise ArgumentError, ~r/session is closed/, fn -> pages(session) end

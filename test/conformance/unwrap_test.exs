@@ -14,9 +14,9 @@ defmodule Fluffy.Conformance.UnwrapTest do
   alias Fluffy.Support.Server
   alias Fluffy.Support.Web.Endpoint
   alias Phoenix.LiveViewTest.View
-  alias PlaywrightEx.BrowserContext
-  alias PlaywrightEx.Locator, as: BrowserLocator
-  alias PlaywrightEx.Page, as: BrowserPage
+  alias Playwright.BrowserContext
+  alias Playwright.Locator, as: BrowserLocator
+  alias Playwright.Page, as: BrowserPage
 
   @endpoint Endpoint
 
@@ -488,7 +488,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
 
       session
       |> unwrap(fn page ->
-        assert {:error, %PlaywrightEx.TimeoutError{}} =
+        assert {:error, %Playwright.TimeoutError{}} =
                  BrowserPage.wait_for_selector(page, "#does-not-exist", timeout: 1)
       end)
       |> expect("Still usable" |> by_text() |> to_be_visible())
@@ -580,7 +580,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
       end
     end
 
-    # With no action timeout, a native call waits until PlaywrightEx.Test closes the test's
+    # With no action timeout, a native call waits until Playwright.Test closes the test's
     # contexts at its timeout. As in Playwright, the call's error and its log show through.
     @tag driver: :playwright
     @tag timeout: 6_000
@@ -588,7 +588,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
       session = playwright_html("<p>Tracked context</p>")
 
       error =
-        assert_raise PlaywrightEx.TargetClosedError, fn ->
+        assert_raise Playwright.TargetClosedError, fn ->
           unwrap(session, &BrowserPage.click(&1, "#missing", timeout: :infinity))
         end
 

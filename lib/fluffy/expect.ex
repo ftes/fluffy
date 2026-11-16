@@ -27,8 +27,8 @@ defmodule Fluffy.Expect do
 
   @dialyzer {:nowarn_function, expect: 3}
 
-  # An Elixir `Regex` is converted to the `PlaywrightEx.RegExp` it stands for (`text_values!/1`).
-  defguardp is_text(value) when is_binary(value) or is_struct(value, Regex) or is_struct(value, PlaywrightEx.RegExp)
+  # An Elixir `Regex` is converted to the `Playwright.RegExp` it stands for (`text_values!/1`).
+  defguardp is_text(value) when is_binary(value) or is_struct(value, Regex) or is_struct(value, Playwright.RegExp)
 
   @type target :: {:locator, Locator.t()} | :page
 
@@ -64,7 +64,7 @@ defmodule Fluffy.Expect do
           | :values
           | :visible
 
-  @type text_expectation :: String.t() | Regex.t() | PlaywrightEx.RegExp.t()
+  @type text_expectation :: String.t() | Regex.t() | Playwright.RegExp.t()
 
   @type t :: %__MODULE__{
           target: target(),
@@ -288,14 +288,14 @@ defmodule Fluffy.Expect do
 
       expect(session, to_have_screenshot(by_role(:main), name: "main.png"))
 
-  In a module with `use Fluffy.Case`, `PlaywrightEx.Test` resolves `name:` (or, without
+  In a module with `use Fluffy.Case`, `Playwright.Test` resolves `name:` (or, without
   one, the test's name) to a file, as Playwright does; see "Snapshots" in its docs. A
   missing baseline is written there and fails the test at the end of its body, as in
   Playwright. A mismatch writes `-actual`, `-diff` and `-previous` images to the test's
   output dir. `path:` names the file itself instead, relative to the current working
   directory; elsewhere it is required. Commit the baselines.
 
-  `config :playwright_ex, :expect` sets `update_snapshots:`, where `:none` fails on a
+  `config :playwright, :expect` sets `update_snapshots:`, where `:none` fails on a
   missing baseline, `:missing` writes it and passes, and `:changed` or `:all` rewrite a
   mismatching one, and comparison defaults such as `to_have_screenshot: %{maxDiffPixels: 10}`.
 
@@ -382,7 +382,7 @@ defmodule Fluffy.Expect do
   An empty `expected` fails with the current snapshot in its message, to paste in.
 
   The file is found as a screenshot baseline is (see `to_have_screenshot/2`): `name:`, or
-  the test's name, resolved by `PlaywrightEx.Test` in a module with `use Fluffy.Case`, or
+  the test's name, resolved by `Playwright.Test` in a module with `use Fluffy.Case`, or
   `path:`, relative to the current working directory. A missing file is written and fails
   the test at its end, or passes under `update_snapshots: :missing`; negated, it fails.
   Under `:none` a missing file fails, comparing against an empty snapshot. Negated, a
@@ -400,7 +400,7 @@ defmodule Fluffy.Expect do
     aria_snapshot_expectation({:locator, locator}, expected_or_options, options)
   end
 
-  # The file travels with the expected value, for PlaywrightEx to raise if both are given.
+  # The file travels with the expected value, for Playwright to raise if both are given.
   defp aria_snapshot_expectation(target, options, []) when is_list(options),
     do: aria_snapshot_expectation(target, nil, options)
 
@@ -638,7 +638,7 @@ defmodule Fluffy.Expect do
     native_expectation(:to_be_empty, {:locator, locator}, :empty, true, options)
   end
 
-  # `visible: false` and the like assert the opposite state, as in PlaywrightEx.
+  # `visible: false` and the like assert the opposite state, as in Playwright.
   defp state_expectation(matcher, locator, kind, options) do
     {timeout, state} = Options.split_expectation!(matcher, options)
     expectation = Internal.new({:locator, locator}, kind, true, timeout)

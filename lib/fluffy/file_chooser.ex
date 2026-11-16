@@ -10,7 +10,7 @@ defmodule Fluffy.FileChooser do
   defstruct [:native, :page, :multiple?]
 
   @opaque t :: %__MODULE__{
-            native: PlaywrightEx.FileChooser.t(),
+            native: Playwright.FileChooser.t(),
             page: Fluffy.Page.t(),
             multiple?: boolean()
           }

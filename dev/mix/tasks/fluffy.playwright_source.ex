@@ -1,8 +1,8 @@
 defmodule Mix.Tasks.Fluffy.PlaywrightSource do
-  @shortdoc "Fetches the Playwright source of the driver version PlaywrightEx pins"
+  @shortdoc "Fetches the Playwright source of the pinned driver version"
   @moduledoc """
   Clones Playwright's source at the tag of the pinned driver (`v<version>`, see
-  `PlaywrightEx.Driver.version/0`) into `tmp/playwright-<version>`, unless that exists. The
+  `Playwright.Driver.version/0`) into `tmp/playwright-<version>`, unless that exists. The
   clone is shallow, blobless and sparse, checking out only `@paths`.
 
       mix fluffy.playwright_source
@@ -19,7 +19,7 @@ defmodule Mix.Tasks.Fluffy.PlaywrightSource do
   @impl Mix.Task
   def run(_args) do
     Mix.Task.run("loadpaths")
-    version = PlaywrightEx.Driver.version()
+    version = Playwright.Driver.version()
     dir = "tmp/playwright-#{version}"
 
     if !File.dir?(dir) do

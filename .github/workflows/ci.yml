@@ -9,7 +9,7 @@ on:
   # Nightly, so Firefox and WebKit regressions show up without a push.
   schedule:
     - cron: "0 3 * * *"
-  # As PlaywrightEx's CI. The inputs are for experiments; their defaults (and every other event)
+  # As playwright_ex's CI. The inputs are for experiments; their defaults (and every other event)
   # run the full CI.
   workflow_dispatch:
     inputs:
@@ -121,7 +121,7 @@ jobs:
             _build
 
   # Each lane's suite per browser in `partitions` jobs (`mix test --partitions`: test files
-  # round-robin by sorted path), as PlaywrightEx's CI. Each job has its own Postgres, browser and
+  # round-robin by sorted path), as playwright_ex's CI. Each job has its own Postgres, browser and
   # FLUFFY_ARTIFACT_DIR.
   test:
     name: test (${{ matrix.lane }}, ${{ matrix.browser }}, ${{ matrix.partition }})
@@ -191,7 +191,7 @@ jobs:
       # Test failures (exit 2) are retried once, only the failed tests (`mix test --failed`);
       # compile errors are not. The retry takes no --partitions: the failures manifest holds this
       # partition's failures only, and --partitions would split those files again. The first run's
-      # failures are annotated by PlaywrightEx.Test.GitHubFormatter, with a notice summing up the
+      # failures are annotated by Playwright.Test.GitHubFormatter, with a notice summing up the
       # run, so a green retry does not hide them; the retry has no annotations, so a test failing
       # twice is annotated once. `--formatter` replaces test_helper's
       # list, so the first run names every formatter. The retry writes each test's artifacts to
@@ -210,7 +210,7 @@ jobs:
           label="$LANE, $FLUFFY_BROWSER, $MIX_TEST_PARTITION/$TEST_PARTITIONS"
           status=0
           formatters=(
-            --formatter ExUnit.CLIFormatter --formatter PlaywrightEx.Test.GitHubFormatter
+            --formatter ExUnit.CLIFormatter --formatter Playwright.Test.GitHubFormatter
             --formatter Fluffy.Support.ModuleTimesFormatter
           )
           mix test "${strict[@]}" "${formatters[@]}" --seed "$fluffy_test_seed" --partitions "$TEST_PARTITIONS" || status=$?

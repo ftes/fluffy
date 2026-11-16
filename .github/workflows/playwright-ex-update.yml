@@ -58,7 +58,7 @@ jobs:
         # (delete the branch first).
         run: |
           out() { echo "$1=$2" | tee -a "$GITHUB_OUTPUT"; }
-          lock=$(sed -nE 's/^  "playwright_ex": \{:(hex|git), [^,]+, "([^"]+)".*/\1 \2/p' mix.lock)
+          lock=$(sed -nE 's/^  "playwright": \{:(hex|git), [^,]+, "([^"]+)".*/\1 \2/p' mix.lock)
           read -r kind from <<< "$lock"
           to=$(curl -fsSL --retry 3 https://hex.pm/api/packages/playwright_ex | jq -r .latest_version)
           [[ -n $from && -n $to ]] || { echo "::error::cannot read mix.lock or Hex"; exit 1; }
@@ -144,12 +144,13 @@ jobs:
             PlaywrightEx TO is on Hex. Update Fluffy to it and open a draft PR. Read AGENTS.md
             first.
 
-            1. In mix.exs, require `~> TO` from Hex, replacing any `github:` source with its options
-               and comment.
-               Run `mix deps.update playwright_ex`, then read what deps/playwright_ex/CHANGELOG.md
-               lists since FROM.
-            2. If the update changed deps/playwright_ex/DRIVER_VERSION, run
-               `mix playwright_ex.install -- chromium` and `mix fluffy.playwright_source`.
+            1. In mix.exs, require `{:playwright, "~> TO", hex: :playwright_ex}`, replacing any
+               `github:` source with its options and comment. Keep `hex: :playwright_ex`: the Hex
+               package `playwright` is a different library.
+               Run `mix deps.update playwright`, then read what deps/playwright/CHANGELOG.md lists
+               since FROM.
+            2. If the update changed deps/playwright/DRIVER_VERSION, run
+               `mix playwright.install -- chromium` and `mix fluffy.playwright_source`.
             3. Run `mix test test/playwright_members_test.exs`. Classify each new PlaywrightEx member
                and event in test/support/playwright_members.ex, as its header describes, and drop
                removed ones. Wrap one in Fluffy only when it's a small, obvious extension of what
@@ -180,7 +181,7 @@ jobs:
           claude_args: |
             --model claude-opus-5-5
             --max-turns 150
-            --allowedTools "Read,Grep,Glob,Edit,Write,Agent,Task,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git add:*),Bash(git commit:*),Bash(mix deps.update playwright_ex),Bash(mix deps.get),Bash(mix playwright_ex.install:*),Bash(mix fluffy.playwright_source),Bash(mix usage_rules.sync:*),Bash(mix usage_rules.docs:*),Bash(mix usage_rules.search_docs:*),Bash(mix format:*),Bash(mix compile:*),Bash(mix credo:*),Bash(mix test:*),Bash(mix check:*),Bash(git push -u origin ${{ env.BRANCH }}),Bash(gh pr create --draft --base main --head ${{ env.BRANCH }} *)"
+            --allowedTools "Read,Grep,Glob,Edit,Write,Agent,Task,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git add:*),Bash(git commit:*),Bash(mix deps.update playwright),Bash(mix deps.get),Bash(mix playwright.install:*),Bash(mix fluffy.playwright_source),Bash(mix usage_rules.sync:*),Bash(mix usage_rules.docs:*),Bash(mix usage_rules.search_docs:*),Bash(mix format:*),Bash(mix compile:*),Bash(mix credo:*),Bash(mix test:*),Bash(mix check:*),Bash(git push -u origin ${{ env.BRANCH }}),Bash(gh pr create --draft --base main --head ${{ env.BRANCH }} *)"
       - name: Summarize Claude's result
         if: ${{ !cancelled() && steps.claude.outputs.execution_file != '' }}
         env:

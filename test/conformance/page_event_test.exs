@@ -12,7 +12,7 @@ defmodule Fluffy.Conformance.PageEventTest do
   alias Fluffy.Support.Server
 
   @tag driver: :playwright
-  test "page/2 turns a PlaywrightEx page of the session into its handle, and rejects another context's" do
+  test "page/2 turns a Playwright page of the session into its handle, and rejects another context's" do
     session = session_for_html(:playwright, "<h1>Main</h1>")
     # A dialog or console message without a page.
     assert page(session, nil) == nil
@@ -96,7 +96,7 @@ defmodule Fluffy.Conformance.PageEventTest do
     assert_receive :held
 
     assert {:ok, nil} =
-             PlaywrightEx.Frame.evaluate(frame, """
+             Playwright.Frame.evaluate(frame, """
              async () => {
                const popup = window.open('details')
                popup.close()
