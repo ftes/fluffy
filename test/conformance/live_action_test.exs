@@ -221,6 +221,132 @@ defmodule Fluffy.Conformance.LiveActionTest do
       |> expect(to_be_checked(notify))
     end
 
+    # Like a browser, a click on a label clicks its control too. Each click
+    # reaches its closest phx-click, and one both reach fires once.
+    @tag driver: driver
+    test "clicking a label clicks its control, with #{driver}", %{driver: driver} do
+      log = by_css("#log")
+
+      driver
+      |> live_session()
+      |> visit("/live/label-clicks")
+      |> click(by_text("Invisibility cloak", exact: true))
+      |> expect(to_have_text(log, "Log: click:yes change:yes,-,-,-"))
+      |> expect(:checkbox |> by_role(name: "Invisibility cloak") |> to_be_checked())
+      |> click(by_text("Gryffindor", exact: true))
+      |> expect(to_have_text(log, ~r/ change:yes,-,-,gryffindor$/))
+      |> expect(:radio |> by_role(name: "Gryffindor") |> to_be_checked())
+      |> click(by_text("Owl post", exact: true))
+      |> expect(to_have_text(log, ~r/gryffindor label click:yes change:yes,yes,-,gryffindor$/))
+      |> click(by_text("Elder wand", exact: true))
+      |> expect(to_have_text(log, ~r/gryffindor pick change:yes,yes,yes,gryffindor$/))
+      # An href="#" binding prevents the label's click from reaching the box.
+      |> click(by_text("Sorting hat", exact: true))
+      |> expect(to_have_text(log, ~r/gryffindor sort$/))
+      |> expect(:checkbox |> by_role(name: "Sorting hat") |> to_be_checked(checked: false))
+      |> click(by_text("Accio", exact: true))
+      |> expect(to_have_text(log, ~r/ sort summon$/))
+      |> click(by_text("Mischief managed", exact: true))
+      |> expect(to_have_text(log, ~r/ summon save$/))
+    end
+
+    # The browser clicks the control at once, before the label's phx-click
+    # replies, so the control's click and change go as the click found them,
+    # though the reply checks the box or removes it.
+    @tag driver: driver
+    test "a label's control clicks as the label's click found it, with #{driver}", %{driver: driver} do
+      log = by_css("#log")
+      familiar = by_role(:checkbox, name: "Familiar")
+
+      driver
+      |> live_session()
+      |> visit("/live/label-clicks")
+      |> click(by_text("Familiar", exact: true))
+      |> expect(to_have_text(log, "Log: adopt familiar:yes,-"))
+      |> expect(to_be_checked(familiar))
+      |> click(by_text("Patronus", exact: true))
+      |> expect(to_have_text(log, "Log: adopt familiar:yes,- banish click:yes familiar:yes,yes"))
+      |> expect(:checkbox |> by_role(name: "Patronus") |> to_have_count(0))
+    end
+
+    # LiveView prevents the default of a click on an href="#" binding, even a
+    # JS-only one, so a label in it doesn't click its control, and a control in
+    # it doesn't take its default action.
+    @tag driver: driver
+    test "an href=\"#\" binding stops a label's click from activating its control, with #{driver}", %{driver: driver} do
+      log = by_css("#log")
+
+      driver
+      |> live_session()
+      |> visit("/live/label-clicks")
+      |> click(by_text("Nimbus 2000", exact: true))
+      |> expect(:checkbox |> by_role(name: "Nimbus 2000") |> to_be_checked(checked: false))
+      |> expect(page_to_have_url(~r{/label-clicks$}))
+      |> click(by_text("Cast lumos", exact: true))
+      |> expect(to_have_text(log, "Log: sort"))
+      |> click(by_text("Accio", exact: true))
+      |> expect(to_have_text(log, "Log: sort summon"))
+    end
+
+    # A browser reverts the toggle of a click whose default an href="#"
+    # binding prevents, and fires no change, whether the click is on the box
+    # or on its label.
+    @tag driver: driver
+    test "an href=\"#\" binding reverts a checkbox's toggle, with #{driver}", %{driver: driver} do
+      log = by_css("#log")
+      quill = by_role(:checkbox, name: "Quill")
+
+      driver
+      |> live_session()
+      |> visit("/live/label-clicks")
+      |> click(quill)
+      |> expect(to_have_text(log, "Log: sort"))
+      |> expect(not_(to_be_checked(quill)))
+      |> click(by_text("Quill", exact: true))
+      |> expect(to_have_text(log, "Log: sort sort"))
+      |> expect(not_(to_be_checked(quill)))
+    end
+
+    # Like Playwright's setChecked, check clicks the element its locator
+    # finds, so a label sends its own phx-click before its control's.
+    @tag driver: driver
+    test "checking through a label clicks the label, with #{driver}", %{driver: driver} do
+      log = by_css("#log")
+      owl = by_text("Owl post", exact: true)
+
+      session =
+        driver
+        |> live_session()
+        |> visit("/live/label-clicks")
+        |> check(owl)
+        |> expect(to_have_text(log, "Log: label click:yes change:-,yes,-,-"))
+        |> check(owl)
+        |> uncheck(owl)
+        |> expect(to_have_text(log, "Log: label click:yes change:-,yes,-,- label click:- change:-,-,-,-"))
+
+      # The label's click still sends its phx-click before the check fails.
+      assert_action_error(session, Fluffy.ActionabilityError, "did not change its state", fn ->
+        check(session, by_text("Sorting hat", exact: true))
+      end)
+
+      expect(session, to_have_text(log, ~r/ sort$/))
+    end
+
+    # Like Chromium and WebKit, a label that is already clicking its control
+    # doesn't click it again, so labels that contain each other's control click
+    # each once. Firefox stops at the first label's control.
+    @tag driver: driver
+    test "labels containing each other's control click each once, with #{driver}", %{driver: driver} do
+      expected =
+        if driver == :playwright and playwright_engine?(:firefox), do: "Log: mirror:b", else: "Log: mirror:b mirror:a"
+
+      driver
+      |> live_session()
+      |> visit("/live/label-clicks")
+      |> click(by_text("Mirror A", exact: true))
+      |> expect(to_have_text(by_css("#log"), expected))
+    end
+
     @tag driver: driver
     test "a click reaches the closest phx-click, and an inner binding wins, with #{driver}", %{driver: driver} do
       log = by_css("#log")

@@ -62,27 +62,28 @@ defmodule Fluffy.Driver.Static do
   @impl true
   def click(%Session{} = session, %Locator{} = locator, options \\ []) do
     Keyword.validate!(options, [:timeout])
+    click = session |> Session.page_state() |> Map.fetch!(:client_dom) |> ClientDOM.click(locator)
+    commit_click(session, click)
+  end
+
+  # Keeps the page the click's last dispatch left and takes its default action.
+  defp commit_click(session, {clicks, default}) do
+    {_target, _page, client_dom} = List.last(clicks)
     state = Session.page_state(session)
-    client_dom = Map.fetch!(state, :client_dom)
-    {client_dom, target} = ClientDOM.click(client_dom, locator)
     session = Session.put_page_state(session, %{state | client_dom: client_dom})
 
-    case ClientDOM.phoenix_html_submission(client_dom, target) do
-      submission when is_map(submission) ->
+    case default do
+      nil ->
+        session
+
+      {:link, %{attributes: attributes}} ->
+        {:navigate, session, Navigation.link(attribute(attributes, "href"), download: attribute(attributes, "download"))}
+
+      {:phoenix_html, submission} ->
         {:navigate, session, Navigation.submission(submission)}
 
-      nil ->
-        case ClientDOM.default_action(client_dom, target) do
-          nil ->
-            session
-
-          {:link, %{attributes: attributes}} ->
-            {:navigate, session,
-             Navigation.link(attribute(attributes, "href"), download: attribute(attributes, "download"))}
-
-          {:submit, _submitter, submission} ->
-            {:navigate, session, Navigation.submission(submission)}
-        end
+      {:submit, _submitter, submission} ->
+        {:navigate, session, Navigation.submission(submission)}
     end
   end
 
@@ -131,10 +132,17 @@ defmodule Fluffy.Driver.Static do
   @impl true
   def set_checked(%Session{} = session, %Locator{} = locator, desired, options \\ []) do
     Keyword.validate!(options, [:timeout])
-    state = Session.page_state(session)
-    client_dom = Map.fetch!(state, :client_dom)
-    {client_dom, _target} = ClientDOM.set_checked(client_dom, locator, desired)
-    Session.put_page_state(session, %{state | client_dom: client_dom})
+
+    case session |> Session.page_state() |> Map.fetch!(:client_dom) |> ClientDOM.set_checked(locator, desired) do
+      nil ->
+        session
+
+      # Like Playwright, check the control's state on the page the click left.
+      {{clicks, _default} = click, control} ->
+        {_target, _page, clicked_dom} = List.last(clicks)
+        ClientDOM.ensure_checked!(clicked_dom, control, desired, locator)
+        commit_click(session, click)
+    end
   end
 
   @impl true

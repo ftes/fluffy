@@ -75,6 +75,7 @@ defmodule Fluffy.Support.Web.Router do
       live("/radio-shift", RadioShiftLive)
       live("/click-checkable", ClickCheckableLive)
       live("/click-bindings", ClickBindingsLive)
+      live("/label-clicks", LabelClickLive)
       live("/unchecked-controls", UncheckedControlsLive)
       live("/shifted-controls", ShiftedControlsLive)
       live("/patched-controls", PatchedControlsLive)

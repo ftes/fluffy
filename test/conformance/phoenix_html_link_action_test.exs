@@ -197,6 +197,24 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
       assert submission.path == "/live-delete"
       assert submission.body == "_csrf_token=live-csrf&_method=delete"
     end
+
+    # Phoenix.HTML prevents the click's default, so a label in its link submits
+    # and doesn't click its control.
+    @tag driver: driver
+    test "a label in a Phoenix.HTML link submits instead of clicking its control with #{driver}", %{
+      driver: driver
+    } do
+      fixture = HTTPFixtures.register(%{body: html("<h1>Owl released</h1>")})
+      action = HTTPFixtures.path(fixture, "/live-delete")
+
+      driver
+      |> start_test_session()
+      |> visit("/live/phoenix-html-link?action=#{URI.encode_www_form(action)}")
+      |> click(by_text("Release owl", exact: true))
+      |> expect(:heading |> by_role(name: "Owl released", exact: true) |> to_be_visible())
+
+      assert [%{method: "POST", body: "_csrf_token=live-csrf&_method=delete"}] = HTTPFixtures.requests(fixture)
+    end
   end
 
   test "Live rejects a competing action on a Phoenix.HTML ancestor clicked through a descendant" do

@@ -24,6 +24,10 @@ defmodule Fluffy.Support.Web.PhoenixHTMLLinkLive do
       >
         <span id="live-delete-label">Delete from LiveView</span>
       </a>
+      <a href="#" data-method="delete" data-to={@action} data-csrf="live-csrf">
+        <label for="released">Release owl</label>
+      </a>
+      <input id="released" type="checkbox" />
     </main>
     """
   end

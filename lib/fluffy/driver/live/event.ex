@@ -47,6 +47,9 @@ defmodule Fluffy.Driver.Live.Event do
     end
   end
 
+  # The JS commands a click on the binding runs, decoded once.
+  def click_commands(attributes), do: live_link(attributes) || commands(attribute(attributes, "phx-click"))
+
   # Like the LiveView client, a LiveView link takes the click before any
   # phx-click binding sees it.
   defp live_link(attributes) do

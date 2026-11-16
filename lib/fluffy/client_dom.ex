@@ -99,18 +99,42 @@ defmodule Fluffy.ClientDOM do
     }
   end
 
-  def click(%__MODULE__{} = client_dom, %Locator{} = locator) do
+  def click(%__MODULE__{} = client_dom, %Locator{} = locator, driver \\ :static) do
     target = target!(client_dom, locator)
 
-    if target_disabled?(client_dom, state_target(client_dom, target)) do
+    if target_disabled?(client_dom, follow_label(client_dom, target)) do
       raise Fluffy.ActionabilityError, action: :click, reason: :disabled, locator: locator
     end
 
     Actionability.ensure_clickable!(target.element, :click, locator)
 
-    client_dom = maybe_toggle_checked(client_dom, target)
+    clicks(client_dom, target, driver)
+  end
 
-    {client_dom, target}
+  # The clicks a click on `target` dispatches, in order, and the last one's
+  # default action (see `default_action/4`). Each is `{target, page,
+  # clicked_page}`: a click toggles a checkbox or selects a radio, and a
+  # label's activation behavior then clicks its control. A Phoenix.HTML link
+  # prevents the click's default, so it keeps the page it found, and submits
+  # instead (`{:phoenix_html, submission}`). The drivers commit the clicks.
+  defp clicks(client_dom, target, driver, clicking \\ []) do
+    case phoenix_html_submission(client_dom, target) do
+      nil ->
+        clicked_dom = maybe_toggle_checked(client_dom, target)
+        click = {target, client_dom, clicked_dom}
+
+        case default_action(clicked_dom, target, driver, clicking) do
+          {:click, control} ->
+            {clicks, default} = clicks(clicked_dom, control, driver, [control.id | clicking])
+            {[click | clicks], default}
+
+          default ->
+            {[click], default}
+        end
+
+      submission ->
+        {[{target, client_dom, client_dom}], {:phoenix_html, submission}}
+    end
   end
 
   @doc false
@@ -147,18 +171,29 @@ defmodule Fluffy.ClientDOM do
   def closest(%__MODULE__{} = client_dom, %Target{} = target, fun) do
     case Enum.find([target | Enum.reverse(target.ancestors)], fun) do
       nil -> nil
-      %{id: id} when id == target.id -> target
-      element -> DocumentIndex.target_by_id(index(client_dom), element.id)
+      element -> inclusive_ancestor(client_dom, target, element)
     end
   end
 
+  defp inclusive_ancestor(_client_dom, %Target{id: id} = target, %{id: id}), do: target
+  defp inclusive_ancestor(client_dom, _target, element), do: DocumentIndex.target_by_id(index(client_dom), element.id)
+
   # A click's default action: `{:link, link}` to follow a link,
-  # `{:submit, submitter, submission}` to submit a submit button's form, or nil.
-  @doc false
-  def default_action(%__MODULE__{} = client_dom, %Target{} = target, driver \\ :static) do
-    case activation_target(client_dom, target) do
+  # `{:submit, submitter, submission}` to submit a submit button's form,
+  # `{:click, control}` to click a label's control, or nil. `clicking` lists
+  # the ids of the controls labels are already clicking in this click.
+  defp default_action(client_dom, target, driver, clicking) do
+    case activation_target(client_dom, target, clicking) do
       nil ->
         nil
+
+      # A browser dispatches no click to a disabled form control, though the
+      # click's enabled check may pass on an enclosing button, as in Playwright.
+      {:label, %Target{form_control_disabled?: true}} ->
+        nil
+
+      {:label, control} ->
+        {:click, control}
 
       %{tag: tag} = link when tag in ["a", "area"] ->
         {:link, link}
@@ -174,12 +209,51 @@ defmodule Fluffy.ClientDOM do
   # Like a browser's click dispatch, the default action belongs to the closest
   # inclusive ancestor with activation behavior. Actionability already rejects
   # a click inside a disabled control.
-  defp activation_target(client_dom, target), do: closest(client_dom, target, &activation_behavior?/1)
+  defp activation_target(client_dom, target, clicking) do
+    aria = aria(client_dom)
+
+    [target | Enum.reverse(target.ancestors)]
+    |> Enum.reduce_while([], fn element, inside ->
+      cond do
+        activation_behavior?(element) -> {:halt, {:element, element}}
+        id = label_control_id(aria, element, inside, clicking) -> {:halt, {:label, id}}
+        true -> {:cont, [element | inside]}
+      end
+    end)
+    |> case do
+      {:element, element} -> inclusive_ancestor(client_dom, target, element)
+      {:label, id} -> {:label, DocumentIndex.target_by_id(index(client_dom), id)}
+      _none -> nil
+    end
+  end
 
   defp activation_behavior?(%{tag: tag, attributes: attributes}) when tag in ["a", "area"],
     do: has_attribute?(attributes, "href")
 
   defp activation_behavior?(%{tag: tag}), do: tag in ["button", "input"]
+
+  # HTML's label activation behavior: a label clicks its labelled control,
+  # unless the click is on that control or on interactive content in the label.
+  # A label without a control has none, so the click goes on to its ancestors.
+  # Like Chromium's processing_click_, a label doesn't click a control it is
+  # already clicking, so labels that contain each other's control stop.
+  defp label_control_id(aria, %{tag: "label"} = label, inside, clicking) do
+    id = Aria.label_control_id(aria, label)
+
+    if id && id not in clicking && not Enum.any?(inside, &(&1.id == id or interactive_content?(&1))), do: id
+  end
+
+  defp label_control_id(_aria, _element, _inside, _clicking), do: nil
+
+  # Interactive content other than the elements with activation behavior, which
+  # take a click before an enclosing label does.
+  defp interactive_content?(%{tag: tag}) when tag in ~w(details embed iframe select textarea), do: true
+
+  defp interactive_content?(%{tag: tag, attributes: attributes}) when tag in ~w(audio video),
+    do: has_attribute?(attributes, "controls")
+
+  defp interactive_content?(%{tag: "img", attributes: attributes}), do: has_attribute?(attributes, "usemap")
+  defp interactive_content?(_element), do: false
 
   @doc false
   def submit_form(%__MODULE__{} = client_dom, target, driver \\ :static) do
@@ -292,29 +366,38 @@ defmodule Fluffy.ClientDOM do
     Fluffy.Form.live_change_form?(index(client_dom), target)
   end
 
-  def set_checked(%__MODULE__{} = client_dom, %Locator{} = locator, desired) when is_boolean(desired) do
-    target = control!(client_dom, locator)
-    Actionability.ensure_checkable!(target.element, checked_action(desired), locator)
-    current = checked_target?(client_dom, target)
+  # Like Playwright's setChecked: nil when the control is already in the
+  # state, or else the clicks of a click on the element the locator resolves
+  # to, such as the control's label, and the control. The drivers check the
+  # control's state once the click took effect (`ensure_checked!/4`).
+  def set_checked(%__MODULE__{} = client_dom, %Locator{} = locator, desired, driver \\ :static)
+      when is_boolean(desired) do
+    target = target!(client_dom, locator)
+    control = follow_label(client_dom, target)
+    Actionability.ensure_checkable!(control.element, checked_action(desired), locator)
 
-    client_dom =
-      cond do
-        current == desired ->
-          client_dom
+    cond do
+      checked_target?(client_dom, control) == desired ->
+        nil
 
-        input_type(target) == "radio" and not desired ->
-          raise Fluffy.ActionabilityError,
-            action: :uncheck,
-            reason: :cannot_uncheck_radio,
-            locator: locator
+      input_type(control) == "radio" and not desired ->
+        raise Fluffy.ActionabilityError,
+          action: :uncheck,
+          reason: :cannot_uncheck_radio,
+          locator: locator
 
-        true ->
-          ensure_target_enabled!(client_dom, target, checked_action(desired), locator)
+      true ->
+        ensure_target_enabled!(client_dom, control, checked_action(desired), locator)
+        {clicks(client_dom, target, driver), control}
+    end
+  end
 
-          put_checked_target(client_dom, target, desired)
-      end
-
-    {client_dom, target}
+  # Playwright's setChecked fails when its click left the control's state.
+  @doc false
+  def ensure_checked!(%__MODULE__{} = client_dom, %Target{} = control, desired, locator) do
+    if checked_target?(client_dom, control) != desired do
+      raise Fluffy.ActionabilityError, action: checked_action(desired), reason: :state_unchanged, locator: locator
+    end
   end
 
   def select_option(%__MODULE__{} = client_dom, %Locator{} = locator, requested) do
@@ -388,41 +471,34 @@ defmodule Fluffy.ClientDOM do
 
   @doc false
   def disabled?(%__MODULE__{} = client_dom, %Locator{} = locator) do
-    target_disabled?(client_dom, state_target(client_dom, target!(client_dom, locator)))
+    target_disabled?(client_dom, control!(client_dom, locator))
   end
 
   defp target_disabled?(client_dom, target), do: Aria.aria_disabled?(aria(client_dom), target)
 
   defp aria(client_dom), do: Aria.for_document(client_dom.document)
 
-  # Like Playwright, an element other than a form control takes its enabled
-  # state from the closest button, so text inside a disabled button is disabled.
-  # Unlike Playwright's retarget(..., "follow-label"), a label doesn't take its
-  # control's enabled state, as a click on it doesn't activate the control (#134);
-  # the other actions and states follow the label (`control!/2`).
-  defp state_target(_client_dom, %Target{tag: tag} = target) when tag in ["input", "textarea", "select"], do: target
-
-  defp state_target(client_dom, target) do
-    if Aria.content_editable?(aria(client_dom), target) do
-      target
-    else
-      closest(client_dom, target, fn %{tag: tag, attributes: attributes} ->
-        tag == "button" or attribute(attributes, "role") in ["button", "checkbox", "radio"]
-      end) || target
-    end
-  end
-
   # Playwright's retarget(..., "follow-label"), which fill, clear, select_option,
-  # set_input_files, set_checked, the value and the checked and editable states use:
-  # an element in a label acts as its control.
+  # set_input_files, set_checked, the value and the enabled, checked and editable
+  # states use, as does click's enabled check. An element other than a form
+  # control first goes to the closest button, so text inside a disabled button
+  # is disabled, and an element in a label then acts as its control.
   @doc false
   def control!(%__MODULE__{} = client_dom, locator), do: follow_label(client_dom, target!(client_dom, locator))
 
   @no_follow_label_tags ~w(a input textarea button select option optgroup)
 
   defp follow_label(client_dom, target) do
-    target = state_target(client_dom, target)
     aria = aria(client_dom)
+
+    target =
+      if target.tag in ["input", "textarea", "select"] or Aria.content_editable?(aria, target) do
+        target
+      else
+        closest(client_dom, target, fn %{tag: tag, attributes: attributes} ->
+          tag == "button" or attribute(attributes, "role") in ["button", "checkbox", "radio"]
+        end) || target
+      end
 
     with false <-
            target.tag in @no_follow_label_tags or
@@ -499,7 +575,9 @@ defmodule Fluffy.ClientDOM do
 
       # A click on a selected radio changes nothing, like a browser's.
       "radio" ->
-        if checked_target?(client_dom, target), do: client_dom, else: put_checked_target(client_dom, target, true)
+        if checked_target?(client_dom, target),
+          do: client_dom,
+          else: client_dom |> clear_radio_group(target) |> put_checked(target.id, true)
 
       _other ->
         client_dom
@@ -519,20 +597,6 @@ defmodule Fluffy.ClientDOM do
       |> put_property(id, :used, true)
 
     %{client_dom | properties: properties}
-  end
-
-  defp put_checked_target(client_dom, target, true) do
-    if input_type(target) == "radio" do
-      client_dom
-      |> clear_radio_group(target)
-      |> put_checked(target.id, true)
-    else
-      put_checked(client_dom, target.id, true)
-    end
-  end
-
-  defp put_checked_target(client_dom, target, false) do
-    put_checked(client_dom, target.id, false)
   end
 
   defp clear_radio_group(client_dom, %{attributes: attributes, id: target_id}) do

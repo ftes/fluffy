@@ -114,6 +114,69 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       assert [_source, %{query: "query=fluffy&commit=on"}] = HTTPFixtures.requests(fixture)
     end
 
+    # A click on a label clicks its control: it checks the checkbox, and the
+    # submit button then submits as the form's submitter.
+    @tag driver: driver
+    test "a click on a label checks its checkbox or submits through its button with #{driver}", %{driver: driver} do
+      fixture =
+        HTTPFixtures.register_sequence([
+          %{
+            body:
+              html("""
+              <form method="get" action="search">
+                <label><input type="checkbox" name="scope" value="forbidden"> Restricted section</label>
+                <label for="commit">Alohomora</label>
+                <button id="commit" name="commit" value="on">Search</button>
+              </form>
+              """)
+          },
+          %{body: html("<h1>Search results</h1>")}
+        ])
+
+      driver
+      |> start_test_session()
+      |> visit(HTTPFixtures.path(fixture, "/forms/start"))
+      |> click(by_text("Restricted section", exact: true))
+      |> click(by_text("Alohomora", exact: true))
+      |> expect("Search results" |> by_text() |> to_be_visible())
+
+      assert [_source, %{query: "scope=forbidden&commit=on"}] = HTTPFixtures.requests(fixture)
+    end
+
+    # A label without a control has no activation of its own, so a click on it
+    # goes on to the enclosing link or submit button.
+    @tag driver: driver
+    test "a click on a label without a control follows its link or submits its button with #{driver}", %{
+      driver: driver
+    } do
+      start_page =
+        html("""
+        <a href="houses"><label>Gryffindor</label></a>
+        <form method="get" action="search">
+          <button name="commit" value="on"><label>Alohomora</label></button>
+        </form>
+        """)
+
+      fixture =
+        HTTPFixtures.register_sequence([
+          %{body: start_page},
+          %{body: html("<h1>Houses</h1>")},
+          %{body: start_page},
+          %{body: html("<h1>Search results</h1>")}
+        ])
+
+      driver
+      |> start_test_session()
+      |> visit(HTTPFixtures.path(fixture, "/forms/start"))
+      |> click(by_text("Gryffindor", exact: true))
+      |> expect(:heading |> by_role(name: "Houses") |> to_be_visible())
+      |> visit(HTTPFixtures.path(fixture, "/forms/start"))
+      |> click(by_text("Alohomora", exact: true))
+      |> expect(:heading |> by_role(name: "Search results") |> to_be_visible())
+
+      assert [_source, %{path: "/forms/houses"}, _again, %{query: "commit=on"}] = HTTPFixtures.requests(fixture)
+    end
+
     @tag driver: driver
     test "submit returns once the server has received the submission using #{driver}", %{driver: driver} do
       fixture =

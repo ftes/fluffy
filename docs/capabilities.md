@@ -65,7 +65,8 @@ visibility; see [Visibility and DOM presence](assertions.md#visibility-and-dom-p
 for the distinction from browser rendering and DOM absence.
 
 Phoenix locators do not model `<details>`, `<dialog>`, `popover` and dropdown
-`<select>` open state, which a Phoenix test has no way to change. Content inside
+`<select>` open state, which a Phoenix test has no way to change: a click on a
+`<summary>` doesn't toggle its `<details>` there, nor its `open` attribute. Content inside
 a closed `<details>`, `<dialog>` or `popover`, and the options of a closed
 `<select>`, count as visible on Phoenix, so a test can reach them without opening
 them; on Playwright they must be opened first. A `refute` on that
@@ -200,7 +201,9 @@ Only URL expectations and `visit` back into the app work on that page; everythin
 Fluffy's conformance suite runs against Playwright's pinned Chromium, Firefox,
 and WebKit. Known engine differences: WebKit does not send `Secure` cookies to
 `http://` loopback origins, and submits the controls in the legend of a disabled
-`<fieldset>` nested in another disabled one. Firefox never completes or fails an interrupted
+`<fieldset>` nested in another disabled one. Firefox doesn't click on through a label whose
+control sits in another label, where Chromium and WebKit click each label's control once.
+Firefox never completes or fails an interrupted
 download, and with Playwright 1.65 a file chooser awaited right after an earlier
 one occasionally opens a native dialog instead.
 Playwright's `set_input_files` checks only that the target is an `<input>`:

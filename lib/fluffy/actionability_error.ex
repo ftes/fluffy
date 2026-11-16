@@ -6,8 +6,10 @@ defmodule Fluffy.ActionabilityError do
 
   defexception [:action, :reason, :locator, :target, :message]
 
-  # Reading a state the element lacks: injectedScript.ts's errors, which an expectation shows.
+  # Reading a state the element lacks: injectedScript.ts's errors, which an
+  # expectation shows, and dom.ts's when setChecked's click leaves the state.
   @state_errors %{
+    state_unchanged: "Clicking the checkbox did not change its state",
     not_checkbox_or_radio: "Not a checkbox or radio button",
     no_readonly_state:
       "Element is not an <input>, <textarea>, <select> or [contenteditable] and does not have a role allowing [aria-readonly]",
