@@ -30,6 +30,8 @@ workaround.
 
 Run `mix check` before handing off code changes; use `mix quality` for
 release-sensitive changes.
+When reviewing a change or fixing review findings, follow
+[Reviewing](CONTRIBUTING.md#reviewing).
 
 - `mix setup` installs deps, builds test assets and installs Chromium. Tests need PostgreSQL
   (`FLUFFY_DB_*` overrides the defaults in `config/test.exs`); `FLUFFY_BROWSER` picks
