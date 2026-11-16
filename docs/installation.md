@@ -34,22 +34,10 @@ dependencies `mix.exs` lists:
 
 ## Usage rules for coding agents
 
-Fluffy ships `usage-rules.md`, rules for coding agents: setup, choosing a backend, locators,
-assertions and waiting, capabilities, events and dropping to Playwright. They build on
-Playwright's usage rules, which cover its API, locators in Playwright's recommended order and
-web-first assertions. Sync them with the [`usage_rules`](https://hexdocs.pm/usage_rules)
-package as one composed `phoenix-feature-tests` skill of `[:fluffy, :playwright]`, so an agent
-loads both when it writes a feature test and other work doesn't carry them. It replaces the
-standalone `playwright` skill Playwright's guide suggests. Run `mix usage_rules.sync`, and
-sync again after upgrading.
-
-Fluffy's rules override Phoenix's "LiveView tests" rules, which recommend
-`Phoenix.LiveViewTest` and locating by element ids. Move `phoenix:liveview` into a skill too:
-in an always-loaded `AGENTS.md` those rules would reach every agent, while Fluffy's override
-reaches only the ones that load its skill.
-
-A skill's description defaults to the package's Hex description, so write descriptions that
-say when to use each skill:
+Fluffy ships usage rules for coding agents that build on Playwright's. Sync them with
+[`usage_rules`](https://hexdocs.pm/usage_rules) as one skill, and move `phoenix:liveview`
+into a skill too: Fluffy's rules override its "LiveView tests" rules, so those shouldn't sit
+in an always-loaded `AGENTS.md`. Run `mix usage_rules.sync` after upgrading.
 
 ```elixir
 # mix.exs
