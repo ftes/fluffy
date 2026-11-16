@@ -131,8 +131,8 @@ backend supports.
 
 ## Guides
 
-- [Installation and runtime](docs/installation.md) — endpoint, browser, and
-  Ecto sandbox setup
+- [Installation and runtime](docs/installation.md) — endpoint, browser,
+  Ecto sandbox setup, and usage rules for coding agents
 - [Usage](docs/usage.md) — your first test, backend choice, and a shared test case
 - [Locators and frames](docs/locators.md) — finding elements and reaching into iframes
 - [Actions and waiting](docs/actions.md) — actions, waiting, uploads, and controlling time

@@ -25,11 +25,42 @@ in `:dev`, where Fluffy needs no config and starts no driver or browser. Mix req
 dependency you list to cover every environment Fluffy needs it in, so widen the
 `lazy_html` line `phx.new` generates, if your app has it.
 Playwright comes with Fluffy in the same environments, so `mix playwright.install`
-works without listing it. List it only to sync its usage rules, since `usage_rules.sync`
-reads only the dependencies `mix.exs` lists:
+works without listing it. List it anyway if you use
+[usage rules](#usage-rules-for-coding-agents), as `usage_rules.sync` reads only the
+dependencies `mix.exs` lists:
 `{:playwright, "~> 0.17.0-rc.6", hex: :playwright_ex, only: [:dev, :test]}`. The app is
 `:playwright` and the Hex package `playwright_ex`; `hex: :playwright_ex` is required, since
 `playwright` on Hex is another library.
+
+## Usage rules for coding agents
+
+Fluffy ships usage rules for coding agents that build on Playwright's. Sync them with
+[`usage_rules`](https://hexdocs.pm/usage_rules) as one skill, and move `phoenix:liveview`
+into a skill too: Fluffy's rules override its "LiveView tests" rules, so those shouldn't sit
+in an always-loaded `AGENTS.md`. Run `mix usage_rules.sync` after upgrading.
+
+```elixir
+# mix.exs
+def project do
+  [
+    # ...
+    usage_rules: [
+      skills: [
+        build: [
+          "phoenix-feature-tests": [
+            description: "Use when writing or debugging Phoenix feature tests with Fluffy.",
+            usage_rules: [:fluffy, :playwright]
+          ],
+          "phoenix-liveview": [
+            description: "Use when writing LiveViews, components or templates.",
+            usage_rules: ["phoenix:liveview"]
+          ]
+        ]
+      ]
+    ]
+  ]
+end
+```
 
 ## Phoenix endpoint
 
