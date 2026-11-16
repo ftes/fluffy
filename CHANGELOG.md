@@ -28,12 +28,6 @@ sandbox, as generated `DataCase` and `ConnCase` do.
 
 The 0.9.0 entry lists them under Breaking; the upgrade guide shows how to move a 0.8 suite.
 
-## Unreleased
-
-### Changed
-
-- Requires PlaywrightEx 1.65.0-rc.1. Its versions now follow Playwright's (major.minor is Playwright's, the patch theirs), so if you list it, write `{:playwright, "~> 1.65.0-rc.1", hex: :playwright_ex}` as in the installation guide.
-
 ## 0.9.0
 
 Changes since 0.8.0.
@@ -41,7 +35,7 @@ Changes since 0.8.0.
 ### Breaking
 
 - Fluffy runs on Playwright (Hex package `playwright_ex`) with a pinned Playwright 1.65 driver, installed by `mix playwright.install`. The npm `playwright` package, `assets_dir` and Node.js are no longer needed; `executable:` names a Playwright CLI. Playwright 1.65's own breaking changes apply: actions wait for an element to be not inert, cookie matching follows RFC 6265, and text the browser does not render is not part of accessible names.
-- PlaywrightEx is renamed `Playwright`: the app is `:playwright` and its modules `Playwright.*`, while the Hex package stays `playwright_ex`. If you list it, write the dependency line from the installation guide (`hex: :playwright_ex` is required), rename `config :playwright_ex` to `config :playwright`, and port `PlaywrightEx.*` calls in `unwrap` callbacks with Playwright's upgrade guide. `alias Fluffy.Playwright` now shadows `Playwright.*`, so don't alias it where you call the dependency.
+- PlaywrightEx is renamed `Playwright`: the app is `:playwright` and its modules `Playwright.*`, while the Hex package stays `playwright_ex`, and its versions follow Playwright's (major.minor is Playwright's). If you list it, write the dependency line from the installation guide (`hex: :playwright_ex` is required), rename `config :playwright_ex` to `config :playwright`, and port `PlaywrightEx.*` calls in `unwrap` callbacks with Playwright's upgrade guide. `alias Fluffy.Playwright` now shadows `Playwright.*`, so don't alias it where you call the dependency.
 - `use Fluffy.Case` after your `ConnCase` replaces `Fluffy.Test.setup`, which is removed. It registers the test with `Playwright.Test`, whose traces, screenshots, videos and `error-context.md` replace `Fluffy.Playwright.trace/2`, `artifact_dir` and `trace_dir`; a failed operation no longer writes HTML or the error text.
 - The application owns the Ecto sandbox, as generated `DataCase` and `ConnCase` do: Fluffy no longer starts, adopts or stops owners, and `sandbox:` and `repos:` are gone. It adds the metadata of `config :fluffy, ecto_repos:` to browser sessions.
 - Browsers come from `Playwright.Test.BrowserPool`, configured by `config :playwright, :test` (`browser_name`, `launch_options`, `driver: [executable: ...]`), at most `workers` at once. `config :fluffy, :playwright` and `pool_size` are removed.
