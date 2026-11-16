@@ -149,7 +149,7 @@ jobs:
                package `playwright` is a different library.
                Run `mix deps.update playwright`, then read what deps/playwright/CHANGELOG.md lists
                since FROM. In integration/consumer, run `mix deps.update playwright` too, and update
-               the version shown in docs/installation.md.
+               the version shown in docs/installation.md and usage-rules.md.
             2. If the update changed deps/playwright/DRIVER_VERSION, run
                `mix playwright.install -- chromium` and `mix fluffy.playwright_source`.
             3. Run `mix test test/playwright_members_test.exs`. Classify each new PlaywrightEx member
