@@ -150,33 +150,8 @@ again; the upgrade guide has the net changes from 0.8.
 
 Fluffy now runs on PlaywrightEx 0.17, a port of the official Playwright client with a pinned Playwright 1.65 driver.
 
-### Upgrading from 0.8
-
-Later release candidates change some of these again; the [upgrade guide](docs/upgrading.md) lists the net changes from 0.8.
-
-- Install the driver and browsers with `MIX_ENV=test mix playwright_ex.install -- chromium`; drop the npm `playwright` package and the `assets_dir` config.
-- Node.js is no longer required, for tests or for developing Fluffy: the driver brings its own.
-- Playwright 1.65 is required. Its breaking changes apply: actions wait for an element to be not inert, and text the browser does not render is no longer part of accessible names.
-- Replace `js_logger:` with `log_browser_console: true | false`; `Fluffy.Playwright.ConsoleLogger` is removed and custom `PlaywrightEx.JsLogger` modules are not supported.
-- Browser `console.warn` messages log at `:warning` instead of `:info`.
-- `executable:` now names a Playwright driver executable instead of the npm `cli.js`; drop it if it pointed at npm `playwright`.
-- `unwrap/2` passes a `%PlaywrightEx.Page{}`; `Fluffy.Playwright.Handle` is removed.
-- `Fluffy.HTTPEvent` is replaced by `Fluffy.Request` and `Fluffy.Response` (`response.request` is the request).
-- `Fluffy.Playwright.evaluate(session, expression, arg \\ nil, options \\ [])` replaces the `is_function:` and `arg:` options, which now raise `NimbleOptions.ValidationError`, and raises after `timeout:` or the session's `timeout:`; JavaScript `null` returns `:null`.
-- `Fluffy.Playwright.cookies(session, urls)` takes the URL list directly; the `urls:` and `timeout:` options now raise `ArgumentError`.
-- Cookie maps of `add_cookies/2` and `cookies/2` use Playwright's camelCase atom keys: `%{name: "a", value: "b", url: url, http_only: true}` becomes `%{name: "a", value: "b", url: url, httpOnly: true}`, likewise `sameSite:` and `partitionKey:`; `add_cookies/2` raises on the old keys. `storage_state/2` returns atom keys instead of strings: `state["cookies"]` becomes `state.cookies`, likewise `:origins`, `:localStorage` and `:httpOnly`. Saved state files and string-keyed maps still load.
-- `browser_context:`, `launch_options:`, and the options of `screenshot`, `storage_state`, cookies and `trace` pass through to PlaywrightEx, which validates them.
-- `go_back`/`go_forward`, `hover`, `drag_to` and `press_sequentially` accept the options of their PlaywrightEx call except `no_wait_after:` and `signal:`, which would bypass navigation tracking.
-- On Phoenix, `go_back`/`go_forward` raise `Fluffy.CapabilityError` with `capability: :browser_history` instead of `:pages`.
-- On Playwright, a failed `visit`, `reload`, `go_back` or `go_forward` raises PlaywrightEx's exception, such as `PlaywrightEx.TimeoutError` or `PlaywrightEx.PlaywrightError`, instead of a `RuntimeError`.
-- `trace(coverage:)` is removed.
-- `Fluffy.Dialog.accept/2` and `dismiss/1` take no timeout; `Fluffy.Dialog` loses its `connection`, `id` and `timeout` fields, and `Fluffy.Download` its `timeout` field; `read!` and `save_as!` are renamed `read` and `save_as`, still raise after the session's `timeout:`, and now cancel the download so a pending save no longer writes the file later.
-- `page_status`, `page_to_have_status` and `Fluffy.Page.status` are removed, as in Playwright; on Playwright, assert on `Event.response` instead.
-- `OperationError.cause` and Playwright assertion messages carry native PlaywrightEx exceptions.
-- `Fluffy.Expect.checked_option` is now `to_be_checked_option`.
-- `Fluffy.Download` loses its `source` and `runtime` fields; its other fields besides `suggested_filename`, `url` and `page` are private. On Playwright, `unwrap_and_return(download, fun)` passes the `PlaywrightEx.Download`.
-- `Fluffy.Locator.describe`, `new` and `append` are internal; `inspect/1` renders a locator.
-- LiveView `set_input_files` on an upload input whose form has no id raises, saying to give the form an id, which LiveView's form recovery needs anyway.
+The [upgrade guide](docs/upgrading.md) lists what a 0.8 suite must change; later release
+candidates revised some of this release's changes.
 
 ### Added
 
