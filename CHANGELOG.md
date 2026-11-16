@@ -14,7 +14,8 @@ events, routes, `unwrap` callbacks, regexes and URLs, they are the port's, as in
 
 `use Fluffy.Case` registers each test with `Playwright.Test`. Browsers come from its pool,
 and timeouts, traces, screenshots, videos, steps and snapshot names follow Playwright Test on
-every driver. `timeout: 0` checks once and `:infinity` means no limit.
+every driver. `:infinity` means no limit; `timeout: 0` checks once on assertions and Phoenix
+actions, while Playwright actions and waits reject it.
 
 ## Phoenix drivers that act like a browser
 
@@ -34,7 +35,7 @@ Changes since 0.8.0.
 ### Breaking
 
 - Fluffy runs on Playwright (Hex package `playwright_ex`) with a pinned Playwright 1.65 driver, installed by `mix playwright.install`. The npm `playwright` package, `assets_dir` and Node.js are no longer needed; `executable:` names a Playwright CLI. Playwright 1.65's own breaking changes apply: actions wait for an element to be not inert, cookie matching follows RFC 6265, and text the browser does not render is not part of accessible names.
-- PlaywrightEx is renamed `Playwright`: the app is `:playwright` and its modules `Playwright.*`, while the Hex package stays `playwright_ex`. If you list it, write the dependency line from the installation guide (`hex: :playwright_ex` is required), rename `config :playwright_ex` to `config :playwright`, and port `PlaywrightEx.*` calls in `unwrap` callbacks with Playwright's upgrade guide.
+- PlaywrightEx is renamed `Playwright`: the app is `:playwright` and its modules `Playwright.*`, while the Hex package stays `playwright_ex`. If you list it, write the dependency line from the installation guide (`hex: :playwright_ex` is required), rename `config :playwright_ex` to `config :playwright`, and port `PlaywrightEx.*` calls in `unwrap` callbacks with Playwright's upgrade guide. `alias Fluffy.Playwright` now shadows `Playwright.*`, so don't alias it where you call the dependency.
 - `use Fluffy.Case` after your `ConnCase` replaces `Fluffy.Test.setup`, which is removed. It registers the test with `Playwright.Test`, whose traces, screenshots, videos and `error-context.md` replace `Fluffy.Playwright.trace/2`, `artifact_dir` and `trace_dir`; a failed operation no longer writes HTML or the error text.
 - The application owns the Ecto sandbox, as generated `DataCase` and `ConnCase` do: Fluffy no longer starts, adopts or stops owners, and `sandbox:` and `repos:` are gone. It adds the metadata of `config :fluffy, ecto_repos:` to browser sessions.
 - Browsers come from `Playwright.Test.BrowserPool`, configured by `config :playwright, :test` (`browser_name`, `launch_options`, `driver: [executable: ...]`), at most `workers` at once. `config :fluffy, :playwright` and `pool_size` are removed.
@@ -62,6 +63,7 @@ Changes since 0.8.0.
   - `by_role` follows Playwright's role and name rules: landmarks, lists, list items and dialogs take no name from their content.
   - Chained locators, `filter(has:)` and `within/3` search descendants only.
   - Visibility ignores `aria-hidden`, and `<input type="hidden">`, `hidden` descendants, `<title>`, `<script>`, `<template>` and similar content count as hidden. Text matching skips `<script>`, `<style>` and `<template>`.
+  - A `select` in a disabled `fieldset` keeps its default option, and the facade's `exact: true` no longer ignores soft hyphens and zero-width spaces.
   - Controls inside `<noscript>` are not submitted, `press` raises in layout content without key bindings, and a render resets local field state only in the views it changed.
   - `select_option` with `[]` deselects every option and rejects a list mixing values with option maps; `to_have_values` requires a multiple select; the facade's `click_button` no longer matches file inputs; LiveView `set_input_files` needs the upload's form to have an id.
 
@@ -84,7 +86,6 @@ Changes since 0.8.0.
 ### Changed
 
 - Playwright `submit` waits like a Playwright action, for its navigation to commit.
-- Browser `console.warn` messages, where you log them, are `:warning`.
 
 ### Fixed
 

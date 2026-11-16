@@ -27,11 +27,6 @@ matched once can now match twice.
   `mix usage_rules.sync` work in `:dev`, and widen the `lazy_html` line `phx.new`
   generates to match. List Playwright too for its usage rules; see
   [Elixir dependency](installation.md#elixir-dependency).
-- PlaywrightEx is renamed `Playwright` (app `:playwright`, modules `Playwright.*`; the Hex
-  package stays `playwright_ex`). If you list it, replace `{:playwright_ex, ...}` with the
-  line from [Elixir dependency](installation.md#elixir-dependency), where `hex: :playwright_ex`
-  is required, rename `config :playwright_ex` to `config :playwright`, and run
-  `mix deps.unlock --unused`.
 
   ```diff
   -    {:lazy_html, ">= 0.1.0", only: :test},
@@ -39,6 +34,12 @@ matched once can now match twice.
   +    {:lazy_html, ">= 0.1.0", only: [:dev, :test]},
   +    {:fluffy, "~> 0.9.0", only: [:dev, :test]}
   ```
+- PlaywrightEx is renamed `Playwright` (app `:playwright`, modules `Playwright.*`; the Hex
+  package stays `playwright_ex`). If you list it, replace `{:playwright_ex, ...}` with the
+  line from [Elixir dependency](installation.md#elixir-dependency), where `hex: :playwright_ex`
+  is required, rename `config :playwright_ex` to `config :playwright`, and run
+  `mix deps.unlock --unused`. `alias Fluffy.Playwright` now shadows `Playwright.*`, so
+  don't alias it where you call the dependency.
 - Playwright 1.65's own breaking changes apply: actions wait for an element to be not
   inert, cookie matching follows RFC 6265, and text the browser does not render is no
   longer part of accessible names.
@@ -176,7 +177,7 @@ Most `unwrap` callbacks that called Playwright with the handle's `frame_id`,
   label stands for its input.
 
 The other callbacks get a `%Playwright.Page{}`; see Playwright's
-[upgrade guide](https://hexdocs.pm/playwright_ex/upgrading.html).
+[upgrade guide](`e:playwright:migration.md`).
 
 On Phoenix, `by_role` knows the landmark roles, so a `by_css("nav")` stand-in becomes
 `by_role(:navigation)`, and a named `<section>` is `by_role(:region, name: "...")`.
