@@ -36,6 +36,17 @@
   ],
   "packageRules": [
     {
+      "description": "PlaywrightEx updates come from playwright-ex-update.yml, which classifies new members for PlaywrightMembersTest; packageName is the Hex name, or the repo for a git dep",
+      "matchManagers": [
+        "mix"
+      ],
+      "matchPackageNames": [
+        "playwright_ex",
+        "ftes/playwright_ex"
+      ],
+      "enabled": false
+    },
+    {
       "description": "Keep runtime updates together",
       "matchManagers": [
         "asdf"
