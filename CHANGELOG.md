@@ -28,6 +28,12 @@ sandbox, as generated `DataCase` and `ConnCase` do.
 
 The 0.9.0 entry lists them under Breaking; the upgrade guide shows how to move a 0.8 suite.
 
+## Unreleased
+
+### Changed
+
+- Requires PlaywrightEx 1.65.0-rc.1. Its versions now follow Playwright's (major.minor is Playwright's, the patch theirs), so if you list it, write `{:playwright, "~> 1.65.0-rc.1", hex: :playwright_ex}` as in the installation guide.
+
 ## 0.9.0
 
 Changes since 0.8.0.
