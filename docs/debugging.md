@@ -23,9 +23,9 @@ Failed assertions remain `ExUnit.AssertionError`. Browser assertion messages
 include the expected condition and Playwright's received values, timeout details,
 and call log. No candidate markup is reconstructed after browser failure.
 
-Trace a Playwright test with `@tag trace: true` (or `trace: :retain_on_failure` in the
+Trace a test with `@tag trace: true` (or `trace: :retain_on_failure` in the
 config, see [Playwright setup](installation.md#playwright-setup)), and name its steps
-with `Fluffy.Playwright.step/4`:
+with `Fluffy.step/3`:
 
 ```elixir
 @tag trace: true
@@ -43,8 +43,8 @@ end
 The test's one `trace.zip` covers every page of all its sessions; open it with
 `mix playwright_ex.cli show-trace test-results/<test>/trace.zip`. A failed test also gets
 `error-context.md` there: its errors, source and an aria snapshot of its page. Steps nest and link to
-their source; they are `PlaywrightEx.Test.step/3`'s, so Phoenix sessions raise
-`Fluffy.CapabilityError`.
+their source; they are `PlaywrightEx.Test.step/3`'s, on every driver. A Phoenix-only
+trace has the steps but no pages.
 
 As in Playwright, `Fluffy.Playwright.screenshot/2` returns the PNG, and `path:` also
 writes it to a file:

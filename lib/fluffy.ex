@@ -98,6 +98,60 @@ defmodule Fluffy do
   @spec open_browser(Session.t()) :: Session.t()
   def open_browser(%Session{} = session), do: open_browser(session, &Fluffy.OpenBrowser.open/1)
 
+  @doc group: "Diagnostics and native access"
+  @doc """
+  Runs `fun` with the session as a step of the test, titled `title`, and returns the
+  session `fun` returns, for a pipeline:
+
+      session
+      |> visit("/potions/polyjuice")
+      |> step("Brew Polyjuice Potion", fn session ->
+        session
+        |> fill(by_label("Boomslang skin"), "3")
+        |> click(by_role(:button, name: "Brew"))
+      end)
+
+  It is `PlaywrightEx.Test.step/3` at this call, on every driver: the step, with the operations
+  in it, is in the test's trace (`test.trace` in `trace.zip`), and steps nest. Only a test of a
+  module with `use Fluffy.Case` records steps; elsewhere `fun` just runs.
+
+  ## Options
+
+    * `:box` - reports an error inside the step at the call of the function the step is in,
+      as `PlaywrightEx.Test.step/3`'s `box:`.
+  """
+  defmacro step(session, title, fun, options \\ []) do
+    location = Macro.escape(%{file: __CALLER__.file, line: __CALLER__.line, column: 0})
+
+    # `PlaywrightEx.Test.step/3` expands in the caller, so its call site, where `box:` cuts the
+    # stack, is the caller's.
+    quote do
+      require PlaywrightEx.Test
+
+      case Fluffy.__step__(unquote(session), unquote(title), unquote(fun), unquote(options), unquote(location)) do
+        {:record, title, body, options} -> PlaywrightEx.Test.step(title, body, options)
+        {:run, body} -> body.()
+      end
+    end
+  end
+
+  @doc false
+  def __step__(%Session{} = session, title, fun, options, location) when is_binary(title) and is_function(fun, 1) do
+    options = Keyword.validate!(options, [:box])
+
+    body = fn ->
+      case fun.(session) do
+        %Session{} = session -> session
+        other -> raise ArgumentError, "Fluffy.step/3 callback must return a Fluffy.Session, got: #{inspect(other)}"
+      end
+    end
+
+    case Fluffy.TestInfo.fetch() do
+      {:ok, _info} -> {:record, title, body, [location: location] ++ options}
+      :error -> {:run, body}
+    end
+  end
+
   @doc false
   @spec open_browser(Session.t(), (String.t() -> term())) :: Session.t()
   def open_browser(%Session{} = session, open_fun) when is_function(open_fun, 1) do

@@ -224,7 +224,7 @@ defmodule Fluffy.Support.PlaywrightMembers do
       ],
       PlaywrightEx.Tracing => [
         {~w(start stop stop_chunk)a, {:denied, "PlaywrightEx.Test records the trace: config or `@tag trace: true`"}},
-        {~w(group group_end)a, {:renamed, {Fluffy.Playwright, :step, 4}}},
+        {~w(group group_end)a, {:renamed, {Fluffy, :step, 4}}},
         {~w(start_chunk start_har stop_har)a, {:unwrap, "on PlaywrightEx.BrowserContext.tracing/1"}}
       ]
     }

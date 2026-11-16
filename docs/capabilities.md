@@ -43,7 +43,6 @@ boundaries described below.
 | Dialogs, console, page errors, frames, workers, WebSockets, and browser network events | - | equivalent |
 | Browser request routing | - | equivalent |
 | Active-page JavaScript evaluation | - | equivalent |
-| Test steps | - | equivalent |
 | Fake page clock and timers | - | equivalent |
 | JavaScript-owned DOM and default actions | - | equivalent |
 | Native invalid, submit, and formdata event ordering | - | equivalent |

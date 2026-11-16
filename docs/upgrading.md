@@ -124,8 +124,6 @@ means no limit; see [Timeouts](installation.md#timeouts).
   `screenshot(session, locator, path, options)` becomes
   `screenshot(session, locator, [path: path] ++ options)` and `pdf(session, path)` becomes
   `pdf(session, path: path)`.
-- `Fluffy.step/3` is `Fluffy.Playwright.step/4`, `PlaywrightEx.Test.step/3` in a pipeline.
-  It raises `Fluffy.CapabilityError` on Phoenix, where it used to just run the callback.
 - `by_test_id/2` takes no `attribute:`, as Playwright's `getByTestId`: every driver reads
   `config :playwright_ex, :test, test_id_attribute:` (`data-testid` by default), or
   `config :fluffy, test_id_attribute:` over it. For another
