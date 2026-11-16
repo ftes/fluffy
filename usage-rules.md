@@ -4,6 +4,7 @@ Fluffy runs Phoenix feature tests through one Playwright-shaped API, in-process 
 
 ## Setup
 
+- Sync Playwright's usage rules too: list `{:playwright, "~> 0.17.0-rc.6", hex: :playwright_ex, only: [:dev, :test]}` and `usage_rules: [:fluffy, :playwright]`. Fluffy's locator advice builds on them.
 - `config :fluffy, endpoint: MyAppWeb.Endpoint` in `config/test.exs`. With Ecto, also `config :fluffy, ecto_repos: [MyApp.Repo]` and the sandbox plug and mount hook from `docs/installation.md`, behind an `Application.compile_env` flag set in `config/test.exs` because Fluffy is not in production. The app's DataCase/ConnCase owns the sandbox (`Sandbox.start_owner!` and `stop_owner` in `on_exit`), used before `use Fluffy.Case`; Fluffy only sends its metadata from browser sessions. A plain `Sandbox.checkout` does not work for browser tests.
 - Add `use Fluffy.Case` after the app's `ConnCase` (never before it: the `test/3` imports clash), in every test module, Phoenix-only or browser; never write `use Playwright.Test`. It only registers the test: browser sessions work, and a hanging Phoenix operation fails with Fluffy's error at the test timeout. It adds no imports and no session: add your own imports (see below) and a setup such as `setup ctx do %{session: start_session(ctx[:backend] || :phoenix)} end`, where the tag is yours. It takes `use Playwright.Test`'s options for the module: `trace:`, `screenshot:`, `video:` and `tags: false` (`use Fluffy.Case, trace: :on`). In a case template, put `use Fluffy.Case, unquote(opts)` in `using opts`; if the template's own `setup` starts a session, also put a bare `use Fluffy.Case` right after `use ExUnit.CaseTemplate`, and start the sandbox before the session.
 - Browser tests need `server: true` on the endpoint, `config :playwright, :test` for the browser (`browser_name`, `launch_options`) and `mix playwright.install -- chromium`. In Microsoft's Playwright image, tagged with `Playwright.Driver.version/0`, `mix playwright.install --no-browsers` is enough; for a system browser, as on Nix, also set `launch_options: [executable_path: ...]` or `channel:`. Sessions use the test's browser from `Playwright.Test.BrowserPool.browser()`, Playwright Test's worker: at most `workers` tests hold one at once, and a test without a Playwright session takes none; pass `browser:` for another, such as `BrowserPool.browser(launch_options: [headless: false])`. For more users, start more sessions, each in its own browser context. For a remote Playwright server, set `connect_options: [ws_endpoint: ..., expose_network: "<loopback>"]`, so the browser reaches the app at `base_url`.
@@ -29,7 +30,8 @@ start_session(:phoenix)
 
 ## Locators
 
-- Prefer, in order: `by_label` for form controls, `by_role(:button, name: ...)`, `by_text`, `by_test_id`, and `by_css` when nothing user-facing identifies the element. `by_test_id(id)` takes no options: set the attribute with `config :playwright, :test, test_id_attribute: ...` (or `config :fluffy`, which overrides it), or use `by_css("[data-owl=\"hedwig\"]")` for another attribute.
+- Choose locators as the `:playwright` usage rules say; Fluffy's `by_role`, `by_label`, `by_placeholder`, `by_text`, `by_alt_text`, `by_title` and `by_test_id` are its `get_by_*`.
+- This overrides Phoenix's usage rule that the DOM ids templates give key elements are for tests. Keep the ids (streams, hooks and forms need them), but locate as users do; an existing id (`by_css("#owl-form")`) is the fallback before adding a test id. `by_test_id(id)` takes no options: set the attribute with `config :playwright, :test, test_id_attribute: ...` (or `config :fluffy`, which overrides it), or use `by_css("[data-owl=\"hedwig\"]")` for another attribute.
 - Text, role-name and label matching is substring by default; pass `exact: true` for a complete match.
 - Locators are values. Scope with `by_role(parent, :row, name: "x")`, refine with `filter(has: ...)`, `first`, `last`, zero-based `nth`, `and_`, `or_`. Use `frame_locator` for iframes on Playwright.
 - Single-target actions and native `visible` are strict and fail on several matches. Narrow the locator, or assert `count(locator, n)` when several are intended. Facade `assert_has` accepts any visible match.
@@ -52,8 +54,7 @@ start_session(:phoenix)
 - `visible` and a plain facade `assert_has` fail on hidden inputs and inside `hidden` elements, even with an attribute selector such as `input[value='x']`, and role locators exclude them. Assert with CSS, without a visibility requirement:
   - Facade: `assert_has("#token", count: 1)`, `assert_has("#token", value: "x")`, `assert_has("#terms", checked: true)`.
   - Native: `assert(count(by_css("#token"), 1))`, `assert(value(by_css("#token"), "x"))`, `assert(checked(by_css("#terms")))`.
-- A checkbox or radio hidden and styled through its label differs by backend. On Playwright, `check(by_label("Terms"))` resolves to the input and times out as it is not visible. Target the label: `set_checked(session, by_css("label[for=terms]"), true)`.
-- On Static and LiveView a label target raises `Fluffy.OperationError` (not checkable). Target the input there with `by_label` or `by_css`, which works on hidden inputs. A test running on both backends needs a branch.
+- For a checkbox or radio hidden and styled through its label, `check(by_label("Terms"))` resolves to the input, which Playwright can't click as it is not visible. Target the label, as a user clicks it: `set_checked(session, by_css("label[for=terms]"), true)` works on every backend.
 
 ## Capabilities
 
