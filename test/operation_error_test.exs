@@ -1,5 +1,5 @@
 defmodule Fluffy.OperationErrorTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
@@ -7,6 +7,7 @@ defmodule Fluffy.OperationErrorTest do
 
   alias Fluffy.OperationError
   alias Fluffy.Playwright
+  alias Fluffy.Support.Server
 
   test "retains structured error names and the complete original error" do
     locator = by_role(:button, name: "Save")
@@ -105,7 +106,7 @@ defmodule Fluffy.OperationErrorTest do
         session_for_html(
           unquote(driver),
           "<button disabled>Save</button><input type='checkbox' disabled aria-label='Updates'>",
-          base_url: Fluffy.TestServer.base_url()
+          base_url: Server.base_url()
         )
 
       button = by_role(:button, name: "Save")
@@ -134,7 +135,7 @@ defmodule Fluffy.OperationErrorTest do
 
       session =
         if unquote(driver) == :static do
-          :phoenix |> start_session(endpoint: Fluffy.TestWeb.Endpoint) |> visit("/chamber")
+          :phoenix |> start_session(endpoint: Fluffy.Support.Web.Endpoint) |> visit("/chamber")
         else
           session
         end
@@ -154,7 +155,17 @@ defmodule Fluffy.OperationErrorTest do
     end
   end
 
+  test "a URL assertion on a session for HTML fails as an assertion" do
+    session = session_for_html(:static, "<h1>Diagon Alley</h1>")
+
+    for expected <- ["/diagon-alley", ~r/diagon-alley/, &(&1.path == "/diagon-alley")] do
+      assert_raise ExUnit.AssertionError, ~r/to have URL/, fn ->
+        expect(session, page_to_have_url(expected, timeout: 0))
+      end
+    end
+  end
+
   defp browser_html(html) do
-    session_for_html(:playwright, html, base_url: Fluffy.TestServer.base_url())
+    session_for_html(:playwright, html, base_url: Server.base_url())
   end
 end

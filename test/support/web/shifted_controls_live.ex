@@ -1,4 +1,4 @@
-defmodule Fluffy.TestWeb.ShiftedControlsLive do
+defmodule Fluffy.Support.Web.ShiftedControlsLive do
   @moduledoc false
 
   use Phoenix.LiveView

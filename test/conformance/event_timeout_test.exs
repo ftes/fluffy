@@ -1,16 +1,16 @@
 defmodule Fluffy.Conformance.EventTimeoutTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
 
   alias Fluffy.Event
-  alias Fluffy.TestHTTPFixtures
+  alias Fluffy.Support.HTTPFixtures
 
   setup do
     fixture =
-      TestHTTPFixtures.register(fn request ->
+      HTTPFixtures.register(fn request ->
         case request.path do
           "/start" ->
             %{
@@ -81,11 +81,11 @@ defmodule Fluffy.Conformance.EventTimeoutTest do
         fn download ->
           assert download.suggested_filename == "marauders_map.csv"
           assert Fluffy.Download.read(download) == "download bytes"
-          assert download.url == TestHTTPFixtures.url(fixture, "/marauders-map")
+          assert download.url == HTTPFixtures.url(fixture, "/marauders-map")
         end,
         timeout: 3_000
       )
-      |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/start")))
+      |> expect(page_to_have_url(HTTPFixtures.url(fixture, "/start")))
     end
 
     @tag driver: driver
@@ -110,10 +110,9 @@ defmodule Fluffy.Conformance.EventTimeoutTest do
 
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
-    test "timeout: :infinity waits past the session timeout with #{driver}", %{driver: driver, fixture: fixture} do
+    test "timeout: :infinity waits for the event with #{driver}", %{driver: driver, fixture: fixture} do
       driver
       |> start_test_session(fixture)
-      |> put_session_timeout(50)
       |> expect_event(
         Event.download(&(&1.suggested_filename == "marauders_map.csv")),
         fn session ->
@@ -128,7 +127,7 @@ defmodule Fluffy.Conformance.EventTimeoutTest do
 
   defp start_test_session(driver, fixture) do
     driver
-    |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Fluffy.TestWeb.Endpoint)
-    |> visit(TestHTTPFixtures.path(fixture, "/start"))
+    |> start_session(base_url: Fluffy.Support.Server.base_url(), endpoint: Fluffy.Support.Web.Endpoint)
+    |> visit(HTTPFixtures.path(fixture, "/start"))
   end
 end

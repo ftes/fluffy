@@ -1,12 +1,11 @@
 defmodule Fluffy.ApplicationTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   test "starts the Fluffy supervision tree" do
     assert Process.alive?(Process.whereis(Fluffy.Supervisor))
   end
 
-  test "starts no Playwright transport or browser before the first browser session" do
-    assert %{runtime: %{initialized?: false, launch_count: 0}, transport: nil} =
-             Application.fetch_env!(:fluffy, :playwright_boot_state)
+  test "starts no Playwright driver or browser before the first browser session" do
+    assert %{pool: nil} = :persistent_term.get({Fluffy.ApplicationTest, :boot_state})
   end
 end

@@ -1,4 +1,4 @@
-defmodule Fluffy.TestWeb.ActionRetryLive do
+defmodule Fluffy.Support.Web.ActionRetryLive do
   @moduledoc false
   use Phoenix.LiveView
 

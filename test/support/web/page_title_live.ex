@@ -1,4 +1,4 @@
-defmodule Fluffy.TestWeb.PageTitleLive do
+defmodule Fluffy.Support.Web.PageTitleLive do
   @moduledoc false
 
   use Phoenix.LiveView

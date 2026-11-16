@@ -6,6 +6,14 @@ defmodule Fluffy.ActionabilityError do
 
   defexception [:action, :reason, :locator, :target, :message]
 
+  # Reading a state the element lacks: injectedScript.ts's errors, which an expectation shows.
+  @state_errors %{
+    not_checkbox_or_radio: "Not a checkbox or radio button",
+    no_readonly_state:
+      "Element is not an <input>, <textarea>, <select> or [contenteditable] and does not have a role allowing [aria-readonly]",
+    not_multiple_select: "Not a select element with a multiple attribute"
+  }
+
   @impl true
   def exception(options) do
     action = Keyword.fetch!(options, :action)
@@ -20,19 +28,18 @@ defmodule Fluffy.ActionabilityError do
         true -> raise ArgumentError, "ActionabilityError requires :locator or :target"
       end
 
-    %__MODULE__{
-      action: action,
-      reason: reason,
-      locator: locator,
-      target: target,
-      message: "Cannot #{action} #{description} because the target is #{reason_label(reason)}."
-    }
+    message =
+      case Map.fetch(@state_errors, reason) do
+        {:ok, message} -> message
+        :error -> "Cannot #{action} #{description} because the target is #{reason_label(reason)}."
+      end
+
+    %__MODULE__{action: action, reason: reason, locator: locator, target: target, message: message}
   end
 
   defp reason_label(:not_editable), do: "not editable"
   defp reason_label(:not_checkable), do: "not checkable"
   defp reason_label(:not_selectable), do: "not selectable"
-  defp reason_label(:not_multiple_select), do: "not a select element with a multiple attribute"
   defp reason_label(:cannot_uncheck_radio), do: "cannot uncheck a selected radio"
   defp reason_label(:disabled_option), do: "a disabled option"
   defp reason_label(:option_not_found), do: "the requested option was not found"

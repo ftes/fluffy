@@ -1,4 +1,4 @@
-defmodule Fluffy.TestWeb.ActionabilityLive do
+defmodule Fluffy.Support.Web.ActionabilityLive do
   @moduledoc false
 
   use Phoenix.LiveView
@@ -89,12 +89,12 @@ defmodule Fluffy.TestWeb.ActionabilityLive do
       <p>JS payload state: {if @checked_keys["js"], do: "checked", else: "unchecked"}</p>
 
       <.live_component
-        module={Fluffy.TestWeb.CheckboxPayloadComponent}
+        module={Fluffy.Support.Web.CheckboxPayloadComponent}
         id="Component payload"
         override={false}
       />
       <.live_component
-        module={Fluffy.TestWeb.CheckboxPayloadComponent}
+        module={Fluffy.Support.Web.CheckboxPayloadComponent}
         id="Override payload"
         override={true}
       />

@@ -1,9 +1,11 @@
 defmodule Fluffy.Conformance.LiveKeyboardActionTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
+
+  alias Fluffy.Support.Server
 
   for key <- ["Enter", "Tab", "Space", " ", "Backspace", "Escape", "ArrowDown", "ControlOrMeta+A", "arbitrary"] do
     test "LiveView passes #{inspect(key)} unchanged to both handlers without phx-key filtering" do
@@ -117,14 +119,14 @@ defmodule Fluffy.Conformance.LiveKeyboardActionTest do
   test "a key handler patch is reconciled" do
     session()
     |> press(by_label("Patch key", exact: true), "Enter")
-    |> expect(page_to_have_url(Fluffy.TestServer.base_url() <> "/live/keyboard?step=patched"))
+    |> expect(page_to_have_url(Server.base_url() <> "/live/keyboard?step=patched"))
     |> expect("Step: patched" |> by_text(exact: true) |> to_be_visible())
   end
 
   test "a keydown navigation stops dispatch and adopts the destination" do
     session()
     |> press(by_label("Navigate key", exact: true), "Enter")
-    |> expect(page_to_have_url(Fluffy.TestServer.base_url() <> "/live/secret-chamber"))
+    |> expect(page_to_have_url(Server.base_url() <> "/live/secret-chamber"))
     |> expect("The secret chamber is open" |> by_text(exact: true) |> to_be_visible())
   end
 
@@ -138,7 +140,7 @@ defmodule Fluffy.Conformance.LiveKeyboardActionTest do
 
   defp session(driver \\ :phoenix) do
     driver
-    |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Fluffy.TestWeb.Endpoint)
+    |> start_session(base_url: Server.base_url(), endpoint: Fluffy.Support.Web.Endpoint)
     |> visit("/live/keyboard")
   end
 end

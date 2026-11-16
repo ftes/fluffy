@@ -8,19 +8,18 @@ behavior depends on JavaScript or other browser-owned capabilities.
 
 ## Your first test
 
-Import the actions and locators; `use Fluffy.Assert` imports the assertion vocabulary:
+Add `use Fluffy.Case` after `use ExUnit.Case` (or your `ConnCase`, see
+[Shared test case](#shared-test-case)), then import the actions and locators;
+`use Fluffy.Assert` imports the assertion vocabulary:
 
 ```elixir
 defmodule MyAppWeb.CreatureTest do
   use ExUnit.Case, async: true
+  use Fluffy.Case
   use Fluffy.Assert
 
   import Fluffy
   import Fluffy.Locator
-
-  setup context do
-    Fluffy.Test.setup(context)
-  end
 
   test "puts Fluffy to sleep" do
     start_session(:phoenix)
@@ -96,41 +95,28 @@ See the [capability matrix](capabilities.md) for backend differences.
 
 ## Shared test case
 
-Put shared imports and session setup in an application-owned `FluffyCase`.
-Keep your ordinary `ConnCase` for fixtures, routes, and sandbox setup, then
-start the Fluffy session after it:
+`use Fluffy.Case` registers the test, for Phoenix and Playwright sessions alike; the
+imports and sessions are yours. Keep the `ConnCase` for fixtures, routes and the sandbox,
+and use it first: used after `Fluffy.Case`, its `use ExUnit.Case` imports `test` again
+and the module fails to compile on an ambiguous `test/3`.
 
-```elixir
-# test/support/fluffy_case.ex
-defmodule MyAppWeb.FluffyCase do
-  use ExUnit.CaseTemplate
-
-  using do
-    quote do
-      use MyAppWeb.ConnCase
-      use Fluffy.Assert
-
-      import Fluffy
-      import Fluffy.Locator
-
-      alias Fluffy.Event
-
-      setup context do
-        :ok = Fluffy.Test.setup(context)
-        %{session: start_session(Map.get(context, :backend, :phoenix))}
-      end
-    end
-  end
-end
-```
-
-Tests receive `session` in their context and default to Phoenix. Use
+A setup can start a session per test, here Phoenix by default and the backend of a
+`backend` tag otherwise. The tag is the setup's own, so name it as you like. Use
 `@moduletag backend: :playwright` for an entire module, `@describetag` for a
 describe block, or `@tag` for one test—without a separate browser test module:
 
 ```elixir
 defmodule MyAppWeb.PotionTest do
-  use MyAppWeb.FluffyCase, async: true
+  use MyAppWeb.ConnCase, async: true
+  use Fluffy.Case
+  use Fluffy.Assert
+
+  import Fluffy
+  import Fluffy.Locator
+
+  setup context do
+    %{session: start_session(context[:backend] || :phoenix)}
+  end
 
   test "lists the available potions", %{session: session} do
     session
@@ -144,6 +130,65 @@ defmodule MyAppWeb.PotionTest do
     |> visit("/potions")
     |> click(by_role(:button, name: "Brew potion"))
     |> assert(visible(by_text("Potion brewed")))
+  end
+end
+```
+
+To share this across modules, put `use Fluffy.Case` in your own case template's
+`using`, with the imports and the session setup after it there; the template's own
+`setup`, here the sandbox owner's, runs before them. It forwards the module's options, so
+`use MyAppWeb.FeatureCase, async: true, trace: :on` works:
+
+```elixir
+defmodule MyAppWeb.FeatureCase do
+  use ExUnit.CaseTemplate
+
+  using opts do
+    quote do
+      use Fluffy.Case, unquote(opts)
+      use Fluffy.Assert
+
+      import Fluffy
+      import Fluffy.Locator
+
+      setup context do
+        %{session: start_session(context[:backend] || :phoenix)}
+      end
+    end
+  end
+
+  setup tags do
+    MyApp.DataCase.setup_sandbox(tags)
+    :ok
+  end
+end
+```
+
+When the template's own `setup` starts the session, also put `use Fluffy.Case` right after
+`use ExUnit.CaseTemplate`. A template's own `setup` callbacks run before those its `using`
+brings in, so the test is then registered before them (a Playwright session started before
+the registration makes it raise). The line in `using` stays, as it brings the `test` macro
+to each module and takes the options; there it registers nothing again. The one in the body
+takes none:
+
+```elixir
+defmodule MyAppWeb.FeatureCase do
+  use ExUnit.CaseTemplate
+  use Fluffy.Case
+
+  using opts do
+    quote do
+      use Fluffy.Case, unquote(opts)
+      use Fluffy.Assert
+
+      import Fluffy
+      import Fluffy.Locator
+    end
+  end
+
+  setup tags do
+    MyApp.DataCase.setup_sandbox(tags)
+    %{session: Fluffy.start_session(tags[:backend] || :phoenix)}
   end
 end
 ```

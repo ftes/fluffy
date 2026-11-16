@@ -1,5 +1,5 @@
 defmodule Fluffy.Conformance.CSSLocatorTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
@@ -13,7 +13,7 @@ defmodule Fluffy.Conformance.CSSLocatorTest do
       item = by_css(".item")
 
       session =
-        session_for_html(driver, ~s(<div class="item">First</div>), base_url: Fluffy.TestServer.base_url())
+        session_for_html(driver, ~s(<div class="item">First</div>), base_url: Fluffy.Support.Server.base_url())
 
       session
       |> expect(to_have_count(item, 1))

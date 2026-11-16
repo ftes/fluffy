@@ -1,5 +1,5 @@
 defmodule Fluffy.Conformance.HTMLIsolationTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
@@ -8,19 +8,15 @@ defmodule Fluffy.Conformance.HTMLIsolationTest do
   for driver <- [:static, :playwright] do
     @tag driver: driver
     test "isolates parallel injected documents with #{driver}", %{driver: driver} do
+      # Sessions start in the test process, which owns them; the documents run in parallel.
       [{"Alpha", "Beta"}, {"Beta", "Alpha"}]
       |> Enum.map(fn {present, absent} ->
-        Task.async(fn ->
-          session =
-            session_for_html(driver, "<button>#{present}</button>", base_url: Fluffy.TestServer.base_url())
+        session = session_for_html(driver, "<button>#{present}</button>", base_url: Fluffy.Support.Server.base_url())
 
-          try do
-            session
-            |> expect(:button |> by_role(name: present) |> to_have_count(1))
-            |> expect(:button |> by_role(name: absent) |> to_have_count(0))
-          after
-            Fluffy.Backend.close_session(session)
-          end
+        Task.async(fn ->
+          session
+          |> expect(:button |> by_role(name: present) |> to_have_count(1))
+          |> expect(:button |> by_role(name: absent) |> to_have_count(0))
         end)
       end)
       |> Task.await_many(30_000)

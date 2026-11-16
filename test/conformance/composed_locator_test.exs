@@ -1,11 +1,12 @@
 defmodule Fluffy.Conformance.ComposedLocatorTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.TestWeb.Endpoint
+  alias Fluffy.Support.Server
+  alias Fluffy.Support.Web.Endpoint
 
   @tag driver: :playwright
   test "within/2 rejects a frame inside a chained locator" do
@@ -307,7 +308,7 @@ defmodule Fluffy.Conformance.ComposedLocatorTest do
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
     test "intersections act on and re-resolve LiveView renders with #{driver}", %{driver: driver} do
-      session = start_session(driver, base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+      session = start_session(driver, base_url: Server.base_url(), endpoint: Endpoint)
       flute = "button" |> by_css() |> and_(by_role(:button, name: "Play the flute"))
 
       session
@@ -323,7 +324,7 @@ defmodule Fluffy.Conformance.ComposedLocatorTest do
     @tag driver: driver
     test "regular expressions act on LiveView renders with #{driver}", %{driver: driver} do
       driver
-      |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+      |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
       |> visit("/live/nested")
       |> click(by_role(:button, name: ~r/^Increment/))
       |> expect("p" |> by_css() |> filter(has_text: ~r/^Child count: 1$/) |> to_be_visible())
@@ -342,7 +343,7 @@ defmodule Fluffy.Conformance.ComposedLocatorTest do
 
   defp with_html(driver, html, fun) do
     session =
-      session_for_html(driver, html, base_url: Fluffy.TestServer.base_url())
+      session_for_html(driver, html, base_url: Server.base_url())
 
     fun.(session)
   end

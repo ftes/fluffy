@@ -1,5 +1,5 @@
 defmodule Fluffy.Conformance.ClientNavigationReadinessTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
@@ -7,7 +7,9 @@ defmodule Fluffy.Conformance.ClientNavigationReadinessTest do
   import Fluffy.Playwright
 
   alias Fluffy.Expect
-  alias Fluffy.TestWeb.Endpoint
+  alias Fluffy.Support.HTTPFixtures
+  alias Fluffy.Support.Server
+  alias Fluffy.Support.Web.Endpoint
 
   for {operation, button} <- [assign: "Assign ready", replace: "Replace ready"] do
     @tag driver: :playwright
@@ -19,7 +21,7 @@ defmodule Fluffy.Conformance.ClientNavigationReadinessTest do
       session =
         :playwright
         |> start_session(
-          base_url: Fluffy.TestServer.base_url(),
+          base_url: Server.base_url(),
           endpoint: Endpoint
         )
         |> visit("/actions/client-navigation?topic=#{topic}")
@@ -36,7 +38,7 @@ defmodule Fluffy.Conformance.ClientNavigationReadinessTest do
   test "adopts a document-level client-side history traversal" do
     :playwright
     |> start_session(
-      base_url: Fluffy.TestServer.base_url(),
+      base_url: Server.base_url(),
       endpoint: Endpoint
     )
     |> visit("/actions/history-source")
@@ -51,7 +53,7 @@ defmodule Fluffy.Conformance.ClientNavigationReadinessTest do
   test "keeps a client-side history state change out of document adoption" do
     :playwright
     |> start_session(
-      base_url: Fluffy.TestServer.base_url(),
+      base_url: Server.base_url(),
       endpoint: Endpoint
     )
     |> visit("/actions/history-push-state")
@@ -64,15 +66,15 @@ defmodule Fluffy.Conformance.ClientNavigationReadinessTest do
     counter = start_supervised!({Agent, fn -> 0 end})
 
     fixture =
-      Fluffy.TestHTTPFixtures.register(fn _request ->
+      HTTPFixtures.register(fn _request ->
         attempt = Agent.get_and_update(counter, &{&1 + 1, &1 + 1})
         %{body: ~s|<p>Attempt #{attempt}</p><button onclick="location.reload()">Reload</button>|}
       end)
 
     session =
       :playwright
-      |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
-      |> visit(Fluffy.TestHTTPFixtures.path(fixture))
+      |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+      |> visit(HTTPFixtures.path(fixture))
 
     first = current_page(session)
     expect(session, "Attempt 1" |> by_text(exact: true) |> Expect.to_be_visible())
@@ -90,7 +92,7 @@ defmodule Fluffy.Conformance.ClientNavigationReadinessTest do
   test "an action follows documents that navigate on load" do
     # Each hop replaces the execution context of Fluffy's post-action check.
     fixture =
-      Fluffy.TestHTTPFixtures.register(fn request ->
+      HTTPFixtures.register(fn request ->
         case request.path do
           "/start" -> %{body: ~s|<button onclick="location.assign('hop-1')">Enter</button>|}
           "/hop-1" -> %{body: ~s|<script>location.replace('hop-2')</script>|}
@@ -101,21 +103,21 @@ defmodule Fluffy.Conformance.ClientNavigationReadinessTest do
       end)
 
     :playwright
-    |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
-    |> visit(Fluffy.TestHTTPFixtures.path(fixture, "/start"))
+    |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+    |> visit(HTTPFixtures.path(fixture, "/start"))
     |> click(by_role(:button, name: "Enter"))
-    |> expect(Expect.page_to_have_url(Fluffy.TestHTTPFixtures.path(fixture, "/arrived")))
+    |> expect(Expect.page_to_have_url(HTTPFixtures.path(fixture, "/arrived")))
     |> expect("Arrived" |> by_text(exact: true) |> Expect.to_be_visible())
   end
 
   @tag driver: :playwright
   test "a requestless document is adopted" do
-    fixture = Fluffy.TestHTTPFixtures.register(%{body: ~s(<a href="about:blank">Blank</a>)})
+    fixture = HTTPFixtures.register(%{body: ~s(<a href="about:blank">Blank</a>)})
 
     session =
       :playwright
-      |> start_session(base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
-      |> visit(Fluffy.TestHTTPFixtures.path(fixture))
+      |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+      |> visit(HTTPFixtures.path(fixture))
       |> click(by_role(:link, name: "Blank"))
 
     assert Fluffy.Page.url(current_page(session)) == "about:blank"

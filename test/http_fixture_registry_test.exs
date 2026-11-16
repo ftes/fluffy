@@ -1,21 +1,21 @@
 defmodule Fluffy.HTTPFixtureRegistryTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
-  alias Fluffy.TestHTTPFixtures
+  alias Fluffy.Support.HTTPFixtures
 
   test "registrations have collision-free paths and capture the request contract" do
-    first = TestHTTPFixtures.register(%{body: "first"})
-    second = TestHTTPFixtures.register(%{body: "second"})
+    first = HTTPFixtures.register(%{body: "first"})
+    second = HTTPFixtures.register(%{body: "second"})
 
     refute first.token == second.token
     refute first.path == second.path
 
-    response = http_request(:get, TestHTTPFixtures.url(first, "/owls?state=open"))
+    response = http_request(:get, HTTPFixtures.url(first, "/owls?state=open"))
 
     assert response.status == 200
     assert response.body == "first"
 
-    assert [request] = TestHTTPFixtures.requests(first)
+    assert [request] = HTTPFixtures.requests(first)
     assert request.method == "GET"
     assert request.path == "/owls"
     assert request.query == "state=open"
@@ -24,13 +24,13 @@ defmodule Fluffy.HTTPFixtureRegistryTest do
 
   test "a declarative response sequence is consumed in registration order" do
     fixture =
-      TestHTTPFixtures.register_sequence([
+      HTTPFixtures.register_sequence([
         %{status: 302, headers: [{"location", "next"}]},
         %{body: "destination"}
       ])
 
-    first = http_request(:get, TestHTTPFixtures.url(fixture))
-    second = http_request(:get, TestHTTPFixtures.url(fixture, "/next"))
+    first = http_request(:get, HTTPFixtures.url(fixture))
+    second = http_request(:get, HTTPFixtures.url(fixture, "/next"))
 
     assert first.status == 302
     assert first.headers["location"] == "next"
@@ -40,14 +40,14 @@ defmodule Fluffy.HTTPFixtureRegistryTest do
 
   test "a response function can derive a response from the captured request" do
     fixture =
-      TestHTTPFixtures.register(fn request ->
+      HTTPFixtures.register(fn request ->
         %{body: "#{request.method} #{request.path}?#{request.query} #{request.body}"}
       end)
 
     response =
       http_request(
         :post,
-        TestHTTPFixtures.url(fixture, "/submit?source=test"),
+        HTTPFixtures.url(fixture, "/submit?source=test"),
         [{"content-type", "application/x-www-form-urlencoded"}],
         "first=one&second=two"
       )
@@ -60,15 +60,15 @@ defmodule Fluffy.HTTPFixtureRegistryTest do
 
     {owner, monitor} =
       spawn_monitor(fn ->
-        fixture = TestHTTPFixtures.register(%{body: "temporary"})
+        fixture = HTTPFixtures.register(%{body: "temporary"})
         send(parent, {:fixture, fixture})
       end)
 
     assert_receive {:fixture, fixture}
     assert_receive {:DOWN, ^monitor, :process, ^owner, :normal}
 
-    refute TestHTTPFixtures.registered?(fixture)
-    assert http_request(:get, TestHTTPFixtures.url(fixture)).status == 404
+    refute HTTPFixtures.registered?(fixture)
+    assert http_request(:get, HTTPFixtures.url(fixture)).status == 404
   end
 
   defp http_request(method, url, headers \\ [], body \\ "") do

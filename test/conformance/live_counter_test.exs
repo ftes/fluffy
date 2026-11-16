@@ -1,5 +1,5 @@
 defmodule Fluffy.Conformance.LiveCounterTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
@@ -10,8 +10,8 @@ defmodule Fluffy.Conformance.LiveCounterTest do
     test "lulls a head through a real LiveView counter with #{driver}", %{driver: driver} do
       session =
         start_session(driver,
-          base_url: Fluffy.TestServer.base_url(),
-          endpoint: Fluffy.TestWeb.Endpoint
+          base_url: Fluffy.Support.Server.base_url(),
+          endpoint: Fluffy.Support.Web.Endpoint
         )
 
       session

@@ -6,16 +6,7 @@ defmodule Fluffy.Driver.PhoenixValidation do
   alias Fluffy.Locator
   alias Fluffy.Session
 
-  @browser_only_kinds [
-    :accessible_description,
-    :accessible_error_message,
-    :accessible_name,
-    :aria_snapshot,
-    :css,
-    :js_property,
-    :role,
-    :screenshot
-  ]
+  @browser_only_kinds [:accessible_error_message, :aria_snapshot, :css, :js_property, :screenshot]
 
   def validate_operation!(session, _operation, arguments) do
     Enum.each(arguments, &validate_argument!(Session.current_driver(session), &1))

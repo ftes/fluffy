@@ -1,4 +1,4 @@
-defmodule Fluffy.TestWeb.FormLive do
+defmodule Fluffy.Support.Web.FormLive do
   @moduledoc false
 
   use Phoenix.LiveView
@@ -174,7 +174,7 @@ defmodule Fluffy.TestWeb.FormLive do
     ~H"""
     <main>
       <section :if={@sticky?}>
-        {live_render(@socket, Fluffy.TestWeb.CounterLive,
+        {live_render(@socket, Fluffy.Support.Web.CounterLive,
           id: "sticky-counter",
           sticky: true,
           session: %{"version" => @version}

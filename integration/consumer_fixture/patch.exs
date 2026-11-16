@@ -1,18 +1,6 @@
 alias Igniter.Project.Config
 alias Igniter.Project.Deps
 
-playwright_config =
-  {:code,
-   Sourceror.parse_string!("""
-   [
-     enabled: true,
-     engine: :chromium,
-     timeout: 15_000,
-     launch_options: [headless: true],
-     artifact_dir: System.get_env("FLUFFY_ARTIFACT_DIR")
-   ]
-   """)}
-
 fixture_dir = __DIR__
 
 Igniter.new()
@@ -52,7 +40,9 @@ Igniter.new()
   [:endpoint],
   FluffyConsumerWeb.Endpoint
 )
-|> Config.configure("test.exs", :fluffy, [:playwright], playwright_config)
+|> Config.configure("test.exs", :fluffy, [:action_timeout], 15_000)
+|> Config.configure("test.exs", :playwright_ex, [:test, :launch_options], headless: true)
+|> Config.configure("test.exs", :playwright_ex, [:test, :navigation_timeout], 15_000)
 |> Igniter.Libs.Phoenix.append_to_scope(
   "/",
   """

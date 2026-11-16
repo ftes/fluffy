@@ -1,15 +1,16 @@
 defmodule Fluffy.Conformance.PlaywrightEvaluateTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
 
   alias Fluffy.CapabilityError
   alias Fluffy.Playwright
+  alias Fluffy.Support.Server
 
   test "evaluates JavaScript in the active Playwright page and returns the value" do
     session =
       session_for_html(:playwright, "<main><h1>Lumos</h1><p data-state=ready>Ready</p></main>",
-        base_url: Fluffy.TestServer.base_url()
+        base_url: Server.base_url()
       )
 
     assert "Lumos" ==
@@ -26,7 +27,7 @@ defmodule Fluffy.Conformance.PlaywrightEvaluateTest do
 
   test "supports function-style evaluation with an argument" do
     session =
-      session_for_html(:playwright, "<main><p id=status>Ready</p></main>", base_url: Fluffy.TestServer.base_url())
+      session_for_html(:playwright, "<main><p id=status>Ready</p></main>", base_url: Server.base_url())
 
     assert "Ready!" ==
              Playwright.evaluate(
@@ -37,7 +38,7 @@ defmodule Fluffy.Conformance.PlaywrightEvaluateTest do
   end
 
   test "rejects the removed Fluffy 0.8 evaluate options as unknown" do
-    session = session_for_html(:playwright, "<main>Options</main>", base_url: Fluffy.TestServer.base_url())
+    session = session_for_html(:playwright, "<main>Options</main>", base_url: Server.base_url())
 
     assert_raise NimbleOptions.ValidationError, ~r/unknown options.*:is_function.*:arg/, fn ->
       Playwright.evaluate(session, "suffix => suffix", is_function: true, arg: "!")
@@ -50,7 +51,7 @@ defmodule Fluffy.Conformance.PlaywrightEvaluateTest do
 
   # As in Playwright, page evaluation has no timeout.
   test "rejects timeout: in place of the argument" do
-    session = session_for_html(:playwright, "<main>Options</main>", base_url: Fluffy.TestServer.base_url())
+    session = session_for_html(:playwright, "<main>Options</main>", base_url: Server.base_url())
 
     assert_raise NimbleOptions.ValidationError, ~r/unknown options.*:timeout/, fn ->
       Playwright.evaluate(session, "1 + 1", timeout: 1_000)
@@ -61,8 +62,8 @@ defmodule Fluffy.Conformance.PlaywrightEvaluateTest do
     session =
       :phoenix
       |> start_session(
-        endpoint: Fluffy.TestWeb.Endpoint,
-        base_url: Fluffy.TestServer.base_url()
+        endpoint: Fluffy.Support.Web.Endpoint,
+        base_url: Server.base_url()
       )
       |> visit("/chamber")
 
@@ -73,7 +74,7 @@ defmodule Fluffy.Conformance.PlaywrightEvaluateTest do
 
   test "raises on Playwright evaluation failure" do
     session =
-      session_for_html(:playwright, "<main>Failure</main>", base_url: Fluffy.TestServer.base_url())
+      session_for_html(:playwright, "<main>Failure</main>", base_url: Server.base_url())
 
     assert_raise PlaywrightEx.PlaywrightError, ~r/boom/, fn ->
       Playwright.evaluate(session, "(() => { throw new Error('boom') })()")

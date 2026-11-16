@@ -1,11 +1,12 @@
 defmodule Fluffy.Conformance.ActionabilityCapabilityTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.TestWeb.Endpoint
+  alias Fluffy.Support.Server
+  alias Fluffy.Support.Web.Endpoint
 
   for driver <- [:static, :playwright] do
     @tag driver: driver
@@ -71,7 +72,7 @@ defmodule Fluffy.Conformance.ActionabilityCapabilityTest do
     test "fill ignores unrelated layout-sensitive markup in a LiveView with #{driver}" do
       session =
         start_session(unquote(driver),
-          base_url: Fluffy.TestServer.base_url(),
+          base_url: Server.base_url(),
           endpoint: Endpoint
         )
 
@@ -87,7 +88,7 @@ defmodule Fluffy.Conformance.ActionabilityCapabilityTest do
 
       session =
         start_session(unquote(driver),
-          base_url: Fluffy.TestServer.base_url(),
+          base_url: Server.base_url(),
           endpoint: Endpoint
         )
 
@@ -116,7 +117,7 @@ defmodule Fluffy.Conformance.ActionabilityCapabilityTest do
   end
 
   defp with_html(driver, html, fun) do
-    session = session_for_html(driver, html, base_url: Fluffy.TestServer.base_url())
+    session = session_for_html(driver, html, base_url: Server.base_url())
     fun.(session)
   end
 end

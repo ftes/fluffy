@@ -118,13 +118,7 @@ defmodule Fluffy.Locator.Internal do
     "#{function}(#{inspect(text)}#{describe_options(options)})"
   end
 
-  defp describe_operation({:test_id, "data-testid", test_id}) do
-    "by_test_id(#{inspect(test_id)})"
-  end
-
-  defp describe_operation({:test_id, attribute, test_id}) do
-    "by_test_id(#{inspect(test_id)}, attribute: #{inspect(attribute)})"
-  end
+  defp describe_operation({:test_id, test_id}), do: "by_test_id(#{inspect(test_id)})"
 
   defp describe_operation({:or, right}), do: "or_(#{describe(right)})"
 

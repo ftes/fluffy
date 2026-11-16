@@ -1,12 +1,13 @@
 defmodule Fluffy.Conformance.ClockTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
 
   alias Fluffy.Playwright.Clock
-  alias Fluffy.TestWeb.Endpoint
+  alias Fluffy.Support.Server
+  alias Fluffy.Support.Web.Endpoint
 
   @noon ~U[2024-02-02 12:00:00Z]
   @later DateTime.shift(@noon, minute: 1)
@@ -21,7 +22,7 @@ defmodule Fluffy.Conformance.ClockTest do
 
     test "set_fixed_time and set_system_time set the page's Date" do
       :playwright
-      |> session_for_html(@dates, base_url: Fluffy.TestServer.base_url())
+      |> session_for_html(@dates, base_url: Server.base_url())
       |> Clock.set_fixed_time(@noon)
       |> click(by_role(:button, name: "Now"))
       |> expect(to_be_visible(by_text("2024-02-02T12:00:00.000Z")))
@@ -105,7 +106,7 @@ defmodule Fluffy.Conformance.ClockTest do
 
     # As in Playwright, clock calls have no timeout.
     test "clock calls reject timeout:" do
-      session = session_for_html(:playwright, @dates, base_url: Fluffy.TestServer.base_url())
+      session = session_for_html(:playwright, @dates, base_url: Server.base_url())
 
       for call <- [&Clock.install(session, &1), &Clock.run_for(session, 200, &1), &Clock.resume(session, &1)] do
         assert_raise NimbleOptions.ValidationError, ~r/unknown options.*:timeout/, fn -> call.(timeout: 500) end
@@ -115,7 +116,7 @@ defmodule Fluffy.Conformance.ClockTest do
     # The call runs in a task, which logs the crash.
     @tag :capture_log
     test "a clock call that PlaywrightEx rejects raises its exception" do
-      session = session_for_html(:playwright, @dates, base_url: Fluffy.TestServer.base_url())
+      session = session_for_html(:playwright, @dates, base_url: Server.base_url())
 
       assert_raise FunctionClauseError, fn -> Clock.install(session, time: :bogus) end
     end
@@ -138,5 +139,5 @@ defmodule Fluffy.Conformance.ClockTest do
     end
   end
 
-  defp session, do: start_session(:playwright, base_url: Fluffy.TestServer.base_url(), endpoint: Endpoint)
+  defp session, do: start_session(:playwright, base_url: Server.base_url(), endpoint: Endpoint)
 end

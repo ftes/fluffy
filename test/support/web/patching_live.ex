@@ -1,4 +1,4 @@
-defmodule Fluffy.TestWeb.PatchingKeyComponent do
+defmodule Fluffy.Support.Web.PatchingKeyComponent do
   @moduledoc false
   use Phoenix.LiveComponent
 
@@ -33,7 +33,7 @@ defmodule Fluffy.TestWeb.PatchingKeyComponent do
   end
 end
 
-defmodule Fluffy.TestWeb.PatchingLive do
+defmodule Fluffy.Support.Web.PatchingLive do
   @moduledoc false
   use Phoenix.LiveView
 
@@ -208,7 +208,7 @@ defmodule Fluffy.TestWeb.PatchingLive do
       <p>Component keyups: {@component_keyups}</p>
       <.live_component
         :if={@mode == "component-myself" && !@component_removed?}
-        module={Fluffy.TestWeb.PatchingKeyComponent}
+        module={Fluffy.Support.Web.PatchingKeyComponent}
         id="key-component"
       />
       <div :for={row <- @rows} :if={String.starts_with?(@mode, "rows-")}>

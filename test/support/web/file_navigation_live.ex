@@ -1,4 +1,4 @@
-defmodule Fluffy.TestWeb.FileNavigationLive do
+defmodule Fluffy.Support.Web.FileNavigationLive do
   @moduledoc false
 
   use Phoenix.LiveView

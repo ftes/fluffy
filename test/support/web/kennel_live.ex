@@ -1,4 +1,4 @@
-defmodule Fluffy.TestWeb.KennelLive do
+defmodule Fluffy.Support.Web.KennelLive do
   @moduledoc false
 
   use Phoenix.LiveView
@@ -84,7 +84,7 @@ defmodule Fluffy.TestWeb.KennelLive do
   end
 end
 
-defmodule Fluffy.TestWeb.KennelKitchenLive do
+defmodule Fluffy.Support.Web.KennelKitchenLive do
   @moduledoc false
 
   use Phoenix.LiveView
@@ -102,7 +102,7 @@ defmodule Fluffy.TestWeb.KennelKitchenLive do
   end
 end
 
-defmodule Fluffy.TestWeb.KennelSidebarLive do
+defmodule Fluffy.Support.Web.KennelSidebarLive do
   @moduledoc false
 
   use Phoenix.LiveView

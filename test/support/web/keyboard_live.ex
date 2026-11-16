@@ -1,4 +1,4 @@
-defmodule Fluffy.TestWeb.KeyboardLive do
+defmodule Fluffy.Support.Web.KeyboardLive do
   @moduledoc false
 
   use Phoenix.LiveView
@@ -209,7 +209,7 @@ defmodule Fluffy.TestWeb.KeyboardLive do
         />
       </label>
 
-      <.live_component module={Fluffy.TestWeb.KeyboardComponent} id="keyboard-component" />
+      <.live_component module={Fluffy.Support.Web.KeyboardComponent} id="keyboard-component" />
 
       <label>
         Patch key <input id="patch-key" phx-keydown="patch" phx-key="Enter" />
@@ -250,7 +250,7 @@ defmodule Fluffy.TestWeb.KeyboardLive do
   end
 end
 
-defmodule Fluffy.TestWeb.KeyboardComponent do
+defmodule Fluffy.Support.Web.KeyboardComponent do
   @moduledoc false
 
   use Phoenix.LiveComponent

@@ -1,4 +1,4 @@
-defmodule Fluffy.TestWeb.RadioShiftLive do
+defmodule Fluffy.Support.Web.RadioShiftLive do
   @moduledoc false
 
   use Phoenix.LiveView

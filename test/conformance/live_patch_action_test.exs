@@ -1,5 +1,5 @@
 defmodule Fluffy.Conformance.LivePatchActionTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
@@ -9,7 +9,7 @@ defmodule Fluffy.Conformance.LivePatchActionTest do
   @second_upload Path.expand("../support/fixtures/fluffy-upload-second.txt", __DIR__)
 
   defp live_session(driver) do
-    start_session(driver, base_url: Fluffy.TestServer.base_url(), endpoint: Fluffy.TestWeb.Endpoint)
+    start_session(driver, base_url: Fluffy.Support.Server.base_url(), endpoint: Fluffy.Support.Web.Endpoint)
   end
 
   defp url_query(session), do: URI.parse(Fluffy.Session.current_page(session).url).query

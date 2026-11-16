@@ -1,11 +1,13 @@
 defmodule Fluffy.Locator.Static do
   @moduledoc false
 
+  alias Fluffy.Expect.Internal
   alias Fluffy.HTML.Aria
   alias Fluffy.HTML.Semantics
   alias Fluffy.Locator
-
-  @labelled_control_selector Enum.join(Semantics.labelable_tags(), ", ")
+  # StringUtils is internal to PlaywrightEx, which is pinned.
+  alias PlaywrightEx.Isomorphic.LocatorUtils
+  alias PlaywrightEx.Isomorphic.StringUtils
 
   # Operations that search inside each candidate. As in Playwright's chains, they
   # find descendants only, except that its text engine also matches the scope itself.
@@ -83,10 +85,14 @@ defmodule Fluffy.Locator.Static do
     end)
   end
 
-  defp apply_operation({:test_id, attribute_name, test_id}, scopes) do
+  # Playwright's test id engine: any of the comma-separated names of the resolved
+  # `test_id_attribute` (`Fluffy.Options.config!/1`), which the Playwright driver's locators get too.
+  defp apply_operation({:test_id, test_id}, scopes) do
+    names = test_id_attribute_names()
+
     scopes
-    |> query_scopes("[#{attribute_name}]")
-    |> Enum.filter(&(element_attribute(&1, attribute_name) == test_id))
+    |> query_scopes(Enum.map_join(names, ",", &"[#{escape_identifier(&1)}]"))
+    |> Enum.filter(fn element -> Enum.any?(names, &(element_attribute(element, &1) == test_id)) end)
   end
 
   defp apply_operation({:nth, index}, scopes) do
@@ -97,6 +103,12 @@ defmodule Fluffy.Locator.Static do
   end
 
   defp filter_candidates(candidates, aria, options) do
+    options =
+      Enum.map(options, fn
+        {key, text} when key in [:has_text, :has_not_text] -> {key, Internal.compile(text)}
+        option -> option
+      end)
+
     Enum.filter(candidates, fn candidate ->
       Enum.all?(options, fn
         {:has_text, text} -> contains_text?(text(aria, candidate), text)
@@ -110,7 +122,7 @@ defmodule Fluffy.Locator.Static do
 
   defp role_matches(scopes, aria, role, options) do
     role = role |> to_string() |> String.downcase()
-    expected_name = Keyword.get(options, :name)
+    expected_name = options |> Keyword.get(:name) |> Internal.compile()
     exact? = Keyword.get(options, :exact, false)
 
     scopes
@@ -126,6 +138,8 @@ defmodule Fluffy.Locator.Static do
   # matches: those without a matching descendant. Ids are preorder, so a match's
   # descendants are the matches up to its last_id.
   defp text_matches(scopes, aria, text, exact?) do
+    text = Internal.compile(text)
+
     scopes
     |> Enum.flat_map(&self_and_scoped_nodes(aria, &1))
     |> Enum.uniq_by(fn {node, _element} -> node.id end)
@@ -141,17 +155,17 @@ defmodule Fluffy.Locator.Static do
   defp self_and_scoped_nodes(%Aria{index: %{document: document}} = aria, document), do: Aria.scoped_nodes(aria, document)
   defp self_and_scoped_nodes(aria, scope), do: [{Aria.node_for(aria, scope), scope} | Aria.scoped_nodes(aria, scope)]
 
-  # A label or an aria-labelledby reference may be anywhere in the document; only
-  # the control has to be inside the scope.
+  # Playwright's label engine: the elements in scope with a matching label, by
+  # getElementLabels. A label or reference may be anywhere in the document.
   defp label_matches(scopes, aria, text, options) do
-    labelled =
-      aria.index.document
-      |> labelled_controls(aria, text, Keyword.get(options, :exact, false))
-      |> MapSet.new(&Aria.node_for(aria, &1).id)
+    exact? = Keyword.get(options, :exact, false)
+    text = Internal.compile(text)
 
     scopes
     |> scoped_nodes(aria)
-    |> Enum.filter(fn {node, _element} -> MapSet.member?(labelled, node.id) end)
+    |> Enum.filter(fn {node, _element} ->
+      aria |> Aria.element_labels(node) |> Enum.any?(&text_matches?(&1, text, exact?))
+    end)
     |> Enum.map(fn {_node, element} -> element end)
   end
 
@@ -166,7 +180,7 @@ defmodule Fluffy.Locator.Static do
 
   # As upstream, a regular expression sees the normalized accessible name.
   defp accessible_name_matches?(aria, node, %Regex{} = expected, _exact?),
-    do: Regex.match?(expected, aria |> Aria.name(node) |> normalize())
+    do: Regex.match?(expected, aria |> Aria.name(node) |> StringUtils.normalize_white_space())
 
   defp accessible_name_matches?(aria, node, expected, exact?) do
     aria |> Aria.name(node) |> text_matches?(expected, exact?)
@@ -178,80 +192,21 @@ defmodule Fluffy.Locator.Static do
     |> Enum.uniq()
   end
 
-  defp labelled_controls(scope, aria, expected, exact?) do
-    controls = query_scopes([scope], @labelled_control_selector)
-
-    html_labelled =
-      scope
-      |> LazyHTML.query("label")
-      |> Enum.filter(&text_matches?(text(aria, &1), expected, exact?))
-      |> Enum.flat_map(fn label ->
-        case element_attribute(label, "for") do
-          nil ->
-            label
-            |> LazyHTML.query(@labelled_control_selector)
-            |> Enum.filter(&labelable?/1)
-            |> Enum.take(1)
-
-          id ->
-            Enum.filter(controls, &(element_attribute(&1, "id") == id and labelable?(&1)))
-        end
-      end)
-      |> Enum.reject(&has_author_label?/1)
-
-    aria_labelled =
-      [scope]
-      |> query_scopes("[aria-label], [aria-labelledby]")
-      |> Enum.filter(fn control ->
-        case element_attribute(control, "aria-labelledby") do
-          nil -> direct_label_matches?(control, expected, exact?)
-          _references -> referenced_label_matches?(scope, aria, control, expected, exact?)
-        end
-      end)
-
-    html_labelled ++ aria_labelled
-  end
-
-  defp direct_label_matches?(control, expected, exact?) do
-    case element_attribute(control, "aria-label") do
-      nil -> false
-      label -> text_matches?(label, expected, exact?)
-    end
-  end
-
-  defp labelable?(control) do
-    case LazyHTML.to_tree(control) do
-      [{tag, attributes, _children}] -> Semantics.labelable?(%{tag: tag, attributes: attributes})
-      _other -> false
-    end
-  end
-
-  defp has_author_label?(control) do
-    element_attribute(control, "aria-labelledby") != nil or
-      element_attribute(control, "aria-label") != nil
-  end
-
-  defp referenced_label_matches?(scope, aria, control, expected, exact?) do
-    case element_attribute(control, "aria-labelledby") do
-      nil ->
-        false
-
-      ids ->
-        references = String.split(ids)
-
-        scope
-        |> LazyHTML.query("[id]")
-        |> Enum.any?(fn reference ->
-          element_attribute(reference, "id") in references and
-            text_matches?(text(aria, reference), expected, exact?)
-        end)
-    end
-  end
-
   defp node_text_matches?(%{tag: tag}, _expected, _exact?) when tag in ~w(script style noscript), do: false
   defp node_text_matches?(node, expected, exact?), do: text_matches?(Semantics.text(node), expected, exact?)
 
   defp text(aria, element), do: Semantics.text(Aria.node_for(aria, element))
+
+  defp test_id_attribute_names,
+    do: :test_id_attribute |> Fluffy.Options.config!() |> LocatorUtils.split_test_id_attribute_names()
+
+  # The names are CSS identifiers (`Fluffy.Options.test_id_attribute/1`), but LazyHTML rejects
+  # non-ASCII characters in a selector's identifier unless they are escaped.
+  defp escape_identifier(name) do
+    for <<char::utf8 <- name>>, into: "" do
+      if char < 0x80, do: <<char::utf8>>, else: "\\#{Integer.to_string(char, 16)} "
+    end
+  end
 
   defp element_attribute(element, name) do
     case LazyHTML.attribute(element, name) do
@@ -268,13 +223,14 @@ defmodule Fluffy.Locator.Static do
   # As upstream, a regular expression ignores `exact?` and sees the text as is.
   defp text_matches?(actual, %Regex{} = expected, _exact?), do: Regex.match?(expected, actual)
 
-  defp text_matches?(actual, expected, true), do: normalize(actual) == normalize(expected)
+  defp text_matches?(actual, expected, true),
+    do: StringUtils.normalize_white_space(actual) == StringUtils.normalize_white_space(expected)
 
   defp text_matches?(actual, expected, false) do
     actual
-    |> normalize()
+    |> StringUtils.normalize_white_space()
     |> String.downcase()
-    |> String.contains?(expected |> normalize() |> String.downcase())
+    |> String.contains?(expected |> StringUtils.normalize_white_space() |> String.downcase())
   end
 
   defp attribute_matches?(nil, _expected, _exact?), do: false
@@ -282,12 +238,5 @@ defmodule Fluffy.Locator.Static do
 
   defp attribute_matches?(actual, expected, false) do
     String.contains?(String.downcase(actual), String.downcase(expected))
-  end
-
-  defp normalize(text) do
-    text
-    |> String.replace(~r/[\x{200B}\x{00AD}]/u, "")
-    |> String.replace(~r/\s+/u, " ")
-    |> String.trim()
   end
 end

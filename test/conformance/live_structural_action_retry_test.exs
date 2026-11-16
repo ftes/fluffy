@@ -1,5 +1,5 @@
 defmodule Fluffy.Conformance.LiveStructuralActionRetryTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
@@ -178,8 +178,8 @@ defmodule Fluffy.Conformance.LiveStructuralActionRetryTest do
   defp live_session(driver) do
     driver
     |> start_session(
-      endpoint: Fluffy.TestWeb.Endpoint,
-      base_url: Fluffy.TestServer.base_url()
+      endpoint: Fluffy.Support.Web.Endpoint,
+      base_url: Fluffy.Support.Server.base_url()
     )
     |> visit("/live/action-retries")
   end

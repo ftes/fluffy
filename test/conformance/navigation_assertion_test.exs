@@ -1,28 +1,28 @@
 defmodule Fluffy.Conformance.NavigationAssertionTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.TestHTTPFixtures
+  alias Fluffy.Support.HTTPFixtures
 
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
     test "asserts link navigation URL and content with #{driver}", %{driver: driver} do
       fixture =
-        TestHTTPFixtures.register(fn request ->
+        HTTPFixtures.register(fn request ->
           case request.path do
             "/start" -> %{body: html(~s(<a href="destination?source=link">Continue</a>))}
             "/destination" -> %{body: html("<h1>Arrived</h1>")}
           end
         end)
 
-      destination = TestHTTPFixtures.url(fixture, "/destination?source=link")
+      destination = HTTPFixtures.url(fixture, "/destination?source=link")
       session = start_test_session(driver)
 
       session
-      |> visit(TestHTTPFixtures.path(fixture, "/start"))
+      |> visit(HTTPFixtures.path(fixture, "/start"))
       |> click(by_role(:link, name: "Continue"))
       |> expect(page_to_have_url(destination))
       |> expect("Arrived" |> by_text() |> to_be_visible())
@@ -31,7 +31,7 @@ defmodule Fluffy.Conformance.NavigationAssertionTest do
     @tag driver: driver
     test "asserts form submission navigation with #{driver}", %{driver: driver} do
       fixture =
-        TestHTTPFixtures.register(fn request ->
+        HTTPFixtures.register(fn request ->
           case request.path do
             "/start" ->
               %{
@@ -49,11 +49,11 @@ defmodule Fluffy.Conformance.NavigationAssertionTest do
           end
         end)
 
-      destination = TestHTTPFixtures.url(fixture, "/submit")
+      destination = HTTPFixtures.url(fixture, "/submit")
       session = start_test_session(driver)
 
       session
-      |> visit(TestHTTPFixtures.path(fixture, "/start"))
+      |> visit(HTTPFixtures.path(fixture, "/start"))
       |> fill(by_label("Query"), "fluffy")
       |> click(by_role(:button, name: "Search"))
       |> expect(page_to_have_url(destination))
@@ -61,7 +61,7 @@ defmodule Fluffy.Conformance.NavigationAssertionTest do
 
       [request] =
         fixture
-        |> TestHTTPFixtures.requests()
+        |> HTTPFixtures.requests()
         |> Enum.filter(&(&1.path == "/submit"))
 
       assert request.method == "POST"
@@ -71,7 +71,7 @@ defmodule Fluffy.Conformance.NavigationAssertionTest do
     @tag driver: driver
     test "asserts the final document after a redirect with #{driver}", %{driver: driver} do
       fixture =
-        TestHTTPFixtures.register(fn request ->
+        HTTPFixtures.register(fn request ->
           case request.path do
             "/start" -> %{body: html(~s(<a href="redirect">Continue</a>))}
             "/redirect" -> %{status: 302, headers: [{"location", "final"}], body: ""}
@@ -79,11 +79,11 @@ defmodule Fluffy.Conformance.NavigationAssertionTest do
           end
         end)
 
-      destination = TestHTTPFixtures.url(fixture, "/final")
+      destination = HTTPFixtures.url(fixture, "/final")
       session = start_test_session(driver)
 
       session
-      |> visit(TestHTTPFixtures.path(fixture, "/start"))
+      |> visit(HTTPFixtures.path(fixture, "/start"))
       |> click(by_role(:link, name: "Continue"))
       |> expect(page_to_have_url(destination))
       |> expect("Final" |> by_text() |> to_be_visible())
@@ -92,8 +92,8 @@ defmodule Fluffy.Conformance.NavigationAssertionTest do
 
   defp start_test_session(driver) do
     start_session(driver,
-      base_url: Fluffy.TestServer.base_url(),
-      endpoint: Fluffy.TestWeb.Endpoint
+      base_url: Fluffy.Support.Server.base_url(),
+      endpoint: Fluffy.Support.Web.Endpoint
     )
   end
 
@@ -107,7 +107,7 @@ defmodule Fluffy.Conformance.NavigationAssertionTest do
       first_path = if unquote(redirect?), do: "redirect", else: "first"
 
       fixture =
-        TestHTTPFixtures.register(fn request ->
+        HTTPFixtures.register(fn request ->
           case request.path do
             "/start" -> %{body: html(~s(<a href="#{first_path}">First</a>))}
             "/redirect" -> %{status: 302, headers: [{"location", "first"}], body: ""}
@@ -118,12 +118,12 @@ defmodule Fluffy.Conformance.NavigationAssertionTest do
 
       driver
       |> start_test_session()
-      |> visit(TestHTTPFixtures.path(fixture, "/start"))
+      |> visit(HTTPFixtures.path(fixture, "/start"))
       |> click(by_role(:link, name: "First"))
-      |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/first")))
+      |> expect(page_to_have_url(HTTPFixtures.url(fixture, "/first")))
       |> expect(:link |> by_role(name: "First") |> to_have_count(0))
       |> click(by_role(:link, name: "Second"))
-      |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/second")))
+      |> expect(page_to_have_url(HTTPFixtures.url(fixture, "/second")))
       |> expect(:heading |> by_role(name: "Second document") |> to_be_visible())
     end
   end
@@ -132,7 +132,7 @@ defmodule Fluffy.Conformance.NavigationAssertionTest do
     @tag driver: driver
     test "asserts a fragment navigation before a new document with #{driver}", %{driver: driver} do
       fixture =
-        TestHTTPFixtures.register(fn request ->
+        HTTPFixtures.register(fn request ->
           case request.path do
             "/start" ->
               %{
@@ -147,12 +147,12 @@ defmodule Fluffy.Conformance.NavigationAssertionTest do
 
       driver
       |> start_test_session()
-      |> visit(TestHTTPFixtures.path(fixture, "/start"))
+      |> visit(HTTPFixtures.path(fixture, "/start"))
       |> click(by_role(:link, name: "Section", exact: true))
-      |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/start#section")))
+      |> expect(page_to_have_url(HTTPFixtures.url(fixture, "/start#section")))
       |> expect("Section content" |> by_text() |> to_be_visible())
       |> click(by_role(:link, name: "Second"))
-      |> expect(page_to_have_url(TestHTTPFixtures.url(fixture, "/second")))
+      |> expect(page_to_have_url(HTTPFixtures.url(fixture, "/second")))
       |> expect(:heading |> by_role(name: "Second document") |> to_be_visible())
     end
   end

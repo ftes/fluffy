@@ -1,8 +1,8 @@
-defmodule Fluffy.PlaywrightMembersTest do
+defmodule Fluffy.Support.PlaywrightMembersTest do
   use ExUnit.Case, async: true
 
   alias Fluffy.Options
-  alias Fluffy.PlaywrightMembers
+  alias Fluffy.Support.PlaywrightMembers
 
   # Like `mix playwright_ex.parity`, for Fluffy's coverage of the PlaywrightEx facade.
   @modules [
@@ -76,10 +76,9 @@ defmodule Fluffy.PlaywrightMembersTest do
 
   test "wrapped calls with a timeout classify their options in Fluffy.Options" do
     classified =
-      for {_action, {module, fun, _arity, _keys}} <-
-            Options.native_actions() ++ Options.playwright_actions() ++ Options.native_expectations(),
+      for {_action, call} <- Options.native_actions() ++ Options.playwright_actions() ++ Options.native_expectations(),
           into: MapSet.new(),
-          do: {module, fun}
+          do: {elem(call, 0), elem(call, 1)}
 
     exceptions = PlaywrightMembers.unclassified_options()
 
@@ -108,10 +107,14 @@ defmodule Fluffy.PlaywrightMembersTest do
     assert duplicates == [], "#{inspect(module)} classifies #{kind}s more than once: #{inspect(duplicates)}"
 
     missing = upstream -- names
-    assert missing == [], "classify the #{inspect(module)} #{kind}s #{inspect(missing)} in Fluffy.PlaywrightMembers"
+
+    assert missing == [],
+           "classify the #{inspect(module)} #{kind}s #{inspect(missing)} in Fluffy.Support.PlaywrightMembers"
 
     stale = names -- upstream
-    assert stale == [], "#{inspect(module)} has no #{kind}s #{inspect(stale)}; drop them from Fluffy.PlaywrightMembers"
+
+    assert stale == [],
+           "#{inspect(module)} has no #{kind}s #{inspect(stale)}; drop them from Fluffy.Support.PlaywrightMembers"
   end
 
   defp classified(table, module) do

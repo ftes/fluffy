@@ -1,11 +1,11 @@
 defmodule Fluffy.Conformance.ReloadTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.TestHTTPFixtures
+  alias Fluffy.Support.HTTPFixtures
 
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
@@ -13,7 +13,7 @@ defmodule Fluffy.Conformance.ReloadTest do
       driver: driver
     } do
       fixture =
-        TestHTTPFixtures.register_sequence([
+        HTTPFixtures.register_sequence([
           %{body: html("<h1>First render</h1>")},
           %{body: html("<h1>Second render</h1>")}
         ])
@@ -21,13 +21,13 @@ defmodule Fluffy.Conformance.ReloadTest do
       session = start_test_session(driver)
 
       session
-      |> visit(TestHTTPFixtures.path(fixture))
+      |> visit(HTTPFixtures.path(fixture))
       |> expect("First render" |> by_text() |> to_be_visible())
       |> reload()
       |> expect("Second render" |> by_text() |> to_be_visible())
-      |> expect(Fluffy.Expect.page_to_have_url(TestHTTPFixtures.url(fixture)))
+      |> expect(Fluffy.Expect.page_to_have_url(HTTPFixtures.url(fixture)))
 
-      assert length(TestHTTPFixtures.requests(fixture)) == 2
+      assert length(HTTPFixtures.requests(fixture)) == 2
     end
   end
 
@@ -35,12 +35,12 @@ defmodule Fluffy.Conformance.ReloadTest do
     @tag driver: driver
     test "reload with timeout: 0 reloads on Phoenix and is rejected on Playwright with #{driver}", %{driver: driver} do
       fixture =
-        TestHTTPFixtures.register_sequence([
+        HTTPFixtures.register_sequence([
           %{body: html("<h1>First render</h1>")},
           %{body: html("<h1>Second render</h1>")}
         ])
 
-      session = driver |> start_test_session() |> visit(TestHTTPFixtures.path(fixture))
+      session = driver |> start_test_session() |> visit(HTTPFixtures.path(fixture))
 
       if driver == :phoenix do
         session
@@ -55,7 +55,7 @@ defmodule Fluffy.Conformance.ReloadTest do
           assert_raise ArgumentError, ~r/^#{operation}: timeout: 0 means check once/, fn -> call.(session) end
         end
 
-        assert length(TestHTTPFixtures.requests(fixture)) == 1
+        assert length(HTTPFixtures.requests(fixture)) == 1
       end
     end
   end
@@ -63,12 +63,12 @@ defmodule Fluffy.Conformance.ReloadTest do
   @tag driver: :playwright
   test "Playwright reload passes wait_until: through and still adopts the new document" do
     fixture =
-      TestHTTPFixtures.register_sequence([
+      HTTPFixtures.register_sequence([
         %{body: html("<h1>First render</h1>")},
         %{body: html("<h1>Second render</h1>")}
       ])
 
-    session = :playwright |> start_test_session() |> visit(TestHTTPFixtures.path(fixture))
+    session = :playwright |> start_test_session() |> visit(HTTPFixtures.path(fixture))
 
     session
     |> reload(wait_until: :commit)
@@ -84,7 +84,7 @@ defmodule Fluffy.Conformance.ReloadTest do
     owner = self()
 
     fixture =
-      TestHTTPFixtures.register_sequence([
+      HTTPFixtures.register_sequence([
         %{body: html("<h1>First render</h1>")},
         %{
           stream: fn conn ->
@@ -101,7 +101,7 @@ defmodule Fluffy.Conformance.ReloadTest do
         }
       ])
 
-    session = :playwright |> start_test_session() |> visit(TestHTTPFixtures.path(fixture))
+    session = :playwright |> start_test_session() |> visit(HTTPFixtures.path(fixture))
 
     try do
       error = assert_raise Fluffy.OperationError, ~r/reload/, fn -> reload(session, timeout: 500) end
@@ -132,8 +132,8 @@ defmodule Fluffy.Conformance.ReloadTest do
 
   @tag driver: :phoenix
   test "Phoenix reload raises a capability error for wait_until:" do
-    fixture = TestHTTPFixtures.register_sequence([%{body: html("<h1>First render</h1>")}])
-    session = :phoenix |> start_test_session() |> visit(TestHTTPFixtures.path(fixture))
+    fixture = HTTPFixtures.register_sequence([%{body: html("<h1>First render</h1>")}])
+    session = :phoenix |> start_test_session() |> visit(HTTPFixtures.path(fixture))
 
     error =
       assert_raise Fluffy.CapabilityError, ~r/:wait_until is a Playwright option/, fn ->
@@ -141,13 +141,13 @@ defmodule Fluffy.Conformance.ReloadTest do
       end
 
     assert error.capability == :playwright_action_options
-    assert length(TestHTTPFixtures.requests(fixture)) == 1
+    assert length(HTTPFixtures.requests(fixture)) == 1
   end
 
   defp start_test_session(driver) do
     start_session(driver,
-      base_url: Fluffy.TestServer.base_url(),
-      endpoint: Fluffy.TestWeb.Endpoint
+      base_url: Fluffy.Support.Server.base_url(),
+      endpoint: Fluffy.Support.Web.Endpoint
     )
   end
 

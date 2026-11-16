@@ -1,5 +1,5 @@
 defmodule Fluffy.Conformance.BrowserAPITest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
@@ -7,12 +7,14 @@ defmodule Fluffy.Conformance.BrowserAPITest do
   import Fluffy.Playwright
 
   alias Fluffy.Playwright
+  alias Fluffy.Support.HTTPFixtures
+  alias Fluffy.Support.Server
 
   @tag driver: :playwright
   test "creates page handles sharing cookies without changing the selection" do
     session = start_session(:playwright)
     main = current_page(session)
-    session = Playwright.add_cookies(session, [%{name: "token", value: "abc", url: Fluffy.TestServer.base_url()}])
+    session = Playwright.add_cookies(session, [%{name: "token", value: "abc", url: Server.base_url()}])
     other = new_page(session)
     assert %Fluffy.Page{} = other
     refute other == main
@@ -59,7 +61,7 @@ defmodule Fluffy.Conformance.BrowserAPITest do
     Playwright.grant_permissions(session, ["geolocation"], origin: "https://elsewhere.example")
     refute Playwright.evaluate(session, state) == "granted"
 
-    Playwright.grant_permissions(session, ["geolocation"], origin: Fluffy.TestServer.base_url())
+    Playwright.grant_permissions(session, ["geolocation"], origin: Server.base_url())
     assert Playwright.evaluate(session, state) == "granted"
   end
 
@@ -79,7 +81,7 @@ defmodule Fluffy.Conformance.BrowserAPITest do
   @tag driver: :playwright
   test "authenticates with HTTP credentials set at runtime, returning the session" do
     fixture =
-      Fluffy.TestHTTPFixtures.register(fn request ->
+      HTTPFixtures.register(fn request ->
         if List.keymember?(request.headers, "authorization", 0) do
           %{body: "<h1>Authenticated</h1>"}
         else
@@ -91,10 +93,10 @@ defmodule Fluffy.Conformance.BrowserAPITest do
     assert Playwright.set_http_credentials(session, %{username: "user", password: "pass"}) == session
 
     session
-    |> visit(Fluffy.TestHTTPFixtures.path(fixture, "/secret"))
+    |> visit(HTTPFixtures.path(fixture, "/secret"))
     |> expect("Authenticated" |> by_text() |> to_be_visible())
 
-    assert [_, %{headers: headers} | _] = Fluffy.TestHTTPFixtures.requests(fixture)
+    assert [_, %{headers: headers} | _] = HTTPFixtures.requests(fixture)
     assert {"authorization", "Basic " <> _} = List.keyfind(headers, "authorization", 0)
   end
 
@@ -102,8 +104,8 @@ defmodule Fluffy.Conformance.BrowserAPITest do
   test "navigates history and handles an empty history" do
     session = :playwright |> start_session() |> go_back() |> go_forward()
     session = session |> visit("/harness") |> visit("/chamber")
-    session = session |> go_back() |> expect(page_to_have_url(Fluffy.TestServer.base_url() <> "/harness"))
-    session |> go_forward() |> expect(page_to_have_url(Fluffy.TestServer.base_url() <> "/chamber"))
+    session = session |> go_back() |> expect(page_to_have_url(Server.base_url() <> "/harness"))
+    session |> go_forward() |> expect(page_to_have_url(Server.base_url() <> "/chamber"))
   end
 
   @tag driver: :playwright
@@ -112,8 +114,8 @@ defmodule Fluffy.Conformance.BrowserAPITest do
 
     session =
       Playwright.add_cookies(session, [
-        %{name: "keep", value: "yes", url: Fluffy.TestServer.base_url()},
-        %{name: "drop", value: "no", url: Fluffy.TestServer.base_url()}
+        %{name: "keep", value: "yes", url: Server.base_url()},
+        %{name: "drop", value: "no", url: Server.base_url()}
       ])
 
     Playwright.evaluate(session, "localStorage.setItem('saved', 'value')")
@@ -134,7 +136,7 @@ defmodule Fluffy.Conformance.BrowserAPITest do
   @tag driver: :playwright
   test "cookie and storage maps use Playwright's camelCase keys" do
     session = :playwright |> start_session() |> visit("/harness")
-    url = Fluffy.TestServer.base_url()
+    url = Server.base_url()
 
     session = Playwright.add_cookies(session, [%{name: "token", value: "abc", url: url, httpOnly: true, sameSite: "Lax"}])
     assert [%{name: "token", httpOnly: true, sameSite: "Lax"}] = Playwright.cookies(session)
@@ -188,7 +190,7 @@ defmodule Fluffy.Conformance.BrowserAPITest do
 
     session
     |> press_sequentially(by_css("input"), "x")
-    |> expect(page_to_have_url(Fluffy.TestServer.base_url() <> "/chamber"))
+    |> expect(page_to_have_url(Server.base_url() <> "/chamber"))
   end
 
   @tag driver: :playwright
@@ -198,8 +200,8 @@ defmodule Fluffy.Conformance.BrowserAPITest do
     assert go_back(session) == session
     assert go_forward(session) == session
     session = session |> visit("/harness") |> visit("/harness#other")
-    session = session |> go_back() |> expect(page_to_have_url(Fluffy.TestServer.base_url() <> "/harness"))
-    session |> go_forward() |> expect(page_to_have_url(Fluffy.TestServer.base_url() <> "/harness#other"))
+    session = session |> go_back() |> expect(page_to_have_url(Server.base_url() <> "/harness"))
+    session |> go_forward() |> expect(page_to_have_url(Server.base_url() <> "/harness#other"))
   end
 
   @tag driver: :playwright
@@ -208,8 +210,8 @@ defmodule Fluffy.Conformance.BrowserAPITest do
     Playwright.evaluate(session, "history.replaceState(null, '', '/harness?replaced')")
     session = go_forward(session)
 
-    assert Fluffy.Page.url(current_page(session)) == Fluffy.TestServer.base_url() <> "/harness?replaced"
-    expect(session, page_to_have_url(Fluffy.TestServer.base_url() <> "/harness?replaced"))
+    assert Fluffy.Page.url(current_page(session)) == Server.base_url() <> "/harness?replaced"
+    expect(session, page_to_have_url(Server.base_url() <> "/harness?replaced"))
   end
 
   @tag driver: :playwright

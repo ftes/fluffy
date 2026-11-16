@@ -1,4 +1,4 @@
-defmodule Fluffy.TestHTTPFixtures do
+defmodule Fluffy.Support.HTTPFixtures do
   @moduledoc false
 
   use GenServer
@@ -42,7 +42,7 @@ defmodule Fluffy.TestHTTPFixtures do
   def sniff_padding, do: String.duplicate(" ", 1024)
 
   def url(%Fixture{} = fixture, suffix \\ "") do
-    Fluffy.TestServer.base_url() <> path(fixture, suffix)
+    Fluffy.Support.Server.base_url() <> path(fixture, suffix)
   end
 
   def dispatch(token, request) do
@@ -173,12 +173,12 @@ defmodule Fluffy.TestHTTPFixtures do
   end
 end
 
-defmodule Fluffy.TestHTTPFixturePlug do
+defmodule Fluffy.Support.HTTPFixturePlug do
   @moduledoc false
 
   import Plug.Conn
 
-  alias Fluffy.TestHTTPFixtures
+  alias Fluffy.Support.HTTPFixtures
 
   def init(options), do: options
 
@@ -201,7 +201,7 @@ defmodule Fluffy.TestHTTPFixturePlug do
       headers: conn.req_headers
     }
 
-    case TestHTTPFixtures.dispatch(token, request) do
+    case HTTPFixtures.dispatch(token, request) do
       {:ok, handler} -> send_fixture_response(conn, response(handler, request))
       {:error, :not_found} -> conn |> send_resp(404, "unknown HTTP fixture") |> halt()
     end

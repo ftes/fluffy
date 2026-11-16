@@ -1,5 +1,5 @@
 defmodule Fluffy.Conformance.UnwrapTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
@@ -10,8 +10,9 @@ defmodule Fluffy.Conformance.UnwrapTest do
   alias Fluffy.Event
   alias Fluffy.Page
   alias Fluffy.Session
-  alias Fluffy.TestHTTPFixtures
-  alias Fluffy.TestWeb.Endpoint
+  alias Fluffy.Support.HTTPFixtures
+  alias Fluffy.Support.Server
+  alias Fluffy.Support.Web.Endpoint
   alias Phoenix.LiveViewTest.View
   alias PlaywrightEx.BrowserContext
   alias PlaywrightEx.Locator, as: BrowserLocator
@@ -75,12 +76,12 @@ defmodule Fluffy.Conformance.UnwrapTest do
 
     @tag driver: :static
     test "keeps a form's unsubmitted state on a Static page" do
-      fixture = TestHTTPFixtures.register(%{body: ~s(<form><input aria-label="Name" name="name"></form>)})
+      fixture = HTTPFixtures.register(%{body: ~s(<form><input aria-label="Name" name="name"></form>)})
 
       session =
         :phoenix
         |> start_test_session()
-        |> visit(TestHTTPFixtures.path(fixture))
+        |> visit(HTTPFixtures.path(fixture))
         |> fill(by_label("Name"), "Hermione")
 
       assert unwrap_and_return(session, fn _conn -> :read end) == :read
@@ -212,11 +213,11 @@ defmodule Fluffy.Conformance.UnwrapTest do
 
   describe "Static" do
     test "a LiveView page kept by a no-content response passes that response's conn" do
-      fixture = TestHTTPFixtures.register(%{status: 204})
+      fixture = HTTPFixtures.register(%{status: 204})
 
       :phoenix
       |> start_test_session()
-      |> visit("/live/no-content?" <> URI.encode_query(to: TestHTTPFixtures.path(fixture, "/save")))
+      |> visit("/live/no-content?" <> URI.encode_query(to: HTTPFixtures.path(fixture, "/save")))
       |> submit(by_css("#http-form"))
       |> unwrap(fn %Plug.Conn{status: 204} = conn -> get(conn, "/chamber") end)
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
@@ -550,7 +551,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
 
       session
       |> switch_page(child)
-      |> expect(Fluffy.Expect.page_to_have_url(Fluffy.TestServer.base_url() <> "/chamber"))
+      |> expect(Fluffy.Expect.page_to_have_url(Server.base_url() <> "/chamber"))
       |> expect(Fluffy.Expect.page_to_have_opener(nil))
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
     end
@@ -579,6 +580,22 @@ defmodule Fluffy.Conformance.UnwrapTest do
       end
     end
 
+    # With no action timeout, a native call waits until PlaywrightEx.Test closes the test's
+    # contexts at its timeout. As in Playwright, the call's error and its log show through.
+    @tag driver: :playwright
+    @tag timeout: 6_000
+    test "lets the error of a call the test timeout ended show through" do
+      session = playwright_html("<p>Tracked context</p>")
+
+      error =
+        assert_raise PlaywrightEx.TargetClosedError, fn ->
+          unwrap(session, &BrowserPage.click(&1, "#missing", timeout: :infinity))
+        end
+
+      assert error.message =~ "Test timeout of 6000ms exceeded."
+      assert error.message =~ "waiting for locator('#missing')"
+    end
+
     @tag driver: :playwright
     test "reports invalidation when native code closes the tracked context" do
       session = playwright_html("<p>Tracked context</p>")
@@ -605,9 +622,10 @@ defmodule Fluffy.Conformance.UnwrapTest do
       assert current_page(switch_page(session, child)) == child
 
       browser_context = BrowserPage.context(untracked)
-      :ok = GenServer.stop(Fluffy.TestScope.current())
+      browser = BrowserContext.browser(browser_context)
+      :ok = close_session(session)
 
-      refute browser_context.guid in browser_context_guids()
+      refute browser_context.guid in browser_context_guids(browser)
     end
 
     @tag driver: :playwright
@@ -665,12 +683,12 @@ defmodule Fluffy.Conformance.UnwrapTest do
 
   defp start_test_session(backend) do
     start_session(backend,
-      base_url: Fluffy.TestServer.base_url(),
+      base_url: Server.base_url(),
       endpoint: Endpoint
     )
   end
 
   defp playwright_html(html) do
-    session_for_html(:playwright, html, base_url: Fluffy.TestServer.base_url())
+    session_for_html(:playwright, html, base_url: Server.base_url())
   end
 end

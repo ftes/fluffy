@@ -11,8 +11,6 @@ if config_env() in [:dev, :test] do
     ]
 end
 
-config :fluffy,
-  ecto_repos: [],
-  playwright: false
+config :fluffy, ecto_repos: []
 
 import_config "#{config_env()}.exs"

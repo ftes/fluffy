@@ -1,30 +1,30 @@
 defmodule Fluffy.Conformance.StaticHTTPCookieTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.TestHTTPFixtures
+  alias Fluffy.Support.HTTPFixtures
 
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
     test "creates, scopes, replaces, and deletes cookies with #{driver}", %{driver: driver} do
-      fixture = TestHTTPFixtures.register(&cookie_response/1)
+      fixture = HTTPFixtures.register(&cookie_response/1)
       session = start_test_session(driver)
 
-      visit(session, TestHTTPFixtures.path(fixture, "/account/set"))
-      visit(session, TestHTTPFixtures.path(fixture, "/outside"))
-      visit(session, TestHTTPFixtures.path(fixture, "/account/read"))
-      visit(session, TestHTTPFixtures.path(fixture, "/replace"))
-      visit(session, TestHTTPFixtures.path(fixture, "/read-replacement"))
-      visit(session, TestHTTPFixtures.path(fixture, "/delete"))
-      visit(session, TestHTTPFixtures.path(fixture, "/after-delete"))
+      visit(session, HTTPFixtures.path(fixture, "/account/set"))
+      visit(session, HTTPFixtures.path(fixture, "/outside"))
+      visit(session, HTTPFixtures.path(fixture, "/account/read"))
+      visit(session, HTTPFixtures.path(fixture, "/replace"))
+      visit(session, HTTPFixtures.path(fixture, "/read-replacement"))
+      visit(session, HTTPFixtures.path(fixture, "/delete"))
+      visit(session, HTTPFixtures.path(fixture, "/after-delete"))
 
       expect(session, "Cookie observation" |> by_text() |> to_be_visible())
 
       [_set, outside, account, replace, replaced, delete, deleted] =
-        TestHTTPFixtures.requests(fixture)
+        HTTPFixtures.requests(fixture)
 
       assert cookie_map(outside) == %{"root" => "one", "theme" => "light"}
 
@@ -44,7 +44,7 @@ defmodule Fluffy.Conformance.StaticHTTPCookieTest do
     @tag driver: driver
     test "isolates cookies between independent #{driver} sessions", %{driver: driver} do
       fixture =
-        TestHTTPFixtures.register(fn request ->
+        HTTPFixtures.register(fn request ->
           case request.path do
             "/set" ->
               %{headers: [{"set-cookie", "secret=alpha; Path=/"}], body: html()}
@@ -57,11 +57,11 @@ defmodule Fluffy.Conformance.StaticHTTPCookieTest do
       first = start_test_session(driver)
       second = start_test_session(driver)
 
-      visit(first, TestHTTPFixtures.path(fixture, "/set"))
-      _second = visit(second, TestHTTPFixtures.path(fixture, "/read"))
-      visit(first, TestHTTPFixtures.path(fixture, "/read"))
+      visit(first, HTTPFixtures.path(fixture, "/set"))
+      _second = visit(second, HTTPFixtures.path(fixture, "/read"))
+      visit(first, HTTPFixtures.path(fixture, "/read"))
 
-      [_set, second_read, first_read] = TestHTTPFixtures.requests(fixture)
+      [_set, second_read, first_read] = HTTPFixtures.requests(fixture)
       assert cookie_map(second_read) == %{}
       assert cookie_map(first_read) == %{"secret" => "alpha"}
     end
@@ -73,7 +73,7 @@ defmodule Fluffy.Conformance.StaticHTTPCookieTest do
       driver: driver
     } do
       fixture =
-        TestHTTPFixtures.register(fn request ->
+        HTTPFixtures.register(fn request ->
           headers =
             if request.path == "/set",
               do: [{"set-cookie", "secure_session=present; Path=/; Secure; HttpOnly"}],
@@ -86,10 +86,10 @@ defmodule Fluffy.Conformance.StaticHTTPCookieTest do
 
       _session =
         session
-        |> visit(TestHTTPFixtures.path(fixture, "/set"))
-        |> visit(TestHTTPFixtures.path(fixture, "/read"))
+        |> visit(HTTPFixtures.path(fixture, "/set"))
+        |> visit(HTTPFixtures.path(fixture, "/read"))
 
-      [_set, read] = TestHTTPFixtures.requests(fixture)
+      [_set, read] = HTTPFixtures.requests(fixture)
 
       if sends_secure_loopback_cookies?(driver),
         do: assert(cookie_map(read)["secure_session"] == "present"),
@@ -145,8 +145,8 @@ defmodule Fluffy.Conformance.StaticHTTPCookieTest do
 
   defp start_test_session(driver) do
     start_session(driver,
-      base_url: Fluffy.TestServer.base_url(),
-      endpoint: Fluffy.TestWeb.Endpoint
+      base_url: Fluffy.Support.Server.base_url(),
+      endpoint: Fluffy.Support.Web.Endpoint
     )
   end
 

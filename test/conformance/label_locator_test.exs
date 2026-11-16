@@ -1,9 +1,11 @@
 defmodule Fluffy.Conformance.LabelLocatorTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
+
+  alias Fluffy.Support.Server
 
   cases = [
     {"an explicit for/id label", ~s(<label for="email">Email address</label><input id="email">), "Email address", [], 1},
@@ -28,7 +30,33 @@ defmodule Fluffy.Conformance.LabelLocatorTest do
      ~s(<span id="vault-name">Vault name</span><input aria-labelledby="vault-name">), "Vault name", [exact: true], 1},
     {"case-sensitive exact matching", ~s(<label for="city">City</label><input id="city">), "city", [exact: true], 0},
     {"quotes in a label", ~s(<label for="quote">Say &quot;hello&quot;</label><input id="quote">), ~s(Say "hello"),
-     [exact: true], 1}
+     [exact: true], 1},
+    # The cases below follow upstream's getByLabel specs (selectors-get-by.spec.ts).
+    {"a wrapping label's first labelable descendant", ~s(<label>Wand<button id="target">Cast</button><input></label>),
+     "Wand", [], 1},
+    {"a label's for over its wrapped control", ~s(<label for="target">Wand <input id="other"></label><input id="target">),
+     "Wand", [], 1},
+    {"aria-labelledby over a wrapping label",
+     ~s(<span id="name">Patronus</span><label>Wrong <button aria-labelledby="name">Cast</button></label>), "Wrong", [],
+     0},
+    {"an empty aria-label falling back to a label",
+     ~s(<label for="target">House</label><input id="target" aria-label="  ">), "House", [exact: true], 1},
+    {"an aria-label over a label", ~s(<label for="target">House</label><input id="target" aria-label="Crest">), "House",
+     [], 0},
+    {"an aria-labelledby without a valid reference falling back to aria-label",
+     ~s(<input aria-labelledby="missing" aria-label="Owl post">), "Owl post", [exact: true], 1},
+    {"an aria-labelledby reference to the first element with an id",
+     ~s(<span id="dup">Gryffindor</span><span id="dup">Slytherin</span><input aria-labelledby="dup">), "Slytherin", [],
+     0},
+    {"an aria-labelledby reference inside a template",
+     ~s(<template><span id="spell">Lumos</span></template><input aria-labelledby="spell" aria-label="Nox">), "Nox",
+     [exact: true], 1},
+    {"a label for a hidden input", ~s(<label for="secret">Secret</label><input id="secret" type="hidden">), "Secret", [],
+     0},
+    {"a label for the first element with an id", ~s(<span id="dup"></span><label for="dup">Broom</label><input id="dup">),
+     "Broom", [], 0},
+    {"a label's whole text, including its control's", ~s(<label>Colour <select><option>Scarlet</option></select></label>),
+     "Colour Scarlet", [exact: true], 1}
   ]
 
   for {case_name, html, label, options, expected} <- cases,
@@ -36,7 +64,7 @@ defmodule Fluffy.Conformance.LabelLocatorTest do
     @tag driver: driver
     test "finds a control from #{case_name} with #{driver}" do
       session =
-        session_for_html(unquote(driver), unquote(html), base_url: Fluffy.TestServer.base_url())
+        session_for_html(unquote(driver), unquote(html), base_url: Server.base_url())
 
       expect(session, unquote(label) |> by_label(unquote(options)) |> to_have_count(unquote(expected)))
     end
@@ -52,7 +80,7 @@ defmodule Fluffy.Conformance.LabelLocatorTest do
       """
 
       session =
-        session_for_html(unquote(driver), html, base_url: Fluffy.TestServer.base_url())
+        session_for_html(unquote(driver), html, base_url: Server.base_url())
 
       session
       |> expect("ARIA Labelled Search" |> by_label(exact: true) |> to_have_count(1))
@@ -69,7 +97,7 @@ defmodule Fluffy.Conformance.LabelLocatorTest do
       """
 
       session =
-        session_for_html(unquote(driver), html, base_url: Fluffy.TestServer.base_url())
+        session_for_html(unquote(driver), html, base_url: Server.base_url())
 
       session
       |> expect("Vault" |> by_label(exact: true) |> to_have_count(1))

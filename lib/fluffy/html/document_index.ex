@@ -1,6 +1,7 @@
 defmodule Fluffy.HTML.DocumentIndex do
   @moduledoc false
 
+  alias Fluffy.HTML.Aria
   alias Fluffy.HTML.Semantics
   alias Fluffy.HTML.Target
 
@@ -11,7 +12,8 @@ defmodule Fluffy.HTML.DocumentIndex do
     :nodes_by_path,
     :nodes_by_tag,
     :form_owner_ids,
-    :disabled_ids
+    :natively_disabled_ids,
+    :form_control_disabled_ids
   ]
   defstruct [
     :document,
@@ -20,7 +22,8 @@ defmodule Fluffy.HTML.DocumentIndex do
     :nodes_by_path,
     :nodes_by_tag,
     :form_owner_ids,
-    :disabled_ids
+    :natively_disabled_ids,
+    :form_control_disabled_ids
   ]
 
   @type path :: [{String.t(), pos_integer()}]
@@ -46,7 +49,8 @@ defmodule Fluffy.HTML.DocumentIndex do
           nodes_by_path: %{path() => entry()},
           nodes_by_tag: %{String.t() => [entry()]},
           form_owner_ids: %{non_neg_integer() => non_neg_integer()},
-          disabled_ids: MapSet.t(non_neg_integer())
+          natively_disabled_ids: MapSet.t(non_neg_integer()),
+          form_control_disabled_ids: MapSet.t(non_neg_integer())
         }
 
   @spec new(LazyHTML.t()) :: t()
@@ -58,16 +62,28 @@ defmodule Fluffy.HTML.DocumentIndex do
     nodes_by_path = Map.new(all_entries, &{&1.path, &1})
     elements_by_html_id = elements_by_html_id(entries)
 
-    %__MODULE__{
+    index = %__MODULE__{
       document: document,
       entries: entries,
       nodes_by_id: nodes_by_id,
       nodes_by_path: nodes_by_path,
       nodes_by_tag: Enum.group_by(entries, & &1.tag),
       form_owner_ids: form_owner_ids(entries, elements_by_html_id),
-      disabled_ids: disabled_ids(entries)
+      natively_disabled_ids: MapSet.new(),
+      form_control_disabled_ids: MapSet.new()
+    }
+
+    # Each walks the control's ancestors, so once per index, not per target.
+    controls = Enum.filter(all_entries, &(&1.tag in Aria.native_form_controls()))
+
+    %{
+      index
+      | natively_disabled_ids: ids(controls, &Aria.resolve_natively_disabled?(index, &1)),
+        form_control_disabled_ids: ids(controls, &Aria.resolve_form_control_disabled?(index, &1))
     }
   end
+
+  defp ids(entries, fun), do: for(entry <- entries, fun.(entry), into: MapSet.new(), do: entry.id)
 
   @spec path(LazyHTML.t()) :: path()
   def path(%LazyHTML{} = element), do: path(element, [])
@@ -149,20 +165,6 @@ defmodule Fluffy.HTML.DocumentIndex do
     end
   end
 
-  @spec ancestor_has_attribute?(t(), non_neg_integer(), String.t(), String.t()) :: boolean()
-  def ancestor_has_attribute?(%__MODULE__{} = index, id, tag, attribute) do
-    index.nodes_by_id
-    |> Map.fetch!(id)
-    |> has_ancestor_attribute?(index, tag, attribute)
-  end
-
-  # Default selection honors this alone: a disabled fieldset does not count.
-  @spec option_disabled?(t(), %{:id => non_neg_integer(), :attributes => list(), optional(atom()) => term()}) :: boolean()
-  def option_disabled?(%__MODULE__{} = index, option) do
-    Semantics.has_attribute?(option.attributes, "disabled") or
-      ancestor_has_attribute?(index, option.id, "optgroup", "disabled")
-  end
-
   @spec target!(t(), LazyHTML.t()) :: Target.t()
   def target!(%__MODULE__{} = index, %LazyHTML{} = element) do
     entry = Map.fetch!(index.nodes_by_path, path(element))
@@ -242,8 +244,9 @@ defmodule Fluffy.HTML.DocumentIndex do
       ancestors: ancestor_targets(index, entry),
       attributes: entry.attributes,
       children: entry.children,
-      disabled?: MapSet.member?(index.disabled_ids, entry.id),
+      disabled?: Aria.natively_disabled?(index, entry),
       element: element,
+      form_control_disabled?: Aria.form_control_disabled?(index, entry),
       id: entry.id,
       selector: selector(entry.selector_path),
       tag: entry.tag
@@ -254,7 +257,8 @@ defmodule Fluffy.HTML.DocumentIndex do
     %Target{
       attributes: entry.attributes,
       children: entry.children,
-      disabled?: MapSet.member?(index.disabled_ids, entry.id),
+      disabled?: Aria.natively_disabled?(index, entry),
+      form_control_disabled?: Aria.form_control_disabled?(index, entry),
       id: entry.id,
       tag: entry.tag
     }
@@ -273,15 +277,6 @@ defmodule Fluffy.HTML.DocumentIndex do
   defp ancestor_entries(%{parent_id: parent_id}, index, ancestors) do
     parent = Map.fetch!(index.nodes_by_id, parent_id)
     ancestor_entries(parent, index, [parent | ancestors])
-  end
-
-  defp has_ancestor_attribute?(%{parent_id: nil}, _index, _tag, _attribute), do: false
-
-  defp has_ancestor_attribute?(%{parent_id: parent_id}, index, tag, attribute) do
-    parent = Map.fetch!(index.nodes_by_id, parent_id)
-
-    (parent.tag == tag and Semantics.has_attribute?(parent.attributes, attribute)) or
-      has_ancestor_attribute?(parent, index, tag, attribute)
   end
 
   defp elements_by_html_id(entries) do
@@ -313,31 +308,7 @@ defmodule Fluffy.HTML.DocumentIndex do
     |> Map.new()
   end
 
-  # A disabled fieldset disables only the native form controls inside it, as
-  # Playwright's isNativelyDisabled does.
-  @native_form_controls ~w(button input select textarea option optgroup)
-
-  defp disabled_ids(entries) do
-    entries
-    |> Enum.filter(&(&1.tag == "fieldset" and Semantics.has_attribute?(&1.attributes, "disabled")))
-    |> Enum.reduce(MapSet.new(), fn fieldset, disabled ->
-      first_legend =
-        Enum.find(entries, &(&1.parent_id == fieldset.id and &1.tag == "legend"))
-
-      Enum.reduce(entries, disabled, fn entry, disabled ->
-        cond do
-          entry.tag not in @native_form_controls -> disabled
-          not descendant?(entry.path, fieldset.path) -> disabled
-          first_legend && within?(entry.path, first_legend.path) -> disabled
-          true -> MapSet.put(disabled, entry.id)
-        end
-      end)
-    end)
-  end
-
   defp descendant?(path, ancestor_path) do
     path != ancestor_path and Enum.take(path, length(ancestor_path)) == ancestor_path
   end
-
-  defp within?(path, ancestor_path), do: path == ancestor_path or descendant?(path, ancestor_path)
 end

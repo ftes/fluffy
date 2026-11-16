@@ -1,10 +1,12 @@
 defmodule Fluffy.Conformance.FillActionTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
   import Fluffy.Playwright
+
+  alias Fluffy.Support.Server
 
   @set_value_input_cases [
     {"color", "#123456", ""},
@@ -68,7 +70,7 @@ defmodule Fluffy.Conformance.FillActionTest do
         {~U[2026-09-30 12:34:56Z], "2026-09-30 12:34:56Z"},
         {~c"<tag>&\"'", "<tag>&\"'"},
         {"<tag>&\"'", "<tag>&\"'"},
-        {%Fluffy.TestFormValue{value: "<tag>&"}, "custom:<tag>&"}
+        {%Fluffy.Support.FormValue{value: "<tag>&"}, "custom:<tag>&"}
       ]
 
       Enum.reduce(values, session, fn {value, expected}, session ->
@@ -321,8 +323,49 @@ defmodule Fluffy.Conformance.FillActionTest do
     end)
   end
 
+  # Playwright's retarget(..., "follow-label"): an element in a label acts as its control.
+  for driver <- [:static, :playwright] do
+    @tag driver: driver
+    test "fill, clear, select_option and set_checked follow a label to its control with #{driver}" do
+      html = """
+      <label>Wand wood <input name="wand" value="Elder"></label>
+      <label>Patronus <input name="patronus" value="Stag"></label>
+      <label>House <select name="house"><option>Gryffindor</option><option>Slytherin</option></select></label>
+      <label><input type="checkbox" name="order"> Join the Order of the Phoenix</label>
+      """
+
+      with_html(unquote(driver), html, fn session ->
+        session
+        |> fill(by_text("Wand wood"), "Holly")
+        |> expect(to_have_value(by_text("Wand wood"), "Holly"))
+        |> expect(to_have_value(by_label("Wand wood"), "Holly"))
+        |> clear(by_text("Patronus"))
+        |> expect(to_have_value(by_label("Patronus"), ""))
+        |> select_option(by_text("House"), "Slytherin")
+        |> expect(to_have_value(by_label("House"), "Slytherin"))
+        |> set_checked(by_text("Join the Order of the Phoenix"), true)
+        |> expect(to_be_checked(by_label("Join the Order of the Phoenix")))
+      end)
+    end
+  end
+
+  for driver <- [:phoenix, :playwright] do
+    @tag driver: driver
+    test "fill, select_option and set_checked through a label reach LiveView with #{driver}", %{driver: driver} do
+      driver
+      |> start_session(base_url: Server.base_url(), endpoint: Fluffy.Support.Web.Endpoint)
+      |> visit("/live/potions")
+      |> fill(by_text("First ingredient", exact: true), "ash")
+      |> expect(to_be_visible(by_text("Last first: ash")))
+      |> select_option(by_text("Potion colours"), ["red", "blue"])
+      |> expect(to_have_values(by_label("Potion colours"), ["red", "blue"]))
+      |> set_checked(by_text("Enabled", exact: true), true)
+      |> expect(to_be_checked(by_label("Enabled")))
+    end
+  end
+
   defp with_html(driver, html, fun) do
-    session = session_for_html(driver, html, base_url: Fluffy.TestServer.base_url())
+    session = session_for_html(driver, html, base_url: Server.base_url())
     fun.(session)
   end
 end

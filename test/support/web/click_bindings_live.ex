@@ -1,4 +1,4 @@
-defmodule Fluffy.TestWeb.ClickBindingsComponent do
+defmodule Fluffy.Support.Web.ClickBindingsComponent do
   @moduledoc false
   use Phoenix.LiveComponent
 
@@ -18,7 +18,7 @@ defmodule Fluffy.TestWeb.ClickBindingsComponent do
   end
 end
 
-defmodule Fluffy.TestWeb.ClickBindingsTargetComponent do
+defmodule Fluffy.Support.Web.ClickBindingsTargetComponent do
   @moduledoc false
   use Phoenix.LiveComponent
 
@@ -32,7 +32,7 @@ defmodule Fluffy.TestWeb.ClickBindingsTargetComponent do
   def render(assigns), do: ~H"<div id={@id}></div>"
 end
 
-defmodule Fluffy.TestWeb.ClickBindingsLive do
+defmodule Fluffy.Support.Web.ClickBindingsLive do
   @moduledoc false
   use Phoenix.LiveView
 
@@ -54,6 +54,8 @@ defmodule Fluffy.TestWeb.ClickBindingsLive do
   def handle_event("track", _params, socket), do: {:noreply, log(socket, "track")}
   def handle_event("pick-value", %{"value" => value}, socket), do: {:noreply, log(socket, "pick-value:#{value}")}
   def handle_event("rename", _params, socket), do: {:noreply, socket |> assign(name: "Fido") |> log("rename")}
+  def handle_event("feed", _params, socket), do: {:noreply, log(socket, "feed")}
+  def handle_event("soothe", _params, socket), do: {:noreply, log(socket, "soothe")}
   def handle_event("save-name", %{"name" => name}, socket), do: {:noreply, log(socket, "save-name:#{name}")}
 
   # Logs the whole payload, with each value's JSON type.
@@ -77,7 +79,7 @@ defmodule Fluffy.TestWeb.ClickBindingsLive do
         <button type="button" phx-click="remove" phx-value-name="beta">Remove beta</button>
       </li>
     </ul>
-    <.live_component module={Fluffy.TestWeb.ClickBindingsComponent} id="click-bindings-component" />
+    <.live_component module={Fluffy.Support.Web.ClickBindingsComponent} id="click-bindings-component" />
     <div phx-click="outer">
       <form id="outer-form" phx-submit="save">
         <button type="submit">Save</button>
@@ -97,8 +99,8 @@ defmodule Fluffy.TestWeb.ClickBindingsLive do
       <button phx-click="track">Track and save</button>
     </form>
     <a href="/chamber" phx-click="track">Track and leave</a>
-    <.live_component module={Fluffy.TestWeb.ClickBindingsTargetComponent} id="target-a" />
-    <.live_component module={Fluffy.TestWeb.ClickBindingsTargetComponent} id="target-b" />
+    <.live_component module={Fluffy.Support.Web.ClickBindingsTargetComponent} id="target-a" />
+    <.live_component module={Fluffy.Support.Web.ClickBindingsTargetComponent} id="target-b" />
     <button type="button" phx-target="#target-a" phx-click={JS.push("ping", target: "#target-b")}>Ping b</button>
     <input aria-label="Pick value" value="rendered" phx-click="pick-value" />
     <form id="rename-form" phx-submit="save-name">
@@ -109,6 +111,12 @@ defmodule Fluffy.TestWeb.ClickBindingsLive do
     <ol>
       <li id="valued-item" value="3" phx-click="inspect">Inspect item</li>
     </ol>
+    <fieldset disabled>
+      <fieldset disabled>
+        <legend><button type="button" phx-click="feed">Feed Fluffy</button></legend>
+      </fieldset>
+      <div phx-click="soothe">Soothe Fluffy</div>
+    </fieldset>
     <input aria-label="Keyed" value="typed" phx-keydown="inspect" phx-value-key="custom" />
     <p id="log">Log: {Enum.join(@log, " ")}</p>
     <p id="tab">Tab: {@tab}</p>

@@ -3,13 +3,9 @@ import Config
 config :fluffy,
   ecto_repos: [],
   endpoint: FluffyConsumerWeb.Endpoint,
-  playwright: [
-    enabled: true,
-    engine: :chromium,
-    timeout: 15_000,
-    launch_options: [headless: true],
-    artifact_dir: System.get_env("FLUFFY_ARTIFACT_DIR")
-  ]
+  action_timeout: 15_000
+
+config :playwright_ex, :test, launch_options: [headless: true], navigation_timeout: 15_000
 
 # We don't run a server during test. If one is required,
 # you can enable the server option below.

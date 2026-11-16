@@ -25,12 +25,14 @@ defmodule Fluffy.Driver.Live.Event do
 
   # A disabled control or an element without the binding gets no event in the
   # browser. These raise, as LiveViewTest's element events do, so a test does
-  # not pass without noticing.
+  # not pass without noticing. The browser follows HTML's disabled form
+  # control, so a control in the first legend of a disabled fieldset nested in
+  # another gets no event either, though Playwright's actionability lets it through.
   def push(view, %{attributes: attributes} = target, kind, payload) do
     names = Map.fetch!(@bindings, kind)
 
     cond do
-      disabled?(target) ->
+      target.form_control_disabled? ->
         raise ArgumentError, "cannot #{kind} element #{inspect(target.selector)} because it is disabled"
 
       commands = kind == :click && live_link(attributes) ->
@@ -125,11 +127,6 @@ defmodule Fluffy.Driver.Live.Event do
       :error -> 0
     end
   end
-
-  defp disabled?(%{tag: tag} = target) when tag in ["button", "input", "select", "textarea"],
-    do: target.disabled? or List.keymember?(target.attributes, "disabled", 0)
-
-  defp disabled?(_target), do: false
 
   defp commands("[" <> _ = encoded), do: Phoenix.json_library().decode!(encoded)
   defp commands(event), do: [["push", %{"event" => event}]]

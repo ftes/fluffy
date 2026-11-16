@@ -1,4 +1,4 @@
-defmodule Fluffy.TestWeb.FacadeLocatorsLive do
+defmodule Fluffy.Support.Web.FacadeLocatorsLive do
   @moduledoc false
 
   use Phoenix.LiveView

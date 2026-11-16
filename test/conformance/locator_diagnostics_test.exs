@@ -1,9 +1,11 @@
 defmodule Fluffy.Conformance.LocatorDiagnosticsTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
+
+  alias Fluffy.Support.Server
 
   for driver <- [:static, :playwright] do
     @tag driver: driver
@@ -12,7 +14,7 @@ defmodule Fluffy.Conformance.LocatorDiagnosticsTest do
         session_for_html(
           unquote(driver),
           "<button>Save</button><button>Save draft</button>",
-          base_url: Fluffy.TestServer.base_url()
+          base_url: Server.base_url()
         )
 
       error =
@@ -35,7 +37,7 @@ defmodule Fluffy.Conformance.LocatorDiagnosticsTest do
     @tag driver: driver
     test "rejects unsupported assertion options with #{driver}" do
       session =
-        session_for_html(unquote(driver), "<button>Save</button>", base_url: Fluffy.TestServer.base_url())
+        session_for_html(unquote(driver), "<button>Save</button>", base_url: Server.base_url())
 
       assert_raise NimbleOptions.ValidationError, ~r/unknown options.*:eventually/, fn ->
         expect(session, :button |> by_role(name: "Save") |> to_have_count(1), eventually: true)
@@ -68,9 +70,7 @@ defmodule Fluffy.Conformance.LocatorDiagnosticsTest do
   @tag driver: :playwright
   test "Playwright actions retain native ambiguity diagnostics" do
     session =
-      session_for_html(:playwright, "<button>Save</button><button>Save draft</button>",
-        base_url: Fluffy.TestServer.base_url()
-      )
+      session_for_html(:playwright, "<button>Save</button><button>Save draft</button>", base_url: Server.base_url())
 
     assert_raise Fluffy.OperationError, ~r/strict mode violation/, fn ->
       click(session, by_role(:button, name: "Save"))

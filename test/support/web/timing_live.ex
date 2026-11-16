@@ -1,4 +1,4 @@
-defmodule Fluffy.TestWeb.TimingLive do
+defmodule Fluffy.Support.Web.TimingLive do
   @moduledoc false
 
   use Phoenix.LiveView

@@ -1,5 +1,5 @@
 defmodule Fluffy.CapabilityMatrixTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   alias Fluffy.Capability
 

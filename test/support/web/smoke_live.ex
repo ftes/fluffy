@@ -1,4 +1,4 @@
-defmodule Fluffy.TestWeb.SmokeLive do
+defmodule Fluffy.Support.Web.SmokeLive do
   @moduledoc false
 
   use Phoenix.LiveView
@@ -27,13 +27,13 @@ defmodule Fluffy.TestWeb.SmokeLive do
         <button type="button">Rouse guardian head</button>
       </section>
 
-      <.live_component module={Fluffy.TestWeb.SmokeComponent} id="smoke-component" />
+      <.live_component module={Fluffy.Support.Web.SmokeComponent} id="smoke-component" />
     </main>
     """
   end
 end
 
-defmodule Fluffy.TestWeb.SmokeComponent do
+defmodule Fluffy.Support.Web.SmokeComponent do
   @moduledoc false
 
   use Phoenix.LiveComponent

@@ -1,5 +1,5 @@
 defmodule Fluffy.Conformance.FrameLocatorTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
@@ -7,7 +7,8 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
   import Fluffy.Playwright
 
   alias Fluffy.FrameLocator
-  alias Fluffy.TestHTTPFixtures
+  alias Fluffy.Support.HTTPFixtures
+  alias Fluffy.Support.Server
 
   test "frame conversions and nested queries remain serializable locator values" do
     owner = "section" |> by_css() |> by_title("Gringotts") |> nth(1)
@@ -152,17 +153,17 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
 
   @tag driver: :playwright
   test "child navigation leaves the page unchanged and top navigation updates it" do
-    destination = TestHTTPFixtures.register(%{body: "<title>Destination</title><h1>Arrived</h1>"})
-    url = TestHTTPFixtures.url(destination)
-    child = TestHTTPFixtures.register(%{body: ~s(<a href="#{url}">Child</a><a href="#{url}" target="_top">Top</a>)})
+    destination = HTTPFixtures.register(%{body: "<title>Destination</title><h1>Arrived</h1>"})
+    url = HTTPFixtures.url(destination)
+    child = HTTPFixtures.register(%{body: ~s(<a href="#{url}">Child</a><a href="#{url}" target="_top">Top</a>)})
 
     source =
-      TestHTTPFixtures.register(%{
-        body: ~s(<title>Parent</title><iframe id="child" src="#{TestHTTPFixtures.url(child)}"></iframe>)
+      HTTPFixtures.register(%{
+        body: ~s(<title>Parent</title><iframe id="child" src="#{HTTPFixtures.url(child)}"></iframe>)
       })
 
-    source_url = TestHTTPFixtures.url(source)
-    session = :playwright |> start_session(base_url: Fluffy.TestServer.base_url()) |> visit(source_url)
+    source_url = HTTPFixtures.url(source)
+    session = :playwright |> start_session(base_url: Server.base_url()) |> visit(source_url)
     frame = frame_locator("#child")
 
     session =
@@ -181,7 +182,7 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
   @tag driver: :playwright
   test "actions and submission traverse a cross-origin frame" do
     child =
-      TestHTTPFixtures.register(%{
+      HTTPFixtures.register(%{
         body: """
         <form onsubmit="event.preventDefault(); document.querySelector('output').textContent = 'Submitted'">
           <label>Email<input name="email"></label><output></output>
@@ -189,7 +190,7 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
         """
       })
 
-    child_url = child |> TestHTTPFixtures.url() |> URI.parse() |> Map.put(:host, "localhost") |> URI.to_string()
+    child_url = child |> HTTPFixtures.url() |> URI.parse() |> Map.put(:host, "localhost") |> URI.to_string()
     session = browser_html(~s(<iframe id="child" src="#{child_url}"></iframe>))
     frame = frame_locator("#child")
     email = by_label(frame, "Email")
@@ -287,7 +288,7 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
       session =
         case unquote(driver) do
           :static -> session_for_html(:static, "<iframe id='child'></iframe>")
-          :live -> :phoenix |> start_session(endpoint: Fluffy.TestWeb.Endpoint) |> visit("/live/three-heads")
+          :live -> :phoenix |> start_session(endpoint: Fluffy.Support.Web.Endpoint) |> visit("/live/three-heads")
         end
 
       locator = "#child" |> frame_locator() |> by_role(:button)
@@ -351,7 +352,7 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
     end
   end
 
-  defp browser_html(html), do: session_for_html(:playwright, html, base_url: Fluffy.TestServer.base_url())
+  defp browser_html(html), do: session_for_html(:playwright, html, base_url: Server.base_url())
 
   defp iframe(id, html) do
     escaped = html |> String.replace("&", "&amp;") |> String.replace("\"", "&quot;")

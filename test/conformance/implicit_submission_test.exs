@@ -1,16 +1,17 @@
 defmodule Fluffy.Conformance.ImplicitSubmissionTest do
-  use Fluffy.TestCase, async: false
+  use Fluffy.Support.Case, async: false
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.TestHTTPFixtures
+  alias Fluffy.Support.HTTPFixtures
+  alias Fluffy.Support.Server
 
   @tag driver: :playwright
   test "Enter submits through the default submitter with Playwright", %{driver: driver} do
     fixture =
-      TestHTTPFixtures.register_sequence([
+      HTTPFixtures.register_sequence([
         %{
           body:
             html("""
@@ -26,18 +27,18 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
 
     session = start_test_session(driver)
 
-    destination = TestHTTPFixtures.url(fixture, "/submit")
+    destination = HTTPFixtures.url(fixture, "/submit")
 
     session =
       session
-      |> visit(TestHTTPFixtures.path(fixture, "/start"))
+      |> visit(HTTPFixtures.path(fixture, "/start"))
       |> fill(by_label("Name"), "Hermione")
       |> press(by_label("Name"), "Enter")
       |> expect("Submitted" |> by_text() |> to_be_visible())
 
     assert Fluffy.Session.current_page(session).url == destination
 
-    [_source, submission] = TestHTTPFixtures.requests(fixture)
+    [_source, submission] = HTTPFixtures.requests(fixture)
     assert submission.method == "POST"
     assert submission.path == "/submit"
     assert submission.body == "name=Hermione&commit=first"
@@ -46,7 +47,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
   @tag driver: :playwright
   test "Enter treats an invalid input type as the text state with Playwright", %{driver: driver} do
     fixture =
-      TestHTTPFixtures.register_sequence([
+      HTTPFixtures.register_sequence([
         %{
           body:
             html("""
@@ -60,11 +61,11 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
 
     driver
     |> start_test_session()
-    |> visit(TestHTTPFixtures.path(fixture, "/start"))
+    |> visit(HTTPFixtures.path(fixture, "/start"))
     |> press(by_label("Name"), "Enter")
     |> expect("Submitted invalid type" |> by_text() |> to_be_visible())
 
-    [_source, submission] = TestHTTPFixtures.requests(fixture)
+    [_source, submission] = HTTPFixtures.requests(fixture)
     assert submission.body == "name=Hermione"
   end
 
@@ -98,7 +99,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
     driver: driver
   } do
     fixture =
-      TestHTTPFixtures.register_sequence([
+      HTTPFixtures.register_sequence([
         %{
           body:
             html("""
@@ -113,12 +114,12 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
     session = start_test_session(driver)
 
     session
-    |> visit(TestHTTPFixtures.path(fixture, "/start"))
+    |> visit(HTTPFixtures.path(fixture, "/start"))
     |> fill(by_label("Name"), "Hermione")
     |> press(by_label("Name"), "Enter")
     |> expect("Submitted" |> by_text() |> to_be_visible())
 
-    [_source, submission] = TestHTTPFixtures.requests(fixture)
+    [_source, submission] = HTTPFixtures.requests(fixture)
     assert submission.body == "name=Hermione"
   end
 
@@ -127,7 +128,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
     driver: driver
   } do
     fixture =
-      TestHTTPFixtures.register(%{
+      HTTPFixtures.register(%{
         body:
           html("""
           <form method="post" action="submit">
@@ -142,11 +143,11 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
     session = start_test_session(driver)
 
     session
-    |> visit(TestHTTPFixtures.path(fixture, "/start"))
+    |> visit(HTTPFixtures.path(fixture, "/start"))
     |> press(by_label("Name"), "Enter")
     |> expect("Still here" |> by_text() |> to_be_visible())
 
-    assert [_source] = TestHTTPFixtures.requests(fixture)
+    assert [_source] = HTTPFixtures.requests(fixture)
   end
 
   @tag driver: :playwright
@@ -154,7 +155,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
     driver: driver
   } do
     fixture =
-      TestHTTPFixtures.register_sequence([
+      HTTPFixtures.register_sequence([
         %{
           body:
             html("""
@@ -171,12 +172,12 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
     session = start_test_session(driver)
 
     session
-    |> visit(TestHTTPFixtures.path(fixture, "/start"))
+    |> visit(HTTPFixtures.path(fixture, "/start"))
     |> fill(by_label("Name"), "Hermione")
     |> press(by_label("Name"), "Enter")
     |> expect("Submitted" |> by_text() |> to_be_visible())
 
-    [_source, submission] = TestHTTPFixtures.requests(fixture)
+    [_source, submission] = HTTPFixtures.requests(fixture)
     assert submission.body == "commit=external&name=Hermione"
   end
 
@@ -185,7 +186,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
     driver: driver
   } do
     fixture =
-      TestHTTPFixtures.register(%{
+      HTTPFixtures.register(%{
         body:
           html("""
           <form method="post" action="submit">
@@ -199,17 +200,17 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
     session = start_test_session(driver)
 
     session
-    |> visit(TestHTTPFixtures.path(fixture, "/start"))
+    |> visit(HTTPFixtures.path(fixture, "/start"))
     |> press(by_label("First"), "Enter")
     |> expect("Still here" |> by_text() |> to_be_visible())
 
-    assert [_source] = TestHTTPFixtures.requests(fixture)
+    assert [_source] = HTTPFixtures.requests(fixture)
   end
 
   @tag driver: :playwright
   test "Enter in a textarea is inert with Playwright", %{driver: driver} do
     fixture =
-      TestHTTPFixtures.register(%{
+      HTTPFixtures.register(%{
         body:
           html("""
           <form method="post" action="submit">
@@ -223,11 +224,11 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
     session = start_test_session(driver)
 
     session
-    |> visit(TestHTTPFixtures.path(fixture, "/start"))
+    |> visit(HTTPFixtures.path(fixture, "/start"))
     |> press(by_label("Notes"), "Enter")
     |> expect("Still here" |> by_text() |> to_be_visible())
 
-    assert [_source] = TestHTTPFixtures.requests(fixture)
+    assert [_source] = HTTPFixtures.requests(fixture)
   end
 
   @tag driver: :playwright
@@ -377,14 +378,14 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
   end
 
   defp with_html(html, fun) do
-    session = session_for_html(:playwright, html, base_url: Fluffy.TestServer.base_url())
+    session = session_for_html(:playwright, html, base_url: Server.base_url())
     fun.(session)
   end
 
   defp start_test_session(driver) do
     start_session(driver,
-      base_url: Fluffy.TestServer.base_url(),
-      endpoint: Fluffy.TestWeb.Endpoint
+      base_url: Server.base_url(),
+      endpoint: Fluffy.Support.Web.Endpoint
     )
   end
 

@@ -1,5 +1,5 @@
 defmodule Fluffy.Conformance.SessionRuntimeTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
@@ -9,6 +9,7 @@ defmodule Fluffy.Conformance.SessionRuntimeTest do
   alias Fluffy.Backend
   alias Fluffy.Page
   alias Fluffy.Session
+  alias Fluffy.Support.HTTPFixtures
 
   for driver <- [:static, :playwright] do
     @tag driver: driver
@@ -54,6 +55,16 @@ defmodule Fluffy.Conformance.SessionRuntimeTest do
       assert Session.handle(session) == page
       assert Page.url(page) =~ "/chamber"
       expect(session, "The guardian sleeps" |> by_text() |> to_be_visible())
+    end
+
+    @tag driver: driver
+    test "a #{driver} session started in a Task belongs to the test" do
+      # LiveViewTest starts LiveViews only from the test process, so the Task visits a static page.
+      session = Task.await(Task.async(fn -> unquote(driver) |> start_session() |> visit("/chamber") end))
+      expect(session, "The guardian sleeps" |> by_text() |> to_be_visible())
+      visit(session, "/live/three-heads")
+      click(session, by_role(:button, name: "Play the flute"))
+      expect(session, "Sleeping heads: 1" |> by_text() |> to_be_visible())
     end
 
     @tag driver: driver
@@ -109,14 +120,14 @@ defmodule Fluffy.Conformance.SessionRuntimeTest do
     @tag driver: :playwright
     test "closing the opener through #{close} clears the child's opener" do
       fixture =
-        Fluffy.TestHTTPFixtures.register(%{
+        HTTPFixtures.register(%{
           body: "<html><body><a href='about:blank' target='_blank'>Open</a></body></html>"
         })
 
       session =
         :playwright
         |> start_session()
-        |> visit(Fluffy.TestHTTPFixtures.path(fixture))
+        |> visit(HTTPFixtures.path(fixture))
 
       pending = wait_for(session, Fluffy.Event.popup())
       click(session, by_role(:link, name: "Open"))
@@ -187,31 +198,6 @@ defmodule Fluffy.Conformance.SessionRuntimeTest do
 
     assert_receive {:DOWN, ^monitor, :process, ^runtime, :normal}, 5_000
     assert_raise ArgumentError, ~r/session is closed/, fn -> pages(session) end
-  end
-
-  for exit <- [:normal, :crash] do
-    @tag driver: :playwright
-    test "an unmanaged browser session closes its context when its owner exits (#{exit})" do
-      parent = self()
-
-      owner =
-        spawn(fn ->
-          session = session_for_html(:playwright, "<p>Owned page</p>")
-          send(parent, {:started, session.runtime, Session.context(session).browser_context})
-
-          receive do
-            :normal -> :ok
-            :crash -> exit(:crash)
-          end
-        end)
-
-      assert_receive {:started, runtime, browser_context}, 5_000
-      assert browser_context.guid in browser_context_guids()
-      monitor = monitor_running(runtime)
-      send(owner, unquote(exit))
-      assert_receive {:DOWN, ^monitor, :process, ^runtime, :normal}, 5_000
-      refute browser_context.guid in browser_context_guids()
-    end
   end
 
   defp assert_eventually(fun, attempts \\ 100)

@@ -1,4 +1,4 @@
-defmodule Fluffy.TestWeb.UncheckedControlsLive do
+defmodule Fluffy.Support.Web.UncheckedControlsLive do
   @moduledoc false
 
   use Phoenix.LiveView

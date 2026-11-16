@@ -1,5 +1,5 @@
 defmodule Fluffy.Conformance.TextLocatorTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
@@ -25,7 +25,7 @@ defmodule Fluffy.Conformance.TextLocatorTest do
     @tag driver: driver
     test "#{case_name} with #{driver}" do
       session =
-        session_for_html(unquote(driver), unquote(html), base_url: Fluffy.TestServer.base_url())
+        session_for_html(unquote(driver), unquote(html), base_url: Fluffy.Support.Server.base_url())
 
       expect(session, unquote(text) |> by_text(unquote(options)) |> to_have_count(unquote(expected)))
     end

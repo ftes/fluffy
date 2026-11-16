@@ -1,9 +1,11 @@
 defmodule Fluffy.Conformance.LiveActionTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
+
+  alias Fluffy.Support.Server
 
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
@@ -100,7 +102,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
       |> visit("/live/nested")
       |> click(by_role(child, :button, name: "Navigate from child", exact: true))
       |> expect("The secret chamber is open" |> by_text() |> to_be_visible())
-      |> expect(Fluffy.Expect.page_to_have_url(Fluffy.TestServer.base_url() <> "/live/secret-chamber"))
+      |> expect(Fluffy.Expect.page_to_have_url(Server.base_url() <> "/live/secret-chamber"))
     end
 
     @tag driver: driver
@@ -111,7 +113,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
       |> live_session()
       |> visit("/live/nested")
       |> click(by_role(child, :button, name: "Patch from child", exact: true))
-      |> expect(Fluffy.Expect.page_to_have_url(Fluffy.TestServer.base_url() <> "/live/nested?from=child"))
+      |> expect(Fluffy.Expect.page_to_have_url(Server.base_url() <> "/live/nested?from=child"))
     end
   end
 
@@ -255,6 +257,35 @@ defmodule Fluffy.Conformance.LiveActionTest do
       |> expect(to_have_text(log, ~s(Log: inspect:name="div" inspect:value=3 inspect:key="custom",value="typed")))
     end
 
+    # HTML disables a control in the first legend of a disabled fieldset nested
+    # in another, so the browser sends it no click, though Playwright's
+    # actionability finds it enabled. A disabled fieldset leaves other elements' clicks alone.
+    @tag driver: driver
+    if driver == :playwright, do: @tag(:webkit_difference)
+
+    test "a legend in a disabled fieldset nested in another gets no click with #{driver}", %{driver: driver} do
+      log = by_css("#log")
+      feed = by_role(:button, name: "Feed Fluffy", exact: true)
+      session = driver |> live_session() |> visit("/live/click-bindings")
+
+      cond do
+        clicks_nested_disabled_legend?(driver) ->
+          session |> click(feed) |> expect(to_have_text(log, "Log: feed"))
+
+        driver == :playwright ->
+          click(session, feed)
+
+        true ->
+          assert_raise ArgumentError, ~r/because it is disabled/, fn -> click(session, feed) end
+      end
+
+      session
+      |> click(by_text("Soothe Fluffy", exact: true))
+      |> expect(
+        to_have_text(log, if(clicks_nested_disabled_legend?(driver), do: "Log: feed soothe", else: "Log: soothe"))
+      )
+    end
+
     @tag driver: driver
     test "a click on text inside a submit button or link takes its default action with #{driver}", %{driver: driver} do
       session = driver |> live_session() |> visit("/live/click-bindings")
@@ -296,7 +327,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
       driver: driver
     } do
       log = by_css("#log")
-      page = Fluffy.TestServer.base_url() <> "/live/click-bindings"
+      page = Server.base_url() <> "/live/click-bindings"
 
       driver
       |> live_session()
@@ -389,10 +420,14 @@ defmodule Fluffy.Conformance.LiveActionTest do
     end
   end
 
+  # WebKit dispatches the click, as it submits such a control; Phoenix keeps HTML's rule.
+  defp clicks_nested_disabled_legend?(:playwright), do: playwright_engine?(:webkit)
+  defp clicks_nested_disabled_legend?(_driver), do: false
+
   defp live_session(driver) do
     start_session(driver,
-      base_url: Fluffy.TestServer.base_url(),
-      endpoint: Fluffy.TestWeb.Endpoint
+      base_url: Server.base_url(),
+      endpoint: Fluffy.Support.Web.Endpoint
     )
   end
 end

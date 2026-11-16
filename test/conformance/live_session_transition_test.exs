@@ -1,11 +1,12 @@
 defmodule Fluffy.Conformance.LiveSessionTransitionTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.TestWeb.Endpoint
+  alias Fluffy.Support.Server
+  alias Fluffy.Support.Web.Endpoint
 
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
@@ -14,7 +15,7 @@ defmodule Fluffy.Conformance.LiveSessionTransitionTest do
     } do
       session =
         start_session(driver,
-          base_url: Fluffy.TestServer.base_url(),
+          base_url: Server.base_url(),
           endpoint: Endpoint
         )
 
@@ -33,7 +34,7 @@ defmodule Fluffy.Conformance.LiveSessionTransitionTest do
     } do
       session =
         start_session(driver,
-          base_url: Fluffy.TestServer.base_url(),
+          base_url: Server.base_url(),
           endpoint: Endpoint
         )
 
@@ -52,7 +53,7 @@ defmodule Fluffy.Conformance.LiveSessionTransitionTest do
     test "preserves Live redirect flash with #{driver}", %{driver: driver} do
       session =
         start_session(driver,
-          base_url: Fluffy.TestServer.base_url(),
+          base_url: Server.base_url(),
           endpoint: Endpoint
         )
 

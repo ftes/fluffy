@@ -1,4 +1,4 @@
-defmodule Fluffy.TestWeb.UsedShiftLive do
+defmodule Fluffy.Support.Web.UsedShiftLive do
   @moduledoc false
 
   use Phoenix.LiveView

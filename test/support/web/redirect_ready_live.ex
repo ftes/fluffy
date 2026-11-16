@@ -1,4 +1,4 @@
-defmodule Fluffy.TestWeb.RedirectReadyLive do
+defmodule Fluffy.Support.Web.RedirectReadyLive do
   @moduledoc false
 
   use Phoenix.LiveView

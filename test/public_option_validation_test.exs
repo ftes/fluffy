@@ -69,12 +69,8 @@ defmodule Fluffy.PublicOptionValidationTest do
       Expect.page_to_have_title("Houses", timeout: -1)
     end
 
-    assert_raise NimbleOptions.ValidationError, ~r/:query_mode.*:exact.*:subset/, fn ->
-      Expect.page_to_have_url(path: "/houses", query_mode: :some)
-    end
-
-    assert_raise NimbleOptions.ValidationError, ~r/:query.*map/, fn ->
-      Expect.page_to_have_url(query: [{"id", "5"}])
+    assert_raise NimbleOptions.ValidationError, ~r/:timeout.*non[- ]negative integer/, fn ->
+      Expect.page_to_have_url("/houses", timeout: -1)
     end
 
     assert_raise NimbleOptions.ValidationError, ~r/:timeout.*non[- ]negative integer/, fn ->

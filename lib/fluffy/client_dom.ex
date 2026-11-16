@@ -232,9 +232,9 @@ defmodule Fluffy.ClientDOM do
   end
 
   def fill(%__MODULE__{} = client_dom, %Locator{} = locator, value, driver, action \\ :fill) when is_binary(value) do
-    target = target!(client_dom, locator)
-    ensure_target_enabled!(target, action, locator)
-    Actionability.ensure_editable!(target.element, action, locator)
+    target = control!(client_dom, locator)
+    ensure_target_enabled!(client_dom, target, action, locator)
+    ensure_target_editable!(client_dom, target, action, locator)
 
     if target.tag not in ["input", "textarea"] do
       raise Fluffy.CapabilityError,
@@ -267,7 +267,7 @@ defmodule Fluffy.ClientDOM do
   end
 
   def set_input_files(%__MODULE__{} = client_dom, %Locator{} = locator, selected_files) when is_list(selected_files) do
-    target = target!(client_dom, locator)
+    target = control!(client_dom, locator)
 
     Actionability.ensure_file_input_files!(
       target.element,
@@ -283,17 +283,17 @@ defmodule Fluffy.ClientDOM do
   end
 
   def live_managed_form?(%__MODULE__{} = client_dom, %Locator{} = locator) do
-    target = target!(client_dom, locator)
+    target = control!(client_dom, locator)
     Fluffy.Form.live_managed_form?(index(client_dom), target)
   end
 
   def live_change_form?(%__MODULE__{} = client_dom, %Locator{} = locator) do
-    target = target!(client_dom, locator)
+    target = control!(client_dom, locator)
     Fluffy.Form.live_change_form?(index(client_dom), target)
   end
 
   def set_checked(%__MODULE__{} = client_dom, %Locator{} = locator, desired) when is_boolean(desired) do
-    target = target!(client_dom, locator)
+    target = control!(client_dom, locator)
     Actionability.ensure_checkable!(target.element, checked_action(desired), locator)
     current = checked_target?(client_dom, target)
 
@@ -309,8 +309,7 @@ defmodule Fluffy.ClientDOM do
             locator: locator
 
         true ->
-          ensure_target_enabled!(target, checked_action(desired), locator)
-          Actionability.ensure_enabled!(target.element, checked_action(desired), locator)
+          ensure_target_enabled!(client_dom, target, checked_action(desired), locator)
 
           put_checked_target(client_dom, target, desired)
       end
@@ -319,8 +318,8 @@ defmodule Fluffy.ClientDOM do
   end
 
   def select_option(%__MODULE__{} = client_dom, %Locator{} = locator, requested) do
-    target = target!(client_dom, locator)
-    ensure_target_enabled!(target, :select_option, locator)
+    target = control!(client_dom, locator)
+    ensure_target_enabled!(client_dom, target, :select_option, locator)
     Actionability.ensure_selectable!(target.element, :select_option, locator)
 
     options = select_options(client_dom, target)
@@ -337,7 +336,7 @@ defmodule Fluffy.ClientDOM do
         locator: locator
     end
 
-    if Enum.any?(selected, & &1.disabled?) do
+    if Enum.any?(selected, &target_disabled?(client_dom, &1)) do
       raise Fluffy.ActionabilityError,
         action: :select_option,
         reason: :disabled_option,
@@ -354,22 +353,18 @@ defmodule Fluffy.ClientDOM do
     {%{client_dom | properties: properties}, target}
   end
 
+  # Playwright's checked state, which raises for an element without one.
   def checked?(%__MODULE__{} = client_dom, %Locator{} = locator) do
-    target = target!(client_dom, locator)
+    target = control!(client_dom, locator)
 
-    case input_type(target) do
-      type when type in ["checkbox", "radio"] ->
-        client_dom.properties
-        |> Map.get(target.id, %{})
-        |> Map.get(:checked, has_attribute?(target.attributes, "checked"))
-
-      _other ->
-        false
+    case Aria.checked(aria(client_dom), target, checked_target?(client_dom, target)) do
+      :error -> raise Fluffy.ActionabilityError, action: :read_checked, reason: :not_checkbox_or_radio, locator: locator
+      checked -> checked
     end
   end
 
   def value(%__MODULE__{} = client_dom, %Locator{} = locator) do
-    target = target!(client_dom, locator)
+    target = control!(client_dom, locator)
 
     if target.tag == "select" do
       client_dom |> selected_values_for_target(target) |> List.first() || ""
@@ -382,7 +377,7 @@ defmodule Fluffy.ClientDOM do
 
   # As in Playwright, only a multiple select has values, enabled or not.
   def selected_values(%__MODULE__{} = client_dom, %Locator{} = locator) do
-    target = target!(client_dom, locator)
+    target = control!(client_dom, locator)
 
     if target.tag != "select" or not has_attribute?(target.attributes, "multiple") do
       raise Fluffy.ActionabilityError, action: :read_value, reason: :not_multiple_select, locator: locator
@@ -396,27 +391,60 @@ defmodule Fluffy.ClientDOM do
     target_disabled?(client_dom, state_target(client_dom, target!(client_dom, locator)))
   end
 
-  defp target_disabled?(client_dom, target) do
-    target.disabled? or Actionability.disabled?(target.element) or
-      (target.tag == "option" and DocumentIndex.option_disabled?(index(client_dom), target))
-  end
+  defp target_disabled?(client_dom, target), do: Aria.aria_disabled?(aria(client_dom), target)
+
+  defp aria(client_dom), do: Aria.for_document(client_dom.document)
 
   # Like Playwright, an element other than a form control takes its enabled
   # state from the closest button, so text inside a disabled button is disabled.
   # Unlike Playwright's retarget(..., "follow-label"), a label doesn't take its
-  # control's state, as a click on it doesn't activate the control (#134).
+  # control's enabled state, as a click on it doesn't activate the control (#134);
+  # the other actions and states follow the label (`control!/2`).
   defp state_target(_client_dom, %Target{tag: tag} = target) when tag in ["input", "textarea", "select"], do: target
 
   defp state_target(client_dom, target) do
-    closest(client_dom, target, fn %{tag: tag, attributes: attributes} ->
-      tag == "button" or attribute(attributes, "role") in ["button", "checkbox", "radio"]
-    end) || target
+    if Aria.content_editable?(aria(client_dom), target) do
+      target
+    else
+      closest(client_dom, target, fn %{tag: tag, attributes: attributes} ->
+        tag == "button" or attribute(attributes, "role") in ["button", "checkbox", "radio"]
+      end) || target
+    end
   end
 
+  # Playwright's retarget(..., "follow-label"), which fill, clear, select_option,
+  # set_input_files, set_checked, the value and the checked and editable states use:
+  # an element in a label acts as its control.
+  @doc false
+  def control!(%__MODULE__{} = client_dom, locator), do: follow_label(client_dom, target!(client_dom, locator))
+
+  @no_follow_label_tags ~w(a input textarea button select option optgroup)
+
+  defp follow_label(client_dom, target) do
+    target = state_target(client_dom, target)
+    aria = aria(client_dom)
+
+    with false <-
+           target.tag in @no_follow_label_tags or
+             attribute(target.attributes, "role") in ["link", "button", "checkbox", "radio"] or
+             Aria.content_editable?(aria, target),
+         %Target{} = label <- closest(client_dom, target, &(&1.tag == "label")),
+         id when is_integer(id) <- Aria.label_control_id(aria, label) do
+      DocumentIndex.target_by_id(index(client_dom), id)
+    else
+      _no_control -> target
+    end
+  end
+
+  # Playwright's editable state, which raises for an element without a readonly state.
   @doc false
   def editable?(%__MODULE__{} = client_dom, %Locator{} = locator) do
-    target = target!(client_dom, locator)
-    not target.disabled? and Actionability.editable?(target.element)
+    target = control!(client_dom, locator)
+
+    case Aria.readonly(aria(client_dom), target) do
+      :error -> raise Fluffy.ActionabilityError, action: :read_editable, reason: :no_readonly_state, locator: locator
+      readonly -> not readonly and not target_disabled?(client_dom, target)
+    end
   end
 
   @doc false
@@ -590,7 +618,7 @@ defmodule Fluffy.ClientDOM do
       value: attribute(target.attributes, "value") || text,
       label: attribute(target.attributes, "label") || text,
       attributes: target.attributes,
-      disabled?: DocumentIndex.option_disabled?(index, target)
+      disabled?: Aria.option_disabled?(index, target)
     }
   end
 
@@ -804,12 +832,23 @@ defmodule Fluffy.ClientDOM do
   defp checked_action(true), do: :check
   defp checked_action(false), do: :uncheck
 
-  defp ensure_target_enabled!(%{disabled?: true}, action, locator) do
-    raise Fluffy.ActionabilityError,
-      action: action,
-      reason: :disabled,
-      locator: locator
+  # Playwright's editable state, then fill's own check of the element.
+  defp ensure_target_editable!(client_dom, target, action, locator) do
+    case Aria.readonly(aria(client_dom), target) do
+      :error ->
+        raise Fluffy.ActionabilityError, action: action, reason: :not_editable, locator: locator
+
+      true ->
+        raise Fluffy.ActionabilityError, action: action, reason: :readonly, locator: locator
+
+      false ->
+        Actionability.ensure_fillable!(target.element, Aria.content_editable?(aria(client_dom), target), action, locator)
+    end
   end
 
-  defp ensure_target_enabled!(_target, _action, _locator), do: :ok
+  defp ensure_target_enabled!(client_dom, target, action, locator) do
+    if target_disabled?(client_dom, target) do
+      raise Fluffy.ActionabilityError, action: action, reason: :disabled, locator: locator
+    end
+  end
 end

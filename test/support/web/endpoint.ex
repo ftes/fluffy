@@ -1,4 +1,4 @@
-defmodule Fluffy.TestWeb.Endpoint do
+defmodule Fluffy.Support.Web.Endpoint do
   @moduledoc false
 
   use Phoenix.Endpoint, otp_app: :fluffy
@@ -29,7 +29,7 @@ defmodule Fluffy.TestWeb.Endpoint do
 
   plug(Plug.RequestId)
   plug(Plug.Telemetry, event_prefix: [:phoenix, :endpoint])
-  plug(Fluffy.TestHTTPFixturePlug)
+  plug(Fluffy.Support.HTTPFixturePlug)
 
   plug(Plug.Parsers,
     parsers: [:urlencoded, :multipart, :json],
@@ -40,5 +40,5 @@ defmodule Fluffy.TestWeb.Endpoint do
   plug(Plug.MethodOverride)
   plug(Plug.Head)
   plug(Plug.Session, @session_options)
-  plug(Fluffy.TestWeb.Router)
+  plug(Fluffy.Support.Web.Router)
 end

@@ -1,9 +1,11 @@
 defmodule Fluffy.Conformance.SelectOptionActionTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
+
+  alias Fluffy.Support.Server
 
   for driver <- [:static, :playwright] do
     @tag driver: driver
@@ -70,7 +72,7 @@ defmodule Fluffy.Conformance.SelectOptionActionTest do
       |> expect(to_have_values(field, [""]))
       |> select_option(field, ~D[2026-09-30])
       |> expect(to_have_values(field, ["2026-09-30"]))
-      |> select_option(field, %Fluffy.TestFormValue{value: "<tag>&"})
+      |> select_option(field, %Fluffy.Support.FormValue{value: "<tag>&"})
       |> expect(to_have_values(field, ["custom:<tag>&"]))
       |> select_option(field, %{label: ~c"<tag>&"})
       |> expect(to_have_values(field, ["literal"]))
@@ -268,10 +270,10 @@ defmodule Fluffy.Conformance.SelectOptionActionTest do
     test "select_option rejects a list mixing values and option maps with #{driver}", %{driver: driver} do
       session =
         if driver == :live do
-          :phoenix |> start_session(endpoint: Fluffy.TestWeb.Endpoint) |> visit("/live/potions")
+          :phoenix |> start_session(endpoint: Fluffy.Support.Web.Endpoint) |> visit("/live/potions")
         else
           html = ~s(<select aria-label="Potion colours" multiple><option>blue</option></select>)
-          session_for_html(driver, html, base_url: Fluffy.TestServer.base_url())
+          session_for_html(driver, html, base_url: Server.base_url())
         end
 
       for requested <- [[:blue, %{value: :green}], [%{value: :green}, "blue"]] do
@@ -283,7 +285,7 @@ defmodule Fluffy.Conformance.SelectOptionActionTest do
   end
 
   defp with_html(driver, html, fun) do
-    session = session_for_html(driver, html, base_url: Fluffy.TestServer.base_url())
+    session = session_for_html(driver, html, base_url: Server.base_url())
     fun.(session)
   end
 end

@@ -1,19 +1,20 @@
 defmodule Fluffy.Conformance.StaticHTTPVisitTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
 
   alias Fluffy.Session
-  alias Fluffy.TestHTTPFixtures
-  alias Fluffy.TestWeb.Endpoint
+  alias Fluffy.Support.HTTPFixtures
+  alias Fluffy.Support.Server
+  alias Fluffy.Support.Web.Endpoint
 
   for driver <- [:phoenix, :playwright] do
     @tag driver: driver
     test "visits one dynamic HTTP contract with #{driver}", %{driver: driver} do
       fixture =
-        TestHTTPFixtures.register(%{
+        HTTPFixtures.register(%{
           status: 200,
           headers: [{"x-fluffy-case", "direct-visit"}],
           body: html("Dynamic owl page")
@@ -23,16 +24,16 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
 
       session =
         session
-        |> visit(TestHTTPFixtures.path(fixture, "/owls?state=open#summary"))
+        |> visit(HTTPFixtures.path(fixture, "/owls?state=open#summary"))
         |> expect("Dynamic owl page" |> by_text() |> to_be_visible())
-        |> expect(Fluffy.Expect.page_to_have_url(TestHTTPFixtures.url(fixture, "/owls?state=open#summary")))
+        |> expect(Fluffy.Expect.page_to_have_url(HTTPFixtures.url(fixture, "/owls?state=open#summary")))
         |> expect(Fluffy.Expect.page_to_have_url(~r|/owls\?state=open#summary$|))
         |> expect(not_(Fluffy.Expect.page_to_have_url(~r|/owls\?state=closed|)))
 
       assert Session.current_page(session).url ==
-               TestHTTPFixtures.url(fixture, "/owls?state=open#summary")
+               HTTPFixtures.url(fixture, "/owls?state=open#summary")
 
-      assert [request] = TestHTTPFixtures.requests(fixture)
+      assert [request] = HTTPFixtures.requests(fixture)
       assert request.method == "GET"
       assert request.path == "/owls"
       assert request.query == "state=open"
@@ -44,7 +45,7 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
       driver: driver
     } do
       fixture =
-        TestHTTPFixtures.register_sequence([
+        HTTPFixtures.register_sequence([
           %{status: 302, headers: [{"location", "middle?step=1"}]},
           %{status: 307, headers: [{"location", "final?done=yes#result"}]},
           %{body: html("Redirect destination")}
@@ -53,11 +54,11 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
       session = start_test_session(driver)
 
       session
-      |> visit(TestHTTPFixtures.path(fixture, "/start?from=visit#original"))
+      |> visit(HTTPFixtures.path(fixture, "/start?from=visit#original"))
       |> expect("Redirect destination" |> by_text() |> to_be_visible())
-      |> expect(Fluffy.Expect.page_to_have_url(TestHTTPFixtures.url(fixture, "/final?done=yes#result")))
+      |> expect(Fluffy.Expect.page_to_have_url(HTTPFixtures.url(fixture, "/final?done=yes#result")))
 
-      assert Enum.map(TestHTTPFixtures.requests(fixture), fn request ->
+      assert Enum.map(HTTPFixtures.requests(fixture), fn request ->
                {request.method, request.path, request.query}
              end) == [
                {"GET", "/start", "from=visit"},
@@ -71,7 +72,7 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
       driver: driver
     } do
       fixture =
-        TestHTTPFixtures.register_sequence([
+        HTTPFixtures.register_sequence([
           %{status: 302, headers: [{"location", "destination"}]},
           %{body: html("Inherited fragment")}
         ])
@@ -79,15 +80,15 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
       session = start_test_session(driver)
 
       session
-      |> visit(TestHTTPFixtures.path(fixture, "/source#details"))
+      |> visit(HTTPFixtures.path(fixture, "/source#details"))
       |> expect("Inherited fragment" |> by_text() |> to_be_visible())
-      |> expect(Fluffy.Expect.page_to_have_url(TestHTTPFixtures.url(fixture, "/destination#details")))
+      |> expect(Fluffy.Expect.page_to_have_url(HTTPFixtures.url(fixture, "/destination#details")))
     end
 
     @tag driver: driver
     test "fails a redirect loop instead of retrying forever with #{driver}", %{driver: driver} do
       fixture =
-        TestHTTPFixtures.register(%{
+        HTTPFixtures.register(%{
           status: 302,
           headers: [{"location", "loop"}]
         })
@@ -95,10 +96,10 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
       session = start_test_session(driver)
 
       assert_raise navigation_error(driver), fn ->
-        visit(session, TestHTTPFixtures.path(fixture, "/loop"))
+        visit(session, HTTPFixtures.path(fixture, "/loop"))
       end
 
-      assert length(TestHTTPFixtures.requests(fixture)) >= 20
+      assert length(HTTPFixtures.requests(fixture)) >= 20
     end
 
     # The browser aborts the navigation and stays where it was; Playwright's goto fails.
@@ -106,63 +107,63 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
       @tag driver: driver
       test "visit fails on a #{status} response with #{driver}", %{driver: driver} do
         fixture =
-          TestHTTPFixtures.register_sequence([
+          HTTPFixtures.register_sequence([
             %{status: unquote(status)},
             %{body: html("Owls")},
             %{status: unquote(status)}
           ])
 
         assert_raise navigation_error(driver), ~r/abort|interrupt/i, fn ->
-          driver |> start_test_session() |> visit(TestHTTPFixtures.path(fixture, "/empty"))
+          driver |> start_test_session() |> visit(HTTPFixtures.path(fixture, "/empty"))
         end
 
-        session = driver |> start_test_session() |> visit(TestHTTPFixtures.path(fixture, "/owls"))
+        session = driver |> start_test_session() |> visit(HTTPFixtures.path(fixture, "/owls"))
 
         assert_raise navigation_error(driver), ~r/abort|interrupt/i, fn ->
-          visit(session, TestHTTPFixtures.path(fixture, "/empty"))
+          visit(session, HTTPFixtures.path(fixture, "/empty"))
         end
 
-        assert Enum.map(TestHTTPFixtures.requests(fixture), & &1.path) == ["/empty", "/owls", "/empty"]
+        assert Enum.map(HTTPFixtures.requests(fixture), & &1.path) == ["/empty", "/owls", "/empty"]
       end
 
       @tag driver: driver
       test "a failed visit keeps the cookies of its #{status} response with #{driver}", %{driver: driver} do
         fixture =
-          TestHTTPFixtures.register_sequence([
+          HTTPFixtures.register_sequence([
             %{body: html("Owls")},
             %{status: unquote(status), headers: [{"set-cookie", "seen=1; Path=/"}]},
             %{body: html("Owls")}
           ])
 
-        session = driver |> start_test_session() |> visit(TestHTTPFixtures.path(fixture, "/owls"))
+        session = driver |> start_test_session() |> visit(HTTPFixtures.path(fixture, "/owls"))
 
         assert_raise navigation_error(driver), ~r/abort|interrupt/i, fn ->
-          visit(session, TestHTTPFixtures.path(fixture, "/beacon"))
+          visit(session, HTTPFixtures.path(fixture, "/beacon"))
         end
 
-        visit(session, TestHTTPFixtures.path(fixture, "/owls"))
+        visit(session, HTTPFixtures.path(fixture, "/owls"))
 
-        assert [_owls, _beacon, %{headers: headers}] = TestHTTPFixtures.requests(fixture)
+        assert [_owls, _beacon, %{headers: headers}] = HTTPFixtures.requests(fixture)
         assert {"cookie", "seen=1"} in headers
       end
     end
 
     @tag driver: driver
     test "keeps configured request headers for the #{driver} session", %{driver: driver} do
-      fixture = TestHTTPFixtures.register(%{body: html("Header destination")})
+      fixture = HTTPFixtures.register(%{body: html("Header destination")})
 
       session =
         start_session(driver,
-          base_url: Fluffy.TestServer.base_url(),
+          base_url: Server.base_url(),
           endpoint: Endpoint,
           headers: [{"x-fluffy-suite", "static-http"}]
         )
 
       session
-      |> visit(TestHTTPFixtures.path(fixture, "/first"))
-      |> visit(TestHTTPFixtures.path(fixture, "/second"))
+      |> visit(HTTPFixtures.path(fixture, "/first"))
+      |> visit(HTTPFixtures.path(fixture, "/second"))
 
-      assert Enum.map(TestHTTPFixtures.requests(fixture), fn request ->
+      assert Enum.map(HTTPFixtures.requests(fixture), fn request ->
                Enum.find_value(request.headers, fn
                  {"x-fluffy-suite", value} -> value
                  _header -> nil
@@ -173,7 +174,7 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
 
   defp start_test_session(driver) do
     start_session(driver,
-      base_url: Fluffy.TestServer.base_url(),
+      base_url: Server.base_url(),
       endpoint: Endpoint
     )
   end

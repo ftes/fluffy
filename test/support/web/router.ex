@@ -1,11 +1,12 @@
-defmodule Fluffy.TestWeb.Router do
+defmodule Fluffy.Support.Web.Router do
   @moduledoc false
 
   use Phoenix.Router
 
   import Phoenix.LiveView.Router
 
-  alias Fluffy.TestWeb.Layouts
+  alias Fluffy.Support.Web
+  alias Fluffy.Support.Web.Layouts
 
   pipeline :browser do
     plug(:accepts, ["html"])
@@ -21,10 +22,10 @@ defmodule Fluffy.TestWeb.Router do
   end
 
   pipeline :initial_connection_authorization do
-    plug(Fluffy.TestWeb.InitialConnectionAuthorization)
+    plug(Fluffy.Support.Web.InitialConnectionAuthorization)
   end
 
-  scope "/", Fluffy.TestWeb do
+  scope "/", Web do
     get("/health", PageController, :health)
     get("/harness", PageController, :harness)
     get("/stage", PageController, :harness)
@@ -41,7 +42,7 @@ defmodule Fluffy.TestWeb.Router do
     get("/redirect/prophet", PageController, :prophet)
   end
 
-  scope "/live", Fluffy.TestWeb do
+  scope "/live", Web do
     pipe_through(:browser)
 
     post("/trigger-on-connect/hand-off", PageController, :session_hand_off)
@@ -87,7 +88,7 @@ defmodule Fluffy.TestWeb.Router do
     end
   end
 
-  scope "/live", Fluffy.TestWeb do
+  scope "/live", Web do
     pipe_through([:browser, :kennel])
 
     live_session :fluffy_kennel, on_mount: Fluffy.Sandbox do
@@ -96,7 +97,7 @@ defmodule Fluffy.TestWeb.Router do
     end
   end
 
-  scope "/session", Fluffy.TestWeb do
+  scope "/session", Web do
     pipe_through(:browser)
 
     get("/start", PageController, :session_start)
@@ -105,20 +106,20 @@ defmodule Fluffy.TestWeb.Router do
     post("/marauders-map", PageController, :marauders_map)
   end
 
-  scope "/initial-connection", Fluffy.TestWeb do
+  scope "/initial-connection", Web do
     pipe_through([:browser, :initial_connection_authorization])
 
     get("/chamber", PageController, :initial_connection_static)
   end
 
-  scope "/initial-connection", Fluffy.TestWeb do
+  scope "/initial-connection", Web do
     pipe_through(:browser)
 
     get("/redirect", PageController, :initial_connection_redirect)
     get("/redirected", PageController, :initial_connection_redirected)
   end
 
-  scope "/live", Fluffy.TestWeb do
+  scope "/live", Web do
     pipe_through([:browser, :initial_connection_authorization])
 
     live_session :fluffy_initial_connection, on_mount: Fluffy.Sandbox do
@@ -126,7 +127,7 @@ defmodule Fluffy.TestWeb.Router do
     end
   end
 
-  scope "/", Fluffy.TestWeb do
+  scope "/", Web do
     pipe_through(:browser)
 
     get("/embedded-ready", PageController, :embedded_ready)

@@ -1,9 +1,9 @@
-defmodule Fluffy.TestWeb.PageController do
+defmodule Fluffy.Support.Web.PageController do
   @moduledoc false
 
   use Phoenix.Controller, formats: [:html]
 
-  alias Fluffy.TestRepo
+  alias Fluffy.Support.Repo
 
   def health(conn, _params) do
     send_resp(conn, 200, "ok")
@@ -38,7 +38,7 @@ defmodule Fluffy.TestWeb.PageController do
   # Renders a LiveView at a URL that does not route to it, so LiveView rejects
   # its connection as unauthorized, as after a live_session change.
   def unrouted_live(conn, _params) do
-    Phoenix.LiveView.Controller.live_render(conn, Fluffy.TestWeb.DestinationLive, router: Fluffy.TestWeb.Router)
+    Phoenix.LiveView.Controller.live_render(conn, Fluffy.Support.Web.DestinationLive, router: Fluffy.Support.Web.Router)
   end
 
   def embedded_ready(conn, %{"topic" => topic} = params) do
@@ -47,7 +47,7 @@ defmodule Fluffy.TestWeb.PageController do
     views =
       for id <- ["first", "second"] do
         conn
-        |> Phoenix.Component.live_render(Fluffy.TestWeb.RedirectReadyLive,
+        |> Phoenix.Component.live_render(Fluffy.Support.Web.RedirectReadyLive,
           id: id,
           session: %{"topic" => topic, "delay" => delay}
         )
@@ -211,7 +211,7 @@ defmodule Fluffy.TestWeb.PageController do
   end
 
   def database(conn, _params) do
-    %{rows: rows} = TestRepo.query!("SELECT value FROM fluffy_records ORDER BY value")
+    %{rows: rows} = Repo.query!("SELECT value FROM fluffy_records ORDER BY value")
     values = Enum.map_join(rows, ", ", &hd/1)
 
     send_html(conn, """
@@ -229,8 +229,8 @@ defmodule Fluffy.TestWeb.PageController do
   end
 
   def databases(conn, _params) do
-    %{rows: [[first]]} = TestRepo.query!("SELECT current_database()")
-    %{rows: [[second]]} = Fluffy.TestRepoTwo.query!("SELECT current_database()")
+    %{rows: [[first]]} = Repo.query!("SELECT current_database()")
+    %{rows: [[second]]} = Fluffy.Support.RepoTwo.query!("SELECT current_database()")
     send_html(conn, "<main>Repos: #{first}, #{second}</main>")
   end
 

@@ -1,6 +1,7 @@
 defmodule Fluffy.Sandbox do
   @moduledoc """
-  Integrates Ecto SQL sandbox ownership with a Fluffy test scope.
+  Carries the test's Ecto SQL sandbox to browser sessions. The sandbox owner is the
+  application's, started by its DataCase or ConnCase.
 
   See [Ecto sandbox](installation.md#ecto-sandbox) for setup.
   """
@@ -25,6 +26,17 @@ defmodule Fluffy.Sandbox do
   @spec connect_info() :: :user_agent | :x_headers
   def connect_info do
     if header() == "user-agent", do: :user_agent, else: :x_headers
+  end
+
+  @doc false
+  # The header that lets a browser session's requests and LiveViews use `owner`'s sandbox
+  # connections, for the configured `ecto_repos`; nil without any.
+  @spec metadata_header(pid()) :: {String.t(), String.t()} | nil
+  def metadata_header(owner) when is_pid(owner) do
+    case Application.get_env(:fluffy, :ecto_repos, []) do
+      [] -> nil
+      repos -> {header(), encode_metadata(repos, owner)}
+    end
   end
 
   @doc false
@@ -60,23 +72,11 @@ defmodule Fluffy.Sandbox do
     import Phoenix.LiveView, only: [connected?: 1, get_connect_info: 2]
 
     alias Phoenix.Ecto.SQL.Sandbox, as: PhoenixSandbox
-    alias Sandbox, as: EctoSandbox
 
-    @doc false
-    def acquire(context, repos) when is_map(context) and is_list(repos) do
-      async? = Map.get(context, :async, false)
-
-      owners =
-        repos
-        |> Enum.map(&ensure_owner(&1, async?))
-        |> Enum.reject(&is_nil/1)
-
-      metadata =
-        repos
-        |> PhoenixSandbox.metadata_for(self(), trap_exit: config()[:trap_exit])
-        |> PhoenixSandbox.encode_metadata()
-
-      {owners, {header(), metadata}}
+    defp encode_metadata(repos, owner) do
+      repos
+      |> PhoenixSandbox.metadata_for(owner, trap_exit: config()[:trap_exit])
+      |> PhoenixSandbox.encode_metadata()
     end
 
     @doc "LiveView `on_mount` hook that allows a connected LiveView to use the test's sandbox connection."
@@ -88,28 +88,6 @@ defmodule Fluffy.Sandbox do
       end
 
       {:cont, socket}
-    end
-
-    defp ensure_owner(repo, async?) do
-      case EctoSandbox.checkout(repo) do
-        :ok ->
-          :ok = EctoSandbox.checkin(repo)
-
-          case EctoSandbox.mode(repo, {:shared, self()}) do
-            :already_shared ->
-              nil
-
-            :ok ->
-              :ok = EctoSandbox.mode(repo, :manual)
-              EctoSandbox.start_owner!(repo, shared: not async?)
-
-            result when result in [:not_found, :not_owner] ->
-              EctoSandbox.start_owner!(repo, shared: not async?)
-          end
-
-        {:already, ownership} when ownership in [:owner, :allowed] ->
-          nil
-      end
     end
 
     defp sandbox_metadata(socket) do
@@ -130,7 +108,7 @@ defmodule Fluffy.Sandbox do
       end
     end
   else
-    def acquire(_context, _repos) do
+    defp encode_metadata(_repos, _owner) do
       raise "Fluffy.Sandbox requires the optional :ecto_sql and :phoenix_ecto dependencies"
     end
 

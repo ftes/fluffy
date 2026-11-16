@@ -1,21 +1,21 @@
 defmodule Fluffy.Conformance.FrameEventTest do
-  use Fluffy.TestCase, async: true
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Playwright
 
   alias Fluffy.Event
-  alias Fluffy.Frame
   alias Fluffy.Playwright
+  alias PlaywrightEx.Frame
 
   @tag driver: :playwright
-  test "main-frame events return a live handle with its owning page and no parent" do
+  test "main-frame events deliver the PlaywrightEx frame, with its page and no parent" do
     session = session_for_html(:playwright, "<h1>Main</h1>")
     pending = wait_for(session, Event.frame_navigated())
     Playwright.evaluate(session, "location.hash = 'first'; true")
     frame = await(pending)
     assert Frame.url(frame) =~ "#first"
-    assert Frame.page(frame) == current_page(session)
+    assert page(session, Frame.page(frame)) == current_page(session)
     assert Frame.parent_frame(frame) == nil
     Playwright.evaluate(session, "location.hash = 'second'; true")
     assert Frame.url(frame) =~ "#second"
@@ -35,12 +35,12 @@ defmodule Fluffy.Conformance.FrameEventTest do
     """)
 
     child = await(pending)
-    assert Frame.page(child) == current_page(session)
+    assert page(session, Frame.page(child)) == current_page(session)
     parent = Frame.parent_frame(child)
-    assert Frame.page(parent) == current_page(session)
+    assert page(session, Frame.page(parent)) == current_page(session)
     assert Frame.parent_frame(parent) == nil
-    assert unwrap_and_return(child, &PlaywrightEx.Frame.name/1) == ""
-    assert parent |> unwrap_and_return(&PlaywrightEx.Frame.child_frames/1) |> length() == 1
+    assert Frame.name(child) == ""
+    assert length(Frame.child_frames(parent)) == 1
 
     pending = wait_for(session, Event.frame_navigated())
     other = switch_page(session, new_page(session))
