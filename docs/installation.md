@@ -38,8 +38,10 @@ Fluffy ships `usage-rules.md`, rules for coding agents: setup, choosing a backen
 assertions and waiting, capabilities, events and dropping to Playwright. They build on
 Playwright's usage rules, which cover its API, locators in Playwright's recommended order and
 web-first assertions. Sync them with the [`usage_rules`](https://hexdocs.pm/usage_rules)
-package as one skill, so an agent loads both when it writes a feature test and other work
-doesn't carry them. Run `mix usage_rules.sync`, and sync again after upgrading.
+package as one composed `phoenix-feature-tests` skill of `[:fluffy, :playwright]`, so an agent
+loads both when it writes a feature test and other work doesn't carry them. It replaces the
+standalone `playwright` skill Playwright's guide suggests. Run `mix usage_rules.sync`, and
+sync again after upgrading.
 
 Fluffy's rules override Phoenix's "LiveView tests" rules, which recommend
 `Phoenix.LiveViewTest` and locating by element ids. Move `phoenix:liveview` into a skill too:
