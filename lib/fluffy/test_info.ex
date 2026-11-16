@@ -6,13 +6,5 @@ defmodule Fluffy.TestInfo do
   `:error` outside a registered test (`use Fluffy.Case`).
   """
   @spec fetch() :: {:ok, map()} | :error
-  def fetch do
-    {:ok, PlaywrightEx.Test.info()}
-  rescue
-    # Its error outside a registered test; any other passes through.
-    error in RuntimeError ->
-      if String.starts_with?(error.message, "PlaywrightEx.Test.info() can only be called while a test is running"),
-        do: :error,
-        else: reraise(error, __STACKTRACE__)
-  end
+  def fetch, do: if(PlaywrightEx.Test.in_registered_test?(), do: {:ok, PlaywrightEx.Test.info()}, else: :error)
 end

@@ -6,20 +6,11 @@ defmodule Fluffy.TestTimeoutTest do
   use Fluffy.Case
 
   alias Fluffy.TestTimeout
-  alias PlaywrightEx.Test.Recorder
 
-  # 5% of the timeout, at most 1 s, before ExUnit's deadline: the moment PlaywrightEx.Test
-  # closes the test's contexts.
-  for {timeout, margin} <- [{2_000, 100}, {10_000, 500}, {60_000, 1_000}] do
-    @tag timeout: timeout
-    test "a #{timeout}ms test's backstop is #{margin}ms before its deadline" do
-      timeout = unquote(timeout)
-      margin = unquote(margin)
-      assert Recorder.test_timeout_margin(timeout) == margin
-
-      %{timeout: ^timeout, deadline: deadline} = PlaywrightEx.Test.info()
-      assert TestTimeout.fetch() == {timeout, deadline - margin}
-    end
+  @tag timeout: 10_000
+  test "a test's backstop is when PlaywrightEx.Test closes its contexts" do
+    %{timeout: 10_000, close_deadline: close_deadline} = PlaywrightEx.Test.info()
+    assert TestTimeout.fetch() == {10_000, close_deadline}
   end
 
   @tag timeout: :infinity
