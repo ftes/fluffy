@@ -155,15 +155,29 @@ defmodule Fluffy.MixProject do
     ]
   end
 
-  # `mix usage_rules.sync --yes` rewrites the managed block of AGENTS.md from this list.
+  # `mix usage_rules.sync --yes` writes these skills to `.agents/skills` (`.claude/skills` links
+  # there).
   defp usage_rules do
     [
-      file: "AGENTS.md",
-      usage_rules: [
-        {:usage_rules, sub_rules: []},
-        "phoenix:html",
-        {"phoenix:liveview", link: :markdown},
-        {:playwright, link: :markdown}
+      skills: [
+        location: ".agents/skills",
+        build: [
+          "usage-rules": [
+            description:
+              "Use when looking up docs for Elixir, OTP or a dependency: `mix usage_rules.docs` and `mix usage_rules.search_docs`.",
+            usage_rules: [{:usage_rules, sub_rules: []}]
+          ],
+          phoenix: [
+            description:
+              "Use when writing the Phoenix fixtures under test/ (HEEx templates, LiveViews, components). The rules are written for applications.",
+            usage_rules: ["phoenix:html", "phoenix:liveview"]
+          ],
+          playwright: [
+            description:
+              "Use when calling Playwright from Fluffy's Playwright driver, or checking the Playwright API Fluffy wraps.",
+            usage_rules: [:playwright]
+          ]
+        ]
       ]
     ]
   end
