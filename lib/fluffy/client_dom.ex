@@ -99,7 +99,7 @@ defmodule Fluffy.ClientDOM do
     }
   end
 
-  def click(%__MODULE__{} = client_dom, %Locator{} = locator) do
+  def click(%__MODULE__{} = client_dom, %Locator{} = locator, driver \\ :static) do
     target = target!(client_dom, locator)
 
     if target_disabled?(client_dom, follow_label(client_dom, target)) do
@@ -108,12 +108,34 @@ defmodule Fluffy.ClientDOM do
 
     Actionability.ensure_clickable!(target.element, :click, locator)
 
-    {click_target(client_dom, target), target}
+    clicks(client_dom, target, driver)
   end
 
-  # A click's own effect on its target: it toggles a checkbox or selects a radio.
-  @doc false
-  def click_target(%__MODULE__{} = client_dom, %Target{} = target), do: maybe_toggle_checked(client_dom, target)
+  # The clicks a click on `target` dispatches, in order, and the last one's
+  # default action (see `default_action/4`). Each is `{target, page,
+  # clicked_page}`: a click toggles a checkbox or selects a radio, and a
+  # label's activation behavior then clicks its control. A Phoenix.HTML link
+  # prevents the click's default, so it keeps the page it found, and submits
+  # instead (`{:phoenix_html, submission}`). The drivers commit the clicks.
+  defp clicks(client_dom, target, driver, clicking \\ []) do
+    case phoenix_html_submission(client_dom, target) do
+      nil ->
+        clicked_dom = maybe_toggle_checked(client_dom, target)
+        click = {target, client_dom, clicked_dom}
+
+        case default_action(clicked_dom, target, driver, clicking) do
+          {:click, control} ->
+            {clicks, default} = clicks(clicked_dom, control, driver, [control.id | clicking])
+            {[click | clicks], default}
+
+          default ->
+            {[click], default}
+        end
+
+      submission ->
+        {[{target, client_dom, client_dom}], {:phoenix_html, submission}}
+    end
+  end
 
   @doc false
   def phoenix_html_submission(%__MODULE__{} = _client_dom, target) do
@@ -160,8 +182,7 @@ defmodule Fluffy.ClientDOM do
   # `{:submit, submitter, submission}` to submit a submit button's form,
   # `{:click, control}` to click a label's control, or nil. `clicking` lists
   # the ids of the controls labels are already clicking in this click.
-  @doc false
-  def default_action(%__MODULE__{} = client_dom, %Target{} = target, driver \\ :static, clicking \\ []) do
+  defp default_action(client_dom, target, driver, clicking) do
     case activation_target(client_dom, target, clicking) do
       nil ->
         nil
@@ -345,29 +366,40 @@ defmodule Fluffy.ClientDOM do
     Fluffy.Form.live_change_form?(index(client_dom), target)
   end
 
-  def set_checked(%__MODULE__{} = client_dom, %Locator{} = locator, desired) when is_boolean(desired) do
+  # Like Playwright's setChecked: nil when the control is already in the
+  # state, or else the clicks of a click on the element the locator resolves
+  # to, such as the control's label, which must leave the control in it, and
+  # the control.
+  def set_checked(%__MODULE__{} = client_dom, %Locator{} = locator, desired, driver \\ :static)
+      when is_boolean(desired) do
     target = control!(client_dom, locator)
     Actionability.ensure_checkable!(target.element, checked_action(desired), locator)
-    current = checked_target?(client_dom, target)
 
-    client_dom =
-      cond do
-        current == desired ->
-          client_dom
+    cond do
+      checked_target?(client_dom, target) == desired ->
+        nil
 
-        input_type(target) == "radio" and not desired ->
-          raise Fluffy.ActionabilityError,
-            action: :uncheck,
-            reason: :cannot_uncheck_radio,
-            locator: locator
+      input_type(target) == "radio" and not desired ->
+        raise Fluffy.ActionabilityError,
+          action: :uncheck,
+          reason: :cannot_uncheck_radio,
+          locator: locator
 
-        true ->
-          ensure_target_enabled!(client_dom, target, checked_action(desired), locator)
+      true ->
+        ensure_target_enabled!(client_dom, target, checked_action(desired), locator)
+        {clicks, _default} = click = clicks(client_dom, target!(client_dom, locator), driver)
+        {_target, _page, clicked_dom} = List.last(clicks)
+        ensure_checked!(clicked_dom, target, desired, locator)
+        {click, target}
+    end
+  end
 
-          put_checked_target(client_dom, target, desired)
-      end
-
-    {client_dom, target}
+  # Playwright's setChecked fails when its click left the control's state.
+  @doc false
+  def ensure_checked!(%__MODULE__{} = client_dom, %Target{} = control, desired, locator) do
+    if checked_target?(client_dom, control) != desired do
+      raise Fluffy.ActionabilityError, action: checked_action(desired), reason: :state_unchanged, locator: locator
+    end
   end
 
   def select_option(%__MODULE__{} = client_dom, %Locator{} = locator, requested) do
@@ -545,7 +577,9 @@ defmodule Fluffy.ClientDOM do
 
       # A click on a selected radio changes nothing, like a browser's.
       "radio" ->
-        if checked_target?(client_dom, target), do: client_dom, else: put_checked_target(client_dom, target, true)
+        if checked_target?(client_dom, target),
+          do: client_dom,
+          else: client_dom |> clear_radio_group(target) |> put_checked(target.id, true)
 
       _other ->
         client_dom
@@ -565,20 +599,6 @@ defmodule Fluffy.ClientDOM do
       |> put_property(id, :used, true)
 
     %{client_dom | properties: properties}
-  end
-
-  defp put_checked_target(client_dom, target, true) do
-    if input_type(target) == "radio" do
-      client_dom
-      |> clear_radio_group(target)
-      |> put_checked(target.id, true)
-    else
-      put_checked(client_dom, target.id, true)
-    end
-  end
-
-  defp put_checked_target(client_dom, target, false) do
-    put_checked(client_dom, target.id, false)
   end
 
   defp clear_radio_group(client_dom, %{attributes: attributes, id: target_id}) do

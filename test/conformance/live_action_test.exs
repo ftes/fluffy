@@ -288,6 +288,59 @@ defmodule Fluffy.Conformance.LiveActionTest do
       |> expect(to_have_text(log, "Log: sort summon"))
     end
 
+    # A browser reverts the toggle of a click whose default an href="#"
+    # binding prevents, and fires no change, whether the click is on the box
+    # or on its label.
+    @tag driver: driver
+    test "an href=\"#\" binding reverts a checkbox's toggle, with #{driver}", %{driver: driver} do
+      log = by_css("#log")
+      quill = by_role(:checkbox, name: "Quill")
+
+      driver
+      |> live_session()
+      |> visit("/live/label-clicks")
+      |> click(quill)
+      |> expect(to_have_text(log, "Log: sort"))
+      |> expect(not_(to_be_checked(quill)))
+      |> click(by_text("Quill", exact: true))
+      |> expect(to_have_text(log, "Log: sort sort"))
+      |> expect(not_(to_be_checked(quill)))
+    end
+
+    # Like Playwright's setChecked, check clicks the element its locator
+    # finds, so a label sends its own phx-click before its control's.
+    @tag driver: driver
+    test "checking through a label clicks the label, with #{driver}", %{driver: driver} do
+      log = by_css("#log")
+      owl = by_text("Owl post", exact: true)
+
+      session =
+        driver
+        |> live_session()
+        |> visit("/live/label-clicks")
+        |> check(owl)
+        |> expect(to_have_text(log, "Log: label click:yes change:-,yes,-,-"))
+        |> check(owl)
+        |> uncheck(owl)
+        |> expect(to_have_text(log, "Log: label click:yes change:-,yes,-,- label click:- change:-,-,-,-"))
+
+      assert_action_error(session, Fluffy.ActionabilityError, "did not change its state", fn ->
+        check(session, by_text("Sorting hat", exact: true))
+      end)
+    end
+
+    # Like a browser, a label that is already clicking its control doesn't
+    # click it again, so labels that contain each other's control click each
+    # once.
+    @tag driver: driver
+    test "labels containing each other's control click each once, with #{driver}", %{driver: driver} do
+      driver
+      |> live_session()
+      |> visit("/live/label-clicks")
+      |> click(by_text("Mirror A", exact: true))
+      |> expect(to_have_text(by_css("#log"), "Log: mirror:b mirror:a"))
+    end
+
     @tag driver: driver
     test "a click reaches the closest phx-click, and an inner binding wins, with #{driver}", %{driver: driver} do
       log = by_css("#log")

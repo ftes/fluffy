@@ -76,8 +76,8 @@ defmodule Fluffy.Driver.Live do
   @impl true
   def click(%Session{} = session, %Locator{} = locator, action_options \\ []) do
     act(session, :click, [locator, action_options], fn session, deadline ->
-      case resolve_live_action(session, locator, deadline, &ClientDOM.click(&1, locator)) do
-        {%Session{} = session, {client_dom, target}} -> commit_user_click(session, client_dom, target)
+      case resolve_live_action(session, locator, deadline, &ClientDOM.click(&1, locator, :live)) do
+        {%Session{} = session, click} -> commit_user_click(session, click)
         navigation -> navigation
       end
     end)
@@ -86,56 +86,60 @@ defmodule Fluffy.Driver.Live do
   # A browser runs a click's handlers and default action at once, before any
   # reply: a click that toggles a checkbox or selects a radio fires input and
   # change after the click event, and a label's click clicks its control. So
-  # the events a click sends, phx-click and then phx-change, and its default
-  # action are settled from `client_dom`, the page as the click left it, and
-  # pushed in order, each reply committing on the page the last one left.
-  defp commit_user_click(session, client_dom, target) do
-    state = Session.page_state(session)
-
-    case prepare_click(session, client_dom, target, client_dom != state.client_dom, [], []) do
-      {:ok, clicked_dom, steps} -> run_steps(Session.put_page_state(session, %{state | client_dom: clicked_dom}), steps)
-      navigation -> navigation
+  # the events the clicks send, phx-click and then phx-change, and the last
+  # click's default action are settled from the pages the clicks left, before
+  # any is sent, and pushed in order, each reply committing on the page the
+  # last one left. A view found gone meanwhile navigated before the click.
+  # `verify` checks the page the clicks leave.
+  defp commit_user_click(session, {clicks, default}, verify \\ fn _client_dom -> :ok end) do
+    with {:ok, clicked_dom, steps} <- prepare_clicks(session, clicks, default, []) do
+      verify.(clicked_dom)
+      state = Session.page_state(session)
+      run_steps(Session.put_page_state(session, %{state | client_dom: clicked_dom}), steps)
     end
   end
 
-  # The click event reaches the binding before the target's default action
-  # takes place. LiveView's client prevents that action only for a LiveView
-  # link or href="#", so a browser also submits a submit button's form, follows
-  # a link or clicks a label's control after its own phx-click. It does so
-  # before the server replies, so the action and the form it submits are those
-  # the click found. Returns the page once the default action has also run on
-  # it, such as a label's click toggling its control, and the click's steps.
-  # LiveView's client skips a `pending` binding, which still awaits its reply
-  # (PHX_REF_SRC). `clicking` lists the controls labels already click.
-  defp prepare_click(session, client_dom, target, toggled?, pending, clicking) do
+  # Phoenix.HTML's handler takes the click before LiveView's client.
+  defp prepare_clicks(_session, [{target, client_dom, _client_dom}], {:phoenix_html, submission}, _pending) do
+    if competing_live_click_binding?(target) do
+      raise Fluffy.CapabilityError,
+        capability: :phoenix_html_live_action_conflict,
+        driver: :live,
+        detail: "a data-method/data-to link with a competing phx-click or LiveView navigation action requires Playwright"
+    end
+
+    {:ok, client_dom, [&{:navigate, &1, Navigation.submission(submission)}]}
+  end
+
+  # Each click event reaches its binding before the click's default action
+  # takes place. LiveView's client skips a `pending` binding, which still
+  # awaits the reply to its push or live patch (PHX_REF_SRC), and prevents
+  # the default for a LiveView link or href="#", which the browser then
+  # reverts: it undoes the click's toggle, fires no change and goes no
+  # further. Otherwise a toggled control fires change, a label's click clicks
+  # its control, and the last click submits its form or follows its link, all
+  # before the server replies.
+  defp prepare_clicks(session, [{target, client_dom, clicked_dom} | clicks], default, pending) do
     with {:ok, event_context} <- owning_view_context(session, target) do
-      case ClientDOM.phoenix_html_submission(client_dom, target) do
-        submission when is_map(submission) ->
-          if competing_live_click_binding?(target) do
-            raise Fluffy.CapabilityError,
-              capability: :phoenix_html_live_action_conflict,
-              driver: :live,
-              detail:
-                "a data-method/data-to link with a competing phx-click or LiveView navigation action requires Playwright"
-          end
+      binding = click_binding(clicked_dom, target)
+      binding = if binding && node_identity(clicked_dom, binding) not in pending, do: binding
+      commands = if binding, do: Event.click_commands(binding.attributes), else: []
+      click = binding_step(clicked_dom, binding, commands, event_context)
 
-          {:ok, client_dom, [&{:navigate, &1, Navigation.submission(submission)}]}
+      if binding && prevents_default?(binding) do
+        {:ok, client_dom, List.wrap(click)}
+      else
+        change = if clicked_dom != client_dom, do: change_step(clicked_dom, target, event_context)
 
-        nil ->
-          binding = click_binding(client_dom, target)
-          binding = if binding && node_identity(client_dom, binding) not in pending, do: binding
+        pending =
+          if command?(commands, ~w(push patch)), do: [node_identity(clicked_dom, binding) | pending], else: pending
 
-          {clicked_dom, default_steps} =
-            if binding && prevents_default?(binding),
-              do: {client_dom, []},
-              else: default_action(session, client_dom, target, event_context, binding, pending, clicking)
+        rest =
+          if clicks == [],
+            do: {:ok, clicked_dom, default_steps(session, clicked_dom, default, event_context)},
+            else: prepare_clicks(session, clicks, default, pending)
 
-          change =
-            if toggled? and Semantics.input_type(target) in ["checkbox", "radio"],
-              do: change_step(client_dom, target, event_context)
-
-          steps = [binding_step(client_dom, binding, event_context) | default_steps] ++ [change]
-          {:ok, clicked_dom, Enum.reject(steps, &is_nil/1)}
+        with {:ok, final_dom, steps} <- rest, do: {:ok, final_dom, Enum.reject([click, change | steps], &is_nil/1)}
       end
     end
   end
@@ -156,25 +160,30 @@ defmodule Fluffy.Driver.Live do
     end)
   end
 
-  # The click's phx-click, with the payload the click found.
-  defp binding_step(client_dom, binding, event_context) do
-    case binding && live_click_action(binding) do
-      action when action in [nil, :none] ->
-        nil
-
-      :dispatch_change ->
-        event = ClientDOM.dispatch_change_event(client_dom, binding)
-        &push_found_change(&1, client_dom, event, event_context)
-
-      :render_click ->
+  # The click's phx-click, with the payload the click found. Like the LiveView
+  # client, a push, patch or navigate goes through the view, and
+  # JS.dispatch("change") fires a change event on the element so its form
+  # sends phx-change. Other commands send the view nothing.
+  defp binding_step(client_dom, binding, commands, event_context) do
+    cond do
+      command?(commands, ~w(navigate patch push)) ->
         payload = Event.element_values(client_dom, binding)
 
         fn session ->
           result = dispatch_view_event(session, fn -> Event.push(event_context.view, binding, :click, payload) end)
           commit_render_result(session, Session.page_state(session).client_dom, result)
         end
+
+      Enum.any?(commands, &match?(["dispatch", %{"event" => "change"}], &1)) ->
+        event = ClientDOM.dispatch_change_event(client_dom, binding)
+        &push_found_change(&1, client_dom, event, event_context)
+
+      true ->
+        nil
     end
   end
+
+  defp command?(commands, names), do: Enum.any?(commands, fn [name, _options] -> name in names end)
 
   # The change goes as the click left the form, which the click's reply may
   # reset, and a selector such as :checked stops matching after uncheck. So
@@ -203,20 +212,6 @@ defmodule Fluffy.Driver.Live do
   # whose handler stops the event, and for an href="#" binding.
   defp prevents_default?(binding), do: live_link?(binding) or attribute(binding.attributes, "href") == "#"
 
-  # LiveView's client marks a binding as awaiting its reply (PHX_REF_SRC) when
-  # it pushes an event or a live patch, not for JS.navigate or other commands.
-  defp awaits_reply?(binding) do
-    case attribute(binding.attributes, "phx-click") do
-      "[" <> _ = encoded ->
-        encoded
-        |> Phoenix.json_library().decode!()
-        |> Enum.any?(&match?([command, _] when command in ["push", "patch"], &1))
-
-      _event ->
-        true
-    end
-  end
-
   # Like the LiveView client's closestPhxBinding, a click goes to the closest
   # element with phx-click that is not disabled, up to its LiveView's container.
   # The closest LiveView link wins over any phx-click: its handler stops the
@@ -242,38 +237,25 @@ defmodule Fluffy.Driver.Live do
       List.keymember?(element.attributes, "disabled", 0)
   end
 
-  # Settles a click's default action from the document the click found, and
-  # returns the page it leaves with the steps that take it on a session.
-  defp default_action(session, client_dom, target, event_context, binding, pending, clicking) do
-    case ClientDOM.default_action(client_dom, target, :live, clicking) do
+  # The steps that take the last click's default action on a session.
+  defp default_steps(session, client_dom, default, event_context) do
+    case default do
       nil ->
-        {client_dom, []}
-
-      # A label's click goes on to click its control at once, before any reply.
-      # If the label's event navigates away, the control's events are lost, as
-      # the browser sends them to the view it leaves.
-      {:click, control} ->
-        toggled_dom = ClientDOM.click_target(client_dom, control)
-        pending = if binding && awaits_reply?(binding), do: [node_identity(client_dom, binding) | pending], else: pending
-
-        case prepare_click(session, toggled_dom, control, toggled_dom != client_dom, pending, [control.id | clicking]) do
-          {:ok, clicked_dom, steps} -> {clicked_dom, steps}
-          navigation -> {client_dom, [fn _session -> navigation end]}
-        end
+        []
 
       {:link, %{attributes: attributes}} ->
         navigation = Navigation.link(attribute(attributes, "href"), download: attribute(attributes, "download"))
-        {client_dom, [&{:navigate, &1, navigation}]}
+        [&{:navigate, &1, navigation}]
 
       {:submit, submitter, %{phx_submit?: true} = submission} ->
         case live_upload_for_submit(session, submitter) do
-          {:ok, form_id, upload} -> {client_dom, [&dispatch_live_upload_submit(&1, form_id, upload, submission)]}
-          :none -> {client_dom, [live_submit(client_dom, submission, event_context)]}
+          {:ok, form_id, upload} -> [&dispatch_live_upload_submit(&1, form_id, upload, submission)]
+          :none -> [live_submit(client_dom, submission, event_context)]
         end
 
       {:submit, _submitter, %{phx_submit?: false} = submission} ->
         navigation = Navigation.submission(submission)
-        {client_dom, [&{:navigate, &1, navigation}]}
+        [&{:navigate, &1, navigation}]
     end
   end
 
@@ -365,15 +347,12 @@ defmodule Fluffy.Driver.Live do
   @impl true
   def set_checked(%Session{} = session, %Locator{} = locator, desired, options \\ []) do
     act(session, :set_checked, [locator, desired, options], fn session, deadline ->
-      case resolve_live_action(session, locator, deadline, &ClientDOM.set_checked(&1, locator, desired)) do
-        {%Session{} = session, {candidate_client_dom, target}} ->
-          state = Session.page_state(session)
+      case resolve_live_action(session, locator, deadline, &ClientDOM.set_checked(&1, locator, desired, :live)) do
+        {%Session{} = session, nil} ->
+          session
 
-          if candidate_client_dom == state.client_dom do
-            session
-          else
-            commit_user_click(session, candidate_client_dom, target)
-          end
+        {%Session{} = session, {click, control}} ->
+          commit_user_click(session, click, &ClientDOM.ensure_checked!(&1, control, desired, locator))
 
         navigation ->
           navigation
@@ -850,29 +829,6 @@ defmodule Fluffy.Driver.Live do
       wait -> session
     end
   end
-
-  defp live_click_action(binding) do
-    if live_link?(binding), do: :render_click, else: phx_click_action(attribute(binding.attributes, "phx-click"))
-  end
-
-  defp phx_click_action("[" <> _ = encoded) do
-    commands = Phoenix.json_library().decode!(encoded)
-
-    cond do
-      Enum.any?(commands, &match?([command, _] when command in ["navigate", "patch", "push"], &1)) ->
-        :render_click
-
-      # Mirrors the LiveView client's JS.dispatch("change"), which fires a
-      # change event on the element so its form sends phx-change.
-      Enum.any?(commands, &match?(["dispatch", %{"event" => "change"}], &1)) ->
-        :dispatch_change
-
-      true ->
-        :none
-    end
-  end
-
-  defp phx_click_action(_event), do: :render_click
 
   defp commit_render_result(session, client_dom, result, after_render \\ &prune_stale_live_uploads/1)
 

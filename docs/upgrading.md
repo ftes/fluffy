@@ -189,7 +189,8 @@ that passed on 0.8 act differently:
   click inside a LiveView link patches or navigates, even past a closer `phx-click`, and
   `href="#"` has no default action.
 - As in Playwright, a label takes its control's enabled state, so `to_be_enabled` and
-  `to_be_disabled` on a label follow its control.
+  `to_be_disabled` on a label follow its control, and `check` and `uncheck` on a label
+  click the label, sending its `phx-click` too.
 - As in Playwright, `disabled` only disables native form controls, so a `disabled` link
   or `div` is clickable, while text inside a disabled button is disabled too.
 - Events carry what the browser sends: the form's current serialization, so an

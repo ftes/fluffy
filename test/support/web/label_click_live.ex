@@ -20,6 +20,7 @@ defmodule Fluffy.Support.Web.LabelClickLive do
   def handle_event("summon", _params, socket), do: {:noreply, log(socket, "summon")}
   def handle_event("sort", _params, socket), do: {:noreply, log(socket, "sort")}
   def handle_event("save", _params, socket), do: {:noreply, log(socket, "save")}
+  def handle_event("mirror", %{"mirror" => mirror}, socket), do: {:noreply, log(socket, "mirror:#{mirror}")}
   def handle_event("adopt", _params, socket), do: {:noreply, socket |> assign(familiar?: true) |> log("adopt")}
   def handle_event("banish", _params, socket), do: {:noreply, socket |> assign(banished?: true) |> log("banish")}
 
@@ -75,7 +76,15 @@ defmodule Fluffy.Support.Web.LabelClickLive do
       </a>
       <label for="lumos">Cast lumos</label>
       <a href="#" phx-click="sort"><button id="lumos">Lumos</button></a>
+      <a href="#" phx-click="sort"><input id="quill" type="checkbox" name="quill" value="yes" /></a>
+      <label for="quill">Quill</label>
     </form>
+    <label for="mirror-b">
+      <span>Mirror A</span> <output id="mirror-a" phx-click="mirror" phx-value-mirror="a">a</output>
+    </label>
+    <label for="mirror-a">
+      <span>Mirror B</span> <output id="mirror-b" phx-click="mirror" phx-value-mirror="b">b</output>
+    </label>
     <form id="familiar-form" phx-change="familiar">
       <label for="familiar" phx-click="adopt">Familiar</label>
       <input id="familiar" type="checkbox" name="familiar" value="yes" checked={@familiar?} />

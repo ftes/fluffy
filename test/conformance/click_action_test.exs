@@ -177,22 +177,6 @@ defmodule Fluffy.Conformance.ClickActionTest do
       end)
     end
 
-    # Like a browser, a label that is already clicking its control doesn't
-    # click it again, so labels that contain each other's control stop.
-    @tag driver: driver
-    test "labels containing each other's control click each once with #{driver}" do
-      html = """
-      <label for="mirror-b">Mirror A <output id="mirror-a">a</output></label>
-      <label for="mirror-a">Mirror B <output id="mirror-b">b</output></label>
-      """
-
-      with_html(unquote(driver), html, fn session ->
-        session
-        |> click(by_text("Mirror A"))
-        |> expect("Mirror B" |> by_text() |> to_be_visible())
-      end)
-    end
-
     # A click on a label's control, or on interactive content in the label,
     # stays there.
     @tag driver: driver
