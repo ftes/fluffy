@@ -11,7 +11,7 @@ matched once can now match twice.
 
 ## Setup
 
-- Install the pinned driver and a browser with `mix playwright.install -- chromium`.
+- Install the pinned driver and a browser with `mix playwright.install chromium`.
   Drop the npm `playwright` package and the `assets_dir` config; Node.js is no longer
   needed. `executable:` now takes a Playwright 1.65 CLI such as
   `node_modules/.bin/playwright`, not `cli.js`; usually drop it and let Playwright

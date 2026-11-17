@@ -151,7 +151,7 @@ jobs:
                since FROM. In integration/consumer, run `mix deps.update playwright` too, and update
                the version shown in docs/installation.md and usage-rules.md.
             2. If the update changed deps/playwright/DRIVER_VERSION, run
-               `mix playwright.install -- chromium` and `mix fluffy.playwright_source`.
+               `mix playwright.install chromium` and `mix fluffy.playwright_source`.
             3. Run `mix test test/playwright_members_test.exs`. Classify each new PlaywrightEx member
                and event in test/support/playwright_members.ex, as its header describes, and drop
                removed ones. Wrap one in Fluffy only when it's a small, obvious extension of what

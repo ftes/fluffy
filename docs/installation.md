@@ -170,11 +170,11 @@ Only the Playwright backend needs a browser. The `:playwright` dependency pins i
 driver; install it and a browser with:
 
 ```bash
-mix playwright.install -- chromium
+mix playwright.install chromium
 ```
 
 On Linux CI runners, add `--with-deps` to install the browser's system packages too:
-`mix playwright.install -- chromium --with-deps`. See
+`mix playwright.install chromium --with-deps`. See
 [GitHub Actions](`e:playwright:debugging-and-ci.md#github-actions`) for a workflow.
 For annotations of failed tests, run the first `mix test` with
 `--formatter ExUnit.CLIFormatter --formatter Playwright.Test.GitHubFormatter` (see
@@ -222,7 +222,7 @@ printed; the trace has them. To log them, register a listener, such as
 `on(session, Event.console(), &Logger.info(Playwright.ConsoleMessage.text(&1)))`.
 
 Set `browser_name: :firefox` or `browser_name: :webkit` after installing the
-corresponding browser (`mix playwright.install -- firefox`).
+corresponding browser (`mix playwright.install firefox`).
 See [Browser baseline](capabilities.md#browser-baseline) for conformance coverage.
 Fluffy creates a fresh isolated `BrowserContext` for each session, in the browser of
 its `browser:` option, else in the test's browser from
