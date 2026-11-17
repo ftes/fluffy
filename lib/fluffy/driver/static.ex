@@ -43,17 +43,17 @@ defmodule Fluffy.Driver.Static do
 
       %Expect{target: {:locator, _locator}} ->
         {passed?, actual} = ClientDOM.Expectation.evaluate(client_dom(session), expectation)
-        assert_truth!(expectation, passed?, actual)
+        Expect.Internal.assert!(expectation, passed?, actual)
 
       %Expect{target: :page, kind: :url, expected: expected} ->
         actual = Session.current_page(session).url
         # A session for HTML has no server, so no base URL.
         base_url = with %{base_url: base_url} <- Session.context(session).http, do: base_url
-        assert_truth!(expectation, Expect.Internal.url_matches?(expected, base_url, actual), actual)
+        Expect.Internal.assert!(expectation, Expect.Internal.url_matches?(expected, base_url, actual), actual)
 
       %Expect{target: :page, kind: :title, expected: expected} ->
         actual = session |> Session.page_state() |> document() |> page_title()
-        assert_truth!(expectation, Expect.Internal.title_matches?(expected, actual), actual)
+        Expect.Internal.assert!(expectation, Expect.Internal.title_matches?(expected, actual), actual)
     end
 
     session
@@ -204,21 +204,12 @@ defmodule Fluffy.Driver.Static do
     end
   end
 
-  defp assert_truth!(%Expect{} = expectation, passed?, actual) do
-    if passed? == expectation.negated? do
-      raise ExUnit.AssertionError,
-        message: "Expected #{Expect.Internal.describe(expectation)}, got #{inspect(actual)}"
-    end
-
-    :ok
-  end
-
   defp assert_count_expectation!(%Expect{negated?: false}, locator, expected, candidates) do
     Expectation.assert_count!(locator, expected, candidates)
   end
 
   defp assert_count_expectation!(%Expect{} = expectation, _locator, expected, candidates) do
     actual = length(candidates)
-    assert_truth!(expectation, actual == expected, actual)
+    Expect.Internal.assert!(expectation, actual == expected, actual)
   end
 end

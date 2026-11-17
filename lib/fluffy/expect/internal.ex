@@ -112,6 +112,18 @@ defmodule Fluffy.Expect.Internal do
     |> maybe_negated(expectation.negated?)
   end
 
+  @doc "Raises the failure of `expectation` unless `passed?`, negated as `expectation` is."
+  def assert!(%Expect{} = expectation, passed?, actual) do
+    if passed? == expectation.negated? do
+      raise ExUnit.AssertionError, message: failure_message(expectation, actual)
+    end
+
+    :ok
+  end
+
+  @doc "The failure message of `expectation` when it got `actual`."
+  def failure_message(%Expect{} = expectation, actual), do: "Expected #{describe(expectation)}, got #{inspect(actual)}"
+
   defp validate_options!(options), do: Options.validate_expectation!(options)
 
   defp positive_description(%Expect{target: {:locator, locator}, kind: kind, expected: expected}) do

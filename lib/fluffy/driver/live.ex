@@ -57,7 +57,7 @@ defmodule Fluffy.Driver.Live do
             {:ok, session}
 
           {:ok, _passed?, actual} ->
-            {:retry, "Expected #{Expect.Internal.describe(expectation)}, got #{inspect(actual)}"}
+            {:retry, Expect.Internal.failure_message(expectation, actual)}
         end
       end)
 
