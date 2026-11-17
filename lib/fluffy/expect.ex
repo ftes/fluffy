@@ -755,24 +755,11 @@ defmodule Fluffy.Expect do
 
   defp expect_active_page(%Session{} = session, %Expect{kind: :opener} = expectation) do
     actual = session |> Session.handle() |> Fluffy.Page.opener()
-    assert_expected!(expectation, actual)
+    Internal.assert!(expectation, actual == expectation.expected, actual)
     session
   end
 
   defp expect_active_page(_session, %Expect{} = expectation) do
     raise ArgumentError, "unsupported active page expectation: #{Internal.describe(expectation)}"
-  end
-
-  defp assert_expected!(%Expect{} = expectation, actual) do
-    assert_expectation_truth!(expectation, Internal.matches?(expectation.expected, actual), actual)
-  end
-
-  defp assert_expectation_truth!(%Expect{} = expectation, passed?, actual) do
-    if passed? == expectation.negated? do
-      raise ExUnit.AssertionError,
-        message: "Expected #{Internal.describe(expectation)}, got #{inspect(actual)}"
-    end
-
-    :ok
   end
 end
