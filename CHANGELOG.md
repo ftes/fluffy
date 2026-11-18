@@ -13,8 +13,9 @@ events, routes, `unwrap` callbacks, regexes and URLs, they are the port's, as in
 ## Playwright Test in ExUnit
 
 `use Playwright.Test` registers each test, which every session needs. Browsers come from its pool,
-and timeouts, traces, screenshots, videos, steps and snapshot names follow Playwright Test on
-every driver. `:infinity` means no limit; `timeout: 0` checks once on assertions and Phoenix
+and its options, timeouts, traces, screenshots, videos, steps and snapshot names follow Playwright
+Test; Phoenix sessions take their timeout from `config :fluffy, phoenix_backend_timeout:`
+([Configuration](docs/installation.md#configuration)). `:infinity` means no limit; `timeout: 0` checks once on assertions and Phoenix
 actions, while Playwright actions and waits reject it.
 
 ## Phoenix drivers that act like a browser

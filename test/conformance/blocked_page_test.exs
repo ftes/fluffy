@@ -1,5 +1,5 @@
 defmodule Fluffy.Conformance.BlockedPageTest do
-  # The default action timeout, which bounds Fluffy's document check, is global config.
+  # The module's action timeout bounds Fluffy's document check.
   use Fluffy.Support.Case, async: true
 
   import Fluffy

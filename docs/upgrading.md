@@ -58,8 +58,9 @@ matched once can now match twice.
 
 ## Timeouts
 
-Timeouts follow Playwright Test, and Elixir for `timeout:`: `0` checks once and `:infinity`
-means no limit; see [Timeouts](installation.md#timeouts).
+A browser session's timeouts follow Playwright Test and a Phoenix session's
+`config :fluffy, phoenix_backend_timeout:`; `timeout:` follows Elixir: `0` checks once and
+`:infinity` means no limit; see [Configuration](installation.md#configuration).
 
 - `config :fluffy` is validated at startup: an unknown key, or the config of a module that
   doesn't exist, raises. Remove `playwright: false`, which does nothing.

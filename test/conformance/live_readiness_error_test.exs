@@ -33,8 +33,7 @@ defmodule Fluffy.Conformance.LiveReadinessErrorTest do
 end
 
 defmodule Fluffy.Conformance.LiveReadinessTimeoutTest do
-  # The readiness waits after a navigation share its timeout, Playwright's `navigation_timeout`,
-  # which is global config.
+  # The readiness waits after a navigation share its timeout, the module's `navigation_timeout`.
   use Fluffy.Support.Case, async: true
 
   import Fluffy

@@ -18,8 +18,10 @@ assert Download.read(download) =~ "student,house"
 ```
 
 Each wait has an independent source, predicate, and deadline. The deadline starts
-at registration, using the action timeout, as Playwright's `waitForEvent`, unless
-`timeout:` is supplied. Await
+at registration, as Playwright's `waitForEvent`, unless `timeout:` is supplied: a browser's
+action timeout, or a Phoenix session's `phoenix_backend_timeout`, 1 second by default, so
+register a Phoenix wait just before the action that triggers it
+([Configuration](installation.md#configuration)). Await
 once; reuse the returned value freely. Separate waits can observe the same event.
 A settled event outcome survives subsequent timeout or source closure. A still-pending
 wait reports timeout, page closure, or session closure through `await`.
