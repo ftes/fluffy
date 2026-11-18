@@ -9,13 +9,37 @@ defmodule Fluffy.Timeouts do
   # phoenix_backend_timeout:` (1 s by default): an in-process session answers at once, so a long
   # wait is only for something that isn't there. Its `0` checks once, as a call's `timeout: 0`.
 
+  alias Fluffy.Backend.Playwright.Context
+  alias Fluffy.Session
+
+  @doc """
+  A browser session's action and navigation timeouts, from the test's options as the session
+  starts (`Playwright.Test.info().use`), as Playwright.Test sets them on the test's contexts.
+  """
+  @spec browser(map()) :: %{action_timeout: timeout(), navigation_timeout: timeout()}
+  def browser(use) do
+    %{
+      action_timeout: no_limit(Map.fetch!(use, :action_timeout)),
+      navigation_timeout: no_limit(Map.fetch!(use, :navigation_timeout))
+    }
+  end
+
   @doc "A browser's action timeout: actions, locator reads, `wait_for_function` and event waits."
-  @spec action() :: timeout()
-  def action, do: test_use!(:action_timeout)
+  @spec action(Session.t()) :: timeout()
+  def action(session), do: Session.context(session).action_timeout
 
   @doc "The navigation timeout of a browser: `visit`, `reload`, history and waits for a URL or load state."
-  @spec navigation() :: timeout()
-  def navigation, do: test_use!(:navigation_timeout)
+  @spec navigation(Session.t()) :: timeout()
+  def navigation(session), do: Session.context(session).navigation_timeout
+
+  @doc "An event wait's default: as Playwright's `waitForEvent`, a browser's action timeout."
+  @spec event(Session.t()) :: timeout()
+  def event(session) do
+    case Session.context(session) do
+      %Context{action_timeout: timeout} -> timeout
+      _phoenix -> phoenix()
+    end
+  end
 
   @doc "A browser's expect timeout of assertions."
   @spec expect() :: timeout()
@@ -34,24 +58,23 @@ defmodule Fluffy.Timeouts do
   @navigations [:visit, :reload, :go_back, :go_forward, :wait_for_load_state]
 
   @doc "A browser operation's `timeout:`, else its default."
-  @spec operation(atom(), keyword()) :: timeout()
-  def operation(operation, options) when operation in @navigations, do: get(options, &navigation/0)
-  def operation(_operation, options), do: get(options, &action/0)
+  @spec operation(Session.t(), atom(), keyword()) :: timeout()
+  def operation(session, operation, options) when operation in @navigations,
+    do: get(options, fn -> navigation(session) end)
+
+  def operation(session, _operation, options), do: get(options, fn -> action(session) end)
 
   @doc """
   The Playwright timeout of an action, wait or navigation: it can't check once, so it rejects
   `0` (`Fluffy.Deadline.playwright_operation!/2`).
   """
-  @spec playwright_operation!(atom(), keyword()) :: pos_integer() | :infinity
-  def playwright_operation!(operation, options),
-    do: Fluffy.Deadline.playwright_operation!(operation, operation(operation, options))
+  @spec playwright_operation!(Session.t(), atom(), keyword()) :: pos_integer() | :infinity
+  def playwright_operation!(session, operation, options),
+    do: Fluffy.Deadline.playwright_operation!(operation, operation(session, operation, options))
 
   @doc "The Playwright timeout of an expectation: its `0` checks once (`Fluffy.Deadline.playwright/1`)."
   @spec playwright_expect(keyword()) :: pos_integer() | :infinity
   def playwright_expect(options), do: Fluffy.Deadline.playwright(get(options, &expect/0))
-
-  # Every session belongs to a registered test (`Fluffy.TestInfo.fetch!/0`).
-  defp test_use!(key), do: no_limit(Map.fetch!(Fluffy.TestInfo.fetch!().use, key))
 
   defp no_limit(0), do: :infinity
   defp no_limit(timeout), do: timeout

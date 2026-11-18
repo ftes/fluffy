@@ -405,9 +405,9 @@ defmodule Fluffy.Driver.Playwright do
   end
 
   defp read(session, operation, target, options, fun) do
-    timeout = Timeouts.playwright_operation!(operation, options)
+    timeout = Timeouts.playwright_operation!(session, operation, options)
 
-    case navigation_aware_action(session, Timeouts.operation(operation, options), fn -> fun.(timeout) end) do
+    case navigation_aware_action(session, Timeouts.operation(session, operation, options), fn -> fun.(timeout) end) do
       {:ok, value, outcome} -> {:return, value, outcome}
       {:error, error} -> OperationFailure.raise_playwright!(operation, target, error)
     end
@@ -479,7 +479,7 @@ defmodule Fluffy.Driver.Playwright do
       {:ok, result}
     end
 
-    case navigation_aware_action(session, Timeouts.action(), action) do
+    case navigation_aware_action(session, Timeouts.action(session), action) do
       {:ok, result, outcome} -> {:return, result, outcome}
       {:error, error} -> OperationFailure.raise_playwright!(operation, target, error)
     end
@@ -492,7 +492,7 @@ defmodule Fluffy.Driver.Playwright do
   def clock(%Session{} = session, operation, fun) do
     clock = BrowserPage.clock(Session.page_state(session).page)
 
-    case navigation_aware_action(session, Timeouts.action(), fn -> result(fun.(clock)) end) do
+    case navigation_aware_action(session, Timeouts.action(session), fn -> result(fun.(clock)) end) do
       {:ok, :ok, outcome} -> outcome
       {:error, error} -> OperationFailure.raise_playwright!(operation, nil, error)
     end
@@ -529,9 +529,9 @@ defmodule Fluffy.Driver.Playwright do
   end
 
   defp action(session, operation, target, options, fun) do
-    timeout = Timeouts.playwright_operation!(operation, options)
+    timeout = Timeouts.playwright_operation!(session, operation, options)
 
-    case navigation_aware_action(session, Timeouts.operation(operation, options), fn -> result(fun.(timeout)) end) do
+    case navigation_aware_action(session, Timeouts.operation(session, operation, options), fn -> result(fun.(timeout)) end) do
       {:ok, _value, outcome} -> outcome
       {:error, error} -> OperationFailure.raise_playwright!(operation, target, error)
     end

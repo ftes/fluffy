@@ -83,8 +83,9 @@ match, so `check_origin: false` lets the LiveView socket connect. By default Pho
 checks only the origin's host against the endpoint's `url` host, so an endpoint
 with `url: [host: "127.0.0.1"]` needs no `check_origin: false`. If Playwright
 targets an application hosted elsewhere, set Playwright's `base_url` instead
-([Configuration](#configuration)). Explicit `endpoint:` and `base_url:` session options
-override the global values for multi-endpoint or dynamic-server tests.
+([Configuration](#configuration)). For multi-endpoint or dynamic-server tests, a session's
+`endpoint:` picks the endpoint and, with no `base_url` set, its URL; a session's `base_url:`
+overrides any configured one.
 
 The application's normal browser bundle must connect its LiveSocket. See
 [Actionability checks and waiting](actions.md#actionability-checks-and-waiting)

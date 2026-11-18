@@ -141,6 +141,9 @@ defmodule Fluffy.PlaywrightConfigurationTest do
       assert_raise ArgumentError,
                    ~r/invalid config :playwright, :test: test_id_attribute: .*attribute names/,
                    fn -> Options.config!(:test_id_attribute) end
+
+      # Only `by_test_id` reads it.
+      assert Timeouts.phoenix() == 1_000
     end
 
     put_playwright(test: [test_id_attribute: "data-owl,data_hedwig,data-élève,--owl"])

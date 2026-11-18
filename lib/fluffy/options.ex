@@ -503,6 +503,14 @@ defmodule Fluffy.Options do
   # (`Playwright.Test.config/0`, its defaults filled in), where `0` means no limit:
   # `:infinity` here.
   @spec config!(atom()) :: term()
+  def config!(:test_id_attribute) do
+    # Validated as it is read, so a bad attribute fails only `by_test_id`.
+    case Map.fetch!(resolved_config!(), :test_id_attribute) do
+      {:ok, names} -> names
+      {:error, message} -> raise ArgumentError, "invalid config :playwright, :test: test_id_attribute: " <> message
+    end
+  end
+
   def config!(key) when key in @resolved_keys, do: Map.fetch!(resolved_config!(), key)
 
   # Read on every timeout, so resolved once per env, as Playwright's
@@ -528,15 +536,9 @@ defmodule Fluffy.Options do
     fluffy = config!()
     playwright = Playwright.Test.config()
 
-    test_id_attribute =
-      case test_id_attribute(playwright.test_id_attribute) do
-        {:ok, names} -> names
-        {:error, message} -> raise ArgumentError, "invalid config :playwright, :test: test_id_attribute: " <> message
-      end
-
     %{
       expect_timeout: no_limit(playwright.expect.timeout),
-      test_id_attribute: test_id_attribute,
+      test_id_attribute: test_id_attribute(playwright.test_id_attribute),
       phoenix_backend_timeout: Keyword.fetch!(fluffy, :phoenix_backend_timeout)
     }
   end

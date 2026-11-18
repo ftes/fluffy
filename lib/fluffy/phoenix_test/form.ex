@@ -8,15 +8,19 @@ defmodule Fluffy.PhoenixTest.Form do
   alias Fluffy.Session
 
   def owner(session, locator) do
-    state_owner(Session.page_state(session), locator)
+    state_owner(session, Session.page_state(session), locator)
   end
 
-  defp state_owner(%Driver.Static.State{client_dom: client_dom}, locator), do: structural_owner(client_dom, locator)
-  defp state_owner(%Driver.Live.State{client_dom: client_dom}, locator), do: structural_owner(client_dom, locator)
-  defp state_owner(%Driver.External.State{}, _locator), do: nil
+  defp state_owner(_session, %Driver.Static.State{client_dom: client_dom}, locator),
+    do: structural_owner(client_dom, locator)
+
+  defp state_owner(_session, %Driver.Live.State{client_dom: client_dom}, locator),
+    do: structural_owner(client_dom, locator)
+
+  defp state_owner(_session, %Driver.External.State{}, _locator), do: nil
 
   # As a locator read, the action timeout bounds it.
-  defp state_owner(%Driver.Playwright.State{frame: frame}, locator) do
+  defp state_owner(session, %Driver.Playwright.State{frame: frame}, locator) do
     case frame
          |> Fluffy.Locator.Playwright.locator(locator)
          |> Playwright.Locator.evaluate(
@@ -34,7 +38,7 @@ defmodule Fluffy.PhoenixTest.Form do
            }
            """,
            nil,
-           timeout: Fluffy.Timeouts.playwright_operation!(:evaluate, [])
+           timeout: Fluffy.Timeouts.playwright_operation!(session, :evaluate, [])
          ) do
       {:ok, :null} -> nil
       {:ok, selector} -> Locator.by_css(selector)
