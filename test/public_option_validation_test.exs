@@ -1,5 +1,6 @@
 defmodule Fluffy.PublicOptionValidationTest do
   use ExUnit.Case, async: true
+  use Playwright.Test
 
   alias Fluffy.Event
   alias Fluffy.Expect

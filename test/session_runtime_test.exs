@@ -1,5 +1,6 @@
 defmodule Fluffy.SessionRuntimeTest do
   use ExUnit.Case, async: true
+  use Playwright.Test
 
   import Fluffy.Support.Case, only: [monitor_running: 1]
 

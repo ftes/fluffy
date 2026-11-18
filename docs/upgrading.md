@@ -76,7 +76,7 @@ means no limit; see [Timeouts](installation.md#timeouts).
   `config :fluffy, action_timeout:, expect_timeout:` override them for Fluffy sessions, as for
   a suite without browser tests; the navigation timeout is Playwright's only
   ([Timeouts](installation.md#timeouts)). Without them, actions and navigations have no
-  timeout, so the test's timeout bounds them: with `Fluffy.Case`, a LiveView action on a
+  timeout, so the test's timeout bounds them: with `use Playwright.Test`, a LiveView action on a
   missing element fails with Fluffy's error at the test timeout, and without it with ExUnit's
   timeout. Assertions default to 5 seconds on every driver; Phoenix used to wait 1 second.
 - Playwright actions, waits, `reload`, `go_back` and `go_forward` raise `ArgumentError`
@@ -115,13 +115,13 @@ means no limit; see [Timeouts](installation.md#timeouts).
 - `Fluffy.Playwright.trace/2`, `artifact_dir` and `trace_dir` are removed. Traces,
   screenshots and videos come from `Playwright.Test`: set
   `config :playwright, :test, trace: :retain_on_failure, screenshot: :only_on_failure`
-  and replace `setup context do Fluffy.Test.setup(context) end` with `use Fluffy.Case` after
-  your `ConnCase` (or in your case template, see `Fluffy.Case`);
-  record a module with `use Fluffy.Case, trace: :on` and a describe block or test with `@tag Playwright.Test.use(trace: :on)` (or `screenshot:`, `video:`). Files go to
+  and replace `setup context do Fluffy.Test.setup(context) end` with `use Playwright.Test` after
+  your `ConnCase` (or in your case template, see `Playwright.Test`);
+  record a module with `use Playwright.Test, trace: :on` and a describe block or test with `@tag Playwright.Test.use(trace: :on)` (or `screenshot:`, `video:`). Files go to
   `test-results/<test>/`; a failed operation no longer writes HTML or the error text.
 - Fluffy no longer starts or adopts Ecto sandbox owners: keep the generated DataCase
   setup (`Sandbox.start_owner!(repo, shared: not tags[:async])` and `stop_owner` in
-  `on_exit`) and use it before `use Fluffy.Case`. Drop `sandbox: false` and `repos:`;
+  `on_exit`) and use it before `use Playwright.Test`. Drop `sandbox: false` and `repos:`;
   Fluffy adds the metadata of `config :fluffy, ecto_repos:` to browser sessions. A plain
   `Sandbox.checkout` in the test process does not work for browser tests.
 - `Fluffy.Playwright.screenshot` and `pdf` return the image or PDF, as in Playwright,

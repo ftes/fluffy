@@ -53,25 +53,9 @@ defmodule Fluffy.Conformance.StepTest do
     end
   end
 
-  # Without `use Fluffy.Case`, nothing records steps: the callback just runs.
+  # Without `use Playwright.Test`, nothing records steps: the callback just runs.
   defp wake_fluffy(session) do
     step(session, "Stop the music", fn _session -> raise "Fluffy wakes up" end, box: true)
     :awake
-  end
-end
-
-defmodule Fluffy.Conformance.StepTest.Unregistered do
-  @moduledoc false
-  use ExUnit.Case, async: true
-
-  import Fluffy
-
-  test "runs the callback outside a registered test" do
-    session =
-      :phoenix
-      |> start_session(endpoint: Fluffy.Support.Web.Endpoint)
-      |> step("Sneak past Fluffy", &visit(&1, "/chamber"))
-
-    assert Fluffy.Session.current_driver(session) == :static
   end
 end

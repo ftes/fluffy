@@ -5,8 +5,8 @@ defmodule Fluffy.TestTimeout do
   # operation without a timeout fails with Fluffy's error just before ExUnit kills the test, at
   # the moment Playwright.Test closes the test's contexts, so a Playwright call fails
   # (`close_deadline` of `Playwright.Test.info/0`). It comes from the test's registration
-  # (`use Fluffy.Case`), also in its Tasks, through `$callers`. Without one, as in a process
-  # outside a registered test, there is no backstop.
+  # (`use Playwright.Test`), also in its Tasks, through `$callers`. Without one, as in a process
+  # outside the test, there is no backstop.
 
   @doc "The calling test's `{timeout, backstop}`, `nil` without one."
   @spec fetch() :: {pos_integer(), integer()} | nil

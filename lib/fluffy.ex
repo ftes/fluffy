@@ -112,8 +112,7 @@ defmodule Fluffy do
       end)
 
   It is `Playwright.Test.step/3` at this call, on every driver: the step, with the operations
-  in it, is in the test's trace (`test.trace` in `trace.zip`), and steps nest. Only a test of a
-  module with `use Fluffy.Case` records steps; elsewhere `fun` just runs.
+  in it, is in the test's trace (`test.trace` in `trace.zip`), and steps nest.
 
   ## Options
 
@@ -128,10 +127,10 @@ defmodule Fluffy do
     quote do
       require Playwright.Test
 
-      case Fluffy.__step__(unquote(session), unquote(title), unquote(fun), unquote(options), unquote(location)) do
-        {:record, title, body, options} -> Playwright.Test.step(title, body, options)
-        {:run, body} -> body.()
-      end
+      {title, body, options} =
+        Fluffy.__step__(unquote(session), unquote(title), unquote(fun), unquote(options), unquote(location))
+
+      Playwright.Test.step(title, body, options)
     end
   end
 
@@ -146,10 +145,7 @@ defmodule Fluffy do
       end
     end
 
-    case Fluffy.TestInfo.fetch() do
-      {:ok, _info} -> {:record, title, body, [location: location] ++ options}
-      :error -> {:run, body}
-    end
+    {title, body, [location: location] ++ options}
   end
 
   @doc false

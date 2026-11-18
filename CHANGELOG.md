@@ -12,7 +12,7 @@ events, routes, `unwrap` callbacks, regexes and URLs, they are the port's, as in
 
 ## Playwright Test in ExUnit
 
-`use Fluffy.Case` registers each test with `Playwright.Test`. Browsers come from its pool,
+`use Playwright.Test` registers each test, which every session needs. Browsers come from its pool,
 and timeouts, traces, screenshots, videos, steps and snapshot names follow Playwright Test on
 every driver. `:infinity` means no limit; `timeout: 0` checks once on assertions and Phoenix
 actions, while Playwright actions and waits reject it.
@@ -28,7 +28,7 @@ sandbox, as generated `DataCase` and `ConnCase` do.
 
 The entry below lists them under Breaking; the upgrade guide shows how to move a 0.8 suite.
 
-## 0.9.0-rc.4 — 2026-11-18
+## 0.9.0
 
 Changes since 0.8.0.
 
@@ -36,7 +36,8 @@ Changes since 0.8.0.
 
 - Fluffy runs on Playwright (Hex package `playwright_ex`, `~> 1.65.0-rc.2`) with a pinned Playwright 1.65 driver, installed by `mix playwright.install`. The npm `playwright` package, `assets_dir` and Node.js are no longer needed; `executable:` names a Playwright CLI. Playwright 1.65's own breaking changes apply: actions wait for an element to be not inert, cookie matching follows RFC 6265, and text the browser does not render is not part of accessible names.
 - PlaywrightEx is renamed `Playwright`: the app is `:playwright` and its modules `Playwright.*`, while the Hex package stays `playwright_ex`, and its versions follow Playwright's (major.minor is Playwright's). If you list it, write the dependency line from the installation guide (`hex: :playwright_ex` is required), rename `config :playwright_ex` to `config :playwright`, and port `PlaywrightEx.*` calls in `unwrap` callbacks with Playwright's upgrade guide. `alias Fluffy.Playwright` now shadows `Playwright.*`, so don't alias it where you call the dependency.
-- `use Fluffy.Case` after your `ConnCase` replaces `Fluffy.Test.setup`, which is removed. It registers the test with `Playwright.Test`, whose traces, screenshots, videos and `error-context.md` replace `Fluffy.Playwright.trace/2`, `artifact_dir` and `trace_dir`: record a module with `use Fluffy.Case, trace: :on` and a describe block or test with `@tag Playwright.Test.use(trace: :on)`. A failed operation no longer writes HTML or the error text.
+- `use Playwright.Test` after your `ConnCase` replaces `Fluffy.Test.setup`, which is removed. It registers the test, whose traces, screenshots, videos and `error-context.md` replace `Fluffy.Playwright.trace/2`, `artifact_dir` and `trace_dir`: record a module with `use Fluffy.Case, trace: :on` and a describe block or test with `@tag Playwright.Test.use(trace: :on)`. A failed operation no longer writes HTML or the error text.
+- Every session, Phoenix ones too, needs a registered test (`use Playwright.Test`) and raises outside one. `Fluffy.Case` of the 0.9 release candidates is removed: write `use Playwright.Test`, with the same options, in its place, also in a case template's body and `using`. A step then always records, and a screenshot's `path:` is never required.
 - The application owns the Ecto sandbox, as generated `DataCase` and `ConnCase` do: Fluffy no longer starts, adopts or stops owners, and `sandbox:` and `repos:` are gone. It adds the metadata of `config :fluffy, ecto_repos:` to browser sessions.
 - Browsers come from `Playwright.Test.BrowserPool`, configured by `config :playwright, :test` (`browser_name`, `launch_options`, `driver: [executable: ...]`), at most `workers` at once. `config :fluffy, :playwright` and `pool_size` are removed.
 - Timeouts follow Playwright Test on every driver: `config :playwright, :test, action_timeout:, navigation_timeout:` (no limit by default, so the test's timeout bounds them) and `config :playwright, :expect, timeout:` (5 seconds; Phoenix waited 1). `config :fluffy, action_timeout:, expect_timeout:` override them for Fluffy sessions. `start_session(timeout:)` and `config :fluffy, timeout:` are removed. `timeout: 0` checks once and `:infinity` means no limit; Playwright actions and waits reject `0`. Calls that have no timeout in Playwright, such as `evaluate`, `cookies` and download reads, take none.
@@ -77,7 +78,7 @@ Changes since 0.8.0.
 - `Fluffy.Locator.within/2`, `Fluffy.clear/3` and `Fluffy.set_checked/4` on every driver; the facade's `assert_has` and `refute_has` accept a locator.
 - `Fluffy.wait_for/3` takes a locator on Playwright.
 - `Fluffy.step/3` is `Playwright.Test.step/3`, on every driver.
-- A Playwright session starts from the test's `Playwright.Test` context options of every level, such as `use Fluffy.Case, locale: "en-GB"` or `@tag Playwright.Test.use(viewport: ...)`; the session's headers merge into the test's `extra_http_headers`.
+- A Playwright session starts from the test's `Playwright.Test` context options of every level, such as `use Playwright.Test, locale: "en-GB"` or `@tag Playwright.Test.use(viewport: ...)`; the session's headers merge into the test's `extra_http_headers`.
 - `Fluffy.Playwright` gains `route/4`, `unroute/3` and `unroute_all/2` (handlers get a `Playwright.Route`), `unwrap/3` for a locator, `page/2`, `add_init_script`, `wait_for_function`, `wait_for_load_state`, `evaluate` on a locator and `evaluate_all`, `dblclick`, `tap`, `drop`, `dispatch_event`, `select_text`, `scroll_into_view_if_needed`, element `screenshot`, `bounding_box`, `aria_snapshot`, `set_viewport_size`, `viewport_size`, `emulate_media`, permissions, geolocation, offline mode, HTTP credentials, extra HTTP headers, script and style tags, `bring_to_front`, `set_storage_state`, `all`, `content`, `title`, `local_storage` and `session_storage`, plus `Fluffy.Playwright.Keyboard`, `Mouse` and `Clock`.
 - More Playwright events: `console`, `page_error`, `worker`, `web_socket`, `request_failed`, `request_finished`, `load`, `dom_content_loaded`, `crash`, `frame_attached` and `frame_detached`, and `Event.close()`.
 - `unwrap_and_return/2` (and `Fluffy.Playwright.unwrap_and_return/3`, facade `unwrap_and_return/2`) returns a native callback's result. A document navigated natively in a callback is adopted.

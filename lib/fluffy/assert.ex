@@ -6,7 +6,7 @@ defmodule Fluffy.Assert do
   to replace the conflicting ExUnit imports:
 
       use ExUnit.Case
-      use Fluffy.Case
+      use Playwright.Test
       use Fluffy.Assert
 
       import Fluffy

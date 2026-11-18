@@ -131,11 +131,10 @@ calls in an `unwrap` callback get them too.
 
 With no action or navigation timeout, the test's timeout bounds them (ExUnit's default
 is 60 seconds). On Playwright, Playwright.Test closes the test's contexts just before,
-so a call that hangs fails with "Test timeout of 60000ms exceeded." and its call log. In a
-test with `Fluffy.Case`, a LiveView action that never finds its element, or a Phoenix event
-wait, fails at the same moment with Fluffy's error and the same reason. Phoenix-only tests
-without `Fluffy.Case` have no such backstop and fail with ExUnit's timeout, so set an
-`action_timeout` there. There is no per-session timeout; pass `timeout:` to a call.
+so a call that hangs fails with "Test timeout of 60000ms exceeded." and its call log. A
+LiveView action that never finds its element, or a Phoenix event wait, fails at the same
+moment with Fluffy's error and the same reason. There is no per-session timeout; pass
+`timeout:` to a call.
 ExUnit's default test timeout is 60 seconds, against Playwright Test's 30, so with no action
 or navigation timeout a failing action takes twice as long to fail; for faster failures, set
 `action_timeout` and `navigation_timeout` (Fluffy's own suite uses 15 seconds), or lower
@@ -207,14 +206,13 @@ driver's version (`Playwright.Driver.version/0`): the driver finds the image's b
 `launch_options: [executable_path: System.find_executable("google-chrome-stable")]` or
 `channel:`.
 
-Test modules have `use Fluffy.Case` after your `ConnCase` or `use ExUnit.Case` (or in
-your case template's `using`). It adds `use Playwright.Test`, which Playwright sessions
-need, and which records every Playwright session of the test: one `trace.zip` of all its
+Test modules have `use Playwright.Test` after your `ConnCase` or `use ExUnit.Case` (or in
+your case template's `using`): every session needs it. It records every Playwright session of the test: one `trace.zip` of all its
 sessions, a screenshot of each page as its session closes, and videos, each `:off` by
 default, and a failed test's `error-context.md`. The `*_on_failure` modes record every
 test and drop the files of passing ones. Each test writes to its own dir under `output_dir` (`test-results`);
 ignore it in git and configure CI to upload it when the test job fails. To override the
-config for a module, pass the mode to `use Fluffy.Case, trace: :on`, or tag a describe
+config for a module, pass the mode to `use Playwright.Test, trace: :on`, or tag a describe
 block or test, such as `@tag Playwright.Test.use(trace: :on)`. See `Playwright.Test` for the
 modes and file names.
 
@@ -319,7 +317,7 @@ end
 
 The application owns the sandbox, as with `Phoenix.ConnTest`: keep the generated
 DataCase setup, which starts an owner for each test and stops it in `on_exit`, and use
-your `ConnCase` (or `DataCase`) before `use Fluffy.Case`:
+your `ConnCase` (or `DataCase`) before `use Playwright.Test`:
 
 ```elixir
 def setup_sandbox(tags) do
