@@ -124,6 +124,17 @@ address, as from Docker, a remote browser or a proxy; with a dynamic port, set i
 `config/runtime.exs` inside `if config_env() == :test`. A static `base_url` beats the
 listener's URL, so it breaks a dynamic port.
 
+- **Levels replace, they don't merge.** As in Playwright, a later level replaces an option's
+  whole value, so a tag's `extra_http_headers` replaces the config's map: repeat the headers
+  you keep. A session's `headers:` merges over them by name.
+- **Language on both backends.** `locale` sets a browser's `Accept-Language` only; for both,
+  set `extra_http_headers: %{"accept-language" => "de-DE"}`.
+- **Case templates.** Put `use Playwright.Test, unquote(opts)` in the template's `using`
+  ([Shared test case](usage.md#shared-test-case)).
+- **From the 0.9 release candidates.** `config :fluffy, action_timeout:, expect_timeout:,
+  base_url:, test_id_attribute:` and `Fluffy.Case` are removed; a removed key raises at startup
+  with what to set instead.
+
 ```elixir
 # config/test.exs: no base_url, as the endpoint's listener gives it.
 config :my_app, MyAppWeb.Endpoint, server: true
