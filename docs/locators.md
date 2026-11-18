@@ -37,10 +37,9 @@ precedence: `aria-labelledby`, then `aria-label`, then native labels and
 captions, then content for the roles Playwright names from content, then
 `title`. Landmarks, lists, list items and dialogs are not named by their content.
 `by_test_id` reads Playwright Test's `testIdAttribute` on every driver,
-`config :playwright, :test, test_id_attribute: "data-owl"` (`data-testid` by default), or
-`config :fluffy, test_id_attribute:` over it ([Timeouts](installation.md#timeouts)), or any of a
-comma-separated list. Inside `Fluffy.Playwright.unwrap/3`, native `get_by_test_id` uses
-Playwright's.
+`config :playwright, :test, test_id_attribute: "data-owl"` (`data-testid` by default), or any
+of a comma-separated list. It is one per suite, as in Playwright: each pooled browser driver
+gets it as it starts.
 Explicit ARIA roles override implicit roles. See `Fluffy.Locator.by_role/2` for the
 implicit roles the Phoenix backend knows. Phoenix computes these from markup, so
 computed CSS and live input state stay browser-only. CSS must be valid browser

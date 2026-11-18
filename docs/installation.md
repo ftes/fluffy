@@ -109,14 +109,13 @@ config :playwright, :test,
 config :playwright, :expect, timeout: 5_000
 ```
 
-Fluffy's three keys override them for Fluffy sessions on every driver; a suite without browser
-tests can set just those:
+Fluffy's two timeout keys override them for Fluffy sessions on every driver; a suite without
+browser tests can set just those. The test id attribute is Playwright's only:
 
 | Setting | Fluffy sessions | Raw Playwright tests |
 | --- | --- | --- |
 | Actions | `config :fluffy, action_timeout:`, else Playwright's `action_timeout` | Playwright's |
 | Assertions | `config :fluffy, expect_timeout:`, else Playwright's `:expect` `timeout` | Playwright's |
-| Test id | `config :fluffy, test_id_attribute:`, else Playwright's `test_id_attribute` | Playwright's |
 | Navigations | Playwright's `navigation_timeout` | Playwright's |
 
 A forgotten Fluffy key keeps overriding a newer Playwright value. A value means what its

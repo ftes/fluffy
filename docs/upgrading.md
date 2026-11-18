@@ -131,8 +131,7 @@ means no limit; see [Timeouts](installation.md#timeouts).
   `screenshot(session, locator, [path: path] ++ options)` and `pdf(session, path)` becomes
   `pdf(session, path: path)`.
 - `by_test_id/2` takes no `attribute:`, as Playwright's `getByTestId`: every driver reads
-  `config :playwright, :test, test_id_attribute:` (`data-testid` by default), or
-  `config :fluffy, test_id_attribute:` over it. For another
+  `config :playwright, :test, test_id_attribute:` (`data-testid` by default). For another
   attribute in one place, replace `by_test_id("hedwig", attribute: "data-owl")` with
   `by_css("[data-owl=\"hedwig\"]")`.
 - `filter/2` takes no `exact:`, as in Playwright. Match a whole text with a regex, such as
