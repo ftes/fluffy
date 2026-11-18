@@ -440,8 +440,8 @@ defmodule Fluffy.Conformance.RouteTest do
     end
   end
 
-  # A failing handler fails the test, as in Playwright: take its errors back, so this one passes.
-  # The error a handler left unhandled, which stops the test unless it traps exits.
+  # The error a failing handler left unhandled, as in Playwright: it stops the test unless the
+  # test traps exits, which then takes it back here, so the test passes.
   defp take_handler_error(attempts \\ 100) do
     # Relies on playwright_ex internals (`TestInfo` is `@moduledoc false`); a bump may change it.
     case TestInfo.take_interrupt(self()) do
