@@ -54,8 +54,9 @@ defmodule Fluffy.Case do
   `locale:`, and the `trace:`, `screenshot:` and `video:` modes, for the module (see
   `Playwright.Test`). For a describe block or a test, tag it with `Playwright.Test.use/1`,
   such as `@tag Playwright.Test.use(trace: :on)`. Fluffy's sessions take their action and
-  navigation timeouts from the config (see [Timeouts](installation.md#timeouts)), not from
-  these options. An unknown option fails to compile.
+  navigation timeouts from the config (see [Timeouts](installation.md#timeouts)) and their
+  `base_url` from `Fluffy.start_session/2`, not from these options. An unknown option fails
+  to compile.
   ExUnit.Case's options such as `async:` belong on `use ExUnit.Case`; `use Fluffy.Case`
   ignores them.
 

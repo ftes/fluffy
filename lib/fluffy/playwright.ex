@@ -1233,9 +1233,10 @@ defmodule Fluffy.Playwright do
   returns the session.
 
   Each call replaces the headers of an earlier one, as in Playwright, but keeps those
-  the session started with: `headers:`, `browser_context: [extra_http_headers: ...]`
-  and the Ecto sandbox header. A header of the same name overrides them. Phoenix
-  sessions raise `Fluffy.CapabilityError`.
+  the session started with: the test's `extra_http_headers` option (config, module or
+  tag), `headers:`, `browser_context: [extra_http_headers: ...]` and the Ecto sandbox
+  header. A header of the same name overrides them. Phoenix sessions raise
+  `Fluffy.CapabilityError`.
   """
   @spec set_extra_http_headers(Session.t(), %{optional(String.t()) => String.t()}) :: Session.t()
   def set_extra_http_headers(session, headers) when is_map(headers) do

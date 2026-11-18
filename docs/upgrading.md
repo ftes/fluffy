@@ -117,7 +117,7 @@ means no limit; see [Timeouts](installation.md#timeouts).
   `config :playwright, :test, trace: :retain_on_failure, screenshot: :only_on_failure`
   and replace `setup context do Fluffy.Test.setup(context) end` with `use Fluffy.Case` after
   your `ConnCase` (or in your case template, see `Fluffy.Case`);
-  tag a module or test with `Playwright.Test.use(trace: :on)` (or `screenshot:`, `video:`) to record it. Files go to
+  record a module with `use Fluffy.Case, trace: :on` and a describe block or test with `@tag Playwright.Test.use(trace: :on)` (or `screenshot:`, `video:`). Files go to
   `test-results/<test>/`; a failed operation no longer writes HTML or the error text.
 - Fluffy no longer starts or adopts Ecto sandbox owners: keep the generated DataCase
   setup (`Sandbox.start_owner!(repo, shared: not tags[:async])` and `stop_owner` in
