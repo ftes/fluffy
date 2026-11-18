@@ -50,6 +50,9 @@ defmodule Fluffy do
   back to `MyAppWeb.Endpoint.url()`. An explicit `:endpoint` or `:base_url`
   option overrides the application configuration for this session.
 
+  A test can start several sessions, but of one backend: mixing `:phoenix` and
+  `:playwright` sessions in one test isn't supported and may not work.
+
   ## Options
 
   #{NimbleOptions.docs(Fluffy.Options.session_schema())}

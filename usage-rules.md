@@ -16,6 +16,7 @@ Fluffy runs Phoenix feature tests through one Playwright-shaped API, in-process 
 - A suite coming from PhoenixTest can keep the facade. Native calls accept the facade's `facade.session`.
 - `start_session(:phoenix)` is the default choice. Its first visit picks the Static or LiveView driver, and later navigations pick again. There is nothing to select between those two.
 - `start_session(:playwright)` is for JavaScript, computed style and layout, native validation, dialogs, network events, tabs or focus.
+- A test can start several sessions (such as two users), but all of one backend; mixing `:phoenix` and `:playwright` sessions in one test isn't supported.
 - In the facade, `conn |> visit(path)` always starts a Phoenix session; use `start_session(:playwright) |> visit(path)` for a browser.
 - Fluffy reads no test tags. Pick a session's backend in your own setup, for example from your own `backend` tag.
 

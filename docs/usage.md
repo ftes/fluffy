@@ -103,7 +103,10 @@ and the module fails to compile on an ambiguous `test/3`.
 A setup can start a session per test, here Phoenix by default and the backend of a
 `backend` tag otherwise. The tag is the setup's own, so name it as you like. Use
 `@moduletag backend: :playwright` for an entire module, `@describetag` for a
-describe block, or `@tag` for one test—without a separate browser test module:
+describe block, or `@tag` for one test—without a separate browser test module.
+A test can start several sessions, such as two users, but of one backend: mixing
+Phoenix and Playwright sessions in one test isn't supported and may not work.
+
 
 ```elixir
 defmodule MyAppWeb.PotionTest do
