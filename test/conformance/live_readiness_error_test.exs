@@ -35,16 +35,15 @@ end
 defmodule Fluffy.Conformance.LiveReadinessTimeoutTest do
   # The readiness waits after a navigation share its timeout, Playwright's `navigation_timeout`,
   # which is global config.
-  use Fluffy.Support.Case, async: false
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
 
   alias Fluffy.Playwright
   alias Fluffy.Support.Server
 
-  setup_all do
-    put_playwright_config(:test, navigation_timeout: 1_000)
-  end
+  # `alias Fluffy.Playwright` shadows the dependency here.
+  @moduletag Elixir.Playwright.Test.use(navigation_timeout: 1_000)
 
   @tag driver: :playwright
   test "a disconnected nested channel is not ready even with a connected CSS marker" do

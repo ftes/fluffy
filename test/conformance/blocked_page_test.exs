@@ -1,6 +1,6 @@
 defmodule Fluffy.Conformance.BlockedPageTest do
   # The default action timeout, which bounds Fluffy's document check, is global config.
-  use Fluffy.Support.Case, async: false
+  use Fluffy.Support.Case, async: true
 
   import Fluffy
   import Fluffy.Locator
@@ -16,9 +16,8 @@ defmodule Fluffy.Conformance.BlockedPageTest do
 
   @html "<button>Other</button>"
 
-  setup_all do
-    put_fluffy_config(action_timeout: 1_000)
-  end
+  # `alias Fluffy.Playwright` shadows the dependency here.
+  @moduletag Elixir.Playwright.Test.use(action_timeout: 1_000)
 
   test "an action on a blocked page fails within the action timeout" do
     session = frozen_session()

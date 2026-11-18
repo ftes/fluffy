@@ -82,65 +82,104 @@ address, such as `127.0.0.1`, which a stock `localhost` endpoint URL does not
 match, so `check_origin: false` lets the LiveView socket connect. By default Phoenix
 checks only the origin's host against the endpoint's `url` host, so an endpoint
 with `url: [host: "127.0.0.1"]` needs no `check_origin: false`. If Playwright
-targets an application hosted elsewhere, configure
-`config :fluffy, base_url: "..."` instead. Explicit `endpoint:` and `base_url:`
-session options override the global values for multi-endpoint or dynamic-server
-tests.
+targets an application hosted elsewhere, set Playwright's `base_url` instead
+([Configuration](#configuration)). Explicit `endpoint:` and `base_url:` session options
+override the global values for multi-endpoint or dynamic-server tests.
 
 The application's normal browser bundle must connect its LiveSocket. See
 [Actionability checks and waiting](actions.md#actionability-checks-and-waiting)
 for Fluffy's automatic LiveView connection wait.
 
-## Timeouts
+## Configuration
 
-The defaults are Playwright Test's, set in Playwright's config for the whole suite, Fluffy
-sessions and raw Playwright tests alike:
+Fluffy is Playwright Test plus Phoenix: Playwright Test owns the test's options, and Fluffy
+has a key only where Playwright has no concept.
+
+| Owner | Where, later wins | Keys |
+| --- | --- | --- |
+| Playwright Test | `config :playwright, :test` < project < module (`use Playwright.Test, ...`) < describe or test (`@tag Playwright.Test.use(...)`) | browser, context options such as `base_url`, `extra_http_headers` and `locale`, `action_timeout`, `navigation_timeout`, `trace`, `screenshot`, `video`; suite-wide only: `test_id_attribute` and `config :playwright, :expect, timeout:` |
+| Fluffy | `config :fluffy` | `endpoint`, `ecto_repos`, `file_input_max_bytes`, `phoenix_backend_timeout` |
+
+What applies to each kind of session:
+
+| Setting | Phoenix session | Browser session |
+| --- | --- | --- |
+| `base_url`, `extra_http_headers` | yes | yes |
+| `test_id_attribute`, from `config :playwright, :test` only | yes | yes |
+| Other context options (`locale`, `viewport`, ...) | no | yes |
+| Default timeouts | `phoenix_backend_timeout` (1 s) | Playwright's `action_timeout`, `navigation_timeout`, `:expect` `timeout` |
+| Recording: trace, screenshot, video | no (steps are recorded) | yes |
+| A call's `timeout:` | overrides the default | overrides the default |
+
+So a `Playwright.Test.use(action_timeout: ...)` tag does nothing for a Phoenix session.
+Per-test values through tags or projects assume one kind of session per test.
+
+A session's URL is its `base_url:` option, else Playwright's resolved `base_url`, else the
+endpoint's. A typical Phoenix app sets no `base_url`: Fluffy takes the endpoint's running
+listener, so `port: 0`, a `PORT` variable or any other dynamic port works, else
+`MyAppWeb.Endpoint.url()` ([Phoenix endpoint](#phoenix-endpoint)). Set
+`config :playwright, :test, base_url:` only when the browser reaches the app at another
+address, as from Docker, a remote browser or a proxy; with a dynamic port, set it in
+`config/runtime.exs` inside `if config_env() == :test`. A static `base_url` beats the
+listener's URL, so it breaks a dynamic port.
 
 ```elixir
-config :playwright, :test,
-  # Actions, locator waits and event waits; `:infinity` (none) by default.
-  action_timeout: 15_000,
-  # `visit`, `reload`, `go_back`, `go_forward` and `wait_for_load_state`; `:infinity` by default.
-  navigation_timeout: 15_000,
-  # `by_test_id`'s attribute; `data-testid` by default.
-  test_id_attribute: "data-owl"
+# config/test.exs: no base_url, as the endpoint's listener gives it.
+config :my_app, MyAppWeb.Endpoint, server: true
+config :fluffy, endpoint: MyAppWeb.Endpoint, ecto_repos: [MyApp.Repo]
 
-# Assertions; 5 seconds by default.
+config :playwright, :test, browser_name: :chromium, action_timeout: 15_000, navigation_timeout: 15_000
 config :playwright, :expect, timeout: 5_000
 ```
 
-Fluffy's two timeout keys override them for Fluffy sessions on every driver; a suite without
-browser tests can set just those. The test id attribute is Playwright's only:
+```elixir
+defmodule MyAppWeb.OwleryTest do
+  use MyAppWeb.ConnCase, async: true
+  use Playwright.Test
 
-| Setting | Fluffy sessions | Raw Playwright tests |
-| --- | --- | --- |
-| Actions | `config :fluffy, action_timeout:`, else Playwright's `action_timeout` | Playwright's |
-| Assertions | `config :fluffy, expect_timeout:`, else Playwright's `:expect` `timeout` | Playwright's |
-| Navigations | Playwright's `navigation_timeout` | Playwright's |
+  import Fluffy
+  import Fluffy.Expect
+  import Fluffy.Locator
 
-A forgotten Fluffy key keeps overriding a newer Playwright value. A value means what its
-source says: Playwright's `0` is no limit. Playwright's config also
-takes `:infinity`, so write that for no limit: it reads the same there and in Fluffy's config,
-where `0` checks once or is rejected. Fluffy's are Elixir timeouts: `expect_timeout: 0`
-checks every assertion once, as a call's `timeout: 0`, which suits a suite without browser
-tests; `action_timeout` rejects `0`, as Playwright actions cannot check once. A screenshot
-assertion cannot either, so with `expect_timeout: 0` it needs its own `timeout:`. A
-Playwright session sets the action and navigation timeouts on its browser context, so native
-calls in an `unwrap` callback get them too.
+  # Waits at most `phoenix_backend_timeout` for the button and the text.
+  test "sends an owl" do
+    :phoenix
+    |> start_session()
+    |> visit("/owlery")
+    |> click(by_role(:button, name: "Send owl"))
+    |> expect("Hedwig is on her way" |> by_text() |> to_be_visible())
+  end
 
-With no action or navigation timeout, the test's timeout bounds them (ExUnit's default
-is 60 seconds). On Playwright, Playwright.Test closes the test's contexts just before,
-so a call that hangs fails with "Test timeout of 60000ms exceeded." and its call log. A
-LiveView action that never finds its element, or a Phoenix event wait, fails at the same
-moment with Fluffy's error and the same reason. There is no per-session timeout; pass
-`timeout:` to a call.
-ExUnit's default test timeout is 60 seconds, against Playwright Test's 30, so with no action
-or navigation timeout a failing action takes twice as long to fail; for faster failures, set
-`action_timeout` and `navigation_timeout` (Fluffy's own suite uses 15 seconds), or lower
-ExUnit's `timeout:`.
+  # Playwright's timeouts and context options, overridden for this test.
+  @tag Playwright.Test.use(action_timeout: 30_000, locale: "en-GB")
+  test "sends an owl in a browser" do
+    :playwright
+    |> start_session()
+    |> visit("/owlery")
+    |> click(by_role(:button, name: "Send owl"))
+    |> expect("Hedwig is on her way" |> by_text() |> to_be_visible())
+  end
+end
+```
 
-An operation's `timeout: 0` checks once, unlike Playwright, where `0` disables the timeout.
-Playwright assertions check once too, but Playwright actions and waits reject 0 with an
+### Timeouts
+
+A browser session's defaults are Playwright Test's. Without an action or navigation timeout,
+the test's timeout bounds them (ExUnit's default is 60 seconds, against Playwright Test's 30, so
+for faster failures set both, as Fluffy's own suite does with 15 seconds, or lower ExUnit's
+`timeout:`). Playwright.Test then closes the test's contexts just before, so a call that hangs
+fails with "Test timeout of 60000ms exceeded." and its call log. It sets the timeouts on the
+test's browser contexts, so native calls in an `unwrap` callback get them too.
+
+A Phoenix session's action retries, assertions and event waits default to
+`config :fluffy, phoenix_backend_timeout:`, 1 second: an in-process session answers at once,
+so a long wait is only for something that isn't there. Its `0` checks once, and `:infinity`
+waits until the test's timeout, which then fails the operation with Fluffy's error and the same
+reason. There is no per-session timeout on either backend; pass `timeout:` to a call.
+
+A value means what its source says: Playwright's `0` is no limit, so write `:infinity`, which
+reads the same in both configs. An operation's `timeout: 0` checks once, unlike Playwright.
+Playwright assertions check once too, but Playwright actions and waits reject `0` with an
 `ArgumentError`, as they cannot check once; pass a positive timeout. So do screenshot
 assertions, which take each screenshot within the timeout.
 
@@ -180,7 +219,7 @@ For annotations of failed tests, run the first `mix test` with
 replaces the default list.
 
 Configure the backend in `config/test.exs`. The browser and its driver are
-`Playwright.Test`'s, as are the [timeouts](#timeouts) unless Fluffy's config overrides them:
+`Playwright.Test`'s, as are its [timeouts](#timeouts):
 
 ```elixir
 config :playwright, :test,

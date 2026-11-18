@@ -10,12 +10,7 @@ defmodule Fluffy.SessionConfigurationTest do
 
   setup do
     original_endpoint = Application.get_env(:fluffy, :endpoint)
-    original_base_url = Application.get_env(:fluffy, :base_url)
-
-    on_exit(fn ->
-      restore_env(:endpoint, original_endpoint)
-      restore_env(:base_url, original_base_url)
-    end)
+    on_exit(fn -> restore_env(:endpoint, original_endpoint) end)
 
     :ok
   end
@@ -67,27 +62,34 @@ defmodule Fluffy.SessionConfigurationTest do
     |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
   end
 
-  test "a configured base URL overrides the endpoint URL" do
+  # As Playwright's `baseURL`, from any level of the test's options.
+  @tag Playwright.Test.use(base_url: "http://configured.example")
+  test "a test's base URL overrides the endpoint URL" do
     Application.put_env(:fluffy, :endpoint, Endpoint)
-    Application.put_env(:fluffy, :base_url, "http://configured.example")
 
     session = start_session(:phoenix)
 
     assert Fluffy.Session.context(session).http.base_url == "http://configured.example"
   end
 
-  test "a configured base URL starts Playwright without an endpoint" do
+  @tag Playwright.Test.use(base_url: "http://configured.example")
+  test "a test's base URL starts Playwright without an endpoint" do
     Application.delete_env(:fluffy, :endpoint)
-    Application.put_env(:fluffy, :base_url, Server.base_url())
 
     session = start_session(:playwright)
 
-    assert Fluffy.Session.context(session).base_url == Server.base_url()
+    assert Fluffy.Session.context(session).base_url == "http://configured.example"
+  end
+
+  @tag Playwright.Test.use(base_url: "http://configured.example")
+  test "a session's base_url: overrides the test's" do
+    session = start_session(:phoenix, endpoint: Endpoint, base_url: Server.base_url())
+
+    assert Fluffy.Session.context(session).http.base_url == Server.base_url()
   end
 
   test "missing global and session configuration reports the required setting" do
     Application.delete_env(:fluffy, :endpoint)
-    Application.delete_env(:fluffy, :base_url)
 
     assert_raise ArgumentError, ~r/missing Fluffy endpoint/, fn ->
       start_session(:phoenix)

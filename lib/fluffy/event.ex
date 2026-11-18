@@ -87,10 +87,20 @@ defmodule Fluffy.Event do
     # As Playwright's `waitForEvent`, the action timeout by default.
     # Bounded by the test's timeout, as Playwright Test rejects a pending `waitForEvent` with it.
     deadline =
-      options |> Fluffy.Timeouts.get(&Fluffy.Timeouts.action/0) |> Fluffy.Deadline.new() |> Fluffy.TestTimeout.bound()
+      options
+      |> Fluffy.Timeouts.get(default_timeout(session))
+      |> Fluffy.Deadline.new()
+      |> Fluffy.TestTimeout.bound()
 
     pid = Subscription.start(session, event, source, :wait, nil, deadline)
     Pending.new(pid)
+  end
+
+  # As Playwright's `waitForEvent`, a browser's action timeout.
+  defp default_timeout(session) do
+    if Session.backend(session) == Fluffy.Backend.Playwright,
+      do: &Fluffy.Timeouts.action/0,
+      else: &Fluffy.Timeouts.phoenix/0
   end
 
   @doc false

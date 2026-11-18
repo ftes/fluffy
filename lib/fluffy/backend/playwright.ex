@@ -61,10 +61,6 @@ defmodule Fluffy.Backend.Playwright do
       }
 
       SessionRuntime.run(runtime, fn ->
-        # The resolved action and navigation timeouts (`Fluffy.Timeouts`), over Playwright.Test's
-        # own: native calls in `unwrap` default to them too, as Fluffy's own calls do.
-        :ok = BrowserContext.set_default_timeout(browser_context, Timeouts.action())
-        :ok = BrowserContext.set_default_navigation_timeout(browser_context, Timeouts.navigation())
         _disposable = BrowserContext.add_init_script!(browser_context, Document.init_script())
       end)
 

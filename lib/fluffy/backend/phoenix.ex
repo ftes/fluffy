@@ -48,12 +48,24 @@ defmodule Fluffy.Backend.Phoenix do
         endpoint: Keyword.fetch!(options, :endpoint),
         cookie_jar: Fluffy.CookieJar.new(),
         initial_conn: Keyword.get(options, :conn),
-        request_headers: Keyword.get(options, :headers, [])
+        request_headers: test_headers() ++ Keyword.get(options, :headers, [])
       }
     }
 
     page = %Page.State{driver: :unvisited, state: %UnvisitedState{}}
     Session.new(__MODULE__, context, page)
+  end
+
+  # The test's `extra_http_headers` (`Playwright.Test.use/1`), as a browser context sends
+  # them, under the session's `headers:`, which are put after them.
+  defp test_headers do
+    case Fluffy.TestInfo.fetch!().use[:extra_http_headers] do
+      headers when is_map(headers) ->
+        Enum.map(headers, fn {name, value} -> {String.downcase(to_string(name)), to_string(value)} end)
+
+      nil ->
+        []
+    end
   end
 
   @doc false

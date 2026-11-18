@@ -73,12 +73,13 @@ means no limit; see [Timeouts](installation.md#timeouts).
   +config :playwright, :expect, timeout: 5_000
   ```
 
-  `config :fluffy, action_timeout:, expect_timeout:` override them for Fluffy sessions, as for
-  a suite without browser tests; the navigation timeout is Playwright's only
-  ([Timeouts](installation.md#timeouts)). Without them, actions and navigations have no
-  timeout, so the test's timeout bounds them: with `use Playwright.Test`, a LiveView action on a
-  missing element fails with Fluffy's error at the test timeout, and without it with ExUnit's
-  timeout. Assertions default to 5 seconds on every driver; Phoenix used to wait 1 second.
+  These are browser sessions'. Phoenix sessions wait `config :fluffy, phoenix_backend_timeout:`,
+  1 second by default, for action retries, assertions and event waits
+  ([Configuration](installation.md#configuration)). Without Playwright's, browser actions and
+  navigations have no timeout, so the test's timeout bounds them.
+- `config :fluffy, base_url:` is removed: set Playwright's `base_url`
+  (`config :playwright, :test` or a test's `Playwright.Test.use/1`). Unset, sessions use the
+  endpoint's URL.
 - Playwright actions, waits, `reload`, `go_back` and `go_forward` raise `ArgumentError`
   for `timeout: 0` instead of timing out after 1ms; pass a positive timeout. Assertions
   and Phoenix actions still check once.

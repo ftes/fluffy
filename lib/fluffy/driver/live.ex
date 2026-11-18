@@ -48,7 +48,10 @@ defmodule Fluffy.Driver.Live do
   @impl true
   def expect(%Session{} = session, %Expect{} = expectation) do
     deadline =
-      expectation.options |> Keyword.validate!([:timeout]) |> Timeouts.get(&Timeouts.expect/0) |> Retry.deadline()
+      expectation.options
+      |> Keyword.validate!([:timeout])
+      |> Timeouts.get(&Timeouts.phoenix/0)
+      |> Retry.deadline()
 
     result =
       eventually(session, deadline, fn session ->
@@ -669,7 +672,11 @@ defmodule Fluffy.Driver.Live do
   # unread. `arguments` are the driver call's own, which the retry repeats.
   defp act(session, operation, arguments, action) do
     deadline =
-      arguments |> List.last() |> Keyword.validate!([:timeout]) |> Timeouts.get(&Timeouts.action/0) |> Retry.deadline()
+      arguments
+      |> List.last()
+      |> Keyword.validate!([:timeout])
+      |> Timeouts.get(&Timeouts.phoenix/0)
+      |> Retry.deadline()
 
     result =
       ActionScope.run(fn ->

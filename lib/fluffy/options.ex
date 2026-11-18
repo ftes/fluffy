@@ -7,9 +7,10 @@ defmodule Fluffy.Options do
     timeout: [
       type: :timeout,
       doc:
-        "Maximum time in milliseconds to wait for the operation. As in Playwright Test, defaults to " <>
-          "the action timeout (navigations: the navigation timeout), no timeout unless set, " <>
-          "and for assertions to the expect timeout, 5 seconds ([Timeouts](installation.md#timeouts)). " <>
+        "Maximum time in milliseconds to wait for the operation. On a browser, as in Playwright Test, " <>
+          "defaults to the action timeout (navigations: the navigation timeout), no timeout unless set, " <>
+          "and for assertions to the expect timeout, 5 seconds; on Phoenix, to `phoenix_backend_timeout`, " <>
+          "1 second ([Configuration](installation.md#configuration)). " <>
           "`0` checks once, unlike Playwright, where `0` disables the timeout. Playwright actions and waits " <>
           "reject `0` with an `ArgumentError`, as they cannot check once; so do screenshot assertions, which " <>
           "take each screenshot within the timeout, while other Playwright assertions accept it. " <>
@@ -358,20 +359,18 @@ defmodule Fluffy.Options do
                     ]
                   )
 
-  # `config :fluffy`. Playwright Test's `actionTimeout` and `expect.timeout` are for Fluffy's
-  # sessions, over Playwright's (`config!/1`); no defaults: unset, Playwright's apply. Its
-  # `testIdAttribute` is Playwright's only.
+  # `config :fluffy`: only what Playwright has no concept of. Timeouts, the test id attribute
+  # and the base URL are Playwright Test's (`config :playwright, :test`, `Playwright.Test.use/1`).
   @config_schema NimbleOptions.new!(
-                   action_timeout: [type: {:custom, __MODULE__, :default_timeout, []}],
-                   # `0`: assertions check once, as with a call's `timeout: 0`.
-                   expect_timeout: [type: :timeout],
-                   base_url: [type: :string],
+                   # A Phoenix session's timeout of operations without `timeout:`
+                   # (`Fluffy.Timeouts`); `0` checks once.
+                   phoenix_backend_timeout: [type: :timeout, default: 1_000],
                    endpoint: [type: :atom],
                    ecto_repos: [type: {:list, :atom}],
                    file_input_max_bytes: [type: :pos_integer]
                  )
 
-  @playwright_test_keys [:action_timeout, :expect_timeout, :test_id_attribute]
+  @resolved_keys [:expect_timeout, :test_id_attribute, :phoenix_backend_timeout]
 
   @type session_option :: unquote(NimbleOptions.option_typespec(@session_schema))
 
@@ -500,18 +499,18 @@ defmodule Fluffy.Options do
   end
 
   @doc false
-  # The setting `key`: Fluffy's of `@config_schema` if set, else Playwright's resolved one
+  # The setting `key`: `phoenix_backend_timeout` Fluffy's, the others Playwright's
   # (`Playwright.Test.config/0`, its defaults filled in), where `0` means no limit:
-  # `:infinity` here. `navigation_timeout` is Playwright's only.
+  # `:infinity` here.
   @spec config!(atom()) :: term()
-  def config!(key) when key in [:navigation_timeout | @playwright_test_keys], do: Map.fetch!(resolved_config!(), key)
+  def config!(key) when key in @resolved_keys, do: Map.fetch!(resolved_config!(), key)
 
   # Read on every timeout, so resolved once per env, as Playwright's
   # `Matchers.Expect.app_env_expect_config/0`: keyed on the values it resolves from, and
   # validated in full (`config!/0`) on a miss, so an invalid value raises on each read.
   defp resolved_config! do
     env =
-      {Enum.map(@playwright_test_keys, &Application.get_env(:fluffy, &1)), Application.get_env(:playwright, :test),
+      {Application.get_env(:fluffy, :phoenix_backend_timeout), Application.get_env(:playwright, :test),
        Application.get_env(:playwright, :expect)}
 
     case :persistent_term.get({__MODULE__, :config}, nil) do
@@ -529,21 +528,18 @@ defmodule Fluffy.Options do
     fluffy = config!()
     playwright = Playwright.Test.config()
 
-    Map.new([:navigation_timeout | @playwright_test_keys], fn key ->
-      {key, Keyword.get_lazy(fluffy, key, fn -> playwright_config(playwright, key) end)}
-    end)
+    test_id_attribute =
+      case test_id_attribute(playwright.test_id_attribute) do
+        {:ok, names} -> names
+        {:error, message} -> raise ArgumentError, "invalid config :playwright, :test: test_id_attribute: " <> message
+      end
+
+    %{
+      expect_timeout: no_limit(playwright.expect.timeout),
+      test_id_attribute: test_id_attribute,
+      phoenix_backend_timeout: Keyword.fetch!(fluffy, :phoenix_backend_timeout)
+    }
   end
-
-  defp playwright_config(config, :expect_timeout), do: no_limit(config.expect.timeout)
-
-  defp playwright_config(config, :test_id_attribute) do
-    case test_id_attribute(config.test_id_attribute) do
-      {:ok, names} -> names
-      {:error, message} -> raise ArgumentError, "invalid config :playwright, :test: test_id_attribute: " <> message
-    end
-  end
-
-  defp playwright_config(config, key), do: no_limit(Map.fetch!(config, key))
 
   defp no_limit(0), do: :infinity
   defp no_limit(timeout), do: timeout
@@ -570,11 +566,20 @@ defmodule Fluffy.Options do
   defp module_key?({key, _value}), do: match?("Elixir." <> _, Atom.to_string(key))
 
   @removed_config [
+    action_timeout:
+      "set `config :playwright, :test, action_timeout: ...` or a test's `Playwright.Test.use(action_timeout: ...)`; " <>
+        "`config :fluffy, phoenix_backend_timeout: ...` is Phoenix sessions'",
+    expect_timeout:
+      "set `config :playwright, :expect, timeout: ...`; " <>
+        "`config :fluffy, phoenix_backend_timeout: ...` is Phoenix sessions' (`0` checks once)",
+    base_url:
+      "set `config :playwright, :test, base_url: ...` or a test's `Playwright.Test.use(base_url: ...)`; " <>
+        "unset, sessions use the endpoint's URL",
     test_id_attribute: "set `config :playwright, :test, test_id_attribute: ...`, which every driver uses",
     timeout:
       "set `config :playwright, :expect, timeout: ...` for assertions and " <>
         "`config :playwright, :test, action_timeout: ...` for actions; " <>
-        "`config :fluffy, expect_timeout: ..., action_timeout: ...` override them for Fluffy sessions",
+        "`config :fluffy, phoenix_backend_timeout: ...` is Phoenix sessions'",
     playwright:
       "set `config :playwright, :test` instead, with `action_timeout:` and `navigation_timeout:` for " <>
         "`timeout:`, `browser_name:` for `engine:`, `launch_options:`, `driver: [executable: ...]`, " <>
@@ -592,19 +597,6 @@ defmodule Fluffy.Options do
 
     :ok
   end
-
-  @doc false
-  # Playwright actions and navigations can't check once, so a default of `0` could only fail
-  # them; Playwright's no limit is `:infinity` here.
-  def default_timeout(timeout) when timeout == :infinity or (is_integer(timeout) and timeout > 0), do: {:ok, timeout}
-
-  def default_timeout(0),
-    do:
-      {:error,
-       "expected a positive integer or :infinity, got: 0. As Playwright actions and navigations " <>
-         "cannot check once, 0 is no default; for no limit, use :infinity"}
-
-  def default_timeout(timeout), do: {:error, "expected a positive integer or :infinity, got: #{inspect(timeout)}"}
 
   @doc false
   # As Playwright.Test's `test_id_attribute`: one attribute or a comma-separated list.
