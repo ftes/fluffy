@@ -27,7 +27,6 @@ defmodule Fluffy.Backend.Phoenix do
   alias Fluffy.Internal.Navigation.StaticConn
   alias Fluffy.Internal.Navigation.Submission
   alias Fluffy.Page
-  alias Fluffy.PageLifecycle
   alias Fluffy.Session
 
   # Phoenix.LiveViewTest.live/1 expands a path-taking branch that reads the
@@ -309,7 +308,7 @@ defmodule Fluffy.Backend.Phoenix do
       monitor: monitor
     }
 
-    session = PageLifecycle.replace_document(session, :live, state, URI.to_string(url), [], &release_page/3)
+    session = replace_document(session, :live, state, URI.to_string(url))
 
     # The client patches the join render before anything the view sends later, so
     # a form that render triggers wins over a redirect reported after the join. It
@@ -403,7 +402,7 @@ defmodule Fluffy.Backend.Phoenix do
     case Session.current_page(session) do
       %Page.State{driver: :live, state: state, url: url} ->
         state = %StaticState{client_dom: state.client_dom, conn: conn}
-        PageLifecycle.replace_document(session, :static, state, url, [same_document: true], &release_page/3)
+        replace_document(session, :static, state, url, same_document: true)
 
       %Page.State{} ->
         session
@@ -544,7 +543,7 @@ defmodule Fluffy.Backend.Phoenix do
       client_dom: ClientDOM.from_document(conn.resp_body)
     }
 
-    PageLifecycle.replace_document(session, :static, state, URI.to_string(url), [], &release_page/3)
+    replace_document(session, :static, state, URI.to_string(url))
   end
 
   # A browser leaves the app for an off-origin request. The test can still
@@ -552,10 +551,16 @@ defmodule Fluffy.Backend.Phoenix do
   # Its URL reads as a browser reports it, with a lowercase host and at least a `/` path.
   defp commit_external(session, url) do
     url = %{url | host: String.downcase(url.host), path: if(url.path in [nil, ""], do: "/", else: url.path)}
-    PageLifecycle.replace_document(session, :external, %ExternalState{}, URI.to_string(url), [], &release_page/3)
+    replace_document(session, :external, %ExternalState{}, URI.to_string(url))
   end
 
-  defp release_page(session, %Page.State{driver: :live} = page, _reason) do
+  # The page's previous document stops its LiveView before the new one commits.
+  defp replace_document(session, driver, state, url, options \\ []) do
+    :ok = release_page(session, Session.current_page(session))
+    Session.commit_page(session, driver, state, url, options)
+  end
+
+  defp release_page(session, %Page.State{driver: :live} = page) do
     proxy_pid = live_view_proxy_pid(page.state.view)
     :ok = LiveDriver.release_page_uploads(session, page)
     Process.demonitor(page.state.monitor, [:flush])
@@ -570,7 +575,7 @@ defmodule Fluffy.Backend.Phoenix do
     :ok
   end
 
-  defp release_page(_session, %Page.State{}, _reason), do: :ok
+  defp release_page(_session, %Page.State{}), do: :ok
 
   defp flush_view_messages(%{proxy: {reference, _topic, _proxy_pid}} = view) do
     receive do

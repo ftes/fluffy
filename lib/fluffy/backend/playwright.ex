@@ -12,7 +12,6 @@ defmodule Fluffy.Backend.Playwright do
   alias Fluffy.Internal.Navigation.BrowserPatch
   alias Fluffy.Internal.OperationFailure
   alias Fluffy.Page
-  alias Fluffy.PageLifecycle
   alias Fluffy.Session
   alias Fluffy.SessionRuntime
   alias Fluffy.Timeouts
@@ -264,9 +263,13 @@ defmodule Fluffy.Backend.Playwright do
     end)
   end
 
+  # As in Playwright, closing a page has no timeout.
   @impl true
-  def close_page(%Session{} = session, page_id) do
-    PageLifecycle.close_page(session, page_id, &release_page/3)
+  def close_page(%Session{} = session, page) do
+    handle = Session.page_handle(session, page)
+    with {:error, error} <- BrowserPage.close(Page.record(handle).state.page), do: raise(error)
+    SessionRuntime.close_page(session.runtime, Page.id(handle))
+    session
   end
 
   @impl true
@@ -274,11 +277,6 @@ defmodule Fluffy.Backend.Playwright do
 
   @impl true
   defdelegate subscribe_event(session, type, source, pid), to: Events
-
-  # As in Playwright, closing a page has no timeout.
-  defp release_page(_session, page, :page_closed) do
-    with {:error, error} <- BrowserPage.close(page.state.page), do: raise(error)
-  end
 
   # As in Playwright, `wait_until:` defaults to `:load`. Like an action, a
   # navigation can't check once, so it rejects Fluffy's `timeout: 0`.
