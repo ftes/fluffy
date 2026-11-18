@@ -28,7 +28,7 @@ Playwright comes with Fluffy in the same environments, so `mix playwright.instal
 works without listing it. List it anyway if you use
 [usage rules](#usage-rules-for-coding-agents), as `usage_rules.sync` reads only the
 dependencies `mix.exs` lists:
-`{:playwright, "~> 1.65.0-rc.1", hex: :playwright_ex, only: [:dev, :test]}`. The app is
+`{:playwright, "~> 1.65.0-rc.2", hex: :playwright_ex, only: [:dev, :test]}`. The app is
 `:playwright` and the Hex package `playwright_ex`; `hex: :playwright_ex` is required, since
 `playwright` on Hex is another library.
 
