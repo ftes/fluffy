@@ -28,7 +28,7 @@ sandbox, as generated `DataCase` and `ConnCase` do.
 
 The entry below lists them under Breaking; the upgrade guide shows how to move a 0.8 suite.
 
-## 0.9.0-rc.4 — 2026-11-18
+## 0.9.0
 
 Changes since 0.8.0.
 
@@ -78,6 +78,7 @@ Changes since 0.8.0.
 - `Fluffy.wait_for/3` takes a locator on Playwright.
 - `Fluffy.step/3` is `Playwright.Test.step/3`, on every driver.
 - A Playwright session starts from the test's `Playwright.Test` context options of every level, such as `use Fluffy.Case, locale: "en-GB"` or `@tag Playwright.Test.use(viewport: ...)`; the session's headers merge into the test's `extra_http_headers`.
+- Every session also takes the test's `action_timeout`, `navigation_timeout`, `base_url` and `extra_http_headers` (`@tag Playwright.Test.use(action_timeout: 2_000)`), on the Phoenix drivers too. A project's, module's or tag's `action_timeout` and `base_url` are over `config :fluffy`'s.
 - `Fluffy.Playwright` gains `route/4`, `unroute/3` and `unroute_all/2` (handlers get a `Playwright.Route`), `unwrap/3` for a locator, `page/2`, `add_init_script`, `wait_for_function`, `wait_for_load_state`, `evaluate` on a locator and `evaluate_all`, `dblclick`, `tap`, `drop`, `dispatch_event`, `select_text`, `scroll_into_view_if_needed`, element `screenshot`, `bounding_box`, `aria_snapshot`, `set_viewport_size`, `viewport_size`, `emulate_media`, permissions, geolocation, offline mode, HTTP credentials, extra HTTP headers, script and style tags, `bring_to_front`, `set_storage_state`, `all`, `content`, `title`, `local_storage` and `session_storage`, plus `Fluffy.Playwright.Keyboard`, `Mouse` and `Clock`.
 - More Playwright events: `console`, `page_error`, `worker`, `web_socket`, `request_failed`, `request_finished`, `load`, `dom_content_loaded`, `crash`, `frame_attached` and `frame_detached`, and `Event.close()`.
 - `unwrap_and_return/2` (and `Fluffy.Playwright.unwrap_and_return/3`, facade `unwrap_and_return/2`) returns a native callback's result. A document navigated natively in a callback is adopted.

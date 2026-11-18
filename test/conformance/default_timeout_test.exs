@@ -129,10 +129,42 @@ defmodule Fluffy.Conformance.DefaultTimeoutTest do
     end
   end
 
+  # A test's `use` timeouts, as Playwright Test's `test.use({actionTimeout})`, are over the config,
+  # Fluffy's too.
+  for driver <- [:phoenix, :playwright] do
+    @tag driver: driver
+    @tag Playwright.Test.use(action_timeout: 300)
+    test "a test's action_timeout is over Fluffy's with #{driver}", %{driver: driver} do
+      session = missing_session(driver)
+
+      {elapsed, error} = failure(fn -> click(session, @missing) end)
+      assert elapsed >= 300 - @early
+      assert elapsed < @action_timeout
+      if driver == :playwright, do: assert(error.message =~ "Timeout 300ms exceeded.")
+    end
+  end
+
+  @tag driver: :playwright
+  @tag Playwright.Test.use(action_timeout: 300, navigation_timeout: 250)
+  test "a test's timeouts are its native calls' and navigations' defaults" do
+    session = start_session(:playwright, base_url: Server.base_url())
+
+    {_elapsed, error} =
+      native_failure(fn -> Fluffy.Playwright.unwrap_and_return(session, @missing, &Playwright.Locator.click/1) end)
+
+    assert error.message =~ "Timeout 300ms exceeded."
+
+    fixture = HTTPFixtures.register(fn _request -> %{body: "<h1>Never</h1>"} end)
+    Fluffy.Playwright.route(session, "**/never", fn _route -> :ok end)
+    {elapsed, error} = failure(fn -> visit(session, HTTPFixtures.path(fixture, "/never")) end)
+    assert error.cause.message =~ "Timeout 250ms exceeded."
+    assert elapsed >= 250 - @early
+  end
+
   # As in Playwright, a route that never answers leaves the navigation to its timeout.
   @tag driver: :playwright
+  @tag Playwright.Test.use(navigation_timeout: @navigation_timeout)
   test "navigations default to Playwright's navigation_timeout" do
-    put_playwright_config(:test, navigation_timeout: @navigation_timeout)
     session = start_session(:playwright, base_url: Server.base_url())
     fixture = HTTPFixtures.register(fn _request -> %{body: "<h1>Never</h1>"} end)
     Fluffy.Playwright.route(session, "**/never", fn _route -> :ok end)
@@ -146,8 +178,8 @@ defmodule Fluffy.Conformance.DefaultTimeoutTest do
   # The session sets the resolved ones on its context, over what Playwright.Test set at
   # registration: a native call gets them too.
   @tag driver: :playwright
+  @tag Playwright.Test.use(navigation_timeout: @navigation_timeout)
   test "native calls default to the resolved action and navigation timeouts" do
-    put_playwright_config(:test, navigation_timeout: @navigation_timeout)
     session = start_session(:playwright)
 
     {elapsed, error} =

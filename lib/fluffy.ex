@@ -48,7 +48,9 @@ defmodule Fluffy do
   `config :fluffy, endpoint: MyAppWeb.Endpoint`. The session base URL uses the
   endpoint's active HTTP or HTTPS listener when available and otherwise falls
   back to `MyAppWeb.Endpoint.url()`. An explicit `:endpoint` or `:base_url`
-  option overrides the application configuration for this session.
+  option overrides the application configuration for this session. A `base_url` the test's
+  module or tags set (`@tag Playwright.Test.use(base_url: ...)`) is over the endpoint and
+  `config :fluffy, base_url:`; only a `:base_url` option is over it.
 
   ## Options
 

@@ -129,6 +129,12 @@ assertion cannot either, so with `expect_timeout: 0` it needs its own `timeout:`
 Playwright session sets the action and navigation timeouts on its browser context, so native
 calls in an `unwrap` callback get them too.
 
+A module, describe block or test sets its own with `use Fluffy.Case, action_timeout: 2_000` or
+`@tag Playwright.Test.use(navigation_timeout: 5_000)`, as Playwright Test's `test.use()`, for
+every Fluffy session in it. Such an `action_timeout` is over `config :fluffy`'s. The test's
+`base_url` and `extra_http_headers` reach every session too, under its own `base_url:` and
+`headers:`.
+
 With no action or navigation timeout, the test's timeout bounds them (ExUnit's default
 is 60 seconds). On Playwright, Playwright.Test closes the test's contexts just before,
 so a call that hangs fails with "Test timeout of 60000ms exceeded." and its call log. In a

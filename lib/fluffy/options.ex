@@ -503,9 +503,40 @@ defmodule Fluffy.Options do
   @doc false
   # The setting `key`: Fluffy's of `@config_schema` if set, else Playwright's resolved one
   # (`Playwright.Test.config/0`, its defaults filled in), where `0` means no limit:
-  # `:infinity` here. `navigation_timeout` is Playwright's only.
+  # `:infinity` here. In a test, its own as Playwright.Test resolved them as it registered, from
+  # every level (`Playwright.Test.info().use`): `navigation_timeout` is Playwright's only, and an
+  # `action_timeout` its project, module or tags set (`test_use/2`) is over Fluffy's.
   @spec config!(atom()) :: term()
-  def config!(key) when key in [:navigation_timeout | @playwright_test_keys], do: Map.fetch!(resolved_config!(), key)
+  def config!(:navigation_timeout) do
+    case Fluffy.TestInfo.fetch() do
+      {:ok, %{use: %{navigation_timeout: timeout}}} -> no_limit(timeout)
+      _outside -> Map.fetch!(resolved_config!().fluffy, :navigation_timeout)
+    end
+  end
+
+  def config!(:action_timeout) do
+    %{fluffy: fluffy, playwright: playwright} = resolved_config!()
+
+    case test_use(:action_timeout, playwright.action_timeout) do
+      nil -> fluffy.action_timeout
+      timeout -> no_limit(timeout)
+    end
+  end
+
+  def config!(key) when key in @playwright_test_keys, do: Map.fetch!(resolved_config!().fluffy, key)
+
+  @doc false
+  # The calling test's `use` option `key` (`Playwright.Test.info().use`) when a level over
+  # `config :playwright, :test` set it: its project, module, describe or tag. That is when it
+  # isn't the config's `config_value`; a level that sets the config's own value can't be told
+  # apart, and counts as unset. `nil` when unset or outside a registered test.
+  @spec test_use(atom(), term()) :: term()
+  def test_use(key, config_value) do
+    with {:ok, %{use: %{^key => value}}} <- Fluffy.TestInfo.fetch(),
+         false <- no_limit(value) == no_limit(config_value),
+         do: value,
+         else: (_unset -> nil)
+  end
 
   # Read on every timeout, so resolved once per env, as Playwright's
   # `Matchers.Expect.app_env_expect_config/0`: keyed on the values it resolves from, and
@@ -526,13 +557,18 @@ defmodule Fluffy.Options do
     end
   end
 
+  # `fluffy`: Fluffy's if set, else Playwright's; `playwright`: Playwright's `action_timeout`.
   defp resolve_config! do
     fluffy = config!()
     playwright = Playwright.Test.config()
 
-    Map.new([:navigation_timeout | @playwright_test_keys], fn key ->
-      {key, Keyword.get_lazy(fluffy, key, fn -> playwright_config(playwright, key) end)}
-    end)
+    %{
+      fluffy:
+        Map.new([:navigation_timeout | @playwright_test_keys], fn key ->
+          {key, Keyword.get_lazy(fluffy, key, fn -> playwright_config(playwright, key) end)}
+        end),
+      playwright: %{action_timeout: playwright_config(playwright, :action_timeout)}
+    }
   end
 
   defp playwright_config(config, :expect_timeout), do: no_limit(config.expect.timeout)

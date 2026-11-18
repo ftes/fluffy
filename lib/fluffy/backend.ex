@@ -78,7 +78,7 @@ defmodule Fluffy.Backend do
   end
 
   defp put_base_url(options, endpoint) do
-    base_url = option(options, :base_url) || endpoint_url(endpoint)
+    base_url = Keyword.get_lazy(options, :base_url, &default_base_url/0) || endpoint_url(endpoint)
 
     if is_nil(base_url) do
       raise ArgumentError, """
@@ -95,6 +95,13 @@ defmodule Fluffy.Backend do
     end
 
     Keyword.put(options, :base_url, base_url)
+  end
+
+  # A `base_url` the test's project, module or tags set (`use Fluffy.Case, base_url: ...`), as
+  # Playwright's `baseURL`, over `config :fluffy`'s.
+  defp default_base_url do
+    Fluffy.Options.test_use(:base_url, Playwright.Test.config()[:base_url]) ||
+      Application.get_env(:fluffy, :base_url)
   end
 
   defp option(options, key) do
