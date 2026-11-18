@@ -137,7 +137,8 @@ listener's URL, so it breaks a dynamic port.
 
 ```elixir
 # config/test.exs: no base_url, as the endpoint's listener gives it.
-config :my_app, MyAppWeb.Endpoint, server: true
+# `check_origin: false` as the browser opens the listener's address (see Phoenix endpoint).
+config :my_app, MyAppWeb.Endpoint, server: true, check_origin: false
 config :fluffy, endpoint: MyAppWeb.Endpoint, ecto_repos: [MyApp.Repo]
 
 config :playwright, :test, browser_name: :chromium, action_timeout: 15_000, navigation_timeout: 15_000
