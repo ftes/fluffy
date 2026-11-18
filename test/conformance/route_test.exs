@@ -210,16 +210,20 @@ defmodule Fluffy.Conformance.RouteTest do
 
     @tag driver: :playwright
     test "that raises fails the test and leaves its request pending, as in Playwright" do
+      # The handler's error stops the test at once: trapping exits turns the stop into a message.
+      Process.flag(:trap_exit, true)
       {session, fixture} = session()
       route(session, "**/api", fn _route -> raise "boom" end)
       start_held_fetch(session, fixture)
 
-      assert [{:error, %RuntimeError{message: "boom"}, [_ | _]}] = take_test_errors()
+      assert {:error, %RuntimeError{message: "boom"}, [_ | _]} = take_handler_stop()
       assert Fluffy.Playwright.evaluate(session, @pending) == "pending"
     end
 
     @tag driver: :playwright
     test "that answers twice fails the test" do
+      # The handler's error stops the test at once: trapping exits turns the stop into a message.
+      Process.flag(:trap_exit, true)
       {session, fixture} = session()
 
       # Two simultaneous answers: the second comes back from the server like this.
@@ -229,11 +233,13 @@ defmodule Fluffy.Conformance.RouteTest do
       end)
 
       assert fetch(session, fixture) == "first"
-      assert [{:error, %PlaywrightError{}, [_ | _]}] = take_test_errors()
+      assert {:error, %PlaywrightError{}, [_ | _]} = take_handler_stop()
     end
 
     @tag driver: :playwright
     test "that a closed target fails gets Playwright's hint and fails the test" do
+      # The handler's error stops the test at once: trapping exits turns the stop into a message.
+      Process.flag(:trap_exit, true)
       {session, fixture} = session()
 
       # Raised by a call on a page or context closed under the handler.
@@ -242,7 +248,7 @@ defmodule Fluffy.Conformance.RouteTest do
       end)
 
       start_held_fetch(session, fixture)
-      assert [{:error, %TargetClosedError{message: message}, [_ | _]}] = take_test_errors()
+      assert {:error, %TargetClosedError{message: message}, [_ | _]} = take_handler_stop()
       assert message =~ ~s("Target page, context or browser has been closed" while running route callback.)
       assert message =~ "unrouteAll({ behavior: 'ignoreErrors' })"
     end
@@ -434,20 +440,19 @@ defmodule Fluffy.Conformance.RouteTest do
     end
   end
 
-  # A failing handler fails the test, as in Playwright: take its errors back, so this one passes.
-  defp take_test_errors(attempts \\ 100) do
-    case TestInfo.take_errors(self()) do
-      [] when attempts > 0 ->
-        Process.sleep(50)
-        take_test_errors(attempts - 1)
-
-      errors ->
-        errors
-    end
+  # The error a failing handler stopped the test with, as in Playwright, taken back so that
+  # Playwright.Test doesn't count the test as failed (no failure artifacts, no browser reset).
+  # It is stored before the exit is sent.
+  defp take_handler_stop do
+    assert_receive {:EXIT, _, {%_{}, [_ | _]} = reason}, 5_000
+    # Relies on playwright_ex internals (`TestInfo` is `@moduledoc false`); a bump may change it.
+    {^reason, error} = TestInfo.take_interrupt(self())
+    error
   end
 
   defp refute_test_errors do
     Process.sleep(200)
+    # Relies on playwright_ex internals (`TestInfo` is `@moduledoc false`); a bump may change it.
     assert TestInfo.take_errors(self()) == []
   end
 

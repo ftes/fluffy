@@ -11,7 +11,7 @@ matched once can now match twice.
 
 ## Setup
 
-- Install the pinned driver and a browser with `mix playwright.install -- chromium`.
+- Install the pinned driver and a browser with `mix playwright.install chromium`.
   Drop the npm `playwright` package and the `assets_dir` config; Node.js is no longer
   needed. `executable:` now takes a Playwright 1.65 CLI such as
   `node_modules/.bin/playwright`, not `cli.js`; usually drop it and let Playwright
@@ -39,7 +39,7 @@ matched once can now match twice.
   line from [Elixir dependency](installation.md#elixir-dependency), where `hex: :playwright_ex`
   is required, rename `config :playwright_ex` to `config :playwright`, and run
   `mix deps.unlock --unused`. `alias Fluffy.Playwright` now shadows `Playwright.*`, so
-  don't alias it where you call the dependency.
+  don't alias it where you call the dependency, such as in `@tag Playwright.Test.use(...)`.
 - Playwright 1.65's own breaking changes apply: actions wait for an element to be not
   inert, cookie matching follows RFC 6265, and text the browser does not render is no
   longer part of accessible names.
@@ -117,7 +117,7 @@ means no limit; see [Timeouts](installation.md#timeouts).
   `config :playwright, :test, trace: :retain_on_failure, screenshot: :only_on_failure`
   and replace `setup context do Fluffy.Test.setup(context) end` with `use Fluffy.Case` after
   your `ConnCase` (or in your case template, see `Fluffy.Case`);
-  tag a module or test with `trace: true` (or `screenshot:`, `video:`) to record it. Files go to
+  record a module with `use Fluffy.Case, trace: :on` and a describe block or test with `@tag Playwright.Test.use(trace: :on)` (or `screenshot:`, `video:`). Files go to
   `test-results/<test>/`; a failed operation no longer writes HTML or the error text.
 - Fluffy no longer starts or adopts Ecto sandbox owners: keep the generated DataCase
   setup (`Sandbox.start_owner!(repo, shared: not tags[:async])` and `stop_owner` in

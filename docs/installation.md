@@ -14,7 +14,7 @@ In `mix.exs`:
      # ...
 -    {:lazy_html, ">= 0.1.0", only: :test},
 +    {:lazy_html, ">= 0.1.0", only: [:dev, :test]},
-+    {:fluffy, "~> 0.9.0-rc.3", only: [:dev, :test]}
++    {:fluffy, "~> 0.9.0-rc.4", only: [:dev, :test]}
    ]
  end
 ```
@@ -28,7 +28,7 @@ Playwright comes with Fluffy in the same environments, so `mix playwright.instal
 works without listing it. List it anyway if you use
 [usage rules](#usage-rules-for-coding-agents), as `usage_rules.sync` reads only the
 dependencies `mix.exs` lists:
-`{:playwright, "~> 1.65.0-rc.1", hex: :playwright_ex, only: [:dev, :test]}`. The app is
+`{:playwright, "~> 1.65.0-rc.2", hex: :playwright_ex, only: [:dev, :test]}`. The app is
 `:playwright` and the Hex package `playwright_ex`; `hex: :playwright_ex` is required, since
 `playwright` on Hex is another library.
 
@@ -170,11 +170,11 @@ Only the Playwright backend needs a browser. The `:playwright` dependency pins i
 driver; install it and a browser with:
 
 ```bash
-mix playwright.install -- chromium
+mix playwright.install chromium
 ```
 
 On Linux CI runners, add `--with-deps` to install the browser's system packages too:
-`mix playwright.install -- chromium --with-deps`. See
+`mix playwright.install chromium --with-deps`. See
 [GitHub Actions](`e:playwright:debugging-and-ci.md#github-actions`) for a workflow.
 For annotations of failed tests, run the first `mix test` with
 `--formatter ExUnit.CLIFormatter --formatter Playwright.Test.GitHubFormatter` (see
@@ -214,15 +214,16 @@ sessions, a screenshot of each page as its session closes, and videos, each `:of
 default, and a failed test's `error-context.md`. The `*_on_failure` modes record every
 test and drop the files of passing ones. Each test writes to its own dir under `output_dir` (`test-results`);
 ignore it in git and configure CI to upload it when the test job fails. To override the
-config for a module, pass the mode to `use Fluffy.Case, trace: :on`, or tag a module or
-test, such as `@tag trace: true`. See `Playwright.Test` for the modes and file names.
+config for a module, pass the mode to `use Fluffy.Case, trace: :on`, or tag a describe
+block or test, such as `@tag Playwright.Test.use(trace: :on)`. See `Playwright.Test` for the
+modes and file names.
 
 As in Playwright, browser `console` messages and uncaught page errors are not
 printed; the trace has them. To log them, register a listener, such as
 `on(session, Event.console(), &Logger.info(Playwright.ConsoleMessage.text(&1)))`.
 
 Set `browser_name: :firefox` or `browser_name: :webkit` after installing the
-corresponding browser (`mix playwright.install -- firefox`).
+corresponding browser (`mix playwright.install firefox`).
 See [Browser baseline](capabilities.md#browser-baseline) for conformance coverage.
 Fluffy creates a fresh isolated `BrowserContext` for each session, in the browser of
 its `browser:` option, else in the test's browser from

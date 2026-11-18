@@ -22,14 +22,14 @@ defmodule Fluffy.Backend.Playwright do
   @impl true
   def start_session(options) do
     # The session belongs to the test, also when a Task of it starts the session.
-    test_pid = test_pid!()
+    %{test_pid: test_pid} = test_info = test_info!()
     base_url = Keyword.fetch!(options, :base_url)
     browser_context_options = Keyword.get(options, :browser_context, [])
 
-    # Merged over the config's, which `extra_http_headers:` would replace as a whole.
+    # Merged over the test's, resolved from every level, which `extra_http_headers:` would
+    # replace as a whole.
     headers =
-      Playwright.Test.config().context_options
-      |> Access.get(:extra_http_headers, %{})
+      (test_info.use[:extra_http_headers] || %{})
       |> Enum.concat(Keyword.get(browser_context_options, :extra_http_headers, %{}))
       |> Enum.concat(Keyword.get(options, :headers, []))
       |> Enum.concat(List.wrap(Fluffy.Sandbox.metadata_header(test_pid)))
@@ -80,10 +80,10 @@ defmodule Fluffy.Backend.Playwright do
 
   # Playwright.Test's error says to add `use Playwright.Test`; Fluffy's modules get it
   # from `use Fluffy.Case`.
-  defp test_pid! do
+  defp test_info! do
     case Fluffy.TestInfo.fetch() do
       {:ok, info} ->
-        info.test_pid
+        info
 
       :error ->
         raise RuntimeError,

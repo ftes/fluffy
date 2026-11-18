@@ -23,12 +23,12 @@ Failed assertions remain `ExUnit.AssertionError`. Browser assertion messages
 include the expected condition and Playwright's received values, timeout details,
 and call log. No candidate markup is reconstructed after browser failure.
 
-Trace a test with `@tag trace: true` (or `trace: :retain_on_failure` in the
+Trace a test with `@tag Playwright.Test.use(trace: :on)` (or `trace: :retain_on_failure` in the
 config, see [Playwright setup](installation.md#playwright-setup)), and name its steps
 with `Fluffy.step/3`:
 
 ```elixir
-@tag trace: true
+@tag Playwright.Test.use(trace: :on)
 test "brews Polyjuice" do
   start_session(:playwright)
   |> visit("/potions/polyjuice")

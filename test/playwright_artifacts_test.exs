@@ -51,7 +51,7 @@ defmodule Fluffy.PlaywrightArtifactsTest do
   # Derived, so the trace's copy of this source file does not contain it.
   @secret "FLUFFY-" <> Base.encode16("upload secret of gringotts")
 
-  @moduletag trace: true
+  @moduletag Playwright.Test.use(trace: :on)
 
   setup %{trace_path: path} do
     trace_path = Playwright.Test.output_path("trace.zip")
