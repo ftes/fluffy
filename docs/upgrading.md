@@ -39,7 +39,7 @@ matched once can now match twice.
   line from [Elixir dependency](installation.md#elixir-dependency), where `hex: :playwright_ex`
   is required, rename `config :playwright_ex` to `config :playwright`, and run
   `mix deps.unlock --unused`. `alias Fluffy.Playwright` now shadows `Playwright.*`, so
-  don't alias it where you call the dependency.
+  don't alias it where you call the dependency, such as in `@tag Playwright.Test.use(...)`.
 - Playwright 1.65's own breaking changes apply: actions wait for an element to be not
   inert, cookie matching follows RFC 6265, and text the browser does not render is no
   longer part of accessible names.

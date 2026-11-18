@@ -444,7 +444,7 @@ defmodule Fluffy.Conformance.RouteTest do
   # Playwright.Test doesn't count the test as failed (no failure artifacts, no browser reset).
   # It is stored before the exit is sent.
   defp take_handler_stop do
-    assert_receive {:EXIT, _, reason}, 5_000
+    assert_receive {:EXIT, _, {%_{}, [_ | _]} = reason}, 5_000
     # Relies on playwright_ex internals (`TestInfo` is `@moduledoc false`); a bump may change it.
     {^reason, error} = TestInfo.take_interrupt(self())
     error

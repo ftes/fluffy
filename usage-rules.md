@@ -79,7 +79,7 @@ Prefer the shared API. For what it does not cover:
 - `Fluffy.unwrap(session, fun)` passes a `%Plug.Conn{}` (Static, return the updated conn), `%Phoenix.LiveViewTest.View{}` (LiveView) or `%Playwright.Page{}` (Playwright), and returns the session. It raises on a Phoenix session before its first visit.
 - `Fluffy.Playwright.unwrap(session, locator, fun)` passes the `%Playwright.Locator{}` for a Fluffy locator, resolved in the active page and through frame locators. A navigation it causes is adopted. It raises `Fluffy.CapabilityError` on Phoenix.
 - Events other than page events, downloads and file choosers deliver Playwright's values: read a response with `Playwright.Response.status/1`, accept a dialog with `Playwright.Dialog.accept!/1`. `Fluffy.Playwright.page(session, native_page)` turns their page into a `Fluffy.Page` for `switch_page`.
-- `alias Fluffy.Playwright` shadows the `Playwright` dependency: in that module, `Playwright.Page` means `Fluffy.Playwright.Page`. Where a module uses the dependency's modules, don't alias `Fluffy.Playwright`; write `Fluffy.Playwright.evaluate(...)` in full.
+- `alias Fluffy.Playwright` shadows the `Playwright` dependency: in that module, `Playwright.Page` means `Fluffy.Playwright.Page`, and `@tag Playwright.Test.use(...)` doesn't compile. Where a module uses the dependency's modules, don't alias `Fluffy.Playwright`; write `Fluffy.Playwright.evaluate(...)` in full.
 - Do not natively close the page or context, call `remove_all_listeners`, `set_default_timeout`, `set_default_navigation_timeout` or `set_content`, stop tracing, or pass `no_wait_after:` or `signal:`. Those break Fluffy's tracking.
 - In a LiveView callback, do not consume `assert_patch` or `assert_redirect`; assert the resulting page after `unwrap`.
 
