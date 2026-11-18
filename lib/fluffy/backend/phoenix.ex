@@ -57,12 +57,9 @@ defmodule Fluffy.Backend.Phoenix do
   end
 
   # The test's `extra_http_headers` (`Playwright.Test.use/1`), as a browser context sends
-  # them, under the session's `headers:`, which are put after them.
-  defp test_headers do
-    for {name, value} <- Fluffy.TestInfo.fetch!().use[:extra_http_headers] || [],
-        not is_nil(value),
-        do: {String.downcase(to_string(name)), to_string(value)}
-  end
+  # them, under the session's `headers:`, which are put after them (`HTTP` normalizes both).
+  defp test_headers,
+    do: for({name, value} <- Fluffy.TestInfo.fetch!().use[:extra_http_headers] || [], value != nil, do: {name, value})
 
   @doc false
   def session_for_html(html) when is_binary(html) do

@@ -54,15 +54,15 @@ defmodule Fluffy.Backend.Playwright do
           BrowserContext.close(browser_context)
         end)
 
-      context =
-        struct!(
-          Context,
-          Map.merge(Timeouts.browser(test_info.use), %{
-            browser_context: browser_context,
-            base_url: base_url,
-            extra_http_headers: headers
-          })
-        )
+      %{action_timeout: action_timeout, navigation_timeout: navigation_timeout} = Timeouts.browser(test_info.use)
+
+      context = %Context{
+        browser_context: browser_context,
+        base_url: base_url,
+        extra_http_headers: headers,
+        action_timeout: action_timeout,
+        navigation_timeout: navigation_timeout
+      }
 
       SessionRuntime.run(runtime, fn ->
         _disposable = BrowserContext.add_init_script!(browser_context, Document.init_script())

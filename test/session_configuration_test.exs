@@ -17,7 +17,6 @@ defmodule Fluffy.SessionConfigurationTest do
 
   test "the configured endpoint supplies Phoenix endpoint and base URL defaults" do
     Application.put_env(:fluffy, :endpoint, Endpoint)
-    Application.delete_env(:fluffy, :base_url)
 
     session = start_session(:phoenix)
 
@@ -31,7 +30,6 @@ defmodule Fluffy.SessionConfigurationTest do
 
   test "an active endpoint listener supplies the default base URL port" do
     Application.put_env(:fluffy, :endpoint, __MODULE__.ActiveEndpoint)
-    Application.delete_env(:fluffy, :base_url)
 
     session = start_session(:phoenix)
 
@@ -40,16 +38,15 @@ defmodule Fluffy.SessionConfigurationTest do
 
   test "an unavailable endpoint listener falls back to the configured endpoint URL" do
     Application.put_env(:fluffy, :endpoint, __MODULE__.InactiveEndpoint)
-    Application.delete_env(:fluffy, :base_url)
 
     session = start_session(:phoenix)
 
     assert Fluffy.Session.context(session).http.base_url == "http://configured.example:4002"
   end
 
-  test "session options override global endpoint and base URL" do
+  @tag Playwright.Test.use(base_url: "http://global.invalid")
+  test "session options override the configured endpoint and the test's base URL" do
     Application.put_env(:fluffy, :endpoint, __MODULE__.WrongEndpoint)
-    Application.put_env(:fluffy, :base_url, "http://global.invalid")
 
     session =
       start_session(:phoenix,

@@ -47,6 +47,15 @@ defmodule Fluffy.UseOptionsTest do
     refute {"x-house", "hufflepuff"} in headers
   end
 
+  # As a browser context, any pairs, a header without a value left out.
+  @tag Playwright.Test.use(extra_http_headers: [{"X-Ghost", "nearly-headless-nick"}, {"x-house", nil}])
+  test "a test's headers as pairs reach a Phoenix session, nil values left out" do
+    {_session, headers} = visit_page(:phoenix, [])
+
+    assert {"x-ghost", "nearly-headless-nick"} in headers
+    refute Enum.any?(headers, &match?({"x-house", _value}, &1))
+  end
+
   # As Playwright's `baseURL`: relative visits resolve against it, over Fluffy's endpoint.
   describe "a test's base_url" do
     @describetag Playwright.Test.use(base_url: "http://hogwarts.test")

@@ -405,9 +405,10 @@ defmodule Fluffy.Driver.Playwright do
   end
 
   defp read(session, operation, target, options, fun) do
-    timeout = Timeouts.playwright_operation!(session, operation, options)
+    default = Timeouts.operation(session, operation, options)
+    timeout = Deadline.playwright_operation!(operation, default)
 
-    case navigation_aware_action(session, Timeouts.operation(session, operation, options), fn -> fun.(timeout) end) do
+    case navigation_aware_action(session, default, fn -> fun.(timeout) end) do
       {:ok, value, outcome} -> {:return, value, outcome}
       {:error, error} -> OperationFailure.raise_playwright!(operation, target, error)
     end
@@ -529,9 +530,10 @@ defmodule Fluffy.Driver.Playwright do
   end
 
   defp action(session, operation, target, options, fun) do
-    timeout = Timeouts.playwright_operation!(session, operation, options)
+    default = Timeouts.operation(session, operation, options)
+    timeout = Deadline.playwright_operation!(operation, default)
 
-    case navigation_aware_action(session, Timeouts.operation(session, operation, options), fn -> result(fun.(timeout)) end) do
+    case navigation_aware_action(session, default, fn -> result(fun.(timeout)) end) do
       {:ok, _value, outcome} -> outcome
       {:error, error} -> OperationFailure.raise_playwright!(operation, target, error)
     end
