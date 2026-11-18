@@ -86,4 +86,4 @@ Prefer the shared API. For what it does not cover:
 ## Debugging
 
 - Element actions fail with `Fluffy.OperationError`, whose `cause` holds the driver's error. Failed assertions are `ExUnit.AssertionError`.
-- Traces, screenshots and videos are Playwright.Test's: `config :playwright, :test, trace: :retain_on_failure, screenshot: :only_on_failure`, or a tag such as `@tag trace: true`. A failed test gets `error-context.md` in its `test-results/` dir. `Fluffy.step/3` names a step of the test in its trace, on any driver. `Fluffy.open_browser/1` opens the current page on any driver.
+- Traces, screenshots and videos are Playwright.Test's: `config :playwright, :test, trace: :retain_on_failure, screenshot: :only_on_failure`, or a tag such as `@tag Playwright.Test.use(trace: :on)`. A failed test gets `error-context.md` in its `test-results/` dir. `Fluffy.step/3` names a step of the test in its trace, on any driver. `Fluffy.open_browser/1` opens the current page on any driver.

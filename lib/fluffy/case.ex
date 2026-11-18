@@ -50,10 +50,12 @@ defmodule Fluffy.Case do
 
   ## Options
 
-  The options are `use Playwright.Test`'s: `trace:`, `screenshot:` and `video:` for the
-  module, over the config and under its tags, and `tags: false`, so tags don't set them (see
-  `Playwright.Test`). An unknown option fails to compile. ExUnit.Case's options such as
-  `async:` belong on `use ExUnit.Case`; `use Fluffy.Case` ignores them.
+  The options are `use Playwright.Test`'s, passed on as they are: context options such as
+  `locale:`, the timeouts, and the `trace:`, `screenshot:` and `video:` modes, for the module
+  (see `Playwright.Test`). For a describe block or a test, tag it with `Playwright.Test.use/1`,
+  such as `@tag Playwright.Test.use(trace: :on)`. An unknown option fails to compile.
+  ExUnit.Case's options such as `async:` belong on `use ExUnit.Case`; `use Fluffy.Case`
+  ignores them.
 
       use Fluffy.Case, trace: :on
 

@@ -214,8 +214,9 @@ sessions, a screenshot of each page as its session closes, and videos, each `:of
 default, and a failed test's `error-context.md`. The `*_on_failure` modes record every
 test and drop the files of passing ones. Each test writes to its own dir under `output_dir` (`test-results`);
 ignore it in git and configure CI to upload it when the test job fails. To override the
-config for a module, pass the mode to `use Fluffy.Case, trace: :on`, or tag a module or
-test, such as `@tag trace: true`. See `Playwright.Test` for the modes and file names.
+config for a module, pass the mode to `use Fluffy.Case, trace: :on`, or tag a describe
+block or test, such as `@tag Playwright.Test.use(trace: :on)`. See `Playwright.Test` for the
+modes and file names.
 
 As in Playwright, browser `console` messages and uncaught page errors are not
 printed; the trace has them. To log them, register a listener, such as
