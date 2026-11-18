@@ -59,9 +59,9 @@ defmodule Fluffy.Backend.Phoenix do
   # The test's `extra_http_headers` (`Playwright.Test.use/1`), as a browser context sends
   # them, under the session's `headers:`, which are put after them.
   defp test_headers do
-    Enum.map(Fluffy.TestInfo.fetch!().use[:extra_http_headers] || [], fn {name, value} ->
-      {String.downcase(to_string(name)), to_string(value)}
-    end)
+    for {name, value} <- Fluffy.TestInfo.fetch!().use[:extra_http_headers] || [],
+        not is_nil(value),
+        do: {String.downcase(to_string(name)), to_string(value)}
   end
 
   @doc false
