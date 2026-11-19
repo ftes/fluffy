@@ -69,12 +69,15 @@ defmodule Fluffy.Conformance.InitialConnTest do
       phoenix_session(conn: Plug.Conn.send_resp(build_conn(), 200, "already sent"))
     end
 
-    assert_raise ArgumentError, ~r/:conn.*only for Phoenix/, fn ->
-      start_session(:playwright,
-        base_url: Server.base_url(),
-        conn: build_conn()
-      )
-    end
+    error =
+      assert_raise Fluffy.CapabilityError, ~r/^Playwright does not support :start_session \(:phoenix_conn\)/, fn ->
+        start_session(:playwright,
+          base_url: Server.base_url(),
+          conn: build_conn()
+        )
+      end
+
+    assert {error.backend, error.driver} == {:playwright, nil}
   end
 
   defp initial_session do

@@ -39,7 +39,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
       path = if unquote(driver) == :static, do: "/chamber", else: "/live/nested"
       session = :phoenix |> start_test_session() |> visit(path)
 
-      assert_raise Fluffy.CapabilityError, ~r/:unwrap requires a Playwright session/, fn ->
+      assert_raise Fluffy.CapabilityError, ~r/:unwrap \(:playwright_only_api\): it requires a Playwright session/, fn ->
         unwrap(session, by_css("body"), fn _locator -> flunk("callback ran") end)
       end
     end
@@ -204,7 +204,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
         path = if unquote(driver) == :static, do: "/chamber", else: "/live/nested"
         session = :phoenix |> start_test_session() |> visit(path)
 
-        assert_raise Fluffy.CapabilityError, ~r/:unwrap_and_return requires a Playwright session/, fn ->
+        assert_raise Fluffy.CapabilityError, ~r/:unwrap_and_return \(:playwright_only_api\)/, fn ->
           unwrap_and_return(session, by_css("body"), fn _locator -> flunk("callback ran") end)
         end
       end

@@ -313,7 +313,7 @@ defmodule Fluffy do
     raise Fluffy.CapabilityError,
       capability: :playwright_only_api,
       operation: :unwrap_and_return,
-      driver: :phoenix,
+      backend: :phoenix,
       detail: "a Phoenix download has no native counterpart"
   end
 
@@ -355,7 +355,7 @@ defmodule Fluffy do
   def wait_for(%Session{} = session, %Event{} = event, options), do: Event.wait(session, event, options)
 
   def wait_for(%Session{} = session, %Fluffy.Locator{} = locator, options) do
-    Fluffy.Playwright.__ensure_playwright_backend__!(session, :playwright_only_api, :wait_for)
+    Fluffy.CapabilityError.require_playwright!(session, :playwright_only_api, :wait_for)
     dispatch_driver(session, :wait_for, [locator, Fluffy.Options.validate_action!(:wait_for, options)])
   end
 

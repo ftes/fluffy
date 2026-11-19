@@ -87,13 +87,13 @@ defmodule Fluffy.Backend.Phoenix.HTTP do
       url.scheme not in ["http", "https"] ->
         raise Fluffy.CapabilityError,
           capability: :external_navigation,
-          driver: :static,
+          backend: :phoenix,
           detail: "in-process navigation cannot dispatch the #{inspect(url.scheme)} scheme"
 
       external?(client, url) ->
         raise Fluffy.CapabilityError,
           capability: :external_navigation,
-          driver: :static,
+          backend: :phoenix,
           detail: "cannot request #{URI.to_string(url)}; in-process navigation is limited to #{client.base_url}"
 
       true ->

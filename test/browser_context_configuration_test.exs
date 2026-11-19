@@ -81,16 +81,19 @@ defmodule Fluffy.BrowserContextConfigurationTest do
   end
 
   test "BrowserContext options are rejected by the Phoenix backend" do
-    assert_raise ArgumentError, ~r/browser_context.*Playwright/, fn ->
+    assert_raise Fluffy.CapabilityError, ~r/:browser_context is an option of Playwright sessions/, fn ->
       start_session(:phoenix,
         endpoint: Endpoint,
         browser_context: [locale: "de-DE"]
       )
     end
 
-    assert_raise ArgumentError, ~r/browser.*Playwright/, fn ->
-      start_session(:phoenix, endpoint: Endpoint, browser: BrowserPool.browser())
-    end
+    error =
+      assert_raise Fluffy.CapabilityError, ~r/:browser is an option of Playwright sessions/, fn ->
+        start_session(:phoenix, endpoint: Endpoint, browser: BrowserPool.browser())
+      end
+
+    assert {error.capability, error.backend, error.driver} == {:browser_context_setters, :phoenix, nil}
   end
 
   test "creates the context in the browser: given, else in the test's" do

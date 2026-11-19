@@ -1,13 +1,14 @@
 # Capability matrix
 
 The table compares Fluffy's Phoenix backend with Playwright, the reference, which
-supports every feature, within the boundaries described below. Each
+supports every feature not marked Phoenix only, within the boundaries described below. Each
 `Fluffy.CapabilityError` names its feature's id in `Fluffy.Capability.matrix/0` as
 `capability`.
 
 - **equivalent** — matching behavior verified against Playwright;
 - **structural subset** — supports HTML-represented state, with browser-only
   behavior excluded;
+- **Phoenix only** — a Phoenix feature that Playwright has no counterpart for;
 - **-** — unavailable or not applicable.
 
 <!-- capability-matrix:start -->
@@ -41,7 +42,7 @@ supports every feature, within the boundaries described below. Each
 | Browser history navigation | - |
 | Adding, reading, and clearing cookies | equivalent |
 | Browser storage: Web Storage reads and storage-state export and restoration | - |
-| Runtime permissions, geolocation, offline mode, and HTTP credentials | - |
+| Browser and context options, permissions, geolocation, offline mode, and HTTP credentials | - |
 | Hover, drag-and-drop, typing, keyboard, mouse, viewport, and media emulation | - |
 | Dialogs, console, page errors, frames, workers, WebSockets, and browser network events | - |
 | Browser request routing | - |
@@ -51,6 +52,7 @@ supports every feature, within the boundaries described below. Each
 | Native invalid, submit, and formdata event ordering | - |
 | Browser-dependent form entries and submissions | - |
 | Page content, locator lists and waits, native locators, and download files | - |
+| A prepared `Plug.Conn` for the first request | Phoenix only |
 | Per-test sessions, cleanup, and Ecto sandbox propagation | equivalent |
 | URL matching | equivalent |
 | Typed file selection and supported upload lifecycle | equivalent |

@@ -84,7 +84,7 @@ defmodule Fluffy.Download do
     raise CapabilityError,
       capability: :playwright_only_api,
       operation: :path,
-      driver: :phoenix,
+      backend: :phoenix,
       detail: "a Phoenix download is held in memory and has no file; use read/2 or save_as/2"
   end
 

@@ -20,14 +20,14 @@ defmodule Fluffy.CapabilityMatrixTest do
       for file <- Path.wildcard(Path.expand("../lib/**/*.ex", __DIR__)),
           pattern <- [
             ~r/capability: :(\w+)/,
-            ~r/ensure_playwright_backend(?:__)?!\(session, :(\w+)/,
+            ~r/require_playwright!\([^,]+, :(\w+)/,
             ~r/(?:browser_context!\(|set_context!\(session, ):(\w+)/
           ],
           [_match, id] <- Regex.scan(pattern, File.read!(file)),
           uniq: true,
           do: String.to_atom(id)
 
-    assert :pages in raised
+    assert :pages in raised and :browser_context_setters in raised
     assert raised -- Capability.ids() == []
   end
 

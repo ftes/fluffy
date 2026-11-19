@@ -54,7 +54,7 @@ defmodule Fluffy.Conformance.PlaywrightEvaluateTest do
       )
       |> visit("/chamber")
 
-    assert_raise CapabilityError, ~r/:static does not support :javascript_evaluation/, fn ->
+    assert_raise CapabilityError, ~r/Phoenix \(:static\) does not support :evaluate \(:javascript_evaluation\)/, fn ->
       Fluffy.Playwright.evaluate(session, "document.title")
     end
   end

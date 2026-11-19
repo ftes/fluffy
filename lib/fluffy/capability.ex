@@ -5,15 +5,16 @@ defmodule Fluffy.Capability do
   `matrix/0` is the machine-readable source used by the published capability
   table. It retains Static and LiveView detail, while the published table
   combines them under the Phoenix backend and uses the applicable status for
-  features that are inherently LiveView-only. Playwright supports every feature. A
-  status describes only the named, documented public behavior; it is not a claim
-  that an in-process DOM is a complete browser implementation.
+  features that are inherently LiveView-only. Playwright supports every feature but
+  the `:phoenix_only` ones. A status describes only the named, documented public
+  behavior; it is not a claim that an in-process DOM is a complete browser
+  implementation.
 
   Every `Fluffy.CapabilityError` names one of these features in `capability`.
   """
 
   @drivers [:static, :live]
-  @statuses [:equivalent, :structural_subset, :not_applicable, :browser_only]
+  @statuses [:equivalent, :structural_subset, :not_applicable, :browser_only, :phoenix_only]
 
   @matrix [
     %{
@@ -225,9 +226,10 @@ defmodule Fluffy.Capability do
     },
     %{
       id: :browser_context_setters,
-      feature: "Runtime permissions, geolocation, offline mode, and HTTP credentials",
+      feature: "Browser and context options, permissions, geolocation, offline mode, and HTTP credentials",
       drivers: %{static: :browser_only, live: :browser_only},
-      detail: "These change a real browser context; a Phoenix session has none."
+      detail:
+        "The `browser:` and `browser_context:` session options and these runtime setters change a real browser context; a Phoenix session has none."
     },
     %{
       id: :browser_pointer_typing,
@@ -289,6 +291,13 @@ defmodule Fluffy.Capability do
       drivers: %{static: :browser_only, live: :browser_only},
       detail:
         "`Fluffy.Playwright.content/2`, `title/2`, `all/2`, `unwrap/3`, `wait_for/3` on a locator, and a download's file path and native Playwright value work on Playwright only. On Phoenix use expectations, `Fluffy.unwrap/2`, and `Fluffy.Download.read/2` or `save_as/2`."
+    },
+    %{
+      id: :phoenix_conn,
+      feature: "A prepared `Plug.Conn` for the first request",
+      drivers: %{static: :phoenix_only, live: :phoenix_only},
+      detail:
+        "The `conn:` session option sends a `Plug.Conn`'s test session, cookies, headers, and assigns with the first request, as with `Phoenix.ConnTest`. A browser makes its own requests, so a Playwright session raises; add a cookie to log in on both backends."
     },
     %{
       id: :test_isolation,
@@ -362,6 +371,7 @@ defmodule Fluffy.Capability do
   defp phoenix_status(static_status, :not_applicable), do: static_status
 
   defp display_status(status) when status in [:browser_only, :not_applicable], do: "-"
+  defp display_status(:phoenix_only), do: "Phoenix only"
 
   defp display_status(status) do
     status

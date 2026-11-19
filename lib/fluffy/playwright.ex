@@ -73,7 +73,7 @@ defmodule Fluffy.Playwright do
   @doc "Returns a live handle to the selected page."
   @spec current_page(Session.t()) :: Fluffy.Page.t()
   def current_page(%Session{} = session) do
-    ensure_playwright_backend!(session, :pages, :current_page)
+    CapabilityError.require_playwright!(session, :pages, :current_page)
     Session.current_driver(session)
     Session.handle(session)
   end
@@ -83,7 +83,7 @@ defmodule Fluffy.Playwright do
   @doc "Selects a page handle for this pipeline, without changing other session handles."
   @spec switch_page(Session.t(), Fluffy.Page.t()) :: Session.t()
   def switch_page(%Session{} = session, %Fluffy.Page{} = page) do
-    ensure_playwright_backend!(session, :pages, :switch_page)
+    CapabilityError.require_playwright!(session, :pages, :switch_page)
     Session.activate_page(session, page)
   end
 
@@ -92,7 +92,7 @@ defmodule Fluffy.Playwright do
   @doc "Closes a page. Handles selecting it must explicitly switch to another page before continuing."
   @spec close_page(Session.t()) :: Session.t()
   def close_page(%Session{} = session) do
-    ensure_playwright_backend!(session, :pages, :close_page)
+    CapabilityError.require_playwright!(session, :pages, :close_page)
     close_page(session, Session.handle(session))
   end
 
@@ -101,7 +101,7 @@ defmodule Fluffy.Playwright do
   @doc "Closes the given page handle, preserving the session's current-page selection."
   @spec close_page(Session.t(), Fluffy.Page.t()) :: Session.t()
   def close_page(%Session{} = session, %Fluffy.Page{} = page) do
-    ensure_playwright_backend!(session, :pages, :close_page)
+    CapabilityError.require_playwright!(session, :pages, :close_page)
     Backend.close_page(session, page)
   end
 
@@ -110,7 +110,7 @@ defmodule Fluffy.Playwright do
   @doc "Returns live handles for all open pages, including browser pages discovered without an event wait."
   @spec pages(Session.t()) :: [Fluffy.Page.t()]
   def pages(%Session{} = session) do
-    ensure_playwright_backend!(session, :pages, :pages)
+    CapabilityError.require_playwright!(session, :pages, :pages)
     Enum.map(Session.pages(session), fn {id, _page} -> Fluffy.Page.new(session.runtime, id) end)
   end
 
@@ -131,7 +131,7 @@ defmodule Fluffy.Playwright do
   """
   @spec page(Session.t(), Playwright.Page.t() | nil) :: Fluffy.Page.t() | nil
   def page(%Session{} = session, page) when is_struct(page, Playwright.Page) or is_nil(page) do
-    ensure_playwright_backend!(session, :pages, :page)
+    CapabilityError.require_playwright!(session, :pages, :page)
     if page, do: PlaywrightBackend.Events.page(session, page)
   end
 
@@ -170,7 +170,7 @@ defmodule Fluffy.Playwright do
   """
   @spec go_back(Session.t(), [go_back_option()]) :: Session.t()
   def go_back(%Session{} = session, options \\ []) do
-    ensure_playwright_backend!(session, :browser_history, :go_back)
+    CapabilityError.require_playwright!(session, :browser_history, :go_back)
     Backend.history(session, :go_back, Options.validate_action!(:go_back, options))
   end
 
@@ -187,7 +187,7 @@ defmodule Fluffy.Playwright do
   """
   @spec go_forward(Session.t(), [go_forward_option()]) :: Session.t()
   def go_forward(%Session{} = session, options \\ []) do
-    ensure_playwright_backend!(session, :browser_history, :go_forward)
+    CapabilityError.require_playwright!(session, :browser_history, :go_forward)
     Backend.history(session, :go_forward, Options.validate_action!(:go_forward, options))
   end
 
@@ -215,7 +215,7 @@ defmodule Fluffy.Playwright do
     do: wait_for_load_state(session, nil, options)
 
   def wait_for_load_state(%Session{} = session, state, options) do
-    ensure_playwright_backend!(session, :pages, :wait_for_load_state)
+    CapabilityError.require_playwright!(session, :pages, :wait_for_load_state)
     options = Options.validate_action!(:wait_for_load_state, options)
     wait = &Playwright.Page.wait_for_load_state(&1, state, &2)
     Fluffy.__dispatch_driver__(session, :page_wait, [:wait_for_load_state, wait, options])
@@ -226,7 +226,7 @@ defmodule Fluffy.Playwright do
   @doc "Focuses the target in the active browser page. Accepts `timeout:`."
   @spec focus(Session.t(), Fluffy.Locator.t(), [Fluffy.action_option()]) :: Session.t()
   def focus(%Session{} = session, locator, options \\ []) do
-    ensure_playwright_backend!(session, :focus, :focus)
+    CapabilityError.require_playwright!(session, :focus, :focus)
     options = Options.validate_action!(:focus, options)
     Fluffy.__dispatch_driver__(session, :focus, [locator, options])
   end
@@ -236,7 +236,7 @@ defmodule Fluffy.Playwright do
   @doc "Blurs the target in the active browser page. Accepts `timeout:`."
   @spec blur(Session.t(), Fluffy.Locator.t(), [Fluffy.action_option()]) :: Session.t()
   def blur(%Session{} = session, locator, options \\ []) do
-    ensure_playwright_backend!(session, :focus, :blur)
+    CapabilityError.require_playwright!(session, :focus, :blur)
     options = Options.validate_action!(:blur, options)
     Fluffy.__dispatch_driver__(session, :blur, [locator, options])
   end
@@ -254,7 +254,7 @@ defmodule Fluffy.Playwright do
   """
   @spec hover(Session.t(), Fluffy.Locator.t(), [hover_option()]) :: Session.t()
   def hover(%Session{} = session, locator, options \\ []) do
-    ensure_playwright_backend!(session, :browser_pointer_typing, :hover)
+    CapabilityError.require_playwright!(session, :browser_pointer_typing, :hover)
     Fluffy.__dispatch_driver__(session, :hover, [locator, Options.validate_action!(:hover, options)])
   end
 
@@ -271,7 +271,7 @@ defmodule Fluffy.Playwright do
   """
   @spec drag_to(Session.t(), Fluffy.Locator.t(), Fluffy.Locator.t(), [drag_to_option()]) :: Session.t()
   def drag_to(%Session{} = session, source, target, options \\ []) do
-    ensure_playwright_backend!(session, :browser_pointer_typing, :drag_to)
+    CapabilityError.require_playwright!(session, :browser_pointer_typing, :drag_to)
     Fluffy.__dispatch_driver__(session, :drag_to, [source, target, Options.validate_action!(:drag_to, options)])
   end
 
@@ -288,7 +288,7 @@ defmodule Fluffy.Playwright do
   """
   @spec press_sequentially(Session.t(), Fluffy.Locator.t(), String.t(), [press_sequentially_option()]) :: Session.t()
   def press_sequentially(%Session{} = session, locator, text, options \\ []) do
-    ensure_playwright_backend!(session, :browser_pointer_typing, :press_sequentially)
+    CapabilityError.require_playwright!(session, :browser_pointer_typing, :press_sequentially)
     options = Options.validate_action!(:press_sequentially, options)
     Fluffy.__dispatch_driver__(session, :press_sequentially, [locator, text, options])
   end
@@ -306,7 +306,7 @@ defmodule Fluffy.Playwright do
   """
   @spec dblclick(Session.t(), Fluffy.Locator.t(), [dblclick_option()]) :: Session.t()
   def dblclick(%Session{} = session, locator, options \\ []) do
-    ensure_playwright_backend!(session, :browser_pointer_typing, :dblclick)
+    CapabilityError.require_playwright!(session, :browser_pointer_typing, :dblclick)
     Fluffy.__dispatch_driver__(session, :dblclick, [locator, Options.validate_action!(:dblclick, options)])
   end
 
@@ -326,7 +326,7 @@ defmodule Fluffy.Playwright do
   """
   @spec tap(Session.t(), Fluffy.Locator.t(), [tap_option()]) :: Session.t()
   def tap(%Session{} = session, locator, options) do
-    ensure_playwright_backend!(session, :browser_pointer_typing, :tap)
+    CapabilityError.require_playwright!(session, :browser_pointer_typing, :tap)
     Fluffy.__dispatch_driver__(session, :tap, [locator, Options.validate_action!(:tap, options)])
   end
 
@@ -348,7 +348,7 @@ defmodule Fluffy.Playwright do
   @spec dispatch_event(Session.t(), Fluffy.Locator.t(), String.t(), map() | nil, [Fluffy.action_option()]) :: Session.t()
   def dispatch_event(%Session{} = session, locator, type, event_init \\ nil, options \\ [])
       when is_binary(type) and (is_map(event_init) or is_nil(event_init)) do
-    ensure_playwright_backend!(session, :browser_pointer_typing, :dispatch_event)
+    CapabilityError.require_playwright!(session, :browser_pointer_typing, :dispatch_event)
     options = Options.validate_action!(:dispatch_event, options)
     Fluffy.__dispatch_driver__(session, :dispatch_event, [locator, type, event_init, options])
   end
@@ -366,7 +366,7 @@ defmodule Fluffy.Playwright do
   """
   @spec select_text(Session.t(), Fluffy.Locator.t(), [select_text_option()]) :: Session.t()
   def select_text(%Session{} = session, locator, options \\ []) do
-    ensure_playwright_backend!(session, :browser_pointer_typing, :select_text)
+    CapabilityError.require_playwright!(session, :browser_pointer_typing, :select_text)
     Fluffy.__dispatch_driver__(session, :select_text, [locator, Options.validate_action!(:select_text, options)])
   end
 
@@ -375,7 +375,7 @@ defmodule Fluffy.Playwright do
   @doc "Scrolls a locator into view unless it is already visible. Accepts `timeout:`."
   @spec scroll_into_view_if_needed(Session.t(), Fluffy.Locator.t(), [Fluffy.action_option()]) :: Session.t()
   def scroll_into_view_if_needed(%Session{} = session, locator, options \\ []) do
-    ensure_playwright_backend!(session, :browser_pointer_typing, :scroll_into_view_if_needed)
+    CapabilityError.require_playwright!(session, :browser_pointer_typing, :scroll_into_view_if_needed)
     options = Options.validate_action!(:scroll_into_view_if_needed, options)
     Fluffy.__dispatch_driver__(session, :scroll_into_view_if_needed, [locator, options])
   end
@@ -398,7 +398,7 @@ defmodule Fluffy.Playwright do
   @spec bounding_box(Session.t(), Fluffy.Locator.t(), [bounding_box_option()]) ::
           %{x: number(), y: number(), width: number(), height: number()} | nil
   def bounding_box(%Session{} = session, %Fluffy.Locator{} = locator, options \\ []) do
-    ensure_playwright_backend!(session, :computed_browser_semantics, :bounding_box)
+    CapabilityError.require_playwright!(session, :computed_browser_semantics, :bounding_box)
     Fluffy.__dispatch_driver__(session, :bounding_box, [locator, Options.validate_action!(:bounding_box, options)])
   end
 
@@ -420,12 +420,12 @@ defmodule Fluffy.Playwright do
   def aria_snapshot(session, locator_or_options \\ [], options \\ [])
 
   def aria_snapshot(%Session{} = session, options, []) when is_list(options) do
-    ensure_playwright_backend!(session, :computed_browser_semantics, :aria_snapshot)
+    CapabilityError.require_playwright!(session, :computed_browser_semantics, :aria_snapshot)
     Fluffy.__dispatch_driver__(session, :page_aria_snapshot, [Options.validate_action!(:page_aria_snapshot, options)])
   end
 
   def aria_snapshot(%Session{} = session, %Fluffy.Locator{} = locator, options) do
-    ensure_playwright_backend!(session, :computed_browser_semantics, :aria_snapshot)
+    CapabilityError.require_playwright!(session, :computed_browser_semantics, :aria_snapshot)
     Fluffy.__dispatch_driver__(session, :aria_snapshot, [locator, Options.validate_action!(:aria_snapshot, options)])
   end
 
@@ -441,7 +441,7 @@ defmodule Fluffy.Playwright do
   """
   @spec all(Session.t(), Fluffy.Locator.t()) :: [Fluffy.Locator.t()]
   def all(%Session{} = session, %Fluffy.Locator{} = locator) do
-    ensure_playwright_backend!(session, :playwright_only_api, :all)
+    CapabilityError.require_playwright!(session, :playwright_only_api, :all)
     count = unwrap_and_return(session, locator, &Playwright.Locator.count!/1)
     for index <- 0..(count - 1)//1, do: Fluffy.Locator.nth(locator, index)
   end
@@ -464,7 +464,7 @@ defmodule Fluffy.Playwright do
   """
   @spec drop(Session.t(), Fluffy.Locator.t(), map(), [drop_option()]) :: Session.t()
   def drop(%Session{} = session, %Fluffy.Locator{} = locator, payload, options \\ []) when is_map(payload) do
-    ensure_playwright_backend!(session, :browser_pointer_typing, :drop)
+    CapabilityError.require_playwright!(session, :browser_pointer_typing, :drop)
     Fluffy.__dispatch_driver__(session, :drop, [locator, payload, Options.validate_action!(:drop, options)])
   end
 
@@ -487,7 +487,7 @@ defmodule Fluffy.Playwright do
   """
   @spec pdf(Session.t(), [pdf_option()]) :: binary()
   def pdf(%Session{} = session, options \\ []) do
-    ensure_playwright_backend!(session, :computed_browser_semantics, :pdf)
+    CapabilityError.require_playwright!(session, :computed_browser_semantics, :pdf)
     native = Options.validate_action!(:pdf, options)
     page_read(session, :pdf, &Playwright.Page.pdf(&1, native))
   end
@@ -497,7 +497,7 @@ defmodule Fluffy.Playwright do
   @doc "Brings the active page to the front and returns the session."
   @spec bring_to_front(Session.t(), []) :: Session.t()
   def bring_to_front(%Session{} = session, options \\ []) do
-    ensure_playwright_backend!(session, :pages, :bring_to_front)
+    CapabilityError.require_playwright!(session, :pages, :bring_to_front)
     Options.validate_untimed!(options)
     page_action(session, :bring_to_front, &Playwright.Page.bring_to_front/1)
   end
@@ -515,7 +515,7 @@ defmodule Fluffy.Playwright do
   """
   @spec content(Session.t(), [content_option()]) :: String.t()
   def content(%Session{} = session, options \\ []) do
-    ensure_playwright_backend!(session, :playwright_only_api, :content)
+    CapabilityError.require_playwright!(session, :playwright_only_api, :content)
     native = Options.validate_action!(:content, options)
     page_read(session, :content, &Playwright.Page.content(&1, native))
   end
@@ -525,7 +525,7 @@ defmodule Fluffy.Playwright do
   @doc "Returns the active page's title. To assert it, use `Fluffy.Expect.page_to_have_title/2`."
   @spec title(Session.t(), []) :: String.t()
   def title(%Session{} = session, options \\ []) do
-    ensure_playwright_backend!(session, :playwright_only_api, :title)
+    CapabilityError.require_playwright!(session, :playwright_only_api, :title)
     Options.validate_untimed!(options)
     page_read(session, :title, &Playwright.Page.title/1)
   end
@@ -539,7 +539,7 @@ defmodule Fluffy.Playwright do
   """
   @spec local_storage(Session.t(), []) :: [%{name: String.t(), value: String.t()}]
   def local_storage(%Session{} = session, options \\ []) do
-    ensure_playwright_backend!(session, :browser_context_state, :local_storage)
+    CapabilityError.require_playwright!(session, :browser_context_state, :local_storage)
     Options.validate_untimed!(options)
     page_read(session, :local_storage, fn page -> WebStorage.items(Playwright.Page.local_storage(page)) end)
   end
@@ -552,7 +552,7 @@ defmodule Fluffy.Playwright do
   """
   @spec session_storage(Session.t(), []) :: [%{name: String.t(), value: String.t()}]
   def session_storage(%Session{} = session, options \\ []) do
-    ensure_playwright_backend!(session, :browser_context_state, :session_storage)
+    CapabilityError.require_playwright!(session, :browser_context_state, :session_storage)
     Options.validate_untimed!(options)
     page_read(session, :session_storage, fn page -> WebStorage.items(Playwright.Page.session_storage(page)) end)
   end
@@ -567,7 +567,7 @@ defmodule Fluffy.Playwright do
   """
   @spec viewport_size(Session.t()) :: %{width: integer(), height: integer()} | nil
   def viewport_size(%Session{} = session) do
-    ensure_playwright_backend!(session, :browser_pointer_typing, :viewport_size)
+    CapabilityError.require_playwright!(session, :browser_pointer_typing, :viewport_size)
     Playwright.Page.viewport_size(Session.page_state(session).page)
   end
 
@@ -578,7 +578,7 @@ defmodule Fluffy.Playwright do
   """
   @spec set_viewport_size(Session.t(), %{width: integer(), height: integer()}, []) :: Session.t()
   def set_viewport_size(%Session{} = session, %{width: _, height: _} = size, options \\ []) do
-    ensure_playwright_backend!(session, :browser_pointer_typing, :set_viewport_size)
+    CapabilityError.require_playwright!(session, :browser_pointer_typing, :set_viewport_size)
     Options.validate_untimed!(options)
     page_action(session, :set_viewport_size, &Playwright.Page.set_viewport_size(&1, size))
   end
@@ -596,7 +596,7 @@ defmodule Fluffy.Playwright do
   """
   @spec emulate_media(Session.t(), [emulate_media_option()]) :: Session.t()
   def emulate_media(%Session{} = session, options \\ []) do
-    ensure_playwright_backend!(session, :browser_pointer_typing, :emulate_media)
+    CapabilityError.require_playwright!(session, :browser_pointer_typing, :emulate_media)
     native = Options.validate_action!(:emulate_media, options)
     page_action(session, :emulate_media, &Playwright.Page.emulate_media(&1, native))
   end
@@ -605,7 +605,7 @@ defmodule Fluffy.Playwright do
 
   @doc false
   def __page_input__(session, device, operation, fun) do
-    ensure_playwright_backend!(session, :browser_pointer_typing, operation)
+    CapabilityError.require_playwright!(session, :browser_pointer_typing, operation)
     page_action(session, operation, &fun.(device.(&1)))
   end
 
@@ -721,7 +721,7 @@ defmodule Fluffy.Playwright do
   """
   @spec unwrap(Session.t(), Fluffy.Locator.t(), (Playwright.Locator.t() -> term())) :: Session.t()
   def unwrap(%Session{} = session, %Fluffy.Locator{} = locator, fun) when is_function(fun, 1) do
-    ensure_playwright_backend!(session, :playwright_only_api, :unwrap)
+    CapabilityError.require_playwright!(session, :playwright_only_api, :unwrap)
     Fluffy.__dispatch_driver__(session, :unwrap_locator, [locator, fun])
   end
 
@@ -739,7 +739,7 @@ defmodule Fluffy.Playwright do
   @spec unwrap_and_return(Session.t(), Fluffy.Locator.t(), (Playwright.Locator.t() -> result)) :: result
         when result: term()
   def unwrap_and_return(%Session{} = session, %Fluffy.Locator{} = locator, fun) when is_function(fun, 1) do
-    ensure_playwright_backend!(session, :playwright_only_api, :unwrap_and_return)
+    CapabilityError.require_playwright!(session, :playwright_only_api, :unwrap_and_return)
     Fluffy.__dispatch_driver__(session, :unwrap_and_return_locator, [locator, fun])
   end
 
@@ -764,7 +764,7 @@ defmodule Fluffy.Playwright do
   def screenshot(session, locator_or_options \\ [])
 
   def screenshot(%Session{} = session, options) when is_list(options) do
-    ensure_playwright_backend!(session, :computed_browser_semantics, :screenshot)
+    CapabilityError.require_playwright!(session, :computed_browser_semantics, :screenshot)
     options = Options.validate_action!(:page_screenshot, options)
     Fluffy.__dispatch_driver__(session, :page_screenshot, [options])
   end
@@ -785,7 +785,7 @@ defmodule Fluffy.Playwright do
   """
   @spec screenshot(Session.t(), Fluffy.Locator.t(), [locator_screenshot_option()]) :: binary()
   def screenshot(%Session{} = session, %Fluffy.Locator{} = locator, options) when is_list(options) do
-    ensure_playwright_backend!(session, :computed_browser_semantics, :screenshot)
+    CapabilityError.require_playwright!(session, :computed_browser_semantics, :screenshot)
     options = Options.validate_action!(:locator_screenshot, options)
     Fluffy.__dispatch_driver__(session, :screenshot, [locator, options])
   end
@@ -885,7 +885,7 @@ defmodule Fluffy.Playwright do
   defp arg_and_options(arg, options), do: {arg, options}
 
   defp evaluate_target(session, nil, expression, arg, options) do
-    ensure_playwright!(session)
+    CapabilityError.require_playwright!(session, :javascript_evaluation, :evaluate)
     Options.validate_untimed!(options)
 
     case Playwright.Frame.evaluate(Session.page_state(session).frame, expression, arg) do
@@ -895,7 +895,7 @@ defmodule Fluffy.Playwright do
   end
 
   defp evaluate_target(session, %Fluffy.Locator{} = locator, expression, arg, options) do
-    ensure_playwright!(session)
+    CapabilityError.require_playwright!(session, :javascript_evaluation, :evaluate)
     options = Options.validate_action!(:locator_evaluate, options)
     Fluffy.__dispatch_driver__(session, :locator_evaluate, [locator, expression, arg, options])
   end
@@ -917,7 +917,7 @@ defmodule Fluffy.Playwright do
   @spec evaluate_all(Session.t(), Fluffy.Locator.t(), String.t(), term(), []) :: term()
   def evaluate_all(%Session{} = session, %Fluffy.Locator{} = locator, expression, arg \\ nil, options \\ [])
       when is_binary(expression) do
-    ensure_playwright!(session)
+    CapabilityError.require_playwright!(session, :javascript_evaluation, :evaluate_all)
     {arg, options} = arg_and_options(arg, options)
     Options.validate_untimed!(options)
     Fluffy.__dispatch_driver__(session, :evaluate_all, [locator, expression, arg])
@@ -1000,14 +1000,14 @@ defmodule Fluffy.Playwright do
   end
 
   defp wait_for_target(session, nil, expression, arg, options) do
-    ensure_playwright!(session)
+    CapabilityError.require_playwright!(session, :javascript_evaluation, :wait_for_function)
     options = Options.validate_action!(:wait_for_function, options)
     wait = &Playwright.Page.wait_for_function(&1, expression, arg, &2)
     Fluffy.__dispatch_driver__(session, :page_wait, [:wait_for_function, wait, options])
   end
 
   defp wait_for_target(session, %Fluffy.Locator{} = locator, expression, arg, options) do
-    ensure_playwright!(session)
+    CapabilityError.require_playwright!(session, :javascript_evaluation, :wait_for_function)
     options = Options.validate_action!(:locator_wait_for_function, options)
     Fluffy.__dispatch_driver__(session, :locator_wait_for_function, [locator, expression, arg, options])
   end
@@ -1058,7 +1058,7 @@ defmodule Fluffy.Playwright do
   """
   @spec add_script_tag(Session.t(), [add_script_tag_option()]) :: Session.t()
   def add_script_tag(%Session{} = session, options) do
-    ensure_playwright_backend!(session, :javascript_evaluation, :add_script_tag)
+    CapabilityError.require_playwright!(session, :javascript_evaluation, :add_script_tag)
     add_tag(session, :add_script_tag, &Playwright.Page.add_script_tag/2, options)
   end
 
@@ -1077,7 +1077,7 @@ defmodule Fluffy.Playwright do
   """
   @spec add_style_tag(Session.t(), [add_style_tag_option()]) :: Session.t()
   def add_style_tag(%Session{} = session, options) do
-    ensure_playwright_backend!(session, :javascript_evaluation, :add_style_tag)
+    CapabilityError.require_playwright!(session, :javascript_evaluation, :add_style_tag)
     add_tag(session, :add_style_tag, &Playwright.Page.add_style_tag/2, options)
   end
 
@@ -1210,35 +1210,7 @@ defmodule Fluffy.Playwright do
   end
 
   defp browser_context!(session, capability, operation) do
-    ensure_playwright_backend!(session, capability, operation)
+    CapabilityError.require_playwright!(session, capability, operation)
     Session.context(session).browser_context
-  end
-
-  defp ensure_playwright!(session) do
-    case Session.current_driver(session) do
-      :playwright ->
-        :ok
-
-      driver ->
-        raise CapabilityError,
-          capability: :javascript_evaluation,
-          driver: driver,
-          detail:
-            "JavaScript evaluation requires an active Playwright page; the current page driver is #{inspect(driver)}"
-    end
-  end
-
-  @doc false
-  def __ensure_playwright_backend__!(session, capability, operation),
-    do: ensure_playwright_backend!(session, capability, operation)
-
-  defp ensure_playwright_backend!(session, capability, operation) do
-    if Session.backend(session) != PlaywrightBackend do
-      raise CapabilityError,
-        capability: capability,
-        operation: operation,
-        driver: Session.current_driver(session),
-        detail: "#{inspect(operation)} requires a Playwright session"
-    end
   end
 end
