@@ -225,7 +225,14 @@ jobs:
 
           echo "retried=true" >> "$GITHUB_OUTPUT"
           echo "::warning::Tests failed; retrying once with seed $fluffy_test_seed. Both attempts' failure artifacts will be uploaded."
-          mix test "${strict[@]}" --seed "$fluffy_test_seed" --failed
+          # A failing setup_all on_exit exits 2 with every test passed, so the manifest is empty
+          # and `--failed` runs nothing and exits 0: that must not pass.
+          set -o pipefail
+          mix test "${strict[@]}" --seed "$fluffy_test_seed" --failed | tee "$RUNNER_TEMP/retry.log"
+          if grep -q "There are no tests to run" "$RUNNER_TEMP/retry.log"; then
+            echo "::error::The first run failed outside a test (exit 2 with no failed tests), so there is nothing to retry."
+            exit 1
+          fi
       - name: Upload browser failure artifacts
         if: failure() || steps.tests.outputs.retried == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
