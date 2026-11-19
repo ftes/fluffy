@@ -81,29 +81,14 @@ jobs:
           key: dialyzer-${{ steps.setup.outputs.image }}-erlang-${{ steps.setup.outputs.erlang }}-elixir-${{ steps.setup.outputs.elixir }}-${{ hashFiles('mix.lock') }}
           restore-keys: |
             dialyzer-${{ steps.setup.outputs.image }}-erlang-${{ steps.setup.outputs.erlang }}-elixir-${{ steps.setup.outputs.elixir }}-
-      - name: Check formatting
+      # `mix lint`, as `mix check` runs it locally: formatting, strict compile, generated usage
+      # rules, Credo, the docs build and Dialyzer, whose last-task args take the GitHub format.
+      - name: Lint (mix lint)
         if: matrix.lane == 'newest'
-        run: mix format --check-formatted
-      # Compiles strictly before the generator's own compile could satisfy it (as `mix lint`).
-      - name: Compile and lint
-        if: matrix.lane == 'newest'
-        run: |
-          mix compile --warnings-as-errors
-          mix credo --format oneline
+        run: mix lint --format github
       - name: Compile
         if: matrix.lane == 'oldest'
         run: mix compile
-      - name: Check generated usage rules
-        if: matrix.lane == 'newest'
-        run: mix usage_rules.sync --check
-      - name: Run Dialyzer
-        if: matrix.lane == 'newest'
-        run: mix dialyzer --format github --format short --list-unused-filters
-      - name: Build documentation without warnings
-        if: matrix.lane == 'newest'
-        env:
-          MIX_ENV: dev
-        run: mix docs --warnings-as-errors
       # Into _build (as _build/esbuild-linux-x64), so the test jobs restore it instead of each
       # fetching it from npm for `mix assets.build`. Only when the save below runs.
       - name: Install esbuild

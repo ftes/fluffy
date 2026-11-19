@@ -57,7 +57,7 @@ defmodule Fluffy.MixProject do
   end
 
   def cli do
-    [preferred_envs: [lint: :test, check: :test, quality: :test]]
+    [preferred_envs: [lint: :test, check: :test]]
   end
 
   # `dev/` holds maintainer tasks, kept out of the package and consumers' builds.
@@ -191,14 +191,17 @@ defmodule Fluffy.MixProject do
       ],
       "consumer.regenerate": "run --no-start integration/regenerate_consumer.exs",
       "assets.build": ["esbuild.install --if-missing", "esbuild test_browser"],
+      # What CI's checks job runs. Compiles strictly before a later task's own compile could
+      # satisfy it. Dialyzer is last, so CI can append `--format github`.
       lint: [
         "format --check-formatted",
         "compile --warnings-as-errors",
         "usage_rules.sync --check",
-        "credo --format oneline"
+        "credo --format oneline",
+        "cmd env MIX_ENV=dev mix docs --warnings-as-errors",
+        "dialyzer --format short --list-unused-filters"
       ],
-      check: ["lint", "test --warnings-as-errors"],
-      quality: ["check", "dialyzer --format short --list-unused-filters"]
+      check: ["lint", "test --warnings-as-errors"]
     ]
   end
 end

@@ -76,7 +76,8 @@ jobs:
                subagents to review large or separate areas in parallel.
                Also review simplicity, consistency and scope, following the Reviewing guidance
                AGENTS.md gives or links: point at the existing code a change duplicates or
-               departs from, or at the issue it goes beyond.
+               departs from, or at the issue it goes beyond. A change users can see needs a
+               CHANGELOG.md entry and an internal one none, as AGENTS.md says.
             4. Verify each candidate before reporting: trace the code path and state the concrete
                input or scenario that fails. Drop anything you cannot substantiate, and skip
                style, naming and formatting nits.

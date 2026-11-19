@@ -7,11 +7,12 @@ Treat observable public behavior as the contract. Keep driver-specific
 boundaries explicit and cover behavior changes with focused conformance tests.
 
 Upstream Playwright is the reference. Fluffy is modeled on Playwright and adds only what Phoenix
-LiveView needs (waiting for LiveViews to connect, following their navigations, form state). Before
-adding a timeout budget, retry, extra check or browser workaround, check what Playwright does and
-match it; the pinned source is in `tmp/playwright-<version>` (`mix setup` or
-`mix fluffy.playwright_source` fetches it) and dependency code in `deps/`, both gitignored, so
-Grep needs their path. Don't work around Playwright, its Elixir client or browser bugs (upstream
+LiveView needs (waiting for LiveViews to connect, following their navigations, form state). The
+exceptions are `Fluffy.submit/3` and the `Fluffy.PhoenixTest` facade, kept for suites coming from
+PhoenixTest; don't grow them into a second API. Before adding a timeout budget, retry, extra check
+or browser workaround, check what Playwright does and match it; the pinned source is in
+`tmp/playwright-<version>` (`mix setup` or `mix fluffy.playwright_source` fetches it) and
+dependency code in `deps/`, both gitignored, so Grep needs their path. Don't work around Playwright, its Elixir client or browser bugs (upstream
 `fixme` tests mark the known ones); let Playwright's behavior show through. Only as a last resort,
 when LiveView support can't work without it, add a workaround, and say why in a comment. Build
 Playwright selectors through the Elixir client (its `Frame`/`Locator`/`FrameLocator` API,
@@ -28,10 +29,16 @@ A difference may stay when it's an edge case most users won't hit, or when closi
 complicated; document the differences you leave. Ask the maintainer before building a complex
 workaround.
 
-Run `mix check` before handing off code changes; use `mix quality` for
-release-sensitive changes.
-When reviewing a change or fixing review findings, follow
+Run `mix check` before handing off code changes. It runs what CI's checks job runs (formatting,
+warnings-as-errors compilation, the usage rules check, Credo, the docs build, Dialyzer) and the
+test suite. When reviewing a change or fixing review findings, follow
 [Reviewing](CONTRIBUTING.md#reviewing).
+
+0.9 is a breaking release candidate: don't add compatibility code for earlier versions or release
+candidates (deprecations, aliases, fallbacks for removed options). A change users can see gets an
+entry under `## Unreleased` in `CHANGELOG.md`, written as a change from the last release (0.8.0),
+and, if it breaks a suite, a step in `docs/upgrading.md`. Refactors, tests, docs fixes and CI
+changes get no entry.
 
 - `mix setup` installs deps, builds test assets and installs Chromium. Tests need PostgreSQL
   (`FLUFFY_DB_*` overrides the defaults in `config/test.exs`); `FLUFFY_BROWSER` picks

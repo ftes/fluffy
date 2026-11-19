@@ -16,18 +16,16 @@ mix test
 Upstream Playwright's behavior is the reference for Fluffy's, and Phoenix LiveView's the
 secondary one for the Phoenix drivers; see `AGENTS.md`.
 
-Run the ordinary local gate—Styler-backed formatting, warnings-as-errors
-compilation, strict Credo, and the test suite—with:
+Run the local gate, the same checks CI runs (Styler-backed formatting, warnings-as-errors
+compilation, the usage rules check, strict Credo, the docs build and Dialyzer), then the test
+suite, with:
 
 ```bash
 mix check
 ```
 
-Add test-environment Dialyzer analysis with:
-
-```bash
-mix quality
-```
+`mix lint` runs the checks without the tests. Rules for compatibility code and the changelog are
+in `AGENTS.md`.
 
 ## Reviewing
 

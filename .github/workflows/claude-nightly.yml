@@ -380,13 +380,15 @@ jobs:
       - name: Pick tonight's focus area
         id: focus
         # By day of the year, so successive nights look at different parts of the code.
+        # Keep the paths in step with lib/.
         run: |
           areas=(
-            "the Static and LiveView drivers: lib/fluffy/driver/static*, lib/fluffy/driver/live*, lib/fluffy/driver/phoenix_validation.ex"
-            "the Playwright driver and backend: lib/fluffy/driver/playwright*, lib/fluffy/backend/playwright*, lib/fluffy/playwright/"
-            "HTML semantics, locators and actionability: lib/fluffy/html/, lib/fluffy/locator*, lib/fluffy/client_dom*, lib/fluffy/actionability.ex"
-            "the public API: lib/fluffy.ex, lib/fluffy/page*, frame*, expect*, options*, phoenix_test* and the error modules"
-            "sessions and runtime: lib/fluffy/session*, browser_runtime*, backend.ex, backend/contract.ex, backend/phoenix*, event*, route*, sandbox.ex, worker.ex"
+            "the Static and LiveView drivers and their form state: lib/fluffy/driver/static*, lib/fluffy/driver/live*, lib/fluffy/driver/phoenix_validation.ex, lib/fluffy/live_view_test/, lib/fluffy/form.ex, lib/fluffy/selected_file.ex"
+            "the Playwright driver and backend: lib/fluffy/driver/playwright*, lib/fluffy/backend/playwright*, lib/fluffy/playwright*, lib/fluffy/open_browser.ex"
+            "HTML semantics, locators and actionability: lib/fluffy/html/, lib/fluffy/locator*, lib/fluffy/frame_locator.ex, lib/fluffy/client_dom*, lib/fluffy/actionability.ex"
+            "the public API: lib/fluffy.ex, lib/fluffy/page*, lib/fluffy/expect*, lib/fluffy/assert.ex, lib/fluffy/options*, lib/fluffy/capability.ex, lib/fluffy/phoenix_test*, lib/fluffy/download.ex, lib/fluffy/file_chooser.ex, lib/fluffy/file_payload.ex and the lib/fluffy/*_error.ex modules"
+            "sessions, backends and events: lib/fluffy/session*, lib/fluffy/backend.ex, lib/fluffy/backend/contract.ex, lib/fluffy/backend/registry.ex, lib/fluffy/backend/phoenix*, lib/fluffy/driver/contract.ex, lib/fluffy/driver/registry.ex, lib/fluffy/driver/external*, lib/fluffy/driver/unvisited/, lib/fluffy/event*, lib/fluffy/cookie_jar.ex, lib/fluffy/sandbox.ex, lib/fluffy/internal/, lib/fluffy/application.ex"
+            "timeouts and the test context: lib/fluffy/timeouts.ex, lib/fluffy/deadline.ex, lib/fluffy/test_timeout.ex, lib/fluffy/test_info.ex, and where the drivers take their timeouts"
             "test/ and its support code, without weakening what a test checks"
           )
           area=${areas[$((10#$(date -u +%j) % ${#areas[@]}))]}
@@ -420,8 +422,9 @@ jobs:
                more than it adds.
 
             Limits: observable public behaviour stays the same, and driver-specific boundaries stay
-            explicit. No new features, bug fixes, dependency, CI or changelog changes, and no
-            changes that are only formatting, comments or renames to taste.
+            explicit. No new features, bug fixes, dependency or CI changes, and no changes that are
+            only formatting, comments or renames to taste. Users see no change, so, as AGENTS.md
+            says, CHANGELOG.md gets no entry.
 
             Run `mix format`, `mix compile --warnings-as-errors` and `mix credo --format oneline`;
             they must pass. Tests can't run here, in place of AGENTS.md's `mix check`: CI runs them
