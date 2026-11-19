@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-26.04
     timeout-minutes: 60
     # Per issue or PR, on the job: every comment starts this workflow, and a run whose job is
-    # skipped must not take the slot. A new request waits for the running one.
+    # skipped must not take the slot. One request waits for the running one; a newer replaces it.
     concurrency:
       group: claude-${{ github.event.issue.number || github.event.pull_request.number }}
       cancel-in-progress: false
@@ -64,7 +64,6 @@ jobs:
           fi
 
       - name: Run Claude Code
-        id: claude
         uses: ./.github/actions/claude
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

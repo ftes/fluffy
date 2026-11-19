@@ -61,3 +61,14 @@ runs:
     - name: Install dependencies
       shell: bash
       run: mix do deps.get + deps.compile
+    # deps.get re-resolves, without failing, a dep whose requirement the lock no longer meets.
+    - name: Check the oldest lane kept its floors
+      if: inputs.lane == 'oldest'
+      shell: bash
+      run: |
+        for dep in phoenix phoenix_live_view; do
+          if [ "$(grep "^  \"$dep\":" mix.lock)" != "$(grep "^  \"$dep\":" mix.lock.oldest)" ]; then
+            echo "::error::mix deps.get moved $dep off its floor in mix.lock.oldest: raise the floor in mix.exs and mix.lock.oldest together"
+            exit 1
+          fi
+        done

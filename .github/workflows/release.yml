@@ -1,7 +1,7 @@
 # Publishes a pushed vX.Y.Z tag to Hex, then creates its GitHub release from CHANGELOG.md.
 #
 # Only a tag on a commit of main whose CI passed is published: `verify` checks both, waiting for
-# a CI run still in progress, before the `release` environment's job starts.
+# a CI run not yet listed or still in progress, before the `release` environment's job starts.
 #
 # Hex authenticates the job by workload identity (hex.pm/docs/workload-identity): no API key.
 # The package's workload identity names this file and the `release` environment, so renaming
@@ -38,13 +38,20 @@ jobs:
             echo "::error::$GITHUB_REF_NAME ($GITHUB_SHA) is not on main"
             exit 1
           fi
+          # A tag pushed right after the merge can arrive before CI's run is listed.
+          unlisted=0
           while true; do
             run=$(gh api "repos/$GH_REPO/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&event=push&branch=main" \
               --jq '.workflow_runs | max_by(.run_started_at) | if . == null then "none" else "\(.status) \(.conclusion)" end')
             case "$run" in
               "completed success") exit 0 ;;
               completed*) echo "::error::CI on $GITHUB_SHA finished: $run"; exit 1 ;;
-              none) echo "::error::No CI run for a push of $GITHUB_SHA to main: tag a commit main's CI ran on"; exit 1 ;;
+              none)
+                unlisted=$((unlisted + 1))
+                if [ "$unlisted" -ge 10 ]; then
+                  echo "::error::No CI run for a push of $GITHUB_SHA to main: tag a commit main's CI ran on"
+                  exit 1
+                fi ;;
             esac
             echo "CI on $GITHUB_SHA: $run; waiting"
             sleep 30

@@ -11,13 +11,13 @@ LiveView needs (waiting for LiveViews to connect, following their navigations, f
 exceptions are `Fluffy.submit/3` and the `Fluffy.PhoenixTest` facade, kept for suites coming from
 PhoenixTest; don't grow them into a second API. Before adding a timeout budget, retry, extra check
 or browser workaround, check what Playwright does and match it; the pinned source is in
-`tmp/playwright-<version>` (`mix setup` or `mix fluffy.playwright_source` fetches it) and
-dependency code in `deps/`, both gitignored, so Grep needs their path. Don't work around Playwright, its Elixir client or browser bugs (upstream
-`fixme` tests mark the known ones); let Playwright's behavior show through. Only as a last resort,
-when LiveView support can't work without it, add a workaround, and say why in a comment. Build
-Playwright selectors through the Elixir client (its `Frame`/`Locator`/`FrameLocator` API,
-`Isomorphic.LocatorUtils` and `SelectorParser`); don't write selector strings in Fluffy, since
-`internal:*` engine syntax changes between Playwright versions.
+`tmp/playwright-<version>` (`mix setup` or `mix fluffy.playwright_source` fetches it) and dependency
+code in `deps/`, both gitignored, so Grep needs their path. Don't work around Playwright, its Elixir
+client or browser bugs (upstream `fixme` tests mark the known ones); let Playwright's behavior show
+through. Only as a last resort, when LiveView support can't work without it, add a workaround, and
+say why in a comment. Build Playwright selectors through the Elixir client (its
+`Frame`/`Locator`/`FrameLocator` API, `Isomorphic.LocatorUtils` and `SelectorParser`); don't write
+selector strings in Fluffy, since `internal:*` engine syntax changes between Playwright versions.
 Timeouts follow Elixir: `0` means check once and `:infinity` means no limit;
 `Fluffy.Deadline.playwright/1` maps `0` to 1ms, since Playwright's 0 means no limit.
 

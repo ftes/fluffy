@@ -126,7 +126,6 @@ jobs:
         run: mix fluffy.playwright_source
       - run: git switch -c "$BRANCH"
       - name: Run Claude
-        id: claude
         uses: ./.github/actions/claude
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

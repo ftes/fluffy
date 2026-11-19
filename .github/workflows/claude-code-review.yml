@@ -46,7 +46,6 @@ jobs:
         run: mix fluffy.playwright_source
 
       - name: Run Claude Code Review
-        id: claude
         uses: ./.github/actions/claude
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

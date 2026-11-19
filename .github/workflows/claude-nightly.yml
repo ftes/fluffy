@@ -50,7 +50,6 @@ jobs:
         with:
           fetch-depth: 0
       - name: Run Claude
-        id: claude
         if: steps.list.outputs.numbers != ''
         uses: ./.github/actions/claude
         with:
@@ -195,7 +194,6 @@ jobs:
           mkdir -p tmp
           gh run view "$run" --log-failed | tail -n 5000 > tmp/ci-failed.log
       - name: Run Claude
-        id: claude
         uses: ./tmp/ci/.github/actions/claude
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -261,7 +259,6 @@ jobs:
         run: mix fluffy.playwright_source
       - run: git switch -c "$NIGHTLY_BRANCH"
       - name: Run Claude
-        id: claude
         uses: ./.github/actions/claude
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -379,7 +376,6 @@ jobs:
           echo "area=$area" >> "$GITHUB_OUTPUT"
 
       - name: Run Claude
-        id: claude
         uses: ./.github/actions/claude
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

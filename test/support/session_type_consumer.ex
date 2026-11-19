@@ -1,7 +1,7 @@
 defmodule Fluffy.Support.SessionTypeConsumer do
   @moduledoc false
 
-  # Compiled by mix quality so Dialyzer checks the public API from a consumer
+  # Compiled by mix lint so Dialyzer checks the public API from a consumer
   # module, where Session.t() must remain compatible throughout the pipeline.
   @spec playwright_session(keyword()) :: Fluffy.Session.t()
   def playwright_session(options), do: Fluffy.start_session(:playwright, options)

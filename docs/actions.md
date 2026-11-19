@@ -217,7 +217,7 @@ limit and per-action override. Error messages and diagnostic artifacts do not
 copy payload contents.
 
 Playwright can also capture a script-opened chooser before the triggering click. Pass
-the chooser directly to `Fluffy.set_input_files/3`; see [Events and
+the chooser directly to `Fluffy.set_input_files/3`; see [Advanced events and
 pages](advanced-events.md#file-choosers).
 
 ## Playwright-only evaluation

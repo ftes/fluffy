@@ -10,7 +10,7 @@ mix setup
 mix test
 ```
 
-`mix.lock.oldest` is `mix.lock` with Phoenix and LiveView at their floors. To move one,
+`mix.lock.oldest` is a lock with Phoenix and LiveView at their floors. To move one,
 require exactly the new floor in `mix.exs`, copy `mix.lock.oldest` to `mix.lock`, run
 `mix deps.update phoenix phoenix_live_view`, keep the result as `mix.lock.oldest`, and
 restore `mix.lock` and the requirement.

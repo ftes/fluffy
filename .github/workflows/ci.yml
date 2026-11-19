@@ -45,10 +45,10 @@ env:
 
 jobs:
   # The newest lane compiles strictly and runs the linters, generators, Dialyzer and docs. The
-  # oldest lane (the Elixir/OTP floor, and the Phoenix and LiveView floors of mix.lock.oldest)
-  # only compiles, warnings allowed: newer, backwards-compatible features may warn there. Its Chromium tests guard the floor, so a call to a function the floor
-  # lacks, only a warning there, fails CI only where they run it. No browser or database. Saves the
-  # deps and _build cache on main.
+  # oldest lane (the Elixir/OTP floor, and the Phoenix and LiveView floors of mix.lock.oldest) only
+  # compiles, warnings allowed: newer, backwards-compatible features may warn there. Its Chromium
+  # tests guard the floor, so a call to a function the floor lacks, only a warning there, fails CI
+  # only where they run it. No browser or database. Saves the deps and _build cache on main.
   checks:
     name: checks (${{ matrix.lane }})
     # Draft PRs skip CI until marked ready, and in a stack only the top PR runs it: it holds every
@@ -121,8 +121,8 @@ jobs:
         # is about 45 s of each job. TEST_PARTITIONS has the same counts.
         partition: ${{ fromJSON('{"1":[1],"2":[1,2],"3":[1,2,3],"4":[1,2,3,4],"5":[1,2,3,4,5],"6":[1,2,3,4,5,6],"7":[1,2,3,4,5,6,7],"8":[1,2,3,4,5,6,7,8]}')[inputs.partitions || '3'] }}
         # The oldest lane checks the Elixir/OTP and dependency floors, which the browser doesn't
-        # depend on. A
-        # dispatch's `browsers` drops the newest lane's others ('none' excludes nothing).
+        # depend on. A dispatch's `browsers` drops the newest lane's others ('none' excludes
+        # nothing).
         exclude:
           - browser: chromium
             partition: ${{ !inputs.partitions && 3 || 'none' }}

@@ -1,6 +1,6 @@
 defmodule Fluffy.Playwright do
   @moduledoc """
-  Browser-only helpers for the active Playwright page.
+  Playwright-only helpers for the active page.
 
   These functions intentionally live under `Fluffy.Playwright` because they
   depend on a real browser. Use them when behavior requires one; they are not
