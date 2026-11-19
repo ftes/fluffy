@@ -14,13 +14,12 @@ defmodule Fluffy.Backend.Phoenix do
   alias Fluffy.ClientDOM
   alias Fluffy.CookieJar
   alias Fluffy.Download
-  alias Fluffy.Driver.External.State, as: ExternalState
   alias Fluffy.Driver.Live, as: LiveDriver
   alias Fluffy.Driver.Live.Document, as: LiveDocument
   alias Fluffy.Driver.Live.State, as: LiveState
   alias Fluffy.Driver.Live.UploadState
+  alias Fluffy.Driver.NoDocument
   alias Fluffy.Driver.Static.State, as: StaticState
-  alias Fluffy.Driver.Unvisited.State, as: UnvisitedState
   alias Fluffy.Internal.Navigation
   alias Fluffy.Internal.Navigation.Link
   alias Fluffy.Internal.Navigation.Patch
@@ -53,7 +52,7 @@ defmodule Fluffy.Backend.Phoenix do
       }
     }
 
-    page = %Page.State{driver: :unvisited, state: %UnvisitedState{}}
+    page = %Page.State{driver: :unvisited, state: %NoDocument.State{}}
     Session.new(__MODULE__, context, page)
   end
 
@@ -182,11 +181,11 @@ defmodule Fluffy.Backend.Phoenix do
     # Playwright-only options such as `wait_until:` raise, as for other actions.
     :ok = Fluffy.Driver.PhoenixValidation.validate_operation!(session, :reload, [options])
 
-    case Session.current_page(session).url do
-      nil ->
-        raise ArgumentError, "cannot reload before the first visit"
+    case Session.current_page(session) do
+      %Page.State{driver: driver} when driver in [:unvisited, :external] ->
+        NoDocument.unsupported!(session, :reload)
 
-      url ->
+      %Page.State{url: url} ->
         visit(session, url)
     end
   end
@@ -598,7 +597,7 @@ defmodule Fluffy.Backend.Phoenix do
   # Its URL reads as a browser reports it, with a lowercase host and at least a `/` path.
   defp commit_external(session, url) do
     url = %{url | host: String.downcase(url.host), path: if(url.path in [nil, ""], do: "/", else: url.path)}
-    replace_document(session, :external, %ExternalState{}, URI.to_string(url))
+    replace_document(session, :external, %NoDocument.State{}, URI.to_string(url))
   end
 
   # The page's previous document stops its LiveView before the new one commits.

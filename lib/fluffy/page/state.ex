@@ -8,10 +8,9 @@ defmodule Fluffy.Page.State do
           id: reference() | nil,
           driver: :unvisited | :static | :live | :external | :playwright,
           state:
-            Fluffy.Driver.Unvisited.State.t()
+            Fluffy.Driver.NoDocument.State.t()
             | Fluffy.Driver.Static.State.t()
             | Fluffy.Driver.Live.State.t()
-            | Fluffy.Driver.External.State.t()
             | Fluffy.Driver.Playwright.State.t(),
           url: String.t() | nil,
           opener: term() | nil,

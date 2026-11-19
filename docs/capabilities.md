@@ -192,6 +192,12 @@ invalid cookie raises `ArgumentError` with Playwright's message, and a key that 
 field, such as `http_only:` for `httpOnly:`, with PlaywrightEx's; a browser session's
 Playwright still drops such a key.
 
+### Before the first visit
+
+A Playwright session starts at `about:blank`, where an action waits for its element until it
+times out. A Phoenix session has no page until its first `visit`: everything else, including
+`reload`, `unwrap` and `open_browser`, raises `ArgumentError` at once.
+
 ### Leaving the app
 
 Phoenix stays in the app. A link, form or redirect to another origin, including a LiveView

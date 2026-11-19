@@ -11,7 +11,7 @@ defmodule Fluffy.PhoenixTest.Form do
     case Session.page_state(session) do
       %Driver.Static.State{client_dom: client_dom} -> structural_owner(client_dom, locator)
       %Driver.Live.State{client_dom: client_dom} -> structural_owner(client_dom, locator)
-      %Driver.External.State{} -> nil
+      %Driver.NoDocument.State{} -> nil
       %Driver.Playwright.State{frame: frame} -> browser_owner(session, frame, locator)
     end
   end

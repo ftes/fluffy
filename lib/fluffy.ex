@@ -157,10 +157,6 @@ defmodule Fluffy do
   @doc false
   @spec open_browser(Session.t(), (String.t() -> term())) :: Session.t()
   def open_browser(%Session{} = session, open_fun) when is_function(open_fun, 1) do
-    if Session.current_driver(session) == :unvisited do
-      raise ArgumentError, "visit a page before calling open_browser/1"
-    end
-
     dispatch_driver(session, :open_browser, [open_fun])
   end
 
@@ -283,18 +279,7 @@ defmodule Fluffy do
   Fluffy API whenever it covers the behavior under test.
   """
   @spec unwrap(Session.t(), (term() -> term())) :: Session.t()
-  def unwrap(%Session{} = session, fun) when is_function(fun, 1), do: dispatch_unwrap(session, :unwrap, fun)
-
-  defp dispatch_unwrap(session, operation, fun) do
-    case Session.current_driver(session) do
-      :unvisited ->
-        raise ArgumentError,
-              "cannot unwrap a Phoenix session before its first visit has classified the page"
-
-      _driver ->
-        dispatch_driver(session, operation, [fun])
-    end
-  end
+  def unwrap(%Session{} = session, fun) when is_function(fun, 1), do: dispatch_driver(session, :unwrap, [fun])
 
   @doc group: "Diagnostics and native access"
   @doc """
@@ -319,7 +304,7 @@ defmodule Fluffy do
   @spec unwrap_and_return(Session.t(), (term() -> result)) :: result when result: term()
   @spec unwrap_and_return(native_value(), (term() -> result)) :: result when result: term()
   def unwrap_and_return(%Session{} = session, fun) when is_function(fun, 1),
-    do: dispatch_unwrap(session, :unwrap_and_return, fun)
+    do: dispatch_driver(session, :unwrap_and_return, [fun])
 
   def unwrap_and_return(%module{} = value, fun) when module in @native_values and is_function(fun, 1),
     do: fun.(native!(value))
