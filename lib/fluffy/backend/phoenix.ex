@@ -216,22 +216,16 @@ defmodule Fluffy.Backend.Phoenix do
   end
 
   @impl true
-  @spec new_page(Session.t()) :: no_return()
-  def new_page(session), do: require_browser_pages!(session, :new_page)
-
-  @impl true
-  @spec history(Session.t(), :go_back | :go_forward, keyword()) :: no_return()
-  def history(session, direction, _options), do: require_browser_pages!(session, direction)
-
-  @impl true
-  @spec close_page(Session.t(), Page.t()) :: no_return()
-  def close_page(%Session{} = session, _page_id), do: require_browser_pages!(session, :close_page)
-
-  @impl true
   def event_source(session, :download, _scope), do: session.active_page
 
   def event_source(session, type, _scope) when type in [:page, :popup, :close, :load, :dom_content_loaded, :crash],
-    do: require_browser_pages!(session, type)
+    do:
+      Fluffy.CapabilityError.require_playwright!(
+        session,
+        :pages,
+        type,
+        "multiple pages, new tabs, and page lifecycle operations require Playwright"
+      )
 
   def event_source(session, :file_chooser, _scope) do
     raise Fluffy.CapabilityError,
@@ -273,14 +267,6 @@ defmodule Fluffy.Backend.Phoenix do
     session = navigate.(session)
 
     if Session.current_page(session).document_id == document_id, do: keep_document(session, nil), else: session
-  end
-
-  defp require_browser_pages!(session, operation) do
-    raise Fluffy.CapabilityError,
-      capability: :pages,
-      operation: operation,
-      driver: Session.current_driver(session),
-      detail: "multiple pages, new tabs, and page lifecycle operations require Playwright"
   end
 
   defp submit(%Session{} = session, submission, redirects) do

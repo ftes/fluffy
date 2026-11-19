@@ -10,23 +10,26 @@ defmodule Fluffy.Driver.NoDocument do
 
   alias Fluffy.Driver.Static
   alias Fluffy.Expect
+  alias Fluffy.Internal.OperationFailure
   alias Fluffy.Session
 
   def validate_operation!(session, operation, arguments) do
     if Session.current_driver(session) == :external and url_expectation?(operation, arguments),
       do: :ok,
-      else: unsupported!(session, operation)
+      else: unsupported!(session, OperationFailure.public_operation(operation, arguments))
   end
 
   defp url_expectation?(:expect, [%Expect{target: :page, kind: :url}]), do: true
   defp url_expectation?(_operation, _arguments), do: false
 
+  # `operation` is the public call's name.
   @spec unsupported!(Session.t(), atom()) :: no_return()
   def unsupported!(session, operation) do
     case Session.current_page(session) do
       %{driver: :external, url: url} ->
         raise Fluffy.CapabilityError,
           capability: :external_navigation,
+          operation: operation,
           driver: :external,
           detail:
             "the app navigated away to #{url}, which has nothing to #{inspect(operation)}; only URL expectations work there"

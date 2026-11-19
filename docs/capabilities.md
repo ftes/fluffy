@@ -200,8 +200,10 @@ Playwright still drops such a key.
 ### Before the first visit
 
 A Playwright session starts at `about:blank`, where an action waits for its element until it
-times out. A Phoenix session has no page until its first `visit`: everything else, including
-`reload`, `unwrap` and `open_browser`, raises `ArgumentError` at once.
+times out. A Phoenix session has no page until its first `visit`: page operations (actions,
+expectations, `reload`, `unwrap`, `open_browser`) raise `ArgumentError` at once. Cookie
+functions work before it, as a login flow needs. `Fluffy.Playwright` calls and Playwright-only
+options raise `Fluffy.CapabilityError`, as on any Phoenix page.
 
 ### Leaving the app
 

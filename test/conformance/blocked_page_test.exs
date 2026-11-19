@@ -45,9 +45,13 @@ defmodule Fluffy.Conformance.BlockedPageTest do
   test "a call without a timeout fails at the document check on a page already blocked" do
     session = frozen_session()
 
-    assert_raise Fluffy.OperationError, ~r/did not respond to Fluffy's document check within 1000ms/, fn ->
-      Playwright.content(session)
-    end
+    error =
+      assert_raise Fluffy.OperationError, ~r/did not respond to Fluffy's document check within 1000ms/, fn ->
+        Playwright.content(session)
+      end
+
+    # The public call, as a failure of Playwright's own in it reports.
+    assert error.operation == :content
   end
 
   test "a blocked page that page code navigated reports its URL without waiting for the page" do

@@ -36,6 +36,9 @@ defmodule Fluffy.Conformance.UnvisitedPageTest do
       assert_raise ArgumentError, ~r/before the first visit/, operation
     end
 
+    # The public call, not the driver's `set_checked`.
+    assert_raise ArgumentError, ~r/no page for :check before/, fn -> check(session, by_label("Letter")) end
+
     session
     |> visit("/chamber")
     |> expect("The guardian sleeps" |> by_text() |> to_be_visible())

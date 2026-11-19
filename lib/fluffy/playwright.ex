@@ -155,7 +155,10 @@ defmodule Fluffy.Playwright do
       |> switch_page(main)
   """
   @spec new_page(Session.t()) :: Fluffy.Page.t()
-  def new_page(%Session{} = session), do: Backend.new_page(session)
+  def new_page(%Session{} = session) do
+    CapabilityError.require_playwright!(session, :pages, :new_page)
+    Backend.new_page(session)
+  end
 
   @doc group: "Lifecycle and navigation"
   @doc playwright_only: true

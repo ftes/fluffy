@@ -2,7 +2,8 @@ defmodule Fluffy.OperationError do
   @moduledoc """
   An operation failure with its backend's original cause.
 
-  `backend` is `:phoenix` or `:playwright`; `driver` identifies the active driver.
+  `backend` is `:phoenix` or `:playwright`; `driver` is the driver of the page the
+  operation started on, so `:unvisited` for a Phoenix session's first `visit` that failed.
   `operation` names the public call and `locator` is the query,
   `Fluffy.FileChooser` handle, or `nil` for an operation on the page as a whole, such
   as a failed navigation. `cause` retains a native Playwright error, a structured Phoenix

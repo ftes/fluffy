@@ -8,9 +8,9 @@ defmodule Fluffy.Internal.OperationFailure do
   alias Fluffy.Session
   alias Fluffy.StrictnessError
 
-  # Turns an error a driver operation raised into what the user sees, once, for both
-  # backends. Phoenix drivers raise structured causes, which element actions, taking their
-  # locator first, wrap; navigation failures come from both backends.
+  # Turns an error a Phoenix driver operation raised into what the user sees: its
+  # structured causes, which element actions, taking their locator first, wrap, and its
+  # navigation failures. The Playwright driver raises its own under the public call's name.
   def normalize(%Session{} = session, operation, arguments, %NavigationFailure{} = failure),
     do: navigation(session, public_operation(operation, arguments), failure)
 
@@ -72,9 +72,10 @@ defmodule Fluffy.Internal.OperationFailure do
     )
   end
 
-  defp public_operation(:set_checked, [_locator, true | _]), do: :check
-  defp public_operation(:set_checked, [_locator, false | _]), do: :uncheck
-  defp public_operation(operation, _arguments), do: operation
+  @doc "The public call's name for a Phoenix driver operation; the Playwright driver holds its own."
+  def public_operation(:set_checked, [_locator, true | _]), do: :check
+  def public_operation(:set_checked, [_locator, false | _]), do: :uncheck
+  def public_operation(operation, _arguments), do: operation
 
   # A Playwright page's driver is always `:playwright`, also once the page has closed.
   defp backend_driver(session) do

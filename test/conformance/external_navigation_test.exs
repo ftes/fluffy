@@ -167,6 +167,11 @@ defmodule Fluffy.Conformance.ExternalNavigationTest do
           ] do
         assert_raise Fluffy.CapabilityError, ~r/external_navigation.*#{Regex.escape(@three_broomsticks)}/, operation
       end
+
+      # The public call, not the driver's `set_checked`.
+      error = assert_raise Fluffy.CapabilityError, fn -> check(session, by_label("Email")) end
+      assert error.operation == :check
+      assert error.message =~ "nothing to :check"
     end
 
     test "visits back into the app", %{fixture: fixture, session: session} do

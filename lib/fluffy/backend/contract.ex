@@ -23,6 +23,9 @@ defmodule Fluffy.Backend.Contract do
   @callback cookies(Session.t(), [String.t()]) :: [map()]
   @callback clear_cookies(Session.t(), keyword() | map()) :: Session.t()
 
+  # Browser pages and history, which `Fluffy.Playwright` gates to a Playwright session.
+  @optional_callbacks new_page: 1, history: 3, close_page: 2
+
   # Metadata and document identity belong to the backend that owns the page.
   @callback page_snapshot(term(), Page.State.t()) :: Page.State.t()
   @callback commit_page(Page.State.t(), atom(), term(), String.t() | nil, keyword()) :: Page.State.t()

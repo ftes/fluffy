@@ -451,9 +451,6 @@ defmodule Fluffy.Options do
   @doc false
   def denied_native_keys, do: @denied_native_keys
 
-  @doc "Options that only a browser can honor."
-  def playwright_option_keys, do: @playwright_option_keys
-
   @doc false
   def expectation_schema, do: @expectation_schema
 

@@ -158,11 +158,21 @@ A browser session's timeouts follow Playwright Test and a Phoenix session's
   and the `i` modifier, or a `Playwright.RegExp` for JavaScript-only syntax.
 - The `Fluffy.Expect.checked_option` type is `to_be_checked_option`.
   `Fluffy.Locator.describe`, `new` and `append` are internal; `inspect/1` renders a locator.
-- On Playwright, a failed `visit`, `reload`, `go_back` or `go_forward` raises
-  `Fluffy.OperationError` instead of a `RuntimeError`. Its `cause`, like that of a
-  failed action, is Playwright's exception.
-- On Phoenix, `go_back` and `go_forward` raise `Fluffy.CapabilityError` with
+- A failed navigation raises `Fluffy.OperationError` instead of a `RuntimeError` on both
+  backends. Its `cause` is Playwright's exception, as for a failed action, or a message
+  from Fluffy: a Phoenix visit that was aborted or redirected too often, or a LiveView that
+  did not connect.
+- A LiveView that exits during a Phoenix operation raises `Fluffy.OperationError` with a
+  `Fluffy.LiveViewError` as its `cause`; rescue the `OperationError`.
+- `Fluffy.CapabilityError.capability` is an id of `Fluffy.Capability.matrix/0`, and the
+  call is in `operation`: match `capability: :browser_pointer_typing, operation: :hover`
+  where you matched `capability: :hover`. `go_back` and `go_forward` on Phoenix raise
   `capability: :browser_history` instead of `:pages`.
+- `browser:` and `browser_context:` on a Phoenix session and `conn:` on a Playwright one
+  raise `Fluffy.CapabilityError` instead of `ArgumentError`.
+- Before a Phoenix session's first `visit`, page operations (actions, expectations,
+  `reload`, `unwrap`, `open_browser`) raise `ArgumentError` instead of mostly
+  `FunctionClauseError`.
 
 ## Workarounds that can go
 

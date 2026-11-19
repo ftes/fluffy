@@ -20,8 +20,8 @@ defmodule Fluffy.CapabilityMatrixTest do
       for file <- Path.wildcard(Path.expand("../lib/**/*.ex", __DIR__)),
           pattern <- [
             ~r/capability: :(\w+)/,
-            ~r/require_playwright!\([^,]+, :(\w+)/,
-            ~r/(?:browser_context!\(|set_context!\(session, ):(\w+)/
+            ~r/require_playwright!\(\s*[^,]+,\s*:(\w+)/,
+            ~r/(?:browser_context!\(|set_context!\(\s*session,)\s*:(\w+)/
           ],
           [_match, id] <- Regex.scan(pattern, File.read!(file)),
           uniq: true,
