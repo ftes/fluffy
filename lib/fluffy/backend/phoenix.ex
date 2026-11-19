@@ -58,8 +58,9 @@ defmodule Fluffy.Backend.Phoenix do
   end
 
   # What a browser context of the test sends (`Playwright.Test.use/1`): its `locale` as
-  # Accept-Language and its `user_agent` as User-Agent, unless a `conn:` has its own, which,
-  # as with `Phoenix.ConnTest.recycle/2`, go with every request. All under the session's
+  # Accept-Language and its `user_agent` as User-Agent, unless a `conn:` has its own, which go
+  # with every request, as a browser's do (`Phoenix.ConnTest.recycle/2` keeps Accept-Language
+  # too). All under the session's
   # `extra_http_headers`, which, as in Playwright, replace the test's as a whole. Later ones are
   # put over earlier ones (`HTTP`).
   defp request_headers(session_headers, conn) do
