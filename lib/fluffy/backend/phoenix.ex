@@ -12,6 +12,7 @@ defmodule Fluffy.Backend.Phoenix do
   alias Fluffy.Backend.Phoenix.HTTP.Client, as: HTTPClient
   alias Fluffy.Backend.Phoenix.HTTP.Response, as: HTTPResponse
   alias Fluffy.ClientDOM
+  alias Fluffy.CookieJar
   alias Fluffy.Download
   alias Fluffy.Driver.External.State, as: ExternalState
   alias Fluffy.Driver.Live, as: LiveDriver
@@ -46,7 +47,7 @@ defmodule Fluffy.Backend.Phoenix do
       http: %HTTPClient{
         base_url: Keyword.fetch!(options, :base_url),
         endpoint: Keyword.fetch!(options, :endpoint),
-        cookie_jar: Fluffy.CookieJar.new(),
+        cookie_jar: CookieJar.new(),
         initial_conn: Keyword.get(options, :conn),
         request_headers: request_headers(options[:extra_http_headers])
       }
@@ -122,6 +123,50 @@ defmodule Fluffy.Backend.Phoenix do
   @impl true
   def absolute_url(%Session{} = session, path) do
     Session.context(session).http.base_url |> URI.merge(path) |> URI.to_string()
+  end
+
+  @impl true
+  def base_url(%Session{} = session), do: http!(session).base_url
+
+  # The session's cookie jar plays the browser context's cookie store: requests send what
+  # it holds when they are made, as a browser does.
+  @impl true
+  def add_cookies(%Session{} = session, cookies) do
+    http = http!(session)
+    put_http(session, %{http | cookie_jar: CookieJar.add_cookies(http.cookie_jar, cookies)})
+  end
+
+  @impl true
+  def cookies(%Session{} = session, urls), do: CookieJar.cookies(http!(session).cookie_jar, urls)
+
+  @clear_cookies_filters [:domain, :name, :path]
+
+  @impl true
+  def clear_cookies(%Session{} = session, options) when is_list(options) or is_map(options) do
+    filters =
+      for {key, value} <- options, value != nil, into: %{} do
+        if key not in @clear_cookies_filters do
+          raise ArgumentError,
+                "clear_cookies: unknown option #{inspect(key)}, expected one of #{inspect(@clear_cookies_filters)}"
+        end
+
+        if not (is_binary(value) or is_struct(value, Regex) or is_struct(value, Playwright.RegExp)) do
+          raise ArgumentError, "clear_cookies: #{inspect(key)} takes a string or a regex, got: #{inspect(value)}"
+        end
+
+        {key, Fluffy.Expect.Internal.reg_exp(value)}
+      end
+
+    http = http!(session)
+    put_http(session, %{http | cookie_jar: CookieJar.clear_cookies(http.cookie_jar, filters)})
+  end
+
+  # A session_for_html/2 session makes no requests.
+  defp http!(session) do
+    case Session.context(session).http do
+      %HTTPClient{} = http -> http
+      nil -> raise ArgumentError, "a session of session_for_html/2 has no base URL or cookies"
+    end
   end
 
   @impl true

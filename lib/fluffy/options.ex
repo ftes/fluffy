@@ -359,7 +359,14 @@ defmodule Fluffy.Options do
                         "Headers sent with every request, replacing the test's `extra_http_headers` as a whole, " <>
                           "as in Playwright."
                     ],
-                    conn: [type: {:struct, Plug.Conn}],
+                    conn: [
+                      type: {:struct, Plug.Conn},
+                      doc:
+                        "*Phoenix only.* A prepared `Plug.Conn` for the first request: its test session " <>
+                          "(`Plug.Test.init_test_session/2`), cookies, headers and assigns go with it, " <>
+                          "as with `Phoenix.ConnTest`. To log in on both backends, add a cookie instead " <>
+                          "([Logging in](usage.md#logging-in))."
+                    ],
                     browser_context: [
                       type: :keyword_list,
                       doc:

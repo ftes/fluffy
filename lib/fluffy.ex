@@ -27,6 +27,7 @@ defmodule Fluffy do
   @moduledoc groups: [
                "Lifecycle and navigation",
                "Actions",
+               "Cookies",
                "Events",
                "Diagnostics and native access"
              ]
@@ -204,6 +205,92 @@ defmodule Fluffy do
     options = Fluffy.Options.validate_action!(:reload, options)
     Backend.reload(session, options)
   end
+
+  @doc group: "Lifecycle and navigation"
+  @doc """
+  Returns the session's base URL, which `visit/2` resolves paths against.
+
+  It is the counterpart of Playwright Test's `baseURL`, resolved as `start_session/2`
+  describes, for building URLs such as a cookie's `url:`.
+  """
+  @spec base_url(Session.t()) :: String.t()
+  def base_url(%Session{} = session), do: Backend.base_url(session)
+
+  @doc group: "Cookies"
+  @doc """
+  Adds cookies to the session and returns it, as Playwright's `browserContext.addCookies`.
+
+  A cookie map takes the keys of `Playwright.BrowserContext.add_cookies/2`: `name:`,
+  `value:` and either `url:` or `domain:` and `path:`, with optional `expires:` (unix
+  seconds, `-1` for a session cookie), `httpOnly:`, `secure:` and `sameSite:` (`"Strict"`,
+  `"Lax"` or `"None"`). A `url:` makes a host-only cookie for its host and directory, secure
+  for `https`; a `domain:` with a leading dot also matches its subdomains.
+
+      add_cookies(session, [%{name: "house", value: "gryffindor", url: base_url(session)}])
+
+  Every request made afterwards sends the cookies that match it, so add them before
+  `visit/2` for the first request. To log in without the UI, see
+  [Logging in](usage.md#logging-in).
+
+  On Phoenix the session's cookie jar holds them; [Cookies](capabilities.md#cookies) says
+  where it differs from a browser.
+  """
+  @spec add_cookies(Session.t(), [map()]) :: Session.t()
+  def add_cookies(%Session{} = session, cookies) when is_list(cookies) do
+    Enum.each(cookies, &reject_snake_case_cookie_keys!/1)
+    Backend.add_cookies(session, cookies)
+  end
+
+  # Playwright ignores unknown cookie keys, such as the snake_case ones Fluffy 0.8 took.
+  @snake_case_cookie_keys %{http_only: :httpOnly, same_site: :sameSite, partition_key: :partitionKey}
+
+  defp reject_snake_case_cookie_keys!(cookie) when is_map(cookie) do
+    for {key, _value} <- cookie,
+        {snake_case, camel_case} <- @snake_case_cookie_keys,
+        key in [snake_case, Atom.to_string(snake_case)] do
+      raise ArgumentError, "cookie key #{inspect(key)} is not a Playwright cookie field; use #{inspect(camel_case)}"
+    end
+  end
+
+  defp reject_snake_case_cookie_keys!(_cookie), do: :ok
+
+  @doc group: "Cookies"
+  @doc """
+  Returns the session's cookies, or those a request to one of `urls` would send, as
+  Playwright's `browserContext.cookies`.
+
+  Cookie maps have Playwright's keys: `name`, `value`, `domain` (with a leading dot when
+  it matches subdomains too), `path`, `expires` (unix seconds, `-1` for a session cookie),
+  `httpOnly`, `secure` and `sameSite`. As in Playwright, it has no timeout.
+  """
+  @spec cookies(Session.t(), String.t() | [String.t()] | nil) :: [map()]
+  def cookies(%Session{} = session, urls \\ nil) do
+    reject_cookies_options!(urls)
+    Backend.cookies(session, List.wrap(urls))
+  end
+
+  # Fluffy 0.8 took `cookies(session, urls: [...], timeout: ...)`; such a list
+  # would now reach Playwright as the URLs.
+  defp reject_cookies_options!([{key, _value} | _] = options) when is_atom(key) do
+    raise ArgumentError,
+          "cookies/2 takes the URL list, not the options #{inspect(Keyword.keys(options))}; " <>
+            "call cookies(session, urls): as in Playwright, it has no timeout"
+  end
+
+  defp reject_cookies_options!(_urls), do: :ok
+
+  @doc group: "Cookies"
+  @doc """
+  Clears the session's cookies and returns the session, as Playwright's
+  `browserContext.clearCookies`.
+
+  The `name:`, `domain:` and `path:` filters, each a string or a regex, limit it to the
+  cookies that match all of them:
+
+      clear_cookies(session, name: ~r/^remember_/)
+  """
+  @spec clear_cookies(Session.t(), Playwright.BrowserContext.clear_cookies_options()) :: Session.t()
+  def clear_cookies(%Session{} = session, options \\ []), do: Backend.clear_cookies(session, options)
 
   @doc group: "Diagnostics and native access"
   @doc """

@@ -214,11 +214,17 @@ defmodule Fluffy.Capability do
       detail: "Back and forward navigation require a real browser history."
     },
     %{
-      id: :browser_context_state,
-      feature: "Browser cookie helpers and storage-state export",
-      drivers: %{static: :browser_only, live: :browser_only, playwright: :equivalent},
+      id: :cookies,
+      feature: "Adding, reading, and clearing cookies",
+      drivers: %{static: :equivalent, live: :equivalent, playwright: :equivalent},
       detail:
-        "Cookie queries and mutation, and storage export and restoration, operate on the Playwright browser context."
+        "add_cookies/2, cookies/2 and clear_cookies/2 follow Playwright's browserContext cookie methods. Phoenix keeps the cookies in the session's jar, which every request sends from; it does not enforce SameSite and ignores partitionKey."
+    },
+    %{
+      id: :browser_context_state,
+      feature: "Browser storage-state export and restoration",
+      drivers: %{static: :browser_only, live: :browser_only, playwright: :equivalent},
+      detail: "Storage export and restoration operate on the Playwright browser context."
     },
     %{
       id: :browser_context_setters,

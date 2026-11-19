@@ -49,6 +49,7 @@ Changes since 0.8.0.
 - Events deliver Playwright's values: a `Playwright.Request`, `Playwright.Response`, `Playwright.Dialog`, `Playwright.ConsoleMessage` and so on. `Fluffy.HTTPEvent` is removed. Page events, `Fluffy.Download` and `Fluffy.FileChooser` stay.
 - `unwrap/2` passes a `%Playwright.Page{}` on Playwright and returns the session; `Fluffy.Playwright.Handle` is removed. Use `unwrap_and_return/2` for the callback's result.
 - `Fluffy.Playwright.evaluate(session, expression, arg)` replaces `is_function:` and `arg:`; JavaScript `null` returns `:null`. `cookies(session, urls)` takes the URL list, cookie maps use Playwright's camelCase keys, and `storage_state/2` returns atom keys.
+- `add_cookies`, `cookies` and `clear_cookies` move from `Fluffy.Playwright` to `Fluffy` and work on Phoenix sessions too, with Playwright's semantics and cookie maps.
 - `Fluffy.Playwright.screenshot` and `pdf` return the image or PDF instead of the session; the path is the optional `path:`.
 - `Fluffy.Download`'s `read!` and `save_as!` are `read` and `save_as`; only its documented fields remain public.
 - `page_status`, `page_to_have_status` and `Fluffy.Page.status` are removed, as in Playwright; assert on `Event.response` instead.
@@ -85,6 +86,7 @@ Changes since 0.8.0.
 - `unwrap_and_return/2` (and `Fluffy.Playwright.unwrap_and_return/3`, facade `unwrap_and_return/2`) returns a native callback's result. A document navigated natively in a callback is adopted.
 - `Fluffy.Download.path`, `Fluffy.Download.page/1` and `Fluffy.FileChooser.page/1`.
 - On Phoenix, a link, form or redirect to another origin ends at a page with that URL, so a test can assert where the app sent it.
+- `Fluffy.base_url/1`, the session's resolved base URL, as Playwright Test's `baseURL`. [Logging in](docs/usage.md#logging-in) shows how to start a test logged in, on both backends.
 
 ### Changed
 

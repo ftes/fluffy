@@ -35,6 +35,11 @@ defmodule Fluffy.Backend do
   end
 
   def absolute_url(session, path), do: Session.backend(session).absolute_url(session, path)
+  def base_url(session), do: dispatch(session, :base_url, [])
+
+  def add_cookies(session, cookies), do: dispatch(session, :add_cookies, [cookies])
+  def cookies(session, urls), do: dispatch(session, :cookies, [urls])
+  def clear_cookies(session, options), do: dispatch(session, :clear_cookies, [options])
 
   def normalize_error(session, operation, arguments, error)
       when is_struct(error, Fluffy.StrictnessError) or is_struct(error, Fluffy.ActionabilityError),

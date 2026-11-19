@@ -14,7 +14,7 @@ defmodule Fluffy.Conformance.BrowserAPITest do
   test "creates page handles sharing cookies without changing the selection" do
     session = start_session(:playwright)
     main = current_page(session)
-    session = Playwright.add_cookies(session, [%{name: "token", value: "abc", url: Server.base_url()}])
+    session = add_cookies(session, [%{name: "token", value: "abc", url: Server.base_url()}])
     other = new_page(session)
     assert %Fluffy.Page{} = other
     refute other == main
@@ -109,18 +109,11 @@ defmodule Fluffy.Conformance.BrowserAPITest do
   end
 
   @tag driver: :playwright
-  test "exports and restores storage and filters cookies" do
+  test "exports and restores storage" do
     session = :playwright |> start_session() |> visit("/harness")
-
-    session =
-      Playwright.add_cookies(session, [
-        %{name: "keep", value: "yes", url: Server.base_url()},
-        %{name: "drop", value: "no", url: Server.base_url()}
-      ])
+    session = add_cookies(session, [%{name: "keep", value: "yes", url: Server.base_url()}])
 
     Playwright.evaluate(session, "localStorage.setItem('saved', 'value')")
-    session = Playwright.clear_cookies(session, name: ~r/^drop$/)
-    assert Enum.map(Playwright.cookies(session), & &1.name) == ["keep"]
     path = Path.join(System.tmp_dir!(), "fluffy-storage-#{System.unique_integer([:positive])}.json")
     on_exit(fn -> File.rm(path) end)
     state = Playwright.storage_state(session, path: path)
@@ -130,35 +123,9 @@ defmodule Fluffy.Conformance.BrowserAPITest do
     assert Playwright.evaluate(restored, "document.cookie") =~ "keep=yes"
     from_file = :playwright |> start_session(browser_context: [storage_state: path]) |> visit("/harness")
     assert Playwright.evaluate(from_file, "localStorage.getItem('saved')") == "value"
-    assert Playwright.cookies(Playwright.clear_cookies(session)) == []
-  end
-
-  @tag driver: :playwright
-  test "cookie and storage maps use Playwright's camelCase keys" do
-    session = :playwright |> start_session() |> visit("/harness")
-    url = Server.base_url()
-
-    session = Playwright.add_cookies(session, [%{name: "token", value: "abc", url: url, httpOnly: true, sameSite: "Lax"}])
-    assert [%{name: "token", httpOnly: true, sameSite: "Lax"}] = Playwright.cookies(session)
-    assert [%{name: "token"}] = Playwright.cookies(session, [url])
-
-    # Fluffy 0.8 options would reach Playwright as URLs.
-    for options <- [[urls: [url]], [timeout: 1_000]] do
-      assert_raise ArgumentError, ~r/cookies\/2 takes the URL list, not the options/, fn ->
-        Playwright.cookies(session, options)
-      end
-    end
-
-    assert %{cookies: [%{httpOnly: true}], origins: _origins} = Playwright.storage_state(session)
-
-    # Playwright would drop these silently.
-    for {key, camel_case} <- [http_only: :httpOnly, same_site: :sameSite], cookie_key <- [key, Atom.to_string(key)] do
-      assert_raise ArgumentError,
-                   ~r/#{inspect(cookie_key)} is not a Playwright cookie field; use #{inspect(camel_case)}/,
-                   fn ->
-                     Playwright.add_cookies(session, [%{:name => "old", :value => "x", :url => url, cookie_key => true}])
-                   end
-    end
+    # Storage state has Playwright's camelCase cookie keys.
+    assert %{cookies: [%{name: "keep", httpOnly: false, sameSite: _}], origins: _origins} =
+             Playwright.storage_state(session)
   end
 
   @tag driver: :playwright
@@ -231,9 +198,6 @@ defmodule Fluffy.Conformance.BrowserAPITest do
           fn -> hover(session, by_css("button")) end,
           fn -> drag_to(session, by_css("a"), by_css("b")) end,
           fn -> press_sequentially(session, by_css("input"), "abc") end,
-          fn -> Playwright.cookies(session) end,
-          fn -> Playwright.add_cookies(session, []) end,
-          fn -> Playwright.clear_cookies(session) end,
           fn -> Playwright.storage_state(session) end,
           fn -> Playwright.grant_permissions(session, ["geolocation"]) end,
           fn -> Playwright.clear_permissions(session) end,

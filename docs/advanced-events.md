@@ -358,11 +358,8 @@ does not operate the OS picker. Choosers require Playwright.
 
 ## Cookies and storage
 
-`Fluffy.Playwright.add_cookies/2` and `Fluffy.Playwright.clear_cookies/2` return the
-session. `Fluffy.Playwright.cookies/2` returns cookie maps; its optional URL list
-filters by URL. Cookie maps use Playwright's camelCase atom keys, such as
-`httpOnly:` and `sameSite:`. `Fluffy.Playwright.clear_cookies/2` accepts string or regex filters for
-`name:`, `domain:`, and `path:`. These helpers operate on the entire browser context.
+`Fluffy.add_cookies/2`, `Fluffy.cookies/2` and `Fluffy.clear_cookies/2` work on both
+backends, on the session's whole browser context (see [Cookies](capabilities.md#cookies)).
 
 `Fluffy.Playwright.storage_state/2` returns a state map with atom keys
 (`:cookies`, `:origins`) and optionally writes JSON with `path:`. Include IndexedDB with `indexed_db: true`. Reuse the result

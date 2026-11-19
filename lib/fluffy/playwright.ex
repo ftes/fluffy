@@ -1012,21 +1012,6 @@ defmodule Fluffy.Playwright do
     Fluffy.__dispatch_driver__(session, :locator_wait_for_function, [locator, expression, arg, options])
   end
 
-  @doc group: "Browser context"
-  @doc playwright_only: true
-  @doc """
-  Adds cookies to the browser context and returns the session.
-
-  Cookie maps use the keys of `Playwright.BrowserContext.add_cookies/2`, such as
-  `%{name: "token", value: "abc", url: url, httpOnly: true, sameSite: "Lax"}`.
-  """
-  @spec add_cookies(Session.t(), [map()]) :: Session.t()
-  def add_cookies(session, cookies) when is_list(cookies) do
-    Enum.each(cookies, &reject_snake_case_cookie_keys!/1)
-    session |> browser_context!(:add_cookies) |> BrowserContext.add_cookies!(cookies)
-    session
-  end
-
   @doc group: "JavaScript"
   @doc playwright_only: true
   @doc """
@@ -1098,51 +1083,6 @@ defmodule Fluffy.Playwright do
   defp add_tag(session, operation, add, options) do
     native = Options.validate_action!(operation, options)
     page_action(session, operation, &with({:ok, tag} <- add.(&1, native), do: Document.release(tag)))
-  end
-
-  # Playwright ignores unknown cookie keys, such as the snake_case ones Fluffy 0.8 took.
-  @snake_case_cookie_keys %{http_only: :httpOnly, same_site: :sameSite, partition_key: :partitionKey}
-
-  defp reject_snake_case_cookie_keys!(cookie) when is_map(cookie) do
-    for {key, _value} <- cookie,
-        {snake_case, camel_case} <- @snake_case_cookie_keys,
-        key in [snake_case, Atom.to_string(snake_case)] do
-      raise ArgumentError, "cookie key #{inspect(key)} is not a Playwright cookie field; use #{inspect(camel_case)}"
-    end
-  end
-
-  defp reject_snake_case_cookie_keys!(_cookie), do: :ok
-
-  @doc group: "Browser context"
-  @doc playwright_only: true
-  @doc "Returns browser cookies, optionally only those for `urls`. See `Playwright.BrowserContext.cookies/2`."
-  @spec cookies(Session.t(), String.t() | [String.t()] | nil) :: [map()]
-  def cookies(session, urls \\ nil) do
-    reject_cookies_options!(urls)
-    session |> browser_context!(:cookies) |> BrowserContext.cookies!(urls)
-  end
-
-  # Fluffy 0.8 took `cookies(session, urls: [...], timeout: ...)`; such a list
-  # would now reach Playwright as the URLs.
-  defp reject_cookies_options!([{key, _value} | _] = options) when is_atom(key) do
-    raise ArgumentError,
-          "cookies/2 takes the URL list, not the options #{inspect(Keyword.keys(options))}; " <>
-            "call cookies(session, urls): as in Playwright, it has no timeout"
-  end
-
-  defp reject_cookies_options!(_urls), do: :ok
-
-  @doc group: "Browser context"
-  @doc playwright_only: true
-  @doc """
-  Clears cookies and returns the session.
-
-  Accepts the filters of `Playwright.BrowserContext.clear_cookies/2`: `name:`, `domain:` and `path:`.
-  """
-  @spec clear_cookies(Session.t(), BrowserContext.clear_cookies_options()) :: Session.t()
-  def clear_cookies(session, options \\ []) do
-    session |> browser_context!(:clear_cookies) |> BrowserContext.clear_cookies!(options)
-    session
   end
 
   @doc group: "Browser context"

@@ -59,7 +59,7 @@ defmodule Fluffy.Support.PlaywrightMembers do
   def counterparts(Playwright.Expect), do: [Fluffy.Expect]
   def counterparts(Playwright.Page), do: [Fluffy, Fluffy.Playwright, Fluffy.Page]
   def counterparts(Playwright.FrameLocator), do: [Fluffy.FrameLocator]
-  def counterparts(Playwright.BrowserContext), do: [Fluffy.Playwright]
+  def counterparts(Playwright.BrowserContext), do: [Fluffy, Fluffy.Playwright]
   def counterparts(Playwright.Clock), do: [Fluffy.Playwright.Clock]
   def counterparts(Playwright.Keyboard), do: [Keyboard]
   def counterparts(Playwright.Mouse), do: [Mouse]
