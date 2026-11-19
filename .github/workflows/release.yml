@@ -1,5 +1,8 @@
 # Publishes a pushed vX.Y.Z tag to Hex, then creates its GitHub release from CHANGELOG.md.
 #
+# Only a tag on a commit of main whose CI passed is published: `verify` checks both, waiting for
+# a CI run still in progress, before the `release` environment's job starts.
+#
 # Hex authenticates the job by workload identity (hex.pm/docs/workload-identity): no API key.
 # The package's workload identity names this file and the `release` environment, so renaming
 # either breaks publishing. Staged publishing holds the release until an owner approves it on
@@ -19,9 +22,42 @@ env:
   MISE_VERSION: "2026.8.14"
 
 jobs:
+  verify:
+    name: Verify the tagged commit
+    runs-on: ubuntu-26.04
+    timeout-minutes: 60
+    permissions:
+      contents: read # compare with main
+      actions: read # CI's runs
+    steps:
+      # CI's run for the push to main that put the commit there, so tag a commit main's CI ran on:
+      # usually its head. A PR's CI runs on its merge ref, and lower PRs of a stack skip it.
+      - name: Check the commit is on main and CI passed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          status=$(gh api "repos/$GH_REPO/compare/main...$GITHUB_SHA" --jq .status)
+          if [ "$status" != identical ] && [ "$status" != behind ]; then
+            echo "::error::$GITHUB_REF_NAME ($GITHUB_SHA) is not on main"
+            exit 1
+          fi
+          while true; do
+            run=$(gh api "repos/$GH_REPO/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&event=push&branch=main" \
+              --jq '.workflow_runs | max_by(.run_started_at) | if . == null then "none" else "\(.status) \(.conclusion)" end')
+            case "$run" in
+              "completed success") exit 0 ;;
+              completed*) echo "::error::CI on $GITHUB_SHA finished: $run"; exit 1 ;;
+              none) echo "::error::No CI run for a push of $GITHUB_SHA to main: tag a commit main's CI ran on"; exit 1 ;;
+            esac
+            echo "CI on $GITHUB_SHA: $run; waiting"
+            sleep 30
+          done
+
   publish:
     name: Publish to Hex and GitHub
-    runs-on: ubuntu-latest
+    needs: verify
+    runs-on: ubuntu-26.04
     environment: release
     timeout-minutes: 360
     permissions:
@@ -31,10 +67,6 @@ jobs:
       RELEASE_TITLE: Fluffy
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - name: Setup languages
-        uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
-        with:
-          version: ${{ env.MISE_VERSION }}
       # Before publishing, so a wrong tag or a missing changelog entry stages nothing on Hex.
       - name: Check the tag and extract the release notes
         run: |
@@ -49,11 +81,10 @@ jobs:
             exit 1
           fi
           echo "VERSION=$version" >> "$GITHUB_ENV"
-      - name: Install dependencies
-        run: |
-          mix local.hex --force
-          mix local.rebar --force
-          mix deps.get
+      - name: Set up toolchain and deps
+        uses: ./.github/actions/setup
+        with:
+          lane: newest
       # No HEX_API_KEY: with one set, Hex would use it instead of the workload identity.
       - name: Publish to Hex and wait for approval
         run: mix hex.publish --yes --wait
