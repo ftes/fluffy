@@ -665,7 +665,7 @@ defmodule Fluffy do
 
     resolve_driver_result(result)
   rescue
-    error -> reraise(Backend.normalize_error(session, operation, arguments, error), __STACKTRACE__)
+    error -> reraise(Fluffy.Internal.OperationFailure.normalize(session, operation, arguments, error), __STACKTRACE__)
   end
 
   defp resolve_driver_result(%Session{} = session), do: session

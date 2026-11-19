@@ -140,14 +140,15 @@ defmodule Fluffy.Conformance.UnwrapTest do
     test "raises when the callback kills the LiveView" do
       session = :phoenix |> start_test_session() |> visit("/live/three-heads")
 
-      assert_raise Fluffy.LiveViewError, fn ->
-        unwrap_and_return(session, fn view ->
-          Process.exit(view.pid, :kill)
-          ref = Process.monitor(view.pid)
-          assert_receive {:DOWN, ^ref, :process, _pid, _reason}
-          :unreachable
-        end)
-      end
+      assert %Fluffy.OperationError{cause: %Fluffy.LiveViewError{}} =
+               assert_raise(Fluffy.OperationError, fn ->
+                 unwrap_and_return(session, fn view ->
+                   Process.exit(view.pid, :kill)
+                   ref = Process.monitor(view.pid)
+                   assert_receive {:DOWN, ^ref, :process, _pid, _reason}
+                   :unreachable
+                 end)
+               end)
     end
 
     @tag driver: :live

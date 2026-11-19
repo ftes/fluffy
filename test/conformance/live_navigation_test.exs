@@ -299,7 +299,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
   test "a connected-mount redirect loop fails at the redirect limit" do
     session = live_session(:phoenix)
 
-    assert_raise RuntimeError, ~r/exceeded 20 redirects/, fn ->
+    assert_raise Fluffy.OperationError, ~r/exceeded 20 redirects/, fn ->
       visit(session, "/live/chamber-map?redirect=ping")
     end
   end
@@ -308,7 +308,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
   test "an action on views that keep navigating to each other fails at the redirect limit" do
     # Each view navigates as it connects, so the action never finds its target
     # and follows each navigation instead.
-    assert_raise RuntimeError, ~r/exceeded 20 redirects/, fn ->
+    assert_raise Fluffy.OperationError, ~r/exceeded 20 redirects/, fn ->
       :phoenix
       |> live_session()
       |> visit("/live/chamber-map?async=loop")
@@ -330,7 +330,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
       |> visit("/live/chamber-map?async=chain")
       |> await_unread_navigation(:phoenix, nil)
 
-    assert_raise RuntimeError, ~r/exceeded 20 redirects/, fn ->
+    assert_raise Fluffy.OperationError, ~r/exceeded 20 redirects/, fn ->
       fill(session, by_label("Map note"), "north")
     end
   end
@@ -352,7 +352,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     send(self(), view_exit)
 
     for _attempt <- 1..2 do
-      assert_raise RuntimeError, ~r/exceeded 20 redirects at .*\/redirect\/loop/, fn ->
+      assert_raise Fluffy.OperationError, ~r/exceeded 20 redirects at .*\/redirect\/loop/, fn ->
         fill(session, by_label("Map note"), "north")
       end
     end
@@ -373,7 +373,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     send(self(), view_exit)
 
     for _attempt <- 1..2 do
-      assert_raise RuntimeError, ~r/exceeded 20 redirects at .*\/redirect\/loop/, fn ->
+      assert_raise Fluffy.OperationError, ~r/exceeded 20 redirects at .*\/redirect\/loop/, fn ->
         expect(session, Fluffy.Expect.to_be_visible(by_label("Map note")))
       end
     end
@@ -394,7 +394,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     send(self(), view_exit)
 
     for _attempt <- 1..2 do
-      assert_raise RuntimeError, ~r/exceeded 20 redirects at .*\/redirect\/loop/, fn ->
+      assert_raise Fluffy.OperationError, ~r/exceeded 20 redirects at .*\/redirect\/loop/, fn ->
         unwrap(session, fn _view -> :ok end)
       end
     end
@@ -404,11 +404,11 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
   test "the next call follows a navigation an action that reached the view could not follow" do
     session = :phoenix |> live_session() |> visit("/live/keyboard")
 
-    assert_raise RuntimeError, ~r/exceeded 20 redirects at .*\/redirect\/loop/, fn ->
+    assert_raise Fluffy.OperationError, ~r/exceeded 20 redirects at .*\/redirect\/loop/, fn ->
       press(session, by_label("Unfollowable key", exact: true), "Enter")
     end
 
-    assert_raise RuntimeError, ~r/exceeded 20 redirects at .*\/redirect\/loop/, fn ->
+    assert_raise Fluffy.OperationError, ~r/exceeded 20 redirects at .*\/redirect\/loop/, fn ->
       expect(session, "Step: initial" |> by_text(exact: true) |> to_be_visible())
     end
   end
@@ -439,7 +439,9 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     Phoenix.LiveViewTest.render_click(state.view, "patch_then_die", %{})
     assert_receive {:DOWN, ^proxy_reference, :process, ^proxy_pid, _reason}, 1_000
 
-    assert_raise Fluffy.LiveViewError, fn -> fill(session, by_label("Map note"), "north", timeout: 500) end
+    assert %Fluffy.OperationError{cause: %Fluffy.LiveViewError{}} =
+             assert_raise(Fluffy.OperationError, fn -> fill(session, by_label("Map note"), "north", timeout: 500) end)
+
     assert URI.parse(Fluffy.Session.current_page(session).url).query == "step=patched"
   end
 
@@ -482,7 +484,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
   test "an expectation on views that keep navigating to each other fails at the redirect limit" do
     session = :phoenix |> live_session() |> visit("/live/chamber-map?async=loop")
 
-    assert_raise RuntimeError, ~r/exceeded 20 redirects/, fn ->
+    assert_raise Fluffy.OperationError, ~r/exceeded 20 redirects/, fn ->
       expect(session, Fluffy.Expect.page_to_have_url("/nowhere"), timeout: 5_000)
     end
   end
@@ -513,7 +515,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
   test "a LiveView whose connection LiveView rejects fails with the rejection instead of redirecting to itself" do
     session = live_session(:phoenix)
 
-    assert_raise RuntimeError, ~r/rejected the connection to .*\/unrouted-live as stale or unauthorized/, fn ->
+    assert_raise Fluffy.OperationError, ~r/rejected the connection to .*\/unrouted-live as stale or unauthorized/, fn ->
       visit(session, "/unrouted-live")
     end
   end

@@ -9,6 +9,7 @@ defmodule Fluffy.Backend.Playwright.Document do
 
   alias Fluffy.Backend.Playwright.Bounded
   alias Fluffy.Deadline
+  alias Fluffy.Internal.NavigationFailure
   alias Playwright.Frame
   alias Playwright.JSHandle
 
@@ -133,7 +134,8 @@ defmodule Fluffy.Backend.Playwright.Document do
           else: raise(error)
 
       :timeout ->
-        raise "the page did not respond to Fluffy's document check within #{timeout}ms; " <>
+        raise NavigationFailure,
+              "the page did not respond to Fluffy's document check within #{timeout}ms; " <>
                 "a script may be blocking its main thread, or a dialog (alert, confirm) may be waiting " <>
                 "to be accepted or dismissed"
     end
@@ -156,7 +158,8 @@ defmodule Fluffy.Backend.Playwright.Document do
         raise error
 
       {:error, error} ->
-        raise "LiveView browser connection failed for #{inspect(destination)}: expected every LiveView root " <>
+        raise NavigationFailure,
+              "LiveView browser connection failed for #{inspect(destination)}: expected every LiveView root " <>
                 "to be connected with its join complete, got: " <> Exception.message(error)
     end
   end
@@ -176,7 +179,8 @@ defmodule Fluffy.Backend.Playwright.Document do
         raise error
 
       {:error, error} ->
-        raise "LiveView browser navigation failed for #{inspect(destination)}: expected redirect completion " <>
+        raise NavigationFailure,
+              "LiveView browser navigation failed for #{inspect(destination)}: expected redirect completion " <>
                 "before [data-phx-main].phx-connected, got: " <> Exception.message(error)
     end
   end
@@ -188,9 +192,14 @@ defmodule Fluffy.Backend.Playwright.Document do
     expression = "cursor => window.__fluffy?.navigations.slice(cursor).every(event => event.complete) ?? true"
 
     case Frame.wait_for_function(frame, expression, cursor, timeout: timeout) do
-      {:ok, handle} -> release(handle)
-      {:error, %Playwright.TargetClosedError{} = error} -> raise error
-      {:error, error} -> raise "LiveView browser navigation did not complete: " <> Exception.message(error)
+      {:ok, handle} ->
+        release(handle)
+
+      {:error, %Playwright.TargetClosedError{} = error} ->
+        raise error
+
+      {:error, error} ->
+        raise NavigationFailure, "LiveView browser navigation did not complete: " <> Exception.message(error)
     end
   end
 

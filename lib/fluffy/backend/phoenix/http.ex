@@ -71,7 +71,8 @@ defmodule Fluffy.Backend.Phoenix.HTTP do
   end
 
   def count_redirect!(redirects, %URI{} = url) when redirects >= @max_redirects do
-    raise "Phoenix request exceeded #{@max_redirects} redirects at #{URI.to_string(url)}"
+    raise Fluffy.Internal.NavigationFailure,
+          "Phoenix request exceeded #{@max_redirects} redirects at #{URI.to_string(url)}"
   end
 
   def count_redirect!(redirects, %URI{}), do: redirects + 1

@@ -95,9 +95,8 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
 
       session = start_test_session(driver)
 
-      assert_raise navigation_error(driver), fn ->
-        visit(session, HTTPFixtures.path(fixture, "/loop"))
-      end
+      error = assert_raise Fluffy.OperationError, fn -> visit(session, HTTPFixtures.path(fixture, "/loop")) end
+      assert {error.backend, error.operation, error.locator} == {driver, :visit, nil}
 
       assert length(HTTPFixtures.requests(fixture)) >= 20
     end
@@ -113,13 +112,16 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
             %{status: unquote(status)}
           ])
 
-        assert_raise navigation_error(driver), ~r/abort|interrupt/i, fn ->
-          driver |> start_test_session() |> visit(HTTPFixtures.path(fixture, "/empty"))
-        end
+        error =
+          assert_raise Fluffy.OperationError, ~r/abort|interrupt/i, fn ->
+            driver |> start_test_session() |> visit(HTTPFixtures.path(fixture, "/empty"))
+          end
+
+        assert {error.backend, error.operation, error.locator} == {driver, :visit, nil}
 
         session = driver |> start_test_session() |> visit(HTTPFixtures.path(fixture, "/owls"))
 
-        assert_raise navigation_error(driver), ~r/abort|interrupt/i, fn ->
+        assert_raise Fluffy.OperationError, ~r/abort|interrupt/i, fn ->
           visit(session, HTTPFixtures.path(fixture, "/empty"))
         end
 
@@ -137,7 +139,7 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
 
         session = driver |> start_test_session() |> visit(HTTPFixtures.path(fixture, "/owls"))
 
-        assert_raise navigation_error(driver), ~r/abort|interrupt/i, fn ->
+        assert_raise Fluffy.OperationError, ~r/abort|interrupt/i, fn ->
           visit(session, HTTPFixtures.path(fixture, "/beacon"))
         end
 
@@ -182,8 +184,4 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
   defp html(text) do
     "<!doctype html><html><body><main><h1>#{text}</h1></main></body></html>"
   end
-
-  # Playwright raises its own exception for a failed navigation.
-  defp navigation_error(:playwright), do: Fluffy.OperationError
-  defp navigation_error(:phoenix), do: RuntimeError
 end

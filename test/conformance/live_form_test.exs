@@ -524,7 +524,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
   test "a form triggered on every connected render fails at the redirect limit" do
     session = start_test_session(:phoenix)
 
-    assert_raise RuntimeError, ~r/exceeded 20 redirects/, fn ->
+    assert_raise Fluffy.OperationError, ~r/exceeded 20 redirects/, fn ->
       visit(session, "/live/trigger-on-connect?trigger=loop")
     end
   end

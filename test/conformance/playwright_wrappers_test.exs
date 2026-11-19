@@ -425,7 +425,7 @@ defmodule Fluffy.Conformance.PlaywrightWrappersTest do
       session = :playwright |> session_for_html("<p>Harness</p>") |> freeze_page()
       started = System.monotonic_time(:millisecond)
 
-      assert_raise RuntimeError, ~r/document check within 1000ms/, fn ->
+      assert_raise Fluffy.OperationError, ~r/document check within 1000ms/, fn ->
         Playwright.wait_for_function(session, "() => false", nil, timeout: 1_000)
       end
 

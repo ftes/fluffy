@@ -6,13 +6,17 @@ The snippets assume the imports from [Your first test](usage.md#your-first-test)
 
 Element-action failures raise `Fluffy.OperationError` across drivers. Rescue it
 uniformly and inspect `backend`, `driver`, `operation`, `locator` (or file-chooser
-handle), and `cause` for details. This includes `submit` and file selection, and on
-Playwright also `visit`, `reload`, history navigation, clock calls, and the page
-handling around an `unwrap` callback, whose own errors pass through.
+handle), and `cause` for details. This includes `submit` and file selection, failed
+navigations on both backends (`visit`, `reload`, and the navigation an action starts,
+with `locator: nil`), and on Playwright also history navigation, clock calls, and the
+page handling around an `unwrap` callback, whose own errors pass through.
 
 For Playwright, `cause` is the native Playwright exception (such as
 `Playwright.TimeoutError`), including its call log. For Phoenix, it retains `Fluffy.StrictnessError` or
-`Fluffy.ActionabilityError`, including structural reasons and candidates. LiveView
+`Fluffy.ActionabilityError`, including structural reasons and candidates, or
+`Fluffy.LiveViewError` when the LiveView exited. When Fluffy finds a navigation failed,
+such as a response the browser would abort, too many redirects, or LiveViews that did
+not connect, `cause` is a message saying why. LiveView
 finishes its action retries before wrapping the final failure. Browser failures
 are not classified by parsing messages or inspecting a later DOM snapshot.
 

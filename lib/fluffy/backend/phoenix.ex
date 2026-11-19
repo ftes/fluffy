@@ -25,6 +25,7 @@ defmodule Fluffy.Backend.Phoenix do
   alias Fluffy.Internal.Navigation.Redirect
   alias Fluffy.Internal.Navigation.StaticConn
   alias Fluffy.Internal.Navigation.Submission
+  alias Fluffy.Internal.NavigationFailure
   alias Fluffy.Page
   alias Fluffy.Session
 
@@ -121,10 +122,6 @@ defmodule Fluffy.Backend.Phoenix do
   end
 
   @impl true
-  def normalize_error(session, operation, arguments, error),
-    do: Fluffy.Internal.OperationFailure.normalize(session, operation, arguments, error)
-
-  @impl true
   def absolute_url(%Session{} = session, path) do
     Session.context(session).http.base_url |> URI.merge(path) |> URI.to_string()
   end
@@ -169,7 +166,8 @@ defmodule Fluffy.Backend.Phoenix do
     # Playwright's goto fails when the browser aborts the navigation; the
     # browser keeps the cookies the response set.
     if match?(%{conn: %{status: status}} when status in @no_content_statuses, response) do
-      raise "Phoenix visit to #{URI.to_string(response.request.url)} was aborted by HTTP #{response.conn.status}"
+      raise NavigationFailure,
+            "Phoenix visit to #{URI.to_string(response.request.url)} was aborted by HTTP #{response.conn.status}"
     end
 
     finish_response(session, response, nil)
@@ -465,7 +463,8 @@ defmodule Fluffy.Backend.Phoenix do
       # reports that as a redirect to the URL being mounted, where the LiveView
       # client would reload the page, so following it would only loop.
       {:error, {:redirect, %{to: ^mounted_url} = options} = reason} when map_size(options) == 1 ->
-        raise "LiveView navigation failed: LiveView rejected the connection to #{mounted_url} as stale or " <>
+        raise NavigationFailure,
+              "LiveView navigation failed: LiveView rejected the connection to #{mounted_url} as stale or " <>
                 "unauthorized, such as for a live_session or on_mount mismatch: #{inspect(reason)}"
 
       # The view redirected in its connected mount. A browser follows it.
@@ -473,7 +472,7 @@ defmodule Fluffy.Backend.Phoenix do
         follow_mount_redirect(session, redirect, url, redirects)
 
       {:error, reason} ->
-        raise "LiveView navigation failed: #{inspect(reason)}"
+        raise NavigationFailure, "LiveView navigation failed: #{inspect(reason)}"
     end
   end
 
@@ -482,7 +481,7 @@ defmodule Fluffy.Backend.Phoenix do
   end
 
   defp commit_response(conn, _session, url, _redirects) do
-    raise "Phoenix navigation failed with HTTP #{conn.status} for #{URI.to_string(url)}"
+    raise NavigationFailure, "Phoenix navigation failed with HTTP #{conn.status} for #{URI.to_string(url)}"
   end
 
   defp put_http(%Session{} = session, %HTTPClient{} = http) do
