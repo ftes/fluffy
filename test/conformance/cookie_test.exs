@@ -135,7 +135,7 @@ defmodule Fluffy.Conformance.CookieTest do
         url = base_url(session)
 
         assert_raise ArgumentError,
-                     ~r/browserContext.addCookies: unknown field :http_only, expected one of :domain, .*:httpOnly/,
+                     ~r/browserContext.addCookies: unknown field :http_only, expected one of .*:domain, .*:httpOnly/,
                      fn ->
                        add_cookies(session, [
                          %{name: "valid", value: "v", url: url},
@@ -148,7 +148,11 @@ defmodule Fluffy.Conformance.CookieTest do
         end
 
         assert cookies(session) == []
-        add_cookies(session, [%{name: "spell", value: "x", url: url, partitionKey: "https://hogwarts.example"}])
+
+        add_cookies(session, [
+          %{name: "spell", value: "x", url: url, partitionKey: "https://hogwarts.example", _crHasCrossSiteAncestor: false}
+        ])
+
         assert [%{name: "spell"}] = cookies(session)
       end
     end

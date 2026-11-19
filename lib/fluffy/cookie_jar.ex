@@ -25,9 +25,12 @@ defmodule Fluffy.CookieJar do
     sameSite: :same_site
   ]
 
-  # The protocol's `SetNetworkCookie` fields, as `api.json` gives them; `partitionKey` is
-  # accepted and ignored. Another key raises, as PlaywrightEx raises for a nested object's.
-  @known_fields @fields |> Keyword.keys() |> Enum.concat([:partitionKey]) |> Enum.sort()
+  # The protocol's `SetNetworkCookie` fields. `partitionKey` and `_crHasCrossSiteAncestor`,
+  # which Chromium's `cookies()` gives partitioned cookies, are accepted and ignored, so a
+  # browser session's cookies round-trip. Another key raises, as PlaywrightEx raises for a
+  # nested object's.
+  @known_fields @fields |> Keyword.keys() |> Enum.concat([:partitionKey, :_crHasCrossSiteAncestor]) |> Enum.sort()
+  @known_names Enum.map(@known_fields, &Atom.to_string/1)
 
   def new, do: %__MODULE__{}
 
@@ -113,7 +116,7 @@ defmodule Fluffy.CookieJar do
 
   # network.ts `rewriteCookies`, after checking the protocol's field types.
   defp rewrite_cookie!(cookie) when is_map(cookie) do
-    for {key, _value} <- cookie, to_string(key) not in Enum.map(@known_fields, &Atom.to_string/1) do
+    for {key, _value} <- cookie, to_string(key) not in @known_names do
       raise ArgumentError,
             "browserContext.addCookies: unknown field #{inspect(key)}, expected one of " <>
               Enum.map_join(@known_fields, ", ", &inspect/1)
