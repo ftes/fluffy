@@ -475,6 +475,27 @@ defmodule Fluffy.Options do
   @spec validate_action!(atom(), keyword()) :: keyword()
   def validate_action!(action, options), do: NimbleOptions.validate!(options, action_schema(action))
 
+  @doc """
+  Validates a cross-driver action's options for `session`. A Phoenix session raises
+  `Fluffy.CapabilityError` for an option only Playwright honors, so its drivers get `timeout:`
+  at most.
+  """
+  @spec validate_action!(Fluffy.Session.t(), atom(), keyword()) :: keyword()
+  def validate_action!(%Fluffy.Session{} = session, action, options) do
+    options = validate_action!(action, options)
+
+    with Fluffy.Backend.Phoenix <- Fluffy.Session.backend(session),
+         key when not is_nil(key) <- Enum.find(Keyword.keys(options), &(&1 in @playwright_option_keys)) do
+      raise Fluffy.CapabilityError,
+        capability: :playwright_action_options,
+        operation: action,
+        driver: Fluffy.Session.current_driver(session),
+        detail: "#{inspect(key)} is a Playwright option"
+    end
+
+    options
+  end
+
   @doc "Validates the options of a call that, as in Playwright, takes none."
   @spec validate_untimed!(keyword()) :: keyword()
   def validate_untimed!(options), do: NimbleOptions.validate!(options, @untimed_schema)

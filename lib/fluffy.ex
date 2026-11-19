@@ -198,7 +198,7 @@ defmodule Fluffy do
   """
   @spec reload(Session.t(), [reload_option()]) :: Session.t()
   def reload(%Session{} = session, options \\ []) do
-    options = Fluffy.Options.validate_action!(:reload, options)
+    options = Fluffy.Options.validate_action!(session, :reload, options)
     Backend.reload(session, options)
   end
 
@@ -401,7 +401,7 @@ defmodule Fluffy do
   """
   @spec click(Session.t(), Fluffy.Locator.t(), [click_option()]) :: Session.t()
   def click(%Session{} = session, locator, options \\ []) do
-    options = Fluffy.Options.validate_action!(:click, options)
+    options = Fluffy.Options.validate_action!(session, :click, options)
     dispatch_driver(session, :click, [locator, options])
   end
 
@@ -442,7 +442,7 @@ defmodule Fluffy do
   """
   @spec fill(Session.t(), Fluffy.Locator.t(), String.Chars.t(), [fill_option()]) :: Session.t()
   def fill(%Session{} = session, locator, value, options \\ []) do
-    options = Fluffy.Options.validate_action!(:fill, options)
+    options = Fluffy.Options.validate_action!(session, :fill, options)
     dispatch_driver(session, :fill, [locator, to_string(value), options])
   end
 
@@ -458,7 +458,7 @@ defmodule Fluffy do
   """
   @spec clear(Session.t(), Fluffy.Locator.t(), [clear_option()]) :: Session.t()
   def clear(%Session{} = session, locator, options \\ []) do
-    options = Fluffy.Options.validate_action!(:clear, options)
+    options = Fluffy.Options.validate_action!(session, :clear, options)
     dispatch_driver(session, :clear, [locator, options])
   end
 
@@ -544,7 +544,7 @@ defmodule Fluffy do
   """
   @spec check(Session.t(), Fluffy.Locator.t(), [check_option()]) :: Session.t()
   def check(%Session{} = session, locator, options \\ []) do
-    options = Fluffy.Options.validate_action!(:check, options)
+    options = Fluffy.Options.validate_action!(session, :check, options)
     dispatch_driver(session, :set_checked, [locator, true, options])
   end
 
@@ -560,7 +560,7 @@ defmodule Fluffy do
   """
   @spec uncheck(Session.t(), Fluffy.Locator.t(), [uncheck_option()]) :: Session.t()
   def uncheck(%Session{} = session, locator, options \\ []) do
-    options = Fluffy.Options.validate_action!(:uncheck, options)
+    options = Fluffy.Options.validate_action!(session, :uncheck, options)
     dispatch_driver(session, :set_checked, [locator, false, options])
   end
 
@@ -576,7 +576,7 @@ defmodule Fluffy do
   """
   @spec set_checked(Session.t(), Fluffy.Locator.t(), boolean(), [set_checked_option()]) :: Session.t()
   def set_checked(%Session{} = session, locator, checked, options \\ []) when is_boolean(checked) do
-    options = Fluffy.Options.validate_action!(:set_checked, options)
+    options = Fluffy.Options.validate_action!(session, :set_checked, options)
     dispatch_driver(session, :set_checked, [locator, checked, options])
   end
 
@@ -599,7 +599,7 @@ defmodule Fluffy do
   """
   @spec select_option(Session.t(), Fluffy.Locator.t(), term(), [select_option_option()]) :: Session.t()
   def select_option(%Session{} = session, locator, requested, options \\ []) do
-    options = Fluffy.Options.validate_action!(:select_option, options)
+    options = Fluffy.Options.validate_action!(session, :select_option, options)
     requested = if is_list(requested), do: requested, else: [requested]
     requested = Enum.map(requested, &stringify_option/1)
 
@@ -646,7 +646,7 @@ defmodule Fluffy do
   """
   @spec press(Session.t(), Fluffy.Locator.t(), String.t(), [press_option()]) :: Session.t()
   def press(%Session{} = session, locator, key, options \\ []) when is_binary(key) do
-    options = Fluffy.Options.validate_action!(:press, options)
+    options = Fluffy.Options.validate_action!(session, :press, options)
 
     dispatch_driver(session, :press, [locator, key, options])
   end

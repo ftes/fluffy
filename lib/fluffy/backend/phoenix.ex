@@ -174,10 +174,7 @@ defmodule Fluffy.Backend.Phoenix do
   end
 
   @impl true
-  def reload(%Session{} = session, options \\ []) do
-    # Playwright-only options such as `wait_until:` raise, as for other actions.
-    :ok = Fluffy.Driver.PhoenixValidation.validate_operation!(session, :reload, [options])
-
+  def reload(%Session{} = session, _options \\ []) do
     case Session.current_page(session) do
       %Page.State{driver: driver} when driver in [:unvisited, :external] ->
         NoDocument.unsupported!(session, :reload)

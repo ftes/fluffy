@@ -76,17 +76,6 @@ defmodule Fluffy.Driver.PhoenixValidation do
     end
   end
 
-  defp validate_argument!(driver, operation, [{key, _value} | _] = options) when is_atom(key) do
-    if key =
-         Keyword.keyword?(options) && Enum.find(Keyword.keys(options), &(&1 in Fluffy.Options.playwright_option_keys())) do
-      raise CapabilityError,
-        capability: :playwright_action_options,
-        operation: operation,
-        driver: driver,
-        detail: "#{inspect(key)} is a Playwright option"
-    end
-  end
-
   defp validate_argument!(_driver, _operation, _argument), do: :ok
 
   defp browser_only_expectation!(driver, operation) do

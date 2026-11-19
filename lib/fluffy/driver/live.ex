@@ -49,7 +49,6 @@ defmodule Fluffy.Driver.Live do
   def expect(%Session{} = session, %Expect{} = expectation) do
     deadline =
       expectation.options
-      |> Keyword.validate!([:timeout])
       |> Timeouts.get(&Timeouts.phoenix/0)
       |> Retry.deadline()
 
@@ -674,7 +673,6 @@ defmodule Fluffy.Driver.Live do
     deadline =
       arguments
       |> List.last()
-      |> Keyword.validate!([:timeout])
       |> Timeouts.get(&Timeouts.phoenix/0)
       |> Retry.deadline()
 
