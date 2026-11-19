@@ -49,7 +49,8 @@ matched once can now match twice.
 - Browser sessions use Playwright's `en-US` locale instead of `en`, and Phoenix sessions,
   which sent no Accept-Language before, now send the test's `locale` (`en-US` by default)
   unless a `conn:` sets its own. An app that picks its language from the request can render
-  another one in Phoenix tests: set `use Playwright.Test, locale: ...` to the one you expect.
+  another one in Phoenix tests: set the one you expect with `use Playwright.Test, locale: ...`,
+  or for one test with `@tag Playwright.Test.use(locale: ...)` ([Configuration](installation.md#configuration)).
 - `start_session`'s `headers: [{name, value}]` is now `extra_http_headers: %{name => value}`,
   which replaces the test's `extra_http_headers` as in Playwright instead of merging into them.
   `base_url` and `extra_http_headers` in `browser_context:` raise: pass them to the session.
