@@ -61,6 +61,8 @@ defmodule Fluffy.CookieJar do
   # Playwright's `browserContext.addCookies`: every cookie is checked and normalized
   # first (network.ts `rewriteCookies`), so an invalid one adds none.
   def add_cookies(%__MODULE__{} = jar, cookies) when is_list(cookies) do
+    cookies |> Enum.with_index() |> Enum.each(&check_fields!/1)
+
     cookies
     |> Enum.map(&rewrite_cookie!/1)
     |> Enum.reduce(jar, fn cookie, jar ->
@@ -114,14 +116,22 @@ defmodule Fluffy.CookieJar do
     %{jar | cookies: cookies}
   end
 
-  # network.ts `rewriteCookies`, after checking the protocol's field types.
-  defp rewrite_cookie!(cookie) when is_map(cookie) do
-    for {key, _value} <- cookie, to_string(key) not in @known_names do
+  # PlaywrightEx's check of a nested object's keys, with its message.
+  defp check_fields!({cookie, index}) when is_map(cookie) do
+    for {key, _value} <- cookie, not ((is_atom(key) or is_binary(key)) and to_string(key) in @known_names) do
       raise ArgumentError,
-            "browserContext.addCookies: unknown field #{inspect(key)}, expected one of " <>
+            "browserContext.addCookies: unknown field cookies[#{index}].#{field_name(key)}, expected one of " <>
               Enum.map_join(@known_fields, ", ", &inspect/1)
     end
+  end
 
+  defp check_fields!(_cookie_and_index), do: :ok
+
+  defp field_name(key) when is_atom(key), do: Atom.to_string(key)
+  defp field_name(key), do: inspect(key)
+
+  # network.ts `rewriteCookies`, after checking the protocol's field types.
+  defp rewrite_cookie!(cookie) when is_map(cookie) do
     cookie = Map.new(cookie, fn {key, value} -> {to_string(key), value} end)
 
     fields =
