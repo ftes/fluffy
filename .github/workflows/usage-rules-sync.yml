@@ -13,7 +13,6 @@ concurrency:
 permissions: {}
 
 env:
-  MISE_VERSION: "2026.8.14" # as ci.yml
   MIX_ENV: test
 
 jobs:

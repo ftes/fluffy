@@ -17,10 +17,6 @@ on:
 permissions:
   contents: read
 
-env:
-  # As ci.yml: mise.jdx.dev/VERSION can race GitHub release assets.
-  MISE_VERSION: "2026.8.14"
-
 jobs:
   verify:
     name: Verify the tagged commit

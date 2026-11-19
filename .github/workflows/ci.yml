@@ -41,9 +41,6 @@ permissions:
   contents: read
 
 env:
-  # Temporary workaround for mise.jdx.dev/VERSION racing GitHub release assets.
-  # Remove once upstream guarantees that advertised versions are downloadable.
-  MISE_VERSION: "2026.8.14"
   MIX_ENV: test
 
 jobs:
