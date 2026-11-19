@@ -226,3 +226,20 @@ end
 Cookies added before `visit/2` go with the first request, as in a browser. A Phoenix-only
 alternative is `start_session(:phoenix, conn: log_in_user(build_conn(), wizard))`: the
 prepared conn's test session goes with the first request.
+
+## Accessibility testing
+
+Follow PlaywrightEx's
+[Accessibility testing](https://hexdocs.pm/playwright_ex/testing-with-exunit.html#accessibility-testing)
+recipe on a Playwright session, with `Fluffy.Playwright.add_script_tag/2` and
+`Fluffy.Playwright.evaluate/2` in place of its `Page` calls:
+
+```elixir
+results =
+  session
+  |> visit("/owlery")
+  |> Fluffy.Playwright.add_script_tag(path: axe_path)
+  |> Fluffy.Playwright.evaluate("() => axe.run()")
+
+assert results["violations"] == []
+```

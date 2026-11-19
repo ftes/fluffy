@@ -135,6 +135,8 @@ listener's URL, so it breaks a dynamic port.
   ([Shared test case](usage.md#shared-test-case)).
 - **Logging in.** Add the session cookie your app signs, on both backends
   ([Logging in](usage.md#logging-in)).
+- **Accessibility.** PlaywrightEx's axe-core recipe works on a browser session
+  ([Accessibility testing](usage.md#accessibility-testing)).
 
 ```elixir
 # config/test.exs: no base_url, as the endpoint's listener gives it.

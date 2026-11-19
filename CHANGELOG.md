@@ -87,6 +87,7 @@ Changes since 0.8.0.
 - `Fluffy.Download.path`, `Fluffy.Download.page/1` and `Fluffy.FileChooser.page/1`.
 - On Phoenix, a link, form or redirect to another origin ends at a page with that URL, so a test can assert where the app sent it.
 - `Fluffy.base_url/1`, the session's resolved base URL, as Playwright Test's `baseURL`. [Logging in](docs/usage.md#logging-in) shows how to start a test logged in, on both backends.
+- [Accessibility testing](docs/usage.md#accessibility-testing) links PlaywrightEx's axe-core recipe and its Fluffy calls.
 
 ### Changed
 

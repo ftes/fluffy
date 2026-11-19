@@ -18,6 +18,7 @@ Fluffy runs Phoenix feature tests through one Playwright-shaped API, in-process 
 - `start_session(:playwright)` is for JavaScript, computed style and layout, native validation, dialogs, network events, tabs or focus.
 - In the facade, `conn |> visit(path)` always starts a Phoenix session; use `start_session(:playwright) |> visit(path)` for a browser.
 - To start logged in on both backends, sign the session cookie in-process and pass it to `Fluffy.add_cookies/2` with `url: Fluffy.base_url(session)` before `visit` ([Logging in](docs/usage.md#logging-in)).
+- To check accessibility, follow PlaywrightEx's axe-core recipe on a Playwright session with `Fluffy.Playwright.add_script_tag/2` and `Fluffy.Playwright.evaluate/2` ([Accessibility testing](docs/usage.md#accessibility-testing)).
 - Fluffy reads no test tags. Pick a session's backend in your own setup, for example from your own `backend` tag.
 
 ```elixir
