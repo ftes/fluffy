@@ -73,7 +73,7 @@ defmodule Fluffy.Conformance.FormCapabilityTest do
         click(session, by_role(:button, name: "Save"))
       end
 
-    assert error.capability == :form_directionality
+    assert error.capability == :advanced_form_entries
   end
 
   test "Static names text/plain encoding as unsupported" do
@@ -88,7 +88,7 @@ defmodule Fluffy.Conformance.FormCapabilityTest do
         click(session, by_role(:button, name: "Save"))
       end
 
-    assert error.capability == :form_encoding
+    assert error.capability == :advanced_form_entries
   end
 
   test "Static names hard textarea wrapping as unsupported" do
@@ -103,7 +103,7 @@ defmodule Fluffy.Conformance.FormCapabilityTest do
         click(session, by_role(:button, name: "Save"))
       end
 
-    assert error.capability == :textarea_hard_wrap
+    assert error.capability == :advanced_form_entries
   end
 
   test "Static names form-associated custom elements as unsupported" do
@@ -118,7 +118,7 @@ defmodule Fluffy.Conformance.FormCapabilityTest do
         click(session, by_role(:button, name: "Save"))
       end
 
-    assert error.capability == :form_associated_elements
+    assert error.capability == :advanced_form_entries
   end
 
   test "Static names scripted form entry mutation as unsupported" do
@@ -133,7 +133,7 @@ defmodule Fluffy.Conformance.FormCapabilityTest do
         click(session, by_role(:button, name: "Save"))
       end
 
-    assert error.capability == :scripted_form_submission
+    assert error.capability == :scripted_default_actions
   end
 
   defp html(body), do: "<!doctype html><html><body><main>#{body}</main></body></html>"

@@ -142,7 +142,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
     download = await(pending)
 
     error = assert_raise Fluffy.CapabilityError, fn -> Download.path(download) end
-    assert error.capability == :download_path
+    assert error.capability == :playwright_only_api
     assert Download.read(download) == "student,house\nHermione,Gryffindor\n"
   end
 

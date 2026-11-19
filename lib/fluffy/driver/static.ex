@@ -158,7 +158,8 @@ defmodule Fluffy.Driver.Static do
   @spec press(Session.t(), Locator.t(), String.t(), keyword()) :: no_return()
   def press(%Session{} = _session, %Locator{} = _locator, _key, _options \\ []) do
     raise Fluffy.CapabilityError,
-      capability: :press,
+      capability: :liveview_keyboard_events,
+      operation: :press,
       driver: :static,
       detail: "Static pages do not support keyboard events"
   end

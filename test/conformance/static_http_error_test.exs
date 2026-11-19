@@ -44,7 +44,7 @@ defmodule Fluffy.Conformance.StaticHTTPErrorTest do
   test "Phoenix reports an unsupported navigation scheme precisely" do
     session = start_test_session(:phoenix)
 
-    assert_raise Fluffy.CapabilityError, ~r/navigation_scheme.*mailto/s, fn ->
+    assert_raise Fluffy.CapabilityError, ~r/external_navigation.*mailto/s, fn ->
       visit(session, "mailto:owlery@hogwarts.example")
     end
   end

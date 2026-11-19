@@ -3,7 +3,6 @@ defmodule Fluffy.Backend.Phoenix do
 
   @behaviour Fluffy.Backend.Contract
 
-  import Fluffy.Event, only: [is_network_type: 1]
   import Phoenix.ConnTest
   import Phoenix.LiveViewTest
 
@@ -223,36 +222,35 @@ defmodule Fluffy.Backend.Phoenix do
 
   @impl true
   @spec new_page(Session.t()) :: no_return()
-  def new_page(session), do: require_browser_pages!(session)
+  def new_page(session), do: require_browser_pages!(session, :new_page)
 
   @impl true
   @spec history(Session.t(), :go_back | :go_forward, keyword()) :: no_return()
-  def history(session, _direction, _options), do: require_browser_pages!(session)
+  def history(session, direction, _options), do: require_browser_pages!(session, direction)
 
   @impl true
   @spec close_page(Session.t(), Page.t()) :: no_return()
-  def close_page(%Session{} = session, _page_id) do
-    require_browser_pages!(session)
-  end
+  def close_page(%Session{} = session, _page_id), do: require_browser_pages!(session, :close_page)
 
   @impl true
   def event_source(session, :download, _scope), do: session.active_page
 
   def event_source(session, type, _scope) when type in [:page, :popup, :close, :load, :dom_content_loaded, :crash],
-    do: require_browser_pages!(session)
+    do: require_browser_pages!(session, type)
 
-  def event_source(session, type, _scope) do
-    capability =
-      case type do
-        :dialog -> :browser_dialogs
-        :file_chooser -> :file_chooser_events
-        type when type in [:frame_navigated, :frame_attached, :frame_detached] -> :browser_frame_events
-        type when is_network_type(type) -> :browser_network_events
-        type when type in [:console, :page_error, :worker, :web_socket] -> :browser_events
-      end
-
+  def event_source(session, :file_chooser, _scope) do
     raise Fluffy.CapabilityError,
-      capability: capability,
+      capability: :file_chooser_events,
+      operation: :file_chooser,
+      driver: Session.current_driver(session),
+      detail: "file_chooser events require a Playwright session"
+  end
+
+  # Dialogs, console, page errors, frames, workers, WebSockets and network events.
+  def event_source(session, type, _scope) do
+    raise Fluffy.CapabilityError,
+      capability: :browser_events,
+      operation: type,
       driver: Session.current_driver(session),
       detail: "#{type} events require a Playwright session"
   end
@@ -282,9 +280,10 @@ defmodule Fluffy.Backend.Phoenix do
     if Session.current_page(session).document_id == document_id, do: keep_document(session, nil), else: session
   end
 
-  defp require_browser_pages!(session) do
+  defp require_browser_pages!(session, operation) do
     raise Fluffy.CapabilityError,
       capability: :pages,
+      operation: operation,
       driver: Session.current_driver(session),
       detail: "multiple pages, new tabs, and page lifecycle operations require Playwright"
   end

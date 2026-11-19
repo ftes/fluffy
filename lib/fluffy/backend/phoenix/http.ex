@@ -86,7 +86,7 @@ defmodule Fluffy.Backend.Phoenix.HTTP do
     cond do
       url.scheme not in ["http", "https"] ->
         raise Fluffy.CapabilityError,
-          capability: :navigation_scheme,
+          capability: :external_navigation,
           driver: :static,
           detail: "in-process navigation cannot dispatch the #{inspect(url.scheme)} scheme"
 

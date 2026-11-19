@@ -312,7 +312,8 @@ defmodule Fluffy.ClientDOM do
 
     if target.tag not in ["input", "textarea"] do
       raise Fluffy.CapabilityError,
-        capability: :contenteditable_fill,
+        capability: :element_actions,
+        operation: action,
         driver: driver,
         detail: "filling contenteditable elements requires a browser"
     end

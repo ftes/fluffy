@@ -216,7 +216,7 @@ defmodule Fluffy.Conformance.NetworkEventTest do
         expect_event(session, Event.request(), fn _ -> flunk("unsupported action ran") end)
       end
 
-    assert error.capability == :browser_network_events
+    assert error.capability == :browser_events
   end
 
   defp url(%Request{} = request), do: Request.url(request)

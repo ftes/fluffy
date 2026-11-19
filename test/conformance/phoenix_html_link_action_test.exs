@@ -231,7 +231,7 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
         click(session, by_css("#live-delete-label"))
       end
 
-    assert error.capability == :phoenix_html_live_action_conflict
+    assert error.capability == :phoenix_html_actions
     assert HTTPFixtures.requests(fixture) == []
   end
 

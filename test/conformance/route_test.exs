@@ -431,13 +431,11 @@ defmodule Fluffy.Conformance.RouteTest do
     session = start_session(:phoenix, endpoint: Endpoint)
     handler = fn route -> Route.continue!(route) end
 
-    assert_raise Fluffy.CapabilityError, ~r/:routing requires a Playwright session/, fn ->
-      route(session, "**/*", handler)
-    end
+    error = assert_raise Fluffy.CapabilityError, fn -> route(session, "**/*", handler) end
+    assert {error.capability, error.operation} == {:routing, :route}
 
-    assert_raise Fluffy.CapabilityError, ~r/:routing requires a Playwright session/, fn ->
-      unroute(session, "**/*")
-    end
+    error = assert_raise Fluffy.CapabilityError, fn -> unroute(session, "**/*") end
+    assert {error.capability, error.operation} == {:routing, :unroute}
   end
 
   # The error a failing handler stopped the test with, as in Playwright, taken back so that

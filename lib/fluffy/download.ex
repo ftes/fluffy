@@ -82,7 +82,8 @@ defmodule Fluffy.Download do
 
   defp source_path!(%{body: bytes}) when is_binary(bytes) do
     raise CapabilityError,
-      capability: :download_path,
+      capability: :playwright_only_api,
+      operation: :path,
       driver: :phoenix,
       detail: "a Phoenix download is held in memory and has no file; use read/2 or save_as/2"
   end

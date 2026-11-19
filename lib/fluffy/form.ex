@@ -144,14 +144,14 @@ defmodule Fluffy.Form do
 
     if method == :dialog do
       raise CapabilityError,
-        capability: :form_method,
+        capability: :advanced_form_entries,
         driver: effective_driver,
         detail: "dialog-form closure requires a browser dialog model"
     end
 
     if effective_driver == :static and method == :post and enctype == "text/plain" do
       raise CapabilityError,
-        capability: :form_encoding,
+        capability: :advanced_form_entries,
         driver: :static,
         detail: "the Static form model does not yet support text/plain submission"
     end
@@ -218,7 +218,7 @@ defmodule Fluffy.Form do
       "image" ->
         if same_target?(target, submitter) do
           raise CapabilityError,
-            capability: :form_submission,
+            capability: :advanced_form_entries,
             driver: driver,
             detail: "image submitter coordinates are deferred to the full form model"
         else
@@ -236,7 +236,7 @@ defmodule Fluffy.Form do
 
       "file" ->
         raise CapabilityError,
-          capability: :form_encoding,
+          capability: :advanced_form_entries,
           driver: driver,
           detail: "Live file controls require the browser-owned upload model"
 
@@ -389,7 +389,7 @@ defmodule Fluffy.Form do
   defp ensure_supported_entry_features!(index, _properties, form, _submitter, driver, owner_ids) do
     if Enum.any?(["onsubmit", "onformdata"], &has_attribute?(attributes(form), &1)) do
       raise CapabilityError,
-        capability: :scripted_form_submission,
+        capability: :scripted_default_actions,
         driver: driver,
         detail: "inline submit/formdata handlers require Playwright"
     end
@@ -401,7 +401,7 @@ defmodule Fluffy.Form do
 
     if Enum.any?(controls, &(attribute(&1.attributes, "dirname") not in [nil, ""])) do
       raise CapabilityError,
-        capability: :form_directionality,
+        capability: :advanced_form_entries,
         driver: driver,
         detail: "dirname submission requires computed element directionality"
     end
@@ -411,7 +411,7 @@ defmodule Fluffy.Form do
            String.downcase(attribute(target.attributes, "wrap") || "") == "hard"
        end) do
       raise CapabilityError,
-        capability: :textarea_hard_wrap,
+        capability: :advanced_form_entries,
         driver: driver,
         detail: "textarea wrap=hard submission depends on browser layout and column wrapping"
     end
@@ -426,7 +426,7 @@ defmodule Fluffy.Form do
 
     if unsupported_form_associated != [] do
       raise CapabilityError,
-        capability: :form_associated_elements,
+        capability: :advanced_form_entries,
         driver: driver,
         detail: "object and form-associated custom element entry construction requires a browser"
     end
