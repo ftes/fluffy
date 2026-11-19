@@ -524,7 +524,7 @@ defmodule Fluffy do
       Keyword.get(
         options,
         :max_bytes,
-        Application.get_env(:fluffy, :file_input_max_bytes, 10_000_000)
+        Keyword.fetch!(Fluffy.Options.config!(), :file_input_max_bytes)
       )
 
     {source, selected_files} = SelectedFile.prepare!(selection, max_bytes: max_bytes)

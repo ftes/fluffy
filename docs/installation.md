@@ -82,10 +82,9 @@ address, such as `127.0.0.1`, which a stock `localhost` endpoint URL does not
 match, so `check_origin: false` lets the LiveView socket connect. By default Phoenix
 checks only the origin's host against the endpoint's `url` host, so an endpoint
 with `url: [host: "127.0.0.1"]` needs no `check_origin: false`. If Playwright
-targets an application hosted elsewhere, set Playwright's `base_url` instead
-([Configuration](#configuration)). For multi-endpoint or dynamic-server tests, a session's
-`endpoint:` picks the endpoint and, with no `base_url` set, its URL; a session's `base_url:`
-overrides any configured one.
+targets an application hosted elsewhere, set Playwright's `base_url` instead; for
+multi-endpoint or dynamic-server tests, pass a session `endpoint:` or `base_url:`
+([Configuration](#configuration)).
 
 The application's normal browser bundle must connect its LiveSocket. See
 [Actionability checks and waiting](actions.md#actionability-checks-and-waiting)
@@ -135,8 +134,6 @@ listener's URL, so it breaks a dynamic port.
   ([Shared test case](usage.md#shared-test-case)).
 - **Logging in.** Add the session cookie your app signs, on both backends
   ([Logging in](usage.md#logging-in)).
-- **Accessibility.** PlaywrightEx's axe-core recipe works on a browser session
-  ([Accessibility testing](usage.md#accessibility-testing)).
 
 ```elixir
 # config/test.exs: no base_url, as the endpoint's listener gives it.

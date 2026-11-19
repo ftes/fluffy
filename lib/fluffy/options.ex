@@ -9,8 +9,8 @@ defmodule Fluffy.Options do
       doc:
         "Maximum time in milliseconds to wait for the operation. On a browser, as in Playwright Test, " <>
           "defaults to the action timeout (navigations: the navigation timeout), no timeout unless set, " <>
-          "and for assertions to the expect timeout, 5 seconds; on Phoenix, to `phoenix_backend_timeout`, " <>
-          "1 second ([Configuration](installation.md#configuration)). " <>
+          "and for assertions to the expect timeout, 5 seconds; on Phoenix, to `phoenix_backend_timeout` " <>
+          "([Configuration](installation.md#configuration)). " <>
           "`0` checks once, unlike Playwright, where `0` disables the timeout. Playwright actions and waits " <>
           "reject `0` with an `ArgumentError`, as they cannot check once; so do screenshot assertions, which " <>
           "take each screenshot within the timeout, while other Playwright assertions accept it. " <>
@@ -288,6 +288,9 @@ defmodule Fluffy.Options do
                          ]
                      )
 
+  # A Phoenix session's `clear_cookies/2` filters; the browser's Playwright client validates its own.
+  @clear_cookies_schema NimbleOptions.new!(for key <- [:domain, :name, :path], do: {key, @text_or_regex})
+
   @exact_locator_schema NimbleOptions.new!(
                           exact: [
                             type: :boolean,
@@ -346,12 +349,12 @@ defmodule Fluffy.Options do
                     endpoint: [
                       type: :atom,
                       doc:
-                        "The Phoenix endpoint, over `config :fluffy, endpoint:`: a Phoenix session dispatches " <>
-                          "to it, and its URL is the session's unless `base_url:` is given."
+                        "The Phoenix endpoint, over `config :fluffy, endpoint:`, that a Phoenix session " <>
+                          "dispatches to and the base URL defaults to ([Configuration](installation.md#configuration))."
                     ],
                     base_url: [
                       type: :string,
-                      doc: "The session's base URL, over Playwright's `base_url` and the endpoint's."
+                      doc: "The session's base URL ([Configuration](installation.md#configuration))."
                     ],
                     extra_http_headers: [
                       type: {:map, :string, :string},
@@ -393,7 +396,7 @@ defmodule Fluffy.Options do
                    phoenix_backend_timeout: [type: :timeout, default: 1_000],
                    endpoint: [type: :atom],
                    ecto_repos: [type: {:list, :atom}],
-                   file_input_max_bytes: [type: :pos_integer]
+                   file_input_max_bytes: [type: :pos_integer, default: 10_000_000]
                  )
 
   @resolved_keys [:expect_timeout, :test_id_attribute, :phoenix_backend_timeout]
@@ -492,6 +495,15 @@ defmodule Fluffy.Options do
   @spec validate_file_input!(keyword()) :: keyword()
   def validate_file_input!(options), do: NimbleOptions.validate!(options, @file_input_schema)
 
+  @doc "`clear_cookies/2` filters as a map, a `Regex` as its `Playwright.RegExp`; a `nil` one filters nothing."
+  @spec validate_clear_cookies!(keyword() | map()) :: map()
+  def validate_clear_cookies!(options) do
+    options
+    |> Map.new()
+    |> Map.reject(fn {_key, value} -> is_nil(value) end)
+    |> NimbleOptions.validate!(@clear_cookies_schema)
+  end
+
   @spec validate_exact_locator!(keyword()) :: keyword()
   def validate_exact_locator!(options), do: NimbleOptions.validate!(options, @exact_locator_schema)
 
@@ -567,14 +579,11 @@ defmodule Fluffy.Options do
     playwright = Playwright.Test.config()
 
     %{
-      expect_timeout: no_limit(playwright.expect.timeout),
+      expect_timeout: Fluffy.Timeouts.no_limit(playwright.expect.timeout),
       test_id_attribute: test_id_attribute(playwright.test_id_attribute),
       phoenix_backend_timeout: Keyword.fetch!(fluffy, :phoenix_backend_timeout)
     }
   end
-
-  defp no_limit(0), do: :infinity
-  defp no_limit(timeout), do: timeout
 
   @doc false
   # `config :fluffy`, validated: a misspelt key raises, as kept it would silently do

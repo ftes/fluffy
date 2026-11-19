@@ -57,12 +57,9 @@ defmodule Fluffy.Backend.Phoenix do
     Session.new(__MODULE__, context, page)
   end
 
-  # What a browser context of the test sends (`Playwright.Test.use/1`): its `locale` as
-  # Accept-Language and its `user_agent` as User-Agent, unless a `conn:` has its own, which go
-  # with every request, as a browser's do (`Phoenix.ConnTest.recycle/2` keeps Accept-Language
-  # too). All under the session's
-  # `extra_http_headers`, which, as in Playwright, replace the test's as a whole. Later ones are
-  # put over earlier ones (`HTTP`).
+  # The headers a browser context of the test sends with every request: its `locale` as
+  # Accept-Language and `user_agent` as User-Agent (a `conn:`'s own win), then the session's
+  # `extra_http_headers`, else the test's, as in Playwright. `HTTP` puts later ones over earlier.
   defp request_headers(session_headers, conn) do
     use = Fluffy.TestInfo.fetch!().use
 
@@ -148,24 +145,9 @@ defmodule Fluffy.Backend.Phoenix do
   @impl true
   def cookies(%Session{} = session, urls), do: CookieJar.cookies(http!(session).cookie_jar, urls)
 
-  @clear_cookies_filters [:domain, :name, :path]
-
   @impl true
   def clear_cookies(%Session{} = session, options) when is_list(options) or is_map(options) do
-    filters =
-      for {key, value} <- options, value != nil, into: %{} do
-        if key not in @clear_cookies_filters do
-          raise ArgumentError,
-                "clear_cookies: unknown option #{inspect(key)}, expected one of #{inspect(@clear_cookies_filters)}"
-        end
-
-        if not (is_binary(value) or is_struct(value, Regex) or is_struct(value, Playwright.RegExp)) do
-          raise ArgumentError, "clear_cookies: #{inspect(key)} takes a string or a regex, got: #{inspect(value)}"
-        end
-
-        {key, Fluffy.Expect.Internal.reg_exp(value)}
-      end
-
+    filters = Fluffy.Options.validate_clear_cookies!(options)
     http = http!(session)
     put_http(session, %{http | cookie_jar: CookieJar.clear_cookies(http.cookie_jar, filters)})
   end

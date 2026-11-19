@@ -80,13 +80,10 @@ A browser session's timeouts follow Playwright Test and a Phoenix session's
   +config :playwright, :expect, timeout: 5_000
   ```
 
-  These are browser sessions'. Phoenix sessions wait `config :fluffy, phoenix_backend_timeout:`,
-  1 second by default, for action retries, assertions and event waits
-  ([Configuration](installation.md#configuration)). Without Playwright's, browser actions and
-  navigations have no timeout, so the test's timeout bounds them.
+  These are browser sessions'. Without them, browser actions and navigations have no timeout,
+  so the test's timeout bounds them.
 - `config :fluffy, base_url:` is removed: set Playwright's `base_url`
-  (`config :playwright, :test` or a test's `Playwright.Test.use/1`). Unset, sessions use the
-  endpoint's URL.
+  ([Configuration](installation.md#configuration)).
 - Playwright actions, waits, `reload`, `go_back` and `go_forward` raise `ArgumentError`
   for `timeout: 0` instead of timing out after 1ms; pass a positive timeout. Assertions
   and Phoenix actions still check once.

@@ -53,11 +53,7 @@ defmodule Fluffy.Driver.Playwright do
       {:ok, :expectation}
     end
 
-    case navigation_aware_action(
-           session,
-           Timeouts.get(expectation.options, &Timeouts.expect/0),
-           action
-         ) do
+    case navigation_aware_action(session, Timeouts.get(expectation.options, &Timeouts.expect/0), action) do
       {:ok, :expectation, outcome} -> outcome
       {:error, error} -> expectation_failed!(expectation, error, "")
     end
