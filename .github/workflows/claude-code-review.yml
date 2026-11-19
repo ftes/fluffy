@@ -39,6 +39,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          persist-credentials: false
           fetch-depth: 0
       # Setup and the dev/ task compile the PR: a PR that doesn't build still gets a Claude run.
       - name: Set up toolchain and deps
