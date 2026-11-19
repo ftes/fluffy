@@ -125,6 +125,34 @@ defmodule Fluffy.Conformance.CookieTest do
       assert cookies(session) == []
     end
 
+    # As PlaywrightEx's nested objects: a key that is no cookie field, such as `http_only:`
+    # for `httpOnly:`, raises instead of being dropped. Phoenix only until PlaywrightEx checks
+    # `add_cookies`' keys.
+    if driver == :phoenix do
+      @tag driver: driver
+      test "rejects an unknown cookie field, adding none with #{driver}", %{driver: driver} do
+        session = start_session(driver)
+        url = base_url(session)
+
+        assert_raise ArgumentError,
+                     ~r/browserContext.addCookies: unknown field :http_only, expected one of :domain, .*:httpOnly/,
+                     fn ->
+                       add_cookies(session, [
+                         %{name: "valid", value: "v", url: url},
+                         %{name: "spell", value: "x", url: url, http_only: true}
+                       ])
+                     end
+
+        assert_raise ArgumentError, ~r/unknown field "same_site"/, fn ->
+          add_cookies(session, [%{"name" => "spell", "value" => "x", "url" => url, "same_site" => "Lax"}])
+        end
+
+        assert cookies(session) == []
+        add_cookies(session, [%{name: "spell", value: "x", url: url, partitionKey: "https://hogwarts.example"}])
+        assert [%{name: "spell"}] = cookies(session)
+      end
+    end
+
     @tag driver: driver
     test "clears cookies by name, domain and path, as strings or regexes, with #{driver}", %{driver: driver} do
       cookies = [

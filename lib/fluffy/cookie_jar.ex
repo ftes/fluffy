@@ -25,6 +25,10 @@ defmodule Fluffy.CookieJar do
     sameSite: :same_site
   ]
 
+  # The protocol's `SetNetworkCookie` fields, as `api.json` gives them; `partitionKey` is
+  # accepted and ignored. Another key raises, as PlaywrightEx raises for a nested object's.
+  @known_fields @fields |> Keyword.keys() |> Enum.concat([:partitionKey]) |> Enum.sort()
+
   def new, do: %__MODULE__{}
 
   def seed_request(%__MODULE__{} = jar, %URI{} = url, %Plug.Conn{} = conn) do
@@ -109,6 +113,12 @@ defmodule Fluffy.CookieJar do
 
   # network.ts `rewriteCookies`, after checking the protocol's field types.
   defp rewrite_cookie!(cookie) when is_map(cookie) do
+    for {key, _value} <- cookie, to_string(key) not in Enum.map(@known_fields, &Atom.to_string/1) do
+      raise ArgumentError,
+            "browserContext.addCookies: unknown field #{inspect(key)}, expected one of " <>
+              Enum.map_join(@known_fields, ", ", &inspect/1)
+    end
+
     cookie = Map.new(cookie, fn {key, value} -> {to_string(key), value} end)
 
     fields =
