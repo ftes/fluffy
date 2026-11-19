@@ -343,11 +343,30 @@ defmodule Fluffy.Options do
                          )
 
   @session_schema NimbleOptions.new!(
-                    endpoint: [type: :atom],
-                    base_url: [type: :string],
-                    headers: [type: {:list, {:tuple, [{:or, [:atom, :string]}, :string]}}],
+                    endpoint: [
+                      type: :atom,
+                      doc:
+                        "The Phoenix endpoint, over `config :fluffy, endpoint:`: a Phoenix session dispatches " <>
+                          "to it, and its URL is the session's unless `base_url:` is given."
+                    ],
+                    base_url: [
+                      type: :string,
+                      doc: "The session's base URL, over Playwright's `base_url` and the endpoint's."
+                    ],
+                    extra_http_headers: [
+                      type: {:map, :string, :string},
+                      doc:
+                        "Headers sent with every request, replacing the test's `extra_http_headers` as a whole, " <>
+                          "as in Playwright."
+                    ],
                     conn: [type: {:struct, Plug.Conn}],
-                    browser_context: [type: :keyword_list],
+                    browser_context: [
+                      type: :keyword_list,
+                      doc:
+                        "*Playwright only.* Options of `Playwright.Browser.new_context/2` for this session, " <>
+                          "each over the test's (`Playwright.Test.use/1`), as for a context a test creates " <>
+                          "itself. Not `base_url` or `extra_http_headers`: pass those to the session."
+                    ],
                     browser: [
                       type: {:struct, Playwright.Browser},
                       doc:
@@ -477,6 +496,12 @@ defmodule Fluffy.Options do
 
   @spec validate_session!(atom(), keyword()) :: keyword()
   def validate_session!(backend, options) do
+    if Keyword.has_key?(options, :headers) do
+      raise ArgumentError,
+            "start_session's headers: is removed: pass `extra_http_headers: %{...}`, Playwright's, which " <>
+              "replaces the test's as a whole"
+    end
+
     options = NimbleOptions.validate!(options, @session_schema)
 
     cond do
@@ -488,6 +513,10 @@ defmodule Fluffy.Options do
 
       backend == :playwright and Keyword.has_key?(options, :conn) ->
         raise ArgumentError, ":conn is available only for Phoenix sessions"
+
+      # One place each: the session's own options, the same on both backends.
+      key = Enum.find([:base_url, :extra_http_headers], &Keyword.has_key?(options[:browser_context] || [], &1)) ->
+        raise ArgumentError, "pass `#{key}:` to start_session/2, not in `browser_context:`"
 
       true ->
         :ok

@@ -48,7 +48,7 @@ defmodule Fluffy.Backend.Phoenix do
         endpoint: Keyword.fetch!(options, :endpoint),
         cookie_jar: Fluffy.CookieJar.new(),
         initial_conn: Keyword.get(options, :conn),
-        request_headers: test_headers() ++ Keyword.get(options, :headers, [])
+        request_headers: request_headers(options[:extra_http_headers])
       }
     }
 
@@ -56,10 +56,16 @@ defmodule Fluffy.Backend.Phoenix do
     Session.new(__MODULE__, context, page)
   end
 
-  # The test's `extra_http_headers` (`Playwright.Test.use/1`), as a browser context sends
-  # them, under the session's `headers:`, which are put after them (`HTTP` normalizes both).
-  defp test_headers,
-    do: for({name, value} <- Fluffy.TestInfo.fetch!().use[:extra_http_headers] || [], value != nil, do: {name, value})
+  # What a browser context of the test sends (`Playwright.Test.use/1`): its `locale` as
+  # Accept-Language and its `user_agent` as User-Agent, under the session's
+  # `extra_http_headers`, which, as in Playwright, replace the test's as a whole. Later ones are
+  # put over earlier ones (`HTTP`).
+  defp request_headers(session_headers) do
+    use = Fluffy.TestInfo.fetch!().use
+    derived = [{"accept-language", use[:locale]}, {"user-agent", use[:user_agent]}]
+    extra = session_headers || use[:extra_http_headers] || []
+    for {name, value} <- derived ++ Enum.to_list(extra), value != nil, do: {name, value}
+  end
 
   @doc false
   def session_for_html(html) when is_binary(html) do

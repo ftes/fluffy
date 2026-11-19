@@ -46,8 +46,11 @@ matched once can now match twice.
 - Browser console messages are no longer logged, as in Playwright, and `js_logger:`,
   custom loggers and `Fluffy.Playwright.ConsoleLogger` are gone. To log them, register
   a listener: `on(session, Event.console(), &Logger.info(Playwright.ConsoleMessage.text(&1)))`.
-- Playwright sessions use Playwright's `en-US` locale instead of `en`; set
-  `browser_context: [locale: "en"]` to keep it.
+- Sessions use Playwright's `en-US` locale instead of `en`, Phoenix ones as their
+  `Accept-Language`; set `use Playwright.Test, locale: "en"` to keep it.
+- `start_session`'s `headers: [{name, value}]` is now `extra_http_headers: %{name => value}`,
+  which replaces the test's `extra_http_headers` as in Playwright instead of merging into them.
+  `base_url` and `extra_http_headers` in `browser_context:` raise: pass them to the session.
 - Browser launch gets Playwright's 3-minute default instead of `timeout:`. A
   `launch_options: [timeout: ...]` that raised the limit on 0.8 now shortens it and can
   fail a loaded machine with `browserType.launch: Timeout ... exceeded`, so drop it.

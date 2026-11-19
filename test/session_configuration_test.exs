@@ -112,6 +112,29 @@ defmodule Fluffy.SessionConfigurationTest do
     end
   end
 
+  # The session's own endpoint is more specific than the test's base URL.
+  @tag Playwright.Test.use(base_url: "http://configured.example")
+  test "a session's endpoint: overrides the test's base URL" do
+    session = start_session(:phoenix, endpoint: __MODULE__.ActiveEndpoint)
+
+    assert Fluffy.Session.context(session).http.base_url == "http://127.0.0.1:43123"
+  end
+
+  # One place each, the same on both backends: not in Playwright's context options.
+  test "rejects base_url and extra_http_headers in browser_context:" do
+    for key <- [:base_url, :extra_http_headers] do
+      assert_raise ArgumentError, ~r/pass `#{key}:` to start_session\/2, not in `browser_context:`/, fn ->
+        start_session(:playwright, browser_context: [{key, nil}])
+      end
+    end
+  end
+
+  test "rejects the removed headers:" do
+    assert_raise ArgumentError, ~r/headers: is removed: pass `extra_http_headers:/, fn ->
+      start_session(:phoenix, endpoint: Endpoint, headers: [{"x-house", "gryffindor"}])
+    end
+  end
+
   defmodule WrongEndpoint do
     def url, do: "http://endpoint.invalid"
   end
