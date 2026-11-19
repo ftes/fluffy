@@ -25,7 +25,8 @@ jobs:
     runs-on: ubuntu-26.04
     timeout-minutes: 60
     # Per issue or PR, on the job: every comment starts this workflow, and a run whose job is
-    # skipped must not take the slot. One request waits for the running one; a newer replaces it.
+    # skipped must not take the slot. One request waits for the running one; a newer one replaces
+    # the waiting one.
     concurrency:
       group: claude-${{ github.event.issue.number || github.event.pull_request.number }}
       cancel-in-progress: false
