@@ -61,6 +61,10 @@ Changes since 0.8.0.
 - `by_test_id/2` takes no `attribute:`; set `test_id_attribute` in `config :playwright, :test`, which every driver uses (`config :fluffy, test_id_attribute:` of the release candidates is removed). `filter/2` takes no `exact:`; use a regex.
 - On Playwright, a failed `visit`, `reload`, `go_back` or `go_forward` raises `Fluffy.OperationError` with Playwright's exception as `cause`, as actions do.
 - On Phoenix, `go_back` and `go_forward` raise `Fluffy.CapabilityError` with `capability: :browser_history`.
+- On Phoenix, every operation but `visit` raises `ArgumentError` before the first visit, where most raised `FunctionClauseError`.
+- `Fluffy.CapabilityError.capability` is always an id of `Fluffy.Capability.matrix/0`, with the call in a new `operation` field: ids such as `:hover`, `:press`, `:download_path` and `:browser_dialogs` are gone. `Fluffy.Capability` drops `matrix_version/0`, the `:experimental` status and the Playwright column, and `status/2` takes `:static` or `:live`.
+- `Fluffy.CapabilityError` has a `backend` field, and `driver` is a page driver or `nil`. `browser:` and `browser_context:` on Phoenix and `conn:` on Playwright raise it instead of `ArgumentError`.
+- Failed navigations raise `Fluffy.OperationError` with `locator: nil` on both backends, not `RuntimeError`: Phoenix aborted visits, redirect loops and LiveView connection failures, and Playwright LiveView readiness and document checks. A LiveView that exits during an operation raises `Fluffy.OperationError` with a `Fluffy.LiveViewError` cause.
 - The `Fluffy.Expect.checked_option` type is `to_be_checked_option`; `Fluffy.Locator.describe`, `new` and `append` are internal.
 - The Phoenix drivers act like a browser running LiveView's client:
   - `click` sends the closest `phx-click`, then takes the default action of the closest button, link or label: it submits the form, follows the link, or clicks the label's control, sending its `phx-click` and `phx-change`. A label takes its control's enabled state, and `check`/`uncheck` on a label click it.
