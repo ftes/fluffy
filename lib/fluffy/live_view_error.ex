@@ -13,14 +13,14 @@ defmodule Fluffy.LiveViewError do
   @impl true
   def exception(options) do
     reason = Keyword.fetch!(options, :reason)
-    %__MODULE__{reason: reason, message: message(reason)}
+    %__MODULE__{reason: reason, message: reason_message(reason)}
   end
 
-  defp message({:nested_live_view_not_found, id, parent_id}),
+  defp reason_message({:nested_live_view_not_found, id, parent_id}),
     do: "LiveView #{inspect(parent_id)} has no nested LiveView #{inspect(id)}"
 
-  defp message({:target_outside_nested_live_view, selector, root_selector}),
+  defp reason_message({:target_outside_nested_live_view, selector, root_selector}),
     do: "the target #{inspect(selector)} is outside its nested LiveView #{inspect(root_selector)}"
 
-  defp message(reason), do: "the LiveView exited: #{inspect(reason)}"
+  defp reason_message(reason), do: "the LiveView exited: #{inspect(reason)}"
 end
