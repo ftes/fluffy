@@ -46,8 +46,10 @@ matched once can now match twice.
 - Browser console messages are no longer logged, as in Playwright, and `js_logger:`,
   custom loggers and `Fluffy.Playwright.ConsoleLogger` are gone. To log them, register
   a listener: `on(session, Event.console(), &Logger.info(Playwright.ConsoleMessage.text(&1)))`.
-- Sessions use Playwright's `en-US` locale instead of `en`, Phoenix ones as their
-  `Accept-Language`; set `use Playwright.Test, locale: "en"` to keep it.
+- Browser sessions use Playwright's `en-US` locale instead of `en`, and Phoenix sessions,
+  which sent no Accept-Language before, now send the test's `locale` (`en-US` by default)
+  unless a `conn:` sets its own. An app that picks its language from the request can render
+  another one in Phoenix tests: set `use Playwright.Test, locale: ...` to the one you expect.
 - `start_session`'s `headers: [{name, value}]` is now `extra_http_headers: %{name => value}`,
   which replaces the test's `extra_http_headers` as in Playwright instead of merging into them.
   `base_url` and `extra_http_headers` in `browser_context:` raise: pass them to the session.

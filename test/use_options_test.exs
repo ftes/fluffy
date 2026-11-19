@@ -70,6 +70,21 @@ defmodule Fluffy.UseOptionsTest do
       assert {"user-agent", "Errol/1.0"} in headers
     end
 
+    # As `Phoenix.ConnTest.recycle/2` keeps them: on the first request and the next.
+    test "give way to a conn's own, on every request" do
+      conn = Plug.Conn.put_req_header(Phoenix.ConnTest.build_conn(), "accept-language", "de")
+      fixture = HTTPFixtures.register(fn _request -> %{body: ~s(<a href="next">Next</a>)} end)
+
+      :phoenix
+      |> start_session(conn: conn)
+      |> visit(HTTPFixtures.path(fixture, "/first"))
+      |> visit(HTTPFixtures.path(fixture, "/next"))
+
+      for request <- HTTPFixtures.requests(fixture) do
+        assert {"accept-language", "de"} in request.headers
+      end
+    end
+
     @tag Playwright.Test.use(extra_http_headers: %{"accept-language" => "de-DE,de;q=0.9"})
     test "give way to the test's headers and to the session's" do
       {_session, headers} = visit_page(:phoenix, [])
