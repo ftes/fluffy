@@ -69,8 +69,9 @@ defmodule Fluffy.MixProject do
     [
       {:nimble_options, "~> 1.1"},
       {:lazy_html, ">= 0.1.0 and < 1.0.0"},
-      {:phoenix, "~> 1.7"},
-      {:phoenix_live_view, "~> 1.0"},
+      # The floors CI's oldest lane runs, from mix.lock.oldest.
+      {:phoenix, "~> 1.7 and >= 1.7.24"},
+      {:phoenix_live_view, "~> 1.2 and >= 1.2.10"},
       {:playwright, "~> 1.65.0-rc.2", hex: :playwright_ex},
       {:phoenix_ecto, "~> 4.7", optional: true},
       {:ecto_sql, "~> 3.10", optional: true},

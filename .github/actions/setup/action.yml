@@ -1,9 +1,9 @@
 name: Set up toolchain and deps
-description: Selects the lane's toolchain, installs it with mise, restores deps and _build, and compiles the deps.
+description: Selects the lane's toolchain and lockfile, installs the toolchain with mise, restores deps and _build, and compiles the deps.
 
 inputs:
   lane:
-    description: "oldest (.tool-versions.oldest) or newest (.tool-versions)"
+    description: "oldest (.tool-versions.oldest and mix.lock.oldest) or newest (.tool-versions and mix.lock)"
     required: true
   # Pinned as a workaround for mise.jdx.dev/VERSION racing GitHub release assets. Remove once
   # upstream guarantees that advertised versions are downloadable.
@@ -34,6 +34,7 @@ runs:
       run: |
         if [ "$TOOLCHAIN_LANE" = oldest ]; then
           cp .tool-versions.oldest .tool-versions
+          cp mix.lock.oldest mix.lock
         fi
         awk '$1 == "elixir" || $1 == "erlang" { print $1 "=" $2 }' .tool-versions >> "$GITHUB_OUTPUT"
         echo "image=$ImageOS" >> "$GITHUB_OUTPUT"
