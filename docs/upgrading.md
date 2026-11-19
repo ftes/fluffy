@@ -105,7 +105,8 @@ A browser session's timeouts follow Playwright Test and a Phoenix session's
 - `add_cookies`, `cookies` and `clear_cookies` move from `Fluffy.Playwright` to `Fluffy`,
   and work on Phoenix sessions too: `Fluffy.Playwright.add_cookies(session, cookies)` becomes
   `Fluffy.add_cookies(session, cookies)`. `cookies(session, urls)` takes the URL list. Cookie
-  maps use Playwright's camelCase keys (`httpOnly:`, `sameSite:`, `partitionKey:`), and
+  maps use Playwright's camelCase keys (`httpOnly:`, `sameSite:`, `partitionKey:`); as in
+  Playwright, snake_case ones such as `http_only:` are ignored without an error. And
   `storage_state/2` returns atom keys: `state["cookies"]` becomes `state.cookies`.
 - `Fluffy.HTTPEvent` is gone: request and response events deliver a
   `Playwright.Request` and `Playwright.Response`, as do the other browser events
