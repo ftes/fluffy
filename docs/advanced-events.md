@@ -1,4 +1,4 @@
-# Events and pages
+# Advanced events and pages
 
 Register before the triggering action, then await an ordinary value:
 
@@ -61,7 +61,8 @@ A download handle exposes `suggested_filename` and `url` when downloading starts
 bytes, enforcing the indicated in-memory limit (10 MB by default).
 `Download.save_as(download, destination)` waits and saves using bounded memory.
 Failures raise when reading or saving; on Playwright, `Fluffy.unwrap_and_return/2` reaches
-`failure` and `cancel` on the `Playwright.Download`. Handles belong to their
+`failure` and `cancel` on the `Playwright.Download` (see
+[Native escape hatch](debugging.md#native-escape-hatch)). Handles belong to their
 session; saved files outlive it. In-process HTTP downloads use the same API and
 complete before delivery. `Fluffy.Download.path/1` returns the browser's copy of the file:
 Phoenix holds the bytes in memory and raises `Fluffy.CapabilityError`.
@@ -131,7 +132,7 @@ Retain `current_page(session)` to return to the initial page, and use `pages(ses
 to list open handles. Phoenix follows links and submits forms in the current page,
 ignoring `target` and `formtarget`; page creation and closing require Playwright.
 
-Frame locators query iframe contents without switching pages. Browser-only
+Frame locators query iframe contents without switching pages. Playwright-only
 `Event.frame_navigated()` observes navigation of any frame belonging to the page bound
 at registration, including frames created later. It resolves with the
 `Playwright.Frame`, whose `url/1`, `page/1` and `parent_frame/1` read current
@@ -363,11 +364,3 @@ backends, on the session's whole browser context (see [Cookies](capabilities.md#
 `Fluffy.Playwright.storage_state/2` returns a state map with atom keys
 (`:cookies`, `:origins`) and optionally writes JSON with `path:`. Include IndexedDB with `indexed_db: true`. Reuse the result
 with `start_session(:playwright, browser_context: [storage_state: state])`.
-
-## Native values
-
-A `Fluffy.Download` and `Fluffy.FileChooser` keep their Playwright
-counterpart private; reach it with `Fluffy.unwrap_and_return/2` (see
-[Native escape hatch](debugging.md#native-escape-hatch)) for members Fluffy does not
-wrap. Other events and route handlers get Playwright's values themselves. Phoenix downloads have none and raise
-`Fluffy.CapabilityError`.

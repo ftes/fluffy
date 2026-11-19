@@ -64,7 +64,7 @@ session
 ```
 
 See [Playwright setup](installation.md#playwright-setup) for console logging,
-traces, screenshots and videos. See [Events and pages](advanced-events.md)
+traces, screenshots and videos. See [Advanced events and pages](advanced-events.md)
 for downloads, popups, dialogs, and network events.
 
 ## Native escape hatch
@@ -122,7 +122,9 @@ session
 |> assert(visible(by_label("Name")))
 ```
 
-A `Fluffy.Download` or `Fluffy.FileChooser` reaches its Playwright
-counterpart through `Fluffy.unwrap_and_return/2`; see [Native values](advanced-events.md#native-values). See
+A `Fluffy.Download` and `Fluffy.FileChooser` keep their Playwright counterpart private;
+`Fluffy.unwrap_and_return/2` on them reaches it for members Fluffy does not wrap. Other
+events and route handlers get Playwright's values themselves. Phoenix downloads have none
+and raise `Fluffy.CapabilityError`. See
 [Playwright coverage](capabilities.md#playwright-coverage) for which native
 calls are safe.

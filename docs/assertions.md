@@ -94,7 +94,7 @@ Locator constructors take a locator; page constructors target the active page.
 
 Use `Fluffy.Assert.assert_event/4` or the equivalent `Fluffy.Expect.expect_event/4` for
 events. The optional assertion receives an ordinary event value; use ExUnit assertions
-on its fields. See [Events and pages](advanced-events.md).
+on its fields. See [Advanced events and pages](advanced-events.md).
 
 The same naming pattern applies to the remaining constructors. See the
 `Fluffy.Assert` and `Fluffy.Expect` references for their complete APIs.
@@ -115,7 +115,7 @@ session
 turning them into successful refutations. Retrying drivers wait until the
 negative condition holds; they do not require it to hold for the entire timeout.
 Event values use ordinary ExUnit assertions; event waiting is documented in
-[Events and pages](advanced-events.md).
+[Advanced events and pages](advanced-events.md).
 
 Refuting visibility accepts an absent or invisible element. See
 [Visibility and DOM presence](#visibility-and-dom-presence) for absence

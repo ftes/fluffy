@@ -33,7 +33,7 @@ Lists in `select_option` represent multiple options. To select a single
 charlist value, use `%{value: charlist}` (or `%{label: charlist}` for its label).
 
 Use `checked(locator, checked: false)` for an unchecked control. The
-browser-owned indeterminate state is Playwright-only:
+browser-owned indeterminate state is Playwright only:
 
 ```elixir
 session
@@ -129,7 +129,7 @@ session
 
 For character-by-character browser typing, use `Fluffy.Playwright.press_sequentially/4`.
 
-### Browser-only actions
+### Playwright-only actions
 
 `Fluffy.Playwright` wraps more of Playwright's actions, such as `dblclick`, `tap`,
 `dispatch_event`, `select_text`, `scroll_into_view_if_needed`, element `screenshot`,
@@ -220,7 +220,7 @@ Playwright can also capture a script-opened chooser before the triggering click.
 the chooser directly to `Fluffy.set_input_files/3`; see [Events and
 pages](advanced-events.md#file-choosers).
 
-## Browser-only evaluation
+## Playwright-only evaluation
 
 Use `Fluffy.Playwright.evaluate/3` when a Playwright test needs a value from
 the active page:

@@ -125,7 +125,7 @@ For native tests, choose an [assertion vocabulary](docs/assertions.md):
 
 Capture downloads, open new tabs, handle dialogs, and observe network events
 with Fluffy's event API. Register a wait before an action, then await a value.
-Predicates select events; ordinary ExUnit assertions inspect their metadata. See [Events and pages](docs/advanced-events.md)
+Predicates select events; ordinary ExUnit assertions inspect their metadata. See [Advanced events and pages](docs/advanced-events.md)
 for examples and the [Capability matrix](docs/capabilities.md) for what each
 backend supports.
 
@@ -140,7 +140,7 @@ backend supports.
   vocabularies compared, visibility, and page assertions
 - [Debugging and native access](docs/debugging.md) — failures, browser diagnostics,
   and the native escape hatch
-- [Events and pages](docs/advanced-events.md) — tabs, windows, iframe
+- [Advanced events and pages](docs/advanced-events.md) — tabs, windows, iframe
   limitations, downloads, navigation, dialogs, and network events
 - [Coming from PhoenixTest](docs/migration-from-phoenix-test.md) — an alternate
   starting point for existing PhoenixTest suites

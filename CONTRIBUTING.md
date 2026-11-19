@@ -27,6 +27,12 @@ mix check
 `mix lint` runs the checks without the tests. Rules for compatibility code and the changelog are
 in `AGENTS.md`.
 
+## Terms
+
+In docs, a *backend* is what `start_session` picks, Phoenix or Playwright; a *driver* runs a
+page: Static and LiveView (the Phoenix drivers) or Playwright. What only a browser can do is
+*Playwright only*, as ex_doc's annotation says.
+
 ## Reviewing
 
 Besides correctness, review a change for simplicity, consistency and scope. This applies to

@@ -21,7 +21,7 @@ In `mix.exs`:
 
 Prefer `only: [:dev, :test]` to `only: :test`: Playwright's Mix tasks, and
 [`mix usage_rules.sync`](https://hexdocs.pm/usage_rules) for Fluffy's usage rules, then work
-in `:dev`, where Fluffy needs no config and starts no driver or browser. Mix requires a
+in `:dev`, where Fluffy needs no config and starts no Playwright driver or browser. Mix requires a
 dependency you list to cover every environment Fluffy needs it in, so widen the
 `lazy_html` line `phx.new` generates, if your app has it.
 Playwright comes with Fluffy in the same environments, so `mix playwright.install`
@@ -217,7 +217,8 @@ or a second if that is shorter, and with none at the test's timeout.
 ## Playwright setup
 
 Only the Playwright backend needs a browser. The `:playwright` dependency pins its
-driver; install it and a browser with:
+driver, the Playwright CLI that runs the browsers (not one of Fluffy's drivers); install it
+and a browser with:
 
 ```bash
 mix playwright.install chromium
