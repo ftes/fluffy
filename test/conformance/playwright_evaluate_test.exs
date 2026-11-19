@@ -36,18 +36,6 @@ defmodule Fluffy.Conformance.PlaywrightEvaluateTest do
              )
   end
 
-  test "rejects the removed Fluffy 0.8 evaluate options as unknown" do
-    session = session_for_html(:playwright, "<main>Options</main>", base_url: Server.base_url())
-
-    assert_raise NimbleOptions.ValidationError, ~r/unknown options.*:is_function.*:arg/, fn ->
-      Fluffy.Playwright.evaluate(session, "suffix => suffix", is_function: true, arg: "!")
-    end
-
-    assert_raise NimbleOptions.ValidationError, ~r/unknown options.*:arg/, fn ->
-      Fluffy.Playwright.evaluate(session, "suffix => suffix", "!", arg: "!")
-    end
-  end
-
   # As in Playwright, page evaluation has no timeout.
   test "rejects timeout: in place of the argument" do
     session = session_for_html(:playwright, "<main>Options</main>", base_url: Server.base_url())

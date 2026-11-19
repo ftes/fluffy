@@ -123,20 +123,6 @@ defmodule Fluffy.Conformance.CookieTest do
       end
 
       assert cookies(session) == []
-
-      # Playwright would drop these silently.
-      for {key, camel_case} <- [http_only: :httpOnly, same_site: :sameSite], cookie_key <- [key, Atom.to_string(key)] do
-        assert_raise ArgumentError,
-                     ~r/#{inspect(cookie_key)} is not a Playwright cookie field; use #{inspect(camel_case)}/,
-                     fn -> add_cookies(session, [%{:name => "old", :value => "x", :url => url, cookie_key => true}]) end
-      end
-
-      # Fluffy 0.8 options would reach Playwright as URLs.
-      for options <- [[urls: [url]], [timeout: 1_000]] do
-        assert_raise ArgumentError, ~r/cookies\/2 takes the URL list, not the options/, fn ->
-          cookies(session, options)
-        end
-      end
     end
 
     @tag driver: driver

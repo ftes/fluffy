@@ -129,12 +129,6 @@ defmodule Fluffy.SessionConfigurationTest do
     end
   end
 
-  test "rejects the removed headers:" do
-    assert_raise ArgumentError, ~r/headers: is removed: pass `extra_http_headers:/, fn ->
-      start_session(:phoenix, endpoint: Endpoint, headers: [{"x-house", "gryffindor"}])
-    end
-  end
-
   defmodule WrongEndpoint do
     def url, do: "http://endpoint.invalid"
   end

@@ -135,9 +135,6 @@ listener's URL, so it breaks a dynamic port.
   ([Shared test case](usage.md#shared-test-case)).
 - **Logging in.** Add the session cookie your app signs, on both backends
   ([Logging in](usage.md#logging-in)).
-- **From the 0.9 release candidates.** `config :fluffy, action_timeout:, expect_timeout:,
-  base_url:, test_id_attribute:` and `Fluffy.Case` are removed; a removed key raises at startup
-  with what to set instead.
 
 ```elixir
 # config/test.exs: no base_url, as the endpoint's listener gives it.

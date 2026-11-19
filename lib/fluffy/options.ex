@@ -503,12 +503,6 @@ defmodule Fluffy.Options do
 
   @spec validate_session!(atom(), keyword()) :: keyword()
   def validate_session!(backend, options) do
-    if Keyword.has_key?(options, :headers) do
-      raise ArgumentError,
-            "start_session's headers: is removed: pass `extra_http_headers: %{...}`, Playwright's, which " <>
-              "replaces the test's as a whole"
-    end
-
     options = NimbleOptions.validate!(options, @session_schema)
 
     cond do
@@ -583,12 +577,11 @@ defmodule Fluffy.Options do
   defp no_limit(timeout), do: timeout
 
   @doc false
-  # `config :fluffy`, validated: a misspelt or removed key raises, as kept it would silently
-  # do nothing. A module's config (`config :fluffy, Fluffy.Sandbox, ...`) is validated by the
+  # `config :fluffy`, validated: a misspelt key raises, as kept it would silently do
+  # nothing. A module's config (`config :fluffy, Fluffy.Sandbox, ...`) is validated by the
   # module, which has to exist.
   @spec config!() :: keyword()
   def config! do
-    reject_removed_config!()
     {modules, options} = Enum.split_with(Application.get_all_env(:fluffy), &module_key?/1)
 
     for {module, _config} <- modules, !Code.ensure_loaded?(module) do
@@ -602,39 +595,6 @@ defmodule Fluffy.Options do
   end
 
   defp module_key?({key, _value}), do: match?("Elixir." <> _, Atom.to_string(key))
-
-  @removed_config [
-    action_timeout:
-      "set `config :playwright, :test, action_timeout: ...` or a test's `Playwright.Test.use(action_timeout: ...)`; " <>
-        "`config :fluffy, phoenix_backend_timeout: ...` is Phoenix sessions'",
-    expect_timeout:
-      "set `config :playwright, :expect, timeout: ...`; " <>
-        "`config :fluffy, phoenix_backend_timeout: ...` is Phoenix sessions' (`0` checks once)",
-    base_url:
-      "set `config :playwright, :test, base_url: ...` or a test's `Playwright.Test.use(base_url: ...)`; " <>
-        "unset, sessions use the endpoint's URL",
-    test_id_attribute: "set `config :playwright, :test, test_id_attribute: ...`, which every driver uses",
-    timeout:
-      "set `config :playwright, :expect, timeout: ...` for assertions and " <>
-        "`config :playwright, :test, action_timeout: ...` for actions; " <>
-        "`config :fluffy, phoenix_backend_timeout: ...` is Phoenix sessions'",
-    playwright:
-      "set `config :playwright, :test` instead, with `action_timeout:` and `navigation_timeout:` for " <>
-        "`timeout:`, `browser_name:` for `engine:`, `launch_options:`, `driver: [executable: ...]`, " <>
-        "`workers:` for `pool_size:`, and `output_dir:` with `trace:` for `artifact_dir:` and `trace_dir:`; " <>
-        "for `log_browser_console:`, log from `on(session, Event.console(), ...)` and `Event.page_error()` listeners",
-    navigation_timeout:
-      "set `config :playwright, :test, navigation_timeout: ...`: only browser navigations wait, " <>
-        "Phoenix navigations are synchronous"
-  ]
-
-  defp reject_removed_config! do
-    for {key, hint} <- @removed_config, Application.fetch_env(:fluffy, key) != :error do
-      raise ArgumentError, "config :fluffy, #{key}: is removed: as in Playwright Test, #{hint}"
-    end
-
-    :ok
-  end
 
   @doc false
   # As Playwright.Test's `test_id_attribute`: one attribute or a comma-separated list.
