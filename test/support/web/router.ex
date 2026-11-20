@@ -85,6 +85,7 @@ defmodule Fluffy.Support.Web.Router do
       live("/no-content", NoContentLive)
       live("/clock", ClockLive)
       live("/expectations", ExpectationsLive)
+      live("/owlery", OwleryLive)
       live("/facade-locators/:markup", FacadeLocatorsLive)
     end
   end
