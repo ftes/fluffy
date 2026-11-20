@@ -1,8 +1,8 @@
 defmodule Fluffy.PhoenixTest.Query do
   @moduledoc false
 
-  alias Fluffy.ClientDOM
   alias Fluffy.Driver
+  alias Fluffy.Driver.Phoenix.ClientDOM
   alias Fluffy.Session
 
   def matches?(session, locator) do

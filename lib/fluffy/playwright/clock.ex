@@ -8,6 +8,7 @@ defmodule Fluffy.Playwright.Clock do
   [Controlling time](actions.md#controlling-time).
   """
 
+  alias Fluffy.Backend
   alias Fluffy.Options
   alias Fluffy.Session
 
@@ -134,5 +135,5 @@ defmodule Fluffy.Playwright.Clock do
     clock(session, operation, fun)
   end
 
-  defp clock(session, operation, fun), do: Fluffy.__dispatch_driver__(session, :clock, [operation, fun])
+  defp clock(session, operation, fun), do: Backend.driver(session, :clock, [operation, fun])
 end

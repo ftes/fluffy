@@ -1,7 +1,7 @@
-defmodule Fluffy.HTML.AriaTest do
+defmodule Fluffy.Driver.Phoenix.HTML.AriaTest do
   use ExUnit.Case, async: true
 
-  alias Fluffy.HTML.Aria
+  alias Fluffy.Driver.Phoenix.HTML.Aria
 
   test "a header cell at the document root is a column header" do
     document = LazyHTML.from_tree([{"th", [], ["H"]}])

@@ -20,8 +20,8 @@ defmodule Fluffy.Playwright do
 
   alias Fluffy.Backend
   alias Fluffy.Backend.Playwright, as: PlaywrightBackend
-  alias Fluffy.Backend.Playwright.Document
   alias Fluffy.CapabilityError
+  alias Fluffy.Driver.Playwright.Document
   alias Fluffy.Options
   alias Fluffy.Session
   alias Playwright.BrowserContext
@@ -523,7 +523,7 @@ defmodule Fluffy.Playwright do
     page_read(session, :session_storage, fn page -> WebStorage.items(Playwright.Page.session_storage(page)) end)
   end
 
-  defp page_read(session, operation, fun), do: Fluffy.__dispatch_driver__(session, :page_read, [operation, fun])
+  defp page_read(session, operation, fun), do: Backend.driver(session, :page_read, [operation, fun])
 
   @doc group: "Page inspection"
   @doc playwright_only: true
@@ -567,7 +567,7 @@ defmodule Fluffy.Playwright do
     page_action(session, :emulate_media, &Playwright.Page.emulate_media(&1, native))
   end
 
-  defp page_action(session, operation, fun), do: Fluffy.__dispatch_driver__(session, :page_action, [operation, fun])
+  defp page_action(session, operation, fun), do: Backend.driver(session, :page_action, [operation, fun])
 
   @doc false
   # The path of a Playwright-only call that is one PlaywrightEx call on the active page
@@ -580,7 +580,7 @@ defmodule Fluffy.Playwright do
     {operation, native} = if is_atom(operation), do: {operation, operation}, else: operation
     CapabilityError.require_playwright!(session, capability, operation)
     options = Options.validate_action!(native, options)
-    Fluffy.__dispatch_driver__(session, :native_call, [kind, {operation, native}, target, arguments, options])
+    Backend.driver(session, :native_call, [kind, {operation, native}, target, arguments, options])
   end
 
   @doc false
@@ -702,7 +702,7 @@ defmodule Fluffy.Playwright do
   @spec unwrap(Session.t(), Fluffy.Locator.t(), (Playwright.Locator.t() -> term())) :: Session.t()
   def unwrap(%Session{} = session, %Fluffy.Locator{} = locator, fun) when is_function(fun, 1) do
     CapabilityError.require_playwright!(session, :playwright_only_api, :unwrap)
-    Fluffy.__dispatch_driver__(session, :unwrap_locator, [locator, fun])
+    Backend.driver(session, :unwrap_locator, [locator, fun])
   end
 
   @doc group: "Diagnostics and native access"
@@ -720,7 +720,7 @@ defmodule Fluffy.Playwright do
         when result: term()
   def unwrap_and_return(%Session{} = session, %Fluffy.Locator{} = locator, fun) when is_function(fun, 1) do
     CapabilityError.require_playwright!(session, :playwright_only_api, :unwrap_and_return)
-    Fluffy.__dispatch_driver__(session, :unwrap_and_return_locator, [locator, fun])
+    Backend.driver(session, :unwrap_and_return_locator, [locator, fun])
   end
 
   @doc group: "Diagnostics and native access"
@@ -900,7 +900,7 @@ defmodule Fluffy.Playwright do
     CapabilityError.require_playwright!(session, :javascript_evaluation, :evaluate_all)
     {arg, options} = arg_and_options(arg, options)
     Options.validate_untimed!(options)
-    Fluffy.__dispatch_driver__(session, :evaluate_all, [locator, expression, arg])
+    Backend.driver(session, :evaluate_all, [locator, expression, arg])
   end
 
   @doc group: "JavaScript"

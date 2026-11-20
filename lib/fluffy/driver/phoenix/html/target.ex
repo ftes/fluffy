@@ -1,4 +1,4 @@
-defmodule Fluffy.HTML.Target do
+defmodule Fluffy.Driver.Phoenix.HTML.Target do
   @moduledoc false
 
   @enforce_keys [:attributes, :id, :tag]
@@ -22,9 +22,9 @@ defmodule Fluffy.HTML.Target do
           tag: String.t(),
           ancestors: [t()] | nil,
           selector: String.t() | nil,
-          # Natively disabled, by `Fluffy.HTML.Aria.natively_disabled?/2`.
+          # Natively disabled, by `Fluffy.Driver.Phoenix.HTML.Aria.natively_disabled?/2`.
           disabled?: boolean(),
-          # HTML's disabled form control, by `Fluffy.HTML.Aria.form_control_disabled?/2`.
+          # HTML's disabled form control, by `Fluffy.Driver.Phoenix.HTML.Aria.form_control_disabled?/2`.
           form_control_disabled?: boolean()
         }
 end

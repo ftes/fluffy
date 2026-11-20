@@ -1,10 +1,10 @@
-defmodule Fluffy.ClientDOM.Expectation do
+defmodule Fluffy.Driver.Phoenix.ClientDOM.Expectation do
   @moduledoc false
 
-  alias Fluffy.ClientDOM
+  alias Fluffy.Driver.Phoenix.ClientDOM
+  alias Fluffy.Driver.Phoenix.HTML.Aria
+  alias Fluffy.Driver.Phoenix.HTML.Semantics
   alias Fluffy.Expect
-  alias Fluffy.HTML.Aria
-  alias Fluffy.HTML.Semantics
   alias Fluffy.Locator.Static
   # StringUtils is internal to Playwright, which is pinned.
   alias Playwright.Isomorphic.StringUtils

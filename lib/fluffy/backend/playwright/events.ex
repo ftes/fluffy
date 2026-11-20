@@ -3,8 +3,8 @@ defmodule Fluffy.Backend.Playwright.Events do
 
   import Fluffy.Event, only: [is_network_type: 1]
 
-  alias Fluffy.Backend.Playwright.Listeners
   alias Fluffy.Download
+  alias Fluffy.Driver.Playwright.Listeners
   alias Fluffy.FileChooser
   alias Fluffy.Page
   alias Fluffy.Session

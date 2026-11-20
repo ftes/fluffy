@@ -1,4 +1,4 @@
-defmodule Fluffy.Backend.Playwright.Listeners do
+defmodule Fluffy.Driver.Playwright.Listeners do
   @moduledoc false
 
   # Native listeners as `{module, target, event, listener}`, such as

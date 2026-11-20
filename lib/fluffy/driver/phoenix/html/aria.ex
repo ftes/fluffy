@@ -1,12 +1,12 @@
-defmodule Fluffy.HTML.Aria do
+defmodule Fluffy.Driver.Phoenix.HTML.Aria do
   @moduledoc false
 
   # Playwright's role and accessible-name computation (roleUtils in its injected
   # script) over parsed markup. Computed CSS stays browser-only: visibility and
   # inline display come from each tag's user-agent defaults.
 
-  alias Fluffy.HTML.DocumentIndex
-  alias Fluffy.HTML.Semantics
+  alias Fluffy.Driver.Phoenix.HTML.DocumentIndex
+  alias Fluffy.Driver.Phoenix.HTML.Semantics
 
   @enforce_keys [:index, :html_ids, :labels]
   defstruct @enforce_keys

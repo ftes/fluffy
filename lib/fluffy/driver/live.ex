@@ -3,28 +3,28 @@ defmodule Fluffy.Driver.Live do
 
   @behaviour Fluffy.Driver.Contract
 
-  import Fluffy.HTML.Semantics, only: [attribute: 2]
+  import Fluffy.Driver.Phoenix.HTML.Semantics, only: [attribute: 2]
   import Phoenix.LiveViewTest, except: [open_browser: 1, open_browser: 2]
 
-  alias Fluffy.Backend.Phoenix.HTTP
-  alias Fluffy.ClientDOM
   alias Fluffy.Deadline
   alias Fluffy.Driver.Live.ActionResolver
   alias Fluffy.Driver.Live.ActionScope
   alias Fluffy.Driver.Live.Document
   alias Fluffy.Driver.Live.Event
+  alias Fluffy.Driver.Live.Processes
   alias Fluffy.Driver.Live.Retry
   alias Fluffy.Driver.Live.State
+  alias Fluffy.Driver.Live.UploadCompat
   alias Fluffy.Driver.Live.UploadState
+  alias Fluffy.Driver.Phoenix.ClientDOM
+  alias Fluffy.Driver.Phoenix.Form
+  alias Fluffy.Driver.Phoenix.HTML.DocumentIndex
+  alias Fluffy.Driver.Phoenix.HTML.Semantics
+  alias Fluffy.Driver.Phoenix.HTML.Target
   alias Fluffy.Expect
-  alias Fluffy.Form
-  alias Fluffy.HTML.DocumentIndex
-  alias Fluffy.HTML.Semantics
-  alias Fluffy.HTML.Target
   alias Fluffy.Internal.Navigation
   alias Fluffy.Internal.Navigation.Redirect
   alias Fluffy.Internal.Navigation.Submission
-  alias Fluffy.LiveViewTest.UploadCompat
   alias Fluffy.Locator
   alias Fluffy.Page
   alias Fluffy.Session
@@ -43,7 +43,7 @@ defmodule Fluffy.Driver.Live do
 
   @impl true
   def validate_operation!(session, operation, arguments),
-    do: Fluffy.Driver.PhoenixValidation.validate_operation!(session, operation, arguments)
+    do: Fluffy.Driver.Phoenix.Validation.validate_operation!(session, operation, arguments)
 
   @impl true
   def expect(%Session{} = session, %Expect{} = expectation) do
@@ -67,8 +67,7 @@ defmodule Fluffy.Driver.Live do
     # action, so pages that keep navigating fail it at the redirect limit.
     case result do
       {:redirected, session, navigation} ->
-        {session, redirects} = follow_for_retry(session, navigation)
-        retry_on_new_page(session, redirects, :expect, [expectation], deadline)
+        retry_on_new_page(session, navigation, :expect, [expectation], deadline)
 
       session ->
         session
@@ -347,17 +346,75 @@ defmodule Fluffy.Driver.Live do
     end
   end
 
-  @doc false
-  def release_page_uploads(%Session{} = session, %Page.State{driver: :live, state: state}) do
-    state
-    |> Map.fetch!(:live_uploads)
-    |> UploadState.forms()
-    |> Enum.each(&release_live_upload_clients(session, &1))
+  @doc """
+  The state of a page with the LiveView `view` the backend mounted, which rendered
+  `html`, and the redirect the view reported right after mounting, if any. The view and
+  its client proxy stop with the session, or with `release/2`.
+  """
+  def mount(runtime, view, html) do
+    # LiveViewTest links its client proxy to the test process, and the proxy
+    # exits with the view's reason. Unlink it so a view that redirects or
+    # crashes doesn't take the test down; the view's monitor reports how it left.
+    proxy_pid = proxy_pid(view)
+    Process.unlink(proxy_pid)
 
+    # The driver reads how the view left from this monitor's message.
+    monitor = State.monitor_view(view.pid)
+
+    :ok = Processes.register(runtime, :live_view, view.pid)
+    :ok = Processes.register(runtime, :live_view, proxy_pid)
+
+    document = Document.new(html, view.id)
+
+    # The view can redirect or exit right after mounting. Its mounted document
+    # stands then: the backend follows a reported redirect, and an exit is left to
+    # the driver's next read.
+    {client_dom, redirect} =
+      try do
+        case Document.render(document, view) do
+          {:ok, composed} -> {ClientDOM.from_document(composed), nil}
+          {:error, redirect} -> {mounted_client_dom(html), redirect}
+        end
+      catch
+        :exit, _reason -> {mounted_client_dom(html), nil}
+      end
+
+    state = %State{
+      client_dom: client_dom,
+      document: document,
+      live_uploads: UploadState.new(),
+      view: view,
+      monitor: monitor
+    }
+
+    {state, redirect}
+  end
+
+  defp mounted_client_dom(html), do: html |> LazyHTML.from_document() |> ClientDOM.from_document()
+
+  @doc "Stops the LiveView of a page whose document the backend replaces, with its upload clients."
+  def release(%Session{} = session, %Page.State{driver: :live, state: state}) do
+    state.live_uploads |> UploadState.forms() |> Enum.each(&release_live_upload_clients(session, &1))
+
+    proxy_pid = proxy_pid(state.view)
+    Process.demonitor(state.monitor, [:flush])
+    Processes.stop(state.view.pid, :normal)
+    Processes.stop(proxy_pid, :normal)
+    Processes.release(session.runtime, :live_view, state.view.pid)
+    Processes.release(session.runtime, :live_view, proxy_pid)
+    flush_view_messages(state.view)
     :ok
   end
 
-  def release_page_uploads(%Session{}, %Page.State{}), do: :ok
+  defp flush_view_messages(%{proxy: {reference, _topic, _proxy_pid}} = view) do
+    receive do
+      {^reference, _message} -> flush_view_messages(view)
+    after
+      0 -> :ok
+    end
+  end
+
+  defp proxy_pid(%{proxy: {_reference, _topic, proxy_pid}}) when is_pid(proxy_pid), do: proxy_pid
 
   @impl true
   def set_checked(%Session{} = session, %Locator{} = locator, desired, options \\ []) do
@@ -688,12 +745,8 @@ defmodule Fluffy.Driver.Live do
       end)
 
     case result do
-      {:retry_on_new_page, session, redirects} ->
-        if Deadline.expired?(deadline), do: raise_navigated_away(operation, arguments, deadline)
-        retry_on_new_page(session, redirects, operation, arguments, deadline)
-
-      result ->
-        result
+      {:retry_on_new_page, session, navigation} -> retry_on_new_page(session, navigation, operation, arguments, deadline)
+      result -> result
     end
   end
 
@@ -704,31 +757,32 @@ defmodule Fluffy.Driver.Live do
 
       {{session, navigation}, false} ->
         if Deadline.expired?(deadline), do: raise_navigated_away(operation, arguments, deadline)
-
-        {session, redirects} = follow_for_retry(session, navigation)
-        {:retry_on_new_page, session, redirects}
+        {:retry_on_new_page, session, navigation}
 
       {:none, _delivered?} ->
         result
     end
   end
 
-  # Follows a navigation an action or expectation found before reaching the
-  # view, for a retry on the new page: a redirect the view left, or a form it
-  # triggered. The navigation counts toward the retry's timeout, and toward the
-  # redirect limit of the retries and of the redirects it leads to (see
-  # docs/capabilities.md).
-  defp follow_for_retry(session, %struct{} = navigation) when struct in [Redirect, Submission] do
-    redirects = HTTP.count_redirect!(ActionScope.redirects(), URI.parse(Session.current_page(session).url))
-    {Fluffy.Backend.navigate(session, %{navigation | redirects: redirects}), redirects}
-  end
+  # A navigation an action or expectation found before reaching the view, a
+  # redirect the view left or a form it triggered, goes back to the backend to
+  # follow, with the retry to run on the new page. The navigation counts toward
+  # the retry's timeout, and toward the redirect limit of the retries and of the
+  # redirects it leads to (see docs/capabilities.md). An action whose following
+  # used up its budget fails on the new page. The retry runs outside the action's
+  # scope, as an action of its own on the page its `redirects`-th redirect landed
+  # on, on that page's driver.
+  defp retry_on_new_page(session, %struct{} = navigation, operation, arguments, deadline)
+       when struct in [Redirect, Submission] do
+    redirects = Navigation.count_redirect!(ActionScope.redirects(), URI.parse(Session.current_page(session).url))
 
-  # Runs outside the action's scope, as an action of its own on the page its
-  # `redirects`-th redirect landed on. Expectations retry the same way.
-  defp retry_on_new_page(session, redirects, operation, arguments, deadline) do
-    remaining = Deadline.remaining(deadline)
-    arguments = List.update_at(arguments, -1, &put_timeout(&1, remaining))
-    ActionScope.after_redirects(redirects, fn -> Fluffy.__dispatch_driver__(session, operation, arguments) end)
+    retry = fn session, dispatch ->
+      if operation != :expect and Deadline.expired?(deadline), do: raise_navigated_away(operation, arguments, deadline)
+      arguments = List.update_at(arguments, -1, &put_timeout(&1, Deadline.remaining(deadline)))
+      ActionScope.after_redirects(redirects, fn -> dispatch.(session, operation, arguments) end)
+    end
+
+    {:navigate, session, %{navigation | redirects: redirects}, retry}
   end
 
   defp put_timeout(%Expect{} = expectation, timeout), do: Expect.Internal.merge_options(expectation, timeout: timeout)
@@ -793,8 +847,10 @@ defmodule Fluffy.Driver.Live do
     end
   end
 
+  # A patch keeps the document; only its URL changes.
   defp commit_patch(session, destination) do
-    Fluffy.Backend.navigate(session, Navigation.patch(destination, Session.page_state(session)))
+    url = Session.current_page(session).url |> URI.merge(destination) |> URI.to_string()
+    Session.commit_page(session, :live, Session.page_state(session), url, same_document: true)
   end
 
   # A navigation the action found before it finished, whether a view call or
@@ -1171,7 +1227,7 @@ defmodule Fluffy.Driver.Live do
     append? = live_multiple_file_input?(target) and live_upload_present?(session, form_key)
     session = if append?, do: session, else: release_live_upload_for_form(session, form_key)
 
-    :ok = Fluffy.Backend.Phoenix.register_process(session.runtime, :upload_client, upload.pid)
+    :ok = Processes.register(session.runtime, :upload_client, upload.pid)
 
     # The selection-triggered `phx-change` may replace or remove this input.
     # Register its client state before reconciling that render, so stale-input
@@ -1559,7 +1615,7 @@ defmodule Fluffy.Driver.Live do
   end
 
   defp release_upload_client(session, upload) do
-    Fluffy.SessionRuntime.release(session.runtime, {:upload_client, upload.pid})
+    Processes.release(session.runtime, :upload_client, upload.pid)
 
     UploadCompat.stop(upload)
   end

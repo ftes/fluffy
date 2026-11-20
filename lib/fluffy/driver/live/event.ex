@@ -7,12 +7,12 @@ defmodule Fluffy.Driver.Live.Event do
   # layout (to the main view) and in teleported portal content (to the view
   # that owns the portal); its events also send server-rendered values.
 
-  import Fluffy.HTML.Semantics, only: [attribute: 2]
+  import Fluffy.Driver.Phoenix.HTML.Semantics, only: [attribute: 2]
   import Phoenix.LiveViewTest
 
-  alias Fluffy.ClientDOM
   alias Fluffy.Driver.Live.ActionScope
-  alias Fluffy.HTML.Semantics
+  alias Fluffy.Driver.Phoenix.ClientDOM
+  alias Fluffy.Driver.Phoenix.HTML.Semantics
   alias Fluffy.Locator
 
   @bindings %{

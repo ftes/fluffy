@@ -1,13 +1,13 @@
-defmodule Fluffy.Form do
+defmodule Fluffy.Driver.Phoenix.Form do
   @moduledoc false
 
-  import Fluffy.HTML.Semantics, only: [attribute: 2, has_attribute?: 2]
+  import Fluffy.Driver.Phoenix.HTML.Semantics, only: [attribute: 2, has_attribute?: 2]
 
   alias Fluffy.CapabilityError
-  alias Fluffy.HTML.Aria
-  alias Fluffy.HTML.DocumentIndex
-  alias Fluffy.HTML.Semantics
-  alias Fluffy.HTML.Target
+  alias Fluffy.Driver.Phoenix.HTML.Aria
+  alias Fluffy.Driver.Phoenix.HTML.DocumentIndex
+  alias Fluffy.Driver.Phoenix.HTML.Semantics
+  alias Fluffy.Driver.Phoenix.HTML.Target
   alias Fluffy.SelectedFile
 
   def build(index, properties, submitter, driver \\ :static) do

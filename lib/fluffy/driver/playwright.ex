@@ -3,12 +3,11 @@ defmodule Fluffy.Driver.Playwright do
 
   @behaviour Fluffy.Driver.Contract
 
-  alias Fluffy.Backend.Playwright.Document
-  alias Fluffy.Backend.Playwright.Listeners
   alias Fluffy.Deadline
+  alias Fluffy.Driver.Playwright.Document
+  alias Fluffy.Driver.Playwright.Listeners
   alias Fluffy.Expect
   alias Fluffy.FileChooser
-  alias Fluffy.Internal.Navigation
   alias Fluffy.Internal.NavigationFailure
   alias Fluffy.Internal.OperationFailure
   alias Fluffy.Locator
@@ -483,7 +482,7 @@ defmodule Fluffy.Driver.Playwright do
       {:ok, session, probe}
     else
       state = %{state | document_identity: probe.document}
-      session = Fluffy.Backend.navigate(session, Navigation.browser_committed(probe.url, state))
+      session = adopt_document(session, state, probe.url)
       {:ok, session, open_page_probe!(session, state, timeout)}
     end
   rescue
@@ -519,22 +518,37 @@ defmodule Fluffy.Driver.Playwright do
         probe
       end
 
-    navigation =
-      cond do
-        probe.document != state.document_identity ->
-          Navigation.browser_committed(probe.url, %{state | document_identity: probe.document})
+    cond do
+      probe.document != state.document_identity -> adopt_probed_document(session, state, probe)
+      probe.kind == :redirect -> adopt_document(session, state, probe.url, before.cursor)
+      probe.url != before.url -> Session.commit_page(session, :playwright, state, probe.url, same_document: true)
+      true -> session
+    end
+  end
 
-        probe.kind == :redirect ->
-          Navigation.browser_committed(probe.url, state, live_navigation_cursor: before.cursor)
+  @doc """
+  Adopts the document the main frame navigated to, as after `visit` or `reload`, and
+  commits it. Its reads and LiveView waits get the navigation timeout, not a `timeout:`
+  of the call, which bounds the navigation only.
+  """
+  def adopt_navigated_document(session, state) do
+    timeout = Document.bookkeeping_timeout(Timeouts.navigation(session))
+    adopt_probed_document(session, state, Document.adopted_probe!(state, nil, timeout))
+  end
 
-        probe.url != before.url ->
-          Navigation.browser_patch(probe.url, state)
+  @doc "Adopts the document a probe of the main frame found."
+  def adopt_probed_document(session, state, probe),
+    do: adopt_document(session, %{state | document_identity: probe.document}, probe.url)
 
-        true ->
-          nil
-      end
-
-    if navigation, do: Fluffy.Backend.navigate(session, navigation), else: session
+  # Commits a document the browser navigated to once its LiveViews are connected, also
+  # after the LiveView redirect recorded since `cursor`, which keeps the HTML document.
+  # The LiveView waits of a navigation an action or page code started share the
+  # navigation timeout, so with none they wait as `goto` does.
+  defp adopt_document(session, state, url, cursor \\ nil) do
+    deadline = Deadline.new(Document.bookkeeping_timeout(Timeouts.navigation(session)))
+    if cursor, do: Document.wait_for_redirect!(state.frame, url, cursor, Deadline.remaining(deadline, 1))
+    :ok = Document.wait_for_live_view!(state.frame, url, Deadline.remaining(deadline, 1))
+    Session.commit_page(session, :playwright, state, url, live_redirect: cursor != nil)
   end
 
   defp files({:local_paths, paths}), do: paths

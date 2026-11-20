@@ -1,9 +1,9 @@
-defmodule Fluffy.HTML.DocumentIndex do
+defmodule Fluffy.Driver.Phoenix.HTML.DocumentIndex do
   @moduledoc false
 
-  alias Fluffy.HTML.Aria
-  alias Fluffy.HTML.Semantics
-  alias Fluffy.HTML.Target
+  alias Fluffy.Driver.Phoenix.HTML.Aria
+  alias Fluffy.Driver.Phoenix.HTML.Semantics
+  alias Fluffy.Driver.Phoenix.HTML.Target
 
   @enforce_keys [
     :document,

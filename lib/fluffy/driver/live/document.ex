@@ -1,9 +1,9 @@
 defmodule Fluffy.Driver.Live.Document do
   @moduledoc false
 
-  import Fluffy.HTML.Semantics, only: [attribute: 2]
+  import Fluffy.Driver.Phoenix.HTML.Semantics, only: [attribute: 2]
 
-  alias Fluffy.HTML.Semantics
+  alias Fluffy.Driver.Phoenix.HTML.Semantics
 
   # LiveViewTest renders only the LiveView container element. A browser keeps
   # the dead-rendered root layout around it, applies title updates to <title>,

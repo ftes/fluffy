@@ -1,7 +1,7 @@
-defmodule Fluffy.ClientDOM.Query do
+defmodule Fluffy.Driver.Phoenix.ClientDOM.Query do
   @moduledoc false
 
-  alias Fluffy.HTML.DocumentIndex
+  alias Fluffy.Driver.Phoenix.HTML.DocumentIndex
   alias Fluffy.Locator
   alias Fluffy.Locator.Static
 

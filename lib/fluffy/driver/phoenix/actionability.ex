@@ -1,7 +1,7 @@
-defmodule Fluffy.Actionability do
+defmodule Fluffy.Driver.Phoenix.Actionability do
   @moduledoc false
 
-  import Fluffy.HTML.Semantics, only: [input_type: 1]
+  import Fluffy.Driver.Phoenix.HTML.Semantics, only: [input_type: 1]
 
   @fillable_input_types [
     "color",
@@ -20,7 +20,7 @@ defmodule Fluffy.Actionability do
     "week"
   ]
 
-  # The click's enabled check follows the label, see `Fluffy.ClientDOM.click/3`.
+  # The click's enabled check follows the label, see `Fluffy.Driver.Phoenix.ClientDOM.click/3`.
   def ensure_clickable!(element, action, locator) do
     if LazyHTML.attribute(element, "hidden") != [] do
       raise_error(action, :hidden, locator)

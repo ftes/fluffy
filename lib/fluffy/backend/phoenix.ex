@@ -7,21 +7,18 @@ defmodule Fluffy.Backend.Phoenix do
   import Phoenix.LiveViewTest
 
   alias Fluffy.Backend.Phoenix.Context
+  alias Fluffy.Backend.Phoenix.CookieJar
   alias Fluffy.Backend.Phoenix.HTTP
   alias Fluffy.Backend.Phoenix.HTTP.Client, as: HTTPClient
   alias Fluffy.Backend.Phoenix.HTTP.Response, as: HTTPResponse
-  alias Fluffy.ClientDOM
-  alias Fluffy.CookieJar
   alias Fluffy.Download
   alias Fluffy.Driver.Live, as: LiveDriver
-  alias Fluffy.Driver.Live.Document, as: LiveDocument
-  alias Fluffy.Driver.Live.State, as: LiveState
-  alias Fluffy.Driver.Live.UploadState
   alias Fluffy.Driver.NoDocument
+  alias Fluffy.Driver.Phoenix.ClientDOM
+  alias Fluffy.Driver.Phoenix.Form
   alias Fluffy.Driver.Static.State, as: StaticState
   alias Fluffy.Internal.Navigation
   alias Fluffy.Internal.Navigation.Link
-  alias Fluffy.Internal.Navigation.Patch
   alias Fluffy.Internal.Navigation.Redirect
   alias Fluffy.Internal.Navigation.StaticConn
   alias Fluffy.Internal.Navigation.Submission
@@ -112,15 +109,6 @@ defmodule Fluffy.Backend.Phoenix do
   @impl true
   def runtime_event(_context, _message), do: :ignore
 
-  # How long a LiveView, its proxy or an upload client may take to stop before it is
-  # killed: OTP's default shutdown of a worker.
-  @stop_timeout 5_000
-
-  @doc false
-  def register_process(runtime, kind, pid) do
-    Fluffy.SessionRuntime.register(runtime, {kind, pid}, fn -> stop_process(pid, @stop_timeout, :shutdown) end)
-  end
-
   @impl true
   def absolute_url(%Session{} = session, path) do
     Session.context(session).http.base_url |> URI.merge(path) |> URI.to_string()
@@ -203,13 +191,6 @@ defmodule Fluffy.Backend.Phoenix do
     inert_if_kept(session, &follow_redirect(&1, navigation.destination, navigation.flash, navigation.redirects))
   end
 
-  def navigate(%Session{} = session, %Patch{} = navigation) do
-    previous_url = Session.current_page(session).url
-    url = URI.merge(previous_url, navigation.destination)
-
-    Session.commit_page(session, :live, navigation.state, URI.to_string(url), same_document: true)
-  end
-
   def navigate(%Session{} = session, %StaticConn{conn: conn}) do
     destination = conn_request_target(conn, Session.current_page(session).url)
     commit_conn(session, conn, destination)
@@ -275,7 +256,7 @@ defmodule Fluffy.Backend.Phoenix do
 
     case submission.method do
       :get ->
-        encoded_fields = Fluffy.Form.url_encode(submission.fields)
+        encoded_fields = Form.url_encode(submission.fields)
         request(session, %{url | query: encoded_fields}, :get, nil, nil, redirects)
 
       :post ->
@@ -287,59 +268,26 @@ defmodule Fluffy.Backend.Phoenix do
     boundary = "----FluffyFormBoundary#{System.unique_integer([:positive, :monotonic])}"
 
     %{
-      body: Fluffy.Form.multipart_encode(fields, boundary),
+      body: Form.multipart_encode(fields, boundary),
       content_type: "multipart/form-data; boundary=#{boundary}"
     }
   end
 
-  defp encode_post_submission(%{fields: fields}), do: Fluffy.Form.url_encode(fields)
+  defp encode_post_submission(%{fields: fields}), do: Form.url_encode(fields)
 
-  @doc false
-  def commit_live(%Session{} = session, view, html, destination, redirects \\ 0) do
-    # LiveViewTest links its client proxy to the test process, and the proxy
-    # exits with the view's reason. Unlink it so a view that redirects or
-    # crashes doesn't take the test down; the view's monitor reports how it left.
-    proxy_pid = live_view_proxy_pid(view)
-    Process.unlink(proxy_pid)
-
+  defp commit_live(%Session{} = session, view, html, destination, redirects) do
     url =
       URI.merge(Session.current_page(session).url || Session.context(session).http.base_url, destination)
 
-    # The Live driver reads how the view left from this monitor's message.
-    monitor = LiveState.monitor_view(view.pid)
-
-    :ok = register_process(session.runtime, :live_view, view.pid)
-    :ok = register_process(session.runtime, :live_view, proxy_pid)
-
-    document = LiveDocument.new(html, view.id)
-
-    # The view can redirect or exit right after mounting. Commit the mounted
-    # document then, so the view is released like any other: follow a reported
-    # redirect now, and leave an exit to the Live driver's next read.
-    {client_dom, redirect} =
-      try do
-        case LiveDocument.render(document, view) do
-          {:ok, composed} -> {ClientDOM.from_document(composed), nil}
-          {:error, redirect} -> {mounted_client_dom(html), redirect}
-        end
-      catch
-        :exit, _reason -> {mounted_client_dom(html), nil}
-      end
-
-    state = %LiveState{
-      client_dom: client_dom,
-      document: document,
-      live_uploads: UploadState.new(),
-      view: view,
-      monitor: monitor
-    }
-
+    # A redirect the view reported right after mounting is followed now; the
+    # mounted document commits first, so the view is released like any other.
+    {state, redirect} = LiveDriver.mount(session.runtime, view, html)
     session = replace_document(session, :live, state, URI.to_string(url))
 
     # The client patches the join render before anything the view sends later, so
     # a form that render triggers wins over a redirect reported after the join. It
     # counts toward the redirects that led here (see docs/capabilities.md).
-    case {ClientDOM.triggered_submission(client_dom), redirect} do
+    case {ClientDOM.triggered_submission(state.client_dom), redirect} do
       {nil, nil} ->
         session
 
@@ -349,7 +297,7 @@ defmodule Fluffy.Backend.Phoenix do
       {submission, _later_redirect} ->
         navigate(
           session,
-          Navigation.submission(submission, redirects: HTTP.count_redirect!(redirects, url), triggered: true)
+          Navigation.submission(submission, redirects: Navigation.count_redirect!(redirects, url), triggered: true)
         )
     end
   end
@@ -357,7 +305,7 @@ defmodule Fluffy.Backend.Phoenix do
   # A browser follows a redirect from a view's mount like an HTTP redirect, so
   # it counts toward the same redirect limit.
   defp follow_mount_redirect(session, {_kind, %{to: destination} = options}, url, redirects) do
-    follow_redirect(session, destination, options[:flash], HTTP.count_redirect!(redirects, url))
+    follow_redirect(session, destination, options[:flash], Navigation.count_redirect!(redirects, url))
   end
 
   # Requests a view's redirect destination, after `redirects` redirects so far,
@@ -369,8 +317,6 @@ defmodule Fluffy.Backend.Phoenix do
     |> put_live_redirect_flash(flash)
     |> request(url, :get, nil, nil, redirects)
   end
-
-  defp mounted_client_dom(html), do: html |> LazyHTML.from_document() |> ClientDOM.from_document()
 
   @doc false
   def commit_conn(%Session{} = session, conn, destination) do
@@ -587,64 +533,6 @@ defmodule Fluffy.Backend.Phoenix do
     Session.commit_page(session, driver, state, url, options)
   end
 
-  defp release_page(session, %Page.State{driver: :live} = page) do
-    proxy_pid = live_view_proxy_pid(page.state.view)
-    :ok = LiveDriver.release_page_uploads(session, page)
-    Process.demonitor(page.state.monitor, [:flush])
-    stop_process(page.state.view.pid, @stop_timeout, :normal)
-    stop_process(proxy_pid, @stop_timeout, :normal)
-
-    Fluffy.SessionRuntime.release(session.runtime, {:live_view, page.state.view.pid})
-
-    Fluffy.SessionRuntime.release(session.runtime, {:live_view, proxy_pid})
-
-    flush_view_messages(page.state.view)
-    :ok
-  end
-
+  defp release_page(session, %Page.State{driver: :live} = page), do: LiveDriver.release(session, page)
   defp release_page(_session, %Page.State{}), do: :ok
-
-  defp flush_view_messages(%{proxy: {reference, _topic, _proxy_pid}} = view) do
-    receive do
-      {^reference, _message} -> flush_view_messages(view)
-    after
-      0 -> :ok
-    end
-  end
-
-  defp live_view_proxy_pid(%{proxy: {_reference, _topic, proxy_pid}}) when is_pid(proxy_pid), do: proxy_pid
-
-  defp stop_process(pid, timeout, reason) do
-    if Process.alive?(pid) do
-      reference = Process.monitor(pid)
-
-      try do
-        request_stop(pid, timeout, reason)
-      catch
-        :exit, _reason -> Process.exit(pid, :kill)
-      end
-
-      receive do
-        {:DOWN, ^reference, :process, ^pid, _reason} -> :ok
-      after
-        timeout ->
-          Process.exit(pid, :kill)
-
-          receive do
-            {:DOWN, ^reference, :process, ^pid, _reason} -> :ok
-          end
-      end
-    end
-
-    :ok
-  end
-
-  # Replacing a document stops its linked processes normally in the caller;
-  # runtime teardown sends shutdown from the resource owner.
-  defp request_stop(pid, timeout, :normal) do
-    Process.unlink(pid)
-    GenServer.stop(pid, :normal, timeout)
-  end
-
-  defp request_stop(pid, _timeout, :shutdown), do: Process.exit(pid, :shutdown)
 end

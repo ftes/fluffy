@@ -1,4 +1,4 @@
-defmodule Fluffy.Backend.Playwright.Bounded do
+defmodule Fluffy.Driver.Playwright.Bounded do
   @moduledoc false
 
   # Fluffy's own reads around an operation (document probes, failure artifacts,
