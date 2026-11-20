@@ -171,8 +171,9 @@ conn
 |> visit("/chambers/secrets")
 ```
 
-The prepared connection applies to the first request only. Connect params do not carry
-across later navigation, and `Fluffy.PhoenixTest.unwrap/2` runs too late to supply
+The prepared connection applies to the first request only, except that its `accept`,
+`accept-language`, `authorization` and `user-agent` headers go with every request, as
+`Phoenix.ConnTest.recycle/2` keeps them. Connect params do not carry across later navigation, and `Fluffy.PhoenixTest.unwrap/2` runs too late to supply
 initial mount params. Browser tests use the application's real LiveSocket parameters.
 
 ### Using native Fluffy APIs
