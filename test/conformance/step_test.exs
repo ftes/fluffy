@@ -41,7 +41,7 @@ defmodule Fluffy.Conformance.StepTest do
   test "requires the callback to return a session and leaves the options to Playwright.Test.step" do
     session = start_session(:phoenix)
 
-    assert_raise ArgumentError, ~r/must return a Fluffy.Session, got: :ok/, fn ->
+    assert_raise ArgumentError, ~r/^Fluffy.step\/4: callback must return a Fluffy.Session, got: :ok/, fn ->
       step(session, "Feed Fluffy", fn _session -> :ok end)
     end
 

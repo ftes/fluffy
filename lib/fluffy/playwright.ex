@@ -1013,7 +1013,7 @@ defmodule Fluffy.Playwright do
   def add_init_script(session, script, arg \\ nil)
 
   def add_init_script(_session, script, arg) when is_map(script) and not is_nil(arg) do
-    raise ArgumentError, "add_init_script: a script map takes no arg, got: #{inspect(arg)}"
+    raise ArgumentError, "Fluffy.Playwright.add_init_script/3: a script map takes no arg, got: #{inspect(arg)}"
   end
 
   def add_init_script(session, script, arg),

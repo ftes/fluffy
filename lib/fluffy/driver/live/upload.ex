@@ -69,7 +69,7 @@ defmodule Fluffy.Driver.Live.Upload do
   defp ensure_upload_form_id!(form) do
     if is_nil(attribute(form.attributes, "id")) do
       raise ArgumentError,
-            "set_input_files/3 on a LiveView upload requires its form to have an id; give the form an id"
+            "Fluffy.set_input_files/4: a LiveView upload requires its form to have an id; give the form an id"
     end
   end
 

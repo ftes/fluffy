@@ -23,7 +23,7 @@ defmodule Fluffy.Locator.Internal do
   def within(%Locator{} = scope, %Locator{operations: operations} = locator) do
     if crosses_frame?(locator) and Enum.any?(operations, &composed?/1) do
       raise ArgumentError,
-            "within/3 cannot scope a frame locator combined with and_, or_, has:, has_not: or label:, " <>
+            "Fluffy.PhoenixTest.within/3: cannot scope a frame locator combined with and_, or_, has:, has_not: or label:, " <>
               "got: #{describe(locator)}"
     end
 

@@ -288,7 +288,7 @@ defmodule Fluffy.Driver.Live do
     with {:ok, event_context} <- View.owning_view_context(session, target) do
       case ClientDOM.submit_form(client_dom, target, :live) do
         nil ->
-          raise ArgumentError, "submit/2 requires a form locator, got #{inspect(target.tag)}"
+          raise ArgumentError, "Fluffy.submit/3: requires a form locator, got #{inspect(target.tag)}"
 
         %{phx_submit?: true} = submission ->
           live_submit(client_dom, submission, event_context).(session)

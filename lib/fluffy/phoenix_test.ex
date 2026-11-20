@@ -243,7 +243,7 @@ defmodule Fluffy.PhoenixTest do
 
     case fun.(scoped) do
       %Session{} = updated -> %{updated | scope: session.scope}
-      _ -> raise ArgumentError, "within callback must return a Fluffy.PhoenixTest.Session"
+      _ -> raise ArgumentError, "Fluffy.PhoenixTest.within/3: callback must return a Fluffy.PhoenixTest.Session"
     end
   end
 
@@ -258,7 +258,8 @@ defmodule Fluffy.PhoenixTest do
 
     case current_form(session, page_identity(session.session)) do
       %Session{active_form: nil} ->
-        raise ArgumentError, "no active form; fill, select, check, choose, or upload a field first"
+        raise ArgumentError,
+              "Fluffy.PhoenixTest.submit/1: no active form; fill, select, check, choose, or upload a field first"
 
       %Session{active_form: locator} = session ->
         submit_form(session, locator)

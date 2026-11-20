@@ -54,7 +54,11 @@ defmodule Fluffy.Sandbox do
     sandbox = Keyword.get(options, :sandbox, @default_sandbox)
 
     trap_exit? = Keyword.get(options, :trap_exit, true)
-    if not is_boolean(trap_exit?), do: raise(ArgumentError, "expected sandbox :trap_exit to be a boolean")
+
+    if not is_boolean(trap_exit?) do
+      raise ArgumentError,
+            "invalid config :fluffy, Fluffy.Sandbox: expected :trap_exit to be a boolean, got: #{inspect(trap_exit?)}"
+    end
 
     validate_header!(header)
     validate_sandbox!(sandbox)
@@ -64,7 +68,7 @@ defmodule Fluffy.Sandbox do
 
   def validate_config!(other) do
     raise ArgumentError,
-          "expected :fluffy, Fluffy.Sandbox configuration to be a keyword list, got: #{inspect(other)}"
+          "invalid config :fluffy, Fluffy.Sandbox: expected a keyword list, got: #{inspect(other)}"
   end
 
   if Code.ensure_loaded?(Sandbox) and
@@ -121,7 +125,7 @@ defmodule Fluffy.Sandbox do
     if header == "" or header != String.downcase(header) or
          not Regex.match?(~r/^[!#$%&'*+.^_`|~0-9a-z-]+$/, header) do
       raise ArgumentError,
-            "expected Fluffy sandbox :header to be a lowercase HTTP header name, got: #{inspect(header)}"
+            "invalid config :fluffy, Fluffy.Sandbox: expected :header to be a lowercase HTTP header name, got: #{inspect(header)}"
     end
 
     :ok
@@ -129,7 +133,7 @@ defmodule Fluffy.Sandbox do
 
   defp validate_header!(header) do
     raise ArgumentError,
-          "expected Fluffy sandbox :header to be a lowercase HTTP header name, got: #{inspect(header)}"
+          "invalid config :fluffy, Fluffy.Sandbox: expected :header to be a lowercase HTTP header name, got: #{inspect(header)}"
   end
 
   defp validate_sandbox!(sandbox) when is_atom(sandbox), do: :ok
@@ -139,6 +143,6 @@ defmodule Fluffy.Sandbox do
 
   defp validate_sandbox!(sandbox) do
     raise ArgumentError,
-          "expected Fluffy sandbox :sandbox to be a module or {module, function, arguments} MFA, got: #{inspect(sandbox)}"
+          "invalid config :fluffy, Fluffy.Sandbox: expected :sandbox to be a module or {module, function, arguments} MFA, got: #{inspect(sandbox)}"
   end
 end

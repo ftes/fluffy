@@ -19,7 +19,7 @@ defmodule Fluffy.EventTest do
     value = await(b)
     assert value == :downloaded
     assert value == :downloaded
-    assert_raise ArgumentError, ~r/already consumed/, fn -> await(a) end
+    assert_raise ArgumentError, ~r/^Fluffy.await\/1: pending event was already consumed/, fn -> await(a) end
   end
 
   test "predicates skip false and nil; failures propagate only through await", %{session: session} do

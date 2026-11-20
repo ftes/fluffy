@@ -143,7 +143,7 @@ defmodule Fluffy do
     body = fn ->
       case fun.(session) do
         %Session{} = session -> session
-        other -> raise ArgumentError, "Fluffy.step/3 callback must return a Fluffy.Session, got: #{inspect(other)}"
+        other -> raise ArgumentError, "Fluffy.step/4: callback must return a Fluffy.Session, got: #{inspect(other)}"
       end
     end
 
@@ -320,7 +320,8 @@ defmodule Fluffy do
     native
   end
 
-  defp native!(value), do: raise(ArgumentError, "#{inspect(value.__struct__)} has no native counterpart")
+  defp native!(value),
+    do: raise(ArgumentError, "Fluffy.unwrap_and_return/2: #{inspect(value.__struct__)} has no native counterpart")
 
   defp owner_page(%{page: page}), do: page
   defp owner_page(_value), do: nil
@@ -598,7 +599,7 @@ defmodule Fluffy do
     # Playwright types the whole list by its first element.
     if !(Enum.all?(requested, &is_binary/1) or Enum.all?(requested, &is_map/1)) do
       raise ArgumentError,
-            "select_option/4 takes a list of values and labels or a list of option maps, not both: " <>
+            "Fluffy.select_option/4: takes a list of values and labels or a list of option maps, not both: " <>
               inspect(requested)
     end
 

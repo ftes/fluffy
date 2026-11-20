@@ -21,7 +21,7 @@ defmodule Fluffy.Event.Pending do
       {:error, message} -> raise ExUnit.AssertionError, message: message
     end
   catch
-    :exit, {:noproc, _} -> raise ArgumentError, "pending event was already consumed or its owner exited"
-    :exit, {:normal, _} -> raise ArgumentError, "pending event was already consumed or its owner exited"
+    :exit, {:noproc, _} -> raise ArgumentError, "Fluffy.await/1: pending event was already consumed or its owner exited"
+    :exit, {:normal, _} -> raise ArgumentError, "Fluffy.await/1: pending event was already consumed or its owner exited"
   end
 end
