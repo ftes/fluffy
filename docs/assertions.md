@@ -245,3 +245,39 @@ session
   fn response -> assert Playwright.Response.status(response) == 200 end
 )
 ```
+
+## Polling and retrying blocks
+
+Fluffy's assertions retry on their own, so prefer them. For what isn't one locator or page
+assertion, such as a computed value or app state, use Playwright's
+[`expect.poll` and `toPass`](https://playwright.dev/docs/test-assertions#expectpoll):
+`Playwright.Expect.poll!/3` and `Playwright.Expect.to_pass!/2` retry an Elixir callback,
+Fluffy calls included, on every driver. They fail with `Playwright.ExpectError`, whose message
+has the last error, such as the value `poll!` last received; `poll/3` and `to_pass/2` return
+`:ok` or `{:ok, value}` and `{:error, error}` instead of raising.
+
+```elixir
+# Wait for app state, such as a job the click started.
+Playwright.Expect.poll!(fn -> Owlery.letters_for("Harry") end, &assert(length(&1) == 1),
+  message: "an owl reaches Privet Drive",
+  timeout: 10_000
+)
+
+# Retry a block until it passes; to_pass! returns the passing attempt's value.
+session =
+  Playwright.Expect.to_pass!(fn ->
+    session
+    |> click(by_role(:button, name: "Check the owlery"))
+    |> assert(visible(by_text("A letter for Harry")), timeout: 0)
+  end)
+```
+
+`poll!` retries for the assertion timeout (5 s by default, `config :playwright, :expect`) and
+`to_pass!` until the test's timeout, unless given a `timeout:`. Each attempt runs to the end: a
+Fluffy assertion or action in the callback waits for its own timeout before `to_pass!` tries
+again, and an attempt still running at `to_pass!`'s deadline isn't cut short, unlike in
+Playwright's JavaScript. So give the calls inside short timeouts: `timeout: 0` makes an
+assertion check once and leaves the retrying to `to_pass!`.
+
+A LiveView or browser page updates between attempts; a Static page doesn't, as it is a
+response. On Static, poll app state, or `reload` in the callback to fetch the page again.
