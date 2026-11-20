@@ -54,7 +54,8 @@ defmodule Fluffy.Backend.Phoenix do
   end
 
   # The headers a browser context of the test sends with every request: its `locale` as
-  # Accept-Language and `user_agent` as User-Agent (a `conn:`'s own win), then the session's
+  # Accept-Language and `user_agent` as User-Agent (a `conn:`'s own win), the `conn:`'s Accept
+  # and Authorization (as `Phoenix.ConnTest.recycle/2` keeps them), then the session's
   # `extra_http_headers`, else the test's, as in Playwright. `HTTP` puts later ones over earlier.
   defp request_headers(session_headers, conn) do
     use = Fluffy.TestInfo.fetch!().use
@@ -63,8 +64,9 @@ defmodule Fluffy.Backend.Phoenix do
       for {name, key} <- [{"accept-language", :locale}, {"user-agent", :user_agent}],
           do: {name, conn_header(conn, name) || use[key]}
 
+    recycled = for name <- ["accept", "authorization"], do: {name, conn_header(conn, name)}
     extra = session_headers || use[:extra_http_headers] || []
-    for {name, value} <- derived ++ Enum.to_list(extra), value != nil, do: {name, value}
+    for {name, value} <- derived ++ recycled ++ Enum.to_list(extra), value != nil, do: {name, value}
   end
 
   defp conn_header(nil, _name), do: nil

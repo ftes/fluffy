@@ -116,6 +116,7 @@ Changes since 0.8.0.
 - The facade's `submit/2` resolves a locator inside the current `within/3` scope.
 - The browsers and the driver close before `mix test` halts the VM, so the terminal is no longer left in the wrong mode ([#213](https://github.com/ftes/fluffy/issues/213)).
 - No unused-function warning when Fluffy is compiled without Ecto.
+- A Phoenix session sends its `conn:`'s `accept` and `authorization` headers with every request, as `Phoenix.ConnTest.recycle/2` keeps them, not only with the first, so an app behind basic auth no longer rejects later requests.
 
 ## 0.8.0 — 2026-11-04
 

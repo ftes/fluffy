@@ -367,8 +367,10 @@ defmodule Fluffy.Options do
                       doc:
                         "*Phoenix only.* A prepared `Plug.Conn` for the first request: its test session " <>
                           "(`Plug.Test.init_test_session/2`), cookies, headers and assigns go with it, " <>
-                          "as with `Phoenix.ConnTest`. To log in on both backends, add a cookie instead " <>
-                          "([Logging in](usage.md#logging-in))."
+                          "as with `Phoenix.ConnTest`. Its `accept`, `accept-language` and `authorization` " <>
+                          "headers, which `Phoenix.ConnTest.recycle/2` keeps, and its `user-agent` go with every " <>
+                          "later request too, unless `extra_http_headers` set them. To log in on both backends, " <>
+                          "add a cookie instead ([Logging in](usage.md#logging-in))."
                     ],
                     browser_context: [
                       type: :keyword_list,

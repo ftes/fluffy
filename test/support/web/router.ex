@@ -4,6 +4,7 @@ defmodule Fluffy.Support.Web.Router do
   use Phoenix.Router
 
   import Phoenix.LiveView.Router
+  import Plug.BasicAuth, only: [basic_auth: 2]
 
   alias Fluffy.Support.Web
   alias Fluffy.Support.Web.Layouts
@@ -23,6 +24,10 @@ defmodule Fluffy.Support.Web.Router do
 
   pipeline :initial_connection_authorization do
     plug(Fluffy.Support.Web.InitialConnectionAuthorization)
+  end
+
+  pipeline :hagrids_basic_auth do
+    plug(:basic_auth, username: "hagrid", password: "fluffy")
   end
 
   scope "/", Web do
@@ -125,6 +130,14 @@ defmodule Fluffy.Support.Web.Router do
 
     live_session :fluffy_initial_connection, on_mount: Fluffy.Sandbox do
       live("/initial-connection", InitialConnectionLive)
+    end
+  end
+
+  scope "/live", Web do
+    pipe_through([:browser, :hagrids_basic_auth])
+
+    live_session :fluffy_trapdoor, on_mount: Fluffy.Sandbox do
+      live("/trapdoor", TrapdoorLive)
     end
   end
 
