@@ -9,8 +9,8 @@ defmodule Fluffy.TestTimeoutTest do
 
   @tag timeout: 10_000
   test "a test's backstop is when Playwright.Test closes its contexts" do
-    %{timeout: 10_000, close_deadline: close_deadline} = Playwright.Test.info()
-    assert TestTimeout.fetch() == {10_000, close_deadline}
+    %{timeout: 10_000, deadline: deadline} = Playwright.Test.info()
+    assert TestTimeout.fetch() == {10_000, deadline}
   end
 
   @tag timeout: :infinity

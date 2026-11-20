@@ -4,7 +4,7 @@ defmodule Fluffy.TestTimeout do
   # The backstop of Fluffy's own waits (LiveView retries, event waits on every driver): an
   # operation without a timeout fails with Fluffy's error just before ExUnit kills the test, at
   # the moment Playwright.Test closes the test's contexts, so a Playwright call fails
-  # (`close_deadline` of `Playwright.Test.info/0`). It comes from the test's registration
+  # (`deadline` of `Playwright.Test.info/0`). It comes from the test's registration
   # (`use Playwright.Test`), also in its Tasks, through `$callers`. Without one, as in a process
   # outside the test, there is no backstop.
 
@@ -12,7 +12,7 @@ defmodule Fluffy.TestTimeout do
   @spec fetch() :: {pos_integer(), integer()} | nil
   def fetch do
     case Fluffy.TestInfo.fetch() do
-      {:ok, %{timeout: timeout, close_deadline: backstop}} when is_integer(timeout) and is_integer(backstop) ->
+      {:ok, %{timeout: timeout, deadline: backstop}} when is_integer(timeout) and is_integer(backstop) ->
         {timeout, backstop}
 
       _none ->
