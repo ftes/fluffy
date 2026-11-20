@@ -189,7 +189,7 @@ defmodule Fluffy.Driver.Playwright do
   @submit """
   form => {
     if (form.localName !== 'form')
-      throw new Error(`submit/2 requires a form locator, got ${form.localName}`)
+      throw new Error(`Fluffy.submit/3: requires a form locator, got ${form.localName}`)
     const view = form.ownerDocument.defaultView
     const property = name => Object.getOwnPropertyDescriptor(HTMLFormElement.prototype, name).get.call(form)
     let submitted

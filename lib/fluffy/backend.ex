@@ -100,7 +100,7 @@ defmodule Fluffy.Backend do
 
     if is_nil(endpoint) do
       raise ArgumentError, """
-      missing Fluffy endpoint; configure:
+      Fluffy.start_session/2: missing Fluffy endpoint; configure:
 
           config :fluffy, endpoint: MyAppWeb.Endpoint
 
@@ -122,7 +122,7 @@ defmodule Fluffy.Backend do
 
     if is_nil(base_url) do
       raise ArgumentError, """
-      missing Fluffy base URL; configure either:
+      Fluffy.start_session/2: missing Fluffy base URL; configure either:
 
           config :fluffy, endpoint: MyAppWeb.Endpoint
 

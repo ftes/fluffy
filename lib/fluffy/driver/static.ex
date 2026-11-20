@@ -94,7 +94,7 @@ defmodule Fluffy.Driver.Static do
 
     case ClientDOM.submit_form(client_dom, target) do
       nil ->
-        raise ArgumentError, "submit/2 requires a form locator, got #{inspect(target.tag)}"
+        raise ArgumentError, "Fluffy.submit/3: requires a form locator, got #{inspect(target.tag)}"
 
       submission ->
         {:navigate, session, Navigation.submission(submission)}
@@ -159,29 +159,29 @@ defmodule Fluffy.Driver.Static do
 
   @impl true
   def unwrap(%Session{} = session, fun) when is_function(fun, 1) do
-    case fun.(current_conn!(session)) do
+    case fun.(current_conn!(session, "Fluffy.unwrap/2")) do
       %Plug.Conn{} = returned_conn ->
         {:navigate, session, Navigation.static_conn(returned_conn)}
 
       other ->
         raise ArgumentError,
-              "Static unwrap callback must return an updated Plug.Conn, got: #{inspect(other)}"
+              "Fluffy.unwrap/2: a Static page's callback must return an updated Plug.Conn, got: #{inspect(other)}"
     end
   end
 
   # A read: the result is not a replacement conn, so the page stays as it is.
   @impl true
   def unwrap_and_return(%Session{} = session, fun) when is_function(fun, 1),
-    do: {:return, fun.(current_conn!(session)), session}
+    do: {:return, fun.(current_conn!(session, "Fluffy.unwrap_and_return/2")), session}
 
-  defp current_conn!(session) do
+  defp current_conn!(session, label) do
     case Session.page_state(session) do
       %{conn: %Plug.Conn{} = conn} ->
         conn
 
       _state ->
         raise ArgumentError,
-              "cannot unwrap a Static page without a current Plug.Conn; visit a Phoenix page first"
+              "#{label}: cannot unwrap a Static page without a current Plug.Conn; visit a Phoenix page first"
     end
   end
 

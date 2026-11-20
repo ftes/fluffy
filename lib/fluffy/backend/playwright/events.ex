@@ -94,7 +94,7 @@ defmodule Fluffy.Backend.Playwright.Events do
   @doc false
   def page(session, browser_page) do
     if BrowserPage.context(browser_page).guid != Session.context(session).browser_context.guid,
-      do: raise(ArgumentError, "the page belongs to another browser context than the session's")
+      do: raise(ArgumentError, "Fluffy.Playwright.page/2: the page belongs to another browser context than the session's")
 
     page_handle(session, browser_page)
   end

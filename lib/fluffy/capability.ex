@@ -335,7 +335,7 @@ defmodule Fluffy.Capability do
   @doc "Returns the status of a feature on a Phoenix page driver, `:static` or `:live`."
   def status(feature, driver) when driver in @drivers do
     case Enum.find(@matrix, &(&1.id == feature)) do
-      nil -> raise ArgumentError, "unknown Fluffy capability #{inspect(feature)}"
+      nil -> raise ArgumentError, "Fluffy.Capability.status/2: unknown Fluffy capability #{inspect(feature)}"
       capability -> Map.fetch!(capability.drivers, driver)
     end
   end

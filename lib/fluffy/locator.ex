@@ -236,7 +236,7 @@ defmodule Fluffy.Locator do
 
   def by_test_id(test_id, options) when is_binary(test_id) and is_list(options) do
     raise ArgumentError,
-          "by_test_id/2 takes no options, as Playwright's getByTestId: set the attribute with " <>
+          "Fluffy.Locator.by_test_id/2: takes no options, as Playwright's getByTestId: set the attribute with " <>
             ~s{`config :playwright, :test, test_id_attribute: ...`, } <>
             ~s{or use by_css("[data-owl=\\"hedwig\\"]"), } <>
             "got: #{inspect(options)}"

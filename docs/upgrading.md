@@ -134,7 +134,9 @@ A browser session's timeouts follow Playwright Test and a Phoenix session's
   screenshots and videos come from `Playwright.Test`: set
   `config :playwright, :test, trace: :retain_on_failure, screenshot: :only_on_failure`
   and replace `setup context do Fluffy.Test.setup(context) end` with `use Playwright.Test` after
-  your `ConnCase` (or in your case template, see `Playwright.Test`);
+  your `ConnCase` (or in your case template, see `Playwright.Test`). Every module that starts a
+  session needs it, Phoenix-only and `Fluffy.PhoenixTest` ones too: a session started outside a
+  registered test raises;
   record a module with `use Playwright.Test, trace: :on` and a describe block or test with `@tag Playwright.Test.use(trace: :on)` (or `screenshot:`, `video:`). Files go to
   `test-results/<test>/`; a failed operation no longer writes HTML or the error text.
 - Fluffy no longer starts or adopts Ecto sandbox owners: keep the generated DataCase

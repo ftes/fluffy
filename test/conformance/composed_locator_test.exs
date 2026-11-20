@@ -10,7 +10,7 @@ defmodule Fluffy.Conformance.ComposedLocatorTest do
     session = session_for_html(:playwright, ~s(<section><iframe srcdoc="<p>In</p>"></iframe></section>))
     locator = within(by_css(frame_locator("iframe"), "p"), by_css("section"))
 
-    assert_raise ArgumentError, ~r/within\/2 cannot enter a frame/, fn ->
+    assert_raise ArgumentError, ~r/Fluffy.Locator.within\/2: cannot enter a frame/, fn ->
       expect(session, to_have_count(locator, 1))
     end
   end

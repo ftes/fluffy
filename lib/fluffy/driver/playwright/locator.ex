@@ -61,7 +61,7 @@ defmodule Fluffy.Driver.Playwright.Locator do
   defp apply_operation(frame, {:within, parent, child}, scope) do
     if Internal.crosses_frame?(child) or (not root?(scope) and Internal.crosses_frame?(parent)) do
       raise ArgumentError,
-            "within/2 cannot enter a frame inside a chained locator, got: " <>
+            "Fluffy.Locator.within/2: cannot enter a frame inside a chained locator, got: " <>
               "within(#{Internal.describe(child)}, #{Internal.describe(parent)}); " <>
               "start the locator from the frame instead"
     end

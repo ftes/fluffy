@@ -482,7 +482,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       set_input_files(session, by_label("Attachments"), [fixture_path(), missing])
     end
 
-    assert_raise ArgumentError, ~r/readable regular file/, fn ->
+    assert_raise ArgumentError, ~r/^Fluffy.set_input_files\/4: expects a readable regular file/, fn ->
       set_input_files(session, by_label("Attachments"), System.tmp_dir!())
     end
 

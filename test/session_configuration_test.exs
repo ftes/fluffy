@@ -125,7 +125,7 @@ defmodule Fluffy.SessionConfigurationTest do
   test "missing global and session configuration reports the required setting" do
     Application.delete_env(:fluffy, :endpoint)
 
-    assert_raise ArgumentError, ~r/missing Fluffy endpoint/, fn ->
+    assert_raise ArgumentError, ~r/^Fluffy.start_session\/2: missing Fluffy endpoint/, fn ->
       start_session(:phoenix)
     end
 
@@ -152,9 +152,11 @@ defmodule Fluffy.SessionConfigurationTest do
   # One place each, the same on both backends: not in Playwright's context options.
   test "rejects base_url and extra_http_headers in browser_context:" do
     for key <- [:base_url, :extra_http_headers] do
-      assert_raise ArgumentError, ~r/pass `#{key}:` to start_session\/2, not in `browser_context:`/, fn ->
-        start_session(:playwright, browser_context: [{key, nil}])
-      end
+      assert_raise ArgumentError,
+                   ~r/^Fluffy.start_session\/2: pass #{inspect(key)} as its own option, not in :browser_context/,
+                   fn ->
+                     start_session(:playwright, browser_context: [{key, nil}])
+                   end
     end
   end
 

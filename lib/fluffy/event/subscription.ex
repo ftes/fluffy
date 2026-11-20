@@ -85,7 +85,8 @@ defmodule Fluffy.Event.Subscription do
   def handle_call(:await, _from, %{mode: :wait, outcome: outcome} = state) when not is_nil(outcome),
     do: {:stop, :normal, outcome, state}
 
-  def handle_call(:await, _from, state), do: {:reply, {:error, "a pending event can only be awaited once"}, state}
+  def handle_call(:await, _from, state),
+    do: {:reply, {:error, "Fluffy.await/1: a pending event can only be awaited once"}, state}
 
   @impl true
   def handle_info({ref, result}, %{task: %Task{ref: ref}} = state) do

@@ -3,6 +3,9 @@ defmodule Fluffy.SelectedFile do
 
   alias Fluffy.FilePayload
 
+  # Only `Fluffy.set_input_files/4` prepares a selection.
+  @label "Fluffy.set_input_files/4"
+
   @enforce_keys [:bytes, :content_type, :name, :size]
   defstruct [:bytes, :content_type, :name, :size]
 
@@ -41,12 +44,12 @@ defmodule Fluffy.SelectedFile do
 
           true ->
             raise ArgumentError,
-                  "set_input_files expects a homogeneous list of local path strings or Fluffy.FilePayload structs"
+                  "#{@label}: expects a homogeneous list of local path strings or Fluffy.FilePayload structs"
         end
 
       _other ->
         raise ArgumentError,
-              "set_input_files expects one local path string, one Fluffy.FilePayload, a homogeneous list of either, or []"
+              "#{@label}: expects one local path string, one Fluffy.FilePayload, a homogeneous list of either, or []"
     end
   end
 
@@ -89,7 +92,7 @@ defmodule Fluffy.SelectedFile do
 
   defp selected_file_from_payload!(%FilePayload{}) do
     raise ArgumentError,
-          "set_input_files expects a Fluffy.FilePayload with binary :name and :bytes and optional binary :content_type"
+          "#{@label}: expects a Fluffy.FilePayload with binary :name and :bytes and optional binary :content_type"
   end
 
   defp stat_path!(path) do
@@ -101,11 +104,11 @@ defmodule Fluffy.SelectedFile do
 
       {:ok, %{type: type}} ->
         raise ArgumentError,
-              "set_input_files expects a readable regular file, got #{inspect(type)} at #{inspect(path)}"
+              "#{@label}: expects a readable regular file, got #{inspect(type)} at #{inspect(path)}"
 
       {:error, reason} ->
         raise ArgumentError,
-              "set_input_files could not stat #{inspect(path)}: #{:file.format_error(reason)}"
+              "#{@label}: could not stat #{inspect(path)}: #{:file.format_error(reason)}"
     end
   end
 
@@ -119,14 +122,14 @@ defmodule Fluffy.SelectedFile do
 
             bytes when is_binary(bytes) ->
               raise ArgumentError,
-                    "set_input_files selection exceeds :max_bytes limit of #{max_bytes}"
+                    "#{@label}: selection exceeds :max_bytes limit of #{max_bytes}"
 
             :eof ->
               ""
 
             {:error, reason} ->
               raise ArgumentError,
-                    "set_input_files could not read #{inspect(path)}: #{:file.format_error(reason)}"
+                    "#{@label}: could not read #{inspect(path)}: #{:file.format_error(reason)}"
           end
         after
           File.close(device)
@@ -134,21 +137,21 @@ defmodule Fluffy.SelectedFile do
 
       {:error, reason} ->
         raise ArgumentError,
-              "set_input_files could not read #{inspect(path)}: #{:file.format_error(reason)}"
+              "#{@label}: could not read #{inspect(path)}: #{:file.format_error(reason)}"
     end
   end
 
   defp validate_max_bytes!(max_bytes) when is_integer(max_bytes) and max_bytes >= 0, do: :ok
 
   defp validate_max_bytes!(max_bytes) do
-    raise ArgumentError, ":max_bytes must be a non-negative integer, got: #{inspect(max_bytes)}"
+    raise ArgumentError, "#{@label}: :max_bytes must be a non-negative integer, got: #{inspect(max_bytes)}"
   end
 
   defp ensure_size_limit!(size, max_bytes) when size <= max_bytes, do: :ok
 
   defp ensure_size_limit!(size, max_bytes) do
     raise ArgumentError,
-          "set_input_files selection is #{size} bytes, exceeding :max_bytes limit of #{max_bytes}"
+          "#{@label}: selection is #{size} bytes, exceeding :max_bytes limit of #{max_bytes}"
   end
 
   # File's Blob MIME type algorithm lowercases printable ASCII and replaces an

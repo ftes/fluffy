@@ -554,7 +554,7 @@ defmodule Fluffy.Options do
 
     if key = Enum.find([:base_url, :extra_http_headers], &Keyword.has_key?(options[:browser_context] || [], &1)) do
       # One place each: the session's own options, the same on both backends.
-      raise ArgumentError, "pass `#{key}:` to start_session/2, not in `browser_context:`"
+      raise ArgumentError, "Fluffy.start_session/2: pass #{inspect(key)} as its own option, not in :browser_context"
     else
       :ok
     end
@@ -660,6 +660,6 @@ defmodule Fluffy.Options do
 
   defp validate_conn!(%Plug.Conn{state: state}) do
     raise ArgumentError,
-          ":conn must be a fresh, unsent %Plug.Conn{} with state :unset, got: #{inspect(state)}"
+          "Fluffy.start_session/2: :conn must be a fresh, unsent %Plug.Conn{} with state :unset, got: #{inspect(state)}"
   end
 end

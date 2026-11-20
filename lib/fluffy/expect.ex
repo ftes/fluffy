@@ -27,7 +27,7 @@ defmodule Fluffy.Expect do
 
   @dialyzer {:nowarn_function, expect: 3}
 
-  # An Elixir `Regex` is converted to the `Playwright.RegExp` it stands for (`text_values!/1`).
+  # An Elixir `Regex` is converted to the `Playwright.RegExp` it stands for (`text_values!/2`).
   defguardp is_text(value) when is_binary(value) or is_struct(value, Regex) or is_struct(value, Playwright.RegExp)
 
   @type target :: {:locator, Locator.t()} | :page
@@ -262,7 +262,7 @@ defmodule Fluffy.Expect do
   @spec to_have_css(Locator.t(), String.t(), text_expectation(), [to_have_css_option()]) :: t()
   def to_have_css(%Locator{} = locator, name, value, options \\ []) when is_binary(name) and is_text(value) do
     {timeout, matching} = Options.split_expectation!(:to_have_css, options)
-    Internal.new({:locator, locator}, :css, {name, text_values!(value), matching}, timeout)
+    Internal.new({:locator, locator}, :css, {name, text_values!(:to_have_css, value), matching}, timeout)
   end
 
   @doc group: "Locator assertions"
@@ -427,7 +427,7 @@ defmodule Fluffy.Expect do
     indeterminate = Keyword.get(state, :indeterminate, :unset)
 
     if indeterminate == true and checked != :unset do
-      raise ArgumentError, "checked: and indeterminate: true cannot be used together"
+      raise ArgumentError, "Fluffy.Expect.to_be_checked/2: :checked and indeterminate: true cannot be used together"
     end
 
     expected =
@@ -532,7 +532,7 @@ defmodule Fluffy.Expect do
   def to_have_attribute(%Locator{} = locator, name, value, options)
       when is_binary(name) and (is_nil(value) or is_text(value)) and is_list(options) do
     {timeout, matching} = Options.split_expectation!(:to_have_attribute, options)
-    Internal.new({:locator, locator}, :attribute, {name, text_values!(value), matching}, timeout)
+    Internal.new({:locator, locator}, :attribute, {name, text_values!(:to_have_attribute, value), matching}, timeout)
   end
 
   @doc group: "Locator assertions"
@@ -549,7 +549,7 @@ defmodule Fluffy.Expect do
   """
   @spec to_have_class(Locator.t(), text_expectation() | [text_expectation()], [to_have_class_option()]) :: t()
   def to_have_class(%Locator{} = locator, expected, options \\ []) when is_text(expected) or is_list(expected) do
-    native_expectation(:to_have_class, {:locator, locator}, :class, text_values!(expected), options)
+    native_expectation(:to_have_class, {:locator, locator}, :class, text_values!(:to_have_class, expected), options)
   end
 
   @doc group: "Locator assertions"
@@ -568,7 +568,8 @@ defmodule Fluffy.Expect do
   @spec to_contain_class(Locator.t(), String.t() | [String.t()], [to_contain_class_option()]) :: t()
   def to_contain_class(%Locator{} = locator, expected, options \\ []) when is_binary(expected) or is_list(expected) do
     if is_list(expected) and not Enum.all?(expected, &is_binary/1) do
-      raise ArgumentError, "expected a string of class names for each element, got: #{inspect(expected)}"
+      raise ArgumentError,
+            "Fluffy.Expect.to_contain_class/3: expected a string of class names for each element, got: #{inspect(expected)}"
     end
 
     native_expectation(:to_contain_class, {:locator, locator}, :contain_class, expected, options)
@@ -585,7 +586,7 @@ defmodule Fluffy.Expect do
   """
   @spec to_have_id(Locator.t(), text_expectation(), [to_have_id_option()]) :: t()
   def to_have_id(%Locator{} = locator, expected, options \\ []) when is_text(expected) do
-    native_expectation(:to_have_id, {:locator, locator}, :id, text_values!(expected), options)
+    native_expectation(:to_have_id, {:locator, locator}, :id, text_values!(:to_have_id, expected), options)
   end
 
   @doc group: "Locator assertions"
@@ -649,18 +650,20 @@ defmodule Fluffy.Expect do
   # The options that select how text is read and compared travel with the expected value.
   defp text_expectation(matcher, locator, kind, expected, options) do
     {timeout, matching} = Options.split_expectation!(matcher, options)
-    Internal.new({:locator, locator}, kind, {text_values!(expected), matching}, timeout)
+    Internal.new({:locator, locator}, kind, {text_values!(matcher, expected), matching}, timeout)
   end
 
-  defp text_values!(expected) when is_list(expected) do
+  # Only matchers of arity 3 take a list.
+  defp text_values!(matcher, expected) when is_list(expected) do
     if Enum.all?(expected, &is_text(&1)) do
       Enum.map(expected, &Internal.reg_exp/1)
     else
-      raise ArgumentError, "expected a list of strings or regular expressions, got: #{inspect(expected)}"
+      raise ArgumentError,
+            "Fluffy.Expect.#{matcher}/3: expected a list of strings or regular expressions, got: #{inspect(expected)}"
     end
   end
 
-  defp text_values!(expected), do: Internal.reg_exp(expected)
+  defp text_values!(_matcher, expected), do: Internal.reg_exp(expected)
 
   @doc group: "Page assertions"
   @doc """
@@ -676,7 +679,7 @@ defmodule Fluffy.Expect do
   @spec page_to_have_title(Fluffy.Page.title_expectation()) :: Expect.t()
   @spec page_to_have_title(Fluffy.Page.title_expectation(), [page_to_have_title_option()]) :: Expect.t()
   def page_to_have_title(expected, options \\ []) when is_text(expected) and is_list(options) do
-    native_expectation(:page_to_have_title, :page, :title, text_values!(expected), options)
+    native_expectation(:page_to_have_title, :page, :title, text_values!(:page_to_have_title, expected), options)
   end
 
   @doc group: "Page assertions"
@@ -758,6 +761,6 @@ defmodule Fluffy.Expect do
   end
 
   defp expect_active_page(_session, %Expect{} = expectation) do
-    raise ArgumentError, "unsupported active page expectation: #{Internal.describe(expectation)}"
+    raise ArgumentError, "Fluffy.Expect.expect/3: unsupported active page expectation: #{Internal.describe(expectation)}"
   end
 end

@@ -156,7 +156,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
             {Locator.filter(field, has_not: Locator.by_css(".absent")), []},
             {field, [label: "Email"]}
           ] do
-        assert_raise ArgumentError, ~r/within\/3 cannot scope a frame locator/, fn ->
+        assert_raise ArgumentError, ~r/^Fluffy.PhoenixTest.within\/3: cannot scope a frame locator/, fn ->
           refute_has(scoped, locator, options)
         end
       end
@@ -1094,7 +1094,10 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
 
   test "within rejects callbacks that discard their updated wrapper" do
     session = Fluffy.session_for_html(:static, "<main></main>")
-    assert_raise ArgumentError, ~r/within callback must return/, fn -> within(session, "main", fn _ -> :ok end) end
+
+    assert_raise ArgumentError, ~r/^Fluffy.PhoenixTest.within\/3: callback must return/, fn ->
+      within(session, "main", fn _ -> :ok end)
+    end
   end
 
   test "unsupported combinations and invalid options fail explicitly before driver execution" do
