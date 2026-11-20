@@ -90,7 +90,7 @@ defmodule Fluffy.MixProject do
       main: "readme",
       # Maintainer tasks in `dev/` are not part of the package.
       filter_modules: fn module, _metadata ->
-        module not in [Mix.Tasks.Fluffy.Gen.NativeOptions, Mix.Tasks.Fluffy.PlaywrightSource]
+        module != Mix.Tasks.Fluffy.PlaywrightSource
       end,
       annotations_for_docs: fn metadata ->
         if metadata[:playwright_only], do: ["Playwright only"], else: []

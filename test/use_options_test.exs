@@ -6,7 +6,6 @@ defmodule Fluffy.UseOptionsTest do
   import Fluffy.Expect
 
   alias Fluffy.Support.HTTPFixtures
-  alias Fluffy.Support.Server
 
   # Playwright.Test resolves the options of every level; a session starts from them.
   test "the module's options reach the session" do
@@ -95,16 +94,16 @@ defmodule Fluffy.UseOptionsTest do
     end
   end
 
-  # As Playwright's `baseURL`: relative visits resolve against it, over Fluffy's endpoint.
-  describe "a test's base_url" do
+  # As Playwright's `baseURL`, over Fluffy's endpoint (precedence: `Fluffy.SessionConfigurationTest`).
+  describe "relative visits resolve against a test's base_url" do
     @describetag Playwright.Test.use(base_url: "http://hogwarts.test")
 
-    test "is a Phoenix session's" do
+    test "on Phoenix" do
       {session, _headers} = visit_page(:phoenix, [])
       expect(session, page_to_have_url(~r|^http://hogwarts\.test/__fluffy__/.*/common-room$|))
     end
 
-    test "is a Playwright session's" do
+    test "on Playwright" do
       session = start_session(:playwright)
 
       Fluffy.Playwright.route(session, "http://hogwarts.test/**", fn route ->
@@ -114,11 +113,6 @@ defmodule Fluffy.UseOptionsTest do
       session
       |> visit("/great-hall")
       |> expect(page_to_have_url("http://hogwarts.test/great-hall"))
-    end
-
-    test "gives way to the session's" do
-      {session, _headers} = visit_page(:phoenix, base_url: Server.base_url())
-      expect(session, page_to_have_url(~r|^#{Server.base_url()}/|))
     end
   end
 

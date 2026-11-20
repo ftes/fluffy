@@ -2,7 +2,7 @@ defmodule Fluffy.Backend.Playwright.Context do
   @moduledoc false
 
   # The test's action and navigation timeouts, fixed as the session starts, as Playwright.Test
-  # sets them on the test's contexts (`Fluffy.Timeouts.browser/1`).
+  # sets them on the test's contexts.
   @enforce_keys [:base_url, :browser_context, :action_timeout, :navigation_timeout]
   defstruct [:base_url, :browser_context, :action_timeout, :navigation_timeout, extra_http_headers: %{}]
 

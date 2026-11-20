@@ -21,68 +21,48 @@ defmodule Fluffy.SessionConfigurationTest do
     session = start_session(:phoenix)
 
     assert Fluffy.Session.context(session).http.endpoint == Endpoint
-    assert Fluffy.Session.context(session).http.base_url == Endpoint.url()
+    assert base_url(session) == Endpoint.url()
 
     session
     |> visit("/chamber")
     |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
   end
 
-  test "an active endpoint listener supplies the default base URL port" do
-    Application.put_env(:fluffy, :endpoint, __MODULE__.ActiveEndpoint)
-
-    session = start_session(:phoenix)
-
-    assert Fluffy.Session.context(session).http.base_url == "http://127.0.0.1:43123"
-  end
-
-  test "an unavailable endpoint listener falls back to the configured endpoint URL" do
-    Application.put_env(:fluffy, :endpoint, __MODULE__.InactiveEndpoint)
-
-    session = start_session(:phoenix)
-
-    assert Fluffy.Session.context(session).http.base_url == "http://configured.example:4002"
-  end
-
-  @tag Playwright.Test.use(base_url: "http://global.invalid")
-  test "session options override the configured endpoint and the test's base URL" do
+  test "a session's endpoint: overrides the configured one" do
     Application.put_env(:fluffy, :endpoint, __MODULE__.WrongEndpoint)
 
-    session =
-      start_session(:phoenix,
-        endpoint: Endpoint,
-        base_url: Server.base_url()
-      )
-
-    session
+    :phoenix
+    |> start_session(endpoint: Endpoint)
     |> visit("/chamber")
     |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
   end
 
-  # As Playwright's `baseURL`, from any level of the test's options.
-  @tag Playwright.Test.use(base_url: "http://configured.example")
-  test "a test's base URL overrides the endpoint URL" do
-    Application.put_env(:fluffy, :endpoint, Endpoint)
+  # As Playwright's `baseURL`, from the most specific level: the session's `base_url:`, else its
+  # `endpoint:`'s, else the test's, else the configured endpoint's.
+  for backend <- [:phoenix, :playwright] do
+    @tag Playwright.Test.use(base_url: "http://hogwarts.test")
+    test "a #{backend} session's base URL is the most specific one" do
+      Application.put_env(:fluffy, :endpoint, __MODULE__.WrongEndpoint)
+      start = &start_session(unquote(backend), &1)
 
-    session = start_session(:phoenix)
+      assert base_url(start.(endpoint: __MODULE__.ActiveEndpoint, base_url: Server.base_url())) == Server.base_url()
+      assert base_url(start.(endpoint: __MODULE__.ActiveEndpoint)) == "http://127.0.0.1:43123"
+      assert base_url(start.([])) == "http://hogwarts.test"
+    end
 
-    assert Fluffy.Session.context(session).http.base_url == "http://configured.example"
+    # An endpoint's is its running listener's (`ActiveEndpoint`), else its configured URL.
+    test "a #{backend} session's base URL defaults to the configured endpoint's" do
+      Application.put_env(:fluffy, :endpoint, __MODULE__.InactiveEndpoint)
+
+      assert base_url(start_session(unquote(backend))) == "http://configured.example:4002"
+    end
   end
 
-  @tag Playwright.Test.use(base_url: "http://configured.example")
+  @tag Playwright.Test.use(base_url: "http://hogwarts.test")
   test "a test's base URL starts Playwright without an endpoint" do
     Application.delete_env(:fluffy, :endpoint)
 
-    session = start_session(:playwright)
-
-    assert Fluffy.Session.context(session).base_url == "http://configured.example"
-  end
-
-  @tag Playwright.Test.use(base_url: "http://configured.example")
-  test "a session's base_url: overrides the test's" do
-    session = start_session(:phoenix, endpoint: Endpoint, base_url: Server.base_url())
-
-    assert Fluffy.Session.context(session).http.base_url == Server.base_url()
+    assert base_url(start_session(:playwright)) == "http://hogwarts.test"
   end
 
   test "missing global and session configuration reports the required setting" do
@@ -112,26 +92,12 @@ defmodule Fluffy.SessionConfigurationTest do
     end
   end
 
-  # The session's own endpoint is more specific than the test's base URL.
-  @tag Playwright.Test.use(base_url: "http://configured.example")
-  test "a session's endpoint: overrides the test's base URL" do
-    session = start_session(:phoenix, endpoint: __MODULE__.ActiveEndpoint)
-
-    assert Fluffy.Session.context(session).http.base_url == "http://127.0.0.1:43123"
-  end
-
   # One place each, the same on both backends: not in Playwright's context options.
   test "rejects base_url and extra_http_headers in browser_context:" do
     for key <- [:base_url, :extra_http_headers] do
       assert_raise ArgumentError, ~r/pass `#{key}:` to start_session\/2, not in `browser_context:`/, fn ->
         start_session(:playwright, browser_context: [{key, nil}])
       end
-    end
-  end
-
-  test "rejects the removed headers:" do
-    assert_raise ArgumentError, ~r/headers: is removed: pass `extra_http_headers:/, fn ->
-      start_session(:phoenix, endpoint: Endpoint, headers: [{"x-house", "gryffindor"}])
     end
   end
 

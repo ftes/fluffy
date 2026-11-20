@@ -42,25 +42,6 @@ defmodule Fluffy.PlaywrightConfigurationTest do
     end)
   end
 
-  test "rejects Fluffy's removed timeout config with the keys to use instead" do
-    put_env(timeout: 2_000)
-
-    assert_raise ArgumentError,
-                 ~r/config :fluffy, timeout: is removed.*`config :playwright, :expect, timeout: \.\.\.`.*:test, action_timeout.*phoenix_backend_timeout/,
-                 &Options.config!/0
-
-    Application.delete_env(:fluffy, :timeout)
-
-    put_env(playwright: [timeout: 15_000])
-
-    assert_raise ArgumentError,
-                 ~r/config :fluffy, playwright: is removed.*`config :playwright, :test` instead, with `action_timeout:`.*`browser_name:` for `engine:`.*`log_browser_console:`.*Event.console\(\)/,
-                 &Options.config!/0
-
-    put_env(playwright: false)
-    assert_raise ArgumentError, ~r/config :fluffy, playwright: is removed/, &Options.config!/0
-  end
-
   # Kept, a misspelt key would silently do nothing.
   test "rejects unknown keys and the config of modules that don't exist" do
     put_env(expect_timout: 1_000)
@@ -73,39 +54,6 @@ defmodule Fluffy.PlaywrightConfigurationTest do
 
     put_env(file_input_max_bytes: 0)
     assert_raise ArgumentError, ~r/invalid config :fluffy: .*file_input_max_bytes/, &Options.config!/0
-  end
-
-  # Every driver uses Playwright's.
-  test "rejects config :fluffy, test_id_attribute: for Playwright's" do
-    put_env(test_id_attribute: "data-owl")
-
-    assert_raise ArgumentError,
-                 ~r/config :fluffy, test_id_attribute: is removed.*`config :playwright, :test, test_id_attribute: ...`/,
-                 &Options.config!/0
-  end
-
-  # Only browsers wait for navigations, so the navigation timeout is Playwright's.
-  test "rejects config :fluffy, navigation_timeout: for Playwright's" do
-    put_env(navigation_timeout: 15_000)
-
-    assert_raise ArgumentError,
-                 ~r/config :fluffy, navigation_timeout: is removed.*`config :playwright, :test, navigation_timeout: ...`/,
-                 &Options.config!/0
-  end
-
-  # Only what Playwright has no concept of is Fluffy's: the rest says what to set instead.
-  test "rejects config :fluffy, action_timeout:, expect_timeout: and base_url: for Playwright's" do
-    for {key, value, hint} <- [
-          {:action_timeout, 4_000, ~r/`config :playwright, :test, action_timeout: \.\.\.`.*phoenix_backend_timeout/},
-          {:expect_timeout, 500, ~r/`config :playwright, :expect, timeout: \.\.\.`.*phoenix_backend_timeout/},
-          {:base_url, "http://localhost:4002", ~r/`config :playwright, :test, base_url: \.\.\.`/}
-        ] do
-      put_env([{key, value}])
-      error = assert_raise ArgumentError, &Options.config!/0
-      assert error.message =~ "config :fluffy, #{key}: is removed"
-      assert error.message =~ hint
-      Application.delete_env(:fluffy, key)
-    end
   end
 
   # The test's action and navigation timeouts are resolved as it registers

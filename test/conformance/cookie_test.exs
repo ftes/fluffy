@@ -123,19 +123,37 @@ defmodule Fluffy.Conformance.CookieTest do
       end
 
       assert cookies(session) == []
+    end
 
-      # Playwright would drop these silently.
-      for {key, camel_case} <- [http_only: :httpOnly, same_site: :sameSite], cookie_key <- [key, Atom.to_string(key)] do
+    # As PlaywrightEx's nested objects: a key that is no cookie field, such as `http_only:`
+    # for `httpOnly:`, raises instead of being dropped. Phoenix only until PlaywrightEx checks
+    # `add_cookies`' keys.
+    if driver == :phoenix do
+      @tag driver: driver
+      test "rejects an unknown cookie field, adding none with #{driver}", %{driver: driver} do
+        session = start_session(driver)
+        url = base_url(session)
+
         assert_raise ArgumentError,
-                     ~r/#{inspect(cookie_key)} is not a Playwright cookie field; use #{inspect(camel_case)}/,
-                     fn -> add_cookies(session, [%{:name => "old", :value => "x", :url => url, cookie_key => true}]) end
-      end
+                     ~r/^browserContext.addCookies: unknown field cookies\[1\].http_only, expected one of :_crHasCrossSiteAncestor, :domain, :expires, :httpOnly, :name, :partitionKey, :path, :sameSite, :secure, :url, :value$/,
+                     fn ->
+                       add_cookies(session, [
+                         %{name: "valid", value: "v", url: url},
+                         %{name: "spell", value: "x", url: url, http_only: true}
+                       ])
+                     end
 
-      # Fluffy 0.8 options would reach Playwright as URLs.
-      for options <- [[urls: [url]], [timeout: 1_000]] do
-        assert_raise ArgumentError, ~r/cookies\/2 takes the URL list, not the options/, fn ->
-          cookies(session, options)
+        assert_raise ArgumentError, ~r/unknown field cookies\[0\]."same_site",/, fn ->
+          add_cookies(session, [%{"name" => "spell", "value" => "x", "url" => url, "same_site" => "Lax"}])
         end
+
+        assert cookies(session) == []
+
+        add_cookies(session, [
+          %{name: "spell", value: "x", url: url, partitionKey: "https://hogwarts.example", _crHasCrossSiteAncestor: false}
+        ])
+
+        assert [%{name: "spell"}] = cookies(session)
       end
     end
 

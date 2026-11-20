@@ -237,22 +237,8 @@ defmodule Fluffy do
   """
   @spec add_cookies(Session.t(), [map()]) :: Session.t()
   def add_cookies(%Session{} = session, cookies) when is_list(cookies) do
-    Enum.each(cookies, &reject_snake_case_cookie_keys!/1)
     Backend.add_cookies(session, cookies)
   end
-
-  # Playwright ignores unknown cookie keys, such as the snake_case ones Fluffy 0.8 took.
-  @snake_case_cookie_keys %{http_only: :httpOnly, same_site: :sameSite, partition_key: :partitionKey}
-
-  defp reject_snake_case_cookie_keys!(cookie) when is_map(cookie) do
-    for {key, _value} <- cookie,
-        {snake_case, camel_case} <- @snake_case_cookie_keys,
-        key in [snake_case, Atom.to_string(snake_case)] do
-      raise ArgumentError, "cookie key #{inspect(key)} is not a Playwright cookie field; use #{inspect(camel_case)}"
-    end
-  end
-
-  defp reject_snake_case_cookie_keys!(_cookie), do: :ok
 
   @doc group: "Cookies"
   @doc """
@@ -265,19 +251,8 @@ defmodule Fluffy do
   """
   @spec cookies(Session.t(), String.t() | [String.t()] | nil) :: [map()]
   def cookies(%Session{} = session, urls \\ nil) do
-    reject_cookies_options!(urls)
     Backend.cookies(session, List.wrap(urls))
   end
-
-  # Fluffy 0.8 took `cookies(session, urls: [...], timeout: ...)`; such a list
-  # would now reach Playwright as the URLs.
-  defp reject_cookies_options!([{key, _value} | _] = options) when is_atom(key) do
-    raise ArgumentError,
-          "cookies/2 takes the URL list, not the options #{inspect(Keyword.keys(options))}; " <>
-            "call cookies(session, urls): as in Playwright, it has no timeout"
-  end
-
-  defp reject_cookies_options!(_urls), do: :ok
 
   @doc group: "Cookies"
   @doc """
@@ -549,7 +524,7 @@ defmodule Fluffy do
       Keyword.get(
         options,
         :max_bytes,
-        Application.get_env(:fluffy, :file_input_max_bytes, 10_000_000)
+        Keyword.fetch!(Fluffy.Options.config!(), :file_input_max_bytes)
       )
 
     {source, selected_files} = SelectedFile.prepare!(selection, max_bytes: max_bytes)

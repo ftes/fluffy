@@ -188,7 +188,9 @@ browser context does, which follows RFC 6265 for domains, paths, `Secure` and ex
 request sends what it holds then, the LiveView mount's included. Its requests stay on the
 app's origin, so it does not enforce `SameSite`, and it ignores `partitionKey`. A cookie
 set without `SameSite` reports `"Lax"`, as Chromium does (Firefox reports `"None"`). An
-invalid cookie raises `ArgumentError` with Playwright's message.
+invalid cookie raises `ArgumentError` with Playwright's message, and a key that is no cookie
+field, such as `http_only:` for `httpOnly:`, with PlaywrightEx's; a browser session's
+Playwright still drops such a key.
 
 ### Leaving the app
 

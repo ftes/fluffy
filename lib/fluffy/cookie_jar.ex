@@ -25,6 +25,13 @@ defmodule Fluffy.CookieJar do
     sameSite: :same_site
   ]
 
+  # The protocol's `SetNetworkCookie` fields. `partitionKey` and `_crHasCrossSiteAncestor`,
+  # which Chromium's `cookies()` gives partitioned cookies, are accepted and ignored, so a
+  # browser session's cookies round-trip. Another key raises, as PlaywrightEx raises for a
+  # nested object's.
+  @known_fields @fields |> Keyword.keys() |> Enum.concat([:partitionKey, :_crHasCrossSiteAncestor]) |> Enum.sort()
+  @known_names Enum.map(@known_fields, &Atom.to_string/1)
+
   def new, do: %__MODULE__{}
 
   def seed_request(%__MODULE__{} = jar, %URI{} = url, %Plug.Conn{} = conn) do
@@ -54,6 +61,8 @@ defmodule Fluffy.CookieJar do
   # Playwright's `browserContext.addCookies`: every cookie is checked and normalized
   # first (network.ts `rewriteCookies`), so an invalid one adds none.
   def add_cookies(%__MODULE__{} = jar, cookies) when is_list(cookies) do
+    cookies |> Enum.with_index() |> Enum.each(&check_fields!/1)
+
     cookies
     |> Enum.map(&rewrite_cookie!/1)
     |> Enum.reduce(jar, fn cookie, jar ->
@@ -106,6 +115,20 @@ defmodule Fluffy.CookieJar do
 
     %{jar | cookies: cookies}
   end
+
+  # PlaywrightEx's check of a nested object's keys, with its message.
+  defp check_fields!({cookie, index}) when is_map(cookie) do
+    for {key, _value} <- cookie, not ((is_atom(key) or is_binary(key)) and to_string(key) in @known_names) do
+      raise ArgumentError,
+            "browserContext.addCookies: unknown field cookies[#{index}].#{field_name(key)}, expected one of " <>
+              Enum.map_join(@known_fields, ", ", &inspect/1)
+    end
+  end
+
+  defp check_fields!(_cookie_and_index), do: :ok
+
+  defp field_name(key) when is_atom(key), do: Atom.to_string(key)
+  defp field_name(key), do: inspect(key)
 
   # network.ts `rewriteCookies`, after checking the protocol's field types.
   defp rewrite_cookie!(cookie) when is_map(cookie) do

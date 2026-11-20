@@ -52,14 +52,13 @@ defmodule Fluffy.Backend.Playwright do
           BrowserContext.close(browser_context)
         end)
 
-      %{action_timeout: action_timeout, navigation_timeout: navigation_timeout} = Timeouts.browser(test_info.use)
-
+      # The test's action and navigation timeouts, as Playwright.Test sets them on its contexts.
       context = %Context{
         browser_context: browser_context,
         base_url: base_url,
         extra_http_headers: headers,
-        action_timeout: action_timeout,
-        navigation_timeout: navigation_timeout
+        action_timeout: Timeouts.no_limit(test_info.use.action_timeout),
+        navigation_timeout: Timeouts.no_limit(test_info.use.navigation_timeout)
       }
 
       SessionRuntime.run(runtime, fn ->
@@ -283,8 +282,10 @@ defmodule Fluffy.Backend.Playwright do
 
   # As in Playwright, `wait_until:` defaults to `:load`. Like an action, a
   # navigation can't check once, so it rejects Fluffy's `timeout: 0`.
-  defp navigation_options(session, operation, options),
-    do: Keyword.put(options, :timeout, Timeouts.playwright_operation!(session, operation, options))
+  defp navigation_options(session, operation, options) do
+    timeout = Timeouts.operation(session, operation, options)
+    Keyword.put(options, :timeout, Deadline.playwright_operation!(operation, timeout))
+  end
 
   # As for an action, Playwright's error, which keeps Playwright's call log,
   # becomes the cause of a `Fluffy.OperationError`.

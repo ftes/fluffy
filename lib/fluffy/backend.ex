@@ -73,23 +73,16 @@ defmodule Fluffy.Backend do
       """
     end
 
-    options
-    |> put_base_url(endpoint)
-    |> Keyword.put(:endpoint, endpoint)
+    options |> put_base_url() |> Keyword.put(:endpoint, endpoint)
   end
 
-  defp session_options(options, :playwright) do
-    put_base_url(options, option(options, :endpoint))
-  end
+  defp session_options(options, :playwright), do: put_base_url(options)
 
-  # `options[:endpoint]` is the session's own, `endpoint` the session's or the configured one.
-  defp put_base_url(options, endpoint) do
-    # As Playwright's `baseURL`, from the most specific level: the session's, else its own
-    # `endpoint:`'s, else the test's from any level (`Playwright.Test.info().use`), else the
-    # configured endpoint's. An endpoint's is its listener's, which knows a port of `0`.
+  defp put_base_url(options) do
+    # As Playwright's `baseURL`, from the most specific level. An endpoint's is its listener's.
     base_url =
       options[:base_url] || endpoint_url(options[:endpoint]) || Fluffy.TestInfo.fetch!().use[:base_url] ||
-        endpoint_url(endpoint)
+        endpoint_url(Application.get_env(:fluffy, :endpoint))
 
     if is_nil(base_url) do
       raise ArgumentError, """
