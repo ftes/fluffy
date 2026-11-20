@@ -38,15 +38,15 @@ defmodule Fluffy.Conformance.StepTest do
              "wake_fluffy(session)"
   end
 
-  test "requires the callback to return a session and rejects unknown options" do
+  test "requires the callback to return a session and leaves the options to Playwright.Test.step" do
     session = start_session(:phoenix)
 
     assert_raise ArgumentError, ~r/must return a Fluffy.Session, got: :ok/, fn ->
       step(session, "Feed Fluffy", fn _session -> :ok end)
     end
 
-    assert_raise ArgumentError, ~r/unknown keys \[:location\]/, fn ->
-      step(session, "Feed Fluffy", & &1, location: %{})
+    assert_raise ArgumentError, ~r/^Playwright.Test.step\/3: unknown option/, fn ->
+      step(session, "Feed Fluffy", & &1, lullaby: true)
     end
   end
 

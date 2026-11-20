@@ -50,6 +50,7 @@ defmodule Fluffy.PlaywrightArtifactsTest do
 
   # Derived, so the trace's copy of this source file does not contain it.
   @secret "FLUFFY-" <> Base.encode16("upload secret of gringotts")
+  @subtitle Enum.join(["past", "the", "harp"], " ")
 
   @moduletag Playwright.Test.use(trace: :on)
 
@@ -99,12 +100,12 @@ defmodule Fluffy.PlaywrightArtifactsTest do
     end)
   end
 
-  @tag trace_has: ["Approach Fluffy", "Tiptoe in", Path.absname(__ENV__.file)]
-  test "records a Phoenix session's steps" do
+  @tag trace_has: ["Approach Fluffy", "Tiptoe in", ~s("subtitle":"#{@subtitle}"), Path.absname(__ENV__.file)]
+  test "records a Phoenix session's steps with Playwright.Test.step's options" do
     :phoenix
     |> start_session(endpoint: Fluffy.Support.Web.Endpoint)
     |> step("Approach Fluffy", fn session ->
-      step(session, "Tiptoe in", &visit(&1, "/chamber"))
+      step(session, "Tiptoe in", &visit(&1, "/chamber"), subtitle: @subtitle)
     end)
   end
 

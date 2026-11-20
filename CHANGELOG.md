@@ -87,7 +87,7 @@ Changes since 0.8.0.
 - `by_role` on Phoenix knows Playwright's implicit roles, landmarks included.
 - `Fluffy.Locator.within/2`, `Fluffy.clear/3` and `Fluffy.set_checked/4` on every driver; the facade's `assert_has` and `refute_has` accept a locator.
 - `Fluffy.wait_for/3` takes a locator on Playwright.
-- `Fluffy.step/3` is `Playwright.Test.step/3`, on every driver.
+- `Fluffy.step/3` is `Playwright.Test.step/3`, on every driver, and `step/4` takes its options, such as `box:` and `subtitle:`.
 - A Playwright session starts from the test's `Playwright.Test` context options of every level, such as `use Playwright.Test, locale: "en-GB"` or `@tag Playwright.Test.use(viewport: ...)`.
 - `Fluffy.Playwright` gains `route/4`, `unroute/3` and `unroute_all/2` (handlers get a `Playwright.Route`), `unwrap/3` for a locator, `page/2`, `add_init_script`, `wait_for_function`, `wait_for_load_state`, `evaluate` on a locator and `evaluate_all`, `dblclick`, `tap`, `drop`, `dispatch_event`, `select_text`, `scroll_into_view_if_needed`, element `screenshot`, `bounding_box`, `aria_snapshot`, `set_viewport_size`, `viewport_size`, `emulate_media`, permissions, geolocation, offline mode, HTTP credentials, extra HTTP headers, script and style tags, `bring_to_front`, `set_storage_state`, `all`, `content`, `title`, `local_storage` and `session_storage`, plus `Fluffy.Playwright.Keyboard`, `Mouse` and `Clock`.
 - More Playwright events: `console`, `page_error`, `worker`, `web_socket`, `request_failed`, `request_finished`, `load`, `dom_content_loaded`, `crash`, `frame_attached` and `frame_detached`, and `Event.close()`.
