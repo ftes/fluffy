@@ -38,7 +38,7 @@ defmodule Fluffy.Options do
     :install_clock
   ]
 
-  # The upstream call behind each cross-driver action. Its options pass through on
+  # The upstream call behind each cross-driver action and read. Its options pass through on
   # Playwright, read from Playwright's `__options__/1`, except Fluffy's own `timeout`
   # (its retry budget) and the denied ones below.
   @native_actions [
@@ -51,7 +51,10 @@ defmodule Fluffy.Options do
     select_option: {Playwright.Locator, :select_option, 3},
     press: {Playwright.Locator, :press, 3},
     set_input_files: {Playwright.Locator, :set_input_files, 3},
-    reload: {Playwright.Page, :reload, 2}
+    reload: {Playwright.Page, :reload, 2},
+    text_content: {Playwright.Locator, :text_content, 2},
+    get_attribute: {Playwright.Locator, :get_attribute, 3},
+    input_value: {Playwright.Locator, :input_value, 2}
   ]
 
   # Playwright-only actions, whose options pass through the same way.
@@ -68,6 +71,7 @@ defmodule Fluffy.Options do
     scroll_into_view_if_needed: {Playwright.Locator, :scroll_into_view_if_needed, 2},
     wait_for: {Playwright.Locator, :wait_for, 2},
     bounding_box: {Playwright.Locator, :bounding_box, 2},
+    inner_text: {Playwright.Locator, :inner_text, 2},
     aria_snapshot: {Playwright.Locator, :aria_snapshot, 2},
     drop: {Playwright.Locator, :drop, 3},
     locator_evaluate: {Playwright.Locator, :evaluate, 4},

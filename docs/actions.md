@@ -166,6 +166,30 @@ and the options of the matching `Playwright.Locator` action, and reconcile navig
 the action causes. Sequential typing emits keyboard events for each character and appends
 at the current caret position. Drag source and target must belong to the same frame.
 
+## Reading values
+
+To use a value from the page in the test, read it, as with Playwright's locator reads.
+They work on every driver:
+
+```elixir
+heading = text_content(session, by_role(:heading, level: 1))
+href = get_attribute(session, by_role(:link, name: "Diagon Alley"), "href")
+owl = input_value(session, by_label("Owl"))
+creatures = all_text_contents(session, by_role(:listitem))
+```
+
+`text_content` is the DOM's text, hidden and `<script>` text included; `get_attribute`
+reads the HTML attribute, or `nil` without it; `input_value` reads an input, textarea or
+select as `fill` and `select_option` left it. Each takes one strict target, while
+`all_text_contents` reads every match, without waiting.
+The browser's rendered text, `Fluffy.Playwright.inner_text/3` and `all_inner_texts/2`,
+requires Playwright.
+
+A read waits for its target to attach, as an action does, then reads the value once; it
+doesn't wait for the value to change. To check a value, use an assertion, which retries
+until it passes: `assert(text(by_role(:heading), "Fluffy"))` rather than comparing what
+`text_content` returned right after an action.
+
 ## Reloading
 
 Use `Fluffy.reload/1` to reload the active document:

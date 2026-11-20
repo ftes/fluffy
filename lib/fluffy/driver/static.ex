@@ -157,6 +157,25 @@ defmodule Fluffy.Driver.Static do
       detail: "Static pages do not support keyboard events"
   end
 
+  # Reads, like actions, check once.
+  @impl true
+  def text_content(%Session{} = session, %Locator{} = locator, _options \\ []),
+    do: read(session, &ClientDOM.text_content(&1, locator))
+
+  @impl true
+  def all_text_contents(%Session{} = session, %Locator{} = locator, _options \\ []),
+    do: read(session, &ClientDOM.all_text_contents(&1, locator))
+
+  @impl true
+  def get_attribute(%Session{} = session, %Locator{} = locator, name, _options \\ []),
+    do: read(session, &ClientDOM.get_attribute(&1, locator, name))
+
+  @impl true
+  def input_value(%Session{} = session, %Locator{} = locator, _options \\ []),
+    do: read(session, &ClientDOM.input_value(&1, locator))
+
+  defp read(session, fun), do: {:return, fun.(client_dom(session)), session}
+
   @impl true
   def unwrap(%Session{} = session, fun) when is_function(fun, 1) do
     case fun.(current_conn!(session, "Fluffy.unwrap/2")) do

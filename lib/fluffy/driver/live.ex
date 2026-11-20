@@ -506,6 +506,39 @@ defmodule Fluffy.Driver.Live do
   end
 
   @impl true
+  def text_content(%Session{} = session, %Locator{} = locator, options \\ []),
+    do: read(session, :text_content, [locator, options], &ClientDOM.text_content(&1, locator))
+
+  @impl true
+  def all_text_contents(%Session{} = session, %Locator{} = locator, options \\ []),
+    do: read(session, :all_text_contents, [locator, options], &ClientDOM.all_text_contents(&1, locator))
+
+  @impl true
+  def get_attribute(%Session{} = session, %Locator{} = locator, name, options \\ []),
+    do: read(session, :get_attribute, [locator, name, options], &ClientDOM.get_attribute(&1, locator, name))
+
+  @impl true
+  def input_value(%Session{} = session, %Locator{} = locator, options \\ []),
+    do: read(session, :input_value, [locator, options], &ClientDOM.input_value(&1, locator))
+
+  # As in Playwright, a read waits for its target to attach, on fresh renders as an
+  # expectation does, and returns the value it first reads. A navigation it finds sends
+  # it on to the new page, within its timeout. A read that finds no target, such as
+  # `all_text_contents`, reads once.
+  defp read(session, operation, [locator | _rest] = arguments, read) do
+    deadline =
+      arguments
+      |> List.last()
+      |> Timeouts.get(&Timeouts.phoenix/0)
+      |> Retry.deadline()
+
+    case eventually(session, deadline, &ActionResolver.attempt(&1, locator, read)) do
+      {:redirected, session, navigation} -> retry_on_new_page(session, navigation, operation, arguments, deadline)
+      {%Session{} = session, value} -> {:return, value, session}
+    end
+  end
+
+  @impl true
   def unwrap(%Session{} = session, fun) when is_function(fun, 1) do
     {:return, _ignored, outcome} = unwrap_and_return(session, fun)
     outcome

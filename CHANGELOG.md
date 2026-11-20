@@ -87,6 +87,7 @@ Changes since 0.8.0.
 - `by_role` on Phoenix knows Playwright's implicit roles, landmarks included.
 - `Fluffy.Locator.within/2`, `Fluffy.clear/3` and `Fluffy.set_checked/4` on every driver; the facade's `assert_has` and `refute_has` accept a locator.
 - `Fluffy.wait_for/3` takes a locator on Playwright.
+- Locator reads, as Playwright's: `Fluffy.text_content/3`, `get_attribute/4`, `input_value/3` and `all_text_contents/2` on every driver, and `Fluffy.Playwright.inner_text/3` and `all_inner_texts/2`. Like upstream, they wait for the element but not for its value; assertions still retry.
 - `Fluffy.step/3` is `Playwright.Test.step/3`, on every driver, and `step/4` takes its options, such as `box:` and `subtitle:`.
 - A Playwright session starts from the test's `Playwright.Test` context options of every level, such as `use Playwright.Test, locale: "en-GB"` or `@tag Playwright.Test.use(viewport: ...)`.
 - `Fluffy.Playwright` gains `route/4`, `unroute/3` and `unroute_all/2` (handlers get a `Playwright.Route`), `unwrap/3` for a locator, `page/2`, `add_init_script`, `wait_for_function`, `wait_for_load_state`, `evaluate` on a locator and `evaluate_all`, `dblclick`, `tap`, `drop`, `dispatch_event`, `select_text`, `scroll_into_view_if_needed`, element `screenshot`, `bounding_box`, `aria_snapshot`, `set_viewport_size`, `viewport_size`, `emulate_media`, permissions, geolocation, offline mode, HTTP credentials, extra HTTP headers, script and style tags, `bring_to_front`, `set_storage_state`, `all`, `content`, `title`, `local_storage` and `session_storage`, plus `Fluffy.Playwright.Keyboard`, `Mouse` and `Clock`.
@@ -105,6 +106,7 @@ Changes since 0.8.0.
 
 ### Fixed
 
+- On Phoenix, `to_have_value` and `to_be_empty` read `"on"` for a checkbox or radio without a `value` attribute, as browsers do, instead of `""`.
 - LiveView follows navigation as a browser does: a `push_navigate` or `redirect` from a connected mount, a redirect while Fluffy reads the view, an action on a view that navigated away, a patch partway through an action, and `phx-mounted={JS.patch(...)}` on a new view. Redirects count toward a 20-redirect limit, so a loop fails instead of hanging.
 - On Phoenix, a `phx-trigger-action` form is submitted as LiveView's client does, from mount or a pushed render.
 - On Phoenix, a `204 No Content` or `205 Reset Content` answer keeps the current page; on Chromium, a `204` no longer leaves later actions waiting.
