@@ -146,7 +146,7 @@ defmodule Fluffy.Conformance.LiveDocumentTest do
       |> expect("Naps: 0" |> by_text() |> to_be_visible())
 
     error = assert_raise Fluffy.CapabilityError, fn -> click(session, by_role(:button, name: "Nap")) end
-    assert error.capability == :root_layout_live_views
+    assert error.capability == :live_document
   end
 
   defp kennel_session(driver) do

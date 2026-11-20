@@ -63,7 +63,7 @@ defmodule Fluffy.Conformance.LiveReadinessTimeoutTest do
       """
     )
 
-    assert_raise RuntimeError, ~r/expected every LiveView root to be connected/, fn ->
+    assert_raise Fluffy.OperationError, ~r/expected every LiveView root to be connected/, fn ->
       visit(session, "/live/nested#disconnected-child")
     end
   end
@@ -74,9 +74,11 @@ defmodule Fluffy.Conformance.LiveReadinessTimeoutTest do
       start_session(:playwright, base_url: Server.base_url(), endpoint: Fluffy.Support.Web.Endpoint)
 
     error =
-      assert_raise RuntimeError, fn ->
+      assert_raise Fluffy.OperationError, fn ->
         visit(session, "/actions/disconnected-live-root")
       end
+
+    assert {error.operation, error.locator} == {:visit, nil}
 
     assert error.message =~ "/actions/disconnected-live-root"
     assert error.message =~ "every LiveView root to be connected with its join complete"

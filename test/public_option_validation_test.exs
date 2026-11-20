@@ -100,6 +100,13 @@ defmodule Fluffy.PublicOptionValidationTest do
     assert_raise NimbleOptions.ValidationError, ~r/unknown options.*:mystery/, fn ->
       Fluffy.reload(session, mystery: true)
     end
+
+    # A Playwright-only option fails on Phoenix before its target is looked up.
+    error = assert_raise Fluffy.CapabilityError, fn -> Fluffy.check(session, Locator.by_text("Missing"), force: true) end
+    assert {error.capability, error.operation, error.driver} == {:playwright_action_options, :check, :static}
+
+    error = assert_raise Fluffy.CapabilityError, fn -> Fluffy.reload(session, wait_until: :load) end
+    assert {error.capability, error.operation} == {:playwright_action_options, :reload}
   end
 
   test "file input bounds fail before selection preflight", %{session: session} do

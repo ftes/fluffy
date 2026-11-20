@@ -49,7 +49,6 @@ defmodule Fluffy.Driver.Live do
   def expect(%Session{} = session, %Expect{} = expectation) do
     deadline =
       expectation.options
-      |> Keyword.validate!([:timeout])
       |> Timeouts.get(&Timeouts.phoenix/0)
       |> Retry.deadline()
 
@@ -104,7 +103,7 @@ defmodule Fluffy.Driver.Live do
     with {:ok, _event_context} <- owning_view_context(session, target) do
       if competing_live_click_binding?(target) do
         raise Fluffy.CapabilityError,
-          capability: :phoenix_html_live_action_conflict,
+          capability: :phoenix_html_actions,
           driver: :live,
           detail:
             "a data-method/data-to link with a competing phx-click or LiveView navigation action requires Playwright"
@@ -674,7 +673,6 @@ defmodule Fluffy.Driver.Live do
     deadline =
       arguments
       |> List.last()
-      |> Keyword.validate!([:timeout])
       |> Timeouts.get(&Timeouts.phoenix/0)
       |> Retry.deadline()
 
@@ -1033,7 +1031,7 @@ defmodule Fluffy.Driver.Live do
       {session, id} when is_binary(session) and session != "" and is_binary(id) and id != "" ->
         if context.layout? do
           raise Fluffy.CapabilityError,
-            capability: :root_layout_live_views,
+            capability: :live_document,
             driver: :live,
             detail: "LiveViewTest does not connect LiveView #{inspect(id)} rendered outside the main LiveView"
         end

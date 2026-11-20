@@ -39,7 +39,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
       path = if unquote(driver) == :static, do: "/chamber", else: "/live/nested"
       session = :phoenix |> start_test_session() |> visit(path)
 
-      assert_raise Fluffy.CapabilityError, ~r/:native_locator requires a Playwright session/, fn ->
+      assert_raise Fluffy.CapabilityError, ~r/:unwrap \(:playwright_only_api\): it requires a Playwright session/, fn ->
         unwrap(session, by_css("body"), fn _locator -> flunk("callback ran") end)
       end
     end
@@ -140,14 +140,15 @@ defmodule Fluffy.Conformance.UnwrapTest do
     test "raises when the callback kills the LiveView" do
       session = :phoenix |> start_test_session() |> visit("/live/three-heads")
 
-      assert_raise Fluffy.LiveViewError, fn ->
-        unwrap_and_return(session, fn view ->
-          Process.exit(view.pid, :kill)
-          ref = Process.monitor(view.pid)
-          assert_receive {:DOWN, ^ref, :process, _pid, _reason}
-          :unreachable
-        end)
-      end
+      assert %Fluffy.OperationError{cause: %Fluffy.LiveViewError{}} =
+               assert_raise(Fluffy.OperationError, fn ->
+                 unwrap_and_return(session, fn view ->
+                   Process.exit(view.pid, :kill)
+                   ref = Process.monitor(view.pid)
+                   assert_receive {:DOWN, ^ref, :process, _pid, _reason}
+                   :unreachable
+                 end)
+               end)
     end
 
     @tag driver: :live
@@ -204,7 +205,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
         path = if unquote(driver) == :static, do: "/chamber", else: "/live/nested"
         session = :phoenix |> start_test_session() |> visit(path)
 
-        assert_raise Fluffy.CapabilityError, ~r/:native_locator requires a Playwright session/, fn ->
+        assert_raise Fluffy.CapabilityError, ~r/:unwrap_and_return \(:playwright_only_api\)/, fn ->
           unwrap_and_return(session, by_css("body"), fn _locator -> flunk("callback ran") end)
         end
       end

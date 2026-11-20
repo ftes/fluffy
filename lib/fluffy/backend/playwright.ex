@@ -10,7 +10,7 @@ defmodule Fluffy.Backend.Playwright do
   alias Fluffy.Driver.Playwright.State
   alias Fluffy.Internal.Navigation.BrowserCommitted
   alias Fluffy.Internal.Navigation.BrowserPatch
-  alias Fluffy.Internal.OperationFailure
+  alias Fluffy.Internal.NavigationFailure
   alias Fluffy.Page
   alias Fluffy.Session
   alias Fluffy.SessionRuntime
@@ -96,14 +96,14 @@ defmodule Fluffy.Backend.Playwright do
 
   # Actions adopt the document they find. One that page code navigated to
   # since is read from the page; a closed or unresponsive page keeps the
-  # adopted identity. The probe raises a `RuntimeError` when the page does not
+  # adopted identity. The probe raises a `NavigationFailure` when the page does not
   # respond and Playwright's error when the page is closed or the read fails.
   defp document_identity(state) do
     if Document.navigated?(state),
       do: Document.probe!(state.frame, nil, @snapshot_probe_timeout).document,
       else: state.document_identity
   rescue
-    _error in [RuntimeError, Playwright.PlaywrightError, Playwright.TimeoutError, TargetClosedError] ->
+    _error in [NavigationFailure, Playwright.PlaywrightError, Playwright.TimeoutError, TargetClosedError] ->
       state.document_identity
   end
 
@@ -175,9 +175,6 @@ defmodule Fluffy.Backend.Playwright do
   def runtime_event(_context, _message), do: :ignore
 
   @impl true
-  def normalize_error(_session, _operation, _arguments, error), do: error
-
-  @impl true
   def absolute_url(%Session{} = session, path) do
     Session.context(session).base_url |> URI.merge(path) |> URI.to_string()
   end
@@ -206,10 +203,8 @@ defmodule Fluffy.Backend.Playwright do
     state = Session.page_state(session)
     timeout = Timeouts.navigation(session)
 
-    navigation!(:visit, fn ->
-      _response = navigate!(:goto, [state.page, path, [timeout: timeout]])
-      adopt_navigated_document(session, state)
-    end)
+    _response = navigate!(:goto, [state.page, path, [timeout: timeout]])
+    adopt_navigated_document(session, state)
   end
 
   @impl true
@@ -217,10 +212,8 @@ defmodule Fluffy.Backend.Playwright do
     state = Session.page_state(session)
     native = navigation_options(session, :reload, options)
 
-    navigation!(:reload, fn ->
-      _response = navigate!(:reload, [state.page, native])
-      adopt_navigated_document(session, state)
-    end)
+    _response = navigate!(:reload, [state.page, native])
+    adopt_navigated_document(session, state)
   end
 
   # The LiveView waits of a navigation an action or page code started share the navigation
@@ -255,14 +248,12 @@ defmodule Fluffy.Backend.Playwright do
     previous_url = Session.current_page(session).url
     native = navigation_options(session, direction, options)
 
-    navigation!(direction, fn ->
-      response = navigate!(direction, [state.page, native])
-      probe = Document.adopted_probe!(state, nil, timeout)
+    response = navigate!(direction, [state.page, native])
+    probe = Document.adopted_probe!(state, nil, timeout)
 
-      if is_nil(response) and probe.url == previous_url and probe.document == state.document_identity,
-        do: session,
-        else: adopt_probed_document(session, state, probe, timeout)
-    end)
+    if is_nil(response) and probe.url == previous_url and probe.document == state.document_identity,
+      do: session,
+      else: adopt_probed_document(session, state, probe, timeout)
   end
 
   # As in Playwright, closing a page has no timeout.
@@ -285,15 +276,6 @@ defmodule Fluffy.Backend.Playwright do
   defp navigation_options(session, operation, options) do
     timeout = Timeouts.operation(session, operation, options)
     Keyword.put(options, :timeout, Deadline.playwright_operation!(operation, timeout))
-  end
-
-  # As for an action, Playwright's error, which keeps Playwright's call log,
-  # becomes the cause of a `Fluffy.OperationError`.
-  defp navigation!(operation, fun) do
-    fun.()
-  rescue
-    error in [Playwright.PlaywrightError, Playwright.TimeoutError, TargetClosedError] ->
-      reraise OperationFailure.playwright(operation, nil, error), __STACKTRACE__
   end
 
   defp navigate!(operation, arguments) do

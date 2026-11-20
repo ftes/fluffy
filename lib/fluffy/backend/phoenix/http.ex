@@ -71,7 +71,8 @@ defmodule Fluffy.Backend.Phoenix.HTTP do
   end
 
   def count_redirect!(redirects, %URI{} = url) when redirects >= @max_redirects do
-    raise "Phoenix request exceeded #{@max_redirects} redirects at #{URI.to_string(url)}"
+    raise Fluffy.Internal.NavigationFailure,
+          "Phoenix request exceeded #{@max_redirects} redirects at #{URI.to_string(url)}"
   end
 
   def count_redirect!(redirects, %URI{}), do: redirects + 1
@@ -86,14 +87,14 @@ defmodule Fluffy.Backend.Phoenix.HTTP do
     cond do
       url.scheme not in ["http", "https"] ->
         raise Fluffy.CapabilityError,
-          capability: :navigation_scheme,
-          driver: :static,
+          capability: :external_navigation,
+          backend: :phoenix,
           detail: "in-process navigation cannot dispatch the #{inspect(url.scheme)} scheme"
 
       external?(client, url) ->
         raise Fluffy.CapabilityError,
           capability: :external_navigation,
-          driver: :static,
+          backend: :phoenix,
           detail: "cannot request #{URI.to_string(url)}; in-process navigation is limited to #{client.base_url}"
 
       true ->

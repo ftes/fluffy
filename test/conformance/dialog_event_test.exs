@@ -122,7 +122,7 @@ defmodule Fluffy.Conformance.DialogEventTest do
         expect_event(session, Event.dialog(), fn _ -> flunk("unsupported action ran") end)
       end
 
-    assert error.capability == :browser_dialogs
+    assert error.capability == :browser_events
   end
 
   defp session do

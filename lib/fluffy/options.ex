@@ -451,9 +451,6 @@ defmodule Fluffy.Options do
   @doc false
   def denied_native_keys, do: @denied_native_keys
 
-  @doc "Options that only a browser can honor."
-  def playwright_option_keys, do: @playwright_option_keys
-
   @doc false
   def expectation_schema, do: @expectation_schema
 
@@ -474,6 +471,27 @@ defmodule Fluffy.Options do
 
   @spec validate_action!(atom(), keyword()) :: keyword()
   def validate_action!(action, options), do: NimbleOptions.validate!(options, action_schema(action))
+
+  @doc """
+  Validates a cross-driver action's options for `session`. A Phoenix session raises
+  `Fluffy.CapabilityError` for an option only Playwright honors, so its drivers get `timeout:`
+  at most.
+  """
+  @spec validate_action!(Fluffy.Session.t(), atom(), keyword()) :: keyword()
+  def validate_action!(%Fluffy.Session{} = session, action, options) do
+    options = validate_action!(action, options)
+
+    with Fluffy.Backend.Phoenix <- Fluffy.Session.backend(session),
+         key when not is_nil(key) <- Enum.find(Keyword.keys(options), &(&1 in @playwright_option_keys)) do
+      raise Fluffy.CapabilityError,
+        capability: :playwright_action_options,
+        operation: action,
+        driver: Fluffy.Session.current_driver(session),
+        detail: "#{inspect(key)} is a Playwright option"
+    end
+
+    options
+  end
 
   @doc "Validates the options of a call that, as in Playwright, takes none."
   @spec validate_untimed!(keyword()) :: keyword()
@@ -517,22 +535,28 @@ defmodule Fluffy.Options do
   def validate_session!(backend, options) do
     options = NimbleOptions.validate!(options, @session_schema)
 
-    cond do
-      backend == :phoenix and Keyword.has_key?(options, :browser_context) ->
-        raise ArgumentError, ":browser_context options are available only for Playwright sessions"
+    for key <- [:browser, :browser_context], Keyword.has_key?(options, key) do
+      Fluffy.CapabilityError.require_playwright!(
+        backend,
+        :browser_context_setters,
+        :start_session,
+        "#{inspect(key)} is an option of Playwright sessions"
+      )
+    end
 
-      backend == :phoenix and Keyword.has_key?(options, :browser) ->
-        raise ArgumentError, ":browser is available only for Playwright sessions"
+    if backend == :playwright and Keyword.has_key?(options, :conn) do
+      raise Fluffy.CapabilityError,
+        capability: :phoenix_conn,
+        operation: :start_session,
+        backend: :playwright,
+        detail: ":conn is an option of Phoenix sessions; add a cookie to log in on both backends"
+    end
 
-      backend == :playwright and Keyword.has_key?(options, :conn) ->
-        raise ArgumentError, ":conn is available only for Phoenix sessions"
-
+    if key = Enum.find([:base_url, :extra_http_headers], &Keyword.has_key?(options[:browser_context] || [], &1)) do
       # One place each: the session's own options, the same on both backends.
-      key = Enum.find([:base_url, :extra_http_headers], &Keyword.has_key?(options[:browser_context] || [], &1)) ->
-        raise ArgumentError, "pass `#{key}:` to start_session/2, not in `browser_context:`"
-
-      true ->
-        :ok
+      raise ArgumentError, "pass `#{key}:` to start_session/2, not in `browser_context:`"
+    else
+      :ok
     end
 
     validate_conn!(options[:conn])

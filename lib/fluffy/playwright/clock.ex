@@ -38,7 +38,7 @@ defmodule Fluffy.Playwright.Clock do
   """
   @spec install(Session.t(), [install_option()]) :: Session.t()
   def install(%Session{} = session, options \\ []) do
-    Fluffy.Playwright.__ensure_playwright_backend__!(session, :clock)
+    Fluffy.CapabilityError.require_playwright!(session, :clock, :"Clock.install")
     native = Options.validate_action!(:install_clock, options)
     clock(session, :"Clock.install", &Playwright.Clock.install(&1, native))
   end
@@ -129,7 +129,7 @@ defmodule Fluffy.Playwright.Clock do
   end
 
   defp clock_call(session, operation, options, fun) do
-    Fluffy.Playwright.__ensure_playwright_backend__!(session, :clock)
+    Fluffy.CapabilityError.require_playwright!(session, :clock, operation)
     Options.validate_untimed!(options)
     clock(session, operation, fun)
   end

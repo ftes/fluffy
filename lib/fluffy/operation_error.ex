@@ -1,11 +1,16 @@
 defmodule Fluffy.OperationError do
   @moduledoc """
-  An element operation failure with its backend's original cause.
+  An operation failure with its backend's original cause.
 
-  `backend` is `:phoenix` or `:playwright`; `driver` identifies the active driver.
-  `operation` names the public action and `locator` is the query,
-  `Fluffy.FileChooser` handle, or `nil` for an action on the page as a whole. `cause` retains a native Playwright error or a structured
-  Phoenix `Fluffy.StrictnessError` or `Fluffy.ActionabilityError`.
+  `backend` is `:phoenix` or `:playwright`; `driver` is the page's driver when the operation
+  failed, so `:unvisited` if a Phoenix session's first `visit` failed before any page loaded.
+  `operation` names the public call and `locator` is the query,
+  `Fluffy.FileChooser` handle, or `nil` for an operation on the page as a whole, such
+  as a failed navigation. `cause` retains a native Playwright error, a structured Phoenix
+  `Fluffy.StrictnessError`, `Fluffy.ActionabilityError` or `Fluffy.LiveViewError`, or,
+  for a navigation that Fluffy found failed, a message saying why: an aborted response,
+  too many redirects, a LiveView that rejected its connection or did not connect, or a page
+  that did not respond to Fluffy's document check.
 
   No shared fine-grained failure category is inferred for browser errors.
   Failed assertions remain `ExUnit.AssertionError`. Invalid arguments,
@@ -40,5 +45,6 @@ defmodule Fluffy.OperationError do
   end
 
   defp format(cause) when is_exception(cause), do: Exception.message(cause)
+  defp format(cause) when is_binary(cause), do: cause
   defp format(cause), do: inspect(cause, pretty: true, limit: :infinity, printable_limit: :infinity)
 end

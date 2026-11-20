@@ -6,20 +6,29 @@ defmodule Fluffy.CapabilityMatrixTest do
   @capability_document Path.expand("../docs/capabilities.md", __DIR__)
   @external_resource @capability_document
 
-  test "declares every driver and only documented statuses" do
-    assert Capability.matrix_version() == 1
-
+  test "declares every Phoenix driver with a documented status" do
     for capability <- Capability.matrix() do
-      assert capability.drivers |> Map.keys() |> Enum.sort() == Enum.sort(Capability.drivers())
-
-      assert Enum.all?(capability.drivers, fn {_driver, status} ->
-               status in Capability.statuses()
-             end)
-
-      for driver <- Capability.drivers() do
-        assert Capability.status(capability.id, driver) == capability.drivers[driver]
-      end
+      assert capability.drivers |> Map.keys() |> Enum.sort() == [:live, :static]
+      assert Enum.all?(Map.values(capability.drivers), &(&1 in Capability.statuses()))
     end
+  end
+
+  # A `Fluffy.CapabilityError`'s `capability` is a matrix id, which `Capability.status/2`
+  # looks up.
+  test "every raised capability is in the matrix" do
+    raised =
+      for file <- Path.wildcard(Path.expand("../lib/**/*.ex", __DIR__)),
+          pattern <- [
+            ~r/capability: :(\w+)/,
+            ~r/require_playwright!\(\s*[^,]+,\s*:(\w+)/,
+            ~r/(?:browser_context!\(|set_context!\(\s*session,)\s*:(\w+)/
+          ],
+          [_match, id] <- Regex.scan(pattern, File.read!(file)),
+          uniq: true,
+          do: String.to_atom(id)
+
+    assert :pages in raised and :browser_context_setters in raised
+    assert raised -- Capability.ids() == []
   end
 
   test "published table is rendered from the machine-readable matrix" do

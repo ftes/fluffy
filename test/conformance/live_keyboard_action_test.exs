@@ -133,9 +133,10 @@ defmodule Fluffy.Conformance.LiveKeyboardActionTest do
   test "Live surfaces a crashing key handler as a LiveView error" do
     session = session()
 
-    assert_raise Fluffy.LiveViewError, fn ->
-      press(session, by_label("Crash key", exact: true), "Enter")
-    end
+    assert %Fluffy.OperationError{cause: %Fluffy.LiveViewError{}} =
+             assert_raise(Fluffy.OperationError, fn ->
+               press(session, by_label("Crash key", exact: true), "Enter")
+             end)
   end
 
   defp session(driver \\ :phoenix) do

@@ -16,15 +16,9 @@ defmodule Fluffy.Backend do
   def close_session(%Session{} = session), do: Fluffy.SessionRuntime.close(session.runtime)
 
   def new_page(session), do: dispatch(session, :new_page, [])
-  def history(session, direction, options), do: dispatch(session, :history, [direction, options])
-
-  def visit(session, destination) do
-    dispatch(session, :visit, [destination])
-  end
-
-  def reload(session, options) do
-    dispatch(session, :reload, [options])
-  end
+  def history(session, direction, options), do: navigation!(session, direction, :history, [direction, options])
+  def visit(session, destination), do: navigation!(session, :visit, :visit, [destination])
+  def reload(session, options), do: navigation!(session, :reload, :reload, [options])
 
   def navigate(session, navigation) do
     dispatch(session, :navigate, [navigation])
@@ -41,12 +35,6 @@ defmodule Fluffy.Backend do
   def cookies(session, urls), do: dispatch(session, :cookies, [urls])
   def clear_cookies(session, options), do: dispatch(session, :clear_cookies, [options])
 
-  def normalize_error(session, operation, arguments, error)
-      when is_struct(error, Fluffy.StrictnessError) or is_struct(error, Fluffy.ActionabilityError),
-      do: Session.backend(session).normalize_error(session, operation, arguments, error)
-
-  def normalize_error(_session, _operation, _arguments, error), do: error
-
   def page_snapshot(runtime, record), do: dispatch_page(runtime, record, :page_snapshot)
 
   defp dispatch_page(runtime, record, operation) do
@@ -58,6 +46,25 @@ defmodule Fluffy.Backend do
 
   defp dispatch(session, operation, args) do
     apply(Session.backend(session), operation, [session | args])
+  end
+
+  # As for an action, Playwright's error, which keeps Playwright's call log, becomes the
+  # cause of a `Fluffy.OperationError`, as do a navigation Fluffy found failed and a
+  # LiveView that failed on the way.
+  defp navigation!(session, operation, callback, args) do
+    dispatch(session, callback, args)
+  rescue
+    error in [
+      Fluffy.Internal.NavigationFailure,
+      Fluffy.LiveViewError,
+      Playwright.PlaywrightError,
+      Playwright.TimeoutError,
+      Playwright.TargetClosedError
+    ] ->
+      reraise Fluffy.Internal.OperationFailure.navigation(session, operation, error), __STACKTRACE__
+
+    error in Fluffy.CapabilityError ->
+      reraise Fluffy.CapabilityError.put_call(error, operation, session), __STACKTRACE__
   end
 
   defp session_options(options, :phoenix) do

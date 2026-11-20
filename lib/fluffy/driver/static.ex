@@ -32,8 +32,6 @@ defmodule Fluffy.Driver.Static do
 
   @impl true
   def expect(%Session{} = session, %Expect{} = expectation) do
-    Keyword.validate!(expectation.options, [:timeout])
-
     case expectation do
       %Expect{target: {:locator, locator}, kind: :count, expected: expected} ->
         candidates =
@@ -59,9 +57,10 @@ defmodule Fluffy.Driver.Static do
     session
   end
 
+  # Static actions check once, since nothing changes, so they read no option: the options
+  # are validated, and on Phoenix hold at most `timeout:` (`Fluffy.Options.validate_action!/3`).
   @impl true
-  def click(%Session{} = session, %Locator{} = locator, options \\ []) do
-    Keyword.validate!(options, [:timeout])
+  def click(%Session{} = session, %Locator{} = locator, _options \\ []) do
     click = session |> Session.page_state() |> Map.fetch!(:client_dom) |> ClientDOM.click(locator)
     commit_click(session, click)
   end
@@ -88,8 +87,7 @@ defmodule Fluffy.Driver.Static do
   end
 
   @impl true
-  def submit(%Session{} = session, %Locator{} = locator, options \\ []) do
-    Keyword.validate!(options, [:timeout])
+  def submit(%Session{} = session, %Locator{} = locator, _options \\ []) do
     state = Session.page_state(session)
     client_dom = Map.fetch!(state, :client_dom)
     target = ClientDOM.target!(client_dom, locator)
@@ -104,17 +102,16 @@ defmodule Fluffy.Driver.Static do
   end
 
   @impl true
-  def fill(%Session{} = session, %Locator{} = locator, value, options \\ []) do
-    fill_value(session, :fill, locator, value, options)
+  def fill(%Session{} = session, %Locator{} = locator, value, _options \\ []) do
+    fill_value(session, :fill, locator, value)
   end
 
   @impl true
-  def clear(%Session{} = session, %Locator{} = locator, options \\ []) do
-    fill_value(session, :clear, locator, "", options)
+  def clear(%Session{} = session, %Locator{} = locator, _options \\ []) do
+    fill_value(session, :clear, locator, "")
   end
 
-  defp fill_value(session, action, locator, value, options) do
-    Keyword.validate!(options, [:timeout])
+  defp fill_value(session, action, locator, value) do
     state = Session.page_state(session)
     client_dom = Map.fetch!(state, :client_dom)
     {client_dom, _target} = ClientDOM.fill(client_dom, locator, value, :static, action)
@@ -122,17 +119,14 @@ defmodule Fluffy.Driver.Static do
   end
 
   @impl true
-  def set_input_files(%Session{} = session, %Locator{} = locator, _source_paths, selected_files, options \\ []) do
-    Keyword.validate!(options, [:timeout])
+  def set_input_files(%Session{} = session, %Locator{} = locator, _source_paths, selected_files, _options \\ []) do
     state = Session.page_state(session)
     client_dom = ClientDOM.set_input_files(state.client_dom, locator, selected_files)
     Session.put_page_state(session, %{state | client_dom: client_dom})
   end
 
   @impl true
-  def set_checked(%Session{} = session, %Locator{} = locator, desired, options \\ []) do
-    Keyword.validate!(options, [:timeout])
-
+  def set_checked(%Session{} = session, %Locator{} = locator, desired, _options \\ []) do
     case session |> Session.page_state() |> Map.fetch!(:client_dom) |> ClientDOM.set_checked(locator, desired) do
       nil ->
         session
@@ -146,8 +140,7 @@ defmodule Fluffy.Driver.Static do
   end
 
   @impl true
-  def select_option(%Session{} = session, %Locator{} = locator, requested, options \\ []) do
-    Keyword.validate!(options, [:timeout])
+  def select_option(%Session{} = session, %Locator{} = locator, requested, _options \\ []) do
     state = Session.page_state(session)
     {client_dom, _target} = state |> Map.fetch!(:client_dom) |> ClientDOM.select_option(locator, requested)
     Session.put_page_state(session, %{state | client_dom: client_dom})
@@ -158,7 +151,8 @@ defmodule Fluffy.Driver.Static do
   @spec press(Session.t(), Locator.t(), String.t(), keyword()) :: no_return()
   def press(%Session{} = _session, %Locator{} = _locator, _key, _options \\ []) do
     raise Fluffy.CapabilityError,
-      capability: :press,
+      capability: :liveview_keyboard_events,
+      operation: :press,
       driver: :static,
       detail: "Static pages do not support keyboard events"
   end

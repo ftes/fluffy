@@ -135,7 +135,8 @@ defmodule Fluffy.Conformance.ClockTest do
           &Clock.set_fixed_time(&1, @noon),
           &Clock.set_system_time(&1, @noon)
         ] do
-      assert_raise Fluffy.CapabilityError, ~r/:clock requires a Playwright session/, fn -> call.(session) end
+      error = assert_raise Fluffy.CapabilityError, fn -> call.(session) end
+      assert error.capability == :clock
     end
   end
 

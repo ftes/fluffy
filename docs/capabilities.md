@@ -1,57 +1,62 @@
 # Capability matrix
 
-The table compares Fluffy's Phoenix and Playwright backends within the
-boundaries described below.
+The table compares Fluffy's Phoenix backend with Playwright, the reference, which
+supports every feature not marked Phoenix only, within the boundaries described below. Each
+`Fluffy.CapabilityError` names its feature's id in `Fluffy.Capability.matrix/0` as
+`capability`.
 
 - **equivalent** — matching behavior verified against Playwright;
 - **structural subset** — supports HTML-represented state, with browser-only
   behavior excluded;
+- **Phoenix only** — a Phoenix feature that Playwright has no counterpart for;
 - **-** — unavailable or not applicable.
 
 <!-- capability-matrix:start -->
-| Feature | Phoenix | Playwright |
-| --- | --- | --- |
-| Frame locators and traversal | - | equivalent |
-| Conformance-tested CSS locators | equivalent | equivalent |
-| Text, label, and attribute locators | equivalent | equivalent |
-| Structural role and accessible-name subset | structural subset | equivalent |
-| Role-state locator options | - | equivalent |
-| Playwright action options | - | equivalent |
-| DOM assertions and strictness | equivalent | equivalent |
-| Page title assertions | equivalent | equivalent |
-| Indeterminate checkbox/radio DOM property | - | equivalent |
-| Focus, blur, and focus assertions | - | equivalent |
-| Structural element actions | structural subset | equivalent |
-| Visits, reloads, links, redirects, cookies, and HTTP forms | equivalent | equivalent |
-| Off-origin links, forms, and redirects | structural subset | equivalent |
-| Phoenix.HTML data-method/data-to actions | structural subset | equivalent |
-| LiveView events, patches, navigation, and structural action retry | equivalent | equivalent |
-| LiveView root layout, title updates, and portals | structural subset | equivalent |
-| LiveView form-change delivery and timing | structural subset | equivalent |
-| Declarative LiveView keyboard events | structural subset | equivalent |
-| Supported mutable form state and ordered submission | equivalent | equivalent |
-| Enter implicit form submission | - | equivalent |
-| Native constraint validation | - | equivalent |
-| Specialized scalar input values | structural subset | equivalent |
-| Computed style, layout, and browser accessibility tree | - | equivalent |
-| Downloads | equivalent | equivalent |
-| Multiple pages and new tabs | - | equivalent |
-| Browser history navigation | - | equivalent |
-| Adding, reading, and clearing cookies | equivalent | equivalent |
-| Browser storage-state export and restoration | - | equivalent |
-| Runtime permissions, geolocation, offline mode, and HTTP credentials | - | equivalent |
-| Hover, drag-and-drop, sequential typing, keyboard, and mouse input | - | equivalent |
-| Dialogs, console, page errors, frames, workers, WebSockets, and browser network events | - | equivalent |
-| Browser request routing | - | equivalent |
-| Active-page JavaScript evaluation | - | equivalent |
-| Fake page clock and timers | - | equivalent |
-| JavaScript-owned DOM and default actions | - | equivalent |
-| Native invalid, submit, and formdata event ordering | - | equivalent |
-| Hard-wrapped textarea, object, and custom-element entries | - | equivalent |
-| Per-test sessions, cleanup, and Ecto sandbox propagation | equivalent | equivalent |
-| URL matching | equivalent | equivalent |
-| Typed file selection and supported upload lifecycle | equivalent | equivalent |
-| Script-opened file chooser events | - | equivalent |
+| Feature | Phoenix |
+| --- | --- |
+| Frame locators and traversal | - |
+| Conformance-tested CSS locators | equivalent |
+| Text, label, and attribute locators | equivalent |
+| Structural role and accessible-name subset | structural subset |
+| Role-state locator options | - |
+| Playwright action options | - |
+| DOM assertions and strictness | equivalent |
+| Page title assertions | equivalent |
+| Indeterminate checkbox/radio DOM property | - |
+| Focus, blur, and focus assertions | - |
+| Structural element actions | structural subset |
+| Visits, reloads, links, redirects, cookies, and HTTP forms | equivalent |
+| Off-origin links, forms, and redirects | structural subset |
+| Phoenix.HTML data-method/data-to actions | structural subset |
+| LiveView events, patches, navigation, and structural action retry | equivalent |
+| LiveView root layout, title updates, and portals | structural subset |
+| LiveView form-change delivery and timing | structural subset |
+| Declarative LiveView keyboard events | structural subset |
+| Supported mutable form state and ordered submission | equivalent |
+| Enter implicit form submission | - |
+| Native constraint validation | - |
+| Specialized scalar input values | structural subset |
+| Computed style, layout, rendering, and browser accessibility tree | - |
+| Downloads | equivalent |
+| Multiple pages and new tabs | - |
+| Browser history navigation | - |
+| Adding, reading, and clearing cookies | equivalent |
+| Browser storage: Web Storage reads and storage-state export and restoration | - |
+| Browser and context options, permissions, geolocation, offline mode, and HTTP credentials | - |
+| Hover, drag-and-drop, typing, keyboard, mouse, viewport, and media emulation | - |
+| Dialogs, console, page errors, frames, workers, WebSockets, and browser network events | - |
+| Browser request routing | - |
+| Active-page JavaScript evaluation | - |
+| Fake page clock and timers | - |
+| JavaScript-owned DOM and default actions | - |
+| Native invalid, submit, and formdata event ordering | - |
+| Browser-dependent form entries and submissions | - |
+| Page content, locator lists and waits, native locators, and download files | - |
+| A prepared `Plug.Conn` for the first request | Phoenix only |
+| Per-test sessions, cleanup, and Ecto sandbox propagation | equivalent |
+| URL matching | equivalent |
+| Typed file selection and supported upload lifecycle | equivalent |
+| Script-opened file chooser events | - |
 <!-- capability-matrix:end -->
 
 ## Boundaries
@@ -191,6 +196,14 @@ set without `SameSite` reports `"Lax"`, as Chromium does (Firefox reports `"None
 invalid cookie raises `ArgumentError` with Playwright's message, and a key that is no cookie
 field, such as `http_only:` for `httpOnly:`, with PlaywrightEx's; a browser session's
 Playwright still drops such a key.
+
+### Before the first visit
+
+A Playwright session starts at `about:blank`, where an action waits for its element until it
+times out. A Phoenix session has no page until its first `visit`: page operations (actions,
+expectations, `reload`, `unwrap`, `open_browser`) raise `ArgumentError` at once. Cookie
+functions work before it, as a login flow needs. `Fluffy.Playwright` calls and Playwright-only
+options raise `Fluffy.CapabilityError`, as on any Phoenix page.
 
 ### Leaving the app
 

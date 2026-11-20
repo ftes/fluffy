@@ -1,4 +1,4 @@
-defmodule Fluffy.Driver.Unvisited.State do
+defmodule Fluffy.Driver.NoDocument.State do
   @moduledoc false
 
   defstruct []

@@ -59,7 +59,7 @@ defmodule Fluffy.Conformance.PressActionTest do
     for key <- ["Enter", "Space", "Tab", "Backspace", "ArrowDown", "ControlOrMeta+A", "a"] do
       error = assert_raise Fluffy.CapabilityError, fn -> press(session, by_label("Name"), key) end
       assert error.driver == :static
-      assert error.capability == :press
+      assert error.capability == :liveview_keyboard_events
     end
   end
 

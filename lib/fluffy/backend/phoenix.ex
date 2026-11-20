@@ -3,7 +3,6 @@ defmodule Fluffy.Backend.Phoenix do
 
   @behaviour Fluffy.Backend.Contract
 
-  import Fluffy.Event, only: [is_network_type: 1]
   import Phoenix.ConnTest
   import Phoenix.LiveViewTest
 
@@ -14,19 +13,19 @@ defmodule Fluffy.Backend.Phoenix do
   alias Fluffy.ClientDOM
   alias Fluffy.CookieJar
   alias Fluffy.Download
-  alias Fluffy.Driver.External.State, as: ExternalState
   alias Fluffy.Driver.Live, as: LiveDriver
   alias Fluffy.Driver.Live.Document, as: LiveDocument
   alias Fluffy.Driver.Live.State, as: LiveState
   alias Fluffy.Driver.Live.UploadState
+  alias Fluffy.Driver.NoDocument
   alias Fluffy.Driver.Static.State, as: StaticState
-  alias Fluffy.Driver.Unvisited.State, as: UnvisitedState
   alias Fluffy.Internal.Navigation
   alias Fluffy.Internal.Navigation.Link
   alias Fluffy.Internal.Navigation.Patch
   alias Fluffy.Internal.Navigation.Redirect
   alias Fluffy.Internal.Navigation.StaticConn
   alias Fluffy.Internal.Navigation.Submission
+  alias Fluffy.Internal.NavigationFailure
   alias Fluffy.Page
   alias Fluffy.Session
 
@@ -53,7 +52,7 @@ defmodule Fluffy.Backend.Phoenix do
       }
     }
 
-    page = %Page.State{driver: :unvisited, state: %UnvisitedState{}}
+    page = %Page.State{driver: :unvisited, state: %NoDocument.State{}}
     Session.new(__MODULE__, context, page)
   end
 
@@ -123,10 +122,6 @@ defmodule Fluffy.Backend.Phoenix do
   end
 
   @impl true
-  def normalize_error(session, operation, arguments, error),
-    do: Fluffy.Internal.OperationFailure.normalize(session, operation, arguments, error)
-
-  @impl true
   def absolute_url(%Session{} = session, path) do
     Session.context(session).http.base_url |> URI.merge(path) |> URI.to_string()
   end
@@ -171,22 +166,20 @@ defmodule Fluffy.Backend.Phoenix do
     # Playwright's goto fails when the browser aborts the navigation; the
     # browser keeps the cookies the response set.
     if match?(%{conn: %{status: status}} when status in @no_content_statuses, response) do
-      raise "Phoenix visit to #{URI.to_string(response.request.url)} was aborted by HTTP #{response.conn.status}"
+      raise NavigationFailure,
+            "Phoenix visit to #{URI.to_string(response.request.url)} was aborted by HTTP #{response.conn.status}"
     end
 
     finish_response(session, response, nil)
   end
 
   @impl true
-  def reload(%Session{} = session, options \\ []) do
-    # Playwright-only options such as `wait_until:` raise, as for other actions.
-    :ok = Fluffy.Driver.PhoenixValidation.validate_operation!(session, :reload, [options])
+  def reload(%Session{} = session, _options \\ []) do
+    case Session.current_page(session) do
+      %Page.State{driver: driver} when driver in [:unvisited, :external] ->
+        NoDocument.unsupported!(session, :reload)
 
-    case Session.current_page(session).url do
-      nil ->
-        raise ArgumentError, "cannot reload before the first visit"
-
-      url ->
+      %Page.State{url: url} ->
         visit(session, url)
     end
   end
@@ -223,37 +216,30 @@ defmodule Fluffy.Backend.Phoenix do
   end
 
   @impl true
-  @spec new_page(Session.t()) :: no_return()
-  def new_page(session), do: require_browser_pages!(session)
-
-  @impl true
-  @spec history(Session.t(), :go_back | :go_forward, keyword()) :: no_return()
-  def history(session, _direction, _options), do: require_browser_pages!(session)
-
-  @impl true
-  @spec close_page(Session.t(), Page.t()) :: no_return()
-  def close_page(%Session{} = session, _page_id) do
-    require_browser_pages!(session)
-  end
-
-  @impl true
   def event_source(session, :download, _scope), do: session.active_page
 
   def event_source(session, type, _scope) when type in [:page, :popup, :close, :load, :dom_content_loaded, :crash],
-    do: require_browser_pages!(session)
+    do:
+      Fluffy.CapabilityError.require_playwright!(
+        session,
+        :pages,
+        type,
+        "multiple pages, new tabs, and page lifecycle operations require Playwright"
+      )
 
-  def event_source(session, type, _scope) do
-    capability =
-      case type do
-        :dialog -> :browser_dialogs
-        :file_chooser -> :file_chooser_events
-        type when type in [:frame_navigated, :frame_attached, :frame_detached] -> :browser_frame_events
-        type when is_network_type(type) -> :browser_network_events
-        type when type in [:console, :page_error, :worker, :web_socket] -> :browser_events
-      end
-
+  def event_source(session, :file_chooser, _scope) do
     raise Fluffy.CapabilityError,
-      capability: capability,
+      capability: :file_chooser_events,
+      operation: :file_chooser,
+      driver: Session.current_driver(session),
+      detail: "file_chooser events require a Playwright session"
+  end
+
+  # Dialogs, console, page errors, frames, workers, WebSockets and network events.
+  def event_source(session, type, _scope) do
+    raise Fluffy.CapabilityError,
+      capability: :browser_events,
+      operation: type,
       driver: Session.current_driver(session),
       detail: "#{type} events require a Playwright session"
   end
@@ -281,13 +267,6 @@ defmodule Fluffy.Backend.Phoenix do
     session = navigate.(session)
 
     if Session.current_page(session).document_id == document_id, do: keep_document(session, nil), else: session
-  end
-
-  defp require_browser_pages!(session) do
-    raise Fluffy.CapabilityError,
-      capability: :pages,
-      driver: Session.current_driver(session),
-      detail: "multiple pages, new tabs, and page lifecycle operations require Playwright"
   end
 
   defp submit(%Session{} = session, submission, redirects) do
@@ -467,7 +446,8 @@ defmodule Fluffy.Backend.Phoenix do
       # reports that as a redirect to the URL being mounted, where the LiveView
       # client would reload the page, so following it would only loop.
       {:error, {:redirect, %{to: ^mounted_url} = options} = reason} when map_size(options) == 1 ->
-        raise "LiveView navigation failed: LiveView rejected the connection to #{mounted_url} as stale or " <>
+        raise NavigationFailure,
+              "LiveView navigation failed: LiveView rejected the connection to #{mounted_url} as stale or " <>
                 "unauthorized, such as for a live_session or on_mount mismatch: #{inspect(reason)}"
 
       # The view redirected in its connected mount. A browser follows it.
@@ -475,7 +455,7 @@ defmodule Fluffy.Backend.Phoenix do
         follow_mount_redirect(session, redirect, url, redirects)
 
       {:error, reason} ->
-        raise "LiveView navigation failed: #{inspect(reason)}"
+        raise NavigationFailure, "LiveView navigation failed: #{inspect(reason)}"
     end
   end
 
@@ -484,7 +464,7 @@ defmodule Fluffy.Backend.Phoenix do
   end
 
   defp commit_response(conn, _session, url, _redirects) do
-    raise "Phoenix navigation failed with HTTP #{conn.status} for #{URI.to_string(url)}"
+    raise NavigationFailure, "Phoenix navigation failed with HTTP #{conn.status} for #{URI.to_string(url)}"
   end
 
   defp put_http(%Session{} = session, %HTTPClient{} = http) do
@@ -598,7 +578,7 @@ defmodule Fluffy.Backend.Phoenix do
   # Its URL reads as a browser reports it, with a lowercase host and at least a `/` path.
   defp commit_external(session, url) do
     url = %{url | host: String.downcase(url.host), path: if(url.path in [nil, ""], do: "/", else: url.path)}
-    replace_document(session, :external, %ExternalState{}, URI.to_string(url))
+    replace_document(session, :external, %NoDocument.State{}, URI.to_string(url))
   end
 
   # The page's previous document stops its LiveView before the new one commits.

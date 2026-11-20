@@ -1,41 +1,94 @@
 defmodule Fluffy.Internal.OperationFailure do
   @moduledoc false
 
-  # Element actions take their locator as the first driver argument. Assertions
-  # take an Expect and unwrap takes a callback, so neither enters this envelope.
-  def normalize(%Fluffy.Session{} = session, operation, arguments, cause)
-      when is_struct(cause, Fluffy.StrictnessError) or is_struct(cause, Fluffy.ActionabilityError) do
-    wrap_operation(session, operation, arguments, cause)
+  alias Fluffy.ActionabilityError
+  alias Fluffy.Backend.Phoenix
+  alias Fluffy.CapabilityError
+  alias Fluffy.Internal.NavigationFailure
+  alias Fluffy.LiveViewError
+  alias Fluffy.Session
+  alias Fluffy.StrictnessError
+
+  # Turns an error a Phoenix driver operation raised into what the user sees: its
+  # structured causes, which element actions, taking their locator first, wrap, its
+  # navigation failures, and the call and driver of a capability error raised below the
+  # page. The Playwright driver raises its own under the public call's name.
+  def normalize(%Session{} = session, operation, arguments, %NavigationFailure{} = failure),
+    do: navigation(session, public_operation(operation, arguments), failure)
+
+  def normalize(%Session{} = session, operation, arguments, cause)
+      when is_struct(cause, StrictnessError) or is_struct(cause, ActionabilityError) or is_struct(cause, LiveViewError) do
+    if Session.backend(session) == Phoenix,
+      do: wrap_operation(session, operation, arguments, cause),
+      else: cause
   end
+
+  def normalize(%Session{} = session, operation, arguments, %CapabilityError{} = error),
+    do: CapabilityError.put_call(error, public_operation(operation, arguments), session)
 
   def normalize(_session, _operation, _arguments, cause), do: cause
 
+  @doc """
+  The `Fluffy.OperationError` of a failed navigation, with Playwright's error or Fluffy's
+  account of the failure as its cause.
+  """
+  def navigation(%Session{} = session, operation, error) do
+    {backend, driver} = backend_driver(session)
+
+    Fluffy.OperationError.exception(
+      backend: backend,
+      driver: driver,
+      operation: operation,
+      locator: nil,
+      cause: navigation_cause(error)
+    )
+  end
+
+  defp navigation_cause(%NavigationFailure{message: message}), do: message
+  defp navigation_cause(error), do: error
+
   # As Playwright's expectation shows an injected script error.
-  defp wrap_operation(_session, :expect, [%Fluffy.Expect{} = expectation], %Fluffy.ActionabilityError{} = cause) do
+  defp wrap_operation(_session, :expect, [%Fluffy.Expect{} = expectation], %ActionabilityError{} = cause) do
     ExUnit.AssertionError.exception(
       message: "Expected #{Fluffy.Expect.Internal.describe(expectation)}\nError: #{Exception.message(cause)}"
     )
   end
 
-  defp wrap_operation(_session, :expect, _arguments, cause) do
+  defp wrap_operation(_session, :expect, _arguments, cause) when not is_struct(cause, LiveViewError) do
     ExUnit.AssertionError.exception(message: Exception.message(cause))
   end
 
-  defp wrap_operation(session, operation, [%Fluffy.Locator{} = locator | rest], cause) do
+  defp wrap_operation(session, operation, [%Fluffy.Locator{} = locator | _rest] = arguments, cause),
+    do: phoenix_operation(session, public_operation(operation, arguments), locator, cause)
+
+  # A view that failed under an unwrap callback; the callback's own errors stay as raised.
+  defp wrap_operation(session, operation, _arguments, %LiveViewError{} = cause),
+    do: phoenix_operation(session, operation, nil, cause)
+
+  defp wrap_operation(_session, _operation, _arguments, cause), do: cause
+
+  defp phoenix_operation(session, operation, locator, cause) do
     Fluffy.OperationError.exception(
       backend: :phoenix,
-      driver: Fluffy.Session.current_driver(session),
-      operation: public_operation(operation, rest),
+      driver: Session.current_driver(session),
+      operation: operation,
       locator: locator,
       cause: cause
     )
   end
 
-  defp wrap_operation(_session, _operation, _arguments, cause), do: cause
+  @doc "The public call's name for a Phoenix driver operation; the Playwright driver holds its own."
+  def public_operation(:set_checked, [_locator, true | _]), do: :check
+  def public_operation(:set_checked, [_locator, false | _]), do: :uncheck
+  def public_operation(operation, _arguments), do: operation
 
-  defp public_operation(:set_checked, [true | _]), do: :check
-  defp public_operation(:set_checked, [false | _]), do: :uncheck
-  defp public_operation(operation, _arguments), do: operation
+  # A Playwright page's driver is always `:playwright`, also once the page has closed.
+  defp backend_driver(session) do
+    case Session.backend(session) do
+      Fluffy.Backend.Playwright -> {:playwright, :playwright}
+      Phoenix -> {:phoenix, Session.current_driver(session)}
+    end
+  end
 
   def raise_playwright!(operation, locator, cause), do: raise(playwright(operation, locator, cause))
 

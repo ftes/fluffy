@@ -37,7 +37,7 @@ defmodule Fluffy.Conformance.FillActionTest do
       session = session_for_html(:static, html)
 
       error = assert_raise Fluffy.CapabilityError, fn -> fill(session, editor, "Updated") end
-      assert error.capability == :contenteditable_fill
+      assert error.capability == :element_actions
       assert error.driver == :static
       expect(session, to_be_visible(by_text(editor, "Initial", exact: true)))
     end
@@ -48,7 +48,7 @@ defmodule Fluffy.Conformance.FillActionTest do
     editor = by_role(:textbox, name: "Editor")
 
     error = assert_raise Fluffy.CapabilityError, fn -> fill(session, editor, "Updated") end
-    assert error.capability == :contenteditable_fill
+    assert error.capability == :element_actions
     assert error.driver == :live
     expect(session, to_be_visible(by_text(editor, "Initial", exact: true)))
   end

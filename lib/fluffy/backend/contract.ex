@@ -15,7 +15,6 @@ defmodule Fluffy.Backend.Contract do
   @callback event_source(Session.t(), atom(), :page | :context) :: :context | reference()
   @callback subscribe_event(Session.t(), atom(), :context | reference(), pid()) ::
               {(term() -> {:ok, term()} | {:error, String.t()} | :ignore), (-> :ok)}
-  @callback normalize_error(Session.t(), atom(), list(), Exception.t()) :: Exception.t()
   @callback absolute_url(Session.t(), String.t()) :: String.t()
   @callback base_url(Session.t()) :: String.t()
 
@@ -23,6 +22,9 @@ defmodule Fluffy.Backend.Contract do
   @callback add_cookies(Session.t(), [map()]) :: Session.t()
   @callback cookies(Session.t(), [String.t()]) :: [map()]
   @callback clear_cookies(Session.t(), keyword() | map()) :: Session.t()
+
+  # Browser pages and history, which `Fluffy.Playwright` gates to a Playwright session.
+  @optional_callbacks new_page: 1, history: 3, close_page: 2
 
   # Metadata and document identity belong to the backend that owns the page.
   @callback page_snapshot(term(), Page.State.t()) :: Page.State.t()

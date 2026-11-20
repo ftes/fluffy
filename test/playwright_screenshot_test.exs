@@ -25,8 +25,10 @@ defmodule Fluffy.PlaywrightScreenshotTest do
       |> start_session(endpoint: Fluffy.Support.Web.Endpoint)
       |> visit("/chamber")
 
-    assert_raise Fluffy.CapabilityError, ~r/:static does not support :screenshot/, fn ->
-      Playwright.screenshot(session)
-    end
+    assert_raise Fluffy.CapabilityError,
+                 ~r/^Phoenix \(:static\) does not support :screenshot \(:computed_browser_semantics\): it requires a Playwright session$/,
+                 fn ->
+                   Playwright.screenshot(session)
+                 end
   end
 end
