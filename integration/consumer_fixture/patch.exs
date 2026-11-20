@@ -15,14 +15,6 @@ Igniter.new()
 |> Config.configure(
   "test.exs",
   :fluffy_consumer,
-  [FluffyConsumerWeb.Endpoint, :url],
-  host: "configured.invalid",
-  port: 0,
-  scheme: "http"
-)
-|> Config.configure(
-  "test.exs",
-  :fluffy_consumer,
   [FluffyConsumerWeb.Endpoint, :server],
   true
 )

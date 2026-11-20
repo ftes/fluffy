@@ -58,6 +58,11 @@ matched once can now match twice.
 - `start_session`'s `headers: [{name, value}]` is now `extra_http_headers: %{name => value}`,
   which replaces the test's `extra_http_headers` as in Playwright instead of merging into them.
   `base_url` and `extra_http_headers` in `browser_context:` raise: pass them to the session.
+- The default base URL is the endpoint's `url` host on its listener's port, not the
+  listener's address: `http://localhost:4002` with `phx.new`'s config, not
+  `http://127.0.0.1:4002`. Drop a `check_origin: false` added for browser tests. If the
+  browser can't reach the `url` host, set one it can in `config/test.exs`, or Playwright's
+  `base_url` ([Configuration](installation.md#configuration)).
 - Browser launch gets Playwright's 3-minute default instead of `timeout:`. A
   `launch_options: [timeout: ...]` that raised the limit on 0.8 now shortens it and can
   fail a loaded machine with `browserType.launch: Timeout ... exceeded`, so drop it.

@@ -48,9 +48,9 @@ defmodule Fluffy do
   Starts an isolated `:phoenix` or `:playwright` session.
 
   Configure the application endpoint once with
-  `config :fluffy, endpoint: MyAppWeb.Endpoint`. The session base URL uses the
-  endpoint's active HTTP or HTTPS listener when available and otherwise falls
-  back to `MyAppWeb.Endpoint.url()`. Playwright's `base_url` (`config :playwright, :test` or
+  `config :fluffy, endpoint: MyAppWeb.Endpoint`. The session base URL is the endpoint's
+  `MyAppWeb.Endpoint.url()`, its `url` config, on the port its HTTP or HTTPS listener runs
+  on. Playwright's `base_url` (`config :playwright, :test` or
   the test's `Playwright.Test.use/1`) overrides it, a session's `:endpoint` overrides that with
   its own URL, and a session's `:base_url` overrides all of them
   ([Configuration](installation.md#configuration)).

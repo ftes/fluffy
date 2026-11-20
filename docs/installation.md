@@ -66,22 +66,18 @@ end
 
 Configure your application endpoint once in `config/test.exs`. Fluffy uses
 it for in-process requests and derives the default session URL from the
-endpoint. When the endpoint has an active HTTP or HTTPS listener, its actual
-bind address and port are authoritative. Fluffy falls back to
-`MyAppWeb.Endpoint.url()` when no listener is running. This supports endpoints
-configured with `port: 0`:
+endpoint: the scheme and host of `MyAppWeb.Endpoint.url()`, from its `url` config, and the
+port its HTTP or HTTPS listener runs on, else the `url` config's. So `port: 0` works, and
+the host is the one the app's own absolute URLs and Phoenix's default `check_origin` use:
 
 ```elixir
 config :fluffy, endpoint: MyAppWeb.Endpoint
 
-config :my_app, MyAppWeb.Endpoint, server: true, check_origin: false
+config :my_app, MyAppWeb.Endpoint, server: true
 ```
 
-The server is required for Playwright tests. The browser opens the listener's
-address, such as `127.0.0.1`, which a stock `localhost` endpoint URL does not
-match, so `check_origin: false` lets the LiveView socket connect. By default Phoenix
-checks only the origin's host against the endpoint's `url` host, so an endpoint
-with `url: [host: "127.0.0.1"]` needs no `check_origin: false`. If Playwright
+The server is required for Playwright tests. With `phx.new`'s defaults the browser opens
+`http://localhost:4002`, which reaches the listener on `127.0.0.1`. If Playwright
 targets an application hosted elsewhere, set Playwright's `base_url` instead; for
 multi-endpoint or dynamic-server tests, pass a session `endpoint:` or `base_url:`
 ([Configuration](#configuration)).
@@ -116,13 +112,14 @@ So a `Playwright.Test.use(action_timeout: ...)` tag does nothing for a Phoenix s
 Per-test values through tags or projects assume one kind of session per test.
 
 A session's URL is, from the most specific: its `base_url:`, else its `endpoint:`'s, else
-Playwright's resolved `base_url`, else the configured endpoint's. A typical Phoenix app sets no `base_url`: Fluffy takes the endpoint's running
-listener, so `port: 0`, a `PORT` variable or any other dynamic port works, else
-`MyAppWeb.Endpoint.url()` ([Phoenix endpoint](#phoenix-endpoint)). Set
+Playwright's resolved `base_url`, else the configured endpoint's. A typical Phoenix app sets
+no `base_url`: Fluffy takes the endpoint's `url` host on its running listener's port, so
+`port: 0`, a `PORT` variable or any other dynamic port works
+([Phoenix endpoint](#phoenix-endpoint)). Set
 `config :playwright, :test, base_url:` only when the browser reaches the app at another
 address, as from Docker, a remote browser or a proxy; with a dynamic port, set it in
 `config/runtime.exs` inside `if config_env() == :test`. A static `base_url` beats the
-listener's URL, so it breaks a dynamic port.
+endpoint's URL, so it breaks a dynamic port.
 
 - **Levels replace, they don't merge.** As in Playwright, a later level replaces an option's
   whole value, so a tag's `extra_http_headers` replaces the config's map, as does a session's
@@ -136,9 +133,8 @@ listener's URL, so it breaks a dynamic port.
   ([Logging in](usage.md#logging-in)).
 
 ```elixir
-# config/test.exs: no base_url, as the endpoint's listener gives it.
-# `check_origin: false` as the browser opens the listener's address (see Phoenix endpoint).
-config :my_app, MyAppWeb.Endpoint, server: true, check_origin: false
+# config/test.exs: no base_url, as the endpoint gives it.
+config :my_app, MyAppWeb.Endpoint, server: true
 config :fluffy, endpoint: MyAppWeb.Endpoint, ecto_repos: [MyApp.Repo]
 
 config :playwright, :test, browser_name: :chromium, action_timeout: 15_000, navigation_timeout: 15_000
