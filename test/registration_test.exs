@@ -1,7 +1,7 @@
-defmodule Fluffy.CaseTest do
-  # Fluffy.Case only registers the test: the imports and the session are the module's own.
+defmodule Fluffy.RegistrationTest do
+  # Playwright.Test registers the test; the imports and the session are the module's own.
   use ExUnit.Case, async: true
-  use Fluffy.Case
+  use Playwright.Test
 
   test "imports nothing of Fluffy and starts no session", context do
     refute Map.has_key?(context, :session)
@@ -14,28 +14,11 @@ defmodule Fluffy.CaseTest do
   test "bounds Phoenix waits by the test's timeout" do
     assert {30_000, _backstop} = Fluffy.TestTimeout.fetch()
   end
-
-  test "comes after use ExUnit.Case" do
-    assert_raise CompileError, ~r/use Fluffy.Case must come after use ExUnit.Case/, fn ->
-      Code.compile_string("defmodule Fluffy.CaseTest.Misplaced, do: use(Fluffy.Case)")
-    end
-  end
-
-  test "rejects an unknown option at compile time" do
-    assert_raise ArgumentError, ~r/unknown options \[:invisibility_cloak\] for use Playwright.Test/, fn ->
-      Code.compile_string("""
-      defmodule Fluffy.CaseTest.UnknownOption do
-        use ExUnit.Case
-        use Fluffy.Case, invisibility_cloak: true
-      end
-      """)
-    end
-  end
 end
 
-defmodule Fluffy.CaseNativeTest do
+defmodule Fluffy.RegistrationNativeTest do
   use ExUnit.Case, async: true
-  use Fluffy.Case
+  use Playwright.Test
   use Fluffy.Assert
 
   import Fluffy
@@ -63,10 +46,10 @@ defmodule Fluffy.CaseNativeTest do
   end
 end
 
-defmodule Fluffy.CasePhoenixTestFacadeTest do
-  # The facade's names don't clash with what Fluffy.Case imports.
+defmodule Fluffy.RegistrationPhoenixTestFacadeTest do
+  # The facade's names don't clash with what Playwright.Test imports.
   use ExUnit.Case, async: true
-  use Fluffy.Case
+  use Playwright.Test
 
   import Fluffy.PhoenixTest
 
@@ -88,16 +71,16 @@ defmodule Fluffy.CasePhoenixTestFacadeTest do
   end
 end
 
-defmodule Fluffy.CaseTest.FeatureCase do
+defmodule Fluffy.RegistrationTest.FeatureCase do
   # The recommended template: registered in its body, before its own setups, and again in
   # `using`, which only brings the `test` macro then.
   @moduledoc false
   use ExUnit.CaseTemplate
-  use Fluffy.Case
+  use Playwright.Test
 
   using do
     quote do
-      use Fluffy.Case
+      use Playwright.Test
       use Fluffy.Assert
 
       import Fluffy
@@ -113,8 +96,8 @@ defmodule Fluffy.CaseTest.FeatureCase do
   end
 end
 
-defmodule Fluffy.CaseTemplateTest do
-  use Fluffy.CaseTest.FeatureCase, async: true
+defmodule Fluffy.RegistrationTemplateTest do
+  use Fluffy.RegistrationTest.FeatureCase, async: true
 
   @tag backend: :playwright
   test "starts a Playwright session in the template's setup", %{session: session} do
@@ -131,12 +114,12 @@ defmodule Fluffy.CaseTemplateTest do
   end
 end
 
-defmodule Fluffy.CaseBrowserLeaseTest do
+defmodule Fluffy.RegistrationBrowserLeaseTest do
   # A test takes a browser from Playwright.Test's pool, and with it one of `workers`
   # seats, only for a Playwright session. The pool has no public view of its seats, so this
   # reads its state: the scopes that hold seats, here the test process, until the test's `on_exit`.
   use ExUnit.Case, async: true
-  use Fluffy.Case
+  use Playwright.Test
   use Fluffy.Assert
 
   import Fluffy
@@ -166,25 +149,15 @@ defmodule Fluffy.CaseBrowserLeaseTest do
   end
 end
 
-defmodule Fluffy.CaseWithPlaywrightExTestTest do
-  use ExUnit.Case, async: true
-  use Fluffy.Case
-  use Playwright.Test
-
-  test "registers the test once" do
-    assert Playwright.Test.info().test_pid == self()
-  end
-end
-
-defmodule Fluffy.CaseWithoutCaseTest do
-  # Phoenix sessions need nothing of Fluffy.Case.
+defmodule Fluffy.UnregisteredTest do
+  # Every session belongs to a registered test.
   use ExUnit.Case, async: true
 
-  test "runs Phoenix sessions and rejects Playwright ones" do
-    Fluffy.start_session(:phoenix, endpoint: Fluffy.Support.Web.Endpoint)
-
-    assert_raise RuntimeError, ~r/use Fluffy.Case/, fn ->
-      Fluffy.start_session(:playwright, base_url: Fluffy.Support.Server.base_url())
+  test "starts no session outside a registered test" do
+    for backend <- [:phoenix, :playwright] do
+      assert_raise RuntimeError, ~r/in a test of a module with `use Playwright.Test`/, fn ->
+        Fluffy.start_session(backend, endpoint: Fluffy.Support.Web.Endpoint)
+      end
     end
   end
 end

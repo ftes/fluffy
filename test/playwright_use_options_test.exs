@@ -1,6 +1,6 @@
 defmodule Fluffy.PlaywrightUseOptionsTest do
   use ExUnit.Case, async: true
-  use Fluffy.Case, locale: "en-GB", extra_http_headers: %{"x-house" => "hufflepuff"}
+  use Playwright.Test, locale: "en-GB", extra_http_headers: %{"x-house" => "hufflepuff"}
 
   import Fluffy
 

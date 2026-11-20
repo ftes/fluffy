@@ -8,14 +8,14 @@ behavior depends on JavaScript or other browser-owned capabilities.
 
 ## Your first test
 
-Add `use Fluffy.Case` after `use ExUnit.Case` (or your `ConnCase`, see
+Add `use Playwright.Test` after `use ExUnit.Case` (or your `ConnCase`, see
 [Shared test case](#shared-test-case)), then import the actions and locators;
 `use Fluffy.Assert` imports the assertion vocabulary:
 
 ```elixir
 defmodule MyAppWeb.CreatureTest do
   use ExUnit.Case, async: true
-  use Fluffy.Case
+  use Playwright.Test
   use Fluffy.Assert
 
   import Fluffy
@@ -95,10 +95,14 @@ See the [capability matrix](capabilities.md) for backend differences.
 
 ## Shared test case
 
-`use Fluffy.Case` registers the test, for Phoenix and Playwright sessions alike; the
-imports and sessions are yours. Keep the `ConnCase` for fixtures, routes and the sandbox,
-and use it first: used after `Fluffy.Case`, its `use ExUnit.Case` imports `test` again
-and the module fails to compile on an ambiguous `test/3`.
+`use Playwright.Test` registers the test, which every session, Phoenix or Playwright,
+needs: one started outside a registered test raises. The imports and sessions are yours.
+Keep the `ConnCase` for fixtures, routes and the sandbox, and use it first: used after
+`use Playwright.Test`, its `use ExUnit.Case` imports `test` again and the module fails to
+compile on an ambiguous `test/3`. Its options, such as `trace: :on` or context options
+like `locale:`, are for the module; tag a describe block or a test with
+`Playwright.Test.use/1`, such as `@tag Playwright.Test.use(trace: :on)` (see
+`Playwright.Test`).
 
 A setup can start a session per test, here Phoenix by default and the backend of a
 `backend` tag otherwise. The tag is the setup's own, so name it as you like. Use
@@ -108,7 +112,7 @@ describe block, or `@tag` for one test—without a separate browser test module:
 ```elixir
 defmodule MyAppWeb.PotionTest do
   use MyAppWeb.ConnCase, async: true
-  use Fluffy.Case
+  use Playwright.Test
   use Fluffy.Assert
 
   import Fluffy
@@ -134,7 +138,7 @@ defmodule MyAppWeb.PotionTest do
 end
 ```
 
-To share this across modules, put `use Fluffy.Case` in your own case template's
+To share this across modules, put `use Playwright.Test` in your own case template's
 `using`, with the imports and the session setup after it there; the template's own
 `setup`, here the sandbox owner's, runs before them. It forwards the module's options, so
 `use MyAppWeb.FeatureCase, async: true, trace: :on` works:
@@ -145,7 +149,7 @@ defmodule MyAppWeb.FeatureCase do
 
   using opts do
     quote do
-      use Fluffy.Case, unquote(opts)
+      use Playwright.Test, unquote(opts)
       use Fluffy.Assert
 
       import Fluffy
@@ -164,21 +168,21 @@ defmodule MyAppWeb.FeatureCase do
 end
 ```
 
-When the template's own `setup` starts the session, also put `use Fluffy.Case` right after
+When the template's own `setup` starts the session, also put `use Playwright.Test` right after
 `use ExUnit.CaseTemplate`. A template's own `setup` callbacks run before those its `using`
 brings in, so the test is then registered before them (a Playwright session started before
 the registration makes it raise). The line in `using` stays, as it brings the `test` macro
-to each module and takes the options; there it registers nothing again. The one in the body
+to each module and takes the options; Playwright.Test registers the test once. The one in the body
 takes none:
 
 ```elixir
 defmodule MyAppWeb.FeatureCase do
   use ExUnit.CaseTemplate
-  use Fluffy.Case
+  use Playwright.Test
 
   using opts do
     quote do
-      use Fluffy.Case, unquote(opts)
+      use Playwright.Test, unquote(opts)
       use Fluffy.Assert
 
       import Fluffy

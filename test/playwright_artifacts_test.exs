@@ -1,13 +1,13 @@
 defmodule Fluffy.PlaywrightArtifactsTest.TraceCase do
   # Playwright.Test writes `trace.zip` in the `on_exit` its registration adds. A case
-  # template's `setup` runs before the `use Fluffy.Case` of its `using`, so this `on_exit` is
+  # template's `setup` runs before the `use Playwright.Test` of its `using`, so this `on_exit` is
   # added before that one and runs after it, reading the path the test's setup puts in.
   @moduledoc false
   use ExUnit.CaseTemplate
 
   using opts do
     quote do
-      use Fluffy.Case, unquote(opts)
+      use Playwright.Test, unquote(opts)
     end
   end
 
@@ -123,7 +123,7 @@ defmodule Fluffy.PlaywrightArtifactsTest do
 end
 
 defmodule Fluffy.PlaywrightArtifactsTest.UseOptionsTest do
-  # `use Fluffy.Case, trace: :on`, forwarded from a template's `using`, records with no tag.
+  # `use Playwright.Test, trace: :on`, forwarded from a template's `using`, records with no tag.
   use Fluffy.PlaywrightArtifactsTest.TraceCase, async: true, trace: :on
 
   import Fluffy

@@ -136,7 +136,7 @@ defmodule Fluffy.Conformance.SlowSetupTestTimeoutTest do
   # setup before the test's registration, such as a ConnCase's, a hanging LiveView action still
   # fails with Fluffy's error before ExUnit kills the test.
   use ExUnit.Case, async: true
-  use Fluffy.Case
+  use Playwright.Test
 
   import Fluffy
   import Fluffy.Locator
@@ -156,7 +156,7 @@ defmodule Fluffy.Conformance.SlowSetupTestTimeoutTest do
     session =
       :phoenix
       |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
-      # Without a registered test (no `use Fluffy.Case`), nothing bounds a Phoenix operation but
+      # Without a registered test (no `use Playwright.Test`), nothing bounds a Phoenix operation but
       # ExUnit's timeout.
       |> visit("/live/chamber-map")
 
@@ -171,7 +171,7 @@ end
 defmodule Fluffy.Conformance.NoTestTimeoutTest do
   use ExUnit.Case, async: true
 
-  test "a test without Fluffy.Case has no test timeout" do
+  test "a test outside Playwright.Test has no test timeout" do
     assert Fluffy.TestTimeout.fetch() == nil
     assert Fluffy.Driver.Live.Retry.deadline(:infinity) == :infinity
   end

@@ -22,7 +22,7 @@ defmodule Fluffy.Backend.Playwright do
   @impl true
   def start_session(options) do
     # The session belongs to the test, also when a Task of it starts the session.
-    %{test_pid: test_pid} = test_info = test_info!()
+    %{test_pid: test_pid} = test_info = Fluffy.TestInfo.fetch!()
     base_url = Keyword.fetch!(options, :base_url)
     browser_context_options = Keyword.get(options, :browser_context, [])
 
@@ -75,20 +75,6 @@ defmodule Fluffy.Backend.Playwright do
       error ->
         SessionRuntime.close(runtime)
         reraise error, __STACKTRACE__
-    end
-  end
-
-  # Playwright.Test's error says to add `use Playwright.Test`; Fluffy's modules get it
-  # from `use Fluffy.Case`.
-  defp test_info! do
-    case Fluffy.TestInfo.fetch() do
-      {:ok, info} ->
-        info
-
-      :error ->
-        raise RuntimeError,
-              "a Playwright session can only start while a test is running: in a test of a module with " <>
-                "`use Fluffy.Case` (its process, or one with it in $callers)"
     end
   end
 

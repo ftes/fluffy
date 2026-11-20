@@ -73,12 +73,12 @@ action and the assertion to it.
 Follow [Installation and runtime](docs/installation.md) for the dependency,
 endpoint, browser, and sandbox configuration.
 
-Add `use Fluffy.Case` after your `ConnCase` (or `use ExUnit.Case`), then import the
+Add `use Playwright.Test` after your `ConnCase` (or `use ExUnit.Case`), then import the
 native locator API's helpers:
 
 ```elixir
 use MyAppWeb.ConnCase, async: true
-use Fluffy.Case
+use Playwright.Test
 use Fluffy.Assert
 
 import Fluffy
@@ -92,12 +92,12 @@ setup, then [Usage](docs/usage.md) for writing tests and starting a session per 
 
 ## Coming from PhoenixTest
 
-Replace `import PhoenixTest` with `import Fluffy.PhoenixTest`, after `use Fluffy.Case`.
+Replace `import PhoenixTest` with `import Fluffy.PhoenixTest`, after `use Playwright.Test`.
 Existing pipelines keep familiar helpers such as `fill_in`, `click_button`, and
 `assert_has`, and their prepared connections:
 
 ```elixir
-use Fluffy.Case
+use Playwright.Test
 import Fluffy.PhoenixTest
 
 # In a test, with the ConnCase's conn:

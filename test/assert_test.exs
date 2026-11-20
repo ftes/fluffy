@@ -1,5 +1,6 @@
 defmodule Fluffy.AssertTest do
   use ExUnit.Case, async: true
+  use Playwright.Test
   use Fluffy.Assert
 
   test "ordinary ExUnit assertions retain values, patterns, and messages" do

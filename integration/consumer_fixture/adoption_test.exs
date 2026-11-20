@@ -1,6 +1,6 @@
 defmodule FluffyConsumer.AdoptionTest do
   use FluffyConsumerWeb.ConnCase, async: true
-  use Fluffy.Case
+  use Playwright.Test
   use Fluffy.Assert
 
   import Fluffy

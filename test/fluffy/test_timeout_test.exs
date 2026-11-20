@@ -3,7 +3,7 @@ defmodule Fluffy.TestTimeoutTest do
   # (`Fluffy.Conformance.TestTimeoutTest`) do that, once per driver class. The backstop comes
   # from Playwright.Test's registration of the test, so the tests run at once.
   use ExUnit.Case, async: true
-  use Fluffy.Case
+  use Playwright.Test
 
   alias Fluffy.TestTimeout
 
