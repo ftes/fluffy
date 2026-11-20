@@ -780,7 +780,7 @@ defmodule Fluffy.Playwright do
   since no JavaScript value serializes to one; any other list, including `[]`, is an
   array.
 
-  `evaluate/4` is a browser-only value query, so it returns the evaluated value
+  `evaluate/4` is a Playwright-only value query, so it returns the evaluated value
   rather than the Fluffy session. Use Elixir's `then/2` when a pipeline needs
   the value and then should continue with the session:
 

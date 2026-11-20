@@ -6,7 +6,7 @@ supports every feature not marked Phoenix only, within the boundaries described 
 `capability`.
 
 - **equivalent** — matching behavior verified against Playwright;
-- **structural subset** — supports HTML-represented state, with browser-only
+- **structural subset** — supports HTML-represented state, with Playwright-only
   behavior excluded;
 - **Phoenix only** — a Phoenix feature that Playwright has no counterpart for;
 - **-** — unavailable or not applicable.
@@ -165,7 +165,7 @@ All public page-management helpers live in `Fluffy.Playwright` and reject Phoeni
 sessions. Phoenix retains one current document internally; use shared page URL,
 and title assertions to inspect it.
 `Fluffy.Playwright.new_page/1` returns a handle; `Fluffy.Playwright.switch_page/2` selects it for subsequent actions.
-Use [frame locators](locators.md#frames-playwright) to query iframe contents with
+Use [frame locators](locators.md#frames-playwright-only) to query iframe contents with
 Playwright. Page switching does not select an iframe, and frame locators do not
 change the active page.
 
@@ -247,7 +247,7 @@ accept, or dismiss a browser dialog; use Playwright whenever the prompt or its
 cancellation path is part of the assertion. Static and LiveView both model the pinned
 Phoenix.HTML `data-method`/`data-to` hidden-form action for plain elements, including
 links and buttons. Custom `phoenix.link.click` listeners, cancellation, and competing
-LiveView actions remain browser-only.
+LiveView actions remain Playwright only.
 
 ### Forms and files
 
