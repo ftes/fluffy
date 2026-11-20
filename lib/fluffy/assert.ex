@@ -37,8 +37,6 @@ defmodule Fluffy.Assert do
 
   alias Playwright.Test.Assertions
 
-  require Assertions
-
   @doc group: "Running expectations"
   @doc "Imports the assertion vocabulary without conflicts with ExUnit or `Playwright.Test.Assertions`."
   defmacro __using__(_options) do
@@ -50,52 +48,35 @@ defmodule Fluffy.Assert do
         else: ExUnit.Assertions
 
     quote do
-      import Fluffy.Assert
+      import Fluffy.Assert, except: [assert: 2, refute: 2]
+      import Fluffy.Assert.Steps
       import unquote(assertions), except: [assert: 2, refute: 2]
     end
   end
 
   @doc group: "Running expectations"
-  @doc "Executes a typed expectation, or delegates an ordinary assertion with a message to `Playwright.Test.Assertions`."
-  defmacro assert(subject, expectation_or_message),
-    do: assertion(:assert, subject, Macro.expand(expectation_or_message, __CALLER__))
+  @doc """
+  Executes a typed expectation, or delegates an ordinary assertion with a message to ExUnit.
+
+  With `use Fluffy.Assert`, the imported `assert/2` is a macro that also records an assertion with
+  a message as a step of the test, with its expression and line, as `use Playwright.Test` does.
+  """
+  @spec assert(Fluffy.Session.t(), Fluffy.Expect.t()) :: Fluffy.Session.t()
+  @spec assert(term(), String.t() | keyword()) :: true
+  def assert(session, %Fluffy.Expect{} = expectation), do: Fluffy.Expect.expect(session, expectation)
+  def assert(expression, message), do: ExUnit.Assertions.assert(expression, message)
 
   @doc group: "Running expectations"
-  @doc "Executes a negated expectation, or delegates an ordinary refutation with a message to `Playwright.Test.Assertions`."
-  defmacro refute(subject, expectation_or_message),
-    do: assertion(:refute, subject, Macro.expand(expectation_or_message, __CALLER__))
+  @doc """
+  Executes a negated expectation, or delegates an ordinary refutation with a message to ExUnit.
 
-  # Macros, so a message's assertion expands at the caller, as with `use Playwright.Test` alone:
-  # its step has the caller's expression and line, and ExUnit's own `refute(value, expr: ...)`
-  # (of `refute match?(...)`) passes through to ExUnit. A message is a string (also a module
-  # attribute's, expanded, or one with interpolation) or a list, never a `Fluffy.Expect`; anything
-  # else, such as a message in a variable, is told apart when it runs, without the caller's line.
-  defp assertion(kind, subject, message)
-       when is_binary(message) or is_list(message) or (is_tuple(message) and elem(message, 0) == :<<>>) do
-    quote do
-      alias Playwright.Test.Assertions
+  With `use Fluffy.Assert`, it records a step as `assert/2` does.
+  """
+  @spec refute(Fluffy.Session.t(), Fluffy.Expect.t()) :: Fluffy.Session.t()
+  @spec refute(term(), String.t() | keyword()) :: false
+  def refute(session, %Fluffy.Expect{} = expectation), do: Fluffy.Expect.expect(session, Fluffy.Expect.not_(expectation))
 
-      require Assertions
-
-      Assertions.unquote(kind)(unquote(subject), unquote(message))
-    end
-  end
-
-  defp assertion(kind, subject, expectation_or_message) do
-    quote do
-      Fluffy.Assert.__assertion__(unquote(kind), unquote(subject), unquote(expectation_or_message))
-    end
-  end
-
-  # Playwright's records a step when the running test has `assert_steps` on, else is ExUnit's.
-  @doc false
-  def __assertion__(:assert, session, %Fluffy.Expect{} = expectation), do: Fluffy.Expect.expect(session, expectation)
-
-  def __assertion__(:refute, session, %Fluffy.Expect{} = expectation),
-    do: Fluffy.Expect.expect(session, Fluffy.Expect.not_(expectation))
-
-  def __assertion__(:assert, value, message), do: Assertions.assert(value, message)
-  def __assertion__(:refute, value, message), do: Assertions.refute(value, message)
+  def refute(expression, message), do: ExUnit.Assertions.refute(expression, message)
 
   @doc group: "Running expectations"
   @doc "Executes a typed expectation with additional options."
