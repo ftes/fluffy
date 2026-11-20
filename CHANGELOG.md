@@ -53,7 +53,7 @@ Changes since 0.8.0.
 - `page_status`, `page_to_have_status` and `Fluffy.Page.status` are removed, as in Playwright; assert on `Event.response` instead.
 - URLs are matched as Playwright does, by a string, a regex or a predicate, in `page_url`/`page_to_have_url` and `route`/`unroute`; the `path:`, `query:` and `fragment:` forms are removed.
 - A regex is a JavaScript `RegExp` on every driver: PCRE-only syntax raises `ArgumentError`, and `$` no longer matches before a final newline.
-- `by_test_id/2` takes no `attribute:`; set `test_id_attribute` in `config :playwright, :test` or `config :fluffy`. `filter/2` takes no `exact:`; use a regex.
+- `by_test_id/2` takes no `attribute:`; set `test_id_attribute` in `config :playwright, :test`, which every driver uses (`config :fluffy, test_id_attribute:` of the release candidates is removed). `filter/2` takes no `exact:`; use a regex.
 - On Playwright, a failed `visit`, `reload`, `go_back` or `go_forward` raises `Fluffy.OperationError` with Playwright's exception as `cause`, as actions do.
 - On Phoenix, `go_back` and `go_forward` raise `Fluffy.CapabilityError` with `capability: :browser_history`.
 - The `Fluffy.Expect.checked_option` type is `to_be_checked_option`; `Fluffy.Locator.describe`, `new` and `append` are internal.

@@ -1,6 +1,6 @@
 defmodule Fluffy.Conformance.TestIdAttributeTest do
-  # Playwright Test's `testIdAttribute`, `config :fluffy, test_id_attribute:` over Playwright's,
-  # is global config.
+  # Playwright Test's `testIdAttribute` is global config, on every driver: the Phoenix drivers
+  # read it, and each pooled Playwright driver gets it as it starts.
   use Fluffy.Support.Case, async: false
 
   import Fluffy
@@ -10,14 +10,14 @@ defmodule Fluffy.Conformance.TestIdAttributeTest do
 
   alias Fluffy.Session
   alias Fluffy.Support.Server
-  alias Playwright.Isomorphic.LocatorUtils
+  alias Playwright.Test.BrowserPool
 
   @owlery ~s(<section id="owlery"><p data-owl="hedwig">Hedwig</p><p data-testid="errol">Errol</p></section>)
 
   for driver <- [:static, :playwright] do
     @tag driver: driver
     test "#{driver} matches the configured attribute", %{driver: driver} do
-      put_fluffy_config(test_id_attribute: "data-owl")
+      put_test_id_attribute(driver, "data-owl")
 
       driver
       |> session_for_html(@owlery, base_url: Server.base_url())
@@ -29,7 +29,7 @@ defmodule Fluffy.Conformance.TestIdAttributeTest do
     # As upstream's test id engine, a comma-separated list matches any of its attributes.
     @tag driver: driver
     test "#{driver} matches any attribute of a comma-separated list", %{driver: driver} do
-      put_fluffy_config(test_id_attribute: "data-owl,data-testid")
+      put_test_id_attribute(driver, "data-owl,data-testid")
 
       driver
       |> session_for_html(@owlery, base_url: Server.base_url())
@@ -40,7 +40,7 @@ defmodule Fluffy.Conformance.TestIdAttributeTest do
     # A name is any CSS identifier, non-ASCII characters included.
     @tag driver: driver
     test "#{driver} matches a non-ASCII attribute", %{driver: driver} do
-      put_fluffy_config(test_id_attribute: "data-élève,data-owl")
+      put_test_id_attribute(driver, "data-élève,data-owl")
 
       driver
       |> session_for_html(~s(<p data-élève="hermione">Hermione</p>), base_url: Server.base_url())
@@ -48,48 +48,25 @@ defmodule Fluffy.Conformance.TestIdAttributeTest do
     end
   end
 
-  # Fluffy's unset (the suite's config): Playwright's, on every driver.
-  for driver <- [:static, :playwright] do
-    @tag driver: driver
-    test "#{driver} falls back to Playwright's attribute", %{driver: driver} do
-      put_playwright_config(:test, test_id_attribute: "data-owl")
-
-      driver
-      |> session_for_html(@owlery, base_url: Server.base_url())
-      |> expect("hedwig" |> by_test_id() |> to_have_text("Hedwig"))
-      |> expect("errol" |> by_test_id() |> to_have_count(0))
-    end
-  end
-
-  @tag driver: :static
-  test "Fluffy's attribute wins over Playwright's" do
-    put_fluffy_config(test_id_attribute: "data-testid")
-    put_playwright_config(:test, test_id_attribute: "data-owl")
-
-    :static
-    |> session_for_html(@owlery, base_url: Server.base_url())
-    |> expect("errol" |> by_test_id() |> to_have_text("Errol"))
-    |> expect("hedwig" |> by_test_id() |> to_have_count(0))
-  end
-
-  # Not the client's VM-global `selectors.setTestIdAttribute`, which Playwright.Test sets from
-  # its own config: `get_by_test_id`'s selector with Fluffy's attribute.
+  # As Playwright's own native `get_by_test_id`.
   @tag driver: :playwright
-  test "Playwright builds get_by_test_id's selector from Fluffy's attribute" do
-    put_fluffy_config(test_id_attribute: "data-owl")
-    session = session_for_html(:playwright, @owlery, base_url: Server.base_url())
-    frame = Session.page_state(session).frame
-
-    assert unwrap_and_return(session, by_test_id("hedwig"), & &1) ==
-             Playwright.Frame.locator(frame, LocatorUtils.get_by_test_id_selector("data-owl", "hedwig"))
-  end
-
-  # With only Playwright's attribute, the suite's default, as its own native `get_by_test_id`.
-  @tag driver: :playwright
-  test "Playwright's locator equals Playwright's native get_by_test_id without Fluffy's attribute" do
+  test "Playwright's locator equals Playwright's native get_by_test_id" do
     session = session_for_html(:playwright, @owlery, base_url: Server.base_url())
     frame = Session.page_state(session).frame
 
     assert unwrap_and_return(session, by_test_id("errol"), & &1) == Playwright.Frame.get_by_test_id(frame, "errol")
+  end
+
+  # A suite has one attribute. To switch it, set the config and, as upstream's own tests do,
+  # the running driver's (`selectors.setTestIdAttribute`), restored after the test.
+  defp put_test_id_attribute(driver, name) do
+    suite = Playwright.Test.config().test_id_attribute
+    put_playwright_config(:test, test_id_attribute: name)
+
+    if driver == :playwright do
+      selectors = Playwright.selectors(BrowserPool.playwright(BrowserPool.browser()))
+      :ok = Playwright.Selectors.set_test_id_attribute(selectors, name)
+      on_exit(fn -> Playwright.Selectors.set_test_id_attribute(selectors, suite) end)
+    end
   end
 end

@@ -73,6 +73,15 @@ defmodule Fluffy.PlaywrightConfigurationTest do
     assert_raise ArgumentError, ~r/invalid config :fluffy: .*file_input_max_bytes/, &Options.config!/0
   end
 
+  # Every driver uses Playwright's.
+  test "rejects config :fluffy, test_id_attribute: for Playwright's" do
+    put_env(test_id_attribute: "data-owl")
+
+    assert_raise ArgumentError,
+                 ~r/config :fluffy, test_id_attribute: is removed.*`config :playwright, :test, test_id_attribute: ...`/,
+                 &Options.config!/0
+  end
+
   # Only browsers wait for navigations, so the navigation timeout is Playwright's.
   test "rejects config :fluffy, navigation_timeout: for Playwright's" do
     put_env(navigation_timeout: 15_000)
@@ -101,9 +110,9 @@ defmodule Fluffy.PlaywrightConfigurationTest do
       expect: [timeout: 1_000]
     )
 
-    put_env(action_timeout: 4_000, expect_timeout: 500, test_id_attribute: "data-hedwig")
+    put_env(action_timeout: 4_000, expect_timeout: 500)
     assert {Timeouts.action(), Timeouts.navigation(), Timeouts.expect()} == {4_000, 3_000, 500}
-    assert Options.config!(:test_id_attribute) == "data-hedwig"
+    assert Options.config!(:test_id_attribute) == "data-owl"
 
     put_env(action_timeout: :infinity, expect_timeout: :infinity)
     assert {Timeouts.action(), Timeouts.expect()} == {:infinity, :infinity}
@@ -140,7 +149,7 @@ defmodule Fluffy.PlaywrightConfigurationTest do
   end
 
   test "rejects invalid values" do
-    for {key, value} <- [action_timeout: -1, expect_timeout: -1, test_id_attribute: ""] do
+    for {key, value} <- [action_timeout: -1, expect_timeout: -1] do
       put_env([{key, value}])
       assert_raise ArgumentError, ~r/invalid config :fluffy: .*#{key}/, &Options.config!/0
       Application.delete_env(:fluffy, key)
@@ -148,10 +157,6 @@ defmodule Fluffy.PlaywrightConfigurationTest do
 
     # Upstream's test id engine fails on a name that is not a CSS identifier.
     for name <- ["data-owl, data-hedwig", "data-owl]", "data:owl", "data-qa.id", "1owl", "data-owl,"] do
-      put_env(test_id_attribute: name)
-      assert_raise ArgumentError, ~r/invalid config :fluffy: .*test_id_attribute.*attribute names/, &Options.config!/0
-
-      Application.delete_env(:fluffy, :test_id_attribute)
       put_playwright(test: [test_id_attribute: name])
 
       assert_raise ArgumentError,
@@ -159,10 +164,9 @@ defmodule Fluffy.PlaywrightConfigurationTest do
                    fn -> Options.config!(:test_id_attribute) end
     end
 
-    Application.delete_env(:playwright, :test)
-    put_env(test_id_attribute: "data-owl,data_hedwig,data-élève,--owl")
+    put_playwright(test: [test_id_attribute: "data-owl,data_hedwig,data-élève,--owl"])
     assert Options.config!(:test_id_attribute) == "data-owl,data_hedwig,data-élève,--owl"
-    Application.delete_env(:fluffy, :test_id_attribute)
+    Application.delete_env(:playwright, :test)
 
     put_playwright(test: [navigation_timeout: -1])
     assert_raise ArgumentError, ~r/invalid navigation_timeout/, &Timeouts.navigation/0

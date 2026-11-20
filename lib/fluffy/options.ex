@@ -358,14 +358,13 @@ defmodule Fluffy.Options do
                     ]
                   )
 
-  # `config :fluffy`. Playwright Test's `actionTimeout`, `expect.timeout` and `testIdAttribute`
-  # are for Fluffy's sessions, over Playwright's (`config!/1`); no defaults: unset,
-  # Playwright's apply.
+  # `config :fluffy`. Playwright Test's `actionTimeout` and `expect.timeout` are for Fluffy's
+  # sessions, over Playwright's (`config!/1`); no defaults: unset, Playwright's apply. Its
+  # `testIdAttribute` is Playwright's only.
   @config_schema NimbleOptions.new!(
                    action_timeout: [type: {:custom, __MODULE__, :default_timeout, []}],
                    # `0`: assertions check once, as with a call's `timeout: 0`.
                    expect_timeout: [type: :timeout],
-                   test_id_attribute: [type: {:custom, __MODULE__, :test_id_attribute, []}],
                    base_url: [type: :string],
                    endpoint: [type: :atom],
                    ecto_repos: [type: {:list, :atom}],
@@ -571,6 +570,7 @@ defmodule Fluffy.Options do
   defp module_key?({key, _value}), do: match?("Elixir." <> _, Atom.to_string(key))
 
   @removed_config [
+    test_id_attribute: "set `config :playwright, :test, test_id_attribute: ...`, which every driver uses",
     timeout:
       "set `config :playwright, :expect, timeout: ...` for assertions and " <>
         "`config :playwright, :test, action_timeout: ...` for actions; " <>
