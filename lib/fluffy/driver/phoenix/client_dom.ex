@@ -688,6 +688,12 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM do
   end
 
   defp default_value(%{tag: "textarea", children: children}), do: tree_text(children)
+  # HTML's default/on value mode: a checkbox or radio without a value is "on", checked or not.
+  defp default_value(%{tag: "input"} = target) do
+    default = if Semantics.input_type(target) in ["checkbox", "radio"], do: "on", else: ""
+    attribute(target.attributes, "value") || default
+  end
+
   defp default_value(%{attributes: attributes}), do: attribute(attributes, "value") || ""
 
   defp select_options(client_dom, target) do

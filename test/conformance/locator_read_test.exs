@@ -83,6 +83,26 @@ defmodule Fluffy.Conformance.LocatorReadTest do
     end
 
     @tag driver: driver
+    test "a checkbox or radio without a value reads \"on\", checked or not, with #{driver}" do
+      html = """
+      <label><input type="checkbox">Owl post</label>
+      <label><input type="checkbox" checked>Floo powder</label>
+      <label><input type="radio" name="house">Gryffindor</label>
+      <label><input type="radio" name="house" checked>Hufflepuff</label>
+      <label><input type="checkbox" value="">Portkey</label>
+      """
+
+      with_html(unquote(driver), html, fn session ->
+        for name <- ["Owl post", "Floo powder", "Gryffindor", "Hufflepuff"] do
+          assert input_value(session, by_label(name)) == "on"
+          expect(session, to_have_value(by_label(name), "on"))
+        end
+
+        assert input_value(session, by_label("Portkey")) == ""
+      end)
+    end
+
+    @tag driver: driver
     test "reads are strict and fail without a target with #{driver}" do
       html = "<p>Lumos</p><p>Lumos</p>"
 
@@ -137,6 +157,22 @@ defmodule Fluffy.Conformance.LocatorReadTest do
 
       assert get_attribute(session, appearing, "phx-value-kind") == "appeared"
       assert session |> text_content(appearing) |> String.trim() == "Appearing action"
+    end
+
+    @tag driver: driver
+    test "a LiveView checkbox without a value reads \"on\", checked or not, with #{driver}", %{driver: driver} do
+      tonic = by_label("Reveal Phoenix Tonic")
+
+      session =
+        driver
+        |> start_session()
+        |> visit("/live/action-retries")
+        |> expect(to_have_value(tonic, "on"))
+
+      assert input_value(session, tonic) == "on"
+
+      session = session |> check(tonic) |> expect(to_have_value(tonic, "on"))
+      assert input_value(session, tonic) == "on"
     end
 
     @tag driver: driver
