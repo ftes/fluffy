@@ -190,7 +190,7 @@ defmodule Fluffy.Capability do
       feature: "Computed style, layout, rendering, and browser accessibility tree",
       drivers: %{static: :browser_only, live: :browser_only},
       detail:
-        "Use Playwright when matching or actionability depends on layout, generated content, computed visibility, or a browser accessibility tree; in-process drivers do not diagnose those dependencies. Bounding boxes, ARIA snapshots, screenshots, and PDFs require Playwright too."
+        "Use Playwright when matching or actionability depends on layout, generated content, computed visibility, or a browser accessibility tree; in-process drivers do not diagnose those dependencies. Rendered inner text, bounding boxes, ARIA snapshots, screenshots, and PDFs require Playwright too."
     },
     %{
       id: :downloads,

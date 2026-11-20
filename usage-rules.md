@@ -52,7 +52,8 @@ start_session(:phoenix)
 - URL strings match the complete URL, including query and fragment. When only the path matters, use a regex or a predicate, which gets a `%URI{}`: `page_url(&(&1.path == "/x"))`.
 - There is no page status assertion. On Playwright, assert on `Event.response` instead.
 - Static and LiveView check structural visibility (`hidden`, `type="hidden"`) and do not compute CSS, so `display: none` alone counts as visible there. `aria-hidden="true"` does not affect visibility; only `by_role` excludes it. Use `:playwright` to test rendered visibility.
-- Text matching skips `<script>` and `<style>`, as in Playwright, so `assert_has("script", text: ...)` fails even with `count:`. Match attributes with `count:`, or read the text natively: `unwrap` on Static passes the conn (`conn.resp_body`), and on Playwright use `Fluffy.Playwright.evaluate(session, locator, "el => el.textContent")`.
+- Text matching skips `<script>` and `<style>`, as in Playwright, so `assert_has("script", text: ...)` fails even with `count:`. Match attributes with `count:`, or read the text with `text_content(session, by_css("script#data"))`.
+- To use a page value in the test, read it on any driver: `text_content`, `get_attribute`, `input_value` and `all_text_contents` (`inner_text` and `all_inner_texts` in `Fluffy.Playwright`). Reads wait for the element but not for its value, so check values with assertions, which retry, not by comparing a read; don't use `Fluffy.Playwright.evaluate` or `unwrap_and_return` for them.
 
 ## Hidden inputs
 

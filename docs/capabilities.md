@@ -304,7 +304,9 @@ Fluffy classifies every member of the Playwright facade it builds on, and a test
 fails when Playwright adds or removes one.
 
 - **Wrapped:** locator builders (`get_by_role` as `by_role`, and so on), the
-  cross-driver actions, including `clear` and `set_checked`, `hover`, `drag_to`,
+  cross-driver actions, including `clear` and `set_checked`, the locator reads
+  `text_content`, `get_attribute`, `input_value`, `all_text_contents`, `inner_text`
+  and `all_inner_texts`, `hover`, `drag_to`,
   `press_sequentially`, `focus`, `blur`, `dblclick`, `tap`, `dispatch_event`,
   `select_text`, `scroll_into_view_if_needed`, `wait_for` on a locator,
   `bounding_box`, `aria_snapshot`, `drop`, `all`, `Fluffy.Locator.within/2`, locator
@@ -325,7 +327,7 @@ fails when Playwright adds or removes one.
   their file by `name:` or the test's name, through `Playwright.Test`, or at `path:`.
 - **Unwrap:** everything else page-, locator-, or value-local, such as
   `aria_snapshot_json`, HAR routing, and response timing. For reads like
-  `text_content`, `Fluffy.unwrap_and_return/2` and
+  `inner_html` or `is_visible`, `Fluffy.unwrap_and_return/2` and
   `Fluffy.Playwright.unwrap_and_return/3` return the callback's result instead of
   the session. Navigation these cause is adopted.
 - **Unsafe natively:** closing the page or context (use `Fluffy.Playwright.close_page/2`

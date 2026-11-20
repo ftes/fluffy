@@ -249,10 +249,7 @@ that passed on 0.8 act differently:
 - Text matching skips `<script>` and `<style>`, as in Playwright, even as the matched
   element, so `assert_has("script", text: "...")` fails even with `count:`. Match
   attributes with `count:` (`assert_has("script[nonce]", count: 1)`), or read the text
-  natively: on Static, `unwrap` passes the `Plug.Conn`, so check `conn.resp_body`; on
-  Playwright, use `Fluffy.Playwright.evaluate(session, by_css("script#data"),
-  "el => el.textContent")`. On LiveView, `unwrap` passes the view, whose
-  `Phoenix.LiveViewTest.render/1` covers the LiveView's markup but not the layout.
+  with `Fluffy.text_content(facade.session, by_css("script#data"))`, on every driver.
 - `select_option` with `[]` deselects every option, and a list mixing values with
   option maps raises. `to_have_values` requires a multiple select.
 - The facade's `click_button` no longer matches `<input type="file">`.
