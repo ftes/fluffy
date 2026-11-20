@@ -45,6 +45,17 @@ defmodule Fluffy.Conformance.TestIdAttributeTest do
       |> session_for_html(~s(<p data-élève="hermione">Hermione</p>))
       |> expect("hermione" |> by_test_id() |> to_have_text("Hermione"))
     end
+
+    # As upstream's `if (testIdAttribute)`, an empty one sets none: the default stays.
+    @tag driver: driver
+    test "#{driver} keeps the default attribute for an empty one", %{driver: driver} do
+      put_test_id_attribute(driver, "")
+
+      driver
+      |> session_for_html(@owlery)
+      |> expect("errol" |> by_test_id() |> to_have_text("Errol"))
+      |> expect("hedwig" |> by_test_id() |> to_have_count(0))
+    end
   end
 
   # As Playwright's own native `get_by_test_id`.
@@ -62,7 +73,8 @@ defmodule Fluffy.Conformance.TestIdAttributeTest do
     suite = Playwright.Test.config().test_id_attribute
     put_playwright_config(:test, test_id_attribute: name)
 
-    if driver == :playwright do
+    # The pool sets none for an empty one, so the running driver keeps the suite's.
+    if driver == :playwright and name != "" do
       selectors = Playwright.selectors(BrowserPool.playwright(BrowserPool.browser()))
       :ok = Playwright.Selectors.set_test_id_attribute(selectors, name)
       on_exit(fn -> Playwright.Selectors.set_test_id_attribute(selectors, suite) end)
