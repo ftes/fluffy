@@ -186,10 +186,23 @@ defmodule Fluffy.Conformance.LocatorReadTest do
 
       assert input_value(session, by_label("First ingredient")) == "ash"
     end
+
+    @tag driver: driver
+    test "LiveView reads are strict and need a control for input_value with #{driver}", %{driver: driver} do
+      session = driver |> start_session() |> visit("/live/potions")
+
+      error = assert_raise Fluffy.OperationError, fn -> text_content(session, by_css("input"), timeout: 100) end
+      assert error.operation == :text_content
+      assert strictness_error?(error)
+
+      error = assert_raise Fluffy.OperationError, fn -> input_value(session, by_css("#wizard-form"), timeout: 100) end
+      assert error.operation == :input_value
+      assert Exception.message(error) =~ "Node is not an <input>, <textarea> or <select> element"
+    end
   end
 
   defp strictness_error?(%{backend: :phoenix, cause: cause}),
-    do: match?(%Fluffy.StrictnessError{candidates: [_, _]}, cause)
+    do: match?(%Fluffy.StrictnessError{candidates: [_, _ | _]}, cause)
 
   defp strictness_error?(%{backend: :playwright} = error), do: Exception.message(error) =~ "strict mode violation"
 end

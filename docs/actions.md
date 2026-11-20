@@ -169,7 +169,7 @@ at the current caret position. Drag source and target must belong to the same fr
 ## Reading values
 
 To use a value from the page in the test, read it, as with Playwright's locator reads.
-Each takes one strict target and works on every driver:
+They work on every driver:
 
 ```elixir
 heading = text_content(session, by_role(:heading, level: 1))
@@ -180,7 +180,8 @@ creatures = all_text_contents(session, by_role(:listitem))
 
 `text_content` is the DOM's text, hidden and `<script>` text included; `get_attribute`
 reads the HTML attribute, or `nil` without it; `input_value` reads an input, textarea or
-select as `fill` and `select_option` left it. `all_text_contents` reads every match.
+select as `fill` and `select_option` left it. Each takes one strict target, while
+`all_text_contents` reads every match, without waiting.
 The browser's rendered text, `Fluffy.Playwright.inner_text/3` and `all_inner_texts/2`,
 requires Playwright.
 
