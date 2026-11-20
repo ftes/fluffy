@@ -302,7 +302,7 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
     crash: :pages
   ]
 
-  for driver <- [:static, :live] do
+  for driver <- Drivers.phoenix() do
     test "#{driver} rejects browser events before invoking an action" do
       session =
         case unquote(driver) do
@@ -352,7 +352,7 @@ defmodule Fluffy.Conformance.PageSignalEventTest do
 
     session =
       :playwright
-      |> start_session(base_url: Server.base_url())
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/start"))
 
     {session, fixture}

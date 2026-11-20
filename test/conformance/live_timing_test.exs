@@ -16,7 +16,7 @@ defmodule Fluffy.Conformance.LiveTimingTest do
         probe = probe("phoenix-eager")
 
         :phoenix
-        |> start_test_session()
+        |> start_session()
         |> visit("/live/timing?probe=#{probe}")
         |> fill(by_label(unquote(label)), "current value")
 
@@ -29,7 +29,7 @@ defmodule Fluffy.Conformance.LiveTimingTest do
       probe = probe("phoenix-not-coalesced")
 
       :phoenix
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/timing?probe=#{probe}")
       |> fill(by_label("Bare debounce"), "first value")
       |> fill(by_label("Bare debounce"), "final value")
@@ -43,7 +43,7 @@ defmodule Fluffy.Conformance.LiveTimingTest do
       probe = probe("phoenix-submit")
 
       :phoenix
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/timing?probe=#{probe}")
       |> fill(by_label("Bare debounce"), "submitted value")
       |> submit(by_css("#timing-form"))
@@ -60,7 +60,7 @@ defmodule Fluffy.Conformance.LiveTimingTest do
       probe = probe("browser-bare")
 
       :playwright
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/timing?probe=#{probe}")
       |> fill(by_label("Bare debounce"), "trailing value")
 
@@ -75,7 +75,7 @@ defmodule Fluffy.Conformance.LiveTimingTest do
       probe = probe("browser-coalesced")
 
       :playwright
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/timing?probe=#{probe}")
       |> fill(by_label("Bare debounce"), "first value")
       |> fill(by_label("Bare debounce"), "final value")
@@ -91,7 +91,7 @@ defmodule Fluffy.Conformance.LiveTimingTest do
 
       session =
         :playwright
-        |> start_test_session()
+        |> start_session()
         |> visit("/live/timing?probe=#{probe}")
         |> fill(by_label("Numeric debounce"), "flush on focus")
 
@@ -108,7 +108,7 @@ defmodule Fluffy.Conformance.LiveTimingTest do
 
       session =
         :playwright
-        |> start_test_session()
+        |> start_session()
         |> visit("/live/timing?probe=#{probe}")
         |> fill(by_label("Throttled"), "leading value")
 
@@ -126,7 +126,7 @@ defmodule Fluffy.Conformance.LiveTimingTest do
       probe = probe("browser-submit")
 
       :playwright
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/timing?probe=#{probe}")
       |> fill(by_label("Numeric debounce"), "submit current value")
       |> click(by_role(:button, name: "Save timing"))
@@ -141,12 +141,5 @@ defmodule Fluffy.Conformance.LiveTimingTest do
     name = "#{prefix}-#{System.unique_integer([:positive])}"
     {:ok, _} = Registry.register(Fluffy.TestTimingProbe, name, nil)
     name
-  end
-
-  defp start_test_session(driver) do
-    start_session(driver,
-      base_url: Fluffy.Support.Server.base_url(),
-      endpoint: Fluffy.Support.Web.Endpoint
-    )
   end
 end

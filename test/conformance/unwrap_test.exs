@@ -21,7 +21,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
   @endpoint Endpoint
 
   test "rejects unwrap before the Phoenix backend has visited and classified a page" do
-    session = start_test_session(:phoenix)
+    session = start_session(:phoenix)
     Process.put(:unwrap_callback_ran, false)
 
     assert_raise ArgumentError, ~r/unwrap.*before.*visit/i, fn ->
@@ -33,11 +33,11 @@ defmodule Fluffy.Conformance.UnwrapTest do
     refute Process.get(:unwrap_callback_ran)
   end
 
-  for driver <- [:static, :live] do
+  for driver <- Drivers.phoenix() do
     @tag driver: driver
     test "rejects a native locator with #{driver}" do
       path = if unquote(driver) == :static, do: "/chamber", else: "/live/nested"
-      session = :phoenix |> start_test_session() |> visit(path)
+      session = :phoenix |> start_session() |> visit(path)
 
       assert_raise Fluffy.CapabilityError, ~r/:unwrap \(:playwright_only_api\): it requires a Playwright session/, fn ->
         unwrap(session, by_css("body"), fn _locator -> flunk("callback ran") end)
@@ -48,14 +48,14 @@ defmodule Fluffy.Conformance.UnwrapTest do
   describe "unwrap_and_return" do
     test "rejects a Phoenix session before its first visit, like unwrap" do
       assert_raise ArgumentError, ~r/unwrap.*before.*visit/i, fn ->
-        :phoenix |> start_test_session() |> unwrap_and_return(fn _native -> flunk("callback ran") end)
+        :phoenix |> start_session() |> unwrap_and_return(fn _native -> flunk("callback ran") end)
       end
     end
 
     @tag driver: :static
     test "returns anything from a Static callback and leaves the page and its conn alone" do
       test_pid = self()
-      session = :phoenix |> start_test_session() |> visit("/chamber")
+      session = :phoenix |> start_session() |> visit("/chamber")
       document = Session.current_page(session).document_id
       conn = Session.page_state(session).conn
 
@@ -80,7 +80,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
 
       session =
         :phoenix
-        |> start_test_session()
+        |> start_session()
         |> visit(HTTPFixtures.path(fixture))
         |> fill(by_label("Name"), "Hermione")
 
@@ -92,7 +92,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
     test "keeps a form's unsubmitted state on a LiveView page" do
       session =
         :phoenix
-        |> start_test_session()
+        |> start_session()
         |> visit("/live/facade-locators/tracked")
         |> fill(by_label("One"), "Hermione")
 
@@ -102,7 +102,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
 
     @tag driver: :live
     test "returns a Live callback's result and commits its render" do
-      session = :phoenix |> start_test_session() |> visit("/live/three-heads")
+      session = :phoenix |> start_session() |> visit("/live/three-heads")
 
       html =
         unwrap_and_return(session, fn %View{} = view -> Phoenix.LiveViewTest.render_click(view, "increment") end)
@@ -113,7 +113,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
 
     @tag driver: :live
     test "keeps up with a patch the callback sets off without waiting for it" do
-      session = :phoenix |> start_test_session() |> visit("/live/chamber-map")
+      session = :phoenix |> start_session() |> visit("/live/chamber-map")
 
       unwrap_and_return(session, fn %View{} = view -> send(view.pid, :patch) end)
 
@@ -122,7 +122,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
 
     @tag driver: :live
     test "follows a Live redirect, so a later action on the same handle sees the new page" do
-      session = :phoenix |> start_test_session() |> visit("/live/chamber-map")
+      session = :phoenix |> start_session() |> visit("/live/chamber-map")
 
       assert unwrap_and_return(session, fn view ->
                _redirect = Phoenix.LiveViewTest.render_click(view, "redirect_static")
@@ -138,7 +138,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
 
     @tag driver: :live
     test "raises when the callback kills the LiveView" do
-      session = :phoenix |> start_test_session() |> visit("/live/three-heads")
+      session = :phoenix |> start_session() |> visit("/live/three-heads")
 
       assert %Fluffy.OperationError{cause: %Fluffy.LiveViewError{}} =
                assert_raise(Fluffy.OperationError, fn ->
@@ -153,7 +153,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
 
     @tag driver: :live
     test "propagates a Live callback's exception, throw and exit" do
-      session = :phoenix |> start_test_session() |> visit("/live/three-heads")
+      session = :phoenix |> start_session() |> visit("/live/three-heads")
 
       assert_raise RuntimeError, "native", fn -> unwrap_and_return(session, fn _ -> raise "native" end) end
       assert catch_throw(unwrap_and_return(session, fn _ -> throw(:native) end)) == :native
@@ -199,11 +199,11 @@ defmodule Fluffy.Conformance.UnwrapTest do
       end
     end
 
-    for driver <- [:static, :live] do
+    for driver <- Drivers.phoenix() do
       @tag driver: driver
       test "rejects a native locator with #{driver}" do
         path = if unquote(driver) == :static, do: "/chamber", else: "/live/nested"
-        session = :phoenix |> start_test_session() |> visit(path)
+        session = :phoenix |> start_session() |> visit(path)
 
         assert_raise Fluffy.CapabilityError, ~r/:unwrap_and_return \(:playwright_only_api\)/, fn ->
           unwrap_and_return(session, by_css("body"), fn _locator -> flunk("callback ran") end)
@@ -217,7 +217,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
       fixture = HTTPFixtures.register(%{status: 204})
 
       :phoenix
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/no-content?" <> URI.encode_query(to: HTTPFixtures.path(fixture, "/save")))
       |> submit(by_css("#http-form"))
       |> unwrap(fn %Plug.Conn{status: 204} = conn -> get(conn, "/chamber") end)
@@ -225,7 +225,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
     end
 
     test "accepts the unchanged current conn and remains pipeable" do
-      session = start_test_session(:phoenix)
+      session = start_session(:phoenix)
 
       session
       |> visit("/chamber")
@@ -234,7 +234,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
     end
 
     test "passes the current conn, requires its replacement, and reconciles response state" do
-      session = start_test_session(:phoenix)
+      session = start_session(:phoenix)
 
       session =
         session
@@ -252,7 +252,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
     end
 
     test "rejects a callback result that is not a Plug.Conn" do
-      session = :phoenix |> start_test_session() |> visit("/chamber")
+      session = :phoenix |> start_session() |> visit("/chamber")
 
       assert_raise ArgumentError, ~r/Static unwrap callback must return.*Plug.Conn/s, fn ->
         unwrap(session, fn _conn -> :ignored end)
@@ -261,7 +261,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
 
     test "follows a returned conn redirect and reclassifies its Secret chamber" do
       test_pid = self()
-      session = start_test_session(:phoenix)
+      session = start_session(:phoenix)
 
       session =
         session
@@ -281,7 +281,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
     end
 
     test "propagates callback exceptions, throws, and exits unchanged" do
-      session = :phoenix |> start_test_session() |> visit("/chamber")
+      session = :phoenix |> start_session() |> visit("/chamber")
 
       assert_raise RuntimeError, "native exception", fn ->
         unwrap(session, fn _conn -> raise "native exception" end)
@@ -295,7 +295,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
   describe "Live" do
     test "passes the current View, ignores the callback result, and re-renders" do
       test_pid = self()
-      session = start_test_session(:phoenix)
+      session = start_session(:phoenix)
 
       session =
         session
@@ -312,7 +312,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
     end
 
     test "allows an assertion-only callback without making its result driver state" do
-      session = :phoenix |> start_test_session() |> visit("/live/three-heads")
+      session = :phoenix |> start_session() |> visit("/live/three-heads")
 
       session
       |> unwrap(fn view ->
@@ -322,7 +322,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
     end
 
     test "reconciles the retained View instead of a stale rendered return value" do
-      session = :phoenix |> start_test_session() |> visit("/live/three-heads")
+      session = :phoenix |> start_session() |> visit("/live/three-heads")
 
       session
       |> unwrap(fn view ->
@@ -334,7 +334,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
     end
 
     test "commits a native patch without requiring the callback to return the View" do
-      session = start_test_session(:phoenix)
+      session = start_session(:phoenix)
 
       session
       |> visit("/live/chamber-map")
@@ -347,7 +347,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
     end
 
     test "reconciles a native hook event and a queued Live render" do
-      session = start_test_session(:phoenix)
+      session = start_session(:phoenix)
 
       session
       |> visit("/live/async?delay=10000")
@@ -364,7 +364,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
     end
 
     test "follows native Live navigation through normal page classification" do
-      session = start_test_session(:phoenix)
+      session = start_session(:phoenix)
 
       session =
         session
@@ -383,7 +383,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
     end
 
     test "commits phx-trigger-action as an HTTP navigation after a native submit" do
-      session = start_test_session(:phoenix)
+      session = start_session(:phoenix)
 
       session =
         session
@@ -398,7 +398,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
     end
 
     test "follows a native redirect after discarding the render result" do
-      session = start_test_session(:phoenix)
+      session = start_session(:phoenix)
 
       session =
         session
@@ -414,7 +414,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
     end
 
     test "preserves flash from a native Live redirect" do
-      session = start_test_session(:phoenix)
+      session = start_session(:phoenix)
 
       session
       |> visit("/live/chamber-map")
@@ -427,7 +427,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
     end
 
     test "does not translate an exit raised by the native callback" do
-      session = :phoenix |> start_test_session() |> visit("/live/three-heads")
+      session = :phoenix |> start_session() |> visit("/live/three-heads")
 
       reason =
         catch_exit(unwrap(session, fn %View{} -> exit(:native_crash) end))
@@ -436,7 +436,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
     end
 
     test "propagates callback exceptions and throws unchanged" do
-      session = :phoenix |> start_test_session() |> visit("/live/three-heads")
+      session = :phoenix |> start_session() |> visit("/live/three-heads")
 
       assert_raise RuntimeError, "native Live exception", fn ->
         unwrap(session, fn %View{} -> raise "native Live exception" end)
@@ -682,14 +682,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
     end
   end
 
-  defp start_test_session(backend) do
-    start_session(backend,
-      base_url: Server.base_url(),
-      endpoint: Endpoint
-    )
-  end
-
   defp playwright_html(html) do
-    session_for_html(:playwright, html, base_url: Server.base_url())
+    session_for_html(:playwright, html)
   end
 end

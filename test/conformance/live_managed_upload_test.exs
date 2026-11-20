@@ -10,13 +10,13 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
   alias Fluffy.Session
   alias Fluffy.Support.Server
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "uploads, progresses, and consumes one local file with #{driver}" do
       file = fixture_path()
 
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/scrolls")
       |> set_input_files(by_label("Attachment"), file)
       |> expect("Validated: true" |> by_text() |> to_be_visible())
@@ -38,7 +38,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       }
 
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/scrolls")
       |> set_input_files(by_label("Attachment"), payload)
       |> expect("Validated: true" |> by_text() |> to_be_visible())
@@ -48,7 +48,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
 
     test "preserves a clicked submitter through a managed upload with #{driver}" do
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/scrolls")
       |> set_input_files(by_label("Attachment"), fixture_path())
       |> click(by_role(:button, name: "Draft"))
@@ -62,7 +62,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
 
     test "follows an ordinary link from a form with a tracked upload with #{driver}" do
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/scrolls")
       |> set_input_files(by_label("Attachment"), fixture_path())
       |> click(by_role(:link, name: "Leave upload form"))
@@ -72,7 +72,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
 
     test "follows a Live redirect after a managed upload submit with #{driver}" do
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/scrolls/redirect")
       |> set_input_files(by_label("Attachment"), fixture_path())
       |> click(by_role(:button, name: "Save", exact: true))
@@ -82,7 +82,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
 
     test "follows navigation returned by an upload progress callback with #{driver}" do
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/scrolls/progress-redirect")
       |> set_input_files(by_label("Attachment"), fixture_path())
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
@@ -96,7 +96,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       child = by_css("#nested-child")
 
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/nested")
       |> set_input_files(by_label(child, "Child attachment", exact: true), fixture_path())
       |> click(by_role(child, :button, name: "Upload child attachment", exact: true))
@@ -105,7 +105,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
 
     test "hands a managed upload form to HTTP after phx-trigger-action with #{driver}" do
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/scrolls/trigger")
       |> set_input_files(by_label("Attachment"), fixture_path())
       |> click(by_role(:button, name: "Save", exact: true))
@@ -116,7 +116,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       expected_title = if unquote(driver) == :playwright, do: "Hermione", else: "initial"
 
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/scrolls/disable-title-on-progress")
       |> fill(by_label("Title"), "Hermione")
       |> set_input_files(by_label("Attachment"), fixture_path())
@@ -128,7 +128,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       file = fixture_path()
 
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/scrolls/auto")
       |> set_input_files(by_label("Attachment"), file)
       |> expect("Validated: true" |> by_text() |> to_be_visible())
@@ -145,7 +145,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
 
     test "auto uploads two selected files before submit with #{driver}" do
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/scrolls/auto-multiple")
       |> set_input_files(by_label("Attachment"), [fixture_path(), second_fixture_path()])
       |> expect("Completed uploads: 2" |> by_text() |> to_be_visible())
@@ -165,7 +165,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
 
     test "auto uploads files selected in separate changes with #{driver}" do
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/scrolls/auto-multiple")
       |> set_input_files(by_label("Attachment"), fixture_path())
       |> expect("Completed uploads: 1" |> by_text() |> to_be_visible())
@@ -188,7 +188,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       files = [fixture_path(), second_fixture_path()]
 
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/scrolls/multiple")
       |> set_input_files(by_label("Attachment"), files)
       |> expect("Validated: true" |> by_text() |> to_be_visible())
@@ -211,7 +211,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       files = [fixture_path(), second_fixture_path()]
 
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/scrolls/multiple")
       |> set_input_files(by_label("Attachment"), files ++ [fixture_path()])
       |> expect("Upload errors: 1" |> by_text() |> to_be_visible())
@@ -220,7 +220,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
 
     test "accumulates files selected in separate changes with #{driver}" do
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/scrolls/multiple")
       |> set_input_files(by_label("Attachment"), fixture_path())
       |> expect("Pending uploads: 1" |> by_text() |> to_be_visible())
@@ -242,7 +242,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
 
     test "selection change can remove its upload form with #{driver}" do
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/scrolls/remove-on-validate")
       |> set_input_files(by_label("Attachment"), fixture_path())
       |> expect("#upload-form" |> by_css() |> to_have_count(0))
@@ -252,7 +252,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
 
     test "rejects one invalid-extension file with #{driver}" do
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/scrolls")
       |> set_input_files(by_label("Attachment"), invalid_fixture_path())
       |> expect("Upload errors: 1" |> by_text() |> to_be_visible())
@@ -261,7 +261,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
 
     test "valid selection replaces rejected selection with #{driver}" do
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/scrolls")
       |> set_input_files(by_label("Attachment"), invalid_fixture_path())
       |> expect("Upload errors: 1" |> by_text() |> to_be_visible())
@@ -278,7 +278,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
 
     test "rejects one oversized file with #{driver}" do
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/scrolls/oversized")
       |> set_input_files(by_label("Attachment"), fixture_path())
       |> expect("Upload errors: 1" |> by_text() |> to_be_visible())
@@ -287,7 +287,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
 
     test "rejects each oversized file in a multi-entry selection with #{driver}" do
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/scrolls/multiple-oversized")
       |> set_input_files(by_label("Attachment"), [fixture_path(), second_fixture_path()])
       |> expect("Upload errors: 2" |> by_text() |> to_be_visible())
@@ -296,7 +296,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
 
     test "uploads the valid entry after cancelling an invalid sibling with #{driver}" do
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/scrolls/multiple")
       |> set_input_files(by_label("Attachment"), [fixture_path(), invalid_fixture_path()])
       |> expect("Upload errors: 1" |> by_text() |> to_be_visible())
@@ -314,7 +314,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
 
     test "leaves a mixed selection pending when submitted before its invalid entry is cancelled with #{driver}" do
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/scrolls/multiple")
       |> set_input_files(by_label("Attachment"), [fixture_path(), invalid_fixture_path()])
       |> expect("Upload errors: 1" |> by_text() |> to_be_visible())
@@ -325,7 +325,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
 
     test "cancels one selected upload before submit with #{driver}" do
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/scrolls")
       |> set_input_files(by_label("Attachment"), fixture_path())
       |> expect("Pending uploads: 1" |> by_text() |> to_be_visible())
@@ -338,7 +338,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
 
     test "does not upload entries the view cancelled without a phx-value-ref with #{driver}" do
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/scrolls")
       |> set_input_files(by_label("Attachment"), fixture_path())
       |> expect("Pending uploads: 1" |> by_text() |> to_be_visible())
@@ -351,7 +351,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
 
     test "does not upload entries the view cancelled from handle_info with #{driver}" do
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/scrolls")
       |> set_input_files(by_label("Attachment"), fixture_path())
       |> expect("Pending uploads: 1" |> by_text() |> to_be_visible())
@@ -364,7 +364,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
 
     test "a submit whose phx-click removes its upload form uploads nothing with #{driver}" do
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/scrolls")
       |> set_input_files(by_label("Attachment"), fixture_path())
       |> expect("Pending uploads: 1" |> by_text() |> to_be_visible())
@@ -376,7 +376,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
 
     test "clearing the file input does not cancel its pending LiveView entry with #{driver}" do
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/scrolls")
       |> set_input_files(by_label("Attachment"), fixture_path())
       |> expect("Pending uploads: 1" |> by_text() |> to_be_visible())
@@ -393,7 +393,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
 
     test "cancels one of two selected uploads without discarding the other with #{driver}" do
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/scrolls/multiple")
       |> set_input_files(by_label("Attachment"), [fixture_path(), second_fixture_path()])
       |> expect("Pending uploads: 2" |> by_text() |> to_be_visible())
@@ -415,7 +415,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
         file = fixture_path()
 
         unquote(driver)
-        |> start_test_session()
+        |> start_session()
         |> visit("/live/scrolls/#{unquote(mode)}")
         |> set_input_files(by_label("Attachment"), file)
         |> click(by_role(:button, name: input_mutation_label(unquote(mode))))
@@ -429,7 +429,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
   test "releases the Live upload client when selection change removes its form" do
     session =
       :phoenix
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/scrolls/remove-on-validate")
       |> set_input_files(by_label("Attachment"), fixture_path())
 
@@ -440,7 +440,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
   test "releases the rejected Live upload client before replacing its selection" do
     session =
       :phoenix
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/scrolls")
       |> set_input_files(by_label("Attachment"), invalid_fixture_path())
 
@@ -456,7 +456,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
   test "starts no Live upload client for a selection the input rejects" do
     session =
       :phoenix
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/scrolls")
 
     error =
@@ -476,7 +476,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
   test "releases a managed upload client after a successful Phoenix submit" do
     session =
       :phoenix
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/scrolls")
       |> set_input_files(by_label("Attachment"), fixture_path())
 
@@ -498,7 +498,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
   test "releases a managed upload client before following a Phoenix redirect" do
     session =
       :phoenix
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/scrolls/redirect")
       |> set_input_files(by_label("Attachment"), fixture_path())
 
@@ -514,7 +514,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
   test "releases a managed upload client after Phoenix cancels its entry" do
     session =
       :phoenix
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/scrolls")
       |> set_input_files(by_label("Attachment"), fixture_path())
 
@@ -533,7 +533,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
   test "keeps the managed upload client for an uncancelled Phoenix entry" do
     session =
       :phoenix
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/scrolls/multiple")
       |> set_input_files(by_label("Attachment"), [fixture_path(), second_fixture_path()])
 
@@ -558,7 +558,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
   test "releases every Phoenix upload client accumulated through separate selections" do
     session =
       :phoenix
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/scrolls/multiple")
       |> set_input_files(by_label("Attachment"), fixture_path())
       |> set_input_files(by_label("Attachment"), second_fixture_path())
@@ -579,7 +579,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
   test "releases a managed upload client when Phoenix navigation replaces the document" do
     session =
       :phoenix
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/scrolls")
       |> set_input_files(by_label("Attachment"), fixture_path())
 
@@ -594,7 +594,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
   test "closing the session releases a managed upload client after an assertion failure" do
     session =
       :phoenix
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/scrolls")
       |> set_input_files(by_label("Attachment"), fixture_path())
 
@@ -612,13 +612,6 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
     after
       Process.flag(:trap_exit, trap_exits?)
     end
-  end
-
-  defp start_test_session(driver) do
-    start_session(driver,
-      base_url: Server.base_url(),
-      endpoint: Fluffy.Support.Web.Endpoint
-    )
   end
 
   defp fixture_path do

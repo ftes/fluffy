@@ -22,11 +22,11 @@ defmodule Fluffy.Conformance.TemplateContentTest do
   <button>Go<template> away</template></button>
   """
 
-  for driver <- [:static, :playwright] do
+  for driver <- Drivers.html() do
     @tag driver: driver
     test "ignores template content with #{driver}" do
       unquote(driver)
-      |> session_for_html(@html, base_url: Fluffy.Support.Server.base_url())
+      |> session_for_html(@html)
       |> expect("Shown" |> by_text(exact: true) |> to_have_count(1))
       |> expect("Outer" |> by_text(exact: true) |> to_have_count(1))
       |> expect("Inner" |> by_text() |> to_have_count(0))

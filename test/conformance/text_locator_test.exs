@@ -21,11 +21,11 @@ defmodule Fluffy.Conformance.TextLocatorTest do
   ]
 
   for {case_name, html, text, options, expected} <- cases,
-      driver <- [:static, :playwright] do
+      driver <- Drivers.html() do
     @tag driver: driver
     test "#{case_name} with #{driver}" do
       session =
-        session_for_html(unquote(driver), unquote(html), base_url: Fluffy.Support.Server.base_url())
+        session_for_html(unquote(driver), unquote(html))
 
       expect(session, unquote(text) |> by_text(unquote(options)) |> to_have_count(unquote(expected)))
     end

@@ -1,7 +1,6 @@
 defmodule Fluffy.Conformance.AccessibilityExpectationTest do
   use Fluffy.Support.Case, async: true
 
-  import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
 
@@ -9,7 +8,7 @@ defmodule Fluffy.Conformance.AccessibilityExpectationTest do
   # its port of getAriaRole, getElementAccessibleName and
   # getElementAccessibleDescription (roleUtils.ts). The cases follow upstream's
   # expect-to-have-accessible.spec.ts.
-  for driver <- [:static, :playwright] do
+  for driver <- Drivers.html() do
     @tag driver: driver
     test "to_have_role reads explicit and implicit roles with #{driver}" do
       html = """
@@ -87,10 +86,5 @@ defmodule Fluffy.Conformance.AccessibilityExpectationTest do
         |> expect("invalid" |> by_test_id() |> to_have_accessible_description(""))
       end)
     end
-  end
-
-  defp with_html(driver, html, fun) do
-    session = session_for_html(driver, html, base_url: Fluffy.Support.Server.base_url())
-    fun.(session)
   end
 end

@@ -132,8 +132,7 @@ defmodule Fluffy.Conformance.DialogEventTest do
       <button onclick="result.textContent = confirm('Proceed?') ? 'accepted' : 'dismissed'">Confirm</button>
       <button onclick="result.textContent = prompt('Your name?', 'Anonymous')">Prompt</button>
       <p id="result"></p>
-      """,
-      base_url: Fluffy.Support.Server.base_url()
+      """
     )
   end
 end

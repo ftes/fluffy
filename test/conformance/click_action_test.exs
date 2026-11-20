@@ -5,16 +5,13 @@ defmodule Fluffy.Conformance.ClickActionTest do
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.Support.Server
-  alias Fluffy.Support.Web.Endpoint
-
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "click with timeout: 0 makes one attempt on Phoenix and is rejected on Playwright with #{driver}",
          %{driver: driver} do
       session =
         driver
-        |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+        |> start_session()
         |> visit("/live/three-heads")
 
       flute = by_role(:button, name: "Play the flute")
@@ -33,7 +30,7 @@ defmodule Fluffy.Conformance.ClickActionTest do
     end
   end
 
-  for driver <- [:static, :playwright] do
+  for driver <- Drivers.html() do
     @tag driver: driver
     test "click toggles a checkbox property with #{driver}" do
       checkbox = by_role(:checkbox, name: "Updates")
@@ -238,24 +235,16 @@ defmodule Fluffy.Conformance.ClickActionTest do
     |> expect(:button |> by_role(name: "Confirm", exact: true) |> to_have_count(1))
   end
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "clicking a link hands navigation to the #{driver} backend" do
       session =
-        start_session(unquote(driver),
-          base_url: Server.base_url(),
-          endpoint: Endpoint
-        )
+        start_session(unquote(driver))
 
       session
       |> visit("/actions/click")
       |> click(by_role(:link, name: "Enter the chamber"))
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
     end
-  end
-
-  defp with_html(driver, html, fun) do
-    session = session_for_html(driver, html, base_url: Server.base_url())
-    fun.(session)
   end
 end

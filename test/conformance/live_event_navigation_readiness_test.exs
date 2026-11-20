@@ -7,7 +7,7 @@ defmodule Fluffy.Conformance.LiveEventNavigationReadinessTest do
 
   alias Fluffy.Expect
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "waits for a LiveView event navigation before returning with #{driver}", %{
       driver: driver
@@ -15,7 +15,7 @@ defmodule Fluffy.Conformance.LiveEventNavigationReadinessTest do
       topic = "event-ready-#{System.unique_integer([:positive])}"
       message = "connected"
 
-      session = start_test_session(driver)
+      session = start_session(driver)
 
       session =
         session
@@ -33,18 +33,11 @@ defmodule Fluffy.Conformance.LiveEventNavigationReadinessTest do
       driver: driver
     } do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/chamber-map")
       |> click(by_role(:link, name: "Reveal passage", exact: true))
       |> expect(Expect.page_to_have_url("/live/chamber-map?step=patched"))
       |> expect("Map position: patched" |> by_text(exact: true) |> Expect.to_be_visible())
     end
-  end
-
-  defp start_test_session(driver) do
-    start_session(driver,
-      base_url: Fluffy.Support.Server.base_url(),
-      endpoint: Fluffy.Support.Web.Endpoint
-    )
   end
 end

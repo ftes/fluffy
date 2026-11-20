@@ -7,14 +7,14 @@ defmodule Fluffy.Conformance.LiveFileInputTest do
 
   alias Fluffy.Support.HTTPFixtures
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "submits one selected file through an ordinary Live form navigation with #{driver}" do
       fixture = HTTPFixtures.register(%{body: html("<h1>Uploaded from Live</h1>")})
       file = fixture_path()
       action = HTTPFixtures.path(fixture, "/submit")
 
-      session = start_test_session(unquote(driver))
+      session = start_session(unquote(driver))
 
       session
       |> visit("/live/file-navigation?action=#{URI.encode_www_form(action)}")
@@ -36,7 +36,7 @@ defmodule Fluffy.Conformance.LiveFileInputTest do
       action = HTTPFixtures.path(fixture, "/submit")
 
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/file-navigation?action=#{URI.encode_www_form(action)}&multiple=true")
       |> set_input_files(by_label("Attachment"), files)
       |> click(by_role(:button, name: "Save"))
@@ -57,7 +57,7 @@ defmodule Fluffy.Conformance.LiveFileInputTest do
       action = HTTPFixtures.path(fixture, "/submit")
 
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/file-navigation?action=#{URI.encode_www_form(action)}")
       |> set_input_files(by_label("Attachment"), fixture_path())
       |> set_input_files(by_label("Attachment"), [])
@@ -71,7 +71,7 @@ defmodule Fluffy.Conformance.LiveFileInputTest do
   end
 
   test "retains the explicit LiveView-managed upload boundary" do
-    session = :phoenix |> start_test_session() |> visit("/live/file-navigation?live_managed=true")
+    session = :phoenix |> start_session() |> visit("/live/file-navigation?live_managed=true")
 
     error =
       assert_raise Fluffy.CapabilityError, fn ->
@@ -80,13 +80,6 @@ defmodule Fluffy.Conformance.LiveFileInputTest do
 
     assert error.capability == :file_uploads
     assert error.driver == :live
-  end
-
-  defp start_test_session(driver) do
-    start_session(driver,
-      base_url: Fluffy.Support.Server.base_url(),
-      endpoint: Fluffy.Support.Web.Endpoint
-    )
   end
 
   defp fixture_path do

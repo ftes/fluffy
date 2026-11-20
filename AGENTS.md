@@ -43,8 +43,9 @@ changes get no entry.
 - `mix setup` installs deps, builds test assets and installs Chromium. Tests need PostgreSQL
   (`FLUFFY_DB_*` overrides the defaults in `config/test.exs`); `FLUFFY_BROWSER` picks
   firefox or webkit.
-- Tests in `test/conformance/` run the same behavior against several drivers. The matrix in
-  `docs/capabilities.md` is rendered from `Fluffy.Capability`, and a test keeps them in sync.
+- Tests in `test/conformance/` run the same behavior against several drivers, listed by the
+  sets in `Fluffy.Support.Drivers`. The matrix in `docs/capabilities.md` is rendered from
+  `Fluffy.Capability`, and a test keeps them in sync.
 - Docs, doc examples and test fixtures follow the Fluffy / Harry Potter theme; keep new examples on theme.
 - `.agents/skills` (linked from `.claude/skills`) is generated: after updating deps run
   `mix usage_rules.sync --yes`; `mix check` fails when it's stale. On Renovate's PRs a workflow

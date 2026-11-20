@@ -8,8 +8,6 @@ defmodule Fluffy.Conformance.NativeOptionsTest do
   alias Fluffy.Options
   alias Fluffy.Playwright.Keyboard
   alias Fluffy.Playwright.Mouse
-  alias Fluffy.Support.Server
-  alias Fluffy.Support.Web.Endpoint
 
   @button ~s(<button onclick="this.textContent = event.shiftKey ? 'shift' : 'plain'">Cast</button>)
   @states ~s(<button disabled>Locked</button><input aria-label="Sealed" readonly><p hidden>Secret</p>)
@@ -44,11 +42,11 @@ defmodule Fluffy.Conformance.NativeOptionsTest do
     end
   end
 
-  for driver <- [:static, :playwright] do
+  for driver <- Drivers.html() do
     @tag driver: driver
     test "state flags and ignore_case mirror Playwright with #{driver}" do
       unquote(driver)
-      |> session_for_html(@states, base_url: Server.base_url())
+      |> session_for_html(@states)
       |> expect(to_be_enabled(by_role(:button, name: "Locked"), enabled: false))
       |> expect(to_be_editable(by_label("Sealed"), editable: false))
       |> expect(to_be_visible(by_text("Secret"), visible: false))
@@ -62,7 +60,7 @@ defmodule Fluffy.Conformance.NativeOptionsTest do
     end
   end
 
-  for driver <- [:static, :live, :playwright] do
+  for driver <- Drivers.all() do
     @tag driver: driver
     test "ignore_case: hands a predicate the URL in lower case with #{driver}" do
       path = if unquote(driver) == :live, do: "/live/nested", else: "/stage"
@@ -95,14 +93,14 @@ defmodule Fluffy.Conformance.NativeOptionsTest do
     pad_locator = by_css("#pad")
 
     :playwright
-    |> session_for_html(pad, base_url: Server.base_url())
+    |> session_for_html(pad)
     |> click(pad_locator)
     |> expect(to_have_text(pad_locator, "40,20"))
     |> click(pad_locator, position: %{x: 5, y: 7})
     |> expect(to_have_text(pad_locator, "5,7"))
   end
 
-  for driver <- [:static, :live] do
+  for driver <- Drivers.phoenix() do
     @tag driver: driver
     test "Playwright-only options raise a capability error with #{driver}" do
       with_session(unquote(driver), fn session ->
@@ -177,17 +175,16 @@ defmodule Fluffy.Conformance.NativeOptionsTest do
   defp locator_schema(locator) when locator in [:by_css, :by_test_id], do: NimbleOptions.new!([])
   defp locator_schema(_text_locator), do: Options.exact_locator_schema()
 
-  defp visited_session(driver, path) when driver in [:static, :live],
-    do: :phoenix |> start_session(endpoint: Endpoint) |> visit(path)
+  defp visited_session(driver, path) when driver in [:static, :live], do: :phoenix |> start_session() |> visit(path)
 
-  defp visited_session(:playwright, path), do: :playwright |> start_session(base_url: Server.base_url()) |> visit(path)
+  defp visited_session(:playwright, path), do: :playwright |> start_session() |> visit(path)
 
   # Options are validated before the target is resolved.
   defp with_session(:live, fun) do
-    :phoenix |> start_session(endpoint: Endpoint) |> visit("/live/nested") |> fun.()
+    :phoenix |> start_session() |> visit("/live/nested") |> fun.()
   end
 
   defp with_session(driver, fun) do
-    fun.(session_for_html(driver, @button, base_url: Server.base_url()))
+    fun.(session_for_html(driver, @button))
   end
 end

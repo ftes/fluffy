@@ -5,8 +5,6 @@ defmodule Fluffy.Conformance.PlaywrightLocatorOptionsTest do
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.Support.Web.Endpoint
-
   @states """
   <button aria-pressed="true">Bold</button>
   <button aria-pressed="false">Italic</button>
@@ -30,7 +28,7 @@ defmodule Fluffy.Conformance.PlaywrightLocatorOptionsTest do
   @tag driver: :playwright
   test "role states compile into the Playwright role selector" do
     :playwright
-    |> session_for_html(@states, base_url: Fluffy.Support.Server.base_url())
+    |> session_for_html(@states)
     |> expect(to_have_count(by_role(:button, pressed: true), 1))
     |> expect(to_have_count(by_role(:button, name: "Bold", pressed: false), 0))
     |> expect(to_have_count(by_role(:button, name: "Locked", disabled: true), 1))
@@ -63,7 +61,7 @@ defmodule Fluffy.Conformance.PlaywrightLocatorOptionsTest do
              "#Fluffy.Locator<by_role(:button, name: #Playwright.RegExp</x/>, pressed: true)>"
   end
 
-  for driver <- [:static, :live] do
+  for driver <- Drivers.phoenix() do
     @tag driver: driver
     test "Playwright-only locator options raise a capability error when resolved with #{driver}" do
       session = session(unquote(driver))
@@ -84,5 +82,5 @@ defmodule Fluffy.Conformance.PlaywrightLocatorOptionsTest do
   end
 
   defp session(:static), do: session_for_html(:static, @text)
-  defp session(:live), do: :phoenix |> start_session(endpoint: Endpoint) |> visit("/live/nested")
+  defp session(:live), do: :phoenix |> start_session() |> visit("/live/nested")
 end

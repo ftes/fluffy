@@ -9,7 +9,7 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
   alias Fluffy.Event
   alias Fluffy.Support.HTTPFixtures
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "submits Phoenix.HTML's POST method override from a descendant click with #{driver}", %{
       driver: driver
@@ -28,7 +28,7 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
         ])
 
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/links/start"))
       |> click(by_text("Delete potion", exact: true))
       |> expect(:heading |> by_role(name: "Deleted", exact: true) |> to_be_visible())
@@ -61,7 +61,7 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
         ])
 
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/links/start"))
       |> click(by_css("#nested-action-target"))
       |> expect(:heading |> by_role(name: "Inner action", exact: true) |> to_be_visible())
@@ -86,7 +86,7 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
         ])
 
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/links/start"))
       |> click(by_text("Search", exact: true))
       |> expect(:heading |> by_role(name: "Results", exact: true) |> to_be_visible())
@@ -112,7 +112,7 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
         ])
 
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/links/start"))
       |> click(by_text("Update", exact: true))
       |> expect(:heading |> by_role(name: "Updated", exact: true) |> to_be_visible())
@@ -139,7 +139,7 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
         end)
 
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/links/start"))
       |> click(by_text("Delete", exact: true))
       |> expect(:heading |> by_role(name: "Redirect complete", exact: true) |> to_be_visible())
@@ -164,7 +164,7 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
     opener_url = HTTPFixtures.url(fixture, "/links/start")
 
     :playwright
-    |> start_test_session()
+    |> start_session()
     |> visit(HTTPFixtures.path(fixture, "/links/start"))
     |> then(fn session ->
       pending = wait_for(session, Event.popup())
@@ -178,7 +178,7 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
     assert submission.method == "POST"
   end
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "submits the plain-link Phoenix.HTML action from a LiveView with #{driver}", %{
       driver: driver
@@ -187,7 +187,7 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
       action = HTTPFixtures.path(fixture, "/live-delete")
 
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/phoenix-html-link?action=#{URI.encode_www_form(action)}")
       |> click(by_text("Delete from LiveView", exact: true))
       |> expect(:heading |> by_role(name: "Deleted from LiveView", exact: true) |> to_be_visible())
@@ -208,7 +208,7 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
       action = HTTPFixtures.path(fixture, "/live-delete")
 
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/phoenix-html-link?action=#{URI.encode_www_form(action)}")
       |> click(by_text("Release owl", exact: true))
       |> expect(:heading |> by_role(name: "Owl released", exact: true) |> to_be_visible())
@@ -223,7 +223,7 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
 
     session =
       :phoenix
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/phoenix-html-link?action=#{URI.encode_www_form(action)}&competing_action=true")
 
     error =
@@ -251,7 +251,7 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
       ])
 
     :playwright
-    |> start_test_session()
+    |> start_session()
     |> visit(HTTPFixtures.path(fixture, "/links/start"))
     |> once(Event.dialog(), fn dialog ->
       assert Playwright.Dialog.message(dialog) == "Delete?\nThis cannot be undone."
@@ -282,7 +282,7 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
     source_url = HTTPFixtures.url(fixture, "/links/start")
 
     :playwright
-    |> start_test_session()
+    |> start_session()
     |> visit(HTTPFixtures.path(fixture, "/links/start"))
     |> once(Event.dialog(), &Playwright.Dialog.dismiss!/1)
     |> expect_event(Event.dialog(), &click(&1, by_text("Delete with confirmation", exact: true)))
@@ -307,7 +307,7 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
       ])
 
     :phoenix
-    |> start_test_session()
+    |> start_session()
     |> visit(HTTPFixtures.path(fixture, "/links/start"))
     |> click(by_text("Delete without a browser", exact: true))
     |> expect(:heading |> by_role(name: "Deleted structurally", exact: true) |> to_be_visible())
@@ -324,7 +324,7 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
       ])
 
     :phoenix
-    |> start_test_session()
+    |> start_session()
     |> visit(HTTPFixtures.path(fixture, "/links/start"))
     |> click(by_role(:link, name: "Next", exact: true))
     |> expect(:heading |> by_role(name: "Next", exact: true) |> to_be_visible())
@@ -332,13 +332,6 @@ defmodule Fluffy.Conformance.PhoenixHTMLLinkActionTest do
     [_source, navigation] = HTTPFixtures.requests(fixture)
     assert navigation.method == "GET"
     assert navigation.path == "/links/next"
-  end
-
-  defp start_test_session(driver) do
-    start_session(driver,
-      base_url: Fluffy.Support.Server.base_url(),
-      endpoint: Fluffy.Support.Web.Endpoint
-    )
   end
 
   defp html(body) do

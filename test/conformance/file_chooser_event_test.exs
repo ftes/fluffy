@@ -177,8 +177,7 @@ defmodule Fluffy.Conformance.FileChooserEventTest do
       """
       <input id="attachment" type="file"#{multiple} hidden>
       <button onclick="document.querySelector('#attachment').click()">Choose attachment</button>
-      """,
-      base_url: Fluffy.Support.Server.base_url()
+      """
     )
   end
 end

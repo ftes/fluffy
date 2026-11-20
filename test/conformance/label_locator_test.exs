@@ -5,8 +5,6 @@ defmodule Fluffy.Conformance.LabelLocatorTest do
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.Support.Server
-
   cases = [
     {"an explicit for/id label", ~s(<label for="email">Email address</label><input id="email">), "Email address", [], 1},
     {"a wrapping label", "<label>Display name <input></label>", "Display name", [], 1},
@@ -60,17 +58,17 @@ defmodule Fluffy.Conformance.LabelLocatorTest do
   ]
 
   for {case_name, html, label, options, expected} <- cases,
-      driver <- [:static, :playwright] do
+      driver <- Drivers.html() do
     @tag driver: driver
     test "finds a control from #{case_name} with #{driver}" do
       session =
-        session_for_html(unquote(driver), unquote(html), base_url: Server.base_url())
+        session_for_html(unquote(driver), unquote(html))
 
       expect(session, unquote(label) |> by_label(unquote(options)) |> to_have_count(unquote(expected)))
     end
   end
 
-  for driver <- [:static, :playwright] do
+  for driver <- Drivers.html() do
     @tag driver: driver
     test "uses accessible-name precedence for labelled controls with #{driver}" do
       html = """
@@ -80,7 +78,7 @@ defmodule Fluffy.Conformance.LabelLocatorTest do
       """
 
       session =
-        session_for_html(unquote(driver), html, base_url: Server.base_url())
+        session_for_html(unquote(driver), html)
 
       session
       |> expect("ARIA Labelled Search" |> by_label(exact: true) |> to_have_count(1))
@@ -97,7 +95,7 @@ defmodule Fluffy.Conformance.LabelLocatorTest do
       """
 
       session =
-        session_for_html(unquote(driver), html, base_url: Server.base_url())
+        session_for_html(unquote(driver), html)
 
       session
       |> expect("Vault" |> by_label(exact: true) |> to_have_count(1))

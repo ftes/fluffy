@@ -5,13 +5,13 @@ defmodule Fluffy.Conformance.LiveDocumentTest do
   import Fluffy.Expect
   import Fluffy.Locator
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "locates root layout content around a LiveView with #{driver}", %{driver: driver} do
       nav = by_role(:navigation, name: "Kennel")
 
       driver
-      |> kennel_session()
+      |> start_session()
       |> visit("/live/kennel")
       |> expect(to_be_visible(nav))
       |> expect(nav |> by_role(:link) |> to_have_count(3))
@@ -22,7 +22,7 @@ defmodule Fluffy.Conformance.LiveDocumentTest do
     @tag driver: driver
     test "applies LiveView title updates through live_title with #{driver}", %{driver: driver} do
       driver
-      |> kennel_session()
+      |> start_session()
       |> visit("/live/kennel")
       |> expect(page_to_have_title("Kennel · Fluffy's kennel"))
       |> click(by_role(:button, name: "Rename kennel"))
@@ -32,7 +32,7 @@ defmodule Fluffy.Conformance.LiveDocumentTest do
     @tag driver: driver
     test "dispatches root layout bindings to the main LiveView with #{driver}", %{driver: driver} do
       driver
-      |> kennel_session()
+      |> start_session()
       |> visit("/live/kennel")
       |> click(by_role(:button, name: "Bark"))
       |> expect("Barks: loud" |> by_text() |> to_be_visible())
@@ -44,7 +44,7 @@ defmodule Fluffy.Conformance.LiveDocumentTest do
     @tag driver: driver
     test "follows root layout links with #{driver}", %{driver: driver} do
       driver
-      |> kennel_session()
+      |> start_session()
       |> visit("/live/kennel")
       |> click(by_role(:link, name: "Garden"))
       |> expect(page_to_have_url("/live/kennel?yard=garden"))
@@ -62,7 +62,7 @@ defmodule Fluffy.Conformance.LiveDocumentTest do
       dialog = by_role(:dialog, name: "Treats")
 
       driver
-      |> kennel_session()
+      |> start_session()
       |> visit("/live/kennel")
       |> expect(to_be_visible(dialog))
       |> expect("#portal-root > [data-phx-teleported-src=treat-portal] > #treat-dialog" |> by_css() |> to_have_count(1))
@@ -76,7 +76,7 @@ defmodule Fluffy.Conformance.LiveDocumentTest do
     @tag driver: driver
     test "matches portal content only where it is teleported with #{driver}", %{driver: driver} do
       driver
-      |> kennel_session()
+      |> start_session()
       |> visit("/live/kennel")
       |> expect("Treats: 0" |> by_text() |> to_have_count(1))
       |> expect("Bones: 0" |> by_text() |> to_have_count(1))
@@ -92,7 +92,7 @@ defmodule Fluffy.Conformance.LiveDocumentTest do
       key = by_label(dialog, "Treat key")
 
       driver
-      |> kennel_session()
+      |> start_session()
       |> visit("/live/kennel")
       |> press(key, "Enter")
       |> expect(dialog |> by_text("Treat keys: keydown:Enter=x, keyup:Enter=x") |> to_be_visible())
@@ -102,13 +102,13 @@ defmodule Fluffy.Conformance.LiveDocumentTest do
     end
   end
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "teleports a portal nested in portal content with #{driver}", %{driver: driver} do
       status = by_role(:status, name: "Bones")
 
       driver
-      |> kennel_session()
+      |> start_session()
       |> visit("/live/kennel")
       |> expect(to_be_visible(status))
       |> expect("body > [data-phx-teleported-src=bone-portal] > #bone-status" |> by_css() |> to_have_count(1))
@@ -121,7 +121,7 @@ defmodule Fluffy.Conformance.LiveDocumentTest do
   # bindings would hear the key in the browser.
   @tag driver: :phoenix
   test "a key press on portal content without keyboard bindings raises with phoenix" do
-    session = :phoenix |> kennel_session() |> visit("/live/kennel")
+    session = :phoenix |> start_session() |> visit("/live/kennel")
 
     assert_raise ArgumentError, ~r/does not have phx-keydown or phx-window-keydown/, fn ->
       press(session, by_label(by_role(:dialog, name: "Treats"), "Treat name"), "Enter")
@@ -131,7 +131,7 @@ defmodule Fluffy.Conformance.LiveDocumentTest do
   @tag driver: :playwright
   test "interacts with a LiveView rendered in the root layout with playwright" do
     :playwright
-    |> kennel_session()
+    |> start_session()
     |> visit("/live/kennel")
     |> click(by_role(:button, name: "Nap"))
     |> expect("Naps: 1" |> by_text() |> to_be_visible())
@@ -141,18 +141,11 @@ defmodule Fluffy.Conformance.LiveDocumentTest do
   test "reads but does not connect a LiveView rendered in the root layout with phoenix" do
     session =
       :phoenix
-      |> kennel_session()
+      |> start_session()
       |> visit("/live/kennel")
       |> expect("Naps: 0" |> by_text() |> to_be_visible())
 
     error = assert_raise Fluffy.CapabilityError, fn -> click(session, by_role(:button, name: "Nap")) end
     assert error.capability == :live_document
-  end
-
-  defp kennel_session(driver) do
-    start_session(driver,
-      base_url: Fluffy.Support.Server.base_url(),
-      endpoint: Fluffy.Support.Web.Endpoint
-    )
   end
 end

@@ -8,8 +8,6 @@ defmodule Fluffy.Conformance.ClientNavigationReadinessTest do
 
   alias Fluffy.Expect
   alias Fluffy.Support.HTTPFixtures
-  alias Fluffy.Support.Server
-  alias Fluffy.Support.Web.Endpoint
 
   for {operation, button} <- [assign: "Assign ready", replace: "Replace ready"] do
     @tag driver: :playwright
@@ -20,10 +18,7 @@ defmodule Fluffy.Conformance.ClientNavigationReadinessTest do
 
       session =
         :playwright
-        |> start_session(
-          base_url: Server.base_url(),
-          endpoint: Endpoint
-        )
+        |> start_session()
         |> visit("/actions/client-navigation?topic=#{topic}")
         |> click(by_role(:button, name: unquote(button)))
         |> expect(Expect.page_to_have_url(destination))
@@ -37,10 +32,7 @@ defmodule Fluffy.Conformance.ClientNavigationReadinessTest do
   @tag driver: :playwright
   test "adopts a document-level client-side history traversal" do
     :playwright
-    |> start_session(
-      base_url: Server.base_url(),
-      endpoint: Endpoint
-    )
+    |> start_session()
     |> visit("/actions/history-source")
     |> click(by_role(:button, name: "Open secret passage"))
     |> expect(Expect.page_to_have_url("/actions/history-target"))
@@ -52,10 +44,7 @@ defmodule Fluffy.Conformance.ClientNavigationReadinessTest do
   @tag driver: :playwright
   test "keeps a client-side history state change out of document adoption" do
     :playwright
-    |> start_session(
-      base_url: Server.base_url(),
-      endpoint: Endpoint
-    )
+    |> start_session()
     |> visit("/actions/history-push-state")
     |> click(by_role(:button, name: "Reveal secret passage"))
     |> expect(Expect.page_to_have_url("/actions/history-push-state?step=pushed"))
@@ -73,7 +62,7 @@ defmodule Fluffy.Conformance.ClientNavigationReadinessTest do
 
     session =
       :playwright
-      |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture))
 
     first = current_page(session)
@@ -103,7 +92,7 @@ defmodule Fluffy.Conformance.ClientNavigationReadinessTest do
       end)
 
     :playwright
-    |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+    |> start_session()
     |> visit(HTTPFixtures.path(fixture, "/start"))
     |> click(by_role(:button, name: "Enter"))
     |> expect(Expect.page_to_have_url(HTTPFixtures.path(fixture, "/arrived")))
@@ -116,7 +105,7 @@ defmodule Fluffy.Conformance.ClientNavigationReadinessTest do
 
     session =
       :playwright
-      |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture))
       |> click(by_role(:link, name: "Blank"))
 

@@ -7,7 +7,7 @@ defmodule Fluffy.Conformance.ReloadTest do
 
   alias Fluffy.Support.HTTPFixtures
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "reloads the current document and preserves the URL with #{driver}", %{
       driver: driver
@@ -18,7 +18,7 @@ defmodule Fluffy.Conformance.ReloadTest do
           %{body: html("<h1>Second render</h1>")}
         ])
 
-      session = start_test_session(driver)
+      session = start_session(driver)
 
       session
       |> visit(HTTPFixtures.path(fixture))
@@ -31,7 +31,7 @@ defmodule Fluffy.Conformance.ReloadTest do
     end
   end
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "reload with timeout: 0 reloads on Phoenix and is rejected on Playwright with #{driver}", %{driver: driver} do
       fixture =
@@ -40,7 +40,7 @@ defmodule Fluffy.Conformance.ReloadTest do
           %{body: html("<h1>Second render</h1>")}
         ])
 
-      session = driver |> start_test_session() |> visit(HTTPFixtures.path(fixture))
+      session = driver |> start_session() |> visit(HTTPFixtures.path(fixture))
 
       if driver == :phoenix do
         session
@@ -68,7 +68,7 @@ defmodule Fluffy.Conformance.ReloadTest do
         %{body: html("<h1>Second render</h1>")}
       ])
 
-    session = :playwright |> start_test_session() |> visit(HTTPFixtures.path(fixture))
+    session = :playwright |> start_session() |> visit(HTTPFixtures.path(fixture))
 
     session
     |> reload(wait_until: :commit)
@@ -101,7 +101,7 @@ defmodule Fluffy.Conformance.ReloadTest do
         }
       ])
 
-    session = :playwright |> start_test_session() |> visit(HTTPFixtures.path(fixture))
+    session = :playwright |> start_session() |> visit(HTTPFixtures.path(fixture))
 
     try do
       error = assert_raise Fluffy.OperationError, ~r/reload/, fn -> reload(session, timeout: 500) end
@@ -122,7 +122,7 @@ defmodule Fluffy.Conformance.ReloadTest do
 
     session =
       :playwright
-      |> start_test_session()
+      |> start_session()
       |> visit("/embedded-ready?topic=#{topic}&delay=1000")
       |> reload(wait_until: :commit, timeout: 500)
 
@@ -133,7 +133,7 @@ defmodule Fluffy.Conformance.ReloadTest do
   @tag driver: :phoenix
   test "Phoenix reload raises a capability error for wait_until:" do
     fixture = HTTPFixtures.register_sequence([%{body: html("<h1>First render</h1>")}])
-    session = :phoenix |> start_test_session() |> visit(HTTPFixtures.path(fixture))
+    session = :phoenix |> start_session() |> visit(HTTPFixtures.path(fixture))
 
     error =
       assert_raise Fluffy.CapabilityError, ~r/:wait_until is a Playwright option/, fn ->
@@ -142,13 +142,6 @@ defmodule Fluffy.Conformance.ReloadTest do
 
     assert error.capability == :playwright_action_options
     assert length(HTTPFixtures.requests(fixture)) == 1
-  end
-
-  defp start_test_session(driver) do
-    start_session(driver,
-      base_url: Fluffy.Support.Server.base_url(),
-      endpoint: Fluffy.Support.Web.Endpoint
-    )
   end
 
   defp html(body), do: "<!doctype html><html><body>#{body}</body></html>"

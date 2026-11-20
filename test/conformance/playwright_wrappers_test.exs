@@ -476,9 +476,7 @@ defmodule Fluffy.Conformance.PlaywrightWrappersTest do
     end
   end
 
-  defp with_html(driver, html, fun), do: fun.(session_for_html(driver, html))
-
-  for driver <- [:static, :live] do
+  for driver <- Drivers.phoenix() do
     @tag driver: driver
     test "to_be_in_viewport requires a browser with #{driver}" do
       session =

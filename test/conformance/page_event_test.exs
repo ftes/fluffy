@@ -9,7 +9,6 @@ defmodule Fluffy.Conformance.PageEventTest do
   alias Fluffy.Event
   alias Fluffy.Page
   alias Fluffy.Support.HTTPFixtures
-  alias Fluffy.Support.Server
 
   @tag driver: :playwright
   test "page/2 turns a Playwright page of the session into its handle, and rejects another context's" do
@@ -182,7 +181,7 @@ defmodule Fluffy.Conformance.PageEventTest do
     |> expect(:heading |> by_role(name: "Details") |> to_be_visible())
   end
 
-  for driver <- [:static, :live] do
+  for driver <- Drivers.phoenix() do
     test "#{driver} rejects page events before invoking an action" do
       session =
         case unquote(driver) do
@@ -248,7 +247,7 @@ defmodule Fluffy.Conformance.PageEventTest do
 
     session =
       :playwright
-      |> start_session(base_url: Server.base_url())
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/start"))
 
     pending = wait_for(session, Event.popup())
@@ -322,7 +321,7 @@ defmodule Fluffy.Conformance.PageEventTest do
 
     session =
       :playwright
-      |> start_session(base_url: Server.base_url())
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/start"))
 
     {session, fixture}

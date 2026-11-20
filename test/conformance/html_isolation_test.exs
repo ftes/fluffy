@@ -5,13 +5,13 @@ defmodule Fluffy.Conformance.HTMLIsolationTest do
   import Fluffy.Expect
   import Fluffy.Locator
 
-  for driver <- [:static, :playwright] do
+  for driver <- Drivers.html() do
     @tag driver: driver
     test "isolates parallel injected documents with #{driver}", %{driver: driver} do
       # Sessions start in the test process, which owns them; the documents run in parallel.
       [{"Alpha", "Beta"}, {"Beta", "Alpha"}]
       |> Enum.map(fn {present, absent} ->
-        session = session_for_html(driver, "<button>#{present}</button>", base_url: Fluffy.Support.Server.base_url())
+        session = session_for_html(driver, "<button>#{present}</button>")
 
         Task.async(fn ->
           session

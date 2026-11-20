@@ -7,12 +7,12 @@ defmodule Fluffy.Conformance.LiveActionTest do
 
   alias Fluffy.Support.Server
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "resolves a composed locator before dispatching a Live event with #{driver}", %{
       driver: driver
     } do
-      session = live_session(driver)
+      session = start_session(driver)
 
       parent_button =
         "section[data-zone='primary']"
@@ -27,7 +27,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
 
     @tag driver: driver
     test "routes a component-targeted event with #{driver}", %{driver: driver} do
-      session = live_session(driver)
+      session = start_session(driver)
 
       session
       |> visit("/live/fluffy")
@@ -43,7 +43,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
       child_email = by_label(child, "Child email", exact: true)
       save_child = by_role(child, :button, name: "Save child", exact: true)
 
-      session = live_session(driver)
+      session = start_session(driver)
 
       session
       |> visit("/live/nested")
@@ -59,7 +59,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
       child = by_css("#nested-child")
 
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/nested")
       |> click(by_role(child, :button, name: "Increment child", exact: true))
       |> expect(child |> by_text("Child count: 1", exact: true) |> to_be_visible())
@@ -71,7 +71,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
       child = by_css("#nested-child")
 
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/nested")
       |> click(by_label(child, "Shift child", exact: true))
       |> expect("Child shifted" |> by_text(exact: true) |> to_be_visible())
@@ -85,7 +85,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
       child = by_css("#nested-child")
 
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/nested")
       |> click(by_role(child, :button, name: "Schedule child action", exact: true))
       |> click(by_role(child, :button, name: "Delayed child action", exact: true))
@@ -98,7 +98,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
       child = by_css("#nested-child")
 
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/nested")
       |> click(by_role(child, :button, name: "Navigate from child", exact: true))
       |> expect("The secret chamber is open" |> by_text() |> to_be_visible())
@@ -110,7 +110,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
       child = by_css("#nested-child")
 
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/nested")
       |> click(by_role(child, :button, name: "Patch from child", exact: true))
       |> expect(Fluffy.Expect.page_to_have_url(Server.base_url() <> "/live/nested?from=child"))
@@ -119,17 +119,17 @@ defmodule Fluffy.Conformance.LiveActionTest do
 
   test "Live ignores data-confirm before dispatching its event" do
     :phoenix
-    |> live_session()
+    |> start_session()
     |> visit("/live/mystic-creatures")
     |> click(by_role(:button, name: "Confirm", exact: true))
     |> expect("confirmed" |> by_text(exact: true) |> to_be_visible())
   end
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "a button JS.dispatch change sends its name and value through the owning form with #{driver}" do
       unquote(driver)
-      |> live_session()
+      |> start_session()
       |> visit("/live/mystic-creatures")
       |> click(by_role(:button, name: "Reset via change", exact: true))
       |> expect("Dispatched action: reset" |> by_text(exact: true) |> to_be_visible())
@@ -143,7 +143,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
       js = by_label("JS payload", exact: true)
 
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/mystic-creatures")
       |> check(attrs)
       |> expect("Attribute payload state: checked" |> by_text(exact: true) |> to_be_visible())
@@ -171,7 +171,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
       override_payload = metadata |> Map.put("value", "from-js") |> inspect()
 
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/mystic-creatures")
       |> check(component)
       |> expect(checked_payload |> by_text(exact: true) |> to_be_visible())
@@ -186,7 +186,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
     @tag driver: driver
     test "an outside-form radio sends its clicked value with #{driver}", %{driver: driver} do
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/mystic-creatures")
       |> check(by_label("Griffin", exact: true))
       |> expect("Selected creature: griffin" |> by_text(exact: true) |> to_be_visible())
@@ -202,7 +202,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
       log = by_css("#log")
 
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/click-checkable")
       |> click(agree)
       |> expect(to_have_text(log, "Log: click:yes change:yes/-"))
@@ -228,7 +228,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
       log = by_css("#log")
 
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/label-clicks")
       |> click(by_text("Invisibility cloak", exact: true))
       |> expect(to_have_text(log, "Log: click:yes change:yes,-,-,-"))
@@ -259,7 +259,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
       familiar = by_role(:checkbox, name: "Familiar")
 
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/label-clicks")
       |> click(by_text("Familiar", exact: true))
       |> expect(to_have_text(log, "Log: adopt familiar:yes,-"))
@@ -277,7 +277,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
       log = by_css("#log")
 
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/label-clicks")
       |> click(by_text("Nimbus 2000", exact: true))
       |> expect(:checkbox |> by_role(name: "Nimbus 2000") |> to_be_checked(checked: false))
@@ -297,7 +297,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
       quill = by_role(:checkbox, name: "Quill")
 
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/label-clicks")
       |> click(quill)
       |> expect(to_have_text(log, "Log: sort"))
@@ -316,7 +316,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
 
       session =
         driver
-        |> live_session()
+        |> start_session()
         |> visit("/live/label-clicks")
         |> check(owl)
         |> expect(to_have_text(log, "Log: label click:yes change:-,yes,-,-"))
@@ -341,7 +341,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
         if driver == :playwright and playwright_engine?(:firefox), do: "Log: mirror:b", else: "Log: mirror:b mirror:a"
 
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/label-clicks")
       |> click(by_text("Mirror A", exact: true))
       |> expect(to_have_text(by_css("#log"), expected))
@@ -352,7 +352,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
       log = by_css("#log")
 
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/click-bindings")
       |> click(by_text("Alpha", exact: true))
       |> expect(to_have_text(log, "Log: select:alpha"))
@@ -373,7 +373,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
       log = by_css("#log")
 
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/click-bindings")
       |> click(by_text("Inspect div", exact: true))
       |> expect(to_have_text(log, ~s(Log: inspect:name="div")))
@@ -392,7 +392,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
     test "a legend in a disabled fieldset nested in another gets no click with #{driver}", %{driver: driver} do
       log = by_css("#log")
       feed = by_role(:button, name: "Feed Fluffy", exact: true)
-      session = driver |> live_session() |> visit("/live/click-bindings")
+      session = driver |> start_session() |> visit("/live/click-bindings")
 
       cond do
         clicks_nested_disabled_legend?(driver) ->
@@ -414,7 +414,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
 
     @tag driver: driver
     test "a click on text inside a submit button or link takes its default action with #{driver}", %{driver: driver} do
-      session = driver |> live_session() |> visit("/live/click-bindings")
+      session = driver |> start_session() |> visit("/live/click-bindings")
 
       # Text inside a disabled button takes its disabled state, so nothing submits.
       assert_action_error(session, Fluffy.ActionabilityError, ~r/disabled/, fn ->
@@ -437,7 +437,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
       log = by_css("#log")
 
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/click-bindings")
       |> click(by_text("Patch by text", exact: true))
       |> expect(to_have_text(by_css("#tab"), "Tab: two"))
@@ -456,7 +456,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
       page = Server.base_url() <> "/live/click-bindings"
 
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/click-bindings")
       |> click(by_role(:link, name: "Track here", exact: true))
       |> expect(to_have_text(log, "Log: track"))
@@ -470,7 +470,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
     @tag driver: driver
     test "a JS.push target replaces the element's phx-target with #{driver}", %{driver: driver} do
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/click-bindings")
       |> click(by_role(:button, name: "Ping b", exact: true))
       |> expect(to_have_text(by_css("#log"), "Log: ping:target-b"))
@@ -481,7 +481,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
       input = by_label("Pick value", exact: true)
 
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/click-bindings")
       |> fill(input, "typed")
       |> click(input)
@@ -493,7 +493,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
     @tag driver: driver
     test "a click submits the form as it was before its phx-click renders with #{driver}", %{driver: driver} do
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/click-bindings")
       |> click(by_role(:button, name: "Rename and save", exact: true))
       |> expect(to_have_text(by_css("#log"), "Log: rename save-name:Rex"))
@@ -505,7 +505,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
       last = by_css("#last")
 
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/unchecked-controls")
       |> uncheck(by_label("Tag a", exact: true))
       |> expect(to_have_text(last, "Last: change tag_ids=b bare=on solo=on colours=red,green plan=pro"))
@@ -526,7 +526,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
       last = by_css("#last")
 
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/unchecked-controls")
       |> select_option(by_label("Plan", exact: true), [])
       |> expect(to_have_text(last, "Last: change tag_ids=a,b bare=on solo=on colours=red,green plan=-"))
@@ -537,7 +537,7 @@ defmodule Fluffy.Conformance.LiveActionTest do
       last = by_css("#last")
 
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/unchecked-controls")
       |> fill(by_label("Note", exact: true), "typed")
       |> expect(to_have_text(last, "Last: note-change note=meta"))
@@ -549,11 +549,4 @@ defmodule Fluffy.Conformance.LiveActionTest do
   # WebKit dispatches the click, as it submits such a control; Phoenix keeps HTML's rule.
   defp clicks_nested_disabled_legend?(:playwright), do: playwright_engine?(:webkit)
   defp clicks_nested_disabled_legend?(_driver), do: false
-
-  defp live_session(driver) do
-    start_session(driver,
-      base_url: Server.base_url(),
-      endpoint: Fluffy.Support.Web.Endpoint
-    )
-  end
 end

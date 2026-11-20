@@ -5,10 +5,7 @@ defmodule Fluffy.Conformance.ActionabilityCapabilityTest do
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.Support.Server
-  alias Fluffy.Support.Web.Endpoint
-
-  for driver <- [:static, :playwright] do
+  for driver <- Drivers.html() do
     @tag driver: driver
     @tag :webkit_difference
     test "click ignores unrelated layout-sensitive stylesheet rules with #{driver}" do
@@ -67,14 +64,11 @@ defmodule Fluffy.Conformance.ActionabilityCapabilityTest do
     |> expect(:button |> by_role(name: "Save") |> to_have_count(1))
   end
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "fill ignores unrelated layout-sensitive markup in a LiveView with #{driver}" do
       session =
-        start_session(unquote(driver),
-          base_url: Server.base_url(),
-          endpoint: Endpoint
-        )
+        start_session(unquote(driver))
 
       session
       |> visit("/live/mystic-creatures")
@@ -87,10 +81,7 @@ defmodule Fluffy.Conformance.ActionabilityCapabilityTest do
       checkbox = by_label("Vaults", exact: true)
 
       session =
-        start_session(unquote(driver),
-          base_url: Server.base_url(),
-          endpoint: Endpoint
-        )
+        start_session(unquote(driver))
 
       session
       |> visit("/live/mystic-creatures")
@@ -100,7 +91,7 @@ defmodule Fluffy.Conformance.ActionabilityCapabilityTest do
     end
   end
 
-  for driver <- [:static, :playwright] do
+  for driver <- Drivers.html() do
     @tag driver: driver
     test "checking survives minimum-dimension ancestors with #{driver}" do
       checkbox = by_label("Vaults", exact: true)
@@ -114,10 +105,5 @@ defmodule Fluffy.Conformance.ActionabilityCapabilityTest do
         |> expect(to_be_checked(checkbox))
       end)
     end
-  end
-
-  defp with_html(driver, html, fun) do
-    session = session_for_html(driver, html, base_url: Server.base_url())
-    fun.(session)
   end
 end

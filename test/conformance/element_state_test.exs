@@ -8,7 +8,7 @@ defmodule Fluffy.Conformance.ElementStateTest do
   # Playwright's element states (getAriaDisabled, getReadonly and getChecked in
   # roleUtils.ts), which Phoenix ports. The cases follow upstream's
   # selectors-role.spec.ts, expect-boolean.spec.ts and locator-convenience.spec.ts.
-  for driver <- [:static, :playwright] do
+  for driver <- Drivers.html() do
     @tag driver: driver
     test "disabled follows native, optgroup, fieldset and ARIA state with #{driver}" do
       html = """
@@ -191,10 +191,5 @@ defmodule Fluffy.Conformance.ElementStateTest do
         end
       end)
     end
-  end
-
-  defp with_html(driver, html, fun) do
-    session = session_for_html(driver, html, base_url: Fluffy.Support.Server.base_url())
-    fun.(session)
   end
 end

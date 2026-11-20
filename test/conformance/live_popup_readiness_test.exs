@@ -8,8 +8,6 @@ defmodule Fluffy.Conformance.LivePopupReadinessTest do
 
   alias Fluffy.Event
   alias Fluffy.Expect
-  alias Fluffy.Support.Server
-  alias Fluffy.Support.Web.Endpoint
 
   @tag driver: :playwright
   test "actions on an awaited popup wait for its LiveView connection" do
@@ -18,10 +16,7 @@ defmodule Fluffy.Conformance.LivePopupReadinessTest do
 
     session =
       :playwright
-      |> start_session(
-        base_url: Server.base_url(),
-        endpoint: Endpoint
-      )
+      |> start_session()
       |> visit("/live/chamber-map?topic=#{topic}")
 
     pending = wait_for(session, Event.popup())
@@ -48,9 +43,7 @@ defmodule Fluffy.Conformance.LivePopupReadinessTest do
         """
         <button onclick="window.popup = window.open('', 'blank-popup')">Open blank popup</button>
         <button onclick="window.popup.location.href = '/live/redirect-ready?topic=#{topic}'">Navigate popup</button>
-        """,
-        base_url: Server.base_url(),
-        endpoint: Endpoint
+        """
       )
 
     pending = wait_for(session, Event.popup())

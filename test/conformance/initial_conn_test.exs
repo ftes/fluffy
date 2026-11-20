@@ -7,7 +7,6 @@ defmodule Fluffy.Conformance.InitialConnTest do
   import Phoenix.ConnTest
 
   alias Fluffy.Session
-  alias Fluffy.Support.Server
 
   test "uses an initial connection's authorization assign for a first Static visit only" do
     session = initial_session()
@@ -38,15 +37,15 @@ defmodule Fluffy.Conformance.InitialConnTest do
       |> Phoenix.LiveViewTest.put_connect_params(%{"timezone" => "Europe/Berlin"})
 
     session =
-      [conn: conn]
-      |> phoenix_session()
+      :phoenix
+      |> start_session(conn: conn)
       |> visit("/live/initial-connection")
 
     expect(session, "Live timezone: Europe/Berlin" |> by_text() |> to_be_visible())
   end
 
   test "an ordinary Phoenix session receives the application's authorization denial" do
-    session = phoenix_session()
+    session = start_session(:phoenix)
 
     visit(session, "/initial-connection/chamber")
 
@@ -62,17 +61,16 @@ defmodule Fluffy.Conformance.InitialConnTest do
 
   test "rejects invalid initial connections and the Playwright backend precisely" do
     assert_raise NimbleOptions.ValidationError, ~r/:conn.*Plug\.Conn/, fn ->
-      phoenix_session(conn: :not_a_conn)
+      start_session(:phoenix, conn: :not_a_conn)
     end
 
     assert_raise ArgumentError, ~r/:conn.*fresh, unsent.*:unset/, fn ->
-      phoenix_session(conn: Plug.Conn.send_resp(build_conn(), 200, "already sent"))
+      start_session(:phoenix, conn: Plug.Conn.send_resp(build_conn(), 200, "already sent"))
     end
 
     error =
       assert_raise Fluffy.CapabilityError, ~r/^Playwright does not support :start_session \(:phoenix_conn\)/, fn ->
         start_session(:playwright,
-          base_url: Server.base_url(),
           conn: build_conn()
         )
       end
@@ -81,16 +79,6 @@ defmodule Fluffy.Conformance.InitialConnTest do
   end
 
   defp initial_session do
-    phoenix_session(conn: Plug.Conn.assign(build_conn(), :initial_principal, "chamber-keeper"))
-  end
-
-  defp phoenix_session(options \\ []) do
-    start_session(
-      :phoenix,
-      [
-        base_url: Server.base_url(),
-        endpoint: Fluffy.Support.Web.Endpoint
-      ] ++ options
-    )
+    start_session(:phoenix, conn: Plug.Conn.assign(build_conn(), :initial_principal, "chamber-keeper"))
   end
 end

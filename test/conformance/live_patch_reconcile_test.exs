@@ -7,13 +7,13 @@ defmodule Fluffy.Conformance.LivePatchReconcileTest do
 
   alias Fluffy.Support.HTTPFixtures
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "checked state stays on its id-less radio when a patch inserts an element before it with #{driver}", %{
       driver: driver
     } do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/radio-shift")
       |> check(by_role(:radio, name: "c"))
       |> expect("Choice: c" |> by_text() |> to_be_visible())
@@ -24,7 +24,7 @@ defmodule Fluffy.Conformance.LivePatchReconcileTest do
     @tag driver: driver
     test "a server-rendered radio choice clears a local choice in its group with #{driver}", %{driver: driver} do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/radio-shift?override=a")
       |> click(by_role(:radio, name: "c"))
       |> expect("Choice: c" |> by_text() |> to_be_visible())
@@ -35,7 +35,7 @@ defmodule Fluffy.Conformance.LivePatchReconcileTest do
     @tag driver: driver
     test "local checkbox state does not move to a shifted id-less sibling with #{driver}", %{driver: driver} do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/radio-shift")
       |> click(by_role(:checkbox, name: "y"))
       |> expect("Changed: true" |> by_text() |> to_be_visible())
@@ -45,7 +45,7 @@ defmodule Fluffy.Conformance.LivePatchReconcileTest do
     @tag driver: driver
     test "a select's choice does not move to a shifted id-less select with #{driver}", %{driver: driver} do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/shifted-controls")
       |> select_option(by_label("Second", exact: true), "y")
       |> expect("Changed: true" |> by_text() |> to_be_visible())
@@ -59,7 +59,7 @@ defmodule Fluffy.Conformance.LivePatchReconcileTest do
       action = HTTPFixtures.path(fixture, "/submit")
 
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/shifted-controls?action=#{URI.encode_www_form(action)}")
       |> set_input_files(by_label("Second file"), Path.expand("../support/fixtures/fluffy-upload.txt", __DIR__))
       |> fill(by_label("Trigger"), "shift")
@@ -74,7 +74,7 @@ defmodule Fluffy.Conformance.LivePatchReconcileTest do
     @tag driver: driver
     test "a title update keeps typed text with #{driver}", %{driver: driver} do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/patched-controls")
       |> fill(by_label("Note", exact: true), "typed")
       |> click(by_role(:button, name: "Retitle"))
@@ -87,7 +87,7 @@ defmodule Fluffy.Conformance.LivePatchReconcileTest do
       driver: driver
     } do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/patched-controls")
       |> fill(by_label("Note", exact: true), "typed")
       |> fill(by_label("Component note"), "typed")
@@ -102,7 +102,7 @@ defmodule Fluffy.Conformance.LivePatchReconcileTest do
       driver: driver
     } do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/patched-controls")
       |> fill(by_label("Note", exact: true), "typed")
       |> fill(by_label("Component note"), "typed")
@@ -115,7 +115,7 @@ defmodule Fluffy.Conformance.LivePatchReconcileTest do
     @tag driver: driver
     test "a view patch keeps typed text in an unchanged component's portal with #{driver}", %{driver: driver} do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/patched-controls")
       |> fill(by_label("Portal note"), "typed")
       |> click(by_role(:button, name: "Bump", exact: true))
@@ -126,7 +126,7 @@ defmodule Fluffy.Conformance.LivePatchReconcileTest do
     @tag driver: driver
     test "a component patch resets typed text in its portal but not in its view with #{driver}", %{driver: driver} do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/patched-controls")
       |> fill(by_label("Note", exact: true), "typed")
       |> fill(by_label("Portal note"), "typed")
@@ -143,7 +143,7 @@ defmodule Fluffy.Conformance.LivePatchReconcileTest do
       dialog = by_role(:dialog, name: "Treats")
 
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/kennel")
       |> fill(by_label("Tune"), "Lullaby")
       |> fill(by_label(dialog, "Treat name"), "Bone")
@@ -157,7 +157,7 @@ defmodule Fluffy.Conformance.LivePatchReconcileTest do
       @tag driver: driver
       test "a view patch resets the #{label} select to its rendered option with #{driver}", %{driver: driver} do
         driver
-        |> start_test_session()
+        |> start_session()
         |> visit("/live/patched-controls")
         |> select_option(by_label(unquote(label)), unquote(pick))
         |> click(by_role(:button, name: "Bump", exact: true))
@@ -169,7 +169,7 @@ defmodule Fluffy.Conformance.LivePatchReconcileTest do
     @tag driver: driver
     test "a view patch resets a multiple select to its rendered options with #{driver}", %{driver: driver} do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/patched-controls")
       |> select_option(by_label("Many"), ["a"])
       |> click(by_role(:button, name: "Bump", exact: true))
@@ -182,7 +182,7 @@ defmodule Fluffy.Conformance.LivePatchReconcileTest do
       driver: driver
     } do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/patched-checks")
       |> check(by_label("Loose", exact: true))
       |> check(by_label("Loose b"))
@@ -200,7 +200,7 @@ defmodule Fluffy.Conformance.LivePatchReconcileTest do
     @tag driver: driver
     test "a checkbox's own phx-change patch resets it to its rendered state with #{driver}", %{driver: driver} do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/patched-checks")
       |> click(by_label("Tracked"))
       |> expect("Changes: 1" |> by_text() |> to_be_visible())
@@ -212,7 +212,7 @@ defmodule Fluffy.Conformance.LivePatchReconcileTest do
       driver: driver
     } do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/patched-checks")
       |> click(by_label("Clicked"))
       |> expect("Count: 1" |> by_text() |> to_be_visible())
@@ -225,7 +225,7 @@ defmodule Fluffy.Conformance.LivePatchReconcileTest do
     test "a checkbox's phx-change sends the form as the click left it, not as its phx-click patch reset it with #{driver}",
          %{driver: driver} do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/patched-checks")
       |> fill(by_label("Stored note"), "typed")
       |> check(by_label("Other box"))
@@ -239,7 +239,7 @@ defmodule Fluffy.Conformance.LivePatchReconcileTest do
     @tag driver: driver
     test "a radio's own phx-change patch resets its group to the rendered choice with #{driver}", %{driver: driver} do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/patched-checks")
       |> click(by_label("Pick b"))
       |> expect("Changes: 1" |> by_text() |> to_be_visible())
@@ -249,16 +249,12 @@ defmodule Fluffy.Conformance.LivePatchReconcileTest do
     @tag driver: driver
     test "a title update keeps a select's choice with #{driver}", %{driver: driver} do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/patched-controls")
       |> select_option(by_label("Pick"), "b")
       |> click(by_role(:button, name: "Retitle"))
       |> expect(page_to_have_title("Retitled controls"))
       |> expect(to_have_value(by_label("Pick"), "b"))
     end
-  end
-
-  defp start_test_session(driver) do
-    start_session(driver, base_url: Fluffy.Support.Server.base_url(), endpoint: Fluffy.Support.Web.Endpoint)
   end
 end

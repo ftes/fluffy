@@ -5,7 +5,7 @@ defmodule Fluffy.Conformance.CSSLocatorTest do
   import Fluffy.Expect
   import Fluffy.Locator
 
-  for driver <- [:static, :playwright] do
+  for driver <- Drivers.html() do
     @tag driver: driver
     test "re-resolves a CSS locator against the current document with #{driver}", %{
       driver: driver
@@ -13,7 +13,7 @@ defmodule Fluffy.Conformance.CSSLocatorTest do
       item = by_css(".item")
 
       session =
-        session_for_html(driver, ~s(<div class="item">First</div>), base_url: Fluffy.Support.Server.base_url())
+        session_for_html(driver, ~s(<div class="item">First</div>))
 
       session
       |> expect(to_have_count(item, 1))

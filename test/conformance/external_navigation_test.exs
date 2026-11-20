@@ -7,15 +7,14 @@ defmodule Fluffy.Conformance.ExternalNavigationTest do
 
   alias Fluffy.Support.HTTPFixtures
   alias Fluffy.Support.Server
-  alias Fluffy.Support.Web.Endpoint
 
   @three_broomsticks "https://hogsmeade.example/three-broomsticks"
 
   # A browser really loads the external page, so Playwright stubs its host.
-  defp hogsmeade_session(:phoenix), do: start_test_session(:phoenix)
+  defp hogsmeade_session(:phoenix), do: start_session(:phoenix)
 
   defp hogsmeade_session(:playwright) do
-    session = start_test_session(:playwright)
+    session = start_session(:playwright)
 
     Fluffy.Playwright.route(session, "https://hogsmeade.example/**", fn route ->
       Playwright.Route.fulfill!(route, content_type: "text/html", body: "<h1>The Three Broomsticks</h1>")
@@ -24,7 +23,7 @@ defmodule Fluffy.Conformance.ExternalNavigationTest do
     session
   end
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "an off-origin link ends at its URL from a static page with #{driver}", %{driver: driver} do
       fixture =
@@ -44,7 +43,7 @@ defmodule Fluffy.Conformance.ExternalNavigationTest do
       fixture = HTTPFixtures.register(%{status: 302, headers: [{"location", ministry_url}]})
 
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/auth"))
       |> expect(page_to_have_url(ministry_url))
     end
@@ -59,7 +58,7 @@ defmodule Fluffy.Conformance.ExternalNavigationTest do
         })
 
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/start"))
       |> click(by_role(:button, name: "Floo to the Ministry"))
       |> expect(page_to_have_url(ministry_url))
@@ -77,7 +76,7 @@ defmodule Fluffy.Conformance.ExternalNavigationTest do
         ])
 
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/start"))
       |> click(by_role(:button, name: "Floo to the Ministry"))
       |> expect(page_to_have_url(ministry_url))
@@ -103,7 +102,7 @@ defmodule Fluffy.Conformance.ExternalNavigationTest do
     end
   end
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "a LiveView external redirect reads as the browser's URL and keeps its flash for the app with #{driver}",
          %{driver: driver} do
@@ -125,7 +124,7 @@ defmodule Fluffy.Conformance.ExternalNavigationTest do
     source = HTTPFixtures.register(%{body: html(~s(<a href="#{next_url}">Next</a>))})
 
     :phoenix
-    |> start_session(base_url: URI.to_string(base_url), endpoint: Endpoint)
+    |> start_session(base_url: URI.to_string(base_url))
     |> visit(HTTPFixtures.path(source))
     |> click(by_role(:link, name: "Next"))
     |> expect("Next page" |> by_text() |> to_be_visible())
@@ -142,7 +141,7 @@ defmodule Fluffy.Conformance.ExternalNavigationTest do
 
       session =
         :phoenix
-        |> start_test_session()
+        |> start_session()
         |> visit(HTTPFixtures.path(fixture, "/start"))
         |> click(by_role(:button, name: "Floo to the Ministry"))
 
@@ -189,13 +188,6 @@ defmodule Fluffy.Conformance.ExternalNavigationTest do
     url = %{URI.parse(HTTPFixtures.url(ministry, suffix)) | host: "localhost"}
     assert url.host != URI.parse(Server.base_url()).host
     URI.to_string(url)
-  end
-
-  defp start_test_session(driver) do
-    start_session(driver,
-      base_url: Server.base_url(),
-      endpoint: Endpoint
-    )
   end
 
   defp html(body), do: "<!doctype html><html><head><title>Fixture</title></head><body>#{body}</body></html>"

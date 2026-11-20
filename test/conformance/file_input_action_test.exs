@@ -8,9 +8,8 @@ defmodule Fluffy.Conformance.FileInputActionTest do
   alias Fluffy.FilePayload
   alias Fluffy.Playwright
   alias Fluffy.Support.HTTPFixtures
-  alias Fluffy.Support.Server
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "selects one local file and submits its multipart part with #{driver}" do
       fixture =
@@ -31,7 +30,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       file = fixture_path()
       bytes = File.read!(file)
 
-      session = start_test_session(unquote(driver))
+      session = start_session(unquote(driver))
 
       session
       |> visit(HTTPFixtures.path(fixture, "/upload/start"))
@@ -72,7 +71,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       }
 
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/upload/start"))
       |> set_input_files(by_label("Attachment"), payload)
       |> click(by_role(:button, name: "Save"))
@@ -91,7 +90,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       fixture = upload_fixture()
 
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/upload/start"))
       |> set_input_files(by_text("Attachment"), fixture_path())
       |> click(by_role(:button, name: "Save"))
@@ -106,7 +105,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       payload = %FilePayload{name: "generated.csv", bytes: "id\n42\n"}
 
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/upload/start"))
       |> set_input_files(by_label("Attachment"), payload)
       |> click(by_role(:button, name: "Save"))
@@ -126,7 +125,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       }
 
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/upload/start"))
       |> set_input_files(by_label("Attachment"), payload)
       |> click(by_role(:button, name: "Save"))
@@ -147,7 +146,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       }
 
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/upload/start"))
       |> set_input_files(by_label("Attachment"), payload)
       |> click(by_role(:button, name: "Save"))
@@ -168,7 +167,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       }
 
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/upload/start"))
       |> set_input_files(by_label("Attachment"), payload)
       |> click(by_role(:button, name: "Save"))
@@ -184,7 +183,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       files = [fixture_path(), invalid_fixture_path()]
 
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/upload/start"))
       |> set_input_files(by_label("Attachments"), files)
       |> click(by_role(:button, name: "Save"))
@@ -204,7 +203,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       ]
 
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/upload/start"))
       |> set_input_files(by_label("Attachments"), payloads)
       |> click(by_role(:button, name: "Save"))
@@ -223,7 +222,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       files = [fixture_path(), invalid_fixture_path()]
 
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/upload/start"))
       |> set_input_files(by_label("Attachments"), files)
       |> set_input_files(by_label("Attachments"), [])
@@ -257,7 +256,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       file = fixture_path()
 
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/upload/start"))
       |> set_input_files(by_label("Attachment"), file)
       |> click(by_role(:button, name: "Reset"))
@@ -282,7 +281,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
 
       session =
         unquote(driver)
-        |> start_test_session()
+        |> start_session()
         |> visit(HTTPFixtures.path(fixture, "/upload/start"))
         |> set_input_files(by_label("Attachment"), file)
 
@@ -309,7 +308,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       fixture = upload_fixture()
       file = fixture_path()
 
-      session = start_test_session(unquote(driver))
+      session = start_session(unquote(driver))
 
       session
       |> visit(HTTPFixtures.path(fixture, "/upload/start"))
@@ -340,7 +339,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       file = fixture_path()
 
       unquote(driver)
-      |> start_test_session()
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/upload/start"))
       |> set_input_files(by_label("Attachment"), file)
       |> click(by_role(:button, name: "Save"))
@@ -354,7 +353,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       fixture = upload_fixture()
       file = fixture_path()
 
-      session = start_test_session(unquote(driver))
+      session = start_session(unquote(driver))
 
       session
       |> visit(HTTPFixtures.path(fixture, "/upload/start"))
@@ -371,7 +370,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       fixture = upload_fixture()
       file = fixture_path()
 
-      session = start_test_session(unquote(driver))
+      session = start_session(unquote(driver))
 
       session
       |> visit(HTTPFixtures.path(fixture, "/upload/start"))
@@ -402,7 +401,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
         fixture = redirect_upload_fixture(unquote(status))
         file = fixture_path()
 
-        session = start_test_session(unquote(driver))
+        session = start_session(unquote(driver))
 
         session
         |> visit(HTTPFixtures.path(fixture, "/upload/start"))
@@ -514,7 +513,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
     end
   end
 
-  for driver <- [:static, :playwright] do
+  for driver <- Drivers.html() do
     @tag driver: driver
     @tag skip:
            if(driver == :playwright and not playwright_engine?(:chromium),
@@ -526,8 +525,7 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       session =
         session_for_html(
           unquote(driver),
-          ~s(<label>Attachment <input name="attachment" type="text"></label>),
-          base_url: Server.base_url()
+          ~s(<label>Attachment <input name="attachment" type="text"></label>)
         )
 
       error =
@@ -538,13 +536,6 @@ defmodule Fluffy.Conformance.FileInputActionTest do
       assert error.operation == :set_input_files
       if Fluffy.Session.current_driver(session) != :playwright, do: assert(error.cause.reason == :not_file_input)
     end
-  end
-
-  defp start_test_session(driver) do
-    start_session(driver,
-      base_url: Server.base_url(),
-      endpoint: Fluffy.Support.Web.Endpoint
-    )
   end
 
   defp fixture_path do

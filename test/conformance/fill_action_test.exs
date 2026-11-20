@@ -6,8 +6,6 @@ defmodule Fluffy.Conformance.FillActionTest do
   import Fluffy.Locator
   import Fluffy.Playwright
 
-  alias Fluffy.Support.Server
-
   @set_value_input_cases [
     {"color", "#123456", ""},
     {"date", "2025-01-02", ""},
@@ -53,7 +51,7 @@ defmodule Fluffy.Conformance.FillActionTest do
     expect(session, to_be_visible(by_text(editor, "Initial", exact: true)))
   end
 
-  for driver <- [:static, :playwright] do
+  for driver <- Drivers.html() do
     @tag driver: driver
     test "fill converts String.Chars values without escaping with #{driver}" do
       session = session_for_html(unquote(driver), ~s(<input aria-label="Value"><textarea aria-label="Notes"></textarea>))
@@ -324,7 +322,7 @@ defmodule Fluffy.Conformance.FillActionTest do
   end
 
   # Playwright's retarget(..., "follow-label"): an element in a label acts as its control.
-  for driver <- [:static, :playwright] do
+  for driver <- Drivers.html() do
     @tag driver: driver
     test "fill, clear, select_option and set_checked follow a label to its control with #{driver}" do
       html = """
@@ -349,11 +347,11 @@ defmodule Fluffy.Conformance.FillActionTest do
     end
   end
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "fill, select_option and set_checked through a label reach LiveView with #{driver}", %{driver: driver} do
       driver
-      |> start_session(base_url: Server.base_url(), endpoint: Fluffy.Support.Web.Endpoint)
+      |> start_session()
       |> visit("/live/potions")
       |> fill(by_text("First ingredient", exact: true), "ash")
       |> expect(to_be_visible(by_text("Last first: ash")))
@@ -362,10 +360,5 @@ defmodule Fluffy.Conformance.FillActionTest do
       |> set_checked(by_text("Enabled", exact: true), true)
       |> expect(to_be_checked(by_label("Enabled")))
     end
-  end
-
-  defp with_html(driver, html, fun) do
-    session = session_for_html(driver, html, base_url: Server.base_url())
-    fun.(session)
   end
 end

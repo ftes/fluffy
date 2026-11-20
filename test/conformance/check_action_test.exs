@@ -7,7 +7,7 @@ defmodule Fluffy.Conformance.CheckActionTest do
 
   alias Fluffy.Playwright
 
-  for driver <- [:static, :playwright] do
+  for driver <- Drivers.html() do
     @tag driver: driver
     test "check and uncheck are idempotent for checkboxes with #{driver}" do
       checkbox = by_role(:checkbox, name: "Updates")
@@ -185,10 +185,5 @@ defmodule Fluffy.Conformance.CheckActionTest do
     assert_raise ArgumentError, ~r/cannot be used together/, fn ->
       :checkbox |> by_role() |> to_be_checked(checked: false, indeterminate: true)
     end
-  end
-
-  defp with_html(driver, html, fun) do
-    session = session_for_html(driver, html, base_url: Fluffy.Support.Server.base_url())
-    fun.(session)
   end
 end

@@ -7,7 +7,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
 
   alias Fluffy.Support.HTTPFixtures
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "submits ordered successful controls with GET using #{driver}", %{driver: driver} do
       fixture =
@@ -33,7 +33,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
           %{body: html("<h1>Search results</h1>")}
         ])
 
-      session = start_test_session(driver)
+      session = start_session(driver)
 
       session
       |> visit(HTTPFixtures.path(fixture, "/forms/start"))
@@ -75,7 +75,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
           %{body: html("<h1>Search results</h1>")}
         ])
 
-      session = start_test_session(driver)
+      session = start_session(driver)
 
       session
       |> visit(HTTPFixtures.path(fixture, "/forms/start"))
@@ -106,7 +106,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
         ])
 
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/forms/start"))
       |> click(by_text("Search", exact: true))
       |> expect("Search results" |> by_text() |> to_be_visible())
@@ -134,7 +134,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
         ])
 
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/forms/start"))
       |> click(by_text("Restricted section", exact: true))
       |> click(by_text("Alohomora", exact: true))
@@ -166,7 +166,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
         ])
 
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/forms/start"))
       |> click(by_text("Gryffindor", exact: true))
       |> expect(:heading |> by_role(name: "Houses") |> to_be_visible())
@@ -186,7 +186,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
         ])
 
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/forms/start"))
       |> submit(by_css("#note"))
 
@@ -210,7 +210,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
         ])
 
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/forms/start"))
       |> submit(by_css("#note"), timeout: 5_000)
 
@@ -228,7 +228,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
         ])
 
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/forms/start"))
       |> submit(by_css("#note"), timeout: 2_000)
 
@@ -251,7 +251,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
           ])
 
         driver
-        |> start_test_session()
+        |> start_session()
         |> visit(HTTPFixtures.path(fixture, "/forms/start"))
         |> fill(by_label("Note"), "edited")
         |> submit(by_css("#note"), timeout: 2_000)
@@ -275,7 +275,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
         ])
 
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/forms/start"))
       |> submit(by_css("#export"), timeout: 2_000)
       |> expect("Exports" |> by_text() |> to_be_visible())
@@ -303,7 +303,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
           %{body: html("<h1>Owl sent</h1>")}
         ])
 
-      session = start_test_session(driver)
+      session = start_session(driver)
 
       session
       |> visit(HTTPFixtures.path(fixture, "/forms/start"))
@@ -344,7 +344,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
           %{body: html("<h1>Owl sent</h1>")}
         ])
 
-      session = start_test_session(driver)
+      session = start_session(driver)
 
       session
       |> visit(HTTPFixtures.path(fixture, "/forms/start"))
@@ -388,7 +388,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
           %{body: html("<h1>Saved</h1>")}
         ])
 
-      session = start_test_session(driver)
+      session = start_session(driver)
 
       session
       |> visit(HTTPFixtures.path(fixture, "/forms/start"))
@@ -435,7 +435,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
           %{body: html("<h1>Saved</h1>")}
         ])
 
-      session = start_test_session(driver)
+      session = start_session(driver)
 
       session
       |> visit(HTTPFixtures.path(fixture, "/forms/start"))
@@ -468,7 +468,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
           %{body: html("<h1>Saved</h1>")}
         ])
 
-      session = start_test_session(driver)
+      session = start_session(driver)
 
       session
       |> visit(HTTPFixtures.path(fixture, "/forms/start"))
@@ -504,7 +504,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
           %{body: html("<h1>Overridden</h1>")}
         ])
 
-      session = start_test_session(driver)
+      session = start_session(driver)
 
       session
       |> visit(HTTPFixtures.path(fixture, "/forms/start"))
@@ -534,7 +534,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
           %{body: html("<h1>Saved</h1>")}
         ])
 
-      session = start_test_session(driver)
+      session = start_session(driver)
 
       session
       |> visit(HTTPFixtures.path(fixture, "/forms/start"))
@@ -572,7 +572,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
           %{body: html("<h1>Saved</h1>")}
         ])
 
-      session = start_test_session(driver)
+      session = start_session(driver)
 
       session
       |> visit(HTTPFixtures.path(fixture, "/forms/start"))
@@ -601,7 +601,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
         ])
 
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/forms/start"))
       |> click(by_role(:button, name: "Save"))
       |> expect("Saved" |> by_text() |> to_be_visible())
@@ -632,7 +632,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
         ])
 
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/forms/start"))
       |> click(by_role(:button, name: "Save"))
       |> expect("Saved" |> by_text() |> to_be_visible())
@@ -663,7 +663,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
         ])
 
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/forms/start"))
       |> click(by_role(:button, name: "Enter the common room"))
       |> expect("Common room" |> by_text() |> to_be_visible())
@@ -693,7 +693,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
         ])
 
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/forms/start"))
       |> select_option(by_label("Plan"), [])
       |> click(by_role(:button, name: "Save"))
@@ -723,7 +723,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
             %{body: html("<h1>Redirected receipt</h1>")}
           ])
 
-        session = start_test_session(driver)
+        session = start_session(driver)
 
         session
         |> visit(HTTPFixtures.path(fixture, "/forms/start"))
@@ -766,7 +766,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
         %{body: html("<h1>Saved</h1>")}
       ])
 
-    session = start_test_session(:phoenix)
+    session = start_session(:phoenix)
 
     session
     |> visit(HTTPFixtures.path(fixture, "/forms/start"))
@@ -797,7 +797,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       fixture = HTTPFixtures.register(%{body: html("<h1>Draft</h1>" <> unquote(form))})
 
       :playwright
-      |> start_test_session()
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/forms/start"))
       |> submit(by_css("#note"), timeout: 2_000)
       |> expect("Draft" |> by_text() |> to_be_visible())
@@ -813,7 +813,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       })
 
     :playwright
-    |> start_test_session()
+    |> start_session()
     |> visit(HTTPFixtures.path(fixture, "/forms/start?q=fluffy"))
     |> submit(by_css("#note"), timeout: 2_000)
     |> expect("Draft" |> by_text() |> to_be_visible())
@@ -838,7 +838,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       })
 
     :playwright
-    |> start_test_session()
+    |> start_session()
     |> visit(HTTPFixtures.path(fixture, "/forms/start"))
     |> submit(by_css("#note"), timeout: 2_000)
     |> expect("Intercepted" |> by_text() |> to_be_visible())
@@ -862,7 +862,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
       fixture = HTTPFixtures.register_sequence([%{body: html(body)}, %{body: html("<h1>Saved</h1>")}])
 
       :playwright
-      |> start_test_session()
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/forms/start"))
       |> fill(by_label("Title"), "Draft")
       |> once(Fluffy.Event.dialog(), unquote(handle))
@@ -885,7 +885,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
     """
 
     fixture = HTTPFixtures.register(%{body: body})
-    session = :playwright |> start_test_session() |> visit(HTTPFixtures.path(fixture, "/forms/start"))
+    session = :playwright |> start_session() |> visit(HTTPFixtures.path(fixture, "/forms/start"))
 
     assert_raise Fluffy.OperationError, ~r/Timeout 2000ms exceeded/, fn ->
       submit(session, by_css("#note"), timeout: 2_000)
@@ -908,7 +908,7 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
     fixture =
       HTTPFixtures.register_sequence([%{body: html(~s(<form id="note" method="post" action="save"></form>))}, slow])
 
-    session = :playwright |> start_test_session() |> visit(HTTPFixtures.path(fixture, "/forms/start"))
+    session = :playwright |> start_session() |> visit(HTTPFixtures.path(fixture, "/forms/start"))
 
     assert_raise Fluffy.OperationError, ~r/Timeout 2000ms exceeded/, fn ->
       submit(session, by_css("#note"), timeout: 2_000)
@@ -922,13 +922,6 @@ defmodule Fluffy.Conformance.StaticHTTPFormTest do
   # disabled one, which HTML disables with the outer fieldset; Phoenix keeps HTML's rule.
   defp submits_nested_disabled_legend?(:playwright), do: playwright_engine?(:webkit)
   defp submits_nested_disabled_legend?(_driver), do: false
-
-  defp start_test_session(driver) do
-    start_session(driver,
-      base_url: Fluffy.Support.Server.base_url(),
-      endpoint: Fluffy.Support.Web.Endpoint
-    )
-  end
 
   defp html(body) do
     "<!doctype html><html><body><main>#{body}</main></body></html>"

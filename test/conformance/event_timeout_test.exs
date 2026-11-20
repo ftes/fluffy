@@ -39,13 +39,13 @@ defmodule Fluffy.Conformance.EventTimeoutTest do
     %{fixture: fixture}
   end
 
-  for driver <- [:phoenix, :playwright], timeout <- [0, 100] do
+  for driver <- Drivers.backends(), timeout <- [0, 100] do
     @tag driver: driver
     test "ignores matching downloads after a #{timeout} ms deadline with #{driver}", %{
       driver: driver,
       fixture: fixture
     } do
-      session = start_test_session(driver, fixture)
+      session = download_page(driver, fixture)
 
       assert_raise ExUnit.AssertionError, ~r/no matching download event/, fn ->
         expect_event(
@@ -61,7 +61,7 @@ defmodule Fluffy.Conformance.EventTimeoutTest do
     end
   end
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "retains a download captured before the deadline when the callback finishes later with #{driver}", %{
       driver: driver,
@@ -71,7 +71,7 @@ defmodule Fluffy.Conformance.EventTimeoutTest do
       # (Firefox dispatches input for one page at a time); the callback still
       # outlives it.
       driver
-      |> start_test_session(fixture)
+      |> download_page(fixture)
       |> expect_event(
         Event.download(&(&1.suggested_filename == "marauders_map.csv")),
         fn session ->
@@ -90,7 +90,7 @@ defmodule Fluffy.Conformance.EventTimeoutTest do
 
     @tag driver: driver
     test "a rejected download does not restart the deadline with #{driver}", %{driver: driver, fixture: fixture} do
-      session = start_test_session(driver, fixture)
+      session = download_page(driver, fixture)
 
       assert_raise ExUnit.AssertionError, ~r/no matching download event/, fn ->
         expect_event(
@@ -108,11 +108,11 @@ defmodule Fluffy.Conformance.EventTimeoutTest do
     end
   end
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "timeout: :infinity waits for the event with #{driver}", %{driver: driver, fixture: fixture} do
       driver
-      |> start_test_session(fixture)
+      |> download_page(fixture)
       |> expect_event(
         Event.download(&(&1.suggested_filename == "marauders_map.csv")),
         fn session ->
@@ -125,9 +125,9 @@ defmodule Fluffy.Conformance.EventTimeoutTest do
     end
   end
 
-  defp start_test_session(driver, fixture) do
+  defp download_page(driver, fixture) do
     driver
-    |> start_session(base_url: Fluffy.Support.Server.base_url(), endpoint: Fluffy.Support.Web.Endpoint)
+    |> start_session()
     |> visit(HTTPFixtures.path(fixture, "/start"))
   end
 end

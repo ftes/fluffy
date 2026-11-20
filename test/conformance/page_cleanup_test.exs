@@ -28,7 +28,7 @@ defmodule Fluffy.Conformance.PageCleanupTest do
 
     session =
       :playwright
-      |> start_session(base_url: Fluffy.Support.Server.base_url())
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/start"))
       |> expect_event(Event.popup(), &click(&1, by_role(:link, name: "Open child")))
 

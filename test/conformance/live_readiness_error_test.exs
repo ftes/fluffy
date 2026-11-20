@@ -6,13 +6,12 @@ defmodule Fluffy.Conformance.LiveReadinessErrorTest do
   import Fluffy.Locator
 
   alias Fluffy.Playwright
-  alias Fluffy.Support.Server
 
   @tag driver: :playwright
   test "a parent patch does not make a connected nested LiveView unready" do
     session =
       :playwright
-      |> start_session(base_url: Server.base_url())
+      |> start_session()
       |> visit("/live/nested")
       |> fill(by_label("Parent email"), "parent@hogwarts.example")
       |> click(by_role(:button, name: "Save parent"))
@@ -39,7 +38,6 @@ defmodule Fluffy.Conformance.LiveReadinessTimeoutTest do
   import Fluffy
 
   alias Fluffy.Playwright
-  alias Fluffy.Support.Server
 
   # `alias Fluffy.Playwright` shadows the dependency here.
   @moduletag Elixir.Playwright.Test.use(navigation_timeout: 1_000)
@@ -48,7 +46,7 @@ defmodule Fluffy.Conformance.LiveReadinessTimeoutTest do
   test "a disconnected nested channel is not ready even with a connected CSS marker" do
     session =
       :playwright
-      |> start_session(base_url: Server.base_url())
+      |> start_session()
       |> visit("/live/nested")
 
     Playwright.evaluate(
@@ -71,7 +69,7 @@ defmodule Fluffy.Conformance.LiveReadinessTimeoutTest do
   @tag driver: :playwright
   test "names the destination and expected marker on a readiness timeout" do
     session =
-      start_session(:playwright, base_url: Server.base_url(), endpoint: Fluffy.Support.Web.Endpoint)
+      start_session(:playwright)
 
     error =
       assert_raise Fluffy.OperationError, fn ->

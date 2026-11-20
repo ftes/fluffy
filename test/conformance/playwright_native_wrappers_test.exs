@@ -917,7 +917,7 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
     end
   end
 
-  for driver <- [:static, :live] do
+  for driver <- Drivers.phoenix() do
     @tag driver: driver
     test "the assertions require a browser with #{driver}" do
       session =
