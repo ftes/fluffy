@@ -57,7 +57,7 @@ defmodule Fluffy.MixProject do
   end
 
   def cli do
-    [preferred_envs: [lint: :test, check: :test, quality: :test]]
+    [preferred_envs: [lint: :test, check: :test]]
   end
 
   # `dev/` holds maintainer tasks, kept out of the package and consumers' builds.
@@ -69,8 +69,9 @@ defmodule Fluffy.MixProject do
     [
       {:nimble_options, "~> 1.1"},
       {:lazy_html, ">= 0.1.0 and < 1.0.0"},
-      {:phoenix, "~> 1.7"},
-      {:phoenix_live_view, "~> 1.0"},
+      # The floors CI's oldest lane runs, from mix.lock.oldest.
+      {:phoenix, "~> 1.7 and >= 1.7.24"},
+      {:phoenix_live_view, "~> 1.2 and >= 1.2.10"},
       {:playwright, "~> 1.65.0-rc.2", hex: :playwright_ex},
       {:phoenix_ecto, "~> 4.7", optional: true},
       {:ecto_sql, "~> 3.10", optional: true},
@@ -191,14 +192,17 @@ defmodule Fluffy.MixProject do
       ],
       "consumer.regenerate": "run --no-start integration/regenerate_consumer.exs",
       "assets.build": ["esbuild.install --if-missing", "esbuild test_browser"],
+      # What CI's checks job runs. Compiles strictly before a later task's own compile could
+      # satisfy it. Dialyzer is last, so CI can append `--format github`.
       lint: [
         "format --check-formatted",
         "compile --warnings-as-errors",
         "usage_rules.sync --check",
-        "credo --format oneline"
+        "credo --format oneline",
+        "cmd env MIX_ENV=dev mix docs --warnings-as-errors",
+        "dialyzer --format short --list-unused-filters"
       ],
-      check: ["lint", "test --warnings-as-errors"],
-      quality: ["check", "dialyzer --format short --list-unused-filters"]
+      check: ["lint", "test --warnings-as-errors"]
     ]
   end
 end

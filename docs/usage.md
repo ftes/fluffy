@@ -32,7 +32,7 @@ defmodule MyAppWeb.CreatureTest do
 end
 ```
 
-For tests using browser-only helpers, also `import Fluffy.Playwright`. This
+For tests using Playwright-only helpers, also `import Fluffy.Playwright`. This
 lets you call `new_page`, `current_page`, `pages`, `switch_page`, `close_page`,
 `go_back`, `go_forward`, `hover`, `drag_to`, `press_sequentially`, `dblclick`,
 and the other browser actions without module qualifiers:

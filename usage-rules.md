@@ -64,7 +64,7 @@ start_session(:phoenix)
 ## Capabilities
 
 - Check `docs/capabilities.md` before relying on a browser behavior in a Phoenix test. Fluffy raises `Fluffy.CapabilityError` (fields `capability`, `driver`, `detail`) for what a driver cannot do, rather than ignoring it.
-- Browser-only helpers live in `Fluffy.Playwright` (`hover`, `drag_to`, `press_sequentially`, `evaluate`, `new_page`, `switch_page`, ...), `Fluffy.Playwright.Keyboard`, `Mouse` and `Clock`.
+- Playwright-only helpers live in `Fluffy.Playwright` (`hover`, `drag_to`, `press_sequentially`, `evaluate`, `new_page`, `switch_page`, ...), `Fluffy.Playwright.Keyboard`, `Mouse` and `Clock`.
 - Playwright-only options, such as `by_role(:button, pressed: true)` or `click(l, force: true)`, raise `Fluffy.CapabilityError` on Phoenix.
 - LiveView ignores `phx-debounce` and `phx-throttle`. Phoenix `click` ignores `data-confirm`. `press` raises on Static and only forwards the key to bound handlers on LiveView.
 

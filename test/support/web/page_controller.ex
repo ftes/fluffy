@@ -1,7 +1,7 @@
 defmodule Fluffy.Support.Web.PageController do
   @moduledoc false
 
-  use Phoenix.Controller, formats: [:html]
+  use Phoenix.Controller, formats: [:html], layouts: []
 
   alias Fluffy.Support.Repo
 

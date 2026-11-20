@@ -1,10 +1,15 @@
 name: Set up toolchain and deps
-description: Selects the lane's toolchain, installs it with mise, restores deps and _build, and compiles the deps.
+description: Selects the lane's toolchain and lockfile, installs the toolchain with mise, restores deps and _build, and compiles the deps.
 
 inputs:
   lane:
-    description: "oldest (.tool-versions.oldest) or newest (.tool-versions)"
+    description: "oldest (.tool-versions.oldest and mix.lock.oldest) or newest (.tool-versions and mix.lock)"
     required: true
+  # Pinned as a workaround for mise.jdx.dev/VERSION racing GitHub release assets. Remove once
+  # upstream guarantees that advertised versions are downloadable.
+  mise-version:
+    description: The mise version to install
+    default: "2026.8.14"
 
 outputs:
   elixir:
@@ -29,13 +34,14 @@ runs:
       run: |
         if [ "$TOOLCHAIN_LANE" = oldest ]; then
           cp .tool-versions.oldest .tool-versions
+          cp mix.lock.oldest mix.lock
         fi
         awk '$1 == "elixir" || $1 == "erlang" { print $1 "=" $2 }' .tool-versions >> "$GITHUB_OUTPUT"
         echo "image=$ImageOS" >> "$GITHUB_OUTPUT"
     - name: Setup toolchain
       uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
       with:
-        version: ${{ env.MISE_VERSION }}
+        version: ${{ inputs.mise-version }}
     # deps and the whole _build (Fluffy too: Mix compares content digests, so a fresh checkout
     # recompiles only what changed, and --warnings-as-errors re-emits the manifest's warnings).
     # Keyed per runner image (PLTs, NIFs and ERTS paths don't carry over) and toolchain. The
@@ -55,3 +61,14 @@ runs:
     - name: Install dependencies
       shell: bash
       run: mix do deps.get + deps.compile
+    # deps.get re-resolves, without failing, a dep whose requirement the lock no longer meets.
+    - name: Check the oldest lane kept its floors
+      if: inputs.lane == 'oldest'
+      shell: bash
+      run: |
+        for dep in phoenix phoenix_live_view; do
+          if [ "$(grep "^  \"$dep\":" mix.lock)" != "$(grep "^  \"$dep\":" mix.lock.oldest)" ]; then
+            echo "::error::mix deps.get moved $dep off its floor in mix.lock.oldest: raise the floor in mix.exs and mix.lock.oldest together"
+            exit 1
+          fi
+        done

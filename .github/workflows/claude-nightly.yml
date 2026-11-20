@@ -14,15 +14,10 @@ permissions:
   contents: read
 
 env:
-  # As in ci.yml.
-  MISE_VERSION: "2026.8.14"
   MIX_ENV: test
   # Runs subagents in the foreground. A headless run ends with Claude's turn, which drops any
   # still running in the background: the survey agents never reported back.
   CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1"
-  # Steers Claude off the Bash habits (cd, pipes, heredocs) that miss the allowlist. Plain text
-  # only (no quotes, $ or backslashes): claude.yml passes it in a quoted claude_args argument.
-  TOOL_HINT: "Prefer your file tools over Bash to read, search and edit files, and keep any scratch files under tmp/; run each allowed Bash command on its own, without cd, git -C, semicolons, &&, pipes or heredocs (you are already in the repository). Give any subagent you start these same rules."
 
 jobs:
   # Frees slots before the cap is counted. A job, not an earlier cron: GitHub delays scheduled
@@ -56,9 +51,8 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
       - name: Run Claude
-        id: claude
         if: steps.list.outputs.numbers != ''
-        uses: anthropics/claude-code-action@f3b070c88125d33dbae5653df5f143101d4ea9dc # v1.0.276
+        uses: ./.github/actions/claude
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
@@ -73,23 +67,11 @@ jobs:
             same change or solved the problem another way. A merge conflict, the PR's age or a
             preference for other work is not a reason. When in doubt, keep it.
 
-            ${{ env.TOOL_HINT }}
-
             To close one, run exactly:
               gh pr close N --delete-branch --comment "<one sentence naming what on main made it obsolete>"
           claude_args: |
-            --model claude-opus-5-5
             --max-turns 60
             --allowedTools "Skill,Read,Grep,Glob,Agent,Task,Bash(git log:*),Bash(git show:*),Bash(git diff:*),Bash(gh pr view:*),Bash(gh pr diff:*),${{ steps.list.outputs.allowed }}"
-      - name: Summarize Claude's result
-        if: ${{ !cancelled() && steps.claude.outputs.execution_file != '' }}
-        env:
-          EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
-        # .github/claude-summary.jq: only the final message and the denied calls (public repo). From
-        # the run's commit, as Claude may have edited the checkout; a failed `git show` stops the step.
-        run: |
-          filter=$(git show "$GITHUB_SHA:.github/claude-summary.jq")
-          jq -r "$filter" "$EXECUTION_FILE" >> "$GITHUB_STEP_SUMMARY"
 
   # After triage, so only PRs worth keeping are looked at. A PR with a human comment or review is
   # left to that human.
@@ -144,6 +126,7 @@ jobs:
 
   # Pushes a fix to each PR whose CI failed, which is where a change gets tested: improve publishes
   # without running the suite. Only new commits, nothing merged from main, so no workflow files.
+  # Postgres and Chromium let Claude rerun the failed tests.
   fix:
     needs: classify
     if: ${{ !cancelled() && needs.classify.result == 'success' && needs.classify.outputs.failing != '[]' }}
@@ -157,6 +140,19 @@ jobs:
       fail-fast: false
       matrix:
         pr: ${{ fromJSON(needs.classify.outputs.failing) }}
+    # As in ci.yml's test job.
+    services:
+      postgres:
+        image: postgres:18.6@sha256:e3d24f6906d0760bf4da0dae872415391ededefad23fd471c47dc53b0ddf3c42
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 1s
+          --health-timeout 5s
+          --health-retries 30
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -166,11 +162,25 @@ jobs:
           persist-credentials: false
           ref: ${{ matrix.pr.branch }}
           fetch-depth: 0
+      # The run's own actions, which a PR branch from before a change to them lacks. Into tmp/,
+      # which is gitignored.
+      - name: Checkout this run's actions
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          path: tmp/ci
+          sparse-checkout: .github/actions
+          persist-credentials: false
       - name: Set up toolchain and deps
-        uses: ./.github/actions/setup
+        uses: ./tmp/ci/.github/actions/setup
         with:
           lane: newest
-      # May fail on a branch that doesn't compile; Claude then runs without it.
+      # These may fail on a branch that doesn't compile; Claude then runs without them.
+      - name: Install Playwright browser
+        continue-on-error: true
+        uses: ./tmp/ci/.github/actions/browser
+      - name: Build test assets
+        continue-on-error: true
+        run: mix assets.build
       - name: Fetch Playwright source
         continue-on-error: true
         run: mix fluffy.playwright_source
@@ -185,8 +195,7 @@ jobs:
           mkdir -p tmp
           gh run view "$run" --log-failed | tail -n 5000 > tmp/ci-failed.log
       - name: Run Claude
-        id: claude
-        uses: anthropics/claude-code-action@f3b070c88125d33dbae5653df5f143101d4ea9dc # v1.0.276
+        uses: ./tmp/ci/.github/actions/claude
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
@@ -198,13 +207,15 @@ jobs:
             tmp/ci-failed.log (tmp/ is gitignored).
 
             Read it along with `gh pr view ${{ matrix.pr.number }}` and
-            `gh pr diff ${{ matrix.pr.number }}` and find the cause. Tests can't run here: CI runs
-            them on your push. Don't merge or rebase on main. End with exactly one of these:
+            `gh pr diff ${{ matrix.pr.number }}` and find the cause. Postgres and Chromium are up:
+            run the failed test files with `mix test <file>` to reproduce it and check your fix. CI
+            runs the whole suite on your push. Don't merge or rebase on main. End with exactly one
+            of these:
 
             - The PR caused it: fix it, keeping what the PR set out to do and the public behaviour,
               and matching the surrounding code. Don't weaken or skip a test to get it green. Run
-              `mix format`, `mix compile --warnings-as-errors` and `mix credo --format oneline`,
-              `git add` the files, commit with one imperative sentence as the subject (match
+              `mix format`, `mix compile --warnings-as-errors`, `mix credo --format oneline` and
+              the failed tests, `git add` the files, commit with one imperative sentence as the subject (match
               `git log`), then run exactly:
                 git push origin ${{ matrix.pr.branch }}
             - It is unrelated to this PR, like a flaky browser test: run exactly
@@ -212,25 +223,10 @@ jobs:
             - It can't be fixed without redesigning the change: run exactly
               gh pr close ${{ matrix.pr.number }} --delete-branch --comment "<one sentence on why>"
 
-            ${{ env.TOOL_HINT }}
-
             No attribution anywhere: no Co-Authored-By trailers or "Generated with" lines.
-          # The owner forbids attribution; the prompt says so too.
-          settings: |
-            {"includeCoAuthoredBy": false, "attribution": {"commit": "", "pr": ""}}
           claude_args: |
-            --model claude-opus-5-5
             --max-turns 60
-            --allowedTools "Skill,Read,Grep,Glob,Edit,Write,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git add:*),Bash(git commit:*),Bash(mix format:*),Bash(mix compile:*),Bash(mix usage_rules.docs:*),Bash(mix usage_rules.search_docs:*),Bash(mix credo:*),Bash(gh pr view ${{ matrix.pr.number }}:*),Bash(gh pr diff ${{ matrix.pr.number }}:*),Bash(git push origin ${{ matrix.pr.branch }}),Bash(gh pr close ${{ matrix.pr.number }} *)"
-      - name: Summarize Claude's result
-        if: ${{ !cancelled() && steps.claude.outputs.execution_file != '' }}
-        env:
-          EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
-        # .github/claude-summary.jq: only the final message and the denied calls (public repo). From
-        # the run's commit, as Claude may have edited the checkout; a failed `git show` stops the step.
-        run: |
-          filter=$(git show "$GITHUB_SHA:.github/claude-summary.jq")
-          jq -r "$filter" "$EXECUTION_FILE" >> "$GITHUB_STEP_SUMMARY"
+            --allowedTools "Skill,Read,Grep,Glob,Edit,Write,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git add:*),Bash(git commit:*),Bash(mix format:*),Bash(mix compile:*),Bash(mix usage_rules.docs:*),Bash(mix usage_rules.search_docs:*),Bash(mix credo:*),Bash(mix test:*),Bash(gh pr view ${{ matrix.pr.number }}:*),Bash(gh pr diff ${{ matrix.pr.number }}:*),Bash(git push origin ${{ matrix.pr.branch }}),Bash(gh pr close ${{ matrix.pr.number }} *)"
 
   # Replaces each conflicted PR with one on a new branch from main. The Claude app can't push
   # workflow file changes, which a merge or rebase of the old branch would carry from main.
@@ -264,8 +260,7 @@ jobs:
         run: mix fluffy.playwright_source
       - run: git switch -c "$NIGHTLY_BRANCH"
       - name: Run Claude
-        id: claude
-        uses: anthropics/claude-code-action@f3b070c88125d33dbae5653df5f143101d4ea9dc # v1.0.276
+        uses: ./.github/actions/claude
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
@@ -289,25 +284,10 @@ jobs:
               gh pr create --base main --head ${{ env.NIGHTLY_BRANCH }} --title "<subject>" --body-file tmp/nightly-pr.md
               gh pr close ${{ matrix.pr }} --delete-branch --comment "Conflicted with main; replaced by <new PR URL>."
 
-            ${{ env.TOOL_HINT }}
-
             No attribution anywhere: no Co-Authored-By trailers or "Generated with" lines.
-          # The owner forbids attribution; the prompt says so too.
-          settings: |
-            {"includeCoAuthoredBy": false, "attribution": {"commit": "", "pr": ""}}
           claude_args: |
-            --model claude-opus-5-5
             --max-turns 60
             --allowedTools "Skill,Read,Grep,Glob,Edit,Write,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git add:*),Bash(git commit:*),Bash(mix format:*),Bash(mix compile:*),Bash(mix credo:*),Bash(mix usage_rules.docs:*),Bash(mix usage_rules.search_docs:*),Bash(gh pr view ${{ matrix.pr }}:*),Bash(gh pr diff ${{ matrix.pr }}:*),Bash(git push -u origin ${{ env.NIGHTLY_BRANCH }}),Bash(gh pr create --base main --head ${{ env.NIGHTLY_BRANCH }} *),Bash(gh pr close ${{ matrix.pr }} *)"
-      - name: Summarize Claude's result
-        if: ${{ !cancelled() && steps.claude.outputs.execution_file != '' }}
-        env:
-          EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
-        # .github/claude-summary.jq: only the final message and the denied calls (public repo). From
-        # the run's commit, as Claude may have edited the checkout; a failed `git show` stops the step.
-        run: |
-          filter=$(git show "$GITHUB_SHA:.github/claude-summary.jq")
-          jq -r "$filter" "$EXECUTION_FILE" >> "$GITHUB_STEP_SUMMARY"
 
   # Enforces the cap before any toolchain is set up. Runs even if an earlier job failed: the
   # count is still right, it just finds fewer slots.
@@ -381,13 +361,15 @@ jobs:
       - name: Pick tonight's focus area
         id: focus
         # By day of the year, so successive nights look at different parts of the code.
+        # Keep the paths in step with lib/.
         run: |
           areas=(
-            "the Static and LiveView drivers: lib/fluffy/driver/static*, lib/fluffy/driver/live*, lib/fluffy/driver/phoenix_validation.ex"
-            "the Playwright driver and backend: lib/fluffy/driver/playwright*, lib/fluffy/backend/playwright*, lib/fluffy/playwright/"
-            "HTML semantics, locators and actionability: lib/fluffy/html/, lib/fluffy/locator*, lib/fluffy/client_dom*, lib/fluffy/actionability.ex"
-            "the public API: lib/fluffy.ex, lib/fluffy/page*, frame*, expect*, options*, phoenix_test* and the error modules"
-            "sessions and runtime: lib/fluffy/session*, browser_runtime*, backend.ex, backend/contract.ex, backend/phoenix*, event*, route*, sandbox.ex, worker.ex"
+            "the Static and LiveView drivers and their form state: lib/fluffy/driver/static*, lib/fluffy/driver/live*, lib/fluffy/driver/phoenix_validation.ex, lib/fluffy/live_view_test/, lib/fluffy/form.ex, lib/fluffy/selected_file.ex"
+            "the Playwright driver and backend: lib/fluffy/driver/playwright*, lib/fluffy/backend/playwright*, lib/fluffy/playwright*, lib/fluffy/open_browser.ex"
+            "HTML semantics, locators and actionability: lib/fluffy/html/, lib/fluffy/locator*, lib/fluffy/frame_locator.ex, lib/fluffy/client_dom*, lib/fluffy/actionability.ex"
+            "the public API: lib/fluffy.ex, lib/fluffy/page*, lib/fluffy/expect*, lib/fluffy/assert.ex, lib/fluffy/options*, lib/fluffy/capability.ex, lib/fluffy/phoenix_test*, lib/fluffy/download.ex, lib/fluffy/file_chooser.ex, lib/fluffy/file_payload.ex and the lib/fluffy/*_error.ex modules"
+            "sessions, backends and events: lib/fluffy/session*, lib/fluffy/backend.ex, lib/fluffy/backend/contract.ex, lib/fluffy/backend/registry.ex, lib/fluffy/backend/phoenix*, lib/fluffy/driver/contract.ex, lib/fluffy/driver/registry.ex, lib/fluffy/driver/external*, lib/fluffy/driver/unvisited/, lib/fluffy/event*, lib/fluffy/cookie_jar.ex, lib/fluffy/sandbox.ex, lib/fluffy/internal/, lib/fluffy/application.ex"
+            "timeouts and the test context: lib/fluffy/timeouts.ex, lib/fluffy/deadline.ex, lib/fluffy/test_timeout.ex, lib/fluffy/test_info.ex, and where the drivers take their timeouts"
             "test/ and its support code, without weakening what a test checks"
           )
           area=${areas[$((10#$(date -u +%j) % ${#areas[@]}))]}
@@ -395,8 +377,7 @@ jobs:
           echo "area=$area" >> "$GITHUB_OUTPUT"
 
       - name: Run Claude
-        id: claude
-        uses: anthropics/claude-code-action@f3b070c88125d33dbae5653df5f143101d4ea9dc # v1.0.276
+        uses: ./.github/actions/claude
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
@@ -421,8 +402,9 @@ jobs:
                more than it adds.
 
             Limits: observable public behaviour stays the same, and driver-specific boundaries stay
-            explicit. No new features, bug fixes, dependency, CI or changelog changes, and no
-            changes that are only formatting, comments or renames to taste.
+            explicit. No new features, bug fixes, dependency or CI changes, and no changes that are
+            only formatting, comments or renames to taste. Users see no change, so, as AGENTS.md
+            says, CHANGELOG.md gets no entry.
 
             Run `mix format`, `mix compile --warnings-as-errors` and `mix credo --format oneline`;
             they must pass. Tests can't run here, in place of AGENTS.md's `mix check`: CI runs them
@@ -438,22 +420,7 @@ jobs:
             Write tmp/nightly-pr.md first (tmp/ is gitignored): a few sentences on what was
             inconsistent or complex and why this is simpler.
 
-            ${{ env.TOOL_HINT }}
-
             No attribution anywhere: no Co-Authored-By trailers or "Generated with" lines.
-          # The owner forbids attribution; the prompt says so too.
-          settings: |
-            {"includeCoAuthoredBy": false, "attribution": {"commit": "", "pr": ""}}
           claude_args: |
-            --model claude-opus-5-5
             --max-turns 150
             --allowedTools "Skill,Read,Grep,Glob,Edit,Write,Agent,Task,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git add:*),Bash(git commit:*),Bash(mix format:*),Bash(mix compile:*),Bash(mix usage_rules.docs:*),Bash(mix usage_rules.search_docs:*),Bash(mix credo:*),Bash(git push -u origin ${{ env.NIGHTLY_BRANCH }}),Bash(gh pr create --base main --head ${{ env.NIGHTLY_BRANCH }} *)"
-      - name: Summarize Claude's result
-        if: ${{ !cancelled() && steps.claude.outputs.execution_file != '' }}
-        env:
-          EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
-        # .github/claude-summary.jq: only the final message and the denied calls (public repo). From
-        # the run's commit, as Claude may have edited the checkout; a failed `git show` stops the step.
-        run: |
-          filter=$(git show "$GITHUB_SHA:.github/claude-summary.jq")
-          jq -r "$filter" "$EXECUTION_FILE" >> "$GITHUB_STEP_SUMMARY"

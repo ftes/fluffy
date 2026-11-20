@@ -1,0 +1,57 @@
+name: Run Claude
+description: Runs claude-code-action with the repo's model, tool hint and no attribution, then writes its result to the step summary.
+
+inputs:
+  claude_code_oauth_token:
+    description: The CLAUDE_CODE_OAUTH_TOKEN secret (a composite action can't read secrets)
+    required: true
+  prompt:
+    description: As claude-code-action's; empty for tag mode
+    default: ""
+  claude_args:
+    description: As claude-code-action's, without --model or --append-system-prompt
+    required: true
+  append_system_prompt:
+    description: Plain text added to the system prompt after the tool hint (no quotes, $ or backslashes)
+    default: ""
+  allowed_bots:
+    description: As claude-code-action's
+    default: ""
+  additional_permissions:
+    description: As claude-code-action's
+    default: ""
+
+outputs:
+  execution_file:
+    value: ${{ steps.claude.outputs.execution_file }}
+
+runs:
+  using: composite
+  steps:
+    - name: Run Claude
+      id: claude
+      uses: anthropics/claude-code-action@f3b070c88125d33dbae5653df5f143101d4ea9dc # v1.0.276
+      with:
+        claude_code_oauth_token: ${{ inputs.claude_code_oauth_token }}
+        prompt: ${{ inputs.prompt }}
+        allowed_bots: ${{ inputs.allowed_bots }}
+        additional_permissions: ${{ inputs.additional_permissions }}
+        # The owner forbids attribution; the prompts say so too.
+        settings: |
+          {"includeCoAuthoredBy": false, "attribution": {"commit": "", "pr": ""}}
+        # The hint steers Claude off the Bash habits (cd, pipes, heredocs) that miss the
+        # allowlists. It sits in a quoted argument, so plain text only.
+        claude_args: |
+          --model claude-opus-5-5
+          --append-system-prompt "Prefer your file tools over Bash to read, search and edit files, and keep any scratch files under tmp/; run each allowed Bash command on its own, without cd, git -C, semicolons, &&, pipes or heredocs (you are already in the repository). Give any subagent you start these same rules. ${{ inputs.append_system_prompt }}"
+          ${{ inputs.claude_args }}
+    # .github/claude-summary.jq: only the final message and the denied calls (public repo). From
+    # the run's commit, as Claude may have edited the checkout; a failed `git show` stops the step.
+    - name: Summarize Claude's result
+      if: ${{ !cancelled() && steps.claude.outputs.execution_file != '' }}
+      shell: bash
+      env:
+        EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
+      run: |
+        filter=$(git show "$GITHUB_SHA:.github/claude-summary.jq")
+        jq -r "$filter" "$EXECUTION_FILE" >> "$GITHUB_STEP_SUMMARY"

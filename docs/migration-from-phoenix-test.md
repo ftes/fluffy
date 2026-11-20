@@ -187,7 +187,7 @@ assert title == "Potions"
 ```
 
 Prefer the native API throughout tests centered on browser scripting, pages,
-or events. See [Events and pages](advanced-events.md) for those workflows.
+or events. See [Advanced events and pages](advanced-events.md) for those workflows.
 
 ## Optional: adopt the locator API
 

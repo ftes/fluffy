@@ -34,6 +34,9 @@ matched once can now match twice.
   +    {:lazy_html, ">= 0.1.0", only: [:dev, :test]},
   +    {:fluffy, "~> 0.9.0", only: [:dev, :test]}
   ```
+- Fluffy requires Phoenix 1.7.24 or later and LiveView 1.2.10 or later; LiveView 1.0 and 1.1
+  are no longer supported. Upgrade them first, raising your requirements where they hold an
+  older version back.
 - PlaywrightEx is renamed `Playwright` (app `:playwright`, modules `Playwright.*`; the Hex
   package stays `playwright_ex`). If you list it, replace `{:playwright_ex, ...}` with the
   line from [Elixir dependency](installation.md#elixir-dependency), where `hex: :playwright_ex`
