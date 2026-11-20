@@ -16,8 +16,9 @@ matched once can now match twice.
   needed. `executable:` now takes a Playwright 1.65 CLI such as
   `node_modules/.bin/playwright`, not `cli.js`; usually drop it and let Playwright
   install the driver.
-- Run the install in CI too, with `-- chromium --with-deps` on Linux runners; the driver
-  would install itself in the first browser test, but browsers do not; see
+- Run the install in CI too, as `mix playwright.install chromium --with-deps` on Linux
+  runners; the driver would install itself in the first browser test, but browsers do
+  not; see
   [GitHub Actions](`e:playwright:debugging-and-ci.md#github-actions`). In Microsoft's
   Playwright image, whose tag must match `Playwright.Driver.version/0`, `--no-browsers`
   is enough: the driver finds the image's browsers. For a system browser, as on Nix, pass
