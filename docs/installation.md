@@ -28,7 +28,7 @@ Playwright comes with Fluffy in the same environments, so `mix playwright.instal
 works without listing it. List it anyway if you use
 [usage rules](#usage-rules-for-coding-agents), as `usage_rules.sync` reads only the
 dependencies `mix.exs` lists:
-`{:playwright, "~> 1.65.0-rc.2", hex: :playwright_ex, only: [:dev, :test]}`. The app is
+`{:playwright, "~> 1.65.0-rc.3", hex: :playwright_ex, only: [:dev, :test]}`. The app is
 `:playwright` and the Hex package `playwright_ex`; `hex: :playwright_ex` is required, since
 `playwright` on Hex is another library.
 
@@ -66,22 +66,20 @@ end
 
 Configure your application endpoint once in `config/test.exs`. Fluffy uses
 it for in-process requests and derives the default session URL from the
-endpoint. When the endpoint has an active HTTP or HTTPS listener, its actual
-bind address and port are authoritative. Fluffy falls back to
-`MyAppWeb.Endpoint.url()` when no listener is running. This supports endpoints
-configured with `port: 0`:
+endpoint: its `url` host, on the scheme and port of its HTTP listener, else its HTTPS one,
+else the `url` config's. So `port: 0` works, and the host is the one Phoenix's default
+`check_origin` allows. Phoenix sessions treat the app's own absolute URLs
+(`MyAppWeb.Endpoint.url()`) as same-origin when the `url` port is the listener's, as with
+`phx.new`'s fixed test port, not with `port: 0`:
 
 ```elixir
 config :fluffy, endpoint: MyAppWeb.Endpoint
 
-config :my_app, MyAppWeb.Endpoint, server: true, check_origin: false
+config :my_app, MyAppWeb.Endpoint, server: true
 ```
 
-The server is required for Playwright tests. The browser opens the listener's
-address, such as `127.0.0.1`, which a stock `localhost` endpoint URL does not
-match, so `check_origin: false` lets the LiveView socket connect. By default Phoenix
-checks only the origin's host against the endpoint's `url` host, so an endpoint
-with `url: [host: "127.0.0.1"]` needs no `check_origin: false`. If Playwright
+The server is required for Playwright tests. With `phx.new`'s defaults the browser opens
+`http://localhost:4002`, which reaches the listener on `127.0.0.1`. If Playwright
 targets an application hosted elsewhere, set Playwright's `base_url` instead; for
 multi-endpoint or dynamic-server tests, pass a session `endpoint:` or `base_url:`
 ([Configuration](#configuration)).
@@ -97,7 +95,7 @@ has a key only where Playwright has no concept.
 
 | Owner | Where, later wins | Keys |
 | --- | --- | --- |
-| Playwright Test | `config :playwright, :test` < project < module (`use Playwright.Test, ...`) < describe or test (`@tag Playwright.Test.use(...)`) | browser, context options such as `base_url`, `extra_http_headers` and `locale`, `action_timeout`, `navigation_timeout`, `trace`, `screenshot`, `video`; suite-wide only: `test_id_attribute` and `config :playwright, :expect, timeout:` |
+| Playwright Test | `config :playwright, :test` < project < module (`use Playwright.Test, ...` or `@moduletag Playwright.Test.use(...)`) < describe or test (`@tag Playwright.Test.use(...)`) | context options such as `base_url`, `extra_http_headers` and `locale`, `action_timeout`, `navigation_timeout`, `trace`, `screenshot`, `video`; up to the module only: the browser (`browser_name`, `launch_options`, `connect_options`); suite-wide only: `test_id_attribute` and `config :playwright, :expect, timeout:` |
 | Fluffy | `config :fluffy` | `endpoint`, `ecto_repos`, `file_input_max_bytes`, `phoenix_backend_timeout` |
 
 What applies to each kind of session:
@@ -116,13 +114,14 @@ So a `Playwright.Test.use(action_timeout: ...)` tag does nothing for a Phoenix s
 Per-test values through tags or projects assume one kind of session per test.
 
 A session's URL is, from the most specific: its `base_url:`, else its `endpoint:`'s, else
-Playwright's resolved `base_url`, else the configured endpoint's. A typical Phoenix app sets no `base_url`: Fluffy takes the endpoint's running
-listener, so `port: 0`, a `PORT` variable or any other dynamic port works, else
-`MyAppWeb.Endpoint.url()` ([Phoenix endpoint](#phoenix-endpoint)). Set
+Playwright's resolved `base_url`, else the configured endpoint's. A typical Phoenix app sets
+no `base_url`: Fluffy takes the endpoint's `url` host on its running listener's port, so
+`port: 0`, a `PORT` variable or any other dynamic port works
+([Phoenix endpoint](#phoenix-endpoint)). Set
 `config :playwright, :test, base_url:` only when the browser reaches the app at another
 address, as from Docker, a remote browser or a proxy; with a dynamic port, set it in
 `config/runtime.exs` inside `if config_env() == :test`. A static `base_url` beats the
-listener's URL, so it breaks a dynamic port.
+endpoint's URL, so it breaks a dynamic port.
 
 - **Levels replace, they don't merge.** As in Playwright, a later level replaces an option's
   whole value, so a tag's `extra_http_headers` replaces the config's map, as does a session's
@@ -136,9 +135,8 @@ listener's URL, so it breaks a dynamic port.
   ([Logging in](usage.md#logging-in)).
 
 ```elixir
-# config/test.exs: no base_url, as the endpoint's listener gives it.
-# `check_origin: false` as the browser opens the listener's address (see Phoenix endpoint).
-config :my_app, MyAppWeb.Endpoint, server: true, check_origin: false
+# config/test.exs: no base_url, as the endpoint gives it.
+config :my_app, MyAppWeb.Endpoint, server: true
 config :fluffy, endpoint: MyAppWeb.Endpoint, ecto_repos: [MyApp.Repo]
 
 config :playwright, :test, browser_name: :chromium, action_timeout: 15_000, navigation_timeout: 15_000
@@ -244,8 +242,9 @@ config :playwright, :test,
   screenshot: :only_on_failure
 ```
 
-`driver: [executable: ...]` optionally points at a Playwright 1.65 CLI such as
-`node_modules/.bin/playwright`, not `cli.js`; by default the pinned driver is used.
+`config :playwright, :driver, executable: ...` optionally points at a Playwright 1.65 CLI such
+as `node_modules/.bin/playwright`, not `cli.js`; by default the pinned driver is used. Put it in
+`config/config.exs`, which `mix playwright.install` reads in `:dev`.
 
 `launch_options` are passed to `Playwright.BrowserType.launch/2` unchanged. Set
 `launch_options: [timeout: 10_000]` to limit browser launch; otherwise Playwright's
@@ -281,13 +280,13 @@ its `browser:` option, else in the test's browser from
 test holds that browser until it ends, and a test that starts no Playwright session takes
 none. At most `workers` tests hold one at once (`config :playwright, :test`, half the
 schedulers by default), others wait for one; see
-[Workers](`e:playwright:testing-with-exunit.md#workers`). No driver or browser starts
+[Workers](`e:playwright:test-artifacts.md#workers`). No driver or browser starts
 until a session needs one, a lost browser is launched again for the next session, and the
 drivers stop after the suite. For more users in a test, start more sessions: each gets its
 own browser context.
 
 To debug one test headed or slowed down, pass it a browser with its own `launch_options:`,
-merged over the config:
+merged one key at a time over the module's, else the config's:
 
 ```elixir
 browser = Playwright.Test.BrowserPool.browser(launch_options: [headless: false, slow_mo: 500])
@@ -297,11 +296,13 @@ browser = Playwright.Test.BrowserPool.browser(launch_options: [headless: false, 
 |> visit("/creatures")
 ```
 
-Call it in `setup_all` to cover a module; `browser_name:` and `driver:` override the same
-way. Other options get a worker of their own, a driver and its browser, which counts toward
-`workers` unless the test or module holds one already; at `workers`, the longest idle worker of
-other options restarts its driver for them. See
-[Debugging one test](`e:playwright:testing-with-exunit.md#debugging-one-test`).
+`browser_name:` overrides the same way. Other options get a worker of their own, a driver and
+its browser, which counts toward `workers` unless the test or module holds one already; at
+`workers`, the longest idle worker of other options restarts its driver for them. For a whole
+module, set `use Playwright.Test, launch_options: [headless: false, slow_mo: 500]` or
+`@moduletag Playwright.Test.use(launch_options: ...)`, which replaces the config's
+`launch_options`: its sessions then get that browser without `browser:`. See
+[Debugging one test](`e:playwright:test-artifacts.md#debugging-one-test`).
 
 To run the browsers on a Playwright server, such as Playwright's Docker image, set
 `connect_options: [ws_endpoint: "ws://localhost:3000/", expose_network: "<loopback>"]` in
@@ -311,7 +312,7 @@ must reach your app, as pages, the Ecto sandbox header and the LiveView socket g
 `expose_network: "<loopback>"` tunnels `localhost` and `127.0.0.1` to your machine, so
 `base_url` stays as it is. Otherwise `base_url` must be an address the container reaches, such as
 `http://host.docker.internal:4002`, and the endpoint's `check_origin` must allow it. See
-[Remote browsers](`e:playwright:testing-with-exunit.md#remote-browsers`) for the options and
+[Remote browsers](`e:playwright:test-artifacts.md#remote-browsers`) for the options and
 an env-var switch.
 
 ## Ecto sandbox

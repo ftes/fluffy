@@ -71,10 +71,11 @@ defmodule Fluffy.Conformance.TestTimeoutTest do
     |> visit("/live/chamber-map")
   end
 
-  # The backstop is 100ms before ExUnit's deadline, which counts from the test's first setup.
+  # The backstop is the test's deadline, 100ms (a 20th of the timeout) before ExUnit's kill,
+  # which counts from the test's first setup.
   defp assert_at_test_timeout do
     %{deadline: deadline} = Playwright.Test.info()
-    assert System.monotonic_time(:millisecond) in (deadline - 100)..deadline
+    assert System.monotonic_time(:millisecond) in deadline..(deadline + 100)
   end
 end
 
@@ -123,10 +124,11 @@ defmodule Fluffy.Conformance.PlaywrightTestTimeoutTest do
     assert_at_test_timeout()
   end
 
-  # The backstop is 100ms before ExUnit's deadline, which counts from the test's first setup.
+  # The backstop is the test's deadline, 100ms (a 20th of the timeout) before ExUnit's kill,
+  # which counts from the test's first setup.
   defp assert_at_test_timeout do
     %{deadline: deadline} = Playwright.Test.info()
-    assert System.monotonic_time(:millisecond) in (deadline - 100)..deadline
+    assert System.monotonic_time(:millisecond) in deadline..(deadline + 100)
   end
 end
 
@@ -159,7 +161,7 @@ defmodule Fluffy.Conformance.SlowSetupTestTimeoutTest do
 
     assert error.message =~ "Test timeout of 2000ms exceeded."
     %{deadline: deadline} = Playwright.Test.info()
-    assert System.monotonic_time(:millisecond) in (deadline - 100)..deadline
+    assert System.monotonic_time(:millisecond) in deadline..(deadline + 100)
   end
 end
 

@@ -11,8 +11,7 @@ config :playwright, :test, launch_options: [headless: true], action_timeout: 15_
 config :fluffy_consumer, FluffyConsumerWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}, port: 0],
   secret_key_base: "nUKuuqXGdDCMZhgOdO7N4WMTxbxPOlNqxUuuXgi7SFZBq5Jsdw5u0LjHKEh+jnfg",
-  server: true,
-  url: [host: "configured.invalid", port: 0, scheme: "http"]
+  server: true
 
 # Print only warnings and errors during test
 config :logger, level: :warning

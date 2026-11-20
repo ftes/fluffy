@@ -125,36 +125,50 @@ defmodule Fluffy.Conformance.CookieTest do
       assert cookies(session) == []
     end
 
-    # As PlaywrightEx's nested objects: a key that is no cookie field, such as `http_only:`
-    # for `httpOnly:`, raises instead of being dropped. Phoenix only until PlaywrightEx checks
-    # `add_cookies`' keys.
-    if driver == :phoenix do
-      @tag driver: driver
-      test "rejects an unknown cookie field, adding none with #{driver}", %{driver: driver} do
-        session = start_session(driver)
-        url = base_url(session)
+    # As PlaywrightEx's `add_cookies`: a key that is no cookie field, such as `http_only:` for
+    # `httpOnly:`, raises instead of being dropped, with the same message on both backends.
+    @tag driver: driver
+    test "rejects an unknown cookie field, adding none with #{driver}", %{driver: driver} do
+      session = start_session(driver)
+      url = base_url(session)
 
-        assert_raise ArgumentError,
-                     ~r/^browserContext.addCookies: unknown field cookies\[1\].http_only, expected one of :_crHasCrossSiteAncestor, :domain, :expires, :httpOnly, :name, :partitionKey, :path, :sameSite, :secure, :url, :value$/,
-                     fn ->
-                       add_cookies(session, [
-                         %{name: "valid", value: "v", url: url},
-                         %{name: "spell", value: "x", url: url, http_only: true}
-                       ])
-                     end
+      error =
+        assert_raise ArgumentError, fn ->
+          add_cookies(session, [
+            %{name: "valid", value: "v", url: url},
+            %{name: "spell", value: "x", url: url, http_only: true}
+          ])
+        end
 
-        assert_raise ArgumentError, ~r/unknown field cookies\[0\]."same_site",/, fn ->
+      assert Exception.message(error) ==
+               "browserContext.addCookies: unknown field cookies[1].http_only, expected one of " <>
+                 "_crHasCrossSiteAncestor, domain, expires, httpOnly, name, partitionKey, path, sameSite, secure, url, value"
+
+      error =
+        assert_raise ArgumentError, fn ->
           add_cookies(session, [%{"name" => "spell", "value" => "x", "url" => url, "same_site" => "Lax"}])
         end
 
-        assert cookies(session) == []
+      assert Exception.message(error) ==
+               ~s|browserContext.addCookies: unknown field cookies[0]."same_site", expected one of | <>
+                 ~s|"_crHasCrossSiteAncestor", "domain", "expires", "httpOnly", "name", "partitionKey", | <>
+                 ~s|"path", "sameSite", "secure", "url", "value"|
 
-        add_cookies(session, [
-          %{name: "spell", value: "x", url: url, partitionKey: "https://hogwarts.example", _crHasCrossSiteAncestor: false}
-        ])
+      assert cookies(session) == []
 
-        assert [%{name: "spell"}] = cookies(session)
-      end
+      # A partitioned cookie is secure, as upstream's CO-056.
+      add_cookies(session, [
+        %{
+          name: "spell",
+          value: "x",
+          url: "https://hogwarts.example",
+          sameSite: "None",
+          partitionKey: "https://hogwarts.example",
+          _crHasCrossSiteAncestor: false
+        }
+      ])
+
+      assert [%{name: "spell"}] = cookies(session)
     end
 
     @tag driver: driver

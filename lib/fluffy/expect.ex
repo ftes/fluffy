@@ -296,7 +296,7 @@ defmodule Fluffy.Expect do
 
   `config :playwright, :expect` sets `update_snapshots:`, where `:none` fails on a
   missing baseline, `:missing` writes it and passes, and `:changed` or `:all` rewrite a
-  mismatching one, and comparison defaults such as `to_have_screenshot: %{maxDiffPixels: 10}`.
+  mismatching one, and comparison defaults such as `to_have_screenshot: [max_diff_pixels: 10]`.
 
   ## Options
 

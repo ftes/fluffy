@@ -645,6 +645,9 @@ defmodule Fluffy.Options do
     end
   end
 
+  # `nil` is Playwright Test's for `""`, which sets no attribute: the browser keeps its default.
+  def test_id_attribute(nil), do: {:ok, "data-testid"}
+
   def test_id_attribute(names), do: {:error, "expected a non-empty string, got: #{inspect(names)}"}
 
   # CSS Syntax's ident-token without escapes; name characters include any non-ASCII one.

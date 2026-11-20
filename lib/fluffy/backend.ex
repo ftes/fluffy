@@ -114,7 +114,8 @@ defmodule Fluffy.Backend do
   defp session_options(options, :playwright), do: put_base_url(options)
 
   defp put_base_url(options) do
-    # As Playwright's `baseURL`, from the most specific level. An endpoint's is its listener's.
+    # As Playwright's `baseURL`, from the most specific level. An endpoint's is its `url` config's,
+    # on its listener's port.
     base_url =
       options[:base_url] || endpoint_url(options[:endpoint]) || Fluffy.TestInfo.fetch!().use[:base_url] ||
         endpoint_url(Application.get_env(:fluffy, :endpoint))
@@ -145,38 +146,29 @@ defmodule Fluffy.Backend do
 
   defp endpoint_url(nil), do: nil
 
+  # The endpoint's configured URL (`struct_url/0`, whose host Phoenix's `check_origin` and the
+  # app's own absolute URLs use), with the scheme and port of its running listener, so `port: 0`
+  # works. The HTTP listener first: a test's HTTPS one often has a self-signed certificate.
   defp endpoint_url(endpoint) do
-    active_listener_url(endpoint) || endpoint.url()
+    url = endpoint.struct_url()
+
+    url =
+      case Enum.find_value([:http, :https], &listener_port(endpoint, &1)) do
+        {scheme, port} -> %{url | scheme: Atom.to_string(scheme), port: port}
+        nil -> url
+      end
+
+    URI.to_string(url)
   end
 
-  defp active_listener_url(endpoint) do
-    if function_exported?(endpoint, :server_info, 1) do
-      Enum.find_value([:http, :https], &listener_url(endpoint, &1))
-    end
-  end
-
-  defp listener_url(endpoint, scheme) do
+  defp listener_port(endpoint, scheme) do
     case endpoint.server_info(scheme) do
-      {:ok, {address, port}} when is_integer(port) and port > 0 ->
-        listener_uri(scheme, address, port)
-
-      _other ->
-        nil
+      {:ok, {_address, port}} when is_integer(port) and port > 0 -> {scheme, port}
+      _other -> nil
     end
   rescue
     _error -> nil
   catch
     _kind, _reason -> nil
   end
-
-  defp listener_uri(scheme, address, port) when tuple_size(address) in [4, 8] do
-    host = address |> reachable_address() |> :inet.ntoa() |> to_string()
-    URI.to_string(%URI{scheme: Atom.to_string(scheme), host: host, port: port})
-  end
-
-  defp listener_uri(_scheme, _address, _port), do: nil
-
-  defp reachable_address({0, 0, 0, 0}), do: {127, 0, 0, 1}
-  defp reachable_address({0, 0, 0, 0, 0, 0, 0, 0}), do: {0, 0, 0, 0, 0, 0, 0, 1}
-  defp reachable_address(address), do: address
 end

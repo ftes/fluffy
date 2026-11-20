@@ -39,7 +39,7 @@ defmodule Fluffy.Support.Server do
     Application.put_env(:fluffy, Endpoint, config)
   end
 
-  defp lease_port do
+  def lease_port do
     {:ok, socket} =
       :gen_tcp.listen(0, [:binary, active: false, ip: {127, 0, 0, 1}, reuseaddr: true])
 

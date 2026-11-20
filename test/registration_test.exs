@@ -149,6 +149,27 @@ defmodule Fluffy.RegistrationBrowserLeaseTest do
   end
 end
 
+defmodule Fluffy.RegistrationSetupAllTest do
+  # `setup_all` is registered too (`Playwright.Test.info/0` works there), but a session belongs to
+  # a test, as Playwright Test's `page` fixture, which `beforeAll` can't use.
+  use ExUnit.Case, async: true
+  use Playwright.Test
+
+  setup_all do
+    for backend <- [:phoenix, :playwright] do
+      assert_raise RuntimeError, ~r/not in its setup_all/, fn ->
+        Fluffy.start_session(backend, endpoint: Fluffy.Support.Web.Endpoint)
+      end
+    end
+
+    %{setup_all_timeout: Fluffy.TestTimeout.fetch()}
+  end
+
+  test "starts no session in setup_all, which has no test backstop", %{setup_all_timeout: timeout} do
+    assert timeout == nil
+  end
+end
+
 defmodule Fluffy.UnregisteredTest do
   # Every session belongs to a registered test.
   use ExUnit.Case, async: true

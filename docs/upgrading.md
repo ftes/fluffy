@@ -16,8 +16,9 @@ matched once can now match twice.
   needed. `executable:` now takes a Playwright 1.65 CLI such as
   `node_modules/.bin/playwright`, not `cli.js`; usually drop it and let Playwright
   install the driver.
-- Run the install in CI too, with `-- chromium --with-deps` on Linux runners; the driver
-  would install itself in the first browser test, but browsers do not; see
+- Run the install in CI too, as `mix playwright.install chromium --with-deps` on Linux
+  runners; the driver would install itself in the first browser test, but browsers do
+  not; see
   [GitHub Actions](`e:playwright:debugging-and-ci.md#github-actions`). In Microsoft's
   Playwright image, whose tag must match `Playwright.Driver.version/0`, `--no-browsers`
   is enough: the driver finds the image's browsers. For a system browser, as on Nix, pass
@@ -57,6 +58,11 @@ matched once can now match twice.
 - `start_session`'s `headers: [{name, value}]` is now `extra_http_headers: %{name => value}`,
   which replaces the test's `extra_http_headers` as in Playwright instead of merging into them.
   `base_url` and `extra_http_headers` in `browser_context:` raise: pass them to the session.
+- The default base URL is the endpoint's `url` host on its listener's port, not the
+  listener's address: `http://localhost:4002` with `phx.new`'s config, not
+  `http://127.0.0.1:4002`. Drop a `check_origin: false` added for browser tests. If the
+  browser can't reach the `url` host, set one it can in `config/test.exs`, or Playwright's
+  `base_url` ([Configuration](installation.md#configuration)).
 - Browser launch gets Playwright's 3-minute default instead of `timeout:`. A
   `launch_options: [timeout: ...]` that raised the limit on 0.8 now shortens it and can
   fail a loaded machine with `browserType.launch: Timeout ... exceeded`, so drop it.
@@ -106,9 +112,8 @@ A browser session's timeouts follow Playwright Test and a Phoenix session's
   and work on Phoenix sessions too: `Fluffy.Playwright.add_cookies(session, cookies)` becomes
   `Fluffy.add_cookies(session, cookies)`. `cookies(session, urls)` takes the URL list. Cookie
   maps use Playwright's camelCase keys (`httpOnly:`, `sameSite:`, `partitionKey:`). A snake_case
-  one such as `http_only:` raises on a Phoenix session, but a browser session still drops it
-  without an error. And
-  `storage_state/2` returns atom keys: `state["cookies"]` becomes `state.cookies`.
+  one such as `http_only:` raises. And `storage_state/2` returns atom keys:
+  `state["cookies"]` becomes `state.cookies`.
 - `Fluffy.HTTPEvent` is gone: request and response events deliver a
   `Playwright.Request` and `Playwright.Response`, as do the other browser events
   (dialog, console, page error, frame, worker and WebSocket) their Playwright values,
@@ -120,10 +125,11 @@ A browser session's timeouts follow Playwright Test and a Phoenix session's
 - `page_status`, `page_to_have_status` and `Fluffy.Page.status` are removed, as in
   Playwright; on Playwright, assert on `Fluffy.Event.response/1` instead.
 - Configure the browser with `config :playwright, :test, browser_name: ..., launch_options:
-  ...` (`driver: [executable: ...]` for a CLI) instead of `config :fluffy, :playwright`,
-  which is removed. `pool_size` goes too: each test takes its own browser from
-  `Playwright.Test.BrowserPool.browser/1`, at most `workers` at once
-  ([Workers](`e:playwright:testing-with-exunit.md#workers`)).
+  ...` (`config :playwright, :driver, executable: ...` in `config/config.exs` for a CLI)
+  instead of `config :fluffy, :playwright`, which is removed. `pool_size` goes too: each
+  test takes its own browser from `Playwright.Test.BrowserPool.browser/1`, at most `workers`
+  at once
+  ([Workers](`e:playwright:test-artifacts.md#workers`)).
 - `Fluffy.Playwright.trace/2`, `artifact_dir` and `trace_dir` are removed. Traces,
   screenshots and videos come from `Playwright.Test`: set
   `config :playwright, :test, trace: :retain_on_failure, screenshot: :only_on_failure`
@@ -200,8 +206,8 @@ Most `unwrap` callbacks that called Playwright with the handle's `frame_id`,
   `Fluffy.set_checked(session, by_css("label[for=terms]"), true)`. As in Playwright, the
   label stands for its input.
 
-The other callbacks get a `%Playwright.Page{}`; see Playwright's
-[upgrade guide](`e:playwright:upgrading.md`).
+The other callbacks get a `%Playwright.Page{}`; Playwright's
+[changelog](`e:playwright:changelog.md`) lists its 1.65 breaking changes.
 
 On Phoenix, `by_role` knows the landmark roles, so a `by_css("nav")` stand-in becomes
 `by_role(:navigation)`, and a named `<section>` is `by_role(:region, name: "...")`.

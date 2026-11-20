@@ -96,6 +96,10 @@ defmodule Fluffy.PlaywrightConfigurationTest do
 
     put_playwright(test: [test_id_attribute: "data-owl,data_hedwig,data-élève,--owl"])
     assert Options.config!(:test_id_attribute) == "data-owl,data_hedwig,data-élève,--owl"
+
+    # Playwright Test's `""` sets none: the default.
+    put_playwright(test: [test_id_attribute: ""])
+    assert Options.config!(:test_id_attribute) == "data-testid"
     Application.delete_env(:playwright, :test)
   end
 
