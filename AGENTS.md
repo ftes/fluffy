@@ -53,3 +53,25 @@ changes get no entry.
 - The compatibility floor is Elixir 1.18 on OTP 27 (`.tool-versions.oldest`) with Phoenix 1.7.24
   and LiveView 1.2.10 (`mix.lock.oldest`), which CI's oldest lane runs. Raise a floor in
   `mix.exs` and `mix.lock.oldest` together.
+
+## Architecture
+
+Five layers, and calls go down only:
+
+1. Public API: `Fluffy`, `Fluffy.Playwright` (and its `Clock`, `Keyboard`, `Mouse`),
+   `Fluffy.Locator`, `Fluffy.Expect`, `Fluffy.Assert`, `Fluffy.PhoenixTest`.
+2. Dispatch: `Fluffy.Backend` starts sessions and runs each operation on the active page's driver.
+3. Backends, `Fluffy.Backend.Phoenix.*` (HTTP, cookie jar, mounting LiveViews, committing a new
+   page) and `Fluffy.Backend.Playwright.*` (browser context, pages, events).
+4. Drivers, one per kind of page, own actions and assertions on the current document:
+   `Fluffy.Driver.Static`, `Fluffy.Driver.Live.*`, `Fluffy.Driver.NoDocument` and
+   `Fluffy.Driver.Playwright.*`. `Fluffy.Driver.Phoenix.*` is what Static and Live share (the
+   in-process DOM, forms, HTML semantics).
+5. Native: `Phoenix.LiveViewTest` and PlaywrightEx.
+
+`Fluffy.Session`, `Fluffy.SessionRuntime`, `Fluffy.Internal.*`, `Fluffy.Options` and the timeout
+modules serve every layer. A driver reports a navigation it starts by returning
+`{:navigate, session, navigation}` (`Fluffy.Driver.Contract`), never by calling up; the backend
+performs it. A new action or assertion belongs in the drivers; a Playwright-only one that is a
+single PlaywrightEx call is a `Fluffy.Playwright.__call__/7` call with its entry in
+`Fluffy.Options.playwright_actions/0`; how a page is loaded or committed belongs in its backend.
