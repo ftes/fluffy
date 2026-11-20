@@ -13,8 +13,9 @@ events, routes, `unwrap` callbacks, regexes and URLs, they are the port's, as in
 ## Playwright Test in ExUnit
 
 `use Playwright.Test` registers each test, which every session needs. Browsers come from its pool,
-and timeouts, traces, screenshots, videos, steps and snapshot names follow Playwright Test on
-every driver. `:infinity` means no limit; `timeout: 0` checks once on assertions and Phoenix
+and its options, timeouts, traces, screenshots, videos, steps and snapshot names follow Playwright
+Test; Phoenix sessions take their timeout from `config :fluffy, phoenix_backend_timeout:`
+([Configuration](docs/installation.md#configuration)). `:infinity` means no limit; `timeout: 0` checks once on assertions and Phoenix
 actions, while Playwright actions and waits reject it.
 
 ## Phoenix drivers that act like a browser
@@ -28,7 +29,7 @@ sandbox, as generated `DataCase` and `ConnCase` do.
 
 The entry below lists them under Breaking; the upgrade guide shows how to move a 0.8 suite.
 
-## 0.9.0
+## Unreleased
 
 Changes since 0.8.0.
 
@@ -36,11 +37,11 @@ Changes since 0.8.0.
 
 - Fluffy runs on Playwright (Hex package `playwright_ex`, `~> 1.65.0-rc.2`) with a pinned Playwright 1.65 driver, installed by `mix playwright.install`. The npm `playwright` package, `assets_dir` and Node.js are no longer needed; `executable:` names a Playwright CLI. Playwright 1.65's own breaking changes apply: actions wait for an element to be not inert, cookie matching follows RFC 6265, and text the browser does not render is not part of accessible names.
 - PlaywrightEx is renamed `Playwright`: the app is `:playwright` and its modules `Playwright.*`, while the Hex package stays `playwright_ex`, and its versions follow Playwright's (major.minor is Playwright's). If you list it, write the dependency line from the installation guide (`hex: :playwright_ex` is required), rename `config :playwright_ex` to `config :playwright`, and port `PlaywrightEx.*` calls in `unwrap` callbacks with Playwright's upgrade guide. `alias Fluffy.Playwright` now shadows `Playwright.*`, so don't alias it where you call the dependency.
-- `use Playwright.Test` after your `ConnCase` replaces `Fluffy.Test.setup`, which is removed. It registers the test, whose traces, screenshots, videos and `error-context.md` replace `Fluffy.Playwright.trace/2`, `artifact_dir` and `trace_dir`: record a module with `use Fluffy.Case, trace: :on` and a describe block or test with `@tag Playwright.Test.use(trace: :on)`. A failed operation no longer writes HTML or the error text.
+- `use Playwright.Test` after your `ConnCase` replaces `Fluffy.Test.setup`, which is removed. It registers the test, whose traces, screenshots, videos and `error-context.md` replace `Fluffy.Playwright.trace/2`, `artifact_dir` and `trace_dir`: record a module with `use Playwright.Test, trace: :on` and a describe block or test with `@tag Playwright.Test.use(trace: :on)`. A failed operation no longer writes HTML or the error text.
 - Every session, Phoenix ones too, needs a registered test (`use Playwright.Test`) and raises outside one. `Fluffy.Case` of the 0.9 release candidates is removed: write `use Playwright.Test`, with the same options, in its place, also in a case template's body and `using`. A step then always records, and a screenshot's `path:` is never required.
 - The application owns the Ecto sandbox, as generated `DataCase` and `ConnCase` do: Fluffy no longer starts, adopts or stops owners, and `sandbox:` and `repos:` are gone. It adds the metadata of `config :fluffy, ecto_repos:` to browser sessions.
 - Browsers come from `Playwright.Test.BrowserPool`, configured by `config :playwright, :test` (`browser_name`, `launch_options`, `driver: [executable: ...]`), at most `workers` at once. `config :fluffy, :playwright` and `pool_size` are removed.
-- Timeouts follow Playwright Test on every driver: `config :playwright, :test, action_timeout:, navigation_timeout:` (no limit by default, so the test's timeout bounds them) and `config :playwright, :expect, timeout:` (5 seconds; Phoenix waited 1). `config :fluffy, action_timeout:, expect_timeout:` override them for Fluffy sessions. `start_session(timeout:)` and `config :fluffy, timeout:` are removed. `timeout: 0` checks once and `:infinity` means no limit; Playwright actions and waits reject `0`. Calls that have no timeout in Playwright, such as `evaluate`, `cookies` and download reads, take none.
+- Configuration follows Playwright Test ([Configuration](docs/installation.md#configuration)): `config :fluffy` keeps only `endpoint`, `ecto_repos`, `file_input_max_bytes` and the new `phoenix_backend_timeout`, and a removed key raises at startup with what to set instead. Browser sessions take Playwright Test's timeouts (`config :playwright, :test, action_timeout:, navigation_timeout:`, no limit by default, so the test's timeout bounds them; `config :playwright, :expect, timeout:`, 5 seconds) from every level, tags included. Phoenix sessions take `config :fluffy, phoenix_backend_timeout:` (1 second) for action retries, assertions and event waits. `config :fluffy, action_timeout:, expect_timeout:` (of the release candidates), `timeout:` and `start_session(timeout:)` are removed. `config :fluffy, base_url:` is removed: a session's URL is its `base_url:`, else Playwright's `base_url`, else the endpoint's, and Phoenix sessions send the test's `extra_http_headers`. `timeout: 0` checks once and `:infinity` means no limit; Playwright actions and waits reject `0`. Calls that have no timeout in Playwright, such as `evaluate`, `cookies` and download reads, take none.
 - `config :fluffy` is validated at startup: an unknown key or the config of a missing module raises.
 - Browser console messages are no longer logged, as in Playwright; `js_logger:` and `Fluffy.Playwright.ConsoleLogger` are removed. Register an `Event.console()` listener instead.
 - Playwright sessions use Playwright's defaults: the `en-US` locale and a 3-minute browser launch timeout.

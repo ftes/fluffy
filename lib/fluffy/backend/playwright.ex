@@ -54,17 +54,17 @@ defmodule Fluffy.Backend.Playwright do
           BrowserContext.close(browser_context)
         end)
 
+      %{action_timeout: action_timeout, navigation_timeout: navigation_timeout} = Timeouts.browser(test_info.use)
+
       context = %Context{
         browser_context: browser_context,
         base_url: base_url,
-        extra_http_headers: headers
+        extra_http_headers: headers,
+        action_timeout: action_timeout,
+        navigation_timeout: navigation_timeout
       }
 
       SessionRuntime.run(runtime, fn ->
-        # The resolved action and navigation timeouts (`Fluffy.Timeouts`), over Playwright.Test's
-        # own: native calls in `unwrap` default to them too, as Fluffy's own calls do.
-        :ok = BrowserContext.set_default_timeout(browser_context, Timeouts.action())
-        :ok = BrowserContext.set_default_navigation_timeout(browser_context, Timeouts.navigation())
         _disposable = BrowserContext.add_init_script!(browser_context, Document.init_script())
       end)
 
@@ -188,7 +188,7 @@ defmodule Fluffy.Backend.Playwright do
   @impl true
   def visit(%Session{} = session, path) do
     state = Session.page_state(session)
-    timeout = Timeouts.navigation()
+    timeout = Timeouts.navigation(session)
 
     navigation!(:visit, fn ->
       _response = navigate!(:goto, [state.page, path, [timeout: timeout]])
@@ -199,7 +199,7 @@ defmodule Fluffy.Backend.Playwright do
   @impl true
   def reload(%Session{} = session, options \\ []) do
     state = Session.page_state(session)
-    native = navigation_options(:reload, options)
+    native = navigation_options(session, :reload, options)
 
     navigation!(:reload, fn ->
       _response = navigate!(:reload, [state.page, native])
@@ -211,7 +211,7 @@ defmodule Fluffy.Backend.Playwright do
   # timeout, so with none they wait as `goto` does.
   @impl true
   def navigate(%Session{} = session, %BrowserCommitted{state: state, url: url, live_navigation_cursor: cursor}) do
-    timeout = Document.bookkeeping_timeout(Timeouts.navigation())
+    timeout = Document.bookkeeping_timeout(Timeouts.navigation(session))
 
     if cursor do
       :ok = ready_navigated_document(state, url, timeout, cursor)
@@ -235,9 +235,9 @@ defmodule Fluffy.Backend.Playwright do
   @impl true
   def history(session, direction, options) do
     state = Session.page_state(session)
-    timeout = Document.bookkeeping_timeout(Timeouts.navigation())
+    timeout = Document.bookkeeping_timeout(Timeouts.navigation(session))
     previous_url = Session.current_page(session).url
-    native = navigation_options(direction, options)
+    native = navigation_options(session, direction, options)
 
     navigation!(direction, fn ->
       response = navigate!(direction, [state.page, native])
@@ -266,8 +266,8 @@ defmodule Fluffy.Backend.Playwright do
 
   # As in Playwright, `wait_until:` defaults to `:load`. Like an action, a
   # navigation can't check once, so it rejects Fluffy's `timeout: 0`.
-  defp navigation_options(operation, options),
-    do: Keyword.put(options, :timeout, Timeouts.playwright_operation!(operation, options))
+  defp navigation_options(session, operation, options),
+    do: Keyword.put(options, :timeout, Timeouts.playwright_operation!(session, operation, options))
 
   # As for an action, Playwright's error, which keeps Playwright's call log,
   # becomes the cause of a `Fluffy.OperationError`.
@@ -288,7 +288,7 @@ defmodule Fluffy.Backend.Playwright do
   # Fluffy's reads and LiveView waits after a navigation get the navigation timeout, not a
   # `timeout:` of the call, which bounds the navigation only.
   defp adopt_navigated_document(session, state) do
-    timeout = Document.bookkeeping_timeout(Timeouts.navigation())
+    timeout = Document.bookkeeping_timeout(Timeouts.navigation(session))
     adopt_probed_document(session, state, Document.adopted_probe!(state, nil, timeout), timeout)
   end
 

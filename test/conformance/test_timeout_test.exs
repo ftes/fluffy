@@ -1,6 +1,7 @@
 defmodule Fluffy.Conformance.TestTimeoutTest do
-  # An operation that would outlast the test, by the suite's action timeout (15 s) or by
-  # `timeout: :infinity`, fails at the test's timeout. `Fluffy.TestTimeoutTest` covers the
+  # An operation that would outlast the test, by the suite's action timeout (15 s) on a
+  # browser or by `timeout: :infinity`, never capped on a Phoenix session, fails at the test's
+  # timeout. `Fluffy.TestTimeoutTest` covers the
   # backstop's bounds without waiting.
   use Fluffy.Support.Case, async: true
 
@@ -21,7 +22,7 @@ defmodule Fluffy.Conformance.TestTimeoutTest do
   @tag driver: :live
   test "an action that outlasts the test fails at the test timeout with live" do
     session = missing_session()
-    error = assert_raise(Fluffy.OperationError, fn -> click(session, @missing) end)
+    error = assert_raise(Fluffy.OperationError, fn -> click(session, @missing, timeout: :infinity) end)
 
     assert error.message =~ "Test timeout of 2000ms exceeded."
     assert error.message =~ ~s|name: "Missing"|
@@ -47,7 +48,7 @@ defmodule Fluffy.Conformance.TestTimeoutTest do
           |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
           |> visit("/chamber")
 
-        assert_raise(ExUnit.AssertionError, fn -> session |> wait_for(Event.download()) |> await() end)
+        assert_raise(ExUnit.AssertionError, fn -> session |> wait_for(Event.download(), timeout: :infinity) |> await() end)
       end
       |> Task.async()
       |> Task.await(:infinity)
@@ -156,11 +157,10 @@ defmodule Fluffy.Conformance.SlowSetupTestTimeoutTest do
     session =
       :phoenix
       |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
-      # Without a registered test (no `use Playwright.Test`), nothing bounds a Phoenix operation but
-      # ExUnit's timeout.
       |> visit("/live/chamber-map")
 
-    error = assert_raise(Fluffy.OperationError, fn -> click(session, by_role(:button, name: "Missing")) end)
+    error =
+      assert_raise(Fluffy.OperationError, fn -> click(session, by_role(:button, name: "Missing"), timeout: :infinity) end)
 
     assert error.message =~ "Test timeout of 2000ms exceeded."
     %{deadline: deadline} = Playwright.Test.info()

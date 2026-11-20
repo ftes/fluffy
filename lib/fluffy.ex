@@ -10,6 +10,9 @@ defmodule Fluffy do
   (`Phoenix.LiveViewTest`) driver for each page; the Playwright backend uses the
   Playwright driver.
 
+  Configuration is Playwright Test's, with `config :fluffy` only for what Playwright has no
+  concept of; see [Configuration](installation.md#configuration).
+
       start_session(:phoenix)
       |> visit("/creatures/new")
       |> fill(by_label("Name"), "Basilisk")
@@ -47,8 +50,9 @@ defmodule Fluffy do
   Configure the application endpoint once with
   `config :fluffy, endpoint: MyAppWeb.Endpoint`. The session base URL uses the
   endpoint's active HTTP or HTTPS listener when available and otherwise falls
-  back to `MyAppWeb.Endpoint.url()`. An explicit `:endpoint` or `:base_url`
-  option overrides the application configuration for this session.
+  back to `MyAppWeb.Endpoint.url()`. Playwright's `base_url` (`config :playwright, :test` or
+  the test's `Playwright.Test.use/1`) overrides it, and a session's `:base_url` overrides both
+  ([Configuration](installation.md#configuration)).
 
   ## Options
 

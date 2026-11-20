@@ -45,20 +45,19 @@ config :fluffy, RepoTwo,
   port: String.to_integer(System.get_env("FLUFFY_DB_PORT", "5432")),
   username: System.get_env("FLUFFY_DB_USER", "postgres")
 
-# A failing action or navigation fails in 15 s, not at the test's timeout, as a loaded machine
-# may take long but not that long. The navigation timeout is Playwright's, as only browsers
-# wait for navigations.
 config :fluffy,
   ecto_repos: [Repo, RepoTwo],
-  endpoint: Endpoint,
-  action_timeout: 15_000
+  endpoint: Endpoint
 
 # The tests write their baselines on first use: written and passed, not failed at the test's end.
 config :playwright, :expect, update_snapshots: :missing
 
+# A failing browser action or navigation fails in 15 s, not at the test's timeout, as a loaded
+# machine may take long but not that long. Phoenix sessions keep Fluffy's own, 1 s by default.
 config :playwright, :test,
   browser_name: browser_engine,
   launch_options: [headless: true],
+  action_timeout: 15_000,
   navigation_timeout: 15_000
 
 # CI keeps a screenshot of each failed test's pages in FLUFFY_ARTIFACT_DIR, and traces the

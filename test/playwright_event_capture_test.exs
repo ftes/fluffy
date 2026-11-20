@@ -36,8 +36,9 @@ defmodule Fluffy.PlaywrightEventCaptureTest do
       page = Session.page_state(session).page
       listeners = response_listeners(page)
 
-      owner =
-        spawn(fn ->
+      # A process with the test in `$callers`, as a session is used from (`Fluffy.Session`).
+      {:ok, owner} =
+        Task.start(fn ->
           pending = wait_for(session, Event.response())
           send(parent, {:pending, pending})
 

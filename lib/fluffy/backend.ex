@@ -78,7 +78,9 @@ defmodule Fluffy.Backend do
   end
 
   defp put_base_url(options, endpoint) do
-    base_url = option(options, :base_url) || endpoint_url(endpoint)
+    # As Playwright's `baseURL`: the session's, else the test's from any level
+    # (`Playwright.Test.info().use`), else the endpoint's, which knows a port of `0`.
+    base_url = options[:base_url] || Fluffy.TestInfo.fetch!().use[:base_url] || endpoint_url(endpoint)
 
     if is_nil(base_url) do
       raise ArgumentError, """
@@ -88,7 +90,7 @@ defmodule Fluffy.Backend do
 
       or:
 
-          config :fluffy, base_url: "http://localhost:4002"
+          config :playwright, :test, base_url: "http://localhost:4002"
 
       or pass `base_url:` to `start_session/2`
       """

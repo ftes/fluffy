@@ -12,6 +12,8 @@ defmodule Fluffy.PlaywrightConfigurationTest do
     :navigation_timeout,
     :expect_timeout,
     :test_id_attribute,
+    :base_url,
+    :phoenix_backend_timeout,
     :expect_timout,
     :file_input_max_bytes,
     Fluffy.Sanbox
@@ -44,7 +46,7 @@ defmodule Fluffy.PlaywrightConfigurationTest do
     put_env(timeout: 2_000)
 
     assert_raise ArgumentError,
-                 ~r/config :fluffy, timeout: is removed.*`config :playwright, :expect, timeout: \.\.\.`.*:test, action_timeout/,
+                 ~r/config :fluffy, timeout: is removed.*`config :playwright, :expect, timeout: \.\.\.`.*:test, action_timeout.*phoenix_backend_timeout/,
                  &Options.config!/0
 
     Application.delete_env(:fluffy, :timeout)
@@ -91,65 +93,42 @@ defmodule Fluffy.PlaywrightConfigurationTest do
                  &Options.config!/0
   end
 
-  test "unset, Fluffy's settings are Playwright's, with its defaults" do
-    assert {Timeouts.action(), Timeouts.navigation(), Timeouts.expect()} == {:infinity, :infinity, 5_000}
-    assert Options.config!(:test_id_attribute) == "data-testid"
-
-    put_playwright(
-      test: [action_timeout: 2_000, navigation_timeout: 3_000, test_id_attribute: "data-owl"],
-      expect: [timeout: 1_000]
-    )
-
-    assert {Timeouts.action(), Timeouts.navigation(), Timeouts.expect()} == {2_000, 3_000, 1_000}
-    assert Options.config!(:test_id_attribute) == "data-owl"
-  end
-
-  test "Fluffy's settings win over Playwright's" do
-    put_playwright(
-      test: [action_timeout: 2_000, navigation_timeout: 3_000, test_id_attribute: "data-owl"],
-      expect: [timeout: 1_000]
-    )
-
-    put_env(action_timeout: 4_000, expect_timeout: 500)
-    assert {Timeouts.action(), Timeouts.navigation(), Timeouts.expect()} == {4_000, 3_000, 500}
-    assert Options.config!(:test_id_attribute) == "data-owl"
-
-    put_env(action_timeout: :infinity, expect_timeout: :infinity)
-    assert {Timeouts.action(), Timeouts.expect()} == {:infinity, :infinity}
-  end
-
-  test "a cached setting follows a later change of either app's env" do
-    put_playwright(expect: [timeout: 1_000])
-    assert Timeouts.expect() == 1_000
-
-    put_playwright(expect: [timeout: 2_000])
-    assert Timeouts.expect() == 2_000
-
-    put_env(expect_timeout: 500)
-    assert Timeouts.expect() == 500
-  end
-
-  # Playwright's `0` means no limit; Fluffy's keep Fluffy's meaning.
-  test "Playwright's 0 is no limit" do
-    put_playwright(test: [action_timeout: 0, navigation_timeout: 0], expect: [timeout: 0])
-    assert {Timeouts.action(), Timeouts.navigation(), Timeouts.expect()} == {:infinity, :infinity, :infinity}
-  end
-
-  # As a call's `timeout: 0`, `expect_timeout: 0` checks once; Playwright actions can't, so
-  # their default rejects it.
-  test "Fluffy's 0 checks assertions once and is rejected for actions" do
-    put_env(expect_timeout: 0)
-    assert Timeouts.expect() == 0
-
-    put_env(action_timeout: 0)
-
-    assert_raise ArgumentError, ~r/invalid config :fluffy: .*action_timeout.*got: 0.*use :infinity/, fn ->
-      Options.config!(:action_timeout)
+  # Only what Playwright has no concept of is Fluffy's: the rest says what to set instead.
+  test "rejects config :fluffy, action_timeout:, expect_timeout: and base_url: for Playwright's" do
+    for {key, value, hint} <- [
+          {:action_timeout, 4_000, ~r/`config :playwright, :test, action_timeout: \.\.\.`.*phoenix_backend_timeout/},
+          {:expect_timeout, 500, ~r/`config :playwright, :expect, timeout: \.\.\.`.*phoenix_backend_timeout/},
+          {:base_url, "http://localhost:4002", ~r/`config :playwright, :test, base_url: \.\.\.`/}
+        ] do
+      put_env([{key, value}])
+      error = assert_raise ArgumentError, &Options.config!/0
+      assert error.message =~ "config :fluffy, #{key}: is removed"
+      assert error.message =~ hint
+      Application.delete_env(:fluffy, key)
     end
   end
 
+  # The test's action and navigation timeouts are resolved as it registers
+  # (`Fluffy.Conformance.DefaultTimeoutTest`); these are read on every operation.
+  test "a browser's expect timeout is Playwright's, a Phoenix session's phoenix_backend_timeout, 1 s by default" do
+    assert {Timeouts.expect(), Timeouts.phoenix()} == {5_000, 1_000}
+
+    put_playwright(expect: [timeout: 300])
+    put_env(phoenix_backend_timeout: 2_000)
+    assert {Timeouts.expect(), Timeouts.phoenix()} == {300, 2_000}
+
+    put_env(phoenix_backend_timeout: 0)
+    assert Timeouts.phoenix() == 0
+  end
+
+  # Playwright's `0` means no limit; Fluffy's checks once.
+  test "Playwright's 0 is no limit" do
+    put_playwright(expect: [timeout: 0])
+    assert Timeouts.expect() == :infinity
+  end
+
   test "rejects invalid values" do
-    for {key, value} <- [action_timeout: -1, expect_timeout: -1] do
+    for {key, value} <- [phoenix_backend_timeout: -1] do
       put_env([{key, value}])
       assert_raise ArgumentError, ~r/invalid config :fluffy: .*#{key}/, &Options.config!/0
       Application.delete_env(:fluffy, key)
@@ -162,14 +141,14 @@ defmodule Fluffy.PlaywrightConfigurationTest do
       assert_raise ArgumentError,
                    ~r/invalid config :playwright, :test: test_id_attribute: .*attribute names/,
                    fn -> Options.config!(:test_id_attribute) end
+
+      # Only `by_test_id` reads it.
+      assert Timeouts.phoenix() == 1_000
     end
 
     put_playwright(test: [test_id_attribute: "data-owl,data_hedwig,data-élève,--owl"])
     assert Options.config!(:test_id_attribute) == "data-owl,data_hedwig,data-élève,--owl"
     Application.delete_env(:playwright, :test)
-
-    put_playwright(test: [navigation_timeout: -1])
-    assert_raise ArgumentError, ~r/invalid navigation_timeout/, &Timeouts.navigation/0
   end
 
   defp put_env(config), do: Enum.each(config, fn {key, value} -> Application.put_env(:fluffy, key, value) end)

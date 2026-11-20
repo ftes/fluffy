@@ -53,7 +53,11 @@ defmodule Fluffy.Driver.Playwright do
       {:ok, :expectation}
     end
 
-    case navigation_aware_action(session, Timeouts.get(expectation.options, &Timeouts.expect/0), action) do
+    case navigation_aware_action(
+           session,
+           Timeouts.get(expectation.options, &Timeouts.expect/0),
+           action
+         ) do
       {:ok, :expectation, outcome} -> outcome
       {:error, error} -> expectation_failed!(expectation, error, "")
     end
@@ -76,15 +80,8 @@ defmodule Fluffy.Driver.Playwright do
 
   # Upstream's expectScreenshot takes each screenshot under the expect timeout, so a
   # screenshot assertion can't check once at 1ms, as an action can't.
-  defp expect_timeout(%Expect{kind: :screenshot, options: options}) do
-    if not Keyword.has_key?(options, :timeout) and Timeouts.expect() == 0 do
-      raise ArgumentError,
-            "to_have_screenshot: config :fluffy, expect_timeout: 0 means check once, which a screenshot " <>
-              "assertion can't do, as it takes screenshots until two match; pass it a positive timeout:"
-    end
-
-    Deadline.playwright_operation!(:to_have_screenshot, Timeouts.get(options, &Timeouts.expect/0))
-  end
+  defp expect_timeout(%Expect{kind: :screenshot, options: options}),
+    do: Deadline.playwright_operation!(:to_have_screenshot, Timeouts.get(options, &Timeouts.expect/0))
 
   defp expect_timeout(expectation), do: Timeouts.playwright_expect(expectation.options)
 
@@ -408,9 +405,10 @@ defmodule Fluffy.Driver.Playwright do
   end
 
   defp read(session, operation, target, options, fun) do
-    timeout = Timeouts.playwright_operation!(operation, options)
+    default = Timeouts.operation(session, operation, options)
+    timeout = Deadline.playwright_operation!(operation, default)
 
-    case navigation_aware_action(session, Timeouts.operation(operation, options), fn -> fun.(timeout) end) do
+    case navigation_aware_action(session, default, fn -> fun.(timeout) end) do
       {:ok, value, outcome} -> {:return, value, outcome}
       {:error, error} -> OperationFailure.raise_playwright!(operation, target, error)
     end
@@ -482,7 +480,7 @@ defmodule Fluffy.Driver.Playwright do
       {:ok, result}
     end
 
-    case navigation_aware_action(session, Timeouts.action(), action) do
+    case navigation_aware_action(session, Timeouts.action(session), action) do
       {:ok, result, outcome} -> {:return, result, outcome}
       {:error, error} -> OperationFailure.raise_playwright!(operation, target, error)
     end
@@ -495,7 +493,7 @@ defmodule Fluffy.Driver.Playwright do
   def clock(%Session{} = session, operation, fun) do
     clock = BrowserPage.clock(Session.page_state(session).page)
 
-    case navigation_aware_action(session, Timeouts.action(), fn -> result(fun.(clock)) end) do
+    case navigation_aware_action(session, Timeouts.action(session), fn -> result(fun.(clock)) end) do
       {:ok, :ok, outcome} -> outcome
       {:error, error} -> OperationFailure.raise_playwright!(operation, nil, error)
     end
@@ -532,9 +530,10 @@ defmodule Fluffy.Driver.Playwright do
   end
 
   defp action(session, operation, target, options, fun) do
-    timeout = Timeouts.playwright_operation!(operation, options)
+    default = Timeouts.operation(session, operation, options)
+    timeout = Deadline.playwright_operation!(operation, default)
 
-    case navigation_aware_action(session, Timeouts.operation(operation, options), fn -> result(fun.(timeout)) end) do
+    case navigation_aware_action(session, default, fn -> result(fun.(timeout)) end) do
       {:ok, _value, outcome} -> outcome
       {:error, error} -> OperationFailure.raise_playwright!(operation, target, error)
     end

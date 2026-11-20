@@ -9,7 +9,7 @@ defmodule Fluffy.Backend.Phoenix.HTTP.Client do
           cookie_jar: Fluffy.CookieJar.t(),
           endpoint: module(),
           initial_conn: Plug.Conn.t() | nil,
-          request_headers: [{String.t(), String.t()}]
+          request_headers: [{String.Chars.t(), String.Chars.t()}]
         }
 end
 

@@ -48,13 +48,18 @@ defmodule Fluffy.Backend.Phoenix do
         endpoint: Keyword.fetch!(options, :endpoint),
         cookie_jar: Fluffy.CookieJar.new(),
         initial_conn: Keyword.get(options, :conn),
-        request_headers: Keyword.get(options, :headers, [])
+        request_headers: test_headers() ++ Keyword.get(options, :headers, [])
       }
     }
 
     page = %Page.State{driver: :unvisited, state: %UnvisitedState{}}
     Session.new(__MODULE__, context, page)
   end
+
+  # The test's `extra_http_headers` (`Playwright.Test.use/1`), as a browser context sends
+  # them, under the session's `headers:`, which are put after them (`HTTP` normalizes both).
+  defp test_headers,
+    do: for({name, value} <- Fluffy.TestInfo.fetch!().use[:extra_http_headers] || [], value != nil, do: {name, value})
 
   @doc false
   def session_for_html(html) when is_binary(html) do

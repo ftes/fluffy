@@ -48,7 +48,8 @@ LiveView expectations observe fresh renders and retry until they pass or reach
 their deadline. Supported LiveView actions also retry transient missing or
 actionability failures, as listed below. Waiting is enabled by default; pass
 `timeout:` to an action or expectation to change its deadline. As in Playwright Test,
-it defaults to the [configured](installation.md#timeouts) action or expect timeout.
+it defaults to the [configured](installation.md#configuration) timeout: Playwright's on a
+browser, `phoenix_backend_timeout` on Phoenix.
 Static checks are immediate. Playwright uses the browser's native waiting behavior.
 
 When a Playwright visit finds LiveView roots, it waits for every root, including
