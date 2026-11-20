@@ -29,8 +29,11 @@ defmodule Fluffy.Backend.Phoenix.CookieJar do
   # which Chromium's `cookies()` gives partitioned cookies, are accepted and ignored, so a
   # browser session's cookies round-trip. Another key raises, as PlaywrightEx raises for a
   # nested object's.
-  @known_fields @fields |> Keyword.keys() |> Enum.concat([:partitionKey, :_crHasCrossSiteAncestor]) |> Enum.sort()
-  @known_names Enum.map(@known_fields, &Atom.to_string/1)
+  @known_names @fields
+               |> Keyword.keys()
+               |> Enum.concat([:partitionKey, :_crHasCrossSiteAncestor])
+               |> Enum.map(&Atom.to_string/1)
+               |> Enum.sort()
 
   def new, do: %__MODULE__{}
 
@@ -116,12 +119,13 @@ defmodule Fluffy.Backend.Phoenix.CookieJar do
     %{jar | cookies: cookies}
   end
 
-  # PlaywrightEx's check of a nested object's keys, with its message.
+  # PlaywrightEx's check of a nested object's keys, with its message: bare names for atom
+  # keys, quoted ones for string keys.
   defp check_fields!({cookie, index}) when is_map(cookie) do
     for {key, _value} <- cookie, not ((is_atom(key) or is_binary(key)) and to_string(key) in @known_names) do
       raise ArgumentError,
             "browserContext.addCookies: unknown field cookies[#{index}].#{field_name(key)}, expected one of " <>
-              Enum.map_join(@known_fields, ", ", &inspect/1)
+              if(is_binary(key), do: Enum.map_join(@known_names, ", ", &inspect/1), else: Enum.join(@known_names, ", "))
     end
   end
 

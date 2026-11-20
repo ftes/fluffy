@@ -135,7 +135,7 @@ defmodule Fluffy.Conformance.CookieTest do
         url = base_url(session)
 
         assert_raise ArgumentError,
-                     ~r/^browserContext.addCookies: unknown field cookies\[1\].http_only, expected one of :_crHasCrossSiteAncestor, :domain, :expires, :httpOnly, :name, :partitionKey, :path, :sameSite, :secure, :url, :value$/,
+                     ~r/^browserContext.addCookies: unknown field cookies\[1\].http_only, expected one of _crHasCrossSiteAncestor, domain, expires, httpOnly, name, partitionKey, path, sameSite, secure, url, value$/,
                      fn ->
                        add_cookies(session, [
                          %{name: "valid", value: "v", url: url},
@@ -143,9 +143,11 @@ defmodule Fluffy.Conformance.CookieTest do
                        ])
                      end
 
-        assert_raise ArgumentError, ~r/unknown field cookies\[0\]."same_site",/, fn ->
-          add_cookies(session, [%{"name" => "spell", "value" => "x", "url" => url, "same_site" => "Lax"}])
-        end
+        assert_raise ArgumentError,
+                     ~r/unknown field cookies\[0\]."same_site", expected one of "_crHasCrossSiteAncestor", "domain", /,
+                     fn ->
+                       add_cookies(session, [%{"name" => "spell", "value" => "x", "url" => url, "same_site" => "Lax"}])
+                     end
 
         assert cookies(session) == []
 
