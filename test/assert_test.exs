@@ -26,6 +26,19 @@ defmodule Fluffy.AssertTest do
     assert error.message == "custom refutation"
   end
 
+  # ExUnit's `refute match?(...)` calls an unqualified `refute(value, expr: ...)`, which resolves
+  # to `use Fluffy.Assert`'s `refute/2`: it passes and fails as ExUnit's.
+  test "refute match? passes and fails as ExUnit's" do
+    owl = Process.get(:owl, {:ok, :hedwig})
+
+    refute match?({:error, _}, owl)
+    assert match?({:ok, _}, owl)
+
+    error = assert_raise ExUnit.AssertionError, fn -> refute match?({:ok, _}, owl) end
+    assert error.message == "match (match?) succeeded, but should have failed"
+    assert Macro.to_string(error.expr) == "refute match?({:ok, _}, owl)"
+  end
+
   test "typed expectations and session expressions are evaluated once" do
     session = Fluffy.session_for_html(:static, "<p>Response</p>")
 
