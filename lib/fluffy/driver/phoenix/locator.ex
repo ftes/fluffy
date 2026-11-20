@@ -1,4 +1,4 @@
-defmodule Fluffy.Locator.Static do
+defmodule Fluffy.Driver.Phoenix.Locator do
   @moduledoc false
 
   alias Fluffy.Driver.Phoenix.HTML.Aria

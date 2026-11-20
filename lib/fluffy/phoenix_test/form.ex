@@ -19,7 +19,7 @@ defmodule Fluffy.PhoenixTest.Form do
   # As a locator read, the action timeout bounds it.
   defp browser_owner(session, frame, locator) do
     case frame
-         |> Fluffy.Locator.Playwright.locator(locator)
+         |> Fluffy.Driver.Playwright.Locator.locator(locator)
          |> Playwright.Locator.evaluate(
            """
            element => {

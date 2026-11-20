@@ -2,8 +2,8 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM.Query do
   @moduledoc false
 
   alias Fluffy.Driver.Phoenix.HTML.DocumentIndex
+  alias Fluffy.Driver.Phoenix.Locator, as: PhoenixLocator
   alias Fluffy.Locator
-  alias Fluffy.Locator.Static
 
   # Ignore strings, comments and escaped characters when replacing pseudo-classes.
   @css_tokens ~r/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\/\*.*?\*\/|\\.|:checked(?![\w-])/is
@@ -13,7 +13,7 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM.Query do
     rewritten = rewrite(locator, marker)
 
     if rewritten == locator do
-      Static.resolve(document, locator)
+      PhoenixLocator.resolve(document, locator)
     else
       # Project current user-input state for this query only. Keep the rendered
       # attributes intact: [checked]/[selected] describe defaults, :checked the
@@ -24,7 +24,7 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM.Query do
 
       tree
       |> LazyHTML.from_tree()
-      |> Static.resolve_uncached(rewritten)
+      |> PhoenixLocator.resolve_uncached(rewritten)
       |> Enum.map(&Map.fetch!(original_nodes, DocumentIndex.path(&1)))
     end
   end

@@ -1,4 +1,4 @@
-defmodule Fluffy.Locator.Playwright do
+defmodule Fluffy.Driver.Playwright.Locator do
   @moduledoc false
   # Builds a Playwright locator from a `Fluffy.Locator`, one call per operation; it never writes selector strings.
 
@@ -51,7 +51,7 @@ defmodule Fluffy.Locator.Playwright do
     do: call(scope, :get_by_title, [text, options])
 
   # Playwright's own: the attribute is Playwright Test's `test_id_attribute`, which each
-  # pooled driver gets, as the Phoenix drivers read it (`Fluffy.Locator.Static`).
+  # pooled driver gets, as the Phoenix drivers read it (`Fluffy.Driver.Phoenix.Locator`).
   defp apply_operation(_frame, {:test_id, test_id}, scope), do: call(scope, :get_by_test_id, [test_id])
 
   defp apply_operation(frame, {:and, right}, scope), do: scope |> native() |> Native.and_(locator(frame, right))

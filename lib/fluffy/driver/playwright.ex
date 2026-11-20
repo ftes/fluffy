@@ -6,12 +6,12 @@ defmodule Fluffy.Driver.Playwright do
   alias Fluffy.Deadline
   alias Fluffy.Driver.Playwright.Document
   alias Fluffy.Driver.Playwright.Listeners
+  alias Fluffy.Driver.Playwright.Locator, as: PlaywrightLocator
   alias Fluffy.Expect
   alias Fluffy.FileChooser
   alias Fluffy.Internal.NavigationFailure
   alias Fluffy.Internal.OperationFailure
   alias Fluffy.Locator
-  alias Fluffy.Locator.Playwright, as: PlaywrightLocator
   alias Fluffy.Session
   alias Fluffy.Timeouts
   alias Playwright.AbortController
@@ -300,14 +300,12 @@ defmodule Fluffy.Driver.Playwright do
     locator_action(session, :press, locator, options, &BrowserLocator.press(&1, key, native(options, &2)))
   end
 
-  # A `Fluffy.Playwright.__call__/7` call: the PlaywrightEx call of the `native` entry of
-  # `Fluffy.Options.playwright_actions/0`, on the page or the target's locator, with
-  # `arguments`, their locators resolved, and the options with the timeout. As in
+  # The driver's end of `Fluffy.Playwright.__call__/7`, which documents the contract. As in
   # Playwright, a locator's `timeout:` limits finding its element, not a read of it.
   def native_call(session, kind, {operation, native}, target, arguments, options) do
     {module, function, _arity} = Keyword.fetch!(Fluffy.Options.playwright_actions(), native)
     options = resolve_mask(options, session)
-    arguments = Enum.map(arguments, &if(is_struct(&1, Locator), do: locator(session, &1), else: &1))
+    arguments = native_arguments(session, native, arguments)
 
     {native_target, target} =
       if target == :page, do: {Session.page_state(session).page, nil}, else: {locator(session, target), target}
@@ -325,6 +323,11 @@ defmodule Fluffy.Driver.Playwright do
         action(session, operation, target, options, &with({:ok, handle} <- call.(&1), do: Document.release(handle)))
     end
   end
+
+  # Only `drag_to`'s target is a locator to resolve; any other argument is data, such as a
+  # `Fluffy.Locator` passed as the `arg` of an evaluation.
+  defp native_arguments(session, :drag_to, [%Locator{} = target]), do: [locator(session, target)]
+  defp native_arguments(_session, _native, arguments), do: arguments
 
   def evaluate_all(session, locator, expression, arg) do
     native_locator = locator(session, locator)

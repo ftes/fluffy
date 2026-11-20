@@ -19,7 +19,7 @@ defmodule Fluffy.PhoenixTest.Query do
   # As in Playwright, `count` has no timeout and waits while a script blocks the page.
   defp page_matches?(%Driver.Playwright.State{frame: frame}, locator) do
     # Probe presence only. The selected click retains native waiting and strictness.
-    native = Fluffy.Locator.Playwright.locator(frame, locator)
+    native = Fluffy.Driver.Playwright.Locator.locator(frame, locator)
 
     case Playwright.Locator.count(native) do
       {:ok, count} -> count > 0
