@@ -6,8 +6,6 @@ defmodule Fluffy.Conformance.FormCapabilityTest do
   import Fluffy.Locator
 
   alias Fluffy.Support.HTTPFixtures
-  alias Fluffy.Support.Server
-  alias Fluffy.Support.Web.Endpoint
 
   test "Static bypasses native constraint validation and submits structurally" do
     fixture =
@@ -19,10 +17,7 @@ defmodule Fluffy.Conformance.FormCapabilityTest do
       ])
 
     :phoenix
-    |> start_session(
-      base_url: Server.base_url(),
-      endpoint: Endpoint
-    )
+    |> start_session()
     |> visit(HTTPFixtures.path(fixture, "/start"))
     |> click(by_role(:button, name: "Save"))
     |> expect("Submitted" |> by_text() |> to_be_visible())
@@ -30,10 +25,7 @@ defmodule Fluffy.Conformance.FormCapabilityTest do
 
   test "Live bypasses native constraint validation and submits structurally" do
     :phoenix
-    |> start_session(
-      base_url: Server.base_url(),
-      endpoint: Endpoint
-    )
+    |> start_session()
     |> visit("/live/potions")
     |> click(by_role(:button, name: "Seal required potion"))
     |> expect("Constrained form submitted" |> by_text() |> to_be_visible())

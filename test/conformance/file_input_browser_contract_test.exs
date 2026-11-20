@@ -77,6 +77,6 @@ defmodule Fluffy.Conformance.FileInputBrowserContractTest do
   end
 
   defp playwright_session(html) do
-    session_for_html(:playwright, html, base_url: Fluffy.Support.Server.base_url())
+    session_for_html(:playwright, html)
   end
 end

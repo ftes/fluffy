@@ -8,11 +8,10 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
   alias Fluffy.PhoenixTest.Session
   alias Fluffy.Support.FormValue
   alias Fluffy.Support.HTTPFixtures
-  alias Fluffy.Support.Server
   alias Fluffy.Support.Web.Endpoint
   alias Fluffy.Support.Web.FacadeLocatorsLive
 
-  for driver <- [:static, :live, :playwright] do
+  for driver <- Drivers.all() do
     @tag driver: driver
     test "assert_has and refute_has take a locator with the selector's options with #{driver}" do
       field = ".field" |> Locator.by_css() |> Locator.filter(has: Locator.by_label("Email"))
@@ -127,7 +126,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
     |> assert_has("#saved", text: "Saved typed")
   end
 
-  for driver <- [:static, :playwright] do
+  for driver <- Drivers.html() do
     @tag driver: driver
     test "an or_ operand of a within parent stays inside the facade's scope with #{driver}" do
       parents = Locator.or_(Locator.by_css(".a"), Locator.by_css(".b"))
@@ -166,7 +165,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
     end)
   end
 
-  for driver <- [:static, :playwright] do
+  for driver <- Drivers.html() do
     @tag driver: driver
     test "exact text assertions preserve CSS candidates, counts, positions, and scopes with #{driver}" do
       unquote(driver)
@@ -263,7 +262,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
       path = HTTPFixtures.path(fixture)
 
       unquote(if driver == :static, do: :phoenix, else: driver)
-      |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+      |> start_session()
       |> visit(path)
       |> within("main", fn session -> click_link(session, "a", "Delete", exact: true) end)
       |> assert_path(path, query_params: %{"delete" => ""})
@@ -286,7 +285,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
 
       session =
         unquote(if driver == :static, do: :phoenix, else: driver)
-        |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+        |> start_session()
         |> visit(path)
         |> click_link("a", "Open", exact: true)
         |> assert_path(path, query_params: %{"text" => ""})
@@ -558,7 +557,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
 
       session =
         :phoenix
-        |> start_session(endpoint: Endpoint)
+        |> start_session()
         |> visit(HTTPFixtures.path(fixture))
         |> fill_in("Name", with: "Hermione")
 
@@ -590,7 +589,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
     end
   end
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "exact CSS clicks distinguish overlapping button and link text with #{driver}" do
       fixture =
@@ -607,7 +606,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
         })
 
       unquote(driver)
-      |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture))
       |> click_button("button", "Union: None", exact: true)
       |> assert_path(HTTPFixtures.path(fixture), query_params: %{choice: "none"})
@@ -631,7 +630,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
         ])
 
       unquote(driver)
-      |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/start"))
       |> within("#two", &submit(&1, Locator.by_css("form")))
       |> assert_has("p", text: "Saved")
@@ -656,7 +655,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
         ])
 
       unquote(driver)
-      |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/start"))
       |> fill_in("One", with: "typed")
       |> within("#two", &submit/1)
@@ -684,7 +683,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
 
       session =
         unquote(driver)
-        |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+        |> start_session()
         |> visit(HTTPFixtures.path(fixture, "/start"))
 
       assert_raise ArgumentError, ~r/no active form/, fn -> submit(session) end
@@ -716,7 +715,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
 
       session =
         unquote(driver)
-        |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+        |> start_session()
         |> visit(path)
         |> fill_in("Name", with: "Hermione")
 
@@ -734,7 +733,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
 
       session =
         unquote(driver)
-        |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+        |> start_session()
         |> visit(HTTPFixtures.path(fixture))
         |> fill_in("Name", with: "Hermione")
 
@@ -751,7 +750,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
     @tag driver: driver
     test "submit retains the active form across LiveView patches with #{driver}" do
       unquote(driver)
-      |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+      |> start_session()
       |> visit("/live/chamber-map")
       |> fill_in("Map step", with: "filtered")
       |> assert_path("/live/chamber-map", query_params: %{step: "filtered"})
@@ -769,7 +768,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
       for link <- ["Secret chamber", "Patching chamber", "Sleeping chamber"] do
         session =
           unquote(driver)
-          |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+          |> start_session()
           |> visit("/live/chamber-map")
           |> fill_in("Map step", with: "filtered")
           |> click_link(link)
@@ -781,7 +780,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
     @tag driver: driver
     test "submit uses current LiveView form state after changes with #{driver}" do
       unquote(driver)
-      |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+      |> start_session()
       |> visit("/live/potions")
       |> fill_in("First ingredient", with: "moonstone")
       |> submit()
@@ -797,7 +796,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
 
       session =
         unquote(driver)
-        |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+        |> start_session()
         |> visit(path <> "?page=2&ready=true&search=a%2Bb+%26+c#section")
         |> assert_path(pattern)
         |> assert_path(pattern, query_params: query, timeout: 0)
@@ -835,7 +834,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
     @tag driver: driver
     test "wildcard paths work after LiveView navigation with #{driver}" do
       unquote(driver)
-      |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+      |> start_session()
       |> visit("/chamber")
       |> assert_path("/*")
       |> visit("/live/three-heads?ready=true")
@@ -855,7 +854,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
 
       session =
         unquote(driver)
-        |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+        |> start_session()
         |> visit(HTTPFixtures.path(fixture, "/title"))
 
       session
@@ -888,7 +887,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
       path = Path.expand("../support/fixtures/fluffy-upload.txt", __DIR__)
 
       unquote(driver)
-      |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/upload/start"))
       |> upload("Evidence", path)
       |> upload("Evidence", path, [])
@@ -922,7 +921,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
           ])
 
         unquote(driver)
-        |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+        |> start_session()
         |> visit(HTTPFixtures.path(fixture, "/upload/start"))
         |> click_button("Upload")
         |> assert_has("p", "Uploaded")
@@ -944,7 +943,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
         ])
 
       unquote(driver)
-      |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/upload/start"))
       |> click_button("Upload")
       |> assert_has("p", "Uploaded")
@@ -971,7 +970,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
 
         session =
           unquote(driver)
-          |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+          |> start_session()
           |> visit(HTTPFixtures.path(fixture, "/upload/start"))
 
         session =
@@ -998,7 +997,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
 
     @tag driver: driver
     test "scoped LiveView actions and page utilities preserve reconciled sessions with #{driver}" do
-      session = start_session(unquote(driver), base_url: Server.base_url(), endpoint: Endpoint)
+      session = start_session(unquote(driver))
 
       session
       |> visit("/live/three-heads")
@@ -1018,7 +1017,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
     @tag driver: driver
     test "assertions forward retry timeouts with #{driver}" do
       unquote(driver)
-      |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+      |> start_session()
       |> visit("/live/async?delay=40")
       |> assert_has("p", "Status: ready", timeout: 1_000)
       |> refute_has("p", "Status: waiting", timeout: 0)
@@ -1039,7 +1038,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
 
     session =
       :playwright
-      |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture))
       |> unwrap(&send(self(), {:page, &1}))
       |> fill_in("Name", with: "Hermione")
@@ -1156,7 +1155,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
 
   defp locators_session(:live, markup) do
     :phoenix
-    |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+    |> start_session()
     |> visit("/live/facade-locators/#{markup}")
   end
 
@@ -1166,12 +1165,12 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
   defp quotes_page(:static) do
     fixture = HTTPFixtures.register(%{body: FacadeLocatorsLive.markup("quotes")})
     path = HTTPFixtures.path(fixture)
-    {:phoenix |> start_session(base_url: Server.base_url(), endpoint: Endpoint) |> visit(path), path}
+    {:phoenix |> start_session() |> visit(path), path}
   end
 
   defp quotes_page(driver) do
     path = "/live/facade-locators/quotes"
     driver = if driver == :live, do: :phoenix, else: driver
-    {driver |> start_session(base_url: Server.base_url(), endpoint: Endpoint) |> visit(path), path}
+    {driver |> start_session() |> visit(path), path}
   end
 end

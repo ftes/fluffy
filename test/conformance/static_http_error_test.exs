@@ -7,7 +7,7 @@ defmodule Fluffy.Conformance.StaticHTTPErrorTest do
 
   alias Fluffy.Support.HTTPFixtures
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "renders an HTTP error response as a page with #{driver}", %{driver: driver} do
       fixture =
@@ -16,7 +16,7 @@ defmodule Fluffy.Conformance.StaticHTTPErrorTest do
           body: "<!doctype html><html><body><h1>Owl not found</h1></body></html>"
         })
 
-      session = start_test_session(driver)
+      session = start_session(driver)
 
       session
       |> visit(HTTPFixtures.path(fixture, "/missing"))
@@ -32,7 +32,7 @@ defmodule Fluffy.Conformance.StaticHTTPErrorTest do
           body: "<!doctype html><html><body><h1>No redirect target</h1></body></html>"
         })
 
-      session = start_test_session(driver)
+      session = start_session(driver)
 
       session
       |> visit(HTTPFixtures.path(fixture, "/no-location"))
@@ -42,7 +42,7 @@ defmodule Fluffy.Conformance.StaticHTTPErrorTest do
   end
 
   test "Phoenix reports an unsupported navigation scheme precisely" do
-    session = start_test_session(:phoenix)
+    session = start_session(:phoenix)
 
     error =
       assert_raise Fluffy.CapabilityError, ~r/:visit \(:external_navigation\).*mailto/s, fn ->
@@ -53,7 +53,7 @@ defmodule Fluffy.Conformance.StaticHTTPErrorTest do
   end
 
   test "Phoenix reports a same-scheme cross-origin navigation precisely" do
-    session = start_test_session(:phoenix)
+    session = start_session(:phoenix)
 
     error =
       assert_raise Fluffy.CapabilityError, ~r/external_navigation/, fn ->
@@ -80,7 +80,7 @@ defmodule Fluffy.Conformance.StaticHTTPErrorTest do
     error =
       assert_raise Fluffy.CapabilityError, ~r/mailto/, fn ->
         :phoenix
-        |> start_test_session()
+        |> start_session()
         |> visit("/chamber")
         |> visit(HTTPFixtures.path(fixture, "/owl-post"))
       end
@@ -94,7 +94,7 @@ defmodule Fluffy.Conformance.StaticHTTPErrorTest do
         body: ~s(<!doctype html><html><body><a href="mailto:owlery@hogwarts.example">Send an owl</a></body></html>)
       })
 
-    session = :phoenix |> start_test_session() |> visit(HTTPFixtures.path(fixture, "/owlery"))
+    session = :phoenix |> start_session() |> visit(HTTPFixtures.path(fixture, "/owlery"))
 
     error =
       assert_raise Fluffy.CapabilityError, ~r/:click \(:external_navigation\).*mailto/s, fn ->
@@ -102,12 +102,5 @@ defmodule Fluffy.Conformance.StaticHTTPErrorTest do
       end
 
     assert %{operation: :click, driver: :static} = error
-  end
-
-  defp start_test_session(driver) do
-    start_session(driver,
-      base_url: Fluffy.Support.Server.base_url(),
-      endpoint: Fluffy.Support.Web.Endpoint
-    )
   end
 end

@@ -11,7 +11,7 @@ defmodule Fluffy.Conformance.SessionRuntimeTest do
   alias Fluffy.Session
   alias Fluffy.Support.HTTPFixtures
 
-  for driver <- [:static, :playwright] do
+  for driver <- Drivers.html() do
     @tag driver: driver
     test "alternating documents preserves each session's input state with #{driver}" do
       first =
@@ -40,7 +40,7 @@ defmodule Fluffy.Conformance.SessionRuntimeTest do
     end
   end
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "existing handles see navigation and actions with #{driver}" do
       session = start_session(unquote(driver))

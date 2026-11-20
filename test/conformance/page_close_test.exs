@@ -102,7 +102,7 @@ defmodule Fluffy.Conformance.PageCloseTest do
 
     session =
       :playwright
-      |> start_session(base_url: Fluffy.Support.Server.base_url())
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/start"))
 
     pending = wait_for(session, Event.popup())

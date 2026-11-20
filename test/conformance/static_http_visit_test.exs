@@ -7,10 +7,8 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
 
   alias Fluffy.Session
   alias Fluffy.Support.HTTPFixtures
-  alias Fluffy.Support.Server
-  alias Fluffy.Support.Web.Endpoint
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "visits one dynamic HTTP contract with #{driver}", %{driver: driver} do
       fixture =
@@ -20,7 +18,7 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
           body: html("Dynamic owl page")
         })
 
-      session = start_test_session(driver)
+      session = start_session(driver)
 
       session =
         session
@@ -51,7 +49,7 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
           %{body: html("Redirect destination")}
         ])
 
-      session = start_test_session(driver)
+      session = start_session(driver)
 
       session
       |> visit(HTTPFixtures.path(fixture, "/start?from=visit#original"))
@@ -77,7 +75,7 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
           %{body: html("Inherited fragment")}
         ])
 
-      session = start_test_session(driver)
+      session = start_session(driver)
 
       session
       |> visit(HTTPFixtures.path(fixture, "/source#details"))
@@ -93,7 +91,7 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
           headers: [{"location", "loop"}]
         })
 
-      session = start_test_session(driver)
+      session = start_session(driver)
 
       error = assert_raise Fluffy.OperationError, fn -> visit(session, HTTPFixtures.path(fixture, "/loop")) end
       assert {error.backend, error.operation, error.locator} == {driver, :visit, nil}
@@ -114,12 +112,12 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
 
         error =
           assert_raise Fluffy.OperationError, ~r/abort|interrupt/i, fn ->
-            driver |> start_test_session() |> visit(HTTPFixtures.path(fixture, "/empty"))
+            driver |> start_session() |> visit(HTTPFixtures.path(fixture, "/empty"))
           end
 
         assert {error.backend, error.operation, error.locator} == {driver, :visit, nil}
 
-        session = driver |> start_test_session() |> visit(HTTPFixtures.path(fixture, "/owls"))
+        session = driver |> start_session() |> visit(HTTPFixtures.path(fixture, "/owls"))
 
         assert_raise Fluffy.OperationError, ~r/abort|interrupt/i, fn ->
           visit(session, HTTPFixtures.path(fixture, "/empty"))
@@ -137,7 +135,7 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
             %{body: html("Owls")}
           ])
 
-        session = driver |> start_test_session() |> visit(HTTPFixtures.path(fixture, "/owls"))
+        session = driver |> start_session() |> visit(HTTPFixtures.path(fixture, "/owls"))
 
         assert_raise Fluffy.OperationError, ~r/abort|interrupt/i, fn ->
           visit(session, HTTPFixtures.path(fixture, "/beacon"))
@@ -156,8 +154,6 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
 
       session =
         start_session(driver,
-          base_url: Server.base_url(),
-          endpoint: Endpoint,
           extra_http_headers: %{"x-fluffy-suite" => "static-http"}
         )
 
@@ -172,13 +168,6 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
                end)
              end) == ["static-http", "static-http"]
     end
-  end
-
-  defp start_test_session(driver) do
-    start_session(driver,
-      base_url: Server.base_url(),
-      endpoint: Endpoint
-    )
   end
 
   defp html(text) do

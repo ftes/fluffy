@@ -6,9 +6,7 @@ defmodule Fluffy.Conformance.CheckedLocatorTest do
   import Fluffy.Locator
   import Fluffy.Playwright
 
-  alias Fluffy.Support.Server
-
-  for driver <- [:static, :playwright] do
+  for driver <- Drivers.html() do
     @tag driver: driver
     test "checked selectors follow user input without changing default attributes with #{driver}", %{driver: driver} do
       html = """
@@ -21,7 +19,7 @@ defmodule Fluffy.Conformance.CheckedLocatorTest do
       """
 
       driver
-      |> session_for_html(html, base_url: Server.base_url())
+      |> session_for_html(html)
       |> expect("input:checked" |> by_css() |> to_have_count(2))
       |> uncheck(by_css("#enabled:checked"))
       |> check(by_css("#blue:not(:checked)"))
@@ -45,7 +43,7 @@ defmodule Fluffy.Conformance.CheckedLocatorTest do
       """
 
       driver
-      |> session_for_html(html, base_url: Server.base_url())
+      |> session_for_html(html)
       |> expect("option:checked" |> by_css() |> to_have_count(3))
       |> expect("Default" |> by_label() |> by_css("option:checked") |> filter(has_text: "First") |> to_have_count(1))
       |> expect("List" |> by_label() |> by_css("option:checked") |> to_have_count(0))
@@ -65,7 +63,7 @@ defmodule Fluffy.Conformance.CheckedLocatorTest do
       html = ~s(<input id="literal:checked" data-note=":checked" type="checkbox" checked>)
 
       driver
-      |> session_for_html(html, base_url: Server.base_url())
+      |> session_for_html(html)
       |> expect(~s([data-note=":checked"]:checked) |> by_css() |> to_have_count(1))
       |> expect(~S(#literal\:checked:checked) |> by_css() |> to_have_count(1))
       |> uncheck(by_css(~s([data-note=":checked"])))
@@ -74,13 +72,13 @@ defmodule Fluffy.Conformance.CheckedLocatorTest do
     end
   end
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "state-dependent check locators dispatch changes to the original control after click patches with #{driver}", %{
       driver: driver
     } do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/potions")
       |> check(by_css("#enabled:not(:checked)"))
       |> expect("Checkbox clicks: 1" |> by_text(exact: true) |> to_be_visible())
@@ -96,7 +94,7 @@ defmodule Fluffy.Conformance.CheckedLocatorTest do
       driver: driver
     } do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/checked-controls")
       |> check(by_label("Enabled"))
       |> select_option(by_label("Colour"), "green")
@@ -118,7 +116,7 @@ defmodule Fluffy.Conformance.CheckedLocatorTest do
       expected = if driver == :playwright, do: "green", else: "blue"
 
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/checked-controls?topic=#{topic}")
       |> select_option(field, "green")
       |> then(fn session -> if driver == :playwright, do: focus(session, field), else: session end)
@@ -138,7 +136,7 @@ defmodule Fluffy.Conformance.CheckedLocatorTest do
       field = by_label("Enabled")
 
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/checked-controls?topic=#{topic}")
       |> check(field)
       |> expect("#enabled:checked" |> by_css() |> to_have_count(1))
@@ -147,12 +145,5 @@ defmodule Fluffy.Conformance.CheckedLocatorTest do
       |> expect(to_be_checked(field, checked: false))
       |> expect("#enabled:checked" |> by_css() |> to_have_count(0))
     end
-  end
-
-  defp start_test_session(driver) do
-    start_session(driver,
-      base_url: Server.base_url(),
-      endpoint: Fluffy.Support.Web.Endpoint
-    )
   end
 end

@@ -6,9 +6,7 @@ defmodule Fluffy.Conformance.OpenBrowserTest do
   import Fluffy.Locator
   import Fluffy.Playwright
 
-  alias Fluffy.Support.Web.Endpoint
-
-  for backend <- [:phoenix, :playwright] do
+  for backend <- Drivers.backends() do
     @tag backend: backend
     test "opens the current static page without changing the #{backend} session", %{backend: backend} do
       session = backend |> start_session() |> visit("/chamber")
@@ -36,7 +34,7 @@ defmodule Fluffy.Conformance.OpenBrowserTest do
   test "static assets resolve through the session endpoint while links and remote assets remain intact" do
     session =
       :phoenix
-      |> start_session(endpoint: Endpoint)
+      |> start_session()
       |> visit("/chamber")
       |> set_html("""
       <link rel="stylesheet" href="/assets/app.css">

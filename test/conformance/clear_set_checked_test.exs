@@ -5,9 +5,7 @@ defmodule Fluffy.Conformance.ClearSetCheckedTest do
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.Support.Server
-
-  for driver <- [:static, :playwright] do
+  for driver <- Drivers.html() do
     @tag driver: driver
     test "clear empties text inputs and textareas with #{driver}" do
       html = ~s(<input aria-label="Name" value="Ron"><textarea aria-label="Notes">Lumos</textarea>)
@@ -68,11 +66,11 @@ defmodule Fluffy.Conformance.ClearSetCheckedTest do
     end
   end
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "clear and set_checked reach LiveView change events with #{driver}", %{driver: driver} do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/potions")
       |> fill(by_label("First ingredient"), "ash")
       |> expect(to_be_visible(by_text("Last first: ash")))
@@ -87,7 +85,7 @@ defmodule Fluffy.Conformance.ClearSetCheckedTest do
   end
 
   test "LiveView retries clear until a disabled field is enabled and reports it by name" do
-    session = :phoenix |> start_test_session() |> visit("/live/potions")
+    session = :phoenix |> start_session() |> visit("/live/potions")
     session = click(session, by_role(:button, name: "Disable first ingredient"))
 
     error = assert_raise Fluffy.OperationError, fn -> clear(session, by_label("First ingredient"), timeout: 50) end
@@ -96,7 +94,7 @@ defmodule Fluffy.Conformance.ClearSetCheckedTest do
     assert error.cause.reason == :disabled
   end
 
-  for driver <- [:static, :live] do
+  for driver <- Drivers.phoenix() do
     @tag driver: driver
     test "clear and set_checked raise a capability error for Playwright options with #{driver}" do
       session = phoenix_page(unquote(driver))
@@ -136,12 +134,7 @@ defmodule Fluffy.Conformance.ClearSetCheckedTest do
     end)
   end
 
-  defp with_html(driver, html, fun), do: fun.(session_for_html(driver, html, base_url: Server.base_url()))
-
-  defp start_test_session(driver),
-    do: start_session(driver, base_url: Server.base_url(), endpoint: Fluffy.Support.Web.Endpoint)
-
-  defp phoenix_page(:live), do: :phoenix |> start_test_session() |> visit("/live/potions")
+  defp phoenix_page(:live), do: :phoenix |> start_session() |> visit("/live/potions")
 
   defp phoenix_page(:static) do
     html = ~s(<input aria-label="First ingredient"><label><input type="checkbox">Enabled</label>)

@@ -88,7 +88,7 @@ defmodule Fluffy.Conformance.FocusActionTest do
     end)
   end
 
-  for driver <- [:static, :live] do
+  for driver <- Drivers.phoenix() do
     test "#{driver} rejects focus actions and assertions, including negation" do
       session =
         case unquote(driver) do
@@ -117,10 +117,5 @@ defmodule Fluffy.Conformance.FocusActionTest do
       |> fill(by_label("Name"), "Hermione")
       |> expect(to_be_focused(by_label("Name")))
     end)
-  end
-
-  defp with_html(driver, html, fun) do
-    session = session_for_html(driver, html, base_url: Fluffy.Support.Server.base_url())
-    fun.(session)
   end
 end

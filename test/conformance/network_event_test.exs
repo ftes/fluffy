@@ -9,7 +9,6 @@ defmodule Fluffy.Conformance.NetworkEventTest do
   alias Fluffy.Event
   alias Fluffy.SessionRuntime
   alias Fluffy.Support.HTTPFixtures
-  alias Fluffy.Support.Server
   alias Playwright.Frame
   alias Playwright.Request
   alias Playwright.Response
@@ -193,7 +192,7 @@ defmodule Fluffy.Conformance.NetworkEventTest do
 
     session =
       :playwright
-      |> start_session(base_url: Server.base_url())
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/start"))
 
     pending = wait_for(session, Event.response(&String.ends_with?(url(&1), "/stream")))
@@ -251,7 +250,7 @@ defmodule Fluffy.Conformance.NetworkEventTest do
 
     session =
       :playwright
-      |> start_session(base_url: Server.base_url())
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/start"))
 
     {session, fixture}

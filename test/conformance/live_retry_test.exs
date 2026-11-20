@@ -9,10 +9,10 @@ defmodule Fluffy.Conformance.LiveRetryTest do
   # with many parallel cases an action can queue behind others for seconds.
   @action_timeout 5_000
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "waits for an asynchronous Live render with #{driver}", %{driver: driver} do
-      session = live_session(driver)
+      session = start_session(driver)
 
       session
       |> visit("/live/async?delay=40")
@@ -22,7 +22,7 @@ defmodule Fluffy.Conformance.LiveRetryTest do
 
     @tag driver: driver
     test "waits for an actionable Live target before clicking with #{driver}", %{driver: driver} do
-      session = live_session(driver)
+      session = start_session(driver)
 
       session
       |> visit("/live/async?delay=40")
@@ -32,7 +32,7 @@ defmodule Fluffy.Conformance.LiveRetryTest do
   end
 
   test "a Live timeout reports the latest rendered text" do
-    session = live_session(:phoenix)
+    session = start_session(:phoenix)
 
     error =
       assert_raise ExUnit.AssertionError, fn ->
@@ -46,7 +46,7 @@ defmodule Fluffy.Conformance.LiveRetryTest do
   end
 
   test "Live locator strictness is terminal rather than retried" do
-    session = :phoenix |> live_session() |> visit("/live/fluffy")
+    session = :phoenix |> start_session() |> visit("/live/fluffy")
     started_at = System.monotonic_time(:millisecond)
 
     assert_raise Fluffy.OperationError, fn ->
@@ -58,12 +58,5 @@ defmodule Fluffy.Conformance.LiveRetryTest do
     end
 
     assert System.monotonic_time(:millisecond) - started_at < 250
-  end
-
-  defp live_session(driver) do
-    start_session(driver,
-      base_url: Fluffy.Support.Server.base_url(),
-      endpoint: Fluffy.Support.Web.Endpoint
-    )
   end
 end

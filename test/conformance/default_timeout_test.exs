@@ -13,8 +13,6 @@ defmodule Fluffy.Conformance.DefaultTimeoutTest do
   alias Fluffy.Event
   alias Fluffy.Session
   alias Fluffy.Support.HTTPFixtures
-  alias Fluffy.Support.Server
-  alias Fluffy.Support.Web.Endpoint
 
   # Short, as the tests wait them out, and apart, so the time a failure took tells which one
   # applied.
@@ -68,7 +66,7 @@ defmodule Fluffy.Conformance.DefaultTimeoutTest do
   end
 
   # Playwright's timeouts are browser sessions' only.
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     @tag Playwright.Test.use(action_timeout: 300)
     test "a tag's action_timeout is a browser session's, not a Phoenix one's, with #{driver}", %{driver: driver} do
@@ -88,7 +86,7 @@ defmodule Fluffy.Conformance.DefaultTimeoutTest do
     @tag driver: driver
     test "timeout: :infinity waits past the defaults with #{driver}", %{driver: driver} do
       driver
-      |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+      |> start_session()
       |> visit("/live/async?delay=#{@action_timeout + 100}")
       |> expect(to_be_visible(@appeared), timeout: :infinity)
       |> click(@appeared, timeout: :infinity)
@@ -104,7 +102,7 @@ defmodule Fluffy.Conformance.DefaultTimeoutTest do
     put_playwright_config(:expect, timeout: 0)
 
     :playwright
-    |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+    |> start_session()
     |> visit("/live/async?delay=#{@action_timeout + 100}")
     |> expect(to_be_visible(@appeared))
     |> click(@appeared)
@@ -117,7 +115,7 @@ defmodule Fluffy.Conformance.DefaultTimeoutTest do
     put_fluffy_config(phoenix_backend_timeout: :infinity)
 
     :phoenix
-    |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+    |> start_session()
     |> visit("/live/async?delay=#{@phoenix_timeout + 100}")
     |> click(@appeared)
     |> expect("Activated" |> by_text() |> to_be_visible())
@@ -130,7 +128,7 @@ defmodule Fluffy.Conformance.DefaultTimeoutTest do
 
     session =
       :phoenix
-      |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+      |> start_session()
       |> visit("/live/async?delay=1000")
 
     {elapsed, _error} = failure(fn -> expect(session, to_be_visible(@appeared)) end)
@@ -143,7 +141,7 @@ defmodule Fluffy.Conformance.DefaultTimeoutTest do
   @tag driver: :playwright
   @tag Playwright.Test.use(navigation_timeout: @navigation_timeout)
   test "navigations default to the test's navigation_timeout" do
-    session = start_session(:playwright, base_url: Server.base_url())
+    session = start_session(:playwright)
     fixture = HTTPFixtures.register(fn _request -> %{body: "<h1>Never</h1>"} end)
     Fluffy.Playwright.route(session, "**/never", fn _route -> :ok end)
 
@@ -178,7 +176,7 @@ defmodule Fluffy.Conformance.DefaultTimeoutTest do
   defp missing_session(:phoenix) do
     session =
       :phoenix
-      |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+      |> start_session()
       |> visit("/live/chamber-map")
 
     assert Session.current_driver(session) == :live
@@ -219,15 +217,13 @@ defmodule Fluffy.Conformance.TimeoutOptionTest do
   import Fluffy.Locator
 
   alias Fluffy.Session
-  alias Fluffy.Support.Server
-  alias Fluffy.Support.Web.Endpoint
 
   @timeout 300
   @early 50
   @missing by_role(:button, name: "Missing")
   @appeared by_role(:button, name: "Appeared")
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "a per-call timeout overrides the default with #{driver}", %{driver: driver} do
       session = missing_session(driver)
@@ -246,7 +242,7 @@ defmodule Fluffy.Conformance.TimeoutOptionTest do
     test "timeout: 0 checks an expectation once with #{driver}", %{driver: driver} do
       session =
         driver
-        |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+        |> start_session()
         |> visit("/live/async?delay=1000")
 
       {elapsed, _error} = failure(fn -> expect(session, to_be_visible(@appeared), timeout: 0) end)
@@ -286,7 +282,7 @@ defmodule Fluffy.Conformance.TimeoutOptionTest do
   defp missing_session(:phoenix) do
     session =
       :phoenix
-      |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+      |> start_session()
       |> visit("/live/chamber-map")
 
     assert Session.current_driver(session) == :live

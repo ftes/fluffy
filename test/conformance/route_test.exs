@@ -8,8 +8,6 @@ defmodule Fluffy.Conformance.RouteTest do
 
   alias Fluffy.Event
   alias Fluffy.Support.HTTPFixtures
-  alias Fluffy.Support.Server
-  alias Fluffy.Support.Web.Endpoint
   alias Playwright.PlaywrightError
   alias Playwright.Request
   alias Playwright.Route
@@ -400,7 +398,7 @@ defmodule Fluffy.Conformance.RouteTest do
     @tag driver: :playwright
     test "a route over every request leaves a LiveView working" do
       session =
-        start_session(:playwright, base_url: Server.base_url(), endpoint: Endpoint)
+        start_session(:playwright)
 
       route(session, "**/*", &Route.continue!/1)
 
@@ -428,7 +426,7 @@ defmodule Fluffy.Conformance.RouteTest do
   end
 
   test "Phoenix sessions raise a capability error" do
-    session = start_session(:phoenix, endpoint: Endpoint)
+    session = start_session(:phoenix)
     handler = fn route -> Route.continue!(route) end
 
     error = assert_raise Fluffy.CapabilityError, fn -> route(session, "**/*", handler) end
@@ -523,7 +521,7 @@ defmodule Fluffy.Conformance.RouteTest do
 
     session =
       :playwright
-      |> start_session(base_url: Server.base_url())
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/start"))
 
     {session, fixture}

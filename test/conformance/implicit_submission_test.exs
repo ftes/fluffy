@@ -6,7 +6,6 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
   import Fluffy.Locator
 
   alias Fluffy.Support.HTTPFixtures
-  alias Fluffy.Support.Server
 
   @tag driver: :playwright
   test "Enter submits through the default submitter with Playwright", %{driver: driver} do
@@ -25,7 +24,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
         %{body: html("<h1>Submitted</h1>")}
       ])
 
-    session = start_test_session(driver)
+    session = start_session(driver)
 
     destination = HTTPFixtures.url(fixture, "/submit")
 
@@ -60,7 +59,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
       ])
 
     driver
-    |> start_test_session()
+    |> start_session()
     |> visit(HTTPFixtures.path(fixture, "/start"))
     |> press(by_label("Name"), "Enter")
     |> expect("Submitted invalid type" |> by_text() |> to_be_visible())
@@ -71,7 +70,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
 
   @tag driver: :playwright
   test "Enter takes the LiveView form's default submit path with Playwright", %{driver: driver} do
-    session = start_test_session(driver)
+    session = start_session(driver)
 
     session
     |> visit("/live/potions")
@@ -83,7 +82,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
 
   @tag driver: :playwright
   test "Enter submits after a blur-debounced Live mutation with Playwright", %{driver: driver} do
-    session = start_test_session(driver)
+    session = start_session(driver)
 
     session
     |> visit("/live/potions")
@@ -111,7 +110,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
         %{body: html("<h1>Submitted</h1>")}
       ])
 
-    session = start_test_session(driver)
+    session = start_session(driver)
 
     session
     |> visit(HTTPFixtures.path(fixture, "/start"))
@@ -140,7 +139,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
           """)
       })
 
-    session = start_test_session(driver)
+    session = start_session(driver)
 
     session
     |> visit(HTTPFixtures.path(fixture, "/start"))
@@ -169,7 +168,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
         %{body: html("<h1>Submitted</h1>")}
       ])
 
-    session = start_test_session(driver)
+    session = start_session(driver)
 
     session
     |> visit(HTTPFixtures.path(fixture, "/start"))
@@ -197,7 +196,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
           """)
       })
 
-    session = start_test_session(driver)
+    session = start_session(driver)
 
     session
     |> visit(HTTPFixtures.path(fixture, "/start"))
@@ -221,7 +220,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
           """)
       })
 
-    session = start_test_session(driver)
+    session = start_session(driver)
 
     session
     |> visit(HTTPFixtures.path(fixture, "/start"))
@@ -234,6 +233,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
   @tag driver: :playwright
   test "the browser submits a single text control without a submitter" do
     with_html(
+      :playwright,
       """
       <form onsubmit="event.preventDefault(); result.value = event.submitter ? event.submitter.value : 'none'">
         <label>Name <input name="name"></label>
@@ -251,6 +251,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
   @tag driver: :playwright
   test "the browser uses the first associated submitter in tree order" do
     with_html(
+      :playwright,
       """
       <form onsubmit="event.preventDefault(); result.value = event.submitter ? event.submitter.value : 'none'">
         <label>Name <input name="name"></label>
@@ -270,6 +271,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
   @tag driver: :playwright
   test "a disabled default submitter suppresses implicit submission" do
     with_html(
+      :playwright,
       """
       <form onsubmit="event.preventDefault(); result.value = 'submitted'">
         <label>Name <input name="name"></label>
@@ -289,6 +291,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
   @tag driver: :playwright
   test "an external submitter participates in default-submitter tree order" do
     with_html(
+      :playwright,
       """
       <button form="search" value="external">External</button>
       <form id="search" onsubmit="event.preventDefault(); result.value = event.submitter ? event.submitter.value : 'none'">
@@ -308,6 +311,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
   @tag driver: :playwright
   test "a form without a submitter needs exactly one blocking text control" do
     with_html(
+      :playwright,
       """
       <form onsubmit="event.preventDefault(); result.value = 'submitted'">
         <label>First <input name="first"></label>
@@ -326,6 +330,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
   @tag driver: :playwright
   test "Enter in a textarea does not implicitly submit" do
     with_html(
+      :playwright,
       """
       <form onsubmit="event.preventDefault(); result.value = 'submitted'">
         <label>Notes <textarea name="notes"></textarea></label>
@@ -344,6 +349,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
   @tag driver: :playwright
   test "constraint validation prevents implicit submission" do
     with_html(
+      :playwright,
       """
       <form onsubmit="event.preventDefault(); result.value = 'submitted'">
         <label>Name <input name="name" required></label>
@@ -362,6 +368,7 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
   @tag driver: :playwright
   test "a key handler that prevents default suppresses implicit submission" do
     with_html(
+      :playwright,
       """
       <form onsubmit="event.preventDefault(); result.value = 'submitted'">
         <label>Name <input name="name" onkeydown="event.preventDefault()"></label>
@@ -374,18 +381,6 @@ defmodule Fluffy.Conformance.ImplicitSubmissionTest do
         |> press(by_label("Name"), "Enter")
         |> expect("Result" |> by_label() |> to_have_value("waiting"))
       end
-    )
-  end
-
-  defp with_html(html, fun) do
-    session = session_for_html(:playwright, html, base_url: Server.base_url())
-    fun.(session)
-  end
-
-  defp start_test_session(driver) do
-    start_session(driver,
-      base_url: Server.base_url(),
-      endpoint: Fluffy.Support.Web.Endpoint
     )
   end
 

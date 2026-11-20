@@ -3,9 +3,6 @@ defmodule Fluffy.Conformance.StepTest do
 
   import Fluffy
 
-  alias Fluffy.Support.Server
-  alias Fluffy.Support.Web.Endpoint
-
   # The trace's steps: Fluffy.PlaywrightArtifactsTest.
   for {driver, backend, path} <- [
         {:static, :phoenix, "/chamber"},
@@ -15,7 +12,7 @@ defmodule Fluffy.Conformance.StepTest do
     test "returns the callback's session from nested steps with #{driver}" do
       session =
         unquote(backend)
-        |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+        |> start_session()
         |> step("Approach Fluffy", fn session ->
           step(session, "Tiptoe in", &visit(&1, unquote(path)), box: true)
         end)
@@ -25,7 +22,7 @@ defmodule Fluffy.Conformance.StepTest do
   end
 
   test "a boxed step reports its error at the call of the function it is in" do
-    session = start_session(:phoenix, endpoint: Endpoint)
+    session = start_session(:phoenix)
 
     stacktrace =
       try do
@@ -42,7 +39,7 @@ defmodule Fluffy.Conformance.StepTest do
   end
 
   test "requires the callback to return a session and rejects unknown options" do
-    session = start_session(:phoenix, endpoint: Endpoint)
+    session = start_session(:phoenix)
 
     assert_raise ArgumentError, ~r/must return a Fluffy.Session, got: :ok/, fn ->
       step(session, "Feed Fluffy", fn _session -> :ok end)

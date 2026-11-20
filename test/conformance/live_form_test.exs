@@ -10,7 +10,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
   alias Fluffy.Support.Server
 
   test "Live reset buttons do not reset fields and still dispatch server events" do
-    session = :phoenix |> start_test_session() |> visit("/live/potions")
+    session = :phoenix |> start_session() |> visit("/live/potions")
 
     session
     |> fill(by_label("Reset name"), "changed")
@@ -22,11 +22,11 @@ defmodule Fluffy.Conformance.LiveFormTest do
     |> expect("#drafts > div:first-child input" |> by_css() |> to_have_value("B"))
   end
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "String.Chars values reach LiveView change events as literal strings with #{driver}", %{driver: driver} do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/potions")
       |> fill(by_label("First ingredient"), ~D[2026-09-30])
       |> expect("Last first: 2026-09-30" |> by_text() |> to_be_visible())
@@ -40,7 +40,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
     @tag driver: driver
     test "unchanged sticky LiveView renders preserve entered form values with #{driver}", %{driver: driver} do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/potions?sticky=true")
       |> fill(by_label("Uncontrolled email"), "hermione@hogwarts.example")
       |> fill(by_label("Uncontrolled name"), "Hermione")
@@ -52,7 +52,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
     test "Live changes use current properties and latest server DOM with #{driver}", %{
       driver: driver
     } do
-      session = start_test_session(driver)
+      session = start_session(driver)
 
       first = by_label("First ingredient")
       last = by_label("Final ingredient")
@@ -86,7 +86,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
       driver: driver
     } do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/used-shift")
       |> click(by_role(:radio, name: "c"))
       |> expect("Changed: true" |> by_text() |> to_be_visible())
@@ -99,7 +99,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
     @tag driver: driver
     test "a submit marks every form control used for later changes with #{driver}", %{driver: driver} do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/submit-used")
       |> fill(by_label("Name"), "Hermione")
       |> expect("Email is required" |> by_text() |> to_have_count(0))
@@ -114,7 +114,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
     @tag driver: driver
     test "a submit blocked by an upload entry error still marks the form used with #{driver}", %{driver: driver} do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/submit-used?upload=oversized")
       |> fill(by_label("Name"), "Hermione")
       |> set_input_files(by_label("Attachment"), Path.expand("../support/fixtures/fluffy-upload.txt", __DIR__))
@@ -130,7 +130,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
     @tag driver: driver
     test "submit sends a phx-submit form to LiveView only with #{driver}", %{driver: driver} do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/potions")
       |> fill(by_label("Row 0"), "aconite")
       |> submit(by_css("#wizard-form"), timeout: 2_000)
@@ -147,7 +147,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
         fixture = HTTPFixtures.register(%{status: unquote(status)})
 
         driver
-        |> start_test_session()
+        |> start_session()
         |> visit("/live/no-content?" <> URI.encode_query(to: HTTPFixtures.path(fixture, "/save")))
         |> click(by_role(:button, name: "Increment"))
         |> expect("Count: 1" |> by_text() |> to_be_visible())
@@ -164,7 +164,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
 
     @tag driver: driver
     test "Live submission serializes the final dynamic DOM with #{driver}", %{driver: driver} do
-      session = start_test_session(driver)
+      session = start_session(driver)
 
       session =
         session
@@ -187,7 +187,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
     test "Live check and select state round-trips through patches with #{driver}", %{
       driver: driver
     } do
-      session = start_test_session(driver)
+      session = start_session(driver)
 
       enabled = by_role(:checkbox, name: "Enabled")
       colours = by_label("Potion colours")
@@ -206,7 +206,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
     test "Live check dispatches phx-click only when checkedness changes with #{driver}", %{
       driver: driver
     } do
-      session = start_test_session(driver)
+      session = start_session(driver)
       checkbox = by_role(:checkbox, name: "Enabled")
 
       session
@@ -225,7 +225,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
     test "Live submission uses controls added and renamed after editing with #{driver}", %{
       driver: driver
     } do
-      session = start_test_session(driver)
+      session = start_session(driver)
 
       session
       |> visit("/live/potions")
@@ -241,7 +241,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
       draft = by_label("Potion draft A")
 
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/potions")
       |> fill(draft, "client draft")
       |> click(by_role(:button, name: "Reorder potion drafts"))
@@ -257,7 +257,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
       draft = by_label("Potion draft A")
 
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/potions")
       |> fill(draft, "client draft")
       |> press(draft, "Enter")
@@ -272,7 +272,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
       draft = by_label("Potion draft A")
 
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/potions")
       |> fill(draft, "client draft")
       |> click(by_role(:button, name: "Disable first ingredient"))
@@ -282,7 +282,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
 
     @tag driver: driver
     test "an input-level phx-change sends only that control with #{driver}", %{driver: driver} do
-      session = start_test_session(driver)
+      session = start_session(driver)
 
       session
       |> visit("/live/potions")
@@ -294,7 +294,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
 
     @tag driver: driver
     test "Live target paths use query-decoded input names with #{driver}", %{driver: driver} do
-      session = start_test_session(driver)
+      session = start_session(driver)
 
       session
       |> visit("/live/potions")
@@ -306,7 +306,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
     test "a control disabled after editing is omitted from Live submission with #{driver}", %{
       driver: driver
     } do
-      session = start_test_session(driver)
+      session = start_session(driver)
 
       session
       |> visit("/live/potions")
@@ -320,7 +320,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
     test "a Live submitter can navigate and retains its identity with #{driver}", %{
       driver: driver
     } do
-      session = start_test_session(driver)
+      session = start_session(driver)
 
       session
       |> visit("/live/potions")
@@ -333,7 +333,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
     test "a normal form submission leaves LiveView through the session backend with #{driver}", %{
       driver: driver
     } do
-      session = start_test_session(driver)
+      session = start_session(driver)
 
       session
       |> visit("/live/potions")
@@ -346,7 +346,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
     test "phx-trigger-action hands the final form to HTTP navigation with #{driver}", %{
       driver: driver
     } do
-      session = start_test_session(driver)
+      session = start_session(driver)
 
       session
       |> visit("/live/potions")
@@ -366,7 +366,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
       driver: driver
     } do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/potions")
       |> click(by_role(:button, name: "Trigger from elsewhere", exact: true))
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
@@ -376,7 +376,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
     @tag driver: driver
     test "phx-trigger-action is committed after a Live patch with #{driver}", %{driver: driver} do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/potions")
       |> click(by_role(:button, name: "Patch and trigger", exact: true))
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
@@ -386,7 +386,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
     @tag driver: driver
     test "a server redirect wins over phx-trigger-action with #{driver}", %{driver: driver} do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/potions")
       |> click(by_role(:button, name: "Redirect and trigger", exact: true))
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
@@ -396,7 +396,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
     @tag driver: driver
     test "a Live navigation wins over phx-trigger-action with #{driver}", %{driver: driver} do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/potions")
       |> click(by_role(:button, name: "Navigate and trigger", exact: true))
       |> expect("The secret chamber is open" |> by_text() |> to_be_visible())
@@ -406,7 +406,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
     @tag driver: driver
     test "the last simultaneously triggered form wins with #{driver}", %{driver: driver} do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/potions")
       |> click(by_role(:button, name: "Trigger multiple", exact: true))
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
@@ -416,7 +416,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
     @tag driver: driver
     test "a dynamically inserted triggered form is submitted with #{driver}", %{driver: driver} do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/potions")
       |> click(by_role(:button, name: "Show trigger form", exact: true))
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
@@ -426,7 +426,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
     @tag driver: driver
     test "a form triggered on the connected render is submitted with #{driver}", %{driver: driver} do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/trigger-on-connect?identity=hermione")
       |> expect(Fluffy.Expect.page_to_have_url(Server.base_url() <> "/session/show"))
       |> expect("Static identity: hermione" |> by_text() |> to_be_visible())
@@ -436,7 +436,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
     test "a form triggered on the connected render beats a navigation sent after the join with #{driver}",
          %{driver: driver} do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/trigger-on-connect?identity=hermione&then=navigate")
       |> expect(Fluffy.Expect.page_to_have_url(Server.base_url() <> "/session/show"))
       |> expect("Static identity: hermione" |> by_text() |> to_be_visible())
@@ -444,7 +444,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
 
     @tag driver: driver
     test "a form triggered on the connected render can leave for another origin with #{driver}", %{driver: driver} do
-      session = start_test_session(driver)
+      session = start_session(driver)
 
       # A browser really loads the external page, so Playwright stubs its host.
       if driver == :playwright do
@@ -461,7 +461,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
     @tag driver: driver
     test "a form triggered on the dead render only is not submitted with #{driver}", %{driver: driver} do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/trigger-on-connect?identity=hermione&trigger=dead")
       |> expect("Floo powder for hermione" |> by_text() |> to_be_visible())
       # The LiveView client disconnects before it submits a triggered form, so
@@ -475,7 +475,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
     @tag driver: driver
     test "a form triggered from handle_info is submitted with #{driver}", %{driver: driver} do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/trigger-on-connect?identity=hermione&trigger=later")
       |> click(by_role(:button, name: "Trigger later"))
       |> click(by_text("Static identity: hermione"))
@@ -486,7 +486,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
     @tag driver: driver
     test "a form triggered in handle_params after a server push_patch is submitted with #{driver}", %{driver: driver} do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/trigger-on-connect?identity=hermione&trigger=later&form=relative")
       |> click(by_role(:button, name: "Patch later"))
       |> expect(Fluffy.Expect.page_to_have_url(Server.base_url() <> "/session/show"))
@@ -497,7 +497,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
     # download leaves an inert page that does not submit the form again.
     @tag driver: driver
     test "a triggered form that downloads leaves the page inert with #{driver}", %{driver: driver} do
-      session = start_test_session(driver)
+      session = start_session(driver)
       pending = wait_for(session, Fluffy.Event.download())
 
       session =
@@ -522,7 +522,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
   end
 
   test "a form triggered on every connected render fails at the redirect limit" do
-    session = start_test_session(:phoenix)
+    session = start_session(:phoenix)
 
     assert_raise Fluffy.OperationError, ~r/exceeded 20 redirects/, fn ->
       visit(session, "/live/trigger-on-connect?trigger=loop")
@@ -531,7 +531,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
 
   # In a browser the form is already submitted, whatever the test's timeout.
   test "an expectation without timeout budget follows a form the view triggered" do
-    session = :phoenix |> start_test_session() |> visit("/live/trigger-on-connect?identity=hermione&trigger=later")
+    session = :phoenix |> start_session() |> visit("/live/trigger-on-connect?identity=hermione&trigger=later")
     view = Fluffy.Session.page_state(session).view.pid
     send(view, :trigger)
     # Returns once the view handled the message.
@@ -544,7 +544,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
     debounced = by_label("Debounced", exact: true)
 
     :phoenix
-    |> start_test_session()
+    |> start_session()
     |> visit("/live/potions")
     |> fill(debounced, "sent by fill")
     |> expect("Last debounced: sent by fill" |> by_text() |> to_be_visible())
@@ -553,7 +553,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
 
   test "the Phoenix driver eagerly synchronizes a numeric-debounced form mutation" do
     :phoenix
-    |> start_test_session()
+    |> start_session()
     |> visit("/live/potions")
     |> fill(by_label("Timed", exact: true), "sent by fill")
     |> expect("Last target: wizard/timed" |> by_text() |> to_be_visible(), timeout: 0)
@@ -565,7 +565,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
     debounced = by_label("Debounced", exact: true)
 
     :playwright
-    |> start_test_session()
+    |> start_session()
     |> visit("/live/potions")
     |> fill(debounced, "sent on blur")
     |> expect("Last debounced: none" |> by_text(exact: true) |> to_be_visible(), timeout: 0)
@@ -574,7 +574,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
   end
 
   test "the Live driver rejects browser-owned indeterminate checkbox state" do
-    session = :phoenix |> start_test_session() |> visit("/live/potions")
+    session = :phoenix |> start_session() |> visit("/live/potions")
 
     error =
       assert_raise Fluffy.CapabilityError, fn ->
@@ -586,12 +586,5 @@ defmodule Fluffy.Conformance.LiveFormTest do
 
     assert error.capability == :indeterminate_checked_state
     assert error.driver == :live
-  end
-
-  defp start_test_session(driver) do
-    start_session(driver,
-      base_url: Server.base_url(),
-      endpoint: Fluffy.Support.Web.Endpoint
-    )
   end
 end

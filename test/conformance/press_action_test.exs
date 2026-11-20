@@ -98,9 +98,4 @@ defmodule Fluffy.Conformance.PressActionTest do
       |> expect("Result" |> by_label() |> to_have_value("submitted"))
     end)
   end
-
-  defp with_html(driver, html, fun) do
-    session = session_for_html(driver, html, base_url: Fluffy.Support.Server.base_url())
-    fun.(session)
-  end
 end

@@ -9,7 +9,7 @@ defmodule Fluffy.Conformance.LiveStructuralActionRetryTest do
   # with many parallel cases an action can queue behind others for seconds.
   @action_timeout 5_000
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "click waits for a target to appear with #{driver}" do
       unquote(driver)
@@ -177,10 +177,7 @@ defmodule Fluffy.Conformance.LiveStructuralActionRetryTest do
 
   defp live_session(driver) do
     driver
-    |> start_session(
-      endpoint: Fluffy.Support.Web.Endpoint,
-      base_url: Fluffy.Support.Server.base_url()
-    )
+    |> start_session()
     |> visit("/live/action-retries")
   end
 

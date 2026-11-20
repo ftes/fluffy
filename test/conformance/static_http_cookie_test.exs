@@ -7,11 +7,11 @@ defmodule Fluffy.Conformance.StaticHTTPCookieTest do
 
   alias Fluffy.Support.HTTPFixtures
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "creates, scopes, replaces, and deletes cookies with #{driver}", %{driver: driver} do
       fixture = HTTPFixtures.register(&cookie_response/1)
-      session = start_test_session(driver)
+      session = start_session(driver)
 
       visit(session, HTTPFixtures.path(fixture, "/account/set"))
       visit(session, HTTPFixtures.path(fixture, "/outside"))
@@ -54,8 +54,8 @@ defmodule Fluffy.Conformance.StaticHTTPCookieTest do
           end
         end)
 
-      first = start_test_session(driver)
-      second = start_test_session(driver)
+      first = start_session(driver)
+      second = start_session(driver)
 
       visit(first, HTTPFixtures.path(fixture, "/set"))
       _second = visit(second, HTTPFixtures.path(fixture, "/read"))
@@ -82,7 +82,7 @@ defmodule Fluffy.Conformance.StaticHTTPCookieTest do
           %{headers: headers, body: html()}
         end)
 
-      session = start_test_session(driver)
+      session = start_session(driver)
 
       _session =
         session
@@ -141,13 +141,6 @@ defmodule Fluffy.Conformance.StaticHTTPCookieTest do
       [name, value] = pair |> String.trim() |> String.split("=", parts: 2)
       {name, value}
     end)
-  end
-
-  defp start_test_session(driver) do
-    start_session(driver,
-      base_url: Fluffy.Support.Server.base_url(),
-      endpoint: Fluffy.Support.Web.Endpoint
-    )
   end
 
   defp html do

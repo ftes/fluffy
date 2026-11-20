@@ -5,8 +5,6 @@ defmodule Fluffy.Conformance.RoleLocatorTest do
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.Support.Server
-
   cases = [
     {"button contents", "<button>Save changes</button>", :button, [name: "Save"], 1},
     {"button input value", ~s(<input type="submit" value="Open a vault">), :button, [name: "Open"], 1},
@@ -326,13 +324,13 @@ defmodule Fluffy.Conformance.RoleLocatorTest do
       Enum.map(implicit_roles, fn {html, role} -> {"implicit role #{role} of #{html}", html, role, [], 1} end)
 
   for {case_name, html, role, options, expected} <- cases,
-      driver <- [:static, :playwright] do
+      driver <- Drivers.html() do
     count = if is_map(expected), do: Map.fetch!(expected, driver), else: expected
 
     @tag driver: driver
     test "matches #{case_name} by role with #{driver}" do
       session =
-        session_for_html(unquote(driver), unquote(html), base_url: Server.base_url())
+        session_for_html(unquote(driver), unquote(html))
 
       expect(session, unquote(role) |> by_role(unquote(options)) |> to_have_count(unquote(count)))
     end
@@ -358,10 +356,10 @@ defmodule Fluffy.Conformance.RoleLocatorTest do
   ]
 
   for {case_name, html, role, options, expected} <- scoped_cases,
-      driver <- [:static, :playwright] do
+      driver <- Drivers.html() do
     @tag driver: driver
     test "#{case_name} counts across the locator's scope with #{driver}" do
-      session = session_for_html(unquote(driver), unquote(html), base_url: Server.base_url())
+      session = session_for_html(unquote(driver), unquote(html))
 
       expect(
         session,
@@ -407,12 +405,12 @@ defmodule Fluffy.Conformance.RoleLocatorTest do
          %{static: true, playwright: false}}
       ]
 
-  for {case_name, html, expected} <- visibility_cases, driver <- [:static, :playwright] do
+  for {case_name, html, expected} <- visibility_cases, driver <- Drivers.html() do
     visible? = if is_map(expected), do: Map.fetch!(expected, driver), else: expected
 
     @tag driver: driver
     test "#{case_name} is #{if visible?, do: "visible", else: "not visible"} with #{driver}" do
-      session = session_for_html(unquote(driver), unquote(html), base_url: Server.base_url())
+      session = session_for_html(unquote(driver), unquote(html))
       target = by_css("#t")
 
       if unquote(visible?) do
@@ -429,11 +427,11 @@ defmodule Fluffy.Conformance.RoleLocatorTest do
     end
   end
 
-  for driver <- [:static, :playwright] do
+  for driver <- Drivers.html() do
     @tag driver: driver
     test "aria-hidden hides an element from by_role but not from visibility with #{driver}" do
       session =
-        session_for_html(unquote(driver), ~s(<button aria-hidden="true">Go</button>), base_url: Server.base_url())
+        session_for_html(unquote(driver), ~s(<button aria-hidden="true">Go</button>))
 
       session
       |> expect(:button |> by_role() |> to_have_count(0))
@@ -445,7 +443,7 @@ defmodule Fluffy.Conformance.RoleLocatorTest do
       html =
         ~s(<div id="s"><noscript><a href="/n">N</a></noscript><svg><template><a href="/t">T</a></template></svg><a href="/after">After</a></div>)
 
-      session = session_for_html(unquote(driver), html, base_url: Server.base_url())
+      session = session_for_html(unquote(driver), html)
 
       session
       |> expect(:link |> by_role(name: "After") |> to_have_attribute("href", "/after"))
@@ -457,7 +455,7 @@ defmodule Fluffy.Conformance.RoleLocatorTest do
       html =
         ~s(<span id="t">Withdraw</span><div class="c"><button aria-labelledby="t"></button></div><div class="c"></div>)
 
-      session = session_for_html(unquote(driver), html, base_url: Server.base_url())
+      session = session_for_html(unquote(driver), html)
       button = by_role(:button, name: "Withdraw", exact: true)
 
       expect(session, ".c" |> by_css() |> filter(has: button) |> to_have_count(1))
@@ -466,7 +464,7 @@ defmodule Fluffy.Conformance.RoleLocatorTest do
     @tag driver: driver
     test "overlapping scopes match an element once with #{driver}" do
       html = ~s(<div class="s"><div class="s"><button>Go</button></div></div>)
-      session = session_for_html(unquote(driver), html, base_url: Server.base_url())
+      session = session_for_html(unquote(driver), html)
 
       expect(session, ".s" |> by_css() |> by_role(:button) |> to_have_count(1))
     end

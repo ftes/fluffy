@@ -9,7 +9,7 @@ defmodule Fluffy.Conformance.StaticHTTPLinkTest do
   alias Fluffy.Support.HTTPFixtures
   alias Fluffy.Support.Server
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "resolves a relative link against the current document with #{driver}", %{driver: driver} do
       fixture =
@@ -18,7 +18,7 @@ defmodule Fluffy.Conformance.StaticHTTPLinkTest do
           %{body: html("<h1>Next owl landed</h1>")}
         ])
 
-      session = start_test_session(driver)
+      session = start_session(driver)
 
       session
       |> visit(HTTPFixtures.path(fixture, "/owls/current"))
@@ -41,7 +41,7 @@ defmodule Fluffy.Conformance.StaticHTTPLinkTest do
         ])
 
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/owls/current"))
       |> click(by_text("Next owl", exact: true))
       |> expect("Next owl landed" |> by_text() |> to_be_visible())
@@ -57,7 +57,7 @@ defmodule Fluffy.Conformance.StaticHTTPLinkTest do
           body: html(~s(<a href="#{destination}">Absolute destination</a>))
         })
 
-      session = start_test_session(driver)
+      session = start_session(driver)
 
       session
       |> visit(HTTPFixtures.path(fixture, "/absolute"))
@@ -75,7 +75,7 @@ defmodule Fluffy.Conformance.StaticHTTPLinkTest do
           body: html(~s(<a href="#details">Details</a><h2 id="details">Owl details</h2>))
         })
 
-      session = start_test_session(driver)
+      session = start_session(driver)
 
       session
       |> visit(HTTPFixtures.path(fixture, "/owls/current?state=open"))
@@ -96,7 +96,7 @@ defmodule Fluffy.Conformance.StaticHTTPLinkTest do
           ])
 
         driver
-        |> start_test_session()
+        |> start_session()
         |> visit(HTTPFixtures.path(fixture, "/owls/current"))
         |> click(by_role(:link, name: "Sign for parcel"))
         |> expect("Current owl" |> by_text() |> to_be_visible())
@@ -113,7 +113,7 @@ defmodule Fluffy.Conformance.StaticHTTPLinkTest do
         body: html(~s(<a href="/live/three-heads" target="_blank">Open counter</a>))
       })
 
-    session = start_test_session(:phoenix)
+    session = start_session(:phoenix)
     session = visit(session, HTTPFixtures.path(fixture, "/source"))
 
     assert Session.current_driver(session) == :static
@@ -122,13 +122,6 @@ defmodule Fluffy.Conformance.StaticHTTPLinkTest do
 
     assert Session.current_driver(session) == :live
     expect(session, "Sleeping heads: 0" |> by_text() |> to_be_visible())
-  end
-
-  defp start_test_session(driver) do
-    start_session(driver,
-      base_url: Server.base_url(),
-      endpoint: Fluffy.Support.Web.Endpoint
-    )
   end
 
   defp html(body) do

@@ -5,9 +5,6 @@ defmodule Fluffy.Conformance.ComposedLocatorTest do
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.Support.Server
-  alias Fluffy.Support.Web.Endpoint
-
   @tag driver: :playwright
   test "within/2 rejects a frame inside a chained locator" do
     session = session_for_html(:playwright, ~s(<section><iframe srcdoc="<p>In</p>"></iframe></section>))
@@ -18,7 +15,7 @@ defmodule Fluffy.Conformance.ComposedLocatorTest do
     end
   end
 
-  for driver <- [:static, :playwright] do
+  for driver <- Drivers.html() do
     @tag driver: driver
     test "by_label reads labels outside its parent with #{driver}" do
       unquote(driver)
@@ -58,7 +55,7 @@ defmodule Fluffy.Conformance.ComposedLocatorTest do
     end
   end
 
-  for driver <- [:static, :playwright] do
+  for driver <- Drivers.html() do
     @tag driver: driver
     test "within resolves nth and first separately inside each parent with #{driver}", %{driver: driver} do
       cell = by_css("td")
@@ -94,7 +91,7 @@ defmodule Fluffy.Conformance.ComposedLocatorTest do
     end
   end
 
-  for driver <- [:static, :playwright] do
+  for driver <- Drivers.html() do
     @tag driver: driver
     test "intersections and unions use current checked state on either side with #{driver}", %{driver: driver} do
       driver
@@ -241,7 +238,7 @@ defmodule Fluffy.Conformance.ComposedLocatorTest do
     assert locator |> :erlang.term_to_binary() |> :erlang.binary_to_term() == locator
   end
 
-  for driver <- [:static, :playwright] do
+  for driver <- Drivers.html() do
     @tag driver: driver
     test "intersects CSS and associated labels on the same control with #{driver}", %{driver: driver} do
       session =
@@ -305,10 +302,10 @@ defmodule Fluffy.Conformance.ComposedLocatorTest do
     end
   end
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "intersections act on and re-resolve LiveView renders with #{driver}", %{driver: driver} do
-      session = start_session(driver, base_url: Server.base_url(), endpoint: Endpoint)
+      session = start_session(driver)
       flute = "button" |> by_css() |> and_(by_role(:button, name: "Play the flute"))
 
       session
@@ -320,11 +317,11 @@ defmodule Fluffy.Conformance.ComposedLocatorTest do
     end
   end
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "regular expressions act on LiveView renders with #{driver}", %{driver: driver} do
       driver
-      |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+      |> start_session()
       |> visit("/live/nested")
       |> click(by_role(:button, name: ~r/^Increment/))
       |> expect("p" |> by_css() |> filter(has_text: ~r/^Child count: 1$/) |> to_be_visible())
@@ -339,12 +336,5 @@ defmodule Fluffy.Conformance.ComposedLocatorTest do
     locator = "#email" |> by_css() |> and_(by_label("Email", exact: true))
     assert locator |> :erlang.term_to_binary() |> :erlang.binary_to_term() == locator
     assert inspect(locator) == ~s{#Fluffy.Locator<by_css("#email") |> and_(by_label("Email", exact: true))>}
-  end
-
-  defp with_html(driver, html, fun) do
-    session =
-      session_for_html(driver, html, base_url: Server.base_url())
-
-    fun.(session)
   end
 end

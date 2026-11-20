@@ -6,8 +6,6 @@ defmodule Fluffy.Conformance.ClockTest do
   import Fluffy.Locator
 
   alias Fluffy.Playwright.Clock
-  alias Fluffy.Support.Server
-  alias Fluffy.Support.Web.Endpoint
 
   @noon ~U[2024-02-02 12:00:00Z]
   @later DateTime.shift(@noon, minute: 1)
@@ -22,7 +20,7 @@ defmodule Fluffy.Conformance.ClockTest do
 
     test "set_fixed_time and set_system_time set the page's Date" do
       :playwright
-      |> session_for_html(@dates, base_url: Server.base_url())
+      |> session_for_html(@dates)
       |> Clock.set_fixed_time(@noon)
       |> click(by_role(:button, name: "Now"))
       |> expect(to_be_visible(by_text("2024-02-02T12:00:00.000Z")))
@@ -32,7 +30,8 @@ defmodule Fluffy.Conformance.ClockTest do
     end
 
     test "an installed clock runs the app's timers and navigation" do
-      session()
+      :playwright
+      |> start_session()
       |> Clock.install(time: @noon)
       |> visit("/live/clock")
       |> fill(by_label("Spell"), "lumos")
@@ -48,7 +47,8 @@ defmodule Fluffy.Conformance.ClockTest do
 
     test "phx-debounce fires on a paused clock only once the clock runs" do
       session =
-        session()
+        :playwright
+        |> start_session()
         |> Clock.install(time: @noon)
         |> visit("/live/clock")
         |> Clock.pause_at(@later)
@@ -65,7 +65,8 @@ defmodule Fluffy.Conformance.ClockTest do
     end
 
     test "actions and navigation work on a paused clock" do
-      session()
+      :playwright
+      |> start_session()
       |> Clock.install(time: @noon)
       |> visit("/live/clock")
       |> Clock.pause_at(@later)
@@ -88,7 +89,8 @@ defmodule Fluffy.Conformance.ClockTest do
 
     test "a paused clock freezes the app's timers, not Fluffy's actions" do
       session =
-        session()
+        :playwright
+        |> start_session()
         |> Clock.install(time: @noon)
         |> visit("/live/clock")
         |> Clock.pause_at(@later)
@@ -106,7 +108,7 @@ defmodule Fluffy.Conformance.ClockTest do
 
     # As in Playwright, clock calls have no timeout.
     test "clock calls reject timeout:" do
-      session = session_for_html(:playwright, @dates, base_url: Server.base_url())
+      session = session_for_html(:playwright, @dates)
 
       for call <- [&Clock.install(session, &1), &Clock.run_for(session, 200, &1), &Clock.resume(session, &1)] do
         assert_raise NimbleOptions.ValidationError, ~r/unknown options.*:timeout/, fn -> call.(timeout: 500) end
@@ -116,7 +118,7 @@ defmodule Fluffy.Conformance.ClockTest do
     # The call runs in a task, which logs the crash.
     @tag :capture_log
     test "a clock call that Playwright rejects raises its exception" do
-      session = session_for_html(:playwright, @dates, base_url: Server.base_url())
+      session = session_for_html(:playwright, @dates)
 
       assert_raise FunctionClauseError, fn -> Clock.install(session, time: :bogus) end
     end
@@ -124,7 +126,7 @@ defmodule Fluffy.Conformance.ClockTest do
 
   @tag driver: :live
   test "the clock requires Playwright" do
-    session = :phoenix |> start_session(endpoint: Endpoint) |> visit("/live/clock")
+    session = :phoenix |> start_session() |> visit("/live/clock")
 
     for call <- [
           &Clock.install(&1, time: @noon),
@@ -139,6 +141,4 @@ defmodule Fluffy.Conformance.ClockTest do
       assert error.capability == :clock
     end
   end
-
-  defp session, do: start_session(:playwright, base_url: Server.base_url(), endpoint: Endpoint)
 end

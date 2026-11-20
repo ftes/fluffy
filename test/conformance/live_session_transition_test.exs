@@ -5,19 +5,13 @@ defmodule Fluffy.Conformance.LiveSessionTransitionTest do
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.Support.Server
-  alias Fluffy.Support.Web.Endpoint
-
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "preserves session identity across Static and Live pages with #{driver}", %{
       driver: driver
     } do
       session =
-        start_session(driver,
-          base_url: Server.base_url(),
-          endpoint: Endpoint
-        )
+        start_session(driver)
 
       session
       |> visit("/session/start?identity=flute-keeper")
@@ -33,10 +27,7 @@ defmodule Fluffy.Conformance.LiveSessionTransitionTest do
       driver: driver
     } do
       session =
-        start_session(driver,
-          base_url: Server.base_url(),
-          endpoint: Endpoint
-        )
+        start_session(driver)
 
       session
       |> visit("/actions/live")
@@ -52,10 +43,7 @@ defmodule Fluffy.Conformance.LiveSessionTransitionTest do
     @tag driver: driver
     test "preserves Live redirect flash with #{driver}", %{driver: driver} do
       session =
-        start_session(driver,
-          base_url: Server.base_url(),
-          endpoint: Endpoint
-        )
+        start_session(driver)
 
       session
       |> visit("/live/chamber-map")

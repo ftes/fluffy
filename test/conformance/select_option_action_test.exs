@@ -5,9 +5,7 @@ defmodule Fluffy.Conformance.SelectOptionActionTest do
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.Support.Server
-
-  for driver <- [:static, :playwright] do
+  for driver <- Drivers.html() do
     @tag driver: driver
     test "select_option with an empty list deselects every option of a multiple select with #{driver}" do
       html =
@@ -265,15 +263,15 @@ defmodule Fluffy.Conformance.SelectOptionActionTest do
   end
 
   # Playwright types a list by its first element, which a mixed list breaks.
-  for driver <- [:static, :live, :playwright] do
+  for driver <- Drivers.all() do
     @tag driver: driver
     test "select_option rejects a list mixing values and option maps with #{driver}", %{driver: driver} do
       session =
         if driver == :live do
-          :phoenix |> start_session(endpoint: Fluffy.Support.Web.Endpoint) |> visit("/live/potions")
+          :phoenix |> start_session() |> visit("/live/potions")
         else
           html = ~s(<select aria-label="Potion colours" multiple><option>blue</option></select>)
-          session_for_html(driver, html, base_url: Server.base_url())
+          session_for_html(driver, html)
         end
 
       for requested <- [[:blue, %{value: :green}], [%{value: :green}, "blue"]] do
@@ -282,10 +280,5 @@ defmodule Fluffy.Conformance.SelectOptionActionTest do
         end
       end
     end
-  end
-
-  defp with_html(driver, html, fun) do
-    session = session_for_html(driver, html, base_url: Server.base_url())
-    fun.(session)
   end
 end

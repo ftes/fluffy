@@ -12,7 +12,7 @@ defmodule Fluffy.Conformance.CookieTest do
 
   @endpoint Fluffy.Support.Web.Endpoint
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "base_url/1 is the URL paths resolve against with #{driver}", %{driver: driver} do
       session = start_session(driver)

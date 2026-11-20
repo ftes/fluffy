@@ -17,10 +17,16 @@ defmodule Fluffy.Support.Case do
           monitor_running: 1,
           playwright_engine?: 1,
           put_fluffy_config: 1,
-          put_playwright_config: 2
+          put_playwright_config: 2,
+          with_html: 3
         ]
+
+      alias Fluffy.Support.Drivers, warn: false
     end
   end
+
+  # Runs `fun` on a session of `driver` (`Fluffy.Support.Drivers.html/0`) showing `html`.
+  def with_html(driver, html, fun), do: fun.(Fluffy.session_for_html(driver, html))
 
   # A plain function, compiled before the tests, so `@tag skip:` can call it at compile time.
   # Read at call time, as the config can differ between runs (FLUFFY_BROWSER).

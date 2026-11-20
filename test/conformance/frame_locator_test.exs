@@ -8,7 +8,6 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
 
   alias Fluffy.FrameLocator
   alias Fluffy.Support.HTTPFixtures
-  alias Fluffy.Support.Server
 
   test "frame conversions and nested queries remain serializable locator values" do
     owner = "section" |> by_css() |> by_title("Gringotts") |> nth(1)
@@ -163,7 +162,7 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
       })
 
     source_url = HTTPFixtures.url(source)
-    session = :playwright |> start_session(base_url: Server.base_url()) |> visit(source_url)
+    session = :playwright |> start_session() |> visit(source_url)
     frame = frame_locator("#child")
 
     session =
@@ -282,13 +281,13 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
     end
   end
 
-  for driver <- [:static, :live] do
+  for driver <- Drivers.phoenix() do
     @tag driver: driver
     test "#{driver} rejects traversal, including negated assertions and composite operands" do
       session =
         case unquote(driver) do
           :static -> session_for_html(:static, "<iframe id='child'></iframe>")
-          :live -> :phoenix |> start_session(endpoint: Fluffy.Support.Web.Endpoint) |> visit("/live/three-heads")
+          :live -> :phoenix |> start_session() |> visit("/live/three-heads")
         end
 
       locator = "#child" |> frame_locator() |> by_role(:button)
@@ -352,7 +351,7 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
     end
   end
 
-  defp browser_html(html), do: session_for_html(:playwright, html, base_url: Server.base_url())
+  defp browser_html(html), do: session_for_html(:playwright, html)
 
   defp iframe(id, html) do
     escaped = html |> String.replace("&", "&amp;") |> String.replace("\"", "&quot;")

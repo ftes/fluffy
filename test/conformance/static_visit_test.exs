@@ -5,14 +5,11 @@ defmodule Fluffy.Conformance.StaticVisitTest do
   import Fluffy.Expect
   import Fluffy.Locator
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "visits the static smoke page with #{driver}", %{driver: driver} do
       session =
-        start_session(driver,
-          base_url: Fluffy.Support.Server.base_url(),
-          endpoint: Fluffy.Support.Web.Endpoint
-        )
+        start_session(driver)
 
       session
       |> visit("/chamber")

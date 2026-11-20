@@ -8,9 +8,8 @@ defmodule Fluffy.Conformance.DownloadEventTest do
   alias Fluffy.Download
   alias Fluffy.Event
   alias Fluffy.Support.HTTPFixtures
-  alias Fluffy.Support.Server
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver, tmp_dir: true
     test "download handles keep the source page and can be read and saved repeatedly with #{driver}", %{
       driver: driver,
@@ -204,7 +203,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
 
     session =
       :playwright
-      |> start_session(base_url: Server.base_url())
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/start"))
 
     pending = wait_for(session, Event.download())
@@ -256,7 +255,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
 
     session =
       :playwright
-      |> start_session(base_url: Server.base_url())
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/start"))
 
     pending = wait_for(session, Event.download())
@@ -313,7 +312,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
       end)
 
     driver
-    |> start_session(base_url: Server.base_url(), endpoint: Fluffy.Support.Web.Endpoint)
+    |> start_session()
     |> visit(HTTPFixtures.path(fixture, "/start"))
   end
 end

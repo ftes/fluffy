@@ -7,7 +7,7 @@ defmodule Fluffy.Conformance.NavigationAssertionTest do
 
   alias Fluffy.Support.HTTPFixtures
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "asserts link navigation URL and content with #{driver}", %{driver: driver} do
       fixture =
@@ -19,7 +19,7 @@ defmodule Fluffy.Conformance.NavigationAssertionTest do
         end)
 
       destination = HTTPFixtures.url(fixture, "/destination?source=link")
-      session = start_test_session(driver)
+      session = start_session(driver)
 
       session
       |> visit(HTTPFixtures.path(fixture, "/start"))
@@ -50,7 +50,7 @@ defmodule Fluffy.Conformance.NavigationAssertionTest do
         end)
 
       destination = HTTPFixtures.url(fixture, "/submit")
-      session = start_test_session(driver)
+      session = start_session(driver)
 
       session
       |> visit(HTTPFixtures.path(fixture, "/start"))
@@ -80,7 +80,7 @@ defmodule Fluffy.Conformance.NavigationAssertionTest do
         end)
 
       destination = HTTPFixtures.url(fixture, "/final")
-      session = start_test_session(driver)
+      session = start_session(driver)
 
       session
       |> visit(HTTPFixtures.path(fixture, "/start"))
@@ -90,16 +90,9 @@ defmodule Fluffy.Conformance.NavigationAssertionTest do
     end
   end
 
-  defp start_test_session(driver) do
-    start_session(driver,
-      base_url: Fluffy.Support.Server.base_url(),
-      endpoint: Fluffy.Support.Web.Endpoint
-    )
-  end
-
   defp html(body), do: "<!doctype html><html><body>#{body}</body></html>"
 
-  for driver <- [:phoenix, :playwright], redirect? <- [false, true] do
+  for driver <- Drivers.backends(), redirect? <- [false, true] do
     @tag driver: driver
     test "asserts sequential navigations with #{driver}, redirect: #{redirect?}", %{
       driver: driver
@@ -117,7 +110,7 @@ defmodule Fluffy.Conformance.NavigationAssertionTest do
         end)
 
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/start"))
       |> click(by_role(:link, name: "First"))
       |> expect(page_to_have_url(HTTPFixtures.url(fixture, "/first")))
@@ -128,7 +121,7 @@ defmodule Fluffy.Conformance.NavigationAssertionTest do
     end
   end
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "asserts a fragment navigation before a new document with #{driver}", %{driver: driver} do
       fixture =
@@ -146,7 +139,7 @@ defmodule Fluffy.Conformance.NavigationAssertionTest do
         end)
 
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit(HTTPFixtures.path(fixture, "/start"))
       |> click(by_role(:link, name: "Section", exact: true))
       |> expect(page_to_have_url(HTTPFixtures.url(fixture, "/start#section")))
@@ -157,7 +150,7 @@ defmodule Fluffy.Conformance.NavigationAssertionTest do
     end
   end
 
-  for driver <- [:phoenix, :playwright], kind <- [:patch, :navigate] do
+  for driver <- Drivers.backends(), kind <- [:patch, :navigate] do
     @tag driver: driver
     test "asserts a LiveView #{kind} before another navigation with #{driver}", %{driver: driver} do
       {link, destination, content} =
@@ -167,7 +160,7 @@ defmodule Fluffy.Conformance.NavigationAssertionTest do
         end
 
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/live/chamber-map")
       |> click(by_role(:link, name: link, exact: true))
       |> expect(page_to_have_url(destination))
@@ -178,11 +171,11 @@ defmodule Fluffy.Conformance.NavigationAssertionTest do
     end
   end
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "asserts a same-URL reload before another navigation with #{driver}", %{driver: driver} do
       driver
-      |> start_test_session()
+      |> start_session()
       |> visit("/chamber")
       |> reload()
       |> expect(page_to_have_url("/chamber"))
@@ -193,7 +186,7 @@ defmodule Fluffy.Conformance.NavigationAssertionTest do
 
     @tag driver: driver
     test "keeps the URL after a LiveView patch to the current URL with #{driver}", %{driver: driver} do
-      session = driver |> start_test_session() |> visit("/live/chamber-map?step=patched")
+      session = driver |> start_session() |> visit("/live/chamber-map?step=patched")
 
       session
       |> click(by_role(:link, name: "Reveal passage", exact: true))

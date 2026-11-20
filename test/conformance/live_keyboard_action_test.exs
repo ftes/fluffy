@@ -62,7 +62,7 @@ defmodule Fluffy.Conformance.LiveKeyboardActionTest do
     |> expect("element-keyup:key=Enter;value=x;scope=none" |> by_text(exact: true) |> to_be_visible())
   end
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "a key press carries the value a fill left with #{driver}", %{driver: driver} do
       input = by_label("Valued key", exact: true)
@@ -141,7 +141,7 @@ defmodule Fluffy.Conformance.LiveKeyboardActionTest do
 
   defp session(driver \\ :phoenix) do
     driver
-    |> start_session(base_url: Server.base_url(), endpoint: Fluffy.Support.Web.Endpoint)
+    |> start_session()
     |> visit("/live/keyboard")
   end
 end

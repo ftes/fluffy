@@ -5,14 +5,12 @@ defmodule Fluffy.Conformance.ElementExpectationTest do
   import Fluffy.Expect
   import Fluffy.Locator
 
-  alias Fluffy.Support.Server
-  alias Fluffy.Support.Web.Endpoint
   alias Fluffy.Support.Web.ExpectationsLive
 
   @miss by_css("#absent")
   @timeout 5_000
 
-  for driver <- [:static, :live, :playwright] do
+  for driver <- Drivers.all() do
     @tag driver: driver
     test "to_have_text compares normalized text with #{driver}", %{driver: driver} do
       spaced = by_css("#spaced")
@@ -279,10 +277,10 @@ defmodule Fluffy.Conformance.ElementExpectationTest do
     end
   end
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "the element expectations retry a changing LiveView with #{driver}", %{driver: driver} do
-      session = start_session(driver, base_url: Server.base_url(), endpoint: Endpoint)
+      session = start_session(driver)
 
       session
       |> visit("/live/expectations?delay=25")
@@ -345,7 +343,7 @@ defmodule Fluffy.Conformance.ElementExpectationTest do
     |> expect(not_(to_contain_text(rendered, "Concealed", use_inner_text: true)))
   end
 
-  for driver <- [:static, :live] do
+  for driver <- Drivers.phoenix() do
     @tag driver: driver
     test "use_inner_text needs a browser with #{driver}", %{driver: driver} do
       session = session(driver)
@@ -368,11 +366,11 @@ defmodule Fluffy.Conformance.ElementExpectationTest do
 
   defp session(:live) do
     :phoenix
-    |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+    |> start_session()
     |> visit("/live/expectations")
   end
 
-  defp session(driver), do: session_for_html(driver, ExpectationsLive.markup(), base_url: Server.base_url())
+  defp session(driver), do: session_for_html(driver, ExpectationsLive.markup())
 
   defp refute_passes(session, expectation) do
     assert_raise ExUnit.AssertionError, fn -> expect(session, expectation, timeout: 50) end

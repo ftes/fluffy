@@ -10,8 +10,6 @@ defmodule Fluffy.Conformance.TestTimeoutTest do
   import Fluffy.Locator
 
   alias Fluffy.Event
-  alias Fluffy.Support.Server
-  alias Fluffy.Support.Web.Endpoint
 
   @moduletag timeout: 2_000
   @missing by_role(:button, name: "Missing")
@@ -45,7 +43,7 @@ defmodule Fluffy.Conformance.TestTimeoutTest do
       fn ->
         session =
           :phoenix
-          |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+          |> start_session()
           |> visit("/chamber")
 
         assert_raise(ExUnit.AssertionError, fn -> session |> wait_for(Event.download(), timeout: :infinity) |> await() end)
@@ -69,7 +67,7 @@ defmodule Fluffy.Conformance.TestTimeoutTest do
 
   defp missing_session do
     :phoenix
-    |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+    |> start_session()
     |> visit("/live/chamber-map")
   end
 
@@ -142,9 +140,6 @@ defmodule Fluffy.Conformance.SlowSetupTestTimeoutTest do
   import Fluffy
   import Fluffy.Locator
 
-  alias Fluffy.Support.Server
-  alias Fluffy.Support.Web.Endpoint
-
   @moduletag timeout: 2_000
 
   # Counted from here, the backstop would come 500ms after ExUnit's kill.
@@ -156,7 +151,7 @@ defmodule Fluffy.Conformance.SlowSetupTestTimeoutTest do
   test "a slow first setup leaves the backstop before ExUnit's timeout with live" do
     session =
       :phoenix
-      |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+      |> start_session()
       |> visit("/live/chamber-map")
 
     error =

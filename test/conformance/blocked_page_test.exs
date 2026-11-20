@@ -10,7 +10,6 @@ defmodule Fluffy.Conformance.BlockedPageTest do
   # times out if Fluffy calls Playwright directly (page `evaluate`, a context setter,
   # `unroute_all`). The others, `content` among them, first make Fluffy's bounded
   # document check.
-  alias Fluffy.Support.Server
 
   @moduletag driver: :playwright
 
@@ -55,7 +54,7 @@ defmodule Fluffy.Conformance.BlockedPageTest do
   end
 
   test "a blocked page that page code navigated reports its URL without waiting for the page" do
-    session = session_for_html(:playwright, @html, base_url: Server.base_url())
+    session = session_for_html(:playwright, @html)
 
     Playwright.evaluate(session, "history.pushState(null, '', 'pushed')")
     freeze_page(session)
@@ -66,7 +65,7 @@ defmodule Fluffy.Conformance.BlockedPageTest do
 
   defp frozen_session do
     :playwright
-    |> session_for_html(@html, base_url: Server.base_url())
+    |> session_for_html(@html)
     |> freeze_page()
   end
 end

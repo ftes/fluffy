@@ -7,10 +7,10 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
 
   @down_tag Fluffy.Driver.Live.State.down_tag()
 
-  for driver <- [:phoenix, :playwright] do
+  for driver <- Drivers.backends() do
     @tag driver: driver
     test "commits a Live patch with #{driver}", %{driver: driver} do
-      session = live_session(driver)
+      session = start_session(driver)
 
       session
       |> visit("/live/chamber-map")
@@ -22,7 +22,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
 
     @tag driver: driver
     test "follows Live navigation with #{driver}", %{driver: driver} do
-      session = live_session(driver)
+      session = start_session(driver)
 
       session
       |> visit("/live/chamber-map")
@@ -33,7 +33,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
 
     @tag driver: driver
     test "reclassifies an ordinary Live link destination with #{driver}", %{driver: driver} do
-      session = live_session(driver)
+      session = start_session(driver)
 
       session
       |> visit("/live/chamber-map")
@@ -46,7 +46,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     test "follows an ordinary redirect returned by a Live event with #{driver}", %{
       driver: driver
     } do
-      session = live_session(driver)
+      session = start_session(driver)
 
       session
       |> visit("/live/chamber-map")
@@ -59,7 +59,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     test "follows an asynchronous Live navigation while waiting with #{driver}", %{
       driver: driver
     } do
-      session = live_session(driver)
+      session = start_session(driver)
 
       session
       |> visit("/live/chamber-map?async=true")
@@ -70,7 +70,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     @tag driver: driver
     test "follows Live navigation that races the mount render with #{driver}", %{driver: driver} do
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/chamber-map?async=mount")
       |> expect(Fluffy.Expect.page_to_have_url("/live/secret-chamber"))
       |> expect("The secret chamber is open" |> by_text() |> to_be_visible())
@@ -79,7 +79,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     @tag driver: driver
     test "follows Live navigation from the connected mount with #{driver}", %{driver: driver} do
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/chamber-map?redirect=live")
       |> expect(Fluffy.Expect.page_to_have_url("/live/secret-chamber"))
       |> expect("The secret passage opened" |> by_text() |> to_be_visible())
@@ -88,7 +88,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     @tag driver: driver
     test "follows a redirect from the connected mount to a static page with #{driver}", %{driver: driver} do
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/chamber-map?redirect=static")
       |> expect(Fluffy.Expect.page_to_have_url("/chamber"))
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
@@ -99,7 +99,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
       driver: driver
     } do
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/chamber-map?async=return")
       |> await_unread_navigation(driver, "/live/chamber-map?step=returned")
       |> click(by_role(:button, name: "Lull guardian", exact: true))
@@ -111,7 +111,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
       driver: driver
     } do
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/chamber-map?async=return")
       |> await_unread_navigation(driver, "/live/chamber-map?step=returned")
       |> fill(by_label("Map step"), "north")
@@ -124,7 +124,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
       driver: driver
     } do
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/chamber-map?async=return")
       |> await_unread_navigation(driver, "/live/chamber-map?step=returned")
       |> click(by_role(:link, name: "Chamber from here", exact: true))
@@ -135,7 +135,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     test "fills a field without phx-change on the document a Live navigation landed on after the last read with #{driver}",
          %{driver: driver} do
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/chamber-map?async=return")
       |> await_unread_navigation(driver, "/live/chamber-map?step=returned")
       |> fill(by_label("Map note"), "north")
@@ -147,7 +147,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     test "clicks inside a nested LiveView on the document a Live navigation landed on after the last read with #{driver}",
          %{driver: driver} do
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/nested?async=return")
       |> await_unread_navigation(driver, "/live/nested?step=returned")
       |> click(by_role(:button, name: "Increment child", exact: true))
@@ -159,7 +159,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     test "uploads inside a nested LiveView on the document a Live navigation landed on after the last read with #{driver}",
          %{driver: driver} do
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/nested?async=return")
       |> await_unread_navigation(driver, "/live/nested?step=returned")
       |> set_input_files(
@@ -175,7 +175,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     test "submits a form that appears late on the document a Live navigation landed on after the last read with #{driver}",
          %{driver: driver} do
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/chamber-map?async=return-late")
       |> await_unread_navigation(driver, "/live/chamber-map?step=returned&late=true")
       |> submit(by_css("#map-form"))
@@ -186,7 +186,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     test "uploads to an input that appears late on the document a Live navigation landed on after the last read with #{driver}",
          %{driver: driver} do
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/nested?async=return-late")
       |> await_unread_navigation(driver, "/live/nested?step=returned&late=true")
       |> set_input_files(
@@ -202,7 +202,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
       driver: driver
     } do
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/chamber-map?async=patch")
       |> await_unread_patches(driver, 1, "/live/chamber-map?step=late-patched")
       |> click(by_role(:link, name: "Chamber from here", exact: true))
@@ -215,7 +215,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     } do
       session =
         driver
-        |> live_session()
+        |> start_session()
         |> visit("/live/chamber-map?async=true")
         |> await_unread_navigation(driver, "/live/secret-chamber")
 
@@ -229,7 +229,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
       driver: driver
     } do
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/keyboard")
       |> press(by_label("Leaving key", exact: true), "Enter")
       |> expect(Fluffy.Expect.page_to_have_url("/live/keyboard?step=left"))
@@ -242,7 +242,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
       driver: driver
     } do
       driver
-      |> live_session()
+      |> start_session()
       |> visit("/live/chamber-map")
       |> click(by_label("Enter chamber and save", exact: true))
       |> expect(Fluffy.Expect.page_to_have_url("/live/secret-chamber"))
@@ -253,7 +253,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     test "follows Live navigation that races the post-action render with #{driver}", %{
       driver: driver
     } do
-      session = live_session(driver)
+      session = start_session(driver)
 
       session
       |> visit("/live/chamber-map")
@@ -266,7 +266,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     test "follows a Live patch that arrives after the post-action render with #{driver}", %{
       driver: driver
     } do
-      session = live_session(driver)
+      session = start_session(driver)
 
       session
       |> visit("/live/chamber-map")
@@ -278,7 +278,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
 
   @tag driver: :phoenix
   test "follows a Live redirect when the channel shutdown wins the client-proxy race" do
-    session = :phoenix |> live_session() |> visit("/live/chamber-map")
+    session = :phoenix |> start_session() |> visit("/live/chamber-map")
     state = Fluffy.Session.page_state(session)
     {_reference, _topic, proxy_pid} = state.view.proxy
     proxy_reference = Process.monitor(proxy_pid)
@@ -297,7 +297,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
 
   @tag driver: :phoenix
   test "a connected-mount redirect loop fails at the redirect limit" do
-    session = live_session(:phoenix)
+    session = start_session(:phoenix)
 
     assert_raise Fluffy.OperationError, ~r/exceeded 20 redirects/, fn ->
       visit(session, "/live/chamber-map?redirect=ping")
@@ -310,7 +310,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     # and follows each navigation instead.
     assert_raise Fluffy.OperationError, ~r/exceeded 20 redirects/, fn ->
       :phoenix
-      |> live_session()
+      |> start_session()
       |> visit("/live/chamber-map?async=loop")
       |> click(by_role(:button, name: "Missing", exact: true), timeout: 10_000)
     end
@@ -320,13 +320,13 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
   test "an action's retry counts its redirect toward those of the page it follows" do
     # A visit follows the page's 20 connected-mount redirects within the limit.
     :phoenix
-    |> live_session()
+    |> start_session()
     |> visit("/live/chamber-map?redirect=chain-20")
     |> expect(Fluffy.Expect.page_to_have_url("/live/chamber-map?redirect=chain-0"))
 
     session =
       :phoenix
-      |> live_session()
+      |> start_session()
       |> visit("/live/chamber-map?async=chain")
       |> await_unread_navigation(:phoenix, nil)
 
@@ -337,7 +337,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
 
   @tag driver: :phoenix
   test "the next action follows a navigation only the view's exit reported after a retry failed before leaving the page" do
-    session = :phoenix |> live_session() |> visit("/live/chamber-map")
+    session = :phoenix |> start_session() |> visit("/live/chamber-map")
     state = Fluffy.Session.page_state(session)
     {_reference, _topic, proxy_pid} = state.view.proxy
     proxy_reference = Process.monitor(proxy_pid)
@@ -360,7 +360,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
 
   @tag driver: :phoenix
   test "the next expectation follows a navigation only the view's exit reported after a retry failed before leaving the page" do
-    session = :phoenix |> live_session() |> visit("/live/chamber-map")
+    session = :phoenix |> start_session() |> visit("/live/chamber-map")
     state = Fluffy.Session.page_state(session)
     {_reference, _topic, proxy_pid} = state.view.proxy
     proxy_reference = Process.monitor(proxy_pid)
@@ -381,7 +381,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
 
   @tag driver: :phoenix
   test "the next unwrap follows a navigation only the view's exit reported after following it failed before leaving the page" do
-    session = :phoenix |> live_session() |> visit("/live/chamber-map")
+    session = :phoenix |> start_session() |> visit("/live/chamber-map")
     state = Fluffy.Session.page_state(session)
     {_reference, _topic, proxy_pid} = state.view.proxy
     proxy_reference = Process.monitor(proxy_pid)
@@ -402,7 +402,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
 
   @tag driver: :phoenix
   test "the next call follows a navigation an action that reached the view could not follow" do
-    session = :phoenix |> live_session() |> visit("/live/keyboard")
+    session = :phoenix |> start_session() |> visit("/live/keyboard")
 
     assert_raise Fluffy.OperationError, ~r/exceeded 20 redirects at .*\/redirect\/loop/, fn ->
       press(session, by_label("Unfollowable key", exact: true), "Enter")
@@ -415,7 +415,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
 
   @tag driver: :phoenix
   test "a view redirect to a download downloads once and keeps the page as inert markup" do
-    session = :phoenix |> live_session() |> visit("/live/chamber-map")
+    session = :phoenix |> start_session() |> visit("/live/chamber-map")
     pending = wait_for(session, Fluffy.Event.download())
 
     click(session, by_role(:button, name: "Fetch the Daily Prophet", exact: true))
@@ -431,7 +431,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
   # when the read of the patched view fails.
   @tag driver: :phoenix
   test "an action keeps a patch it read when the view died before rendering it" do
-    session = :phoenix |> live_session() |> visit("/live/chamber-map")
+    session = :phoenix |> start_session() |> visit("/live/chamber-map")
     state = Fluffy.Session.page_state(session)
     {_reference, _topic, proxy_pid} = state.view.proxy
     proxy_reference = Process.monitor(proxy_pid)
@@ -447,7 +447,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
 
   @tag driver: :phoenix
   test "following a view's redirect leaves none of its messages in the test process" do
-    session = :phoenix |> live_session() |> visit("/live/chamber-map")
+    session = :phoenix |> start_session() |> visit("/live/chamber-map")
     state = Fluffy.Session.page_state(session)
     {reference, _topic, proxy_pid} = state.view.proxy
     proxy_reference = Process.monitor(proxy_pid)
@@ -463,7 +463,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
 
   @tag driver: :phoenix
   test "an action commits the last of the patches queued while it ran" do
-    session = :phoenix |> live_session() |> visit("/live/chamber-map")
+    session = :phoenix |> start_session() |> visit("/live/chamber-map")
     view_pid = Fluffy.Session.page_state(session).view.pid
 
     # Suspending the view queues its own patch ahead of the click's event.
@@ -482,7 +482,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
   @tag driver: :phoenix
   @tag timeout: 20_000
   test "an expectation on views that keep navigating to each other fails at the redirect limit" do
-    session = :phoenix |> live_session() |> visit("/live/chamber-map?async=loop")
+    session = :phoenix |> start_session() |> visit("/live/chamber-map?async=loop")
 
     assert_raise Fluffy.OperationError, ~r/exceeded 20 redirects/, fn ->
       expect(session, Fluffy.Expect.page_to_have_url("/nowhere"), timeout: 5_000)
@@ -493,7 +493,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
   test "an action without timeout budget fails on a navigation and leaves it for the next call" do
     session =
       :phoenix
-      |> live_session()
+      |> start_session()
       |> visit("/live/chamber-map?async=return")
       |> await_unread_navigation(:phoenix, nil)
 
@@ -513,7 +513,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
 
   @tag driver: :phoenix
   test "a LiveView whose connection LiveView rejects fails with the rejection instead of redirecting to itself" do
-    session = live_session(:phoenix)
+    session = start_session(:phoenix)
 
     assert_raise Fluffy.OperationError, ~r/rejected the connection to .*\/unrouted-live as stale or unauthorized/, fn ->
       visit(session, "/unrouted-live")
@@ -524,7 +524,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
   test "an action whose timeout following a navigation used up fails without acting on the new page" do
     session =
       :phoenix
-      |> live_session()
+      |> start_session()
       |> visit("/live/chamber-map?async=return-slow")
       |> await_unread_navigation(:phoenix, nil)
 
@@ -539,7 +539,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
 
   @tag driver: :phoenix
   test "an action without timeout budget fails on a navigation only the view's exit reported and leaves it for the next call" do
-    session = :phoenix |> live_session() |> visit("/live/chamber-map")
+    session = :phoenix |> start_session() |> visit("/live/chamber-map")
     state = Fluffy.Session.page_state(session)
     {_reference, _topic, proxy_pid} = state.view.proxy
     proxy_reference = Process.monitor(proxy_pid)
@@ -563,7 +563,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
   @tag driver: :phoenix
   test "an action without timeout budget acts on the document Live patches changed after the last read" do
     :phoenix
-    |> live_session()
+    |> start_session()
     |> visit("/live/chamber-map?async=patch-twice")
     |> await_unread_patches(:phoenix, 2, nil)
     |> click(by_role(:link, name: "Chamber from here", exact: true), timeout: 0)
@@ -605,12 +605,5 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
       true ->
         flunk("expected #{count} unread Live patches")
     end
-  end
-
-  defp live_session(driver) do
-    start_session(driver,
-      base_url: Fluffy.Support.Server.base_url(),
-      endpoint: Fluffy.Support.Web.Endpoint
-    )
   end
 end
