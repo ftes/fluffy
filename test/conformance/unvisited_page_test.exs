@@ -18,7 +18,7 @@ defmodule Fluffy.Conformance.UnvisitedPageTest do
     assert error.operation == :click
   end
 
-  # Phoenix has no page before the first visit, so everything but a visit raises at once.
+  # Phoenix has no page before the first visit, so page operations raise at once.
   test "a Phoenix session has no page before its first visit" do
     session = start_session(:phoenix)
 

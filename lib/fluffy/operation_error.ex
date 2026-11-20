@@ -2,14 +2,15 @@ defmodule Fluffy.OperationError do
   @moduledoc """
   An operation failure with its backend's original cause.
 
-  `backend` is `:phoenix` or `:playwright`; `driver` is the driver of the page the
-  operation started on, so `:unvisited` for a Phoenix session's first `visit` that failed.
+  `backend` is `:phoenix` or `:playwright`; `driver` is the page's driver when the operation
+  failed, so `:unvisited` if a Phoenix session's first `visit` failed before any page loaded.
   `operation` names the public call and `locator` is the query,
   `Fluffy.FileChooser` handle, or `nil` for an operation on the page as a whole, such
   as a failed navigation. `cause` retains a native Playwright error, a structured Phoenix
   `Fluffy.StrictnessError`, `Fluffy.ActionabilityError` or `Fluffy.LiveViewError`, or,
   for a navigation that Fluffy found failed, a message saying why: an aborted response,
-  too many redirects, or a LiveView that rejected its connection or did not connect.
+  too many redirects, a LiveView that rejected its connection or did not connect, or a page
+  that did not respond to Fluffy's document check.
 
   No shared fine-grained failure category is inferred for browser errors.
   Failed assertions remain `ExUnit.AssertionError`. Invalid arguments,

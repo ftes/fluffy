@@ -160,8 +160,8 @@ A browser session's timeouts follow Playwright Test and a Phoenix session's
   `Fluffy.Locator.describe`, `new` and `append` are internal; `inspect/1` renders a locator.
 - A failed navigation raises `Fluffy.OperationError` instead of a `RuntimeError` on both
   backends. Its `cause` is Playwright's exception, as for a failed action, or a message
-  from Fluffy: a Phoenix visit that was aborted or redirected too often, or a LiveView that
-  did not connect.
+  from Fluffy: a Phoenix visit that was aborted or redirected too often, a LiveView that
+  did not connect, or a page that did not respond to Fluffy's document check.
 - A LiveView that exits during a Phoenix operation raises `Fluffy.OperationError` with a
   `Fluffy.LiveViewError` as its `cause`; rescue the `OperationError`.
 - `Fluffy.CapabilityError.capability` is an id of `Fluffy.Capability.matrix/0`, and the
