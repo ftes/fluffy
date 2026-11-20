@@ -57,6 +57,7 @@ defmodule Fluffy.Playwright do
   @type wait_for_load_state_option ::
           unquote(NimbleOptions.option_typespec(Options.action_schema(:wait_for_load_state)))
   @type bounding_box_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:bounding_box)))
+  @type inner_text_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:inner_text)))
   @type aria_snapshot_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:aria_snapshot)))
   @type add_script_tag_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:add_script_tag)))
   @type add_style_tag_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:add_style_tag)))
@@ -373,6 +374,39 @@ defmodule Fluffy.Playwright do
           %{x: number(), y: number(), width: number(), height: number()} | nil
   def bounding_box(%Session{} = session, %Fluffy.Locator{} = locator, options \\ []),
     do: __call__(session, :read, :computed_browser_semantics, :bounding_box, locator, [], options)
+
+  @doc group: "Page inspection"
+  @doc playwright_only: true
+  @doc """
+  Returns the rendered text of one strict target, as Playwright's `locator.innerText()`.
+
+  It is the browser's `innerText`, which depends on CSS: hidden text is left out, and
+  blocks, `<br>` and table cells add line breaks and tabs. It waits and reads once as
+  `Fluffy.text_content/3` does, which works on every driver. Phoenix sessions raise
+  `Fluffy.CapabilityError`, as they render no CSS.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.action_schema(:inner_text))}
+  """
+  @spec inner_text(Session.t(), Fluffy.Locator.t(), [inner_text_option()]) :: String.t()
+  def inner_text(%Session{} = session, %Fluffy.Locator{} = locator, options \\ []),
+    do: __call__(session, :read, :computed_browser_semantics, :inner_text, locator, [], options)
+
+  @doc group: "Page inspection"
+  @doc playwright_only: true
+  @doc """
+  Returns the rendered text of every element the locator matches, as Playwright's
+  `locator.allInnerTexts()`.
+
+  Like `Fluffy.all_text_contents/2`, it doesn't wait and returns `[]` if nothing matches.
+  Phoenix sessions raise `Fluffy.CapabilityError`.
+  """
+  @spec all_inner_texts(Session.t(), Fluffy.Locator.t()) :: [String.t()]
+  def all_inner_texts(%Session{} = session, %Fluffy.Locator{} = locator) do
+    CapabilityError.require_playwright!(session, :computed_browser_semantics, :all_inner_texts)
+    Backend.driver(session, :all_inner_texts, [locator])
+  end
 
   @doc group: "Page inspection"
   @doc playwright_only: true

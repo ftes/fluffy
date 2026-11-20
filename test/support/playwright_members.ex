@@ -82,8 +82,8 @@ defmodule Fluffy.Support.PlaywrightMembers do
           {[:locator], {:renamed, {Fluffy.Locator, :by_css, 2}}},
           {[:visible], {:renamed, {Fluffy.Locator, :filter, 2}}},
           {~w(evaluate_handle aria_snapshot_json)a, @native_locator},
-          {~w(count text_content inner_text inner_html all_text_contents all_inner_texts get_attribute input_value
-              is_checked is_disabled is_editable is_enabled is_hidden is_visible)a, @native_read},
+          {~w(text_content inner_text all_text_contents all_inner_texts get_attribute input_value)a, :wrapped},
+          {~w(count inner_html is_checked is_disabled is_editable is_enabled is_hidden is_visible)a, @native_read},
           {~w(describe description to_string normalize)a, {:na, "names a native locator; Fluffy locators inspect"}},
           {[:page], {:renamed, {Fluffy.Playwright, :current_page, 1}}},
           {~w(highlight hide_highlight)a, @tooling},

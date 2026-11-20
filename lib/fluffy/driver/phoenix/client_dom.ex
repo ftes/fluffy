@@ -448,9 +448,32 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM do
     end
   end
 
-  def value(%__MODULE__{} = client_dom, %Locator{} = locator) do
+  def value(%__MODULE__{} = client_dom, %Locator{} = locator), do: target_value(client_dom, control!(client_dom, locator))
+
+  # Playwright's inputValue: the value of the control the target retargets to, which
+  # must be an input, textarea or select.
+  def input_value(%__MODULE__{} = client_dom, %Locator{} = locator) do
     target = control!(client_dom, locator)
 
+    if target.tag not in ["input", "textarea", "select"] do
+      raise Fluffy.ActionabilityError, action: :input_value, reason: :not_input, locator: locator
+    end
+
+    target_value(client_dom, target)
+  end
+
+  # The DOM's textContent of the one target, or of each match, and getAttribute: they
+  # read the element itself, without retargeting.
+  def text_content(%__MODULE__{} = client_dom, %Locator{} = locator),
+    do: client_dom |> target!(locator) |> Semantics.text_content()
+
+  def all_text_contents(%__MODULE__{} = client_dom, %Locator{} = locator),
+    do: client_dom |> targets(locator) |> Enum.map(&Semantics.text_content/1)
+
+  def get_attribute(%__MODULE__{} = client_dom, %Locator{} = locator, name),
+    do: client_dom |> target!(locator) |> Semantics.get_attribute(name)
+
+  defp target_value(client_dom, target) do
     if target.tag == "select" do
       client_dom |> selected_values_for_target(target) |> List.first() || ""
     else

@@ -33,6 +33,15 @@ defmodule Fluffy.Driver.Phoenix.HTML.Semantics do
     end
   end
 
+  # The DOM's getAttribute, which lowercases the name on an HTML element; the parser keeps
+  # the case of SVG and MathML ones, such as viewBox.
+  def get_attribute(%{attributes: attributes}, name) when is_binary(name) do
+    case List.keyfind(attributes, name, 0) do
+      {^name, value} -> value
+      nil -> attribute(attributes, String.downcase(name, :ascii))
+    end
+  end
+
   def present_attribute?(attributes, name) do
     case attribute(attributes, name) do
       value when is_binary(value) and value != "" -> true
@@ -56,6 +65,16 @@ defmodule Fluffy.Driver.Phoenix.HTML.Semantics do
   defp tree_text({_tag, _attributes, children}), do: Enum.map_join(children, &tree_text/1)
   defp tree_text(text) when is_binary(text), do: text
   defp tree_text(_comment), do: ""
+
+  # The DOM's textContent: every descendant text, hidden and script text included. A
+  # template's content is a fragment of its own, outside the element's children.
+  def text_content(%{tag: "template"}), do: ""
+  def text_content(%{children: children}), do: Enum.map_join(children, &content_text/1)
+
+  defp content_text({"template", _attributes, _children}), do: ""
+  defp content_text({_tag, _attributes, children}), do: Enum.map_join(children, &content_text/1)
+  defp content_text(text) when is_binary(text), do: text
+  defp content_text(_comment), do: ""
 
   # HTML's "strip and collapse ASCII whitespace", as document.title and
   # option.text apply it.

@@ -300,6 +300,38 @@ defmodule Fluffy.Driver.Playwright do
     locator_action(session, :press, locator, options, &BrowserLocator.press(&1, key, native(options, &2)))
   end
 
+  @impl true
+  def text_content(%Session{} = session, %Locator{} = locator, options \\ []),
+    do: locator_read(session, :text_content, locator, options, &BrowserLocator.text_content(&1, native(options, &2)))
+
+  # As in Playwright, these list reads don't wait and have no timeout.
+  @impl true
+  def all_text_contents(%Session{} = session, %Locator{} = locator, _options \\ []),
+    do:
+      locator_read(session, :all_text_contents, locator, [], fn native, _remaining ->
+        BrowserLocator.all_text_contents(native)
+      end)
+
+  def all_inner_texts(%Session{} = session, %Locator{} = locator),
+    do:
+      locator_read(session, :all_inner_texts, locator, [], fn native, _remaining ->
+        BrowserLocator.all_inner_texts(native)
+      end)
+
+  @impl true
+  def get_attribute(%Session{} = session, %Locator{} = locator, name, options \\ []) do
+    locator_read(session, :get_attribute, locator, options, &BrowserLocator.get_attribute(&1, name, native(options, &2)))
+  end
+
+  @impl true
+  def input_value(%Session{} = session, %Locator{} = locator, options \\ []),
+    do: locator_read(session, :input_value, locator, options, &BrowserLocator.input_value(&1, native(options, &2)))
+
+  defp locator_read(session, operation, locator, options, fun) do
+    native = locator(session, locator)
+    read(session, operation, locator, options, &fun.(native, &1))
+  end
+
   # The driver's end of `Fluffy.Playwright.__call__/7`, which documents the contract. As in
   # Playwright, a locator's `timeout:` limits finding its element, not a read of it.
   def native_call(session, kind, {operation, native}, target, arguments, options) do

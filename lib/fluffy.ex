@@ -27,6 +27,7 @@ defmodule Fluffy do
   @moduledoc groups: [
                "Lifecycle and navigation",
                "Actions",
+               "Reads",
                "Cookies",
                "Events",
                "Diagnostics and native access"
@@ -69,6 +70,9 @@ defmodule Fluffy do
   @type set_checked_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema(:set_checked)))
   @type select_option_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema(:select_option)))
   @type press_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema(:press)))
+  @type text_content_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema(:text_content)))
+  @type get_attribute_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema(:get_attribute)))
+  @type input_value_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema(:input_value)))
   @type reload_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema(:reload)))
   @type file_input_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.file_input_schema()))
   @type session_option ::
@@ -642,6 +646,89 @@ defmodule Fluffy do
     options = Fluffy.Options.validate_action!(session, :press, options)
 
     dispatch_driver(session, :press, [locator, key, options])
+  end
+
+  @doc group: "Reads"
+  @doc """
+  Returns the text content of one strict target, as Playwright's `locator.textContent()`.
+
+  It is the DOM's `textContent`: all the element's text, including hidden text and the
+  content of `<script>` and `<style>`, with its whitespace as written. Upstream returns
+  `nil` for a node without text content, which an element never is.
+
+  Like every read, it waits for the target to attach, within `timeout:` (LiveView retries,
+  Static checks once), and raises for a locator that matches several elements. It reads the
+  value once and doesn't wait for it to change: to check a value, prefer an assertion, which
+  retries ([Reading values](actions.md#reading-values)).
+
+      name = text_content(session, by_role(:heading, level: 1))
+
+  ## Options
+
+  #{NimbleOptions.docs(Fluffy.Options.action_schema(:text_content))}
+  """
+  @spec text_content(Session.t(), Fluffy.Locator.t(), [text_content_option()]) :: String.t() | nil
+  def text_content(%Session{} = session, %Fluffy.Locator{} = locator, options \\ []) do
+    options = Fluffy.Options.validate_action!(session, :text_content, options)
+    dispatch_driver(session, :text_content, [locator, options])
+  end
+
+  @doc group: "Reads"
+  @doc """
+  Returns the text content of every element the locator matches, in document order, as
+  Playwright's `locator.allTextContents()`.
+
+  As upstream, it doesn't wait for elements to match and returns `[]` if none do. It
+  takes no timeout. Wait first with an assertion, such as `Fluffy.Expect.to_have_count/3`,
+  or assert the texts with `Fluffy.Expect.to_have_text/3` and a list.
+  """
+  @spec all_text_contents(Session.t(), Fluffy.Locator.t()) :: [String.t()]
+  def all_text_contents(%Session{} = session, %Fluffy.Locator{} = locator),
+    do: dispatch_driver(session, :all_text_contents, [locator, []])
+
+  @doc group: "Reads"
+  @doc """
+  Returns the value of the target's attribute `name`, or `nil` if it has none, as
+  Playwright's `locator.getAttribute()`.
+
+  It reads the attribute as the HTML has it, not a control's current value: use
+  `input_value/3` for that. It waits and raises as `text_content/3` does.
+
+      href = get_attribute(session, by_role(:link, name: "Hogwarts"), "href")
+
+  ## Options
+
+  #{NimbleOptions.docs(Fluffy.Options.action_schema(:get_attribute))}
+  """
+  @spec get_attribute(Session.t(), Fluffy.Locator.t(), String.t(), [get_attribute_option()]) :: String.t() | nil
+  def get_attribute(%Session{} = session, %Fluffy.Locator{} = locator, name, options \\ []) when is_binary(name) do
+    options = Fluffy.Options.validate_action!(session, :get_attribute, options)
+    dispatch_driver(session, :get_attribute, [locator, name, options])
+  end
+
+  @doc group: "Reads"
+  @doc """
+  Returns the current value of an `<input>`, `<textarea>` or `<select>`, as Playwright's
+  `locator.inputValue()`.
+
+  The value is what the user sees: what `fill/4` or `select_option/4` set, or the
+  control's default. A select's is its first selected option's value. A label, or an
+  element inside one, reads the label's control; any other element raises. It waits and raises as
+  `text_content/3` does.
+
+      session
+      |> fill(by_label("Owl"), "Hedwig")
+      |> input_value(by_label("Owl"))
+      #=> "Hedwig"
+
+  ## Options
+
+  #{NimbleOptions.docs(Fluffy.Options.action_schema(:input_value))}
+  """
+  @spec input_value(Session.t(), Fluffy.Locator.t(), [input_value_option()]) :: String.t()
+  def input_value(%Session{} = session, %Fluffy.Locator{} = locator, options \\ []) do
+    options = Fluffy.Options.validate_action!(session, :input_value, options)
+    dispatch_driver(session, :input_value, [locator, options])
   end
 
   defp dispatch_driver(session, operation, arguments), do: Backend.driver(session, operation, arguments)

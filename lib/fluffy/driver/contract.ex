@@ -12,7 +12,11 @@ defmodule Fluffy.Driver.Contract do
   @type result ::
           Session.t()
           | {:navigate, Session.t(), Navigation.t()}
-          | {:navigate, Session.t(), Navigation.t(), (Session.t(), (Session.t(), atom(), list() -> term()) -> term())}
+          | {:navigate, Session.t(), Navigation.t(), continuation()}
+  @type continuation :: (Session.t(), (Session.t(), atom(), list() -> term()) -> term())
+
+  # A read returns its value, or a navigation it found first with the read to retry there.
+  @type read(value) :: {:return, value, result()} | {:navigate, Session.t(), Navigation.t(), continuation()}
 
   @callback validate_operation!(Session.t(), atom(), list()) :: :ok
 
@@ -32,6 +36,10 @@ defmodule Fluffy.Driver.Contract do
   @callback set_checked(Session.t(), Locator.t(), boolean(), keyword()) :: result()
   @callback select_option(Session.t(), Locator.t(), term(), keyword()) :: result()
   @callback press(Session.t(), Locator.t(), String.t(), keyword()) :: result()
+  @callback text_content(Session.t(), Locator.t(), keyword()) :: read(String.t() | nil)
+  @callback all_text_contents(Session.t(), Locator.t(), keyword()) :: read([String.t()])
+  @callback get_attribute(Session.t(), Locator.t(), String.t(), keyword()) :: read(String.t() | nil)
+  @callback input_value(Session.t(), Locator.t(), keyword()) :: read(String.t())
   @callback open_browser(Session.t(), (String.t() -> term())) :: Session.t()
   @callback unwrap(Session.t(), (term() -> term())) :: result()
   @callback unwrap_and_return(Session.t(), (term() -> value)) :: {:return, value, result()} when value: term()
