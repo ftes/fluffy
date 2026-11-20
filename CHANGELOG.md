@@ -100,7 +100,7 @@ Changes since 0.8.0.
 ### Changed
 
 - Playwright `submit` waits like a Playwright action, for its navigation to commit.
-- Fluffy's own error messages start with the call that raised them, such as `Fluffy.set_input_files/4: ...`.
+- Most of Fluffy's own error messages start with the call that raised them, such as `Fluffy.set_input_files/4: ...`.
 
 ### Fixed
 

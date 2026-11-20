@@ -254,7 +254,7 @@ defmodule Fluffy.Conformance.UnwrapTest do
     test "rejects a callback result that is not a Plug.Conn" do
       session = :phoenix |> start_session() |> visit("/chamber")
 
-      assert_raise ArgumentError, ~r/^Fluffy.unwrap\/2: .*callback must return an updated Plug.Conn/s, fn ->
+      assert_raise ArgumentError, ~r/^Fluffy.unwrap\/2: a Static page's callback must return an updated Plug.Conn/, fn ->
         unwrap(session, fn _conn -> :ignored end)
       end
     end

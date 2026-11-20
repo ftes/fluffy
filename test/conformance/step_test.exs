@@ -45,7 +45,7 @@ defmodule Fluffy.Conformance.StepTest do
       step(session, "Feed Fluffy", fn _session -> :ok end)
     end
 
-    assert_raise ArgumentError, ~r/^Playwright.Test.step\/3: unknown option/, fn ->
+    assert_raise ArgumentError, ~r/^Playwright.Test.step\/3: unknown option lullaby, /, fn ->
       step(session, "Feed Fluffy", & &1, lullaby: true)
     end
   end
