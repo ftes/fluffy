@@ -157,12 +157,25 @@ defmodule Fluffy.PlaywrightArtifactsTest.AssertStepsTest do
   # Derived, as the trace's copy of this source file would match a literal title.
   @owl "An owl reaches " <> "Privet Drive"
   @howler "No howler " <> "today"
+  @sum "2 + 2" <> " == 4"
+  @product "3 * 3" <> " == 9"
+  @fluffy_variable "val" <> "ue"
 
-  @tag trace_has: [~s(Expect \\"assert\\"), ~s("title":"#{@owl}"), ~s("title":"#{@howler}")]
+  # With the caller's expression, not Fluffy's (`value`), and `refute match?` once.
+  @tag trace_has: [
+         ~s(Expect \\"assert\\"),
+         ~s("title":"#{@owl}"),
+         ~s("expression":"#{@sum}"),
+         ~s("expression":"#{@product}"),
+         ~s("title":"#{@howler}")
+       ],
+       trace_lacks: [~s("expression":"#{@fluffy_variable}")]
   test "records ExUnit assertions and Fluffy's with a message as steps" do
     assert 1 + 1 == 2
-    assert(:letter, @owl)
+    assert(2 + 2 == 4, @owl)
+    assert(3 * 3 == 9, "Hedwig #{:flies}")
     refute(nil, @howler)
+    refute match?({:ok, _}, Process.get(:owl_post))
 
     :static |> Fluffy.session_for_html("<p>Hedwig</p>") |> assert(visible(by_text("Hedwig")))
   end
