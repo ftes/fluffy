@@ -95,7 +95,7 @@ has a key only where Playwright has no concept.
 
 | Owner | Where, later wins | Keys |
 | --- | --- | --- |
-| Playwright Test | `config :playwright, :test` < project < module (`use Playwright.Test, ...`) < describe or test (`@tag Playwright.Test.use(...)`) | browser, context options such as `base_url`, `extra_http_headers` and `locale`, `action_timeout`, `navigation_timeout`, `trace`, `screenshot`, `video`; suite-wide only: `test_id_attribute` and `config :playwright, :expect, timeout:` |
+| Playwright Test | `config :playwright, :test` < project < module (`use Playwright.Test, ...` or `@moduletag Playwright.Test.use(...)`) < describe or test (`@tag Playwright.Test.use(...)`) | context options such as `base_url`, `extra_http_headers` and `locale`, `action_timeout`, `navigation_timeout`, `trace`, `screenshot`, `video`; up to the module only: the browser (`browser_name`, `launch_options`, `connect_options`); suite-wide only: `test_id_attribute` and `config :playwright, :expect, timeout:` |
 | Fluffy | `config :fluffy` | `endpoint`, `ecto_repos`, `file_input_max_bytes`, `phoenix_backend_timeout` |
 
 What applies to each kind of session:
@@ -242,8 +242,9 @@ config :playwright, :test,
   screenshot: :only_on_failure
 ```
 
-`driver: [executable: ...]` optionally points at a Playwright 1.65 CLI such as
-`node_modules/.bin/playwright`, not `cli.js`; by default the pinned driver is used.
+`config :playwright, :driver, executable: ...` optionally points at a Playwright 1.65 CLI such
+as `node_modules/.bin/playwright`, not `cli.js`; by default the pinned driver is used. Put it in
+`config/config.exs`, which `mix playwright.install` reads in `:dev`.
 
 `launch_options` are passed to `Playwright.BrowserType.launch/2` unchanged. Set
 `launch_options: [timeout: 10_000]` to limit browser launch; otherwise Playwright's
@@ -279,13 +280,13 @@ its `browser:` option, else in the test's browser from
 test holds that browser until it ends, and a test that starts no Playwright session takes
 none. At most `workers` tests hold one at once (`config :playwright, :test`, half the
 schedulers by default), others wait for one; see
-[Workers](`e:playwright:testing-with-exunit.md#workers`). No driver or browser starts
+[Workers](`e:playwright:test-artifacts.md#workers`). No driver or browser starts
 until a session needs one, a lost browser is launched again for the next session, and the
 drivers stop after the suite. For more users in a test, start more sessions: each gets its
 own browser context.
 
 To debug one test headed or slowed down, pass it a browser with its own `launch_options:`,
-merged over the config:
+merged one key at a time over the module's, else the config's:
 
 ```elixir
 browser = Playwright.Test.BrowserPool.browser(launch_options: [headless: false, slow_mo: 500])
@@ -295,11 +296,13 @@ browser = Playwright.Test.BrowserPool.browser(launch_options: [headless: false, 
 |> visit("/creatures")
 ```
 
-Call it in `setup_all` to cover a module; `browser_name:` and `driver:` override the same
-way. Other options get a worker of their own, a driver and its browser, which counts toward
-`workers` unless the test or module holds one already; at `workers`, the longest idle worker of
-other options restarts its driver for them. See
-[Debugging one test](`e:playwright:testing-with-exunit.md#debugging-one-test`).
+`browser_name:` overrides the same way. Other options get a worker of their own, a driver and
+its browser, which counts toward `workers` unless the test or module holds one already; at
+`workers`, the longest idle worker of other options restarts its driver for them. For a whole
+module, set `use Playwright.Test, launch_options: [headless: false, slow_mo: 500]` or
+`@moduletag Playwright.Test.use(launch_options: ...)`, which replaces the config's
+`launch_options`: its sessions then get that browser without `browser:`. See
+[Debugging one test](`e:playwright:test-artifacts.md#debugging-one-test`).
 
 To run the browsers on a Playwright server, such as Playwright's Docker image, set
 `connect_options: [ws_endpoint: "ws://localhost:3000/", expose_network: "<loopback>"]` in
@@ -309,7 +312,7 @@ must reach your app, as pages, the Ecto sandbox header and the LiveView socket g
 `expose_network: "<loopback>"` tunnels `localhost` and `127.0.0.1` to your machine, so
 `base_url` stays as it is. Otherwise `base_url` must be an address the container reaches, such as
 `http://host.docker.internal:4002`, and the endpoint's `check_origin` must allow it. See
-[Remote browsers](`e:playwright:testing-with-exunit.md#remote-browsers`) for the options and
+[Remote browsers](`e:playwright:test-artifacts.md#remote-browsers`) for the options and
 an env-var switch.
 
 ## Ecto sandbox

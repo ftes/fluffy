@@ -125,10 +125,11 @@ A browser session's timeouts follow Playwright Test and a Phoenix session's
 - `page_status`, `page_to_have_status` and `Fluffy.Page.status` are removed, as in
   Playwright; on Playwright, assert on `Fluffy.Event.response/1` instead.
 - Configure the browser with `config :playwright, :test, browser_name: ..., launch_options:
-  ...` (`driver: [executable: ...]` for a CLI) instead of `config :fluffy, :playwright`,
-  which is removed. `pool_size` goes too: each test takes its own browser from
-  `Playwright.Test.BrowserPool.browser/1`, at most `workers` at once
-  ([Workers](`e:playwright:testing-with-exunit.md#workers`)).
+  ...` (`config :playwright, :driver, executable: ...` in `config/config.exs` for a CLI)
+  instead of `config :fluffy, :playwright`, which is removed. `pool_size` goes too: each
+  test takes its own browser from `Playwright.Test.BrowserPool.browser/1`, at most `workers`
+  at once
+  ([Workers](`e:playwright:test-artifacts.md#workers`)).
 - `Fluffy.Playwright.trace/2`, `artifact_dir` and `trace_dir` are removed. Traces,
   screenshots and videos come from `Playwright.Test`: set
   `config :playwright, :test, trace: :retain_on_failure, screenshot: :only_on_failure`
