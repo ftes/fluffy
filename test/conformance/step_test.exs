@@ -50,7 +50,7 @@ defmodule Fluffy.Conformance.StepTest do
     end
   end
 
-  # Without `use Playwright.Test`, nothing records steps: the callback just runs.
+  # The step is boxed, so its error is reported at this function's call.
   defp wake_fluffy(session) do
     step(session, "Stop the music", fn _session -> raise "Fluffy wakes up" end, box: true)
     :awake
