@@ -354,10 +354,8 @@ defmodule Fluffy do
 
   def wait_for(%Session{} = session, %Event{} = event, options), do: Event.wait(session, event, options)
 
-  def wait_for(%Session{} = session, %Fluffy.Locator{} = locator, options) do
-    Fluffy.CapabilityError.require_playwright!(session, :playwright_only_api, :wait_for)
-    dispatch_driver(session, :wait_for, [locator, Fluffy.Options.validate_action!(:wait_for, options)])
-  end
+  def wait_for(%Session{} = session, %Fluffy.Locator{} = locator, options),
+    do: Fluffy.Playwright.__call__(session, :action, :playwright_only_api, :wait_for, locator, [], options)
 
   @doc group: "Events"
   @doc "Consumes a pending event and returns its value. Its deadline starts at registration."
