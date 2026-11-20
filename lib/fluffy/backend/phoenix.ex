@@ -48,7 +48,7 @@ defmodule Fluffy.Backend.Phoenix do
         endpoint: Keyword.fetch!(options, :endpoint),
         cookie_jar: Fluffy.CookieJar.new(),
         initial_conn: Keyword.get(options, :conn),
-        request_headers: test_headers() ++ Keyword.get(options, :headers, [])
+        request_headers: request_headers(options[:extra_http_headers], options[:conn])
       }
     }
 
@@ -56,10 +56,24 @@ defmodule Fluffy.Backend.Phoenix do
     Session.new(__MODULE__, context, page)
   end
 
-  # The test's `extra_http_headers` (`Playwright.Test.use/1`), as a browser context sends
-  # them, under the session's `headers:`, which are put after them (`HTTP` normalizes both).
-  defp test_headers,
-    do: for({name, value} <- Fluffy.TestInfo.fetch!().use[:extra_http_headers] || [], value != nil, do: {name, value})
+  # What a browser context of the test sends (`Playwright.Test.use/1`): its `locale` as
+  # Accept-Language and its `user_agent` as User-Agent, unless a `conn:` has its own, which,
+  # as with `Phoenix.ConnTest.recycle/2`, go with every request. All under the session's
+  # `extra_http_headers`, which, as in Playwright, replace the test's as a whole. Later ones are
+  # put over earlier ones (`HTTP`).
+  defp request_headers(session_headers, conn) do
+    use = Fluffy.TestInfo.fetch!().use
+
+    derived =
+      for {name, key} <- [{"accept-language", :locale}, {"user-agent", :user_agent}],
+          do: {name, conn_header(conn, name) || use[key]}
+
+    extra = session_headers || use[:extra_http_headers] || []
+    for {name, value} <- derived ++ Enum.to_list(extra), value != nil, do: {name, value}
+  end
+
+  defp conn_header(nil, _name), do: nil
+  defp conn_header(conn, name), do: conn |> Plug.Conn.get_req_header(name) |> List.first()
 
   @doc false
   def session_for_html(html) when is_binary(html) do

@@ -401,7 +401,7 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
   describe "set_extra_http_headers" do
     test "sends the headers, replaces an earlier call and keeps the session's headers" do
       fixture = HTTPFixtures.register(fn _request -> %{body: "<p>Page</p>"} end)
-      session = start_session(:playwright, headers: [{"x-session", "kept"}])
+      session = start_session(:playwright, extra_http_headers: %{"x-session" => "kept"})
 
       assert Fluffy.Playwright.set_extra_http_headers(session, %{"X-First" => "1"}) == session
       visit(session, HTTPFixtures.path(fixture, "/first"))
@@ -424,7 +424,7 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
       fixture = HTTPFixtures.register(fn _request -> %{body: "<p>Page</p>"} end)
 
       :playwright
-      |> start_session(headers: [{"x-session", "start"}])
+      |> start_session(extra_http_headers: %{"x-session" => "start"})
       |> Fluffy.Playwright.set_extra_http_headers(%{"X-Session" => "changed"})
       |> visit(HTTPFixtures.path(fixture, "/page"))
 

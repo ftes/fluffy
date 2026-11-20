@@ -26,12 +26,10 @@ defmodule Fluffy.Backend.Playwright do
     base_url = Keyword.fetch!(options, :base_url)
     browser_context_options = Keyword.get(options, :browser_context, [])
 
-    # Merged over the test's, resolved from every level, which `extra_http_headers:` would
-    # replace as a whole.
+    # As in Playwright, the session's `extra_http_headers` replace the test's as a whole; the
+    # sandbox's metadata goes with them.
     headers =
-      (test_info.use[:extra_http_headers] || %{})
-      |> Enum.concat(Keyword.get(browser_context_options, :extra_http_headers, %{}))
-      |> Enum.concat(Keyword.get(options, :headers, []))
+      (options[:extra_http_headers] || test_info.use[:extra_http_headers] || %{})
       |> Enum.concat(List.wrap(Fluffy.Sandbox.metadata_header(test_pid)))
       |> Map.new(fn {name, value} -> {String.downcase(to_string(name)), value} end)
 

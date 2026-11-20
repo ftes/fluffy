@@ -9,12 +9,11 @@ defmodule Fluffy.UseOptionsTest do
   alias Fluffy.Support.Server
 
   # Playwright.Test resolves the options of every level; a session starts from them.
-  test "the module's options reach the session, its headers merged with the session's" do
-    {session, headers} = visit_page(headers: [{"x-wand", "holly"}])
+  test "the module's options reach the session" do
+    {session, headers} = visit_page([])
 
     assert Fluffy.Playwright.evaluate(session, "navigator.language") == "en-GB"
     assert {"x-house", "hufflepuff"} in headers
-    assert {"x-wand", "holly"} in headers
   end
 
   describe "a describe's and a test's options" do
@@ -23,7 +22,7 @@ defmodule Fluffy.UseOptionsTest do
     # A level's `extra_http_headers` replaces those below it as a whole, as in Playwright.
     @tag Playwright.Test.use(color_scheme: :dark, extra_http_headers: %{"x-house" => "ravenclaw"})
     test "layer over the module's" do
-      {session, headers} = visit_page(headers: [{"x-wand", "holly"}])
+      {session, headers} = visit_page([])
 
       assert Fluffy.Playwright.evaluate(
                session,
@@ -31,20 +30,20 @@ defmodule Fluffy.UseOptionsTest do
              ) == ["en-GB", 640, true]
 
       assert {"x-house", "ravenclaw"} in headers
-      assert {"x-wand", "holly"} in headers
     end
   end
 
-  # As a browser context's, the test's headers go with a Phoenix session's requests, under its own.
-  test "the module's headers reach a Phoenix session, merged with the session's" do
-    {_session, headers} = visit_page(:phoenix, headers: [{"x-wand", "holly"}])
+  # As in Playwright, a session's `extra_http_headers` replace the test's as a whole, on both
+  # backends.
+  for driver <- [:phoenix, :playwright] do
+    test "the module's headers reach a #{driver} session, unless it has its own" do
+      {_session, headers} = visit_page(unquote(driver), [])
+      assert {"x-house", "hufflepuff"} in headers
 
-    assert {"x-house", "hufflepuff"} in headers
-    assert {"x-wand", "holly"} in headers
-
-    {_session, headers} = visit_page(:phoenix, headers: [{"x-house", "slytherin"}])
-    assert {"x-house", "slytherin"} in headers
-    refute {"x-house", "hufflepuff"} in headers
+      {_session, headers} = visit_page(unquote(driver), extra_http_headers: %{"x-wand" => "holly"})
+      assert {"x-wand", "holly"} in headers
+      refute Enum.any?(headers, &match?({"x-house", _value}, &1))
+    end
   end
 
   # As a browser context, any pairs, a header without a value left out.
@@ -54,6 +53,46 @@ defmodule Fluffy.UseOptionsTest do
 
     assert {"x-ghost", "nearly-headless-nick"} in headers
     refute Enum.any?(headers, &match?({"x-house", _value}, &1))
+  end
+
+  # As a browser context sends them: the locale as Accept-Language and the user agent as
+  # User-Agent, under the test's headers, under the session's.
+  describe "a Phoenix session's derived headers" do
+    test "send the module's locale as Accept-Language" do
+      {_session, headers} = visit_page(:phoenix, [])
+      assert {"accept-language", "en-GB"} in headers
+      refute Enum.any?(headers, &match?({"user-agent", _value}, &1))
+    end
+
+    @tag Playwright.Test.use(user_agent: "Errol/1.0")
+    test "send the test's user agent as User-Agent" do
+      {_session, headers} = visit_page(:phoenix, [])
+      assert {"user-agent", "Errol/1.0"} in headers
+    end
+
+    # As `Phoenix.ConnTest.recycle/2` keeps them: on the first request and the next.
+    test "give way to a conn's own, on every request" do
+      conn = Plug.Conn.put_req_header(Phoenix.ConnTest.build_conn(), "accept-language", "de")
+      fixture = HTTPFixtures.register(fn _request -> %{body: ~s(<a href="next">Next</a>)} end)
+
+      :phoenix
+      |> start_session(conn: conn)
+      |> visit(HTTPFixtures.path(fixture, "/first"))
+      |> visit(HTTPFixtures.path(fixture, "/next"))
+
+      for request <- HTTPFixtures.requests(fixture) do
+        assert {"accept-language", "de"} in request.headers
+      end
+    end
+
+    @tag Playwright.Test.use(extra_http_headers: %{"accept-language" => "de-DE,de;q=0.9"})
+    test "give way to the test's headers and to the session's" do
+      {_session, headers} = visit_page(:phoenix, [])
+      assert {"accept-language", "de-DE,de;q=0.9"} in headers
+
+      {_session, headers} = visit_page(:phoenix, extra_http_headers: %{"Accept-Language" => "fr-FR"})
+      assert {"accept-language", "fr-FR"} in headers
+    end
   end
 
   # As Playwright's `baseURL`: relative visits resolve against it, over Fluffy's endpoint.

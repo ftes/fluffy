@@ -156,7 +156,7 @@ defmodule Fluffy.Conformance.StaticHTTPVisitTest do
         start_session(driver,
           base_url: Server.base_url(),
           endpoint: Endpoint,
-          headers: [{"x-fluffy-suite", "static-http"}]
+          extra_http_headers: %{"x-fluffy-suite" => "static-http"}
         )
 
       session

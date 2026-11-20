@@ -106,8 +106,9 @@ What applies to each kind of session:
 | Setting | Phoenix session | Browser session |
 | --- | --- | --- |
 | `base_url`, `extra_http_headers` | yes | yes |
+| `locale`, `user_agent` | as the `Accept-Language` and `User-Agent` headers a browser sends | yes |
 | `test_id_attribute`, from `config :playwright, :test` only | yes | yes |
-| Other context options (`locale`, `viewport`, ...) | no | yes |
+| Other context options (`viewport`, `color_scheme`, ...) | no: nothing a server sees | yes |
 | Default timeouts | `phoenix_backend_timeout` (1 s) | Playwright's `action_timeout`, `navigation_timeout`, `:expect` `timeout` |
 | Recording: trace, screenshot, video | no (steps are recorded) | yes |
 | A call's `timeout:` | overrides the default | overrides the default |
@@ -115,8 +116,8 @@ What applies to each kind of session:
 So a `Playwright.Test.use(action_timeout: ...)` tag does nothing for a Phoenix session.
 Per-test values through tags or projects assume one kind of session per test.
 
-A session's URL is its `base_url:` option, else Playwright's resolved `base_url`, else the
-endpoint's. A typical Phoenix app sets no `base_url`: Fluffy takes the endpoint's running
+A session's URL is, from the most specific: its `base_url:`, else its `endpoint:`'s, else
+Playwright's resolved `base_url`, else the configured endpoint's. A typical Phoenix app sets no `base_url`: Fluffy takes the endpoint's running
 listener, so `port: 0`, a `PORT` variable or any other dynamic port works, else
 `MyAppWeb.Endpoint.url()` ([Phoenix endpoint](#phoenix-endpoint)). Set
 `config :playwright, :test, base_url:` only when the browser reaches the app at another
@@ -125,10 +126,11 @@ address, as from Docker, a remote browser or a proxy; with a dynamic port, set i
 listener's URL, so it breaks a dynamic port.
 
 - **Levels replace, they don't merge.** As in Playwright, a later level replaces an option's
-  whole value, so a tag's `extra_http_headers` replaces the config's map: repeat the headers
-  you keep. A session's `headers:` merges over them by name.
-- **Language on both backends.** `locale` sets a browser's `Accept-Language` only; for both,
-  set `extra_http_headers: %{"accept-language" => "de-DE"}`.
+  whole value, so a tag's `extra_http_headers` replaces the config's map, as does a session's
+  `start_session(..., extra_http_headers: ...)` on either backend: repeat the headers you keep.
+- **Language on both backends.** Set `locale` (Playwright's default is `en-US`): a Phoenix
+  session sends it as `Accept-Language`, as a browser does. An `accept-language` in
+  `extra_http_headers` overrides it, as in a browser.
 - **Case templates.** Put `use Playwright.Test, unquote(opts)` in the template's `using`
   ([Shared test case](usage.md#shared-test-case)).
 - **From the 0.9 release candidates.** `config :fluffy, action_timeout:, expect_timeout:,
