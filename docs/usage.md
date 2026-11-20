@@ -10,7 +10,7 @@ behavior depends on JavaScript or other browser-owned capabilities.
 
 Add `use Playwright.Test` after `use ExUnit.Case` (or your `ConnCase`, see
 [Shared test case](#shared-test-case)), then import the actions and locators;
-`use Fluffy.Assert` imports the assertion vocabulary:
+`use Fluffy.Assert`, after `use Playwright.Test`, imports the assertion vocabulary:
 
 ```elixir
 defmodule MyAppWeb.CreatureTest do

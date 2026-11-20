@@ -9,10 +9,11 @@ retries, timeout options, diagnostics, and the returned session.
 
 ## ExUnit style
 
-Place `use Fluffy.Assert` after `use ExUnit.Case` or your application's case module. It
-imports the constructors and replaces only ExUnit's conflicting
-`ExUnit.Assertions.assert/2` and `ExUnit.Assertions.refute/2` imports. Ordinary ExUnit
-assertions, pattern bindings, custom messages, and other helpers remain available.
+Place `use Fluffy.Assert` after `use Playwright.Test` (or the case template that has it). It
+imports the constructors and takes over only the conflicting `assert/2` and `refute/2`
+imports. Ordinary ExUnit assertions, pattern bindings, custom messages, and other helpers
+remain available, and each `assert` and `refute` is a step of the test's trace, as with
+`use Playwright.Test` alone, unless it has `assert_steps: false`.
 
 ```elixir
 use ExUnit.Case, async: true

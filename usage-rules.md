@@ -47,7 +47,7 @@ start_session(:phoenix)
 - Configuration ([installation guide](docs/installation.md#configuration)): Playwright Test owns the test's options, and `config :fluffy` has only `endpoint`, `ecto_repos`, `file_input_max_bytes` and `phoenix_backend_timeout`. Phoenix sessions use `phoenix_backend_timeout` (1 s); a `Playwright.Test.use` timeout tag doesn't apply there.
 - `timeout: 0` checks once, unlike Playwright's no timeout; Playwright actions and waits reject it. For no timeout, pass `timeout: :infinity`, never Playwright's `0`.
 - A Playwright `visit` already waits for LiveViews to connect, so do not assert `.phx-connected`.
-- `use Fluffy.Assert` gives `assert(visible(l))` and `refute(visible(l))`, and ordinary ExUnit asserts still work. `import Fluffy.Expect` gives `expect(to_be_visible(l))` and `expect(not_(to_be_visible(l)))`. Both return the session.
+- `use Fluffy.Assert`, always after `use Playwright.Test` (else `assert/2` is ambiguous), gives `assert(visible(l))` and `refute(visible(l))`, and ordinary ExUnit asserts still work, as trace steps unless `assert_steps: false`. `import Fluffy.Expect` gives `expect(to_be_visible(l))` and `expect(not_(to_be_visible(l)))`. Both return the session.
 - `refute(visible(l))` passes for an absent or invisible element. Use `assert(count(l, 0))` to require DOM absence.
 - URL strings match the complete URL, including query and fragment. When only the path matters, use a regex or a predicate, which gets a `%URI{}`: `page_url(&(&1.path == "/x"))`.
 - There is no page status assertion. On Playwright, assert on `Event.response` instead.

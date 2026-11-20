@@ -14,7 +14,8 @@ events, routes, `unwrap` callbacks, regexes and URLs, they are the port's, as in
 
 `use Playwright.Test` registers each test, which every session needs. Browsers come from its pool,
 and its options, timeouts, traces, screenshots, videos, steps and snapshot names follow Playwright
-Test ([Configuration](docs/installation.md#configuration)). `:infinity` means no limit; `timeout: 0` checks once on assertions and Phoenix
+Test ([Configuration](docs/installation.md#configuration)). Its `assert` and `refute` are trace
+steps, also with `use Fluffy.Assert`, which goes after `use Playwright.Test`. `:infinity` means no limit; `timeout: 0` checks once on assertions and Phoenix
 actions, while Playwright actions and waits reject it.
 
 ## Phoenix drivers that act like a browser
