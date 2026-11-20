@@ -174,6 +174,9 @@ A browser session's timeouts follow Playwright Test and a Phoenix session's
   call is in `operation`: match `capability: :browser_pointer_typing, operation: :hover`
   where you matched `capability: :hover`. `go_back` and `go_forward` on Phoenix raise
   `capability: :browser_history` instead of `:pages`.
+- `Fluffy.Capability.matrix_version/0`, the `:experimental` status and the matrix's
+  Playwright column are removed: `Fluffy.Capability.status/2` takes `:static` or `:live`,
+  not `:playwright`.
 - `browser:` and `browser_context:` on a Phoenix session and `conn:` on a Playwright one
   raise `Fluffy.CapabilityError` instead of `ArgumentError`.
 - Before a Phoenix session's first `visit`, page operations (actions, expectations,
