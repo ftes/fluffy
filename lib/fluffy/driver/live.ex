@@ -473,28 +473,18 @@ defmodule Fluffy.Driver.Live do
     {:return, result, reconcile_unwrapped(session, state.client_dom)}
   end
 
-  defp evaluate_expectation(%Session{} = session, %Expect{target: {:locator, _locator}} = expectation) do
+  defp evaluate_expectation(%Session{} = session, %Expect{target: :page, kind: :url, expected: expected}) do
+    actual = Session.current_page(session).url
+    {:ok, Expect.Internal.url_matches?(expected, Session.context(session).http.base_url, actual), actual}
+  end
+
+  defp evaluate_expectation(%Session{} = session, %Expect{} = expectation) do
     {passed?, actual} = ClientDOM.Expectation.evaluate(client_dom(session), expectation)
 
     actual =
       if expectation.kind == :visible and actual == 0, do: document_text(session), else: actual
 
     {:ok, passed?, actual}
-  end
-
-  defp evaluate_expectation(%Session{} = session, %Expect{target: :page, kind: :url, expected: expected}) do
-    actual = Session.current_page(session).url
-    {:ok, Expect.Internal.url_matches?(expected, Session.context(session).http.base_url, actual), actual}
-  end
-
-  defp evaluate_expectation(%Session{} = session, %Expect{target: :page, kind: :title, expected: expected}) do
-    actual =
-      case session |> document() |> LazyHTML.query("title") |> Enum.at(0) do
-        nil -> nil
-        title -> LazyHTML.text(title)
-      end
-
-    {:ok, Expect.Internal.title_matches?(expected, actual), actual}
   end
 
   defp client_dom(session), do: session |> Session.page_state() |> Map.fetch!(:client_dom)

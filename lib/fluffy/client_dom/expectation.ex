@@ -15,6 +15,16 @@ defmodule Fluffy.ClientDOM.Expectation do
     {actual == expected, actual}
   end
 
+  def evaluate(%ClientDOM{document: document}, %Expect{target: :page, kind: :title, expected: expected}) do
+    actual =
+      case document |> LazyHTML.query("title") |> Enum.at(0) do
+        nil -> nil
+        title -> LazyHTML.text(title)
+      end
+
+    {Expect.Internal.title_matches?(expected, actual), actual}
+  end
+
   def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :visible}) do
     actual = count_visible(client_dom, strict_candidates!(client_dom, locator))
     {actual > 0, actual}
