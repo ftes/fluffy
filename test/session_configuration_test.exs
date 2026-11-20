@@ -58,14 +58,23 @@ defmodule Fluffy.SessionConfigurationTest do
     end
   end
 
+  # Whatever the `url` scheme: a test's HTTPS listener often has a self-signed certificate.
+  test "the base URL takes the HTTP listener's scheme and port before the HTTPS one's" do
+    assert base_url(start_session(:phoenix, endpoint: __MODULE__.BothEndpoint)) == "http://configured.example:43123"
+  end
+
   # phx.new's shape: the listener on 127.0.0.1, the url host `localhost` and the default
   # `check_origin`, which compares the browser's origin with the url host.
   describe "an endpoint whose url host is not its listener's address" do
-    setup do
+    setup context do
+      # `port: 0` by default; `@tag :fixed_port` is phx.new's shape, the url port the listener's.
+      port = if context[:fixed_port], do: Server.lease_port(), else: 0
+      url_port = if context[:fixed_port], do: [port: port], else: []
+
       config = [
         adapter: Bandit.PhoenixAdapter,
-        http: [ip: {127, 0, 0, 1}, port: 0],
-        url: [host: "localhost"],
+        http: [ip: {127, 0, 0, 1}, port: port],
+        url: [host: "localhost"] ++ url_port,
         live_view: [signing_salt: "fluffy-live-view"],
         pubsub_server: Fluffy.TestPubSub,
         secret_key_base: String.duplicate("fluffy-secret-", 8),
@@ -86,10 +95,14 @@ defmodule Fluffy.SessionConfigurationTest do
       end
     end
 
+    # With `port: 0` the endpoint's `url()` has port 0, another origin than the base URL's.
+    @tag :fixed_port
     test "a Phoenix session visits the app's own absolute URL", %{url: url} do
+      assert __MODULE__.LocalhostEndpoint.url() == url
+
       :phoenix
       |> start_session(endpoint: __MODULE__.LocalhostEndpoint)
-      |> visit(url <> "/chamber")
+      |> visit(__MODULE__.LocalhostEndpoint.url() <> "/chamber")
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
     end
 
@@ -152,6 +165,12 @@ defmodule Fluffy.SessionConfigurationTest do
   defmodule ActiveEndpoint do
     def struct_url, do: URI.parse("http://configured.example:4002")
     def server_info(:http), do: {:ok, {{127, 0, 0, 1}, 43_123}}
+  end
+
+  defmodule BothEndpoint do
+    def struct_url, do: URI.parse("https://configured.example")
+    def server_info(:http), do: {:ok, {{127, 0, 0, 1}, 43_123}}
+    def server_info(:https), do: {:ok, {{127, 0, 0, 1}, 43_443}}
   end
 
   defmodule InactiveEndpoint do

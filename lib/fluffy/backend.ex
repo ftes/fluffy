@@ -143,14 +143,14 @@ defmodule Fluffy.Backend do
 
   defp endpoint_url(nil), do: nil
 
-  # The endpoint's configured URL (`struct_url/0`, which Phoenix's `check_origin` and the app's
-  # own absolute URLs use), with the port of its running listener, so `port: 0` works.
+  # The endpoint's configured URL (`struct_url/0`, whose host Phoenix's `check_origin` and the
+  # app's own absolute URLs use), with the scheme and port of its running listener, so `port: 0`
+  # works. The HTTP listener first: a test's HTTPS one often has a self-signed certificate.
   defp endpoint_url(endpoint) do
     url = endpoint.struct_url()
-    schemes = if url.scheme == "https", do: [:https, :http], else: [:http, :https]
 
     url =
-      case Enum.find_value(schemes, &listener_port(endpoint, &1)) do
+      case Enum.find_value([:http, :https], &listener_port(endpoint, &1)) do
         {scheme, port} -> %{url | scheme: Atom.to_string(scheme), port: port}
         nil -> url
       end
@@ -159,11 +159,9 @@ defmodule Fluffy.Backend do
   end
 
   defp listener_port(endpoint, scheme) do
-    if function_exported?(endpoint, :server_info, 1) do
-      case endpoint.server_info(scheme) do
-        {:ok, {_address, port}} when is_integer(port) and port > 0 -> {scheme, port}
-        _other -> nil
-      end
+    case endpoint.server_info(scheme) do
+      {:ok, {_address, port}} when is_integer(port) and port > 0 -> {scheme, port}
+      _other -> nil
     end
   rescue
     _error -> nil

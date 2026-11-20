@@ -66,9 +66,11 @@ end
 
 Configure your application endpoint once in `config/test.exs`. Fluffy uses
 it for in-process requests and derives the default session URL from the
-endpoint: the scheme and host of `MyAppWeb.Endpoint.url()`, from its `url` config, and the
-port its HTTP or HTTPS listener runs on, else the `url` config's. So `port: 0` works, and
-the host is the one the app's own absolute URLs and Phoenix's default `check_origin` use:
+endpoint: its `url` host, on the scheme and port of its HTTP listener, else its HTTPS one,
+else the `url` config's. So `port: 0` works, and the host is the one Phoenix's default
+`check_origin` allows. Phoenix sessions treat the app's own absolute URLs
+(`MyAppWeb.Endpoint.url()`) as same-origin when the `url` port is the listener's, as with
+`phx.new`'s fixed test port, not with `port: 0`:
 
 ```elixir
 config :fluffy, endpoint: MyAppWeb.Endpoint
