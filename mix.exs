@@ -72,8 +72,8 @@ defmodule Fluffy.MixProject do
       # The floors CI's oldest lane runs, from mix.lock.oldest.
       {:phoenix, "~> 1.7 and >= 1.7.24"},
       {:phoenix_live_view, "~> 1.2 and >= 1.2.10"},
-      # playwright_ex main until rc.3 is published, then Hex `~> 1.65.0-rc.3`, hex: :playwright_ex.
-      {:playwright, github: "ftes/playwright_ex", branch: "main"},
+      # playwright_ex's rc.3 candidate until rc.3 is published, then Hex `~> 1.65.0-rc.3`, hex: :playwright_ex.
+      {:playwright, github: "ftes/playwright_ex", ref: "7a5ae3a2"},
       {:phoenix_ecto, "~> 4.7", optional: true},
       {:ecto_sql, "~> 3.10", optional: true},
       {:ex_doc, "~> 0.40.3", only: :dev, runtime: false},
