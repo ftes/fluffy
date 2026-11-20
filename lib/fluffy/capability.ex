@@ -297,7 +297,7 @@ defmodule Fluffy.Capability do
       feature: "A prepared `Plug.Conn` for the first request",
       drivers: %{static: :phoenix_only, live: :phoenix_only},
       detail:
-        "The `conn:` session option sends a `Plug.Conn`'s test session, cookies, headers, and assigns with the first request, as with `Phoenix.ConnTest`. A browser makes its own requests, so a Playwright session raises; add a cookie to log in on both backends."
+        "The `conn:` session option sends a `Plug.Conn`'s test session, cookies, headers, and assigns with the first request, and its `accept`, `accept-language`, `authorization` and `user-agent` headers with every request, as with `Phoenix.ConnTest`. A browser makes its own requests, so a Playwright session raises; add a cookie to log in on both backends."
     },
     %{
       id: :test_isolation,
