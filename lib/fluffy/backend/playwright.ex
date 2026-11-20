@@ -184,6 +184,25 @@ defmodule Fluffy.Backend.Playwright do
   end
 
   @impl true
+  def base_url(%Session{} = session), do: Session.context(session).base_url
+
+  # As in Playwright, these have no timeout.
+  @impl true
+  def add_cookies(%Session{} = session, cookies) do
+    :ok = BrowserContext.add_cookies!(Session.context(session).browser_context, cookies)
+    session
+  end
+
+  @impl true
+  def cookies(%Session{} = session, urls), do: BrowserContext.cookies!(Session.context(session).browser_context, urls)
+
+  @impl true
+  def clear_cookies(%Session{} = session, options) do
+    :ok = BrowserContext.clear_cookies!(Session.context(session).browser_context, options)
+    session
+  end
+
+  @impl true
   def visit(%Session{} = session, path) do
     state = Session.page_state(session)
     timeout = Timeouts.navigation(session)

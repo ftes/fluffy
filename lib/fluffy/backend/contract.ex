@@ -17,6 +17,12 @@ defmodule Fluffy.Backend.Contract do
               {(term() -> {:ok, term()} | {:error, String.t()} | :ignore), (-> :ok)}
   @callback normalize_error(Session.t(), atom(), list(), Exception.t()) :: Exception.t()
   @callback absolute_url(Session.t(), String.t()) :: String.t()
+  @callback base_url(Session.t()) :: String.t()
+
+  # The session's cookies, as Playwright's `browserContext` cookie methods.
+  @callback add_cookies(Session.t(), [map()]) :: Session.t()
+  @callback cookies(Session.t(), [String.t()]) :: [map()]
+  @callback clear_cookies(Session.t(), keyword() | map()) :: Session.t()
 
   # Metadata and document identity belong to the backend that owns the page.
   @callback page_snapshot(term(), Page.State.t()) :: Page.State.t()

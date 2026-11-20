@@ -196,3 +196,33 @@ defmodule MyAppWeb.FeatureCase do
   end
 end
 ```
+
+## Logging in
+
+To start a test logged in without the login form, give its session the cookie your login
+sets. Sign it in-process with your app's own test helper, such as phx.gen.auth's
+`log_in_user/2` in `ConnCase`, and one request through the endpoint, whose `Plug.Session`
+writes the signed cookie. This works unchanged on both backends:
+
+```elixir
+defp log_in(session, wizard) do
+  conn = build_conn() |> log_in_user(wizard) |> get(~p"/")
+
+  cookies =
+    for {name, %{value: value}} <- conn.resp_cookies,
+        do: %{name: name, value: value, url: Fluffy.base_url(session)}
+
+  Fluffy.add_cookies(session, cookies)
+end
+
+test "Hermione opens her vault" do
+  start_session(:playwright)
+  |> log_in(wizard_fixture(name: "Hermione"))
+  |> visit("/gringotts/vault")
+  |> assert(visible(by_text("Vault 687")))
+end
+```
+
+Cookies added before `visit/2` go with the first request, as in a browser. A Phoenix-only
+alternative is `start_session(:phoenix, conn: log_in_user(build_conn(), wizard))`: the
+prepared conn's test session goes with the first request.

@@ -37,7 +37,8 @@ boundaries described below.
 | Downloads | equivalent | equivalent |
 | Multiple pages and new tabs | - | equivalent |
 | Browser history navigation | - | equivalent |
-| Browser cookie helpers and storage-state export | - | equivalent |
+| Adding, reading, and clearing cookies | equivalent | equivalent |
+| Browser storage-state export and restoration | - | equivalent |
 | Runtime permissions, geolocation, offline mode, and HTTP credentials | - | equivalent |
 | Hover, drag-and-drop, sequential typing, keyboard, and mouse input | - | equivalent |
 | Dialogs, console, page errors, frames, workers, WebSockets, and browser network events | - | equivalent |
@@ -178,6 +179,16 @@ to test the embedding behavior, including interactions between the parent page a
 iframe. See
 [Pages, popups, and frames](advanced-events.md#pages-popups-and-frames)
 for how pages, browser contexts, and frames relate.
+
+### Cookies
+
+`Fluffy.add_cookies/2`, `Fluffy.cookies/2` and `Fluffy.clear_cookies/2` work on both
+backends, with Playwright's cookie maps. A Phoenix session keeps its cookies in a jar, as a
+browser context does, which follows RFC 6265 for domains, paths, `Secure` and expiry; every
+request sends what it holds then, the LiveView mount's included. Its requests stay on the
+app's origin, so it does not enforce `SameSite`, and it ignores `partitionKey`. A cookie
+set without `SameSite` reports `"Lax"`, as Chromium does (Firefox reports `"None"`). An
+invalid cookie raises `ArgumentError` with Playwright's message.
 
 ### Leaving the app
 

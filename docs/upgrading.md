@@ -90,8 +90,8 @@ A browser session's timeouts follow Playwright Test and a Phoenix session's
   for `timeout: 0` instead of timing out after 1ms; pass a positive timeout. Assertions
   and Phoenix actions still check once.
 - For no limit, pass `timeout: :infinity`, never Playwright's `0`.
-- Calls that have no timeout in Playwright take no `timeout:`: `Fluffy.Playwright.evaluate`,
-  `cookies`, `clear_cookies` and `storage_state`. Download `read` and `save_as` no longer
+- Calls that have no timeout in Playwright take no `timeout:`: `Fluffy.Playwright.evaluate`
+  and `storage_state`, and `Fluffy.cookies` and `clear_cookies`. Download `read` and `save_as` no longer
   end at a timeout; an unfinished download waits until the test times out.
 
 ## Renamed and removed APIs
@@ -101,8 +101,10 @@ A browser session's timeouts follow Playwright Test and a Phoenix session's
   returns the callback's result.
 - `Fluffy.Playwright.evaluate(session, expression, arg)` replaces the `is_function:`
   and `arg:` options. JavaScript `null` returns `:null`.
-- `Fluffy.Playwright.cookies(session, urls)` takes the URL list. Cookie maps use
-  Playwright's camelCase keys (`httpOnly:`, `sameSite:`, `partitionKey:`), and
+- `add_cookies`, `cookies` and `clear_cookies` move from `Fluffy.Playwright` to `Fluffy`,
+  and work on Phoenix sessions too: `Fluffy.Playwright.add_cookies(session, cookies)` becomes
+  `Fluffy.add_cookies(session, cookies)`. `cookies(session, urls)` takes the URL list. Cookie
+  maps use Playwright's camelCase keys (`httpOnly:`, `sameSite:`, `partitionKey:`), and
   `storage_state/2` returns atom keys: `state["cookies"]` becomes `state.cookies`.
 - `Fluffy.HTTPEvent` is gone: request and response events deliver a
   `Playwright.Request` and `Playwright.Response`, as do the other browser events

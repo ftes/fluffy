@@ -17,6 +17,7 @@ Fluffy runs Phoenix feature tests through one Playwright-shaped API, in-process 
 - `start_session(:phoenix)` is the default choice. Its first visit picks the Static or LiveView driver, and later navigations pick again. There is nothing to select between those two.
 - `start_session(:playwright)` is for JavaScript, computed style and layout, native validation, dialogs, network events, tabs or focus.
 - In the facade, `conn |> visit(path)` always starts a Phoenix session; use `start_session(:playwright) |> visit(path)` for a browser.
+- To start logged in on both backends, sign the session cookie in-process and pass it to `Fluffy.add_cookies/2` with `url: Fluffy.base_url(session)` before `visit` ([Logging in](docs/usage.md#logging-in)).
 - Fluffy reads no test tags. Pick a session's backend in your own setup, for example from your own `backend` tag.
 
 ```elixir
