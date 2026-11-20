@@ -122,7 +122,7 @@ defmodule Fluffy.Expect do
 
     case expectation.target do
       {:locator, _locator} ->
-        Fluffy.__expect__(session, expectation)
+        Fluffy.Backend.driver(session, :expect, [expectation])
 
       :page ->
         expect_active_page(session, expectation)
@@ -748,7 +748,7 @@ defmodule Fluffy.Expect do
 
   defp expect_active_page(%Session{} = session, %Expect{kind: kind} = expectation)
        when kind in [:url, :title, :screenshot, :aria_snapshot] do
-    Fluffy.__expect__(session, expectation)
+    Fluffy.Backend.driver(session, :expect, [expectation])
   end
 
   defp expect_active_page(%Session{} = session, %Expect{kind: :opener} = expectation) do

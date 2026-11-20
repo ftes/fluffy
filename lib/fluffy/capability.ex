@@ -29,7 +29,7 @@ defmodule Fluffy.Capability do
       feature: "Conformance-tested CSS locators",
       drivers: %{static: :equivalent, live: :equivalent},
       detail:
-        "The shared contract covers the selectors in the CSS conformance corpus; arbitrary browser-only pseudo-classes are not advertised."
+        "The shared contract covers the selectors in the CSS conformance corpus; arbitrary Playwright-only pseudo-classes are not advertised."
     },
     %{
       id: :text_label_attribute_locators,

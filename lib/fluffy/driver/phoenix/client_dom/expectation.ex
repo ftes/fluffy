@@ -1,11 +1,11 @@
-defmodule Fluffy.ClientDOM.Expectation do
+defmodule Fluffy.Driver.Phoenix.ClientDOM.Expectation do
   @moduledoc false
 
-  alias Fluffy.ClientDOM
+  alias Fluffy.Driver.Phoenix.ClientDOM
+  alias Fluffy.Driver.Phoenix.HTML.Aria
+  alias Fluffy.Driver.Phoenix.HTML.Semantics
+  alias Fluffy.Driver.Phoenix.Locator, as: PhoenixLocator
   alias Fluffy.Expect
-  alias Fluffy.HTML.Aria
-  alias Fluffy.HTML.Semantics
-  alias Fluffy.Locator.Static
   # StringUtils is internal to Playwright, which is pinned.
   alias Playwright.Isomorphic.StringUtils
 
@@ -175,7 +175,7 @@ defmodule Fluffy.ClientDOM.Expectation do
 
   defp count_visible(client_dom, candidates) do
     aria = Aria.for_document(client_dom.document)
-    Enum.count(candidates, &Static.structurally_visible?(aria, &1))
+    Enum.count(candidates, &PhoenixLocator.structurally_visible?(aria, &1))
   end
 
   defp strict_candidates!(client_dom, locator) do

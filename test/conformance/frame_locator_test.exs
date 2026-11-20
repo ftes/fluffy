@@ -22,7 +22,7 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
 
     playwright_frame = %Playwright.Frame{guid: "frame"}
 
-    assert Fluffy.Locator.Playwright.locator(playwright_frame, nested) ==
+    assert Fluffy.Driver.Playwright.Locator.locator(playwright_frame, nested) ==
              playwright_frame
              |> Playwright.Frame.locator("css=section")
              |> Playwright.Locator.get_by_title("Gringotts")

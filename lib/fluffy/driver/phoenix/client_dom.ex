@@ -1,14 +1,15 @@
-defmodule Fluffy.ClientDOM do
+defmodule Fluffy.Driver.Phoenix.ClientDOM do
   @moduledoc false
 
-  import Fluffy.HTML.Semantics, only: [attribute: 2, has_attribute?: 2, present_attribute?: 2]
+  import Fluffy.Driver.Phoenix.HTML.Semantics, only: [attribute: 2, has_attribute?: 2, present_attribute?: 2]
 
-  alias Fluffy.Actionability
-  alias Fluffy.ClientDOM.Query
-  alias Fluffy.HTML.Aria
-  alias Fluffy.HTML.DocumentIndex
-  alias Fluffy.HTML.Semantics
-  alias Fluffy.HTML.Target
+  alias Fluffy.Driver.Phoenix.Actionability
+  alias Fluffy.Driver.Phoenix.ClientDOM.Query
+  alias Fluffy.Driver.Phoenix.Form
+  alias Fluffy.Driver.Phoenix.HTML.Aria
+  alias Fluffy.Driver.Phoenix.HTML.DocumentIndex
+  alias Fluffy.Driver.Phoenix.HTML.Semantics
+  alias Fluffy.Driver.Phoenix.HTML.Target
   alias Fluffy.Locator
 
   @enforce_keys [:document]
@@ -199,7 +200,7 @@ defmodule Fluffy.ClientDOM do
         {:link, link}
 
       control ->
-        case Fluffy.Form.build(index(client_dom), client_dom.properties, control, driver) do
+        case Form.build(index(client_dom), client_dom.properties, control, driver) do
           nil -> nil
           submission -> {:submit, control, submission}
         end
@@ -257,7 +258,7 @@ defmodule Fluffy.ClientDOM do
 
   @doc false
   def submit_form(%__MODULE__{} = client_dom, target, driver \\ :static) do
-    Fluffy.Form.submit(
+    Form.submit(
       index(client_dom),
       client_dom.properties,
       target,
@@ -266,7 +267,7 @@ defmodule Fluffy.ClientDOM do
   end
 
   def triggered_submission(%__MODULE__{} = client_dom) do
-    Fluffy.Form.triggered(index(client_dom), client_dom.properties)
+    Form.triggered(index(client_dom), client_dom.properties)
   end
 
   def change_event(%__MODULE__{} = client_dom, %Locator{} = locator) do
@@ -282,7 +283,7 @@ defmodule Fluffy.ClientDOM do
   def dispatch_change_event(%__MODULE__{} = client_dom, target) do
     index = index(client_dom)
 
-    case Fluffy.Form.dispatch_change(index, client_dom.properties, target) do
+    case Form.dispatch_change(index, client_dom.properties, target) do
       nil ->
         nil
 
@@ -294,7 +295,7 @@ defmodule Fluffy.ClientDOM do
   end
 
   defp build_change_event(client_dom, index, target) do
-    case Fluffy.Form.change(index, client_dom.properties, target) do
+    case Form.change(index, client_dom.properties, target) do
       nil ->
         nil
 
@@ -359,12 +360,12 @@ defmodule Fluffy.ClientDOM do
 
   def live_managed_form?(%__MODULE__{} = client_dom, %Locator{} = locator) do
     target = control!(client_dom, locator)
-    Fluffy.Form.live_managed_form?(index(client_dom), target)
+    Form.live_managed_form?(index(client_dom), target)
   end
 
   def live_change_form?(%__MODULE__{} = client_dom, %Locator{} = locator) do
     target = control!(client_dom, locator)
-    Fluffy.Form.live_change_form?(index(client_dom), target)
+    Form.live_change_form?(index(client_dom), target)
   end
 
   # Like Playwright's setChecked: nil when the control is already in the

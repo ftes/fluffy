@@ -26,6 +26,9 @@ defmodule Fluffy.Backend.Contract do
   # Browser pages and history, which `Fluffy.Playwright` gates to a Playwright session.
   @optional_callbacks new_page: 1, history: 3, close_page: 2
 
+  # A navigation a driver reports; the Playwright driver adopts what the browser did itself.
+  @optional_callbacks navigate: 2
+
   # Metadata and document identity belong to the backend that owns the page.
   @callback page_snapshot(term(), Page.State.t()) :: Page.State.t()
   @callback commit_page(Page.State.t(), atom(), term(), String.t() | nil, keyword()) :: Page.State.t()

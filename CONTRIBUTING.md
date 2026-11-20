@@ -22,6 +22,8 @@ restore `mix.lock` and the requirement.
 Upstream Playwright's behavior is the reference for Fluffy's, and Phoenix LiveView's the
 secondary one for the Phoenix drivers; see `AGENTS.md`.
 
+The layers of the code, and where a new feature belongs, are in [Architecture](AGENTS.md#architecture).
+
 Run the local gate, the same checks CI runs (Styler-backed formatting, warnings-as-errors
 compilation, the usage rules check, strict Credo, the docs build and Dialyzer), then the test
 suite, with:

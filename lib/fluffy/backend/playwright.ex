@@ -4,12 +4,11 @@ defmodule Fluffy.Backend.Playwright do
   @behaviour Fluffy.Backend.Contract
 
   alias Fluffy.Backend.Playwright.Context
-  alias Fluffy.Backend.Playwright.Document
   alias Fluffy.Backend.Playwright.Events
   alias Fluffy.Deadline
+  alias Fluffy.Driver.Playwright, as: PlaywrightDriver
+  alias Fluffy.Driver.Playwright.Document
   alias Fluffy.Driver.Playwright.State
-  alias Fluffy.Internal.Navigation.BrowserCommitted
-  alias Fluffy.Internal.Navigation.BrowserPatch
   alias Fluffy.Internal.NavigationFailure
   alias Fluffy.Page
   alias Fluffy.Session
@@ -154,10 +153,7 @@ defmodule Fluffy.Backend.Playwright do
   @doc false
   def page_record(browser_page) do
     # A page's document is unknown until Fluffy reads it.
-    navigated = :atomics.new(1, [])
-    :atomics.put(navigated, 1, 1)
-    state = %State{page: browser_page, frame: BrowserPage.main_frame(browser_page), navigated: navigated}
-    %Page.State{driver: :playwright, state: state}
+    %Page.State{driver: :playwright, state: State.new(browser_page)}
   end
 
   @impl true
@@ -204,7 +200,7 @@ defmodule Fluffy.Backend.Playwright do
     timeout = Timeouts.navigation(session)
 
     _response = navigate!(:goto, [state.page, path, [timeout: timeout]])
-    adopt_navigated_document(session, state)
+    PlaywrightDriver.adopt_navigated_document(session, state)
   end
 
   @impl true
@@ -213,25 +209,7 @@ defmodule Fluffy.Backend.Playwright do
     native = navigation_options(session, :reload, options)
 
     _response = navigate!(:reload, [state.page, native])
-    adopt_navigated_document(session, state)
-  end
-
-  # The LiveView waits of a navigation an action or page code started share the navigation
-  # timeout, so with none they wait as `goto` does.
-  @impl true
-  def navigate(%Session{} = session, %BrowserCommitted{state: state, url: url, live_navigation_cursor: cursor}) do
-    timeout = Document.bookkeeping_timeout(Timeouts.navigation(session))
-
-    if cursor do
-      :ok = ready_navigated_document(state, url, timeout, cursor)
-      Session.commit_page(session, :playwright, state, url, live_redirect: true)
-    else
-      adopt_document(session, state, url, timeout)
-    end
-  end
-
-  def navigate(%Session{} = session, %BrowserPatch{state: state, url: url}) do
-    Session.commit_page(session, :playwright, state, url, same_document: true)
+    PlaywrightDriver.adopt_navigated_document(session, state)
   end
 
   @impl true
@@ -253,7 +231,7 @@ defmodule Fluffy.Backend.Playwright do
 
     if is_nil(response) and probe.url == previous_url and probe.document == state.document_identity,
       do: session,
-      else: adopt_probed_document(session, state, probe, timeout)
+      else: PlaywrightDriver.adopt_probed_document(session, state, probe)
   end
 
   # As in Playwright, closing a page has no timeout.
@@ -283,28 +261,5 @@ defmodule Fluffy.Backend.Playwright do
       {:ok, response} -> response
       {:error, error} -> raise error
     end
-  end
-
-  # Fluffy's reads and LiveView waits after a navigation get the navigation timeout, not a
-  # `timeout:` of the call, which bounds the navigation only.
-  defp adopt_navigated_document(session, state) do
-    timeout = Document.bookkeeping_timeout(Timeouts.navigation(session))
-    adopt_probed_document(session, state, Document.adopted_probe!(state, nil, timeout), timeout)
-  end
-
-  defp adopt_probed_document(session, state, probe, timeout) do
-    state = %{state | document_identity: probe.document}
-    adopt_document(session, state, probe.url, timeout)
-  end
-
-  defp adopt_document(session, state, url, timeout) do
-    :ok = ready_navigated_document(state, url, timeout, nil)
-    Session.commit_page(session, :playwright, state, url)
-  end
-
-  defp ready_navigated_document(state, destination, timeout, cursor) do
-    deadline = Deadline.new(timeout)
-    if cursor, do: Document.wait_for_redirect!(state.frame, destination, cursor, Deadline.remaining(deadline, 1))
-    Document.wait_for_live_view!(state.frame, destination, Deadline.remaining(deadline, 1))
   end
 end

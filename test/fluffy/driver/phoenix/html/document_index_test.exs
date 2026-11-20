@@ -1,7 +1,7 @@
-defmodule Fluffy.HTML.DocumentIndexTest do
+defmodule Fluffy.Driver.Phoenix.HTML.DocumentIndexTest do
   use ExUnit.Case, async: true
 
-  alias Fluffy.HTML.DocumentIndex
+  alias Fluffy.Driver.Phoenix.HTML.DocumentIndex
 
   test "maps duplicate-looking siblings and multiple fragment roots to unique nodes" do
     document =

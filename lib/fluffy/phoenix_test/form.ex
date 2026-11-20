@@ -1,9 +1,9 @@
 defmodule Fluffy.PhoenixTest.Form do
   @moduledoc false
 
-  alias Fluffy.ClientDOM
   alias Fluffy.Driver
-  alias Fluffy.HTML.DocumentIndex
+  alias Fluffy.Driver.Phoenix.ClientDOM
+  alias Fluffy.Driver.Phoenix.HTML.DocumentIndex
   alias Fluffy.Locator
   alias Fluffy.Session
 
@@ -19,7 +19,7 @@ defmodule Fluffy.PhoenixTest.Form do
   # As a locator read, the action timeout bounds it.
   defp browser_owner(session, frame, locator) do
     case frame
-         |> Fluffy.Locator.Playwright.locator(locator)
+         |> Fluffy.Driver.Playwright.Locator.locator(locator)
          |> Playwright.Locator.evaluate(
            """
            element => {

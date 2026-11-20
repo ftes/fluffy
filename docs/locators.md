@@ -107,7 +107,7 @@ for you. Facade `assert_has` accepts any visible match, and `refute_has` require
 no visible matches. Narrow the locator, or use `assert(count(locator, n))` when
 multiple matches are the intended assertion.
 
-## Frames (Playwright)
+## Frames (Playwright only)
 
 Use a frame locator to query elements inside an iframe. Frame locators are lazy;
 Playwright resolves the frame and target when an action or assertion runs. See

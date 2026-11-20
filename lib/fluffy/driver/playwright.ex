@@ -3,16 +3,15 @@ defmodule Fluffy.Driver.Playwright do
 
   @behaviour Fluffy.Driver.Contract
 
-  alias Fluffy.Backend.Playwright.Document
-  alias Fluffy.Backend.Playwright.Listeners
   alias Fluffy.Deadline
+  alias Fluffy.Driver.Playwright.Document
+  alias Fluffy.Driver.Playwright.Listeners
+  alias Fluffy.Driver.Playwright.Locator, as: PlaywrightLocator
   alias Fluffy.Expect
   alias Fluffy.FileChooser
-  alias Fluffy.Internal.Navigation
   alias Fluffy.Internal.NavigationFailure
   alias Fluffy.Internal.OperationFailure
   alias Fluffy.Locator
-  alias Fluffy.Locator.Playwright, as: PlaywrightLocator
   alias Fluffy.Session
   alias Fluffy.Timeouts
   alias Playwright.AbortController
@@ -296,109 +295,52 @@ defmodule Fluffy.Driver.Playwright do
     )
   end
 
-  def focus(%Session{} = session, %Locator{} = locator, options \\ []) do
-    locator_action(session, :focus, locator, options, &BrowserLocator.focus(&1, timeout: &2))
-  end
-
-  def blur(%Session{} = session, %Locator{} = locator, options \\ []) do
-    locator_action(session, :blur, locator, options, &BrowserLocator.blur(&1, timeout: &2))
-  end
-
   @impl true
   def press(%Session{} = session, %Locator{} = locator, key, options \\ []) do
     locator_action(session, :press, locator, options, &BrowserLocator.press(&1, key, native(options, &2)))
   end
 
-  def hover(session, locator, options) do
-    locator_action(session, :hover, locator, options, &BrowserLocator.hover(&1, native(options, &2)))
+  # The driver's end of `Fluffy.Playwright.__call__/7`, which documents the contract. As in
+  # Playwright, a locator's `timeout:` limits finding its element, not a read of it.
+  def native_call(session, kind, {operation, native}, target, arguments, options) do
+    {module, function, _arity} = Keyword.fetch!(Fluffy.Options.playwright_actions(), native)
+    options = resolve_mask(options, session)
+    arguments = native_arguments(session, native, arguments)
+
+    {native_target, target} =
+      if target == :page, do: {Session.page_state(session).page, nil}, else: {locator(session, target), target}
+
+    call = &apply(module, function, [native_target | arguments] ++ [native(options, &1)])
+
+    case kind do
+      :action ->
+        action(session, operation, target, options, call)
+
+      :read ->
+        read(session, operation, target, options, call)
+
+      :wait ->
+        action(session, operation, target, options, &with({:ok, handle} <- call.(&1), do: Document.release(handle)))
+    end
   end
 
-  def drag_to(session, source, target, options) do
-    target = locator(session, target)
+  # Only `drag_to`'s target is a locator to resolve; any other argument is data, such as a
+  # `Fluffy.Locator` passed as the `arg` of an evaluation.
+  defp native_arguments(session, :drag_to, [%Locator{} = target]), do: [locator(session, target)]
+  defp native_arguments(_session, _native, arguments), do: arguments
 
-    locator_action(session, :drag_to, source, options, fn native_source, remaining ->
-      BrowserLocator.drag_to(native_source, target, native(options, remaining))
-    end)
-  end
-
-  def press_sequentially(session, locator, text, options) when is_binary(text) do
-    locator_action(session, :press_sequentially, locator, options, fn native_locator, remaining ->
-      BrowserLocator.press_sequentially(native_locator, text, native(options, remaining))
-    end)
-  end
-
-  def dblclick(session, locator, options) do
-    locator_action(session, :dblclick, locator, options, &BrowserLocator.dblclick(&1, native(options, &2)))
-  end
-
-  def tap(session, locator, options) do
-    locator_action(session, :tap, locator, options, &BrowserLocator.tap(&1, native(options, &2)))
-  end
-
-  def dispatch_event(session, locator, type, event_init, options) do
-    locator_action(session, :dispatch_event, locator, options, fn native_locator, remaining ->
-      BrowserLocator.dispatch_event(native_locator, type, event_init, native(options, remaining))
-    end)
-  end
-
-  def select_text(session, locator, options) do
-    locator_action(session, :select_text, locator, options, &BrowserLocator.select_text(&1, native(options, &2)))
-  end
-
-  def scroll_into_view_if_needed(session, locator, options) do
-    locator_action(session, :scroll_into_view_if_needed, locator, options, fn native_locator, remaining ->
-      BrowserLocator.scroll_into_view_if_needed(native_locator, native(options, remaining))
-    end)
-  end
-
-  def wait_for(session, locator, options) do
-    locator_action(session, :wait_for, locator, options, &BrowserLocator.wait_for(&1, native(options, &2)))
-  end
-
-  def drop(session, locator, payload, options) do
-    locator_action(session, :drop, locator, options, &BrowserLocator.drop(&1, payload, native(options, &2)))
-  end
-
-  def locator_wait_for_function(session, locator, expression, arg, options) do
-    locator_action(
-      session,
-      :wait_for_function,
-      locator,
-      options,
-      &BrowserLocator.wait_for_function(&1, expression, arg, native(options, &2))
-    )
-  end
-
-  # As in Playwright, `timeout:` limits finding the element, not reading its box.
-  def bounding_box(session, locator, options) do
-    locator_read(session, :bounding_box, locator, options, &BrowserLocator.bounding_box(&1, native(options, &2)))
-  end
-
-  def aria_snapshot(session, locator, options) do
+  def evaluate_all(session, locator, expression, arg) do
     native_locator = locator(session, locator)
-    read(session, :aria_snapshot, locator, options, &BrowserLocator.aria_snapshot(native_locator, native(options, &1)))
-  end
 
-  def page_aria_snapshot(session, options) do
-    page = Session.page_state(session).page
-    read(session, :aria_snapshot, nil, options, &BrowserPage.aria_snapshot(page, native(options, &1)))
+    read(session, :evaluate_all, locator, [], fn _remaining ->
+      BrowserLocator.evaluate_all(native_locator, expression, arg)
+    end)
   end
 
   # As in Playwright, a page read has no timeout and waits while a script blocks the page.
   def page_read(session, operation, fun) do
     page = Session.page_state(session).page
     read(session, operation, nil, [], fn _remaining -> fun.(page) end)
-  end
-
-  # As in Playwright, `timeout:` limits finding the element, not the evaluation.
-  def locator_evaluate(session, locator, expression, arg, options) do
-    locator_read(session, :evaluate, locator, options, &BrowserLocator.evaluate(&1, expression, arg, native(options, &2)))
-  end
-
-  def evaluate_all(session, locator, expression, arg) do
-    locator_read(session, :evaluate_all, locator, [], fn native_locator, _remaining ->
-      BrowserLocator.evaluate_all(native_locator, expression, arg)
-    end)
   end
 
   defp read(session, operation, target, options, fun) do
@@ -411,17 +353,6 @@ defmodule Fluffy.Driver.Playwright do
     end
   end
 
-  def screenshot(session, locator, options) do
-    options = resolve_mask(options, session)
-    locator_read(session, :screenshot, locator, options, &BrowserLocator.screenshot(&1, native(options, &2)))
-  end
-
-  def page_screenshot(session, options) do
-    page = Session.page_state(session).page
-    options = resolve_mask(options, session)
-    read(session, :screenshot, nil, options, &BrowserPage.screenshot(page, native(options, &1)))
-  end
-
   # As in Playwright, page-wide input and emulation have no timeout and wait while
   # a script blocks the page. Unlike a locator action, Playwright does not wait for
   # a navigation the input starts, which may commit after this returns; the next
@@ -431,23 +362,8 @@ defmodule Fluffy.Driver.Playwright do
     action(session, operation, nil, [], fn _remaining -> fun.(page) end)
   end
 
-  # `fun` gets the native options, with the timeout, and may return a handle.
-  # Playwright's own timeout ends the wait, even while a script blocks the page.
-  def page_wait(%Session{} = session, operation, fun, options) do
-    page = Session.page_state(session).page
-
-    action(session, operation, nil, options, fn remaining ->
-      with {:ok, handle} <- fun.(page, native(options, remaining)), do: Document.release(handle)
-    end)
-  end
-
   defp resolve_mask(options, session),
     do: Keyword.replace_lazy(options, :mask, fn mask -> Enum.map(mask, &locator(session, &1)) end)
-
-  defp locator_read(session, operation, locator, options, call) do
-    native_locator = locator(session, locator)
-    read(session, operation, locator, options, &call.(native_locator, &1))
-  end
 
   @impl true
   def unwrap(%Session{} = session, fun) when is_function(fun, 1),
@@ -569,7 +485,7 @@ defmodule Fluffy.Driver.Playwright do
       {:ok, session, probe}
     else
       state = %{state | document_identity: probe.document}
-      session = Fluffy.Backend.navigate(session, Navigation.browser_committed(probe.url, state))
+      session = adopt_document(session, state, probe.url)
       {:ok, session, open_page_probe!(session, state, timeout)}
     end
   rescue
@@ -605,22 +521,37 @@ defmodule Fluffy.Driver.Playwright do
         probe
       end
 
-    navigation =
-      cond do
-        probe.document != state.document_identity ->
-          Navigation.browser_committed(probe.url, %{state | document_identity: probe.document})
+    cond do
+      probe.document != state.document_identity -> adopt_probed_document(session, state, probe)
+      probe.kind == :redirect -> adopt_document(session, state, probe.url, before.cursor)
+      probe.url != before.url -> Session.commit_page(session, :playwright, state, probe.url, same_document: true)
+      true -> session
+    end
+  end
 
-        probe.kind == :redirect ->
-          Navigation.browser_committed(probe.url, state, live_navigation_cursor: before.cursor)
+  @doc """
+  Adopts the document the main frame navigated to, as after `visit` or `reload`, and
+  commits it. Its reads and LiveView waits get the navigation timeout, not a `timeout:`
+  of the call, which bounds the navigation only.
+  """
+  def adopt_navigated_document(session, state) do
+    timeout = Document.bookkeeping_timeout(Timeouts.navigation(session))
+    adopt_probed_document(session, state, Document.adopted_probe!(state, nil, timeout))
+  end
 
-        probe.url != before.url ->
-          Navigation.browser_patch(probe.url, state)
+  @doc "Adopts the document a probe of the main frame found."
+  def adopt_probed_document(session, state, probe),
+    do: adopt_document(session, %{state | document_identity: probe.document}, probe.url)
 
-        true ->
-          nil
-      end
-
-    if navigation, do: Fluffy.Backend.navigate(session, navigation), else: session
+  # Commits a document the browser navigated to once its LiveViews are connected, also
+  # after the LiveView redirect recorded since `cursor`, which keeps the HTML document.
+  # The LiveView waits of a navigation an action or page code started share the
+  # navigation timeout, so with none they wait as `goto` does.
+  defp adopt_document(session, state, url, cursor \\ nil) do
+    deadline = Deadline.new(Document.bookkeeping_timeout(Timeouts.navigation(session)))
+    if cursor, do: Document.wait_for_redirect!(state.frame, url, cursor, Deadline.remaining(deadline, 1))
+    :ok = Document.wait_for_live_view!(state.frame, url, Deadline.remaining(deadline, 1))
+    Session.commit_page(session, :playwright, state, url, live_redirect: cursor != nil)
   end
 
   defp files({:local_paths, paths}), do: paths

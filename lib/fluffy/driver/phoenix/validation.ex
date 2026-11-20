@@ -1,4 +1,4 @@
-defmodule Fluffy.Driver.PhoenixValidation do
+defmodule Fluffy.Driver.Phoenix.Validation do
   @moduledoc false
 
   alias Fluffy.CapabilityError

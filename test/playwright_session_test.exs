@@ -2,8 +2,8 @@ defmodule Fluffy.PlaywrightSessionTest do
   use Fluffy.Support.Case, async: false
 
   alias Fluffy.Backend.Playwright, as: PlaywrightBackend
-  alias Fluffy.Backend.Playwright.Document
   alias Fluffy.Driver.Playwright, as: PlaywrightDriver
+  alias Fluffy.Driver.Playwright.Document
   alias Fluffy.Driver.Registry, as: DriverRegistry
   alias Fluffy.Session
   alias Fluffy.Support.Server

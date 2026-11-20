@@ -1,4 +1,4 @@
-defmodule Fluffy.LiveViewTest.UploadCompat do
+defmodule Fluffy.Driver.Live.UploadCompat do
   @moduledoc false
 
   # Phoenix.LiveViewTest.file_input/4 is a macro because Phoenix.ChannelTest

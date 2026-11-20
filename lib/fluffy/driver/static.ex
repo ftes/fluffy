@@ -3,9 +3,9 @@ defmodule Fluffy.Driver.Static do
 
   @behaviour Fluffy.Driver.Contract
 
-  import Fluffy.HTML.Semantics, only: [attribute: 2]
+  import Fluffy.Driver.Phoenix.HTML.Semantics, only: [attribute: 2]
 
-  alias Fluffy.ClientDOM
+  alias Fluffy.Driver.Phoenix.ClientDOM
   alias Fluffy.Expect
   alias Fluffy.Expectation
   alias Fluffy.Internal.Navigation
@@ -22,7 +22,7 @@ defmodule Fluffy.Driver.Static do
 
   @impl true
   def validate_operation!(session, operation, arguments),
-    do: Fluffy.Driver.PhoenixValidation.validate_operation!(session, operation, arguments)
+    do: Fluffy.Driver.Phoenix.Validation.validate_operation!(session, operation, arguments)
 
   @impl true
   def set_html(%Session{} = session, html) when is_binary(html) do

@@ -6,7 +6,7 @@ defmodule Fluffy.Backend.Phoenix.HTTP.Client do
 
   @type t :: %__MODULE__{
           base_url: String.t(),
-          cookie_jar: Fluffy.CookieJar.t(),
+          cookie_jar: Fluffy.Backend.Phoenix.CookieJar.t(),
           endpoint: module(),
           initial_conn: Plug.Conn.t() | nil,
           request_headers: [{String.Chars.t(), String.Chars.t()}]
@@ -46,13 +46,12 @@ defmodule Fluffy.Backend.Phoenix.HTTP do
 
   import Phoenix.ConnTest
 
+  alias Fluffy.Backend.Phoenix.CookieJar
   alias Fluffy.Backend.Phoenix.HTTP.Client
   alias Fluffy.Backend.Phoenix.HTTP.Request
   alias Fluffy.Backend.Phoenix.HTTP.Response
-  alias Fluffy.CookieJar
 
   @redirect_statuses [301, 302, 303, 307, 308]
-  @max_redirects 20
 
   # `redirects` counts the hops that led here, including LiveView mount
   # redirects, so a redirect loop through either fails at the same limit.
@@ -69,13 +68,6 @@ defmodule Fluffy.Backend.Phoenix.HTTP do
       |> follow_redirects(redirects)
     end
   end
-
-  def count_redirect!(redirects, %URI{} = url) when redirects >= @max_redirects do
-    raise Fluffy.Internal.NavigationFailure,
-          "Phoenix request exceeded #{@max_redirects} redirects at #{URI.to_string(url)}"
-  end
-
-  def count_redirect!(redirects, %URI{}), do: redirects + 1
 
   def follow(%Client{} = client, %Plug.Conn{} = conn, %URI{} = url, method \\ :get, body \\ nil) do
     request = %Request{body: body, method: method, url: validate_url!(client, url)}
@@ -115,7 +107,7 @@ defmodule Fluffy.Backend.Phoenix.HTTP do
           {client, response}
 
         [location | _rest] ->
-          redirects = count_redirect!(redirects, response.request.url)
+          redirects = Fluffy.Internal.Navigation.count_redirect!(redirects, response.request.url)
 
           {method, body} =
             redirected_request(conn.status, response.request.method, response.request.body)

@@ -1,4 +1,4 @@
-defmodule Fluffy.Backend.Playwright.Document do
+defmodule Fluffy.Driver.Playwright.Document do
   @moduledoc false
 
   # Document identity and LiveView navigation bookkeeping live in the page.
@@ -7,8 +7,8 @@ defmodule Fluffy.Backend.Playwright.Document do
   # Page timers may be faked and paused (`Fluffy.Playwright.Clock.install/2`), so
   # these scripts never wait on them, and waits poll through Playwright's own.
 
-  alias Fluffy.Backend.Playwright.Bounded
   alias Fluffy.Deadline
+  alias Fluffy.Driver.Playwright.Bounded
   alias Fluffy.Internal.NavigationFailure
   alias Playwright.Frame
   alias Playwright.JSHandle

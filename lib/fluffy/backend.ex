@@ -1,6 +1,8 @@
 defmodule Fluffy.Backend do
   @moduledoc false
 
+  alias Fluffy.Driver.Registry, as: DriverRegistry
+  alias Fluffy.Internal.OperationFailure
   alias Fluffy.Session
 
   def start_session(name, options) when is_list(options) do
@@ -37,6 +39,32 @@ defmodule Fluffy.Backend do
 
   def page_snapshot(runtime, record), do: dispatch_page(runtime, record, :page_snapshot)
 
+  @doc """
+  Runs `operation` on the driver of the session's active page and resolves its result
+  (`Fluffy.Driver.Contract`): a navigation it reports is the backend's to perform, and
+  a continuation then runs on the page it landed on, with this function to dispatch
+  again. Calls go down only: a driver hands navigation back instead of calling up.
+  """
+  def driver(%Session{} = session, operation, arguments) do
+    driver = DriverRegistry.module(Session.current_driver(session))
+    driver.validate_operation!(session, operation, arguments)
+    driver |> apply(operation, [session | arguments]) |> resolve_driver_result()
+  rescue
+    error -> reraise(OperationFailure.normalize(session, operation, arguments, error), __STACKTRACE__)
+  end
+
+  defp resolve_driver_result(%Session{} = session), do: session
+
+  defp resolve_driver_result({:return, result, outcome}) do
+    resolve_driver_result(outcome)
+    result
+  end
+
+  defp resolve_driver_result({:navigate, %Session{} = session, navigation}), do: navigate(session, navigation)
+
+  defp resolve_driver_result({:navigate, %Session{} = session, navigation, continue}) when is_function(continue, 2),
+    do: session |> navigate(navigation) |> continue.(&driver/3)
+
   defp dispatch_page(runtime, record, operation) do
     case Fluffy.SessionRuntime.configuration(runtime) do
       {:ok, {backend, context}} -> apply(backend, operation, [context, record])
@@ -61,7 +89,7 @@ defmodule Fluffy.Backend do
       Playwright.TimeoutError,
       Playwright.TargetClosedError
     ] ->
-      reraise Fluffy.Internal.OperationFailure.navigation(session, operation, error), __STACKTRACE__
+      reraise OperationFailure.navigation(session, operation, error), __STACKTRACE__
 
     error in Fluffy.CapabilityError ->
       reraise Fluffy.CapabilityError.put_call(error, operation, session), __STACKTRACE__

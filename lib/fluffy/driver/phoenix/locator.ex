@@ -1,9 +1,9 @@
-defmodule Fluffy.Locator.Static do
+defmodule Fluffy.Driver.Phoenix.Locator do
   @moduledoc false
 
+  alias Fluffy.Driver.Phoenix.HTML.Aria
+  alias Fluffy.Driver.Phoenix.HTML.Semantics
   alias Fluffy.Expect.Internal
-  alias Fluffy.HTML.Aria
-  alias Fluffy.HTML.Semantics
   alias Fluffy.Locator
   # StringUtils is internal to Playwright, which is pinned.
   alias Playwright.Isomorphic.LocatorUtils

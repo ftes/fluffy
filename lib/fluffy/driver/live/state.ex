@@ -1,9 +1,9 @@
 defmodule Fluffy.Driver.Live.State do
   @moduledoc false
 
-  alias Fluffy.ClientDOM
   alias Fluffy.Driver.Live.Document
   alias Fluffy.Driver.Live.UploadState
+  alias Fluffy.Driver.Phoenix.ClientDOM
 
   @enforce_keys [:client_dom, :document, :view, :monitor]
   defstruct [:client_dom, :document, :view, :monitor, live_uploads: %UploadState{}]

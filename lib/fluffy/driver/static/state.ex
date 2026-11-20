@@ -1,7 +1,7 @@
 defmodule Fluffy.Driver.Static.State do
   @moduledoc false
 
-  alias Fluffy.ClientDOM
+  alias Fluffy.Driver.Phoenix.ClientDOM
 
   defstruct [:client_dom, :conn]
 

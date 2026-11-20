@@ -6,9 +6,13 @@ defmodule Fluffy.Driver.Contract do
   alias Fluffy.Locator
   alias Fluffy.Session
 
+  # A driver reports a navigation by returning it, for `Fluffy.Backend` to perform, and
+  # with it, for a retry on the new page, a continuation to run there with the dispatch
+  # function. It never calls up.
   @type result ::
           Session.t()
           | {:navigate, Session.t(), Navigation.t()}
+          | {:navigate, Session.t(), Navigation.t(), (Session.t(), (Session.t(), atom(), list() -> term()) -> term())}
 
   @callback validate_operation!(Session.t(), atom(), list()) :: :ok
 

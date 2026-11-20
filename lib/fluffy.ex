@@ -33,7 +33,6 @@ defmodule Fluffy do
              ]
 
   alias Fluffy.Backend
-  alias Fluffy.Driver.Registry, as: DriverRegistry
   alias Fluffy.Event
   alias Fluffy.Event.Pending
   alias Fluffy.SelectedFile
@@ -354,10 +353,8 @@ defmodule Fluffy do
 
   def wait_for(%Session{} = session, %Event{} = event, options), do: Event.wait(session, event, options)
 
-  def wait_for(%Session{} = session, %Fluffy.Locator{} = locator, options) do
-    Fluffy.CapabilityError.require_playwright!(session, :playwright_only_api, :wait_for)
-    dispatch_driver(session, :wait_for, [locator, Fluffy.Options.validate_action!(:wait_for, options)])
-  end
+  def wait_for(%Session{} = session, %Fluffy.Locator{} = locator, options),
+    do: Fluffy.Playwright.__call__(session, :action, :playwright_only_api, :wait_for, locator, [], options)
 
   @doc group: "Events"
   @doc "Consumes a pending event and returns its value. Its deadline starts at registration."
@@ -380,9 +377,6 @@ defmodule Fluffy do
   @doc "Removes the most recently registered listener matching this source, event type, and handler."
   @spec off(Session.t(), Event.t(), (term() -> term()), [{:scope, :page | :context}]) :: Session.t()
   def off(%Session{} = session, %Event{} = event, handler, options \\ []), do: Event.off(session, event, handler, options)
-
-  @doc false
-  def __expect__(session, expectation), do: dispatch_driver(session, :expect, [expectation])
 
   @doc false
   def set_html(%Session{} = session, html) do
@@ -651,31 +645,5 @@ defmodule Fluffy do
     dispatch_driver(session, :press, [locator, key, options])
   end
 
-  @doc false
-  def __dispatch_driver__(session, operation, arguments), do: dispatch_driver(session, operation, arguments)
-
-  defp dispatch_driver(%Session{} = session, operation, arguments) do
-    driver = DriverRegistry.module(Session.current_driver(session))
-    driver.validate_operation!(session, operation, arguments)
-
-    result =
-      apply(driver, operation, [
-        session | arguments
-      ])
-
-    resolve_driver_result(result)
-  rescue
-    error -> reraise(Fluffy.Internal.OperationFailure.normalize(session, operation, arguments, error), __STACKTRACE__)
-  end
-
-  defp resolve_driver_result(%Session{} = session), do: session
-
-  defp resolve_driver_result({:return, result, outcome}) do
-    resolve_driver_result(outcome)
-    result
-  end
-
-  defp resolve_driver_result({:navigate, %Session{} = session, navigation}) do
-    Backend.navigate(session, navigation)
-  end
+  defp dispatch_driver(session, operation, arguments), do: Backend.driver(session, operation, arguments)
 end

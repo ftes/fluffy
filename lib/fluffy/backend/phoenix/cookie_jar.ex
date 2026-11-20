@@ -1,4 +1,4 @@
-defmodule Fluffy.CookieJar do
+defmodule Fluffy.Backend.Phoenix.CookieJar do
   @moduledoc false
 
   # A browser's cookie store for the Phoenix drivers. Cookies are kept as Playwright's
