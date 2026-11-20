@@ -194,8 +194,7 @@ request sends what it holds then, the LiveView mount's included. Its requests st
 app's origin, so it does not enforce `SameSite`, and it ignores `partitionKey`. A cookie
 set without `SameSite` reports `"Lax"`, as Chromium does (Firefox reports `"None"`). An
 invalid cookie raises `ArgumentError` with Playwright's message, and a key that is no cookie
-field, such as `http_only:` for `httpOnly:`, with PlaywrightEx's; a browser session's
-Playwright still drops such a key.
+field, such as `http_only:` for `httpOnly:`, with PlaywrightEx's, on both backends.
 
 ### Before the first visit
 
