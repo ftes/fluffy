@@ -3,14 +3,16 @@ defmodule Fluffy.Internal.OperationFailure do
 
   alias Fluffy.ActionabilityError
   alias Fluffy.Backend.Phoenix
+  alias Fluffy.CapabilityError
   alias Fluffy.Internal.NavigationFailure
   alias Fluffy.LiveViewError
   alias Fluffy.Session
   alias Fluffy.StrictnessError
 
   # Turns an error a Phoenix driver operation raised into what the user sees: its
-  # structured causes, which element actions, taking their locator first, wrap, and its
-  # navigation failures. The Playwright driver raises its own under the public call's name.
+  # structured causes, which element actions, taking their locator first, wrap, its
+  # navigation failures, and the call and driver of a capability error raised below the
+  # page. The Playwright driver raises its own under the public call's name.
   def normalize(%Session{} = session, operation, arguments, %NavigationFailure{} = failure),
     do: navigation(session, public_operation(operation, arguments), failure)
 
@@ -20,6 +22,9 @@ defmodule Fluffy.Internal.OperationFailure do
       do: wrap_operation(session, operation, arguments, cause),
       else: cause
   end
+
+  def normalize(%Session{} = session, operation, arguments, %CapabilityError{} = error),
+    do: CapabilityError.put_call(error, public_operation(operation, arguments), session)
 
   def normalize(_session, _operation, _arguments, cause), do: cause
 
