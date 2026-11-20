@@ -90,6 +90,9 @@ defmodule Fluffy.Backend do
       Playwright.TargetClosedError
     ] ->
       reraise OperationFailure.navigation(session, operation, error), __STACKTRACE__
+
+    error in Fluffy.CapabilityError ->
+      reraise Fluffy.CapabilityError.put_call(error, operation, session), __STACKTRACE__
   end
 
   defp session_options(options, :phoenix) do

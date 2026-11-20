@@ -4,8 +4,9 @@ defmodule Fluffy.CapabilityError do
 
   `capability` is the feature's id in `Fluffy.Capability.matrix/0`, and `operation` the
   call that needs it, or `nil` when the feature is in the page rather than the call.
-  `backend` is `:phoenix` or `:playwright`, and `driver` the active page driver, or `nil`
-  when no page is involved, such as for a session option.
+  `backend` is `:phoenix` or `:playwright`, and `driver` the active page driver, so
+  `:unvisited` before a Phoenix session's first `visit`, or `nil` when no page is involved,
+  such as for a session option.
   """
 
   alias Fluffy.Session
@@ -52,6 +53,22 @@ defmodule Fluffy.CapabilityError do
 
     :ok
   end
+
+  @doc false
+  # An error raised below the session, as by the Phoenix HTTP client, gets the public call
+  # and the page's driver from the caller that has the session.
+  @spec put_call(%__MODULE__{}, atom(), Session.t()) :: %__MODULE__{}
+  def put_call(%__MODULE__{operation: nil, driver: nil} = error, operation, %Session{} = session) do
+    exception(
+      capability: error.capability,
+      operation: operation,
+      backend: error.backend,
+      driver: Session.current_driver(session),
+      detail: error.detail
+    )
+  end
+
+  def put_call(%__MODULE__{} = error, _operation, %Session{}), do: error
 
   defp backend!(driver) when driver in [:unvisited, :static, :live, :external], do: :phoenix
   defp backend!(:playwright), do: :playwright
