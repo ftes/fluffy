@@ -50,17 +50,11 @@ defmodule Fluffy.Page do
   end
 
   @doc false
+  # Raises once the page's session is closed.
   @spec ensure_session!(t()) :: :ok
-  def ensure_session!(page) do
-    context!(page)
-    :ok
-  end
-
-  @doc false
-  @spec context!(t()) :: map()
-  def context!(%__MODULE__{runtime: runtime}) do
+  def ensure_session!(%__MODULE__{runtime: runtime}) do
     case SessionRuntime.context(runtime) do
-      {:ok, context} -> context
+      {:ok, _context} -> :ok
       {:error, message} -> raise ArgumentError, message
     end
   end

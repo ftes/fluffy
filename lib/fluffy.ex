@@ -319,16 +319,10 @@ defmodule Fluffy do
   end
 
   # A value such as a download outlives its page but not its session.
-  defp native!(%{native: native} = value) when is_struct(native) do
-    if page = owner_page(value), do: Fluffy.Page.ensure_session!(page)
+  defp native!(%{native: native, page: page}) do
+    Fluffy.Page.ensure_session!(page)
     native
   end
-
-  defp native!(value),
-    do: raise(ArgumentError, "Fluffy.unwrap_and_return/2: #{inspect(value.__struct__)} has no native counterpart")
-
-  defp owner_page(%{page: page}), do: page
-  defp owner_page(_value), do: nil
 
   @doc group: "Events"
   @doc """
