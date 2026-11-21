@@ -125,14 +125,6 @@ jobs:
           # it sits in an includeIf file claude-code-action doesn't clear, so the push gets a 403.
           persist-credentials: false
           fetch-depth: 0
-      # The Claude action from main, not from the checkout above: into tmp/, which is gitignored.
-      - name: Checkout main's actions
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          ref: main
-          path: tmp/ci
-          sparse-checkout: .github/actions
-          persist-credentials: false
       - name: Set up toolchain and deps
         continue-on-error: true
         uses: ./.github/actions/setup
@@ -141,6 +133,15 @@ jobs:
       - name: Fetch Playwright source
         continue-on-error: true
         run: mix fluffy.playwright_source
+      # The Claude action from main, not from the checkout above: into tmp/, which is gitignored.
+      # After the steps that run the checkout's code, which could otherwise rewrite it.
+      - name: Checkout main's actions
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: main
+          path: tmp/ci
+          sparse-checkout: .github/actions
+          persist-credentials: false
 
       - name: Run Claude Code
         uses: ./tmp/ci/.github/actions/claude

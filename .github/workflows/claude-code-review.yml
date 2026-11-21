@@ -38,16 +38,6 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      # The Claude action from main, not from the checkout above: into tmp/, which is gitignored.
-      - name: Checkout main's actions
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          ref: main
-          path: tmp/ci
-          sparse-checkout: |
-            .github/actions
-            .github/scripts
-          persist-credentials: false
       # A rebase of reviewed changes skips the rest; a later push can be reviewed by its increment.
       # Should it fail, Claude reviews it all.
       - name: Compare with the last review
@@ -60,15 +50,6 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           BASE_REF: ${{ github.base_ref }}
         run: bash .github/claude-review-increment.sh
-      # The comments, reviews and review comments of maintainers and claude[bot], for the prompt;
-      # Claude's tools can't read comments. Should it fail, so does the job: no review without them.
-      - name: Collect maintainers' comments
-        if: steps.increment.outputs.mode != 'skip'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          PR: ${{ github.event.pull_request.number }}
-        run: bash tmp/ci/.github/scripts/claude-review-comments.sh
       # Setup and the dev/ task compile the PR: a PR that doesn't build still gets a Claude run.
       - name: Set up toolchain and deps
         if: steps.increment.outputs.mode != 'skip'
@@ -80,6 +61,28 @@ jobs:
         if: steps.increment.outputs.mode != 'skip'
         continue-on-error: true
         run: mix fluffy.playwright_source
+
+      # The Claude action from main, not from the checkout above: into tmp/, which is gitignored.
+      # After the steps that run the checkout's code, which could otherwise rewrite it.
+      - name: Checkout main's actions
+        if: steps.increment.outputs.mode != 'skip'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: main
+          path: tmp/ci
+          sparse-checkout: |
+            .github/actions
+            .github/scripts
+          persist-credentials: false
+      # The comments, reviews and review comments of maintainers and claude[bot], for the prompt;
+      # Claude's tools can't read comments. Should it fail, so does the job: no review without them.
+      - name: Collect maintainers' comments
+        if: steps.increment.outputs.mode != 'skip'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: bash tmp/ci/.github/scripts/claude-review-comments.sh
 
       - name: Run Claude Code Review
         if: steps.increment.outputs.mode != 'skip'
