@@ -1,3 +1,10 @@
+# The tool rules (each job's allowed tools, the denials below, dontAsk) steer Claude's tool use;
+# they are no sandbox: a job that lets Claude edit files and run mix lets it run code. What these
+# jobs rely on is that none loads another repository's content, the tokens' scopes, and the
+# rulesets on main and the branches. Jobs on a branch other than main load this action from main.
+#
+# Accepted risk: playwright-ex-update.yml loads a new PlaywrightEx release (its code, driver,
+# CHANGELOG and usage rules) with the Claude app token. PlaywrightEx is the owner's own library.
 name: Run Claude
 description: Runs claude-code-action with the repo's model, tool hint and no attribution, then writes its result to the step summary.
 
@@ -9,8 +16,11 @@ inputs:
     description: As claude-code-action's; empty for tag mode
     default: ""
   claude_args:
-    description: As claude-code-action's, without --model or --append-system-prompt
+    description: As claude-code-action's, without --model, --append-system-prompt or --disallowedTools
     required: true
+  disallowed_tools:
+    description: Claude's --disallowedTools, comma-separated, besides the ones every job denies
+    default: ""
   append_system_prompt:
     description: Plain text added to the system prompt after the tool hint (no quotes, $ or backslashes)
     default: ""
@@ -19,6 +29,9 @@ inputs:
     default: ""
   additional_permissions:
     description: As claude-code-action's
+    default: ""
+  comment_authors:
+    description: "claude-code-action's include_comments_by_actor: the logins whose comments, reviews and review comments tag mode shows Claude. Empty: every login."
     default: ""
 
 outputs:
@@ -36,14 +49,22 @@ runs:
         prompt: ${{ inputs.prompt }}
         allowed_bots: ${{ inputs.allowed_bots }}
         additional_permissions: ${{ inputs.additional_permissions }}
-        # The owner forbids attribution; the prompts say so too.
+        include_comments_by_actor: ${{ inputs.comment_authors }}
+        # The owner forbids attribution; the prompts say so too. dontAsk: a call no rule allows is
+        # denied, except the read-only ones Claude Code always allows (the action would otherwise
+        # start in auto mode, where a review decides them). Tag mode (claude.yml) runs in
+        # acceptEdits instead, which also allows file edits in the checkout.
         settings: |
-          {"includeCoAuthoredBy": false, "attribution": {"commit": "", "pr": ""}}
+          {"includeCoAuthoredBy": false, "attribution": {"commit": "", "pr": ""}, "permissions": {"defaultMode": "dontAsk"}}
         # The hint steers Claude off the Bash habits (cd, pipes, heredocs) that miss the
-        # allowlists. It sits in a quoted argument, so plain text only.
+        # allowlists. It sits in a quoted argument, so plain text only. --disallowedTools: the
+        # caller's, and in every job other repositories' PRs and issues, comments and reviews (which
+        # anyone can write; a job that needs them gets maintainers' from a workflow step), API paths
+        # outside the allowed ones, and mix's commands that run arbitrary code.
         claude_args: |
           --model claude-opus-5-5
           --append-system-prompt "Prefer your file tools over Bash to read, search and edit files, and keep any scratch files under tmp/; run each allowed Bash command on its own, without cd, git -C, semicolons, &&, pipes or heredocs (you are already in the repository). Give any subagent you start these same rules. ${{ inputs.append_system_prompt }}"
+          --disallowedTools "Bash(gh pr * -R*),Bash(gh pr * --repo*),Bash(gh issue * -R*),Bash(gh issue * --repo*),Bash(gh pr view *comments*),Bash(gh pr view *eview*),Bash(gh pr view * -c*),Bash(gh issue view *comments*),Bash(gh issue view * -c*),Bash(gh api *comments*),Bash(gh api *reviews*),Bash(gh api *timeline*),Bash(gh api graphql*),Bash(gh api *..*),Bash(gh api *%*),Bash(gh api * --hostname*),Bash(mix cmd*),Bash(mix run*),Bash(mix eval*),Bash(*mix cmd*)${{ inputs.disallowed_tools != '' && format(',{0}', inputs.disallowed_tools) || '' }}"
           ${{ inputs.claude_args }}
     # .github/claude-summary.jq: only the final message and the denied calls (public repo). From
     # the run's commit, as Claude may have edited the checkout; a failed `git show` stops the step.
