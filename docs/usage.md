@@ -104,6 +104,30 @@ like `locale:`, are for the module; tag a describe block or a test with
 `Playwright.Test.use/1`, such as `@tag Playwright.Test.use(trace: :on)` (see
 `Playwright.Test`).
 
+A case template that brings your `ConnCase` in its `using` forwards the module's options to
+both. `ExUnit.CaseTemplate` passes `use ExUnit.Case` only its own keys (`async`, `group`,
+`parameterize`), and `use Playwright.Test` ignores those, so a Playwright option that only
+reaches the `ConnCase`, such as `trace: :on`, is dropped without a warning:
+
+```elixir
+defmodule MyAppWeb.FeatureCase do
+  use ExUnit.CaseTemplate
+
+  using opts do
+    quote do
+      use MyAppWeb.ConnCase, unquote(opts)
+      use Playwright.Test, unquote(opts)
+      use Fluffy.Assert
+
+      import Fluffy
+      import Fluffy.Locator
+    end
+  end
+end
+```
+
+A module then writes `use MyAppWeb.FeatureCase, async: true, trace: :on`.
+
 A setup can start a session per test, here Phoenix by default and the backend of a
 `backend` tag otherwise. The tag is the setup's own, so name it as you like. Use
 `@moduletag backend: :playwright` for an entire module, `@describetag` for a
