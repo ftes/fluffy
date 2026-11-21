@@ -29,7 +29,7 @@ sandbox, as generated `DataCase` and `ConnCase` do.
 
 The entry below lists them under Breaking; the upgrade guide shows how to move a 0.8 suite.
 
-## Unreleased
+## 0.9.0-rc.5 — 2026-11-21
 
 Changes since 0.8.0.
 
