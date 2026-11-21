@@ -40,6 +40,9 @@ inputs:
 outputs:
   execution_file:
     value: ${{ steps.claude.outputs.execution_file }}
+  structured_output:
+    description: "Claude's answer as a JSON string, with --json-schema in claude_args: data, to pass to a script by env"
+    value: ${{ steps.claude.outputs.structured_output }}
 
 runs:
   using: composite
