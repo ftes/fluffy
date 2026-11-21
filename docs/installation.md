@@ -236,7 +236,7 @@ Configure the backend in `config/test.exs`. The browser and its driver are
 ```elixir
 config :playwright, :test,
   browser_name: :chromium,
-  launch_options: [headless: true],
+  headless: true,
   # Traces, screenshots and videos of failed tests, under test-results/.
   trace: :retain_on_failure,
   screenshot: :only_on_failure
@@ -285,23 +285,23 @@ until a session needs one, a lost browser is launched again for the next session
 drivers stop after the suite. For more users in a test, start more sessions: each gets its
 own browser context.
 
-To debug one test headed or slowed down, pass it a browser with its own `launch_options:`,
-merged one key at a time over the module's, else the config's:
+To debug one test headed or slowed down, pass it a browser with its own `headless:` or
+`launch_options:`, merged one key at a time over the module's, else the config's:
 
 ```elixir
-browser = Playwright.Test.BrowserPool.browser(launch_options: [headless: false, slow_mo: 500])
+browser = Playwright.Test.BrowserPool.browser(headless: false, launch_options: [slow_mo: 500])
 
 :playwright
 |> start_session(browser: browser)
 |> visit("/creatures")
 ```
 
-`browser_name:` overrides the same way. Other options get a worker of their own, a driver and
-its browser, which counts toward `workers` unless the test or module holds one already; at
-`workers`, the longest idle worker of other options restarts its driver for them. For a whole
-module, set `use Playwright.Test, launch_options: [headless: false, slow_mo: 500]` or
-`@moduletag Playwright.Test.use(launch_options: ...)`, which replaces the config's
-`launch_options`: its sessions then get that browser without `browser:`. See
+`browser_name:` and `channel:` override the same way. Other options get a worker of their own, a
+driver and its browser, which counts toward `workers` unless the test or module holds one
+already; at `workers`, the longest idle worker of other options restarts its driver for them.
+For a whole module, set `use Playwright.Test, headless: false, launch_options: [slow_mo: 500]`
+or `@moduletag Playwright.Test.use(headless: false)`; a module's `launch_options` replace the
+config's. Its sessions then get that browser without `browser:`. See
 [Debugging one test](`e:playwright:test-artifacts.md#debugging-one-test`).
 
 To run the browsers on a Playwright server, such as Playwright's Docker image, set
