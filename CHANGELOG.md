@@ -81,7 +81,7 @@ Changes since 0.8.0.
 
 ### Added
 
-- `start_session(:playwright, browser: browser)` uses another browser, such as `BrowserPool.browser(launch_options: [headless: false])`.
+- `start_session(:playwright, browser: browser)` uses another browser, such as `BrowserPool.browser(headless: false)`.
 - Actions, `reload` and expectations accept the options of their Playwright call, such as `modifiers:`, `force:`, `wait_until:`, `visible:` and `ignore_case:`; Phoenix raises `Fluffy.CapabilityError` for Playwright-only ones. `by_role` accepts Playwright's `checked:`, `disabled:`, `expanded:`, `include_hidden:`, `level:`, `pressed:`, `selected:` and `description:`.
 - A regex in a locator's `name:`, `has_text:` and `has_not_text:`, on every driver.
 - `Fluffy.Expect` gains `to_have_text`, `to_contain_text`, `to_have_attribute`, `to_have_class`, `to_contain_class`, `to_have_id`, `to_be_attached`, `to_be_hidden`, `to_be_empty`, `to_have_role`, `to_have_accessible_name` and `to_have_accessible_description` on every driver, and `to_have_css`, `to_have_js_property`, `to_have_accessible_error_message`, `to_be_in_viewport` (`Fluffy.Assert.in_viewport/2`), screenshot and aria snapshot assertions on Playwright. Snapshot names derive from the test, as in Playwright.
