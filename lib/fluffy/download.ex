@@ -32,15 +32,14 @@ defmodule Fluffy.Download do
   @spec read(t(), keyword()) :: binary()
   def read(%__MODULE__{} = download, options \\ []) do
     options = NimbleOptions.validate!(options, max_bytes: [type: :non_neg_integer, default: 10_000_000])
-    # Raises once the session is closed.
-    Fluffy.Page.context!(download.page)
+    Fluffy.Page.ensure_session!(download.page)
     read_source!(download, options[:max_bytes])
   end
 
   @doc "Waits for completion and saves to the destination using bounded memory."
   @spec save_as(t(), Path.t()) :: :ok
   def save_as(%__MODULE__{} = download, destination) do
-    Fluffy.Page.context!(download.page)
+    Fluffy.Page.ensure_session!(download.page)
     save_source!(download, destination, :save_as)
   end
 
@@ -51,7 +50,7 @@ defmodule Fluffy.Download do
   """
   @spec path(t()) :: Path.t()
   def path(%__MODULE__{} = download) do
-    Fluffy.Page.context!(download.page)
+    Fluffy.Page.ensure_session!(download.page)
     source_path!(download)
   end
 
