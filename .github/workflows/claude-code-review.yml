@@ -16,9 +16,11 @@ env:
 
 jobs:
   claude-review:
-    # Claude's own PRs are the only bot PRs reviewed, and only this repository's PRs.
+    # Claude's own PRs are the only bot PRs reviewed, and only this repository's PRs, never
+    # Renovate's branches, whoever opened the PR.
     if: >-
       !github.event.pull_request.draft &&
+      !startsWith(github.head_ref, 'renovate/') &&
       (github.event.pull_request.user.type != 'Bot' || github.event.pull_request.user.login == 'claude[bot]') &&
       github.event.pull_request.head.repo.full_name == github.repository
     # The image main saves setup's deps cache from.
@@ -36,6 +38,14 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+      # The Claude action from main, not from the checkout above: into tmp/, which is gitignored.
+      - name: Checkout main's actions
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: main
+          path: tmp/ci
+          sparse-checkout: .github/actions
+          persist-credentials: false
       # A rebase of reviewed changes skips the rest; a later push can be reviewed by its increment.
       # Should it fail, Claude reviews it all.
       - name: Compare with the last review
@@ -62,7 +72,7 @@ jobs:
 
       - name: Run Claude Code Review
         if: steps.increment.outputs.mode != 'skip'
-        uses: ./.github/actions/claude
+        uses: ./tmp/ci/.github/actions/claude
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           allowed_bots: claude[bot]

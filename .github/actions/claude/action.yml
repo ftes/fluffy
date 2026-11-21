@@ -1,7 +1,10 @@
 # The tool rules (each job's allowed tools, the denials below, dontAsk) steer Claude's tool use;
 # they are no sandbox: a job that lets Claude edit files and run mix lets it run code. What these
 # jobs rely on is that none loads another repository's content, the tokens' scopes, and the
-# rulesets on main and the branches.
+# rulesets on main and the branches. Jobs on a branch other than main load this action from main.
+#
+# Accepted risk: playwright-ex-update.yml loads a new PlaywrightEx release (its code, driver,
+# CHANGELOG and usage rules) with the Claude app token. PlaywrightEx is the owner's own library.
 name: Run Claude
 description: Runs claude-code-action with the repo's model, tool hint and no attribution, then writes its result to the step summary.
 
