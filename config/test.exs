@@ -56,7 +56,7 @@ config :playwright, :expect, update_snapshots: :missing
 # machine may take long but not that long. Phoenix sessions keep Fluffy's own, 1 s by default.
 config :playwright, :test,
   browser_name: browser_engine,
-  launch_options: [headless: true],
+  headless: true,
   action_timeout: 15_000,
   navigation_timeout: 15_000
 

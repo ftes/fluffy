@@ -388,8 +388,8 @@ defmodule Fluffy.Options do
                       doc:
                         "*Playwright only.* The `Playwright.Browser` the session's context is created in. " <>
                           "Defaults to the test's browser from `Playwright.Test.BrowserPool.browser/1`; " <>
-                          "to override launch options such as `headless: false` for one test, " <>
-                          "pass `Playwright.Test.BrowserPool.browser(launch_options: ...)` " <>
+                          "to run one test headed or with other launch options, " <>
+                          "pass `Playwright.Test.BrowserPool.browser(headless: false, launch_options: ...)` " <>
                           "([Playwright setup](installation.md#playwright-setup))."
                     ]
                   )
