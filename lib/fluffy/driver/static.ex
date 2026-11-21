@@ -39,19 +39,15 @@ defmodule Fluffy.Driver.Static do
 
         assert_count_expectation!(expectation, locator, expected, candidates)
 
-      %Expect{target: {:locator, _locator}} ->
-        {passed?, actual} = ClientDOM.Expectation.evaluate(client_dom(session), expectation)
-        Expect.Internal.assert!(expectation, passed?, actual)
-
       %Expect{target: :page, kind: :url, expected: expected} ->
         actual = Session.current_page(session).url
         # A session for HTML has no server, so no base URL.
         base_url = with %{base_url: base_url} <- Session.context(session).http, do: base_url
         Expect.Internal.assert!(expectation, Expect.Internal.url_matches?(expected, base_url, actual), actual)
 
-      %Expect{target: :page, kind: :title, expected: expected} ->
-        actual = session |> Session.page_state() |> document() |> page_title()
-        Expect.Internal.assert!(expectation, Expect.Internal.title_matches?(expected, actual), actual)
+      %Expect{} ->
+        {passed?, actual} = ClientDOM.Expectation.evaluate(client_dom(session), expectation)
+        Expect.Internal.assert!(expectation, passed?, actual)
     end
 
     session
@@ -205,17 +201,6 @@ defmodule Fluffy.Driver.Static do
   end
 
   defp client_dom(session), do: session |> Session.page_state() |> Map.fetch!(:client_dom)
-  defp document(state), do: state |> Map.fetch!(:client_dom) |> Map.fetch!(:document)
-
-  defp page_title(document) do
-    document
-    |> LazyHTML.query("title")
-    |> Enum.at(0)
-    |> case do
-      nil -> nil
-      title -> LazyHTML.text(title)
-    end
-  end
 
   defp assert_count_expectation!(%Expect{negated?: false}, locator, expected, candidates) do
     Expectation.assert_count!(locator, expected, candidates)
