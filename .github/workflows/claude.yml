@@ -17,7 +17,9 @@ jobs:
   # Maintainers only: the action rejects anyone else, but only after the setup in `claude`. Reviews
   # only on this repository's PRs, never Renovate's; a comment's PR is checked here, before anything
   # is checked out, and none when the lookup fails. Also picks the gh commands Claude may run: on
-  # this event's PR or issue only.
+  # this event's PR or issue only, and the logins whose comments Claude sees: maintainers' and its
+  # own. The PR's or issue's own body isn't filtered: tagging Claude on it is the maintainer's
+  # choice.
   pr:
     if: |
       ((github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
@@ -29,11 +31,13 @@ jobs:
     runs-on: ubuntu-26.04
     timeout-minutes: 5
     permissions:
+      issues: read
       pull-requests: read
     outputs:
       skip: ${{ steps.pr.outputs.skip }}
       other-repo: ${{ steps.pr.outputs.other-repo }}
       gh: ${{ steps.pr.outputs.gh }}
+      comment-authors: ${{ steps.authors.outputs.list }}
     steps:
       - name: Skip other repositories' and Renovate's PRs
         id: pr
@@ -56,6 +60,28 @@ jobs:
             echo "::notice::Claude doesn't run on Renovate's PRs."
             echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
+      # The maintainers who commented, reviewed or left review comments here, for the action's
+      # include_comments_by_actor, which matches logins. Fails, and so skips Claude, when a lookup
+      # fails.
+      - name: List the maintainers who commented
+        id: authors
+        if: steps.pr.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number || (github.event.issue.pull_request && github.event.issue.number) }}
+          ISSUE: ${{ github.event.issue.number }}
+        run: |
+          paths=("issues/${PR:-$ISSUE}/comments")
+          if [[ -n $PR ]]; then paths+=("pulls/$PR/comments" "pulls/$PR/reviews"); fi
+          logins=()
+          for path in "${paths[@]}"; do
+            out=$(gh api --paginate "repos/$GITHUB_REPOSITORY/$path" \
+              --jq '.[] | select(.author_association | IN("OWNER", "MEMBER", "COLLABORATOR")) | .user.login') ||
+              { echo "::error::Couldn't list $path."; exit 1; }
+            mapfile -t -O "${#logins[@]}" logins <<< "$out"
+          done
+          list=$(printf '%s\n' "${logins[@]}" "claude[bot]" | grep -E '^[A-Za-z0-9-]+(\[bot\])?$' | sort -u | paste -sd, -)
+          echo "list=$list" >> "$GITHUB_OUTPUT"
 
   # Says so on a PR from another repository, which `claude` skips.
   reply:
@@ -74,7 +100,8 @@ jobs:
 
   claude:
     needs: pr
-    if: needs.pr.outputs.skip != 'true'
+    # Never with an empty list of comment authors, which would show Claude everyone's.
+    if: needs.pr.outputs.skip != 'true' && needs.pr.outputs.comment-authors != ''
     # The image main saves setup's deps cache from.
     runs-on: ubuntu-26.04
     timeout-minutes: 60
@@ -124,6 +151,7 @@ jobs:
           additional_permissions: |
             actions: read
           disallowed_tools: "mcp__github_ci__get_workflow_run_details,mcp__github_ci__download_job_log"
+          comment_authors: ${{ needs.pr.outputs.comment-authors }}
 
           append_system_prompt: "Tests can't run here; if your change needs them, say they haven't run. No Claude attribution: leave the Generated with Claude Code signature out of commits, PRs and PR links."
           # Tag mode adds file, comment, CI and commit tools and allows edits inside the checkout.
