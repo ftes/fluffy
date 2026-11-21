@@ -36,13 +36,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         # A human comment or review keeps a PR out of triage; Claude's own review doesn't. The
-        # allowlist names each PR, so Claude can't close any other.
+        # allowlist names each PR, so Claude can't read or close any other.
         run: |
           numbers=$(gh pr list --state open --limit 1000 --json number,headRefName,isCrossRepository,comments,reviews \
             --jq '[.[] | select((.isCrossRepository | not) and (.headRefName | startswith("claude/nightly-")) and ([.comments[], .reviews[]] | all(.author.login == "claude"))) | .number]')
           {
             echo "numbers=$(jq -r 'join(" ")' <<< "$numbers")"
-            echo "allowed=$(jq -r 'map("Bash(gh pr close \(.) *)") | join(",")' <<< "$numbers")"
+            echo "allowed=$(jq -r 'map("Bash(gh pr close \(.) *),Bash(gh pr view \(.)),Bash(gh pr view \(.) *),Bash(gh pr diff \(.)),Bash(gh pr diff \(.) *)") | join(",")' <<< "$numbers")"
           } >> "$GITHUB_OUTPUT"
       - name: Checkout repository
         if: steps.list.outputs.numbers != ''
@@ -71,7 +71,7 @@ jobs:
               gh pr close N --delete-branch --comment "<one sentence naming what on main made it obsolete>"
           claude_args: |
             --max-turns 60
-            --allowedTools "Skill,Read,Grep,Glob,Agent,Task,Bash(git log:*),Bash(git show:*),Bash(git diff:*),Bash(gh pr view:*),Bash(gh pr diff:*),${{ steps.list.outputs.allowed }}"
+            --allowedTools "Skill,Read,Grep,Glob,Agent,Task,Bash(git log:*),Bash(git show:*),Bash(git diff:*),${{ steps.list.outputs.allowed }}"
 
   # After triage, so only PRs worth keeping are looked at. A PR with a human comment or review is
   # left to that human.
@@ -191,7 +191,12 @@ jobs:
           GH_REPO: ${{ github.repository }}
           BRANCH: ${{ matrix.pr.branch }}
         run: |
-          run=$(gh run list --branch "$BRANCH" --workflow ci.yml --event pull_request --limit 1 --json databaseId --jq '.[0].databaseId')
+          # This repository's runs of the checked-out commit only.
+          head=$(git rev-parse HEAD)
+          # shellcheck disable=SC2016 # jq's $ENV
+          run=$(gh api -X GET "repos/$GH_REPO/actions/workflows/ci.yml/runs" -f branch="$BRANCH" -f head_sha="$head" -f event=pull_request -f per_page=100 \
+            --jq '[.workflow_runs[] | select(.head_repository.full_name == $ENV.GH_REPO)][0].id // empty')
+          if [[ -z $run ]]; then echo "::error::No CI run of $BRANCH at $head."; exit 1; fi
           mkdir -p tmp
           gh run view "$run" --log-failed | tail -n 5000 > tmp/ci-failed.log
       - name: Run Claude
@@ -226,7 +231,7 @@ jobs:
             No attribution anywhere: no Co-Authored-By trailers or "Generated with" lines.
           claude_args: |
             --max-turns 60
-            --allowedTools "Skill,Read,Grep,Glob,Edit,Write,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git add:*),Bash(git commit:*),Bash(mix format:*),Bash(mix compile:*),Bash(mix usage_rules.docs:*),Bash(mix usage_rules.search_docs:*),Bash(mix credo:*),Bash(mix test:*),Bash(gh pr view ${{ matrix.pr.number }}:*),Bash(gh pr diff ${{ matrix.pr.number }}:*),Bash(git push origin ${{ matrix.pr.branch }}),Bash(gh pr close ${{ matrix.pr.number }} *)"
+            --allowedTools "Skill,Read,Grep,Glob,Edit,Write,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git add:*),Bash(git commit:*),Bash(mix format:*),Bash(mix compile:*),Bash(mix usage_rules.docs:*),Bash(mix usage_rules.search_docs:*),Bash(mix credo:*),Bash(mix test:*),Bash(gh pr view ${{ matrix.pr.number }}),Bash(gh pr view ${{ matrix.pr.number }} *),Bash(gh pr diff ${{ matrix.pr.number }}),Bash(gh pr diff ${{ matrix.pr.number }} *),Bash(git push origin ${{ matrix.pr.branch }}),Bash(gh pr close ${{ matrix.pr.number }} *)"
 
   # Replaces each conflicted PR with one on a new branch from main. The Claude app can't push
   # workflow file changes, which a merge or rebase of the old branch would carry from main.
@@ -287,7 +292,7 @@ jobs:
             No attribution anywhere: no Co-Authored-By trailers or "Generated with" lines.
           claude_args: |
             --max-turns 60
-            --allowedTools "Skill,Read,Grep,Glob,Edit,Write,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git add:*),Bash(git commit:*),Bash(mix format:*),Bash(mix compile:*),Bash(mix credo:*),Bash(mix usage_rules.docs:*),Bash(mix usage_rules.search_docs:*),Bash(gh pr view ${{ matrix.pr }}:*),Bash(gh pr diff ${{ matrix.pr }}:*),Bash(git push -u origin ${{ env.NIGHTLY_BRANCH }}),Bash(gh pr create --base main --head ${{ env.NIGHTLY_BRANCH }} *),Bash(gh pr close ${{ matrix.pr }} *)"
+            --allowedTools "Skill,Read,Grep,Glob,Edit,Write,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git add:*),Bash(git commit:*),Bash(mix format:*),Bash(mix compile:*),Bash(mix credo:*),Bash(mix usage_rules.docs:*),Bash(mix usage_rules.search_docs:*),Bash(gh pr view ${{ matrix.pr }}),Bash(gh pr view ${{ matrix.pr }} *),Bash(gh pr diff ${{ matrix.pr }}),Bash(gh pr diff ${{ matrix.pr }} *),Bash(git push -u origin ${{ env.NIGHTLY_BRANCH }}),Bash(gh pr create --base main --head ${{ env.NIGHTLY_BRANCH }} *),Bash(gh pr close ${{ matrix.pr }} *)"
 
   # Enforces the cap before any toolchain is set up. Runs even if an earlier job failed: the
   # count is still right, it just finds fewer slots.
