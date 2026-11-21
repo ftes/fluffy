@@ -13,7 +13,10 @@ inputs:
     description: The CLAUDE_CODE_OAUTH_TOKEN secret (a composite action can't read secrets)
     required: true
   prompt:
-    description: As claude-code-action's; empty for tag mode
+    description: As claude-code-action's, empty for tag mode; with prompt_name, its context
+    default: ""
+  prompt_name:
+    description: A prompt of this action's copy (main's), .github/prompts/<name>.md, after `prompt`
     default: ""
   claude_args:
     description: As claude-code-action's, without --model, --append-system-prompt or --disallowedTools
@@ -41,12 +44,30 @@ outputs:
 runs:
   using: composite
   steps:
+    # From this action's copy, which callers check out from main after the steps that run the
+    # branch's code: a prompt the branch changes takes effect once it is on main.
+    - name: Read the prompt
+      id: prompt
+      if: inputs.prompt_name != ''
+      shell: bash
+      env:
+        NAME: ${{ inputs.prompt_name }}
+        CONTEXT: ${{ inputs.prompt }}
+      run: |
+        if [[ ! $NAME =~ ^[a-z0-9-]+$ ]]; then echo "::error::prompt_name: a name, got: $NAME"; exit 1; fi
+        eof="EOF_$(openssl rand -hex 16)"
+        {
+          echo "text<<$eof"
+          if [[ -n $CONTEXT ]]; then printf '%s\n\n' "$CONTEXT"; fi
+          cat "$GITHUB_ACTION_PATH/../../prompts/$NAME.md"
+          echo "$eof"
+        } >> "$GITHUB_OUTPUT"
     - name: Run Claude
       id: claude
       uses: anthropics/claude-code-action@f3b070c88125d33dbae5653df5f143101d4ea9dc # v1.0.276
       with:
         claude_code_oauth_token: ${{ inputs.claude_code_oauth_token }}
-        prompt: ${{ inputs.prompt }}
+        prompt: ${{ inputs.prompt_name != '' && steps.prompt.outputs.text || inputs.prompt }}
         allowed_bots: ${{ inputs.allowed_bots }}
         additional_permissions: ${{ inputs.additional_permissions }}
         include_comments_by_actor: ${{ inputs.comment_authors }}
