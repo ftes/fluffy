@@ -168,6 +168,12 @@ defmodule MyAppWeb.FeatureCase do
 end
 ```
 
+A template that brings your `ConnCase` in its `using` instead, for the sandbox and fixtures,
+forwards the options to both: `use MyAppWeb.ConnCase, unquote(opts)`, then
+`use Playwright.Test, unquote(opts)`. `ExUnit.CaseTemplate` passes `use ExUnit.Case` only its
+own keys (`async`, `group`, `parameterize`), and `use Playwright.Test` ignores those, so a
+`trace: :on` that only reaches the `ConnCase` is dropped without a warning.
+
 When the template's own `setup` starts the session, also put `use Playwright.Test` right after
 `use ExUnit.CaseTemplate`. A template's own `setup` callbacks run before those its `using`
 brings in, so the test is then registered before them (a Playwright session started before
