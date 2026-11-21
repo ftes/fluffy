@@ -140,3 +140,66 @@ defmodule Fluffy.PlaywrightArtifactsTest.UseOptionsTest do
     :playwright |> start_session(base_url: Fluffy.Support.Server.base_url()) |> visit("/stage")
   end
 end
+
+defmodule Fluffy.PlaywrightArtifactsTest.AssertStepsTest do
+  # `use Fluffy.Assert` after a template's `use Playwright.Test`: its assertions record steps,
+  # ExUnit's and Fluffy's own with a message, and typed expectations still run.
+  use Fluffy.PlaywrightArtifactsTest.TraceCase, async: true, trace: :on
+  use Fluffy.Assert
+
+  import Fluffy.Locator
+
+  setup %{trace_path: path} do
+    trace_path = Playwright.Test.output_path("trace.zip")
+    Agent.update(path, fn _ -> trace_path end)
+  end
+
+  # Derived, as the trace's copy of this source file would match a literal title.
+  @owl "An owl reaches " <> "Privet Drive"
+  @howler "No howler " <> "today"
+  @sum "2 + 2" <> " == 4"
+  @product "3 * 3" <> " == 9"
+  @fluffy_variable "val" <> "ue"
+
+  # With the caller's expression, not Fluffy's (`value`), and `refute match?` once.
+  @tag trace_has: [
+         ~s(Expect \\"assert\\"),
+         ~s("title":"#{@owl}"),
+         ~s("expression":"#{@sum}"),
+         ~s("expression":"#{@product}"),
+         ~s("title":"#{@howler}")
+       ],
+       trace_lacks: [~s("expression":"#{@fluffy_variable}")]
+  test "records ExUnit assertions and Fluffy's with a message as steps" do
+    assert 1 + 1 == 2
+    assert(2 + 2 == 4, @owl)
+    assert(3 * 3 == 9, "Hedwig #{:flies}")
+    refute(nil, @howler)
+    refute match?({:ok, _}, Process.get(:owl_post))
+
+    :static |> Fluffy.session_for_html("<p>Hedwig</p>") |> assert(visible(by_text("Hedwig")))
+  end
+end
+
+defmodule Fluffy.PlaywrightArtifactsTest.AssertStepsOffTest do
+  # With `assert_steps: false`, `use Fluffy.Assert` imports ExUnit's assertions: no steps.
+  use Fluffy.PlaywrightArtifactsTest.TraceCase, async: true, trace: :on, assert_steps: false
+  use Fluffy.Assert
+
+  import Fluffy.Locator
+
+  setup %{trace_path: path} do
+    trace_path = Playwright.Test.output_path("trace.zip")
+    Agent.update(path, fn _ -> trace_path end)
+  end
+
+  @owl "An owl reaches " <> "Privet Drive"
+
+  @tag trace_lacks: [~s(Expect \\"assert\\"), @owl]
+  test "records no assertion steps" do
+    assert 1 + 1 == 2
+    assert(:letter, @owl)
+
+    :static |> Fluffy.session_for_html("<p>Hedwig</p>") |> assert(visible(by_text("Hedwig")))
+  end
+end

@@ -175,10 +175,11 @@ jobs:
       # compile errors are not. The retry takes no --partitions: the failures manifest holds this
       # partition's failures only, and --partitions would split those files again. The first run's
       # failures are annotated by Playwright.Test.GitHubFormatter, with a notice summing up the
-      # run, so a green retry does not hide them; the retry has no annotations, so a test failing
-      # twice is annotated once. `--formatter` replaces test_helper's
-      # list, so the first run names every formatter. The retry writes each test's artifacts to
-      # `<dir>-retry1`, next to the first run's, as Playwright Test's retries do. The 10 slowest modules
+      # run, so a green retry does not hide them. As upstream annotates every attempt, the retry
+      # is annotated too, under `Retry #1`, and its summary lists a test that passed there as flaky.
+      # `--formatter` replaces test_helper's list, so each run names its formatters. The retry
+      # writes each test's artifacts to `<dir>-retry1`, next to the first run's, as Playwright
+      # Test's retries do. The 10 slowest modules
       # (Fluffy.Support.ModuleTimesFormatter) are the floor of a partition's time. Warnings fail the
       # newest lane only, as in the checks job.
       - name: Run tests with one retry
@@ -208,7 +209,8 @@ jobs:
 
           echo "retried=true" >> "$GITHUB_OUTPUT"
           echo "::warning::Tests failed; retrying once with seed $fluffy_test_seed. Both attempts' failure artifacts will be uploaded."
-          mix test "${strict[@]}" --seed "$fluffy_test_seed" --failed
+          mix test "${strict[@]}" --formatter ExUnit.CLIFormatter --formatter Playwright.Test.GitHubFormatter \
+            --seed "$fluffy_test_seed" --failed
       - name: Upload browser failure artifacts
         if: failure() || steps.tests.outputs.retried == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7

@@ -5,7 +5,6 @@ defmodule Fluffy.Driver.Playwright.Locator do
   alias Fluffy.Locator
   alias Fluffy.Locator.Internal
   alias Playwright.FrameLocator
-  alias Playwright.Isomorphic.LocatorUtils
   alias Playwright.Isomorphic.SelectorParser
   alias Playwright.Locator, as: Native
 
@@ -26,17 +25,8 @@ defmodule Fluffy.Driver.Playwright.Locator do
     call(scope, :locator, [selector])
   end
 
-  # `get_by_role` takes only the roles of Playwright's `AriaRole` type, which lacks some that
-  # the browser matches, such as `mark`. Playwright's selector builder takes any role.
-  defp apply_operation(_frame, {:role, role, options}, scope) do
-    options =
-      Map.new(options, fn
-        {:include_hidden, include_hidden} -> {:includeHidden, include_hidden}
-        option -> option
-      end)
-
-    call(scope, :locator, [LocatorUtils.get_by_role_selector(role, options)])
-  end
+  # As a string, any role goes through, also one Playwright's `AriaRole` type lacks (`mark`).
+  defp apply_operation(_frame, {:role, role, options}, scope), do: call(scope, :get_by_role, [to_string(role), options])
 
   defp apply_operation(_frame, {:text, text, options}, scope), do: call(scope, :get_by_text, [text, options])
   defp apply_operation(_frame, {:label, text, options}, scope), do: call(scope, :get_by_label, [text, options])
