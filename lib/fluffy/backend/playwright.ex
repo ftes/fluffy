@@ -171,11 +171,6 @@ defmodule Fluffy.Backend.Playwright do
   def runtime_event(_context, _message), do: :ignore
 
   @impl true
-  def absolute_url(%Session{} = session, path) do
-    Session.context(session).base_url |> URI.merge(path) |> URI.to_string()
-  end
-
-  @impl true
   def base_url(%Session{} = session), do: Session.context(session).base_url
 
   # As in Playwright, these have no timeout.

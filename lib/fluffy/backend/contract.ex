@@ -15,7 +15,6 @@ defmodule Fluffy.Backend.Contract do
   @callback event_source(Session.t(), atom(), :page | :context) :: :context | reference()
   @callback subscribe_event(Session.t(), atom(), :context | reference(), pid()) ::
               {(term() -> {:ok, term()} | {:error, String.t()} | :ignore), (-> :ok)}
-  @callback absolute_url(Session.t(), String.t()) :: String.t()
   @callback base_url(Session.t()) :: String.t()
 
   # The session's cookies, as Playwright's `browserContext` cookie methods.
