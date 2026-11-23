@@ -224,7 +224,11 @@ The facade covers PhoenixTest's API. For what PhoenixTest.Playwright adds:
   - `screenshot` and `assert_screenshot`: `Fluffy.Playwright.screenshot/2` (with `path:`,
     and `full_page: true` for the old default; it returns the PNG, not the session) and
     `Fluffy.Expect.page_to_have_screenshot/1` (with `name:`);
-  - `with_dialog`: see [Listeners and dialogs](advanced-events.md#listeners-and-dialogs).
+  - `with_dialog`: see [Listeners and dialogs](advanced-events.md#listeners-and-dialogs);
+  - `assert_download`: wait for `Fluffy.Event.download/1`, then `Fluffy.Download.read/2` or
+    `Fluffy.Download.save_as/2` ([Downloads](advanced-events.md#downloads)). The event comes
+    when downloading starts; reading or saving waits for completion and raises on failure,
+    which PhoenixTest.Playwright's read of the file checked.
 - **`assert_has` with `count:`:** PhoenixTest.Playwright counted visible elements only; the
   facade counts hidden ones too, so pass `by_css(selector) |> filter(visible: true)` there.
 - **`assert_has` and `refute_has` with `text:`:** PhoenixTest.Playwright checked the element
