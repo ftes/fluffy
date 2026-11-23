@@ -229,6 +229,35 @@ test "Hermione opens her vault" do
 end
 ```
 
+Without a login helper or a route to request, run the endpoint's `Plug.Session` on a bare
+conn and read the cookie it writes for your session values. Expose the endpoint's
+`@session_options` with `def session_options, do: @session_options` in `MyAppWeb.Endpoint`:
+
+```elixir
+defp session_cookie(session, values) do
+  options = MyAppWeb.Endpoint.session_options()
+
+  conn =
+    build_conn()
+    |> Map.put(:secret_key_base, MyAppWeb.Endpoint.config(:secret_key_base))
+    |> Plug.Session.call(Plug.Session.init(options))
+    |> Plug.Conn.fetch_session()
+
+  conn =
+    values
+    |> Enum.reduce(conn, fn {key, value}, conn -> Plug.Conn.put_session(conn, key, value) end)
+    |> Plug.Conn.send_resp(200, "")
+
+  %{
+    name: options[:key],
+    value: conn.resp_cookies[options[:key]].value,
+    url: Fluffy.base_url(session)
+  }
+end
+
+Fluffy.add_cookies(session, [session_cookie(session, %{"wizard_token" => token})])
+```
+
 Cookies added before `visit/2` go with the first request, as in a browser. A Phoenix-only
 alternative is `start_session(:phoenix, conn: log_in_user(build_conn(), wizard))`: the
 prepared conn's test session goes with the first request.
