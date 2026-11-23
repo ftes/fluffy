@@ -398,6 +398,11 @@ owner stops. A plain `Ecto.Adapters.SQL.Sandbox.checkout/1` in the test process 
 supported for browser tests: its connection goes with the test process, before the browser
 closes.
 
+A LiveView's process exits shortly after its browser closes, so the test waits, up to 5 seconds,
+for the LiveViews its browser sessions connected to exit before the owner stops: their
+`terminate/2` can still use the database. This covers sessions started in the test process or its
+`setup`, not from a Task.
+
 The defaults are the `x-fluffy-sandbox` header and
 `Ecto.Adapters.SQL.Sandbox`. Applications that already use Phoenix Ecto's
 `user-agent` transport or need to grant additional process ownership can
@@ -433,7 +438,9 @@ Fluffy validates this configuration when its application starts. With the
 `user-agent` header, list `:user_agent` in the socket's `connect_info` in place of
 `:x_headers`. An application may instead retain its own LiveView/channel hook when
 additional ownership rules require application state; use the same encoded metadata
-and call `Phoenix.Ecto.SQL.Sandbox.allow/2` there.
+and call `Phoenix.Ecto.SQL.Sandbox.allow(metadata, Fluffy.Sandbox)` there, which also gives it
+the wait for LiveViews to exit. `Fluffy.Sandbox` grants the configured `:sandbox`, so a hook
+that passed its own allowance module moves that module to `sandbox:` above.
 
 ## Upload limits
 

@@ -6,6 +6,7 @@ defmodule Fluffy.EctoSandboxConformanceTest do
   import Fluffy.Expect
   import Fluffy.Locator
 
+  alias Ecto.Adapters.SQL.Sandbox
   alias Fluffy.Event
   alias Fluffy.Support.Repo
   alias Fluffy.Support.Server
@@ -130,6 +131,24 @@ defmodule Fluffy.EctoSandboxConformanceTest do
     |> expect("Static values: #{value}" |> by_text() |> to_be_visible())
 
     assert Process.info(self(), :trap_exit) == {:trap_exit, false}
+  end
+
+  for {hook, path} <- [{"Fluffy.Sandbox", "/live/lumos"}, {"a hook passing Fluffy.Sandbox", "/live/lumos-own-hook"}] do
+    test "the sandbox owner outlasts a LiveView allowed by #{hook}", %{sandbox_owners: [owner | _]} do
+      # Runs after the session's `on_exit` and before the owner stops: the LiveView's
+      # `terminate/2` ran and reached the owner's connection.
+      on_exit(fn ->
+        :ok = Sandbox.allow(Repo, owner, self())
+        assert Repo.query!("SELECT value FROM fluffy_records WHERE value = 'Nox'").rows == [["Nox"]]
+      end)
+
+      :playwright
+      |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+      |> visit(unquote(path))
+      |> expect("Lumos" |> by_text() |> to_be_visible())
+
+      assert_receive {:fluffy_test_sandbox_allow, Repo, _child}
+    end
   end
 
   test "uses the configured sandbox transport and allowance adapter" do

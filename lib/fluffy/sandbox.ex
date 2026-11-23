@@ -3,14 +3,22 @@ defmodule Fluffy.Sandbox do
   Carries the test's Ecto SQL sandbox to browser sessions. The sandbox owner is the
   application's, started by its DataCase or ConnCase.
 
+  A test with browser sessions waits, after they close and before the owner stops, for the
+  LiveViews the hook allowed to exit, up to 5 seconds, so their `terminate/2` still reaches the
+  database.
+
   See [Ecto sandbox](installation.md#ecto-sandbox) for setup.
   """
 
   alias Ecto.Adapters.SQL.Sandbox
+  alias Fluffy.Deadline
 
   @default_header "x-fluffy-sandbox"
   @default_sandbox Sandbox
   @config_keys [:header, :sandbox, :trap_exit]
+  @registry __MODULE__.Registry
+  # LiveViewTest's budget for a LiveView to shut down.
+  @exit_timeout 5_000
 
   @type allowance :: module() | {module(), atom(), list()}
 
@@ -18,7 +26,7 @@ defmodule Fluffy.Sandbox do
   @spec header() :: String.t()
   def header, do: config()[:header]
 
-  @doc "Returns the sandbox allowance module or MFA used by Phoenix Ecto."
+  @doc "Returns the sandbox allowance module or MFA used by Phoenix Ecto and `allow/3`."
   @spec allowance() :: allowance()
   def allowance, do: config()[:sandbox]
 
@@ -26,6 +34,54 @@ defmodule Fluffy.Sandbox do
   @spec connect_info() :: :user_agent | :x_headers
   def connect_info do
     if header() == "user-agent", do: :user_agent, else: :x_headers
+  end
+
+  @doc """
+  The sandbox callback Phoenix Ecto calls when a hook passes `Fluffy.Sandbox` to
+  `Phoenix.Ecto.SQL.Sandbox.allow/2`; tests don't call it. It allows `child` through the
+  configured `:sandbox` and has `owner`'s test wait for the calling process to exit. Only a
+  custom LiveView hook needs it, see [Ecto sandbox](installation.md#ecto-sandbox).
+  """
+  @spec allow(module(), pid(), pid()) :: term()
+  def allow(repo, owner, child) do
+    # Once per process, though Phoenix Ecto allows each repo.
+    if owner not in Registry.keys(@registry, self()), do: Registry.register(@registry, owner, nil)
+
+    case allowance() do
+      {module, function, arguments} -> apply(module, function, [repo, owner, child | arguments])
+      module -> module.allow(repo, owner, child)
+    end
+  end
+
+  @doc false
+  # Has the test wait, before its sandbox owners stop, for the processes `allow/3` registered
+  # for `owner` to exit. Registered once per test, before the first session's own `on_exit`:
+  # ExUnit runs them in reverse, so it runs once all the test's sessions are closed. A process
+  # still running at the deadline is left to stop with the owner.
+  @spec await_exits_on_exit(pid()) :: :ok
+  def await_exits_on_exit(owner) do
+    if owner == self() and Process.put({__MODULE__, :await_exits}, true) == nil,
+      do: ExUnit.Callbacks.on_exit(fn -> await_exits(owner) end)
+
+    :ok
+  rescue
+    ArgumentError -> :ok
+  end
+
+  defp await_exits(owner) do
+    deadline = Deadline.new(@exit_timeout)
+
+    for {pid, nil} <- Registry.lookup(@registry, owner) do
+      monitor = Process.monitor(pid)
+
+      receive do
+        {:DOWN, ^monitor, :process, _pid, _reason} -> :ok
+      after
+        Deadline.remaining(deadline) -> Process.demonitor(monitor, [:flush])
+      end
+    end
+
+    :ok
   end
 
   @doc false
@@ -83,12 +139,12 @@ defmodule Fluffy.Sandbox do
       |> PhoenixSandbox.encode_metadata()
     end
 
-    @doc "LiveView `on_mount` hook that allows a connected LiveView to use the test's sandbox connection."
+    @doc "LiveView `on_mount` hook that allows a connected LiveView to use the test's sandbox connection, with `allow/3`."
     def on_mount(:default, _params, _session, socket) do
       if connected?(socket) do
         metadata = sandbox_metadata(socket)
 
-        PhoenixSandbox.allow(metadata, allowance())
+        PhoenixSandbox.allow(metadata, __MODULE__)
       end
 
       {:cont, socket}
@@ -134,6 +190,12 @@ defmodule Fluffy.Sandbox do
   defp validate_header!(header) do
     raise ArgumentError,
           "invalid config :fluffy, Fluffy.Sandbox: expected :header to be a lowercase HTTP header name, got: #{inspect(header)}"
+  end
+
+  # `allow/3` delegates to the configured sandbox, so this one would call itself.
+  defp validate_sandbox!(sandbox) when sandbox == __MODULE__ or (is_tuple(sandbox) and elem(sandbox, 0) == __MODULE__) do
+    raise ArgumentError,
+          "invalid config :fluffy, Fluffy.Sandbox: :sandbox can't be Fluffy.Sandbox; pass Fluffy.Sandbox to Phoenix.Ecto.SQL.Sandbox.allow/2 in your hook instead"
   end
 
   defp validate_sandbox!(sandbox) when is_atom(sandbox), do: :ok
