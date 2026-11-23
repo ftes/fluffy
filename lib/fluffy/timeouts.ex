@@ -4,7 +4,7 @@ defmodule Fluffy.Timeouts do
   # The defaults of an operation without `timeout:`. A browser session's are Playwright Test's:
   # the action and navigation timeouts as the test resolved them from every level
   # (`Playwright.Test.info().use`: config, project, module, tags) and the expect timeout of
-  # `config :playwright, :expect`. Playwright's `0` means no limit, `:infinity` here. A Phoenix
+  # `config :playwright, :test, expect:`. Playwright's `0` means no limit, `:infinity` here. A Phoenix
   # session's, for action retries, assertions and event waits, is `config :fluffy,
   # phoenix_backend_timeout:` (1 s by default): an in-process session answers at once, so a long
   # wait is only for something that isn't there. Its `0` checks once, as a call's `timeout: 0`.

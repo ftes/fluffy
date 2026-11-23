@@ -49,16 +49,15 @@ config :fluffy,
   ecto_repos: [Repo, RepoTwo],
   endpoint: Endpoint
 
-# The tests write their baselines on first use: written and passed, not failed at the test's end.
-config :playwright, :expect, update_snapshots: :missing
-
 # A failing browser action or navigation fails in 15 s, not at the test's timeout, as a loaded
 # machine may take long but not that long. Phoenix sessions keep Fluffy's own, 1 s by default.
 config :playwright, :test,
   browser_name: browser_engine,
   headless: true,
   action_timeout: 15_000,
-  navigation_timeout: 15_000
+  navigation_timeout: 15_000,
+  # The tests write their baselines on first use: written and passed, not failed at the test's end.
+  update_snapshots: :missing
 
 # CI keeps a screenshot of each failed test's pages in FLUFFY_ARTIFACT_DIR, and traces the
 # `--failed` retry, as Playwright's CI default (`trace: 'on-first-retry'`).
