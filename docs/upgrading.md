@@ -90,7 +90,9 @@ A browser session's timeouts follow Playwright Test and a Phoenix session's
   ```
 
   These are browser sessions'. Without them, browser actions and navigations have no timeout,
-  so the test's timeout bounds them.
+  so the test's timeout bounds them. A Phoenix session's operations take
+  `config :fluffy, phoenix_backend_timeout:` (1s by default), so a suite that raised
+  `timeout:` for both backends sets it too.
 - `config :fluffy, base_url:` is removed: set Playwright's `base_url`
   ([Configuration](installation.md#configuration)).
 - Playwright actions, waits, `reload`, `go_back` and `go_forward` raise `ArgumentError`
@@ -193,8 +195,10 @@ Most `unwrap` callbacks that called Playwright with the handle's `frame_id`,
 - `add_init_script`: `Fluffy.Playwright.add_init_script/3`.
 - `Frame.wait_for_function` with `is_function:` and `arg:`:
   `Fluffy.Playwright.wait_for_function(session, expression, arg)`.
-- An `evaluate` of `document.querySelector(...)`, say to read a `dataset`:
-  `Fluffy.Playwright.evaluate(session, locator, "el => el.dataset.state")`.
+- An `evaluate` of `document.querySelector(...)` that reads text or an attribute, say a
+  `dataset`: `Fluffy.text_content(session, locator)` or
+  `Fluffy.get_attribute(session, locator, "data-state")`, which work on Phoenix too. For
+  other JavaScript on an element, `Fluffy.Playwright.evaluate(session, locator, expression)`.
 - `Frame.expect(expression: "to.be.in.viewport")`: `Fluffy.Assert.in_viewport/2` or
   `Fluffy.Expect.to_be_in_viewport/2`.
 - `Page.route`: `Fluffy.Playwright.route/4`, whose handler gets the `Playwright.Route`.
@@ -254,6 +258,12 @@ that passed on 0.8 act differently:
   option maps raises. `to_have_values` requires a multiple select.
 - The facade's `click_button` no longer matches `<input type="file">`.
 - LiveView `set_input_files` raises unless the upload's form has an id.
+- A `phx-trigger-action` form is submitted from mount or a pushed render, as LiveView's
+  client does, and a link, form or redirect to another origin ends at a page with that URL
+  ([Leaving the app](capabilities.md#leaving-the-app)) instead of raising. A test that
+  asserted on the page before such a navigation, say a flash shown on the way to a sign-in
+  provider, now ends at the target: assert where the app sent it with `page_to_have_url`,
+  and the flash in a controller or LiveView test.
 
 Rarer differences follow the browser too: some implicit roles and accessible names
 changed, text in `<template>` no longer matches text locators, controls inside
