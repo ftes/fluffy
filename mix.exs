@@ -68,7 +68,7 @@ defmodule Fluffy.MixProject do
   defp deps do
     [
       {:nimble_options, "~> 1.1"},
-      {:lazy_html, ">= 0.1.0 and < 1.0.0"},
+      {:lazy_html, ">= 0.1.13 and < 1.0.0"},
       # The floors CI's oldest lane runs, from mix.lock.oldest.
       {:phoenix, "~> 1.7 and >= 1.7.24"},
       {:phoenix_live_view, "~> 1.2 and >= 1.2.10"},
