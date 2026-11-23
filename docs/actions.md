@@ -252,20 +252,18 @@ the active page:
 ```elixir
 alias Fluffy.Playwright
 
-session
-|> then(fn session ->
-  data_url = Playwright.evaluate(session, "document.querySelector('canvas').toDataURL()")
+data_url = Playwright.evaluate(session, "document.querySelector('canvas').toDataURL()")
+assert data_url =~ "data:image/png"
 
-  assert data_url =~ "data:image/png"
-  session
-end)
+session
 |> click(by_role(:button, name: "Reveal diary message"))
 ```
 
-`Fluffy.Playwright.evaluate/3` returns the JavaScript result, not the session. Use
-`then/2`, as above, to continue a pipeline. A function expression receives the
-optional third argument, as in `Playwright.Frame.evaluate/3`. Phoenix sessions raise a capability error because
-Phoenix does not execute client code.
+`Fluffy.Playwright.evaluate/2` returns the JavaScript result, not the session, and
+leaves the session as it was. To assert on page state, prefer `Fluffy.Expect`, which
+retries. A function expression receives the optional `arg` of
+`Fluffy.Playwright.evaluate/3`, as in `Playwright.Frame.evaluate/3`. Phoenix sessions
+raise a capability error because Phoenix does not execute client code.
 
 ## Controlling time
 

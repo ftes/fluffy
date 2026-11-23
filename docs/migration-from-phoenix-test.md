@@ -201,15 +201,18 @@ The facade covers PhoenixTest's API. For what PhoenixTest.Playwright adds:
   `launch_options`. Add `/test-results/` to `.gitignore`. Drop a `runtime: false` from the
   dependency: sessions need Fluffy's application started. PhoenixTest.Playwright's `js_logger` becomes a
   listener ([Console, page errors, and page lifecycle](advanced-events.md#console-page-errors-and-page-lifecycle)).
-- **`use PhoenixTest.Playwright.Case`:** `use Playwright.Test`, and start the session in your
-  own setup ([Shared test case](usage.md#shared-test-case)). A context option tag such as
-  `browser_context_opts` becomes `@tag Playwright.Test.use(...)`.
+- **`use PhoenixTest.Playwright.Case`:** `use Playwright.Test`, and start the sandbox owner and
+  session in your own setup ([Ecto sandbox](installation.md#ecto-sandbox),
+  [Shared test case](usage.md#shared-test-case)). A context option
+  tag such as `browser_context_opts` becomes `@tag Playwright.Test.use(...)`.
 - **Extra helpers** are native calls on `facade.session` ([Using native Fluffy APIs](#using-native-fluffy-apis)).
   They take a locator where PhoenixTest.Playwright took a selector: a CSS selector goes in
   `Fluffy.Locator.by_css/1`, and `Selector.role/3` or `Selector.text/2` become `by_role/2` or
   `by_text/2`. They don't see the facade's `within` scope, so scope the locator yourself.
   - `evaluate`: `Fluffy.Playwright.evaluate/3`, with `arg:` positional and no `is_function:`;
-    it returns the value instead of passing it to a callback;
+    it returns the value instead of passing it to a callback. JavaScript run for its effect
+    in a pipeline becomes the facade's `unwrap(&Playwright.Page.evaluate!(&1, js, arg))`
+    (`Fluffy.PhoenixTest.unwrap/2`, which keeps the facade session);
   - `click(selector)` and `press`: `Fluffy.click/3` and `Fluffy.press/4`; `click`'s text
     argument becomes `filter(has: by_text(text))`, or `by_text(text)` chained under the
     selector before PhoenixTest.Playwright 0.16, which clicked the text itself;
@@ -224,6 +227,11 @@ The facade covers PhoenixTest's API. For what PhoenixTest.Playwright adds:
   - `with_dialog`: see [Listeners and dialogs](advanced-events.md#listeners-and-dialogs).
 - **`assert_has` with `count:`:** PhoenixTest.Playwright counted visible elements only; the
   facade counts hidden ones too, so pass `by_css(selector) |> filter(visible: true)` there.
+- **`assert_has` and `refute_has` with `text:`:** PhoenixTest.Playwright checked the element
+  holding the text inside the selector; the facade checks the selector's element, as
+  PhoenixTest does. When that element is never visible, such as a modal's zero-size
+  wrapper, `assert_has` fails and `refute_has` passes even while the text shows, so select
+  the visible element, such as the modal's `[role='dialog']`.
 - **`add_session_cookie`:** sign the cookie in-process, as in [Logging in](usage.md#logging-in).
 - **Direct `PlaywrightEx` calls:** use playwright_ex 1.65's `Playwright` API through `unwrap`,
   whose callback gets the `Playwright.Page` instead of a map. It returns JS `null` as `:null`.

@@ -814,24 +814,18 @@ defmodule Fluffy.Playwright do
   since no JavaScript value serializes to one; any other list, including `[]`, is an
   array.
 
-  `evaluate/4` is a Playwright-only value query, so it returns the evaluated value
-  rather than the Fluffy session. Use Elixir's `then/2` when a pipeline needs
-  the value and then should continue with the session:
+  `evaluate` is a Playwright-only value query, so it returns the evaluated value
+  rather than the Fluffy session. The session is unchanged, so keep using it:
 
-      import Fluffy
-      import Fluffy.Playwright
-      import Fluffy.Locator
       alias Fluffy.Playwright
 
-      session
-      |> then(fn session ->
-        title = Playwright.evaluate(session, "document.title")
-        assert title == "Potions classroom"
-        session
-      end)
-      |> click(by_role(:button, name: "Continue"))
+      house = Playwright.evaluate(session, "localStorage.getItem('house')")
+      assert house == "Ravenclaw"
 
       Playwright.evaluate(session, "selector => document.querySelector(selector).textContent", "#status")
+
+  To assert on page state, prefer `Fluffy.Expect`, which retries; a value read
+  here is checked once.
 
   Do not use this for JavaScript that owns a navigation, opens a page, starts a
   download, or installs a durable listener. Use the corresponding
