@@ -112,11 +112,6 @@ defmodule Fluffy.Backend.Phoenix do
   def runtime_event(_context, _message), do: :ignore
 
   @impl true
-  def absolute_url(%Session{} = session, path) do
-    Session.context(session).http.base_url |> URI.merge(path) |> URI.to_string()
-  end
-
-  @impl true
   def base_url(%Session{} = session), do: http!(session).base_url
 
   # The session's cookie jar plays the browser context's cookie store: requests send what
@@ -320,8 +315,7 @@ defmodule Fluffy.Backend.Phoenix do
     |> request(url, :get, nil, nil, redirects)
   end
 
-  @doc false
-  def commit_conn(%Session{} = session, conn, destination) do
+  defp commit_conn(%Session{} = session, conn, destination) do
     url =
       URI.merge(Session.current_page(session).url || Session.context(session).http.base_url, destination)
 

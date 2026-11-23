@@ -30,7 +30,6 @@ defmodule Fluffy.Backend do
     dispatch(session, :close_page, [page_id])
   end
 
-  def absolute_url(session, path), do: Session.backend(session).absolute_url(session, path)
   def base_url(session), do: dispatch(session, :base_url, [])
 
   def add_cookies(session, cookies), do: dispatch(session, :add_cookies, [cookies])

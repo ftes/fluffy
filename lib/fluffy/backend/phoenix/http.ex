@@ -69,8 +69,8 @@ defmodule Fluffy.Backend.Phoenix.HTTP do
     end
   end
 
-  def follow(%Client{} = client, %Plug.Conn{} = conn, %URI{} = url, method \\ :get, body \\ nil) do
-    request = %Request{body: body, method: method, url: validate_url!(client, url)}
+  def follow(%Client{} = client, %Plug.Conn{} = conn, %URI{} = url) do
+    request = %Request{body: nil, method: :get, url: validate_url!(client, url)}
     client = store_response_cookies(client, request.url, conn)
     follow_redirects({client, %Response{conn: conn, redirects: 0, request: request}}, 0)
   end
