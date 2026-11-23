@@ -190,6 +190,44 @@ assert title == "Potions"
 Prefer the native API throughout tests centered on browser scripting, pages,
 or events. See [Advanced events and pages](advanced-events.md) for those workflows.
 
+## Coming from PhoenixTest.Playwright
+
+The facade covers PhoenixTest's API. For what PhoenixTest.Playwright adds:
+
+- **Setup:** drop `PhoenixTest.Playwright.Supervisor` from `test_helper.exs` and replace
+  `config :phoenix_test` as [Installation and runtime](installation.md) shows: `timeout`
+  becomes `action_timeout`, `navigation_timeout` and `expect: [timeout: ...]`, `trace: true`
+  and `screenshot: true` become `:on`, and `browser_launch_timeout` moves into
+  `launch_options`. Add `/test-results/` to `.gitignore`. Drop a `runtime: false` from the
+  dependency: sessions need Fluffy's application started. PhoenixTest.Playwright's `js_logger` becomes a
+  listener ([Console, page errors, and page lifecycle](advanced-events.md#console-page-errors-and-page-lifecycle)).
+- **`use PhoenixTest.Playwright.Case`:** `use Playwright.Test`, and start the session in your
+  own setup ([Shared test case](usage.md#shared-test-case)). A context option tag such as
+  `browser_context_opts` becomes `@tag Playwright.Test.use(...)`.
+- **Extra helpers** are native calls on `facade.session` ([Using native Fluffy APIs](#using-native-fluffy-apis)).
+  They take a locator where PhoenixTest.Playwright took a selector: a CSS selector goes in
+  `Fluffy.Locator.by_css/1`, and `Selector.role/3` or `Selector.text/2` become `by_role/2` or
+  `by_text/2`. They don't see the facade's `within` scope, so scope the locator yourself.
+  - `evaluate`: `Fluffy.Playwright.evaluate/3`, with `arg:` positional and no `is_function:`;
+    it returns the value instead of passing it to a callback;
+  - `click(selector)` and `press`: `Fluffy.click/3` and `Fluffy.press/4`; `click`'s text
+    argument becomes `filter(has: by_text(text))`, or `by_text(text)` chained under the
+    selector before PhoenixTest.Playwright 0.16, which clicked the text itself;
+  - `type`: `Fluffy.Playwright.press_sequentially/4`;
+  - `drag`: `Fluffy.Playwright.drag_to/4`;
+  - `add_cookies` and `clear_cookies`: `Fluffy.add_cookies/2` and `Fluffy.clear_cookies/2`;
+    cookies are maps that need a `url:` (such as `Fluffy.base_url/1`), with `expires:`
+    instead of `max_age:`;
+  - `screenshot` and `assert_screenshot`: `Fluffy.Playwright.screenshot/2` (with `path:`,
+    and `full_page: true` for the old default; it returns the PNG, not the session) and
+    `Fluffy.Expect.page_to_have_screenshot/1` (with `name:`);
+  - `with_dialog`: see [Listeners and dialogs](advanced-events.md#listeners-and-dialogs).
+- **`assert_has` with `count:`:** PhoenixTest.Playwright counted visible elements only; the
+  facade counts hidden ones too, so pass `by_css(selector) |> filter(visible: true)` there.
+- **`add_session_cookie`:** sign the cookie in-process, as in [Logging in](usage.md#logging-in).
+- **Direct `PlaywrightEx` calls:** use playwright_ex 1.65's `Playwright` API through `unwrap`,
+  whose callback gets the `Playwright.Page` instead of a map. It returns JS `null` as `:null`.
+
 ## Optional: adopt the locator API
 
 Use the native API when composable locators make a test clearer. Replace the
