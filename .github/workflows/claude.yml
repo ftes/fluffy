@@ -119,7 +119,7 @@ jobs:
       actions: read # This PR's CI status (the action's get_ci_status); not other runs' logs.
     steps:
       - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Else checkout's read-only token can override the app token Claude pushes with: from v6
           # it sits in an includeIf file claude-code-action doesn't clear, so the push gets a 403.
@@ -127,7 +127,7 @@ jobs:
           fetch-depth: 0
       # The Claude action from main, not from the checkout above: into tmp/, which is gitignored.
       - name: Checkout main's actions
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
           path: tmp/ci

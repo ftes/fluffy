@@ -61,7 +61,7 @@ jobs:
       matrix:
         lane: [oldest, newest]
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Set up toolchain and deps
         id: setup
         uses: ./.github/actions/setup
@@ -157,7 +157,7 @@ jobs:
       MIX_TEST_PARTITION: ${{ matrix.partition }}
       TEST_PARTITIONS: ${{ inputs.partitions || (matrix.browser == 'chromium' && 2 || 3) }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Set up toolchain and deps
         id: setup
         uses: ./.github/actions/setup
@@ -227,7 +227,7 @@ jobs:
     env:
       FLUFFY_ARTIFACT_DIR: tmp/fluffy-artifacts
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Set up toolchain and deps
         id: setup
         uses: ./.github/actions/setup

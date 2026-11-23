@@ -36,7 +36,7 @@ jobs:
       to: ${{ steps.check.outputs.to }}
       branch: ${{ steps.check.outputs.branch }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           sparse-checkout: mix.lock
           sparse-checkout-cone-mode: false
@@ -107,7 +107,7 @@ jobs:
       BRANCH: ${{ needs.check.outputs.branch }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Else checkout's read-only token can override the app token Claude pushes with: from v6
           # it sits in an includeIf file claude-code-action doesn't clear, so the push gets a 403.
