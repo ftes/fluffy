@@ -33,5 +33,7 @@ defmodule Fluffy.SandboxConfigurationTest do
     assert_raise ArgumentError, fn -> Sandbox.validate_config!(header: "not a header") end
     assert_raise ArgumentError, fn -> Sandbox.validate_config!(sandbox: {:invalid, :mfa}) end
     assert_raise ArgumentError, fn -> Sandbox.validate_config!(%{}) end
+    assert_raise ArgumentError, ~r/pass Fluffy.Sandbox to/, fn -> Sandbox.validate_config!(sandbox: Sandbox) end
+    assert_raise ArgumentError, fn -> Sandbox.validate_config!(sandbox: {Sandbox, :allow, []}) end
   end
 end

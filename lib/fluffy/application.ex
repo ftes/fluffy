@@ -12,6 +12,8 @@ defmodule Fluffy.Application do
 
     Supervisor.start_link(
       [
+        # First: LiveViews link to it, so a later child's restart mustn't restart it.
+        {Registry, keys: :duplicate, name: Fluffy.Sandbox.Registry},
         {Task.Supervisor, name: Fluffy.TaskSupervisor},
         {DynamicSupervisor, strategy: :one_for_one, name: Fluffy.SessionRuntime.Supervisor}
       ],

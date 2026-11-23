@@ -92,6 +92,11 @@ defmodule Fluffy.Support.Web.Router do
       live("/expectations", ExpectationsLive)
       live("/owlery", OwleryLive)
       live("/facade-locators/:markup", FacadeLocatorsLive)
+      live("/lumos", LumosLive)
+    end
+
+    live_session :fluffy_own_sandbox_hook, on_mount: Web.OwnSandboxHook do
+      live("/lumos-own-hook", LumosLive)
     end
   end
 

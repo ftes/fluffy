@@ -32,6 +32,8 @@ defmodule Fluffy.Backend.Playwright do
       |> Enum.concat(List.wrap(Fluffy.Sandbox.metadata_header(test_pid)))
       |> Map.new(fn {name, value} -> {String.downcase(to_string(name)), value} end)
 
+    # Before the runtime's `on_exit`, so the test waits for its LiveViews once its sessions are closed.
+    Fluffy.Sandbox.await_exits_on_exit(test_pid)
     runtime = SessionRuntime.start!(test_pid)
 
     try do
