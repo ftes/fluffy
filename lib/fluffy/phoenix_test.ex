@@ -307,8 +307,10 @@ defmodule Fluffy.PhoenixTest do
     A locator resolves inside the current `within/3` scope and takes the same options.
     Multiple matches are allowed; refutation requires every match to be hidden or absent.
     Static and Live use structural visibility; Playwright uses rendered visibility.
-    Without a count or field predicate, hidden and absent elements satisfy refutation.
-    Counts and field predicates do not add a visibility requirement, matching native assertions.
+    `count:` and `at:` count visible matches only, as PhoenixTest.Playwright did. Field
+    predicates without `at:` add no visibility requirement, so they check hidden inputs too;
+    for DOM presence use a native count on the native session,
+    `assert(session.session, count(locator, n))`.
 
     Supports `text:`, `count:`, one-based `at:`, `value:`, `checked:`, `selected:`,
     `label:`, `exact:`, and `timeout:`. Text and label matching default to substring
@@ -482,6 +484,8 @@ defmodule Fluffy.PhoenixTest do
         else: locator
 
     locator = locator_in_scope(session, locator)
+    # Positions and counts take visible matches; a field predicate alone also checks hidden fields.
+    locator = if field? and !options[:at], do: locator, else: Locator.filter(locator, visible: true)
     locator = if options[:at], do: Locator.nth(locator, options[:at] - 1), else: locator
 
     locator =
@@ -513,7 +517,7 @@ defmodule Fluffy.PhoenixTest do
         Expect.to_have_count(locator, options[:count], timeout)
 
       true ->
-        locator |> Locator.filter(visible: true) |> Locator.first() |> Expect.to_be_visible(timeout)
+        locator |> Locator.first() |> Expect.to_be_visible(timeout)
     end
   end
 

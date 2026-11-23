@@ -173,12 +173,13 @@ rendering as invisible: a `hidden` attribute on the element or an ancestor, an
 `<video>`'s children. `aria-hidden="true"` does not count, as in Playwright: it
 only keeps an element out of `by_role`.
 
-Without `count:` or a field predicate, the PhoenixTest-style facade's `assert_has`
-and `refute_has` check visibility; [Locators](locators.md#locators) covers strictness.
-Counts and field predicates (`value:`, `checked:`, `selected:`) add no visibility
-requirement. Use `assert_has(selector, count: 1)` for DOM presence, including
-hidden inputs or script elements, and `selected:` on a select to check its
-selected option.
+The PhoenixTest-style facade's `assert_has` and `refute_has` check visibility, and
+their `count:` and `at:` count visible matches only; [Locators](locators.md#locators)
+covers strictness. Field predicates (`value:`, `checked:`, `selected:`) without `at:`
+add no visibility requirement, so they check hidden inputs too, and `selected:` on a select
+checks its selected option. For DOM presence, including hidden inputs or script
+elements, use a native count on the native session:
+`assert(facade.session, count(by_css("script[nonce]"), 1))`.
 
 Phoenix does not compute CSS or browser layout: a CSS class or inline
 `display: none` alone does not make an element structurally invisible. Use
