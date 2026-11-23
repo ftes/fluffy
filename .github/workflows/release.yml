@@ -69,7 +69,7 @@ jobs:
     env:
       RELEASE_TITLE: Fluffy
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Before publishing, so a wrong tag or a missing changelog entry stages nothing on Hex.
       - name: Check the tag and extract the release notes
         run: |
