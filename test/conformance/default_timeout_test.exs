@@ -30,7 +30,7 @@ defmodule Fluffy.Conformance.DefaultTimeoutTest do
   @moduletag Playwright.Test.use(action_timeout: @action_timeout, navigation_timeout: 5_000)
 
   setup_all do
-    put_playwright_config(:expect, timeout: @expect_timeout)
+    put_playwright_config(:test, expect: [timeout: @expect_timeout])
     put_fluffy_config(phoenix_backend_timeout: @phoenix_timeout)
   end
 
@@ -99,7 +99,7 @@ defmodule Fluffy.Conformance.DefaultTimeoutTest do
   @tag driver: :playwright
   @tag Playwright.Test.use(action_timeout: 0)
   test "Playwright's timeouts of 0 mean no limit" do
-    put_playwright_config(:expect, timeout: 0)
+    put_playwright_config(:test, expect: [timeout: 0])
 
     :playwright
     |> start_session()

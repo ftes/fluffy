@@ -64,10 +64,10 @@ defmodule Fluffy.Support.Case do
     :ok
   end
 
-  # Merges `options` into `config :playwright, key` (`:test` or `:expect`), as
+  # Merges `options` into `config :playwright, :test`, as
   # `put_fluffy_config/1`. Playwright.Test reads `:test` when a test registers, in its
   # `setup`, and Fluffy when a session starts: set the context timeouts in `setup_all`.
-  def put_playwright_config(key, options) when key in [:test, :expect] do
+  def put_playwright_config(:test = key, options) do
     original = Application.get_env(:playwright, key)
     Application.put_env(:playwright, key, Keyword.merge(original || [], options))
 
