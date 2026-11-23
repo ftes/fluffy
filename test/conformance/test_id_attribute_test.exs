@@ -71,7 +71,7 @@ defmodule Fluffy.Conformance.TestIdAttributeTest do
   # the running driver's (`selectors.setTestIdAttribute`), restored after the test.
   defp put_test_id_attribute(driver, name) do
     suite = Playwright.Test.config().test_id_attribute
-    put_playwright_config(:test, test_id_attribute: name)
+    put_playwright_config(test_id_attribute: name)
 
     # The pool sets none for an empty one, so the running driver keeps the suite's.
     if driver == :playwright and name != "" do

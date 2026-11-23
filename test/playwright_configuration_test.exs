@@ -22,8 +22,8 @@ defmodule Fluffy.PlaywrightConfigurationTest do
   setup do
     originals = for key <- @keys, do: {key, Application.fetch_env(:fluffy, key)}
     Enum.each(@keys, &Application.delete_env(:fluffy, &1))
-    playwright = for key <- [:test, :expect], do: {key, Application.fetch_env(:playwright, key)}
-    Enum.each([:test, :expect], &Application.delete_env(:playwright, &1))
+    playwright = [test: Application.fetch_env(:playwright, :test)]
+    Application.delete_env(:playwright, :test)
 
     on_exit(fn ->
       for {key, original} <- originals do
@@ -61,7 +61,7 @@ defmodule Fluffy.PlaywrightConfigurationTest do
   test "a browser's expect timeout is Playwright's, a Phoenix session's phoenix_backend_timeout, 1 s by default" do
     assert {Timeouts.expect(), Timeouts.phoenix()} == {5_000, 1_000}
 
-    put_playwright(expect: [timeout: 300])
+    put_playwright(test: [expect: [timeout: 300]])
     put_env(phoenix_backend_timeout: 2_000)
     assert {Timeouts.expect(), Timeouts.phoenix()} == {300, 2_000}
 
@@ -71,7 +71,7 @@ defmodule Fluffy.PlaywrightConfigurationTest do
 
   # Playwright's `0` means no limit; Fluffy's checks once.
   test "Playwright's 0 is no limit" do
-    put_playwright(expect: [timeout: 0])
+    put_playwright(test: [expect: [timeout: 0]])
     assert Timeouts.expect() == :infinity
   end
 

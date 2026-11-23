@@ -589,9 +589,7 @@ defmodule Fluffy.Options do
   # `Matchers.Expect.app_env_expect_config/0`: keyed on the values it resolves from, and
   # validated in full (`config!/0`) on a miss, so an invalid value raises on each read.
   defp resolved_config! do
-    env =
-      {Application.get_env(:fluffy, :phoenix_backend_timeout), Application.get_env(:playwright, :test),
-       Application.get_env(:playwright, :expect)}
+    env = {Application.get_env(:fluffy, :phoenix_backend_timeout), Application.get_env(:playwright, :test)}
 
     case :persistent_term.get({__MODULE__, :config}, nil) do
       {^env, config} ->

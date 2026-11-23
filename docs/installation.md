@@ -28,7 +28,7 @@ Playwright comes with Fluffy in the same environments, so `mix playwright.instal
 works without listing it. List it anyway if you use
 [usage rules](#usage-rules-for-coding-agents), as `usage_rules.sync` reads only the
 dependencies `mix.exs` lists:
-`{:playwright, "~> 1.65.0-rc.3", hex: :playwright_ex, only: [:dev, :test]}`. The app is
+`{:playwright, "~> 1.65.0-rc.4", hex: :playwright_ex, only: [:dev, :test]}`. The app is
 `:playwright` and the Hex package `playwright_ex`; `hex: :playwright_ex` is required, since
 `playwright` on Hex is another library.
 
@@ -95,7 +95,7 @@ has a key only where Playwright has no concept.
 
 | Owner | Where, later wins | Keys |
 | --- | --- | --- |
-| Playwright Test | `config :playwright, :test` < project < module (`use Playwright.Test, ...` or `@moduletag Playwright.Test.use(...)`) < describe or test (`@tag Playwright.Test.use(...)`) | context options such as `base_url`, `extra_http_headers` and `locale`, `action_timeout`, `navigation_timeout`, `trace`, `screenshot`, `video`; up to the module only: the browser (`browser_name`, `launch_options`, `connect_options`); suite-wide only: `test_id_attribute` and `config :playwright, :expect, timeout:` |
+| Playwright Test | `config :playwright, :test` < project < module (`use Playwright.Test, ...` or `@moduletag Playwright.Test.use(...)`) < describe or test (`@tag Playwright.Test.use(...)`) | context options such as `base_url`, `extra_http_headers` and `locale`, `action_timeout`, `navigation_timeout`, `trace`, `screenshot`, `video`; up to the module only: the browser (`browser_name`, `launch_options`, `connect_options`); suite-wide only: `test_id_attribute` and `expect: [timeout: ...]` |
 | Fluffy | `config :fluffy` | `endpoint`, `ecto_repos`, `file_input_max_bytes`, `phoenix_backend_timeout` |
 
 What applies to each kind of session:
@@ -106,7 +106,7 @@ What applies to each kind of session:
 | `locale`, `user_agent` | as the `Accept-Language` and `User-Agent` headers a browser sends | yes |
 | `test_id_attribute`, from `config :playwright, :test` only | yes | yes |
 | Other context options (`viewport`, `color_scheme`, ...) | no: nothing a server sees | yes |
-| Default timeouts | `phoenix_backend_timeout` (1 s) | Playwright's `action_timeout`, `navigation_timeout`, `:expect` `timeout` |
+| Default timeouts | `phoenix_backend_timeout` (1 s) | Playwright's `action_timeout`, `navigation_timeout`, `expect: [timeout: ...]` |
 | Recording: trace, screenshot, video | no (steps are recorded) | yes |
 | A call's `timeout:` | overrides the default | overrides the default |
 
@@ -139,8 +139,11 @@ endpoint's URL, so it breaks a dynamic port.
 config :my_app, MyAppWeb.Endpoint, server: true
 config :fluffy, endpoint: MyAppWeb.Endpoint, ecto_repos: [MyApp.Repo]
 
-config :playwright, :test, browser_name: :chromium, action_timeout: 15_000, navigation_timeout: 15_000
-config :playwright, :expect, timeout: 5_000
+config :playwright, :test,
+  browser_name: :chromium,
+  action_timeout: 15_000,
+  navigation_timeout: 15_000,
+  expect: [timeout: 5_000]
 ```
 
 ```elixir

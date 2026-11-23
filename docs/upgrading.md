@@ -85,8 +85,10 @@ A browser session's timeouts follow Playwright Test and a Phoenix session's
 
   ```diff
   -config :fluffy, timeout: 2_000, playwright: [timeout: 15_000]
-  +config :playwright, :test, action_timeout: 15_000, navigation_timeout: 15_000
-  +config :playwright, :expect, timeout: 5_000
+  +config :playwright, :test,
+  +  action_timeout: 15_000,
+  +  navigation_timeout: 15_000,
+  +  expect: [timeout: 5_000]
   ```
 
   These are browser sessions'. Without them, browser actions and navigations have no timeout,

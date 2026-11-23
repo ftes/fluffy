@@ -29,6 +29,14 @@ sandbox, as generated `DataCase` and `ConnCase` do.
 
 The entry below lists them under Breaking; the upgrade guide shows how to move a 0.8 suite.
 
+## Unreleased
+
+Changes since 0.8.0.
+
+### Breaking
+
+- Requires PlaywrightEx 1.65.0-rc.4 (Hex package `playwright_ex`, `~> 1.65.0-rc.4`). Browser sessions' expect timeout and the snapshot settings are part of Playwright Test's config, as in `playwright.config.ts`: `config :playwright, :test, expect: [timeout: 5_000], update_snapshots: :missing`; a `config :playwright, :expect` is ignored.
+
 ## 0.9.0-rc.5 — 2026-11-21
 
 Changes since 0.8.0.

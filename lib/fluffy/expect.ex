@@ -294,9 +294,10 @@ defmodule Fluffy.Expect do
   output dir. `path:` names the file itself instead, relative to the current working
   directory; elsewhere it is required. Commit the baselines.
 
-  `config :playwright, :expect` sets `update_snapshots:`, where `:none` fails on a
+  `config :playwright, :test` sets `update_snapshots:`, where `:none` fails on a
   missing baseline, `:missing` writes it and passes, and `:changed` or `:all` rewrite a
-  mismatching one, and comparison defaults such as `to_have_screenshot: [max_diff_pixels: 10]`.
+  mismatching one, and its `expect:` comparison defaults such as
+  `expect: [to_have_screenshot: [max_diff_pixels: 10]]`.
 
   ## Options
 

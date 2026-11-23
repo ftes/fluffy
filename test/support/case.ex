@@ -17,7 +17,7 @@ defmodule Fluffy.Support.Case do
           monitor_running: 1,
           playwright_engine?: 1,
           put_fluffy_config: 1,
-          put_playwright_config: 2,
+          put_playwright_config: 1,
           with_html: 3
         ]
 
@@ -64,17 +64,24 @@ defmodule Fluffy.Support.Case do
     :ok
   end
 
-  # Merges `options` into `config :playwright, key` (`:test` or `:expect`), as
-  # `put_fluffy_config/1`. Playwright.Test reads `:test` when a test registers, in its
-  # `setup`, and Fluffy when a session starts: set the context timeouts in `setup_all`.
-  def put_playwright_config(key, options) when key in [:test, :expect] do
-    original = Application.get_env(:playwright, key)
-    Application.put_env(:playwright, key, Keyword.merge(original || [], options))
+  # Merges `options` into `config :playwright, :test` (its `expect:` block too), as
+  # `put_fluffy_config/1`. Playwright.Test reads it when a test registers, in its `setup`,
+  # and Fluffy when a session starts: set the context timeouts in `setup_all`.
+  def put_playwright_config(options) do
+    original = Application.get_env(:playwright, :test)
+
+    merged =
+      Keyword.merge(original || [], options, fn
+        :expect, original_expect, expect -> Keyword.merge(original_expect, expect)
+        _key, _original, value -> value
+      end)
+
+    Application.put_env(:playwright, :test, merged)
 
     ExUnit.Callbacks.on_exit(fn ->
       if original,
-        do: Application.put_env(:playwright, key, original),
-        else: Application.delete_env(:playwright, key)
+        do: Application.put_env(:playwright, :test, original),
+        else: Application.delete_env(:playwright, :test)
     end)
 
     :ok

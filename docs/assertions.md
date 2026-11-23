@@ -276,7 +276,7 @@ session =
   end)
 ```
 
-`poll!` retries for Playwright's expect timeout (5 s by default, `config :playwright, :expect`) and
+`poll!` retries for Playwright's expect timeout (5 s by default, `config :playwright, :test, expect: [timeout: ...]`) and
 `to_pass!` until the test's timeout, unless given a `timeout:`. Each attempt runs to the end: a
 Fluffy assertion or action in the callback waits for its own timeout before `to_pass!` tries
 again, and an attempt still running at `to_pass!`'s deadline isn't cut short, unlike in
