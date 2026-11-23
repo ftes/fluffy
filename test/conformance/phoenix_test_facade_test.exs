@@ -28,7 +28,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
       |> refute_has(field, "Hint two")
       |> refute_has(Locator.by_css("#missing"))
       |> refute_has(Locator.by_css("p"))
-      |> refute_has(Locator.by_css("p"), count: 0)
+      |> assert_has(Locator.by_css("p"), count: 0)
     end
 
     @tag driver: driver
@@ -176,7 +176,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
         a-b (c) #1 $2.50 x|y [z]
       </p>
       """)
-      |> assert_has("th", text: "Day", exact: true, count: 2)
+      |> assert_has("th", text: "Day", exact: true, count: 1)
       |> assert_has("p", text: "a-b  (c) #1 $2.50 x|y [z]", exact: true)
       |> refute_has("p", text: "a-b (c) #1 $2.50 x|y", exact: true)
       |> assert_has("th", "Day", exact: true, at: 2)
@@ -190,7 +190,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
     end
 
     @tag driver: driver
-    test "counts and field predicates preserve native visibility defaults with #{driver}" do
+    test "counts and positions take visible matches while field predicates check hidden fields with #{driver}" do
       session =
         Fluffy.session_for_html(unquote(driver), """
         <p hidden>Hidden</p><p>Visible</p><p>Also visible</p>
@@ -201,12 +201,14 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
 
       session
       |> assert_has("p", at: 2)
-      |> assert_has("p", count: 3)
+      |> refute_has("p", at: 3)
+      |> assert_has("p", count: 2)
       |> refute_has("p[hidden]")
-      |> assert_has("p[hidden]", count: 1)
-      |> refute_has("p[hidden]", count: 0)
+      |> assert_has("p[hidden]", count: 0)
+      |> refute_has("p[hidden]", count: 1)
       |> refute_has("#missing")
       |> assert_has("#public", value: "public")
+      |> assert_has("input", at: 1, value: "public")
       |> assert_has("input[hidden][value]", value: "secret")
       |> assert_has("#checked", checked: true)
       |> assert_has("select", selected: "Hidden choice")
@@ -301,11 +303,12 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
 
       session
       |> assert_has("p")
+      |> assert_has("p", at: 1)
       |> assert_has("p", at: 2)
-      |> refute_has("p", at: 1)
+      |> refute_has("p", at: 3)
       |> refute_has("p[hidden]")
       |> refute_has("#missing")
-      |> assert_has("p", count: 3)
+      |> assert_has("p", count: 2)
 
       assert_raise ExUnit.AssertionError, fn -> refute_has(session, "p", timeout: 0) end
 
@@ -384,11 +387,11 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
       returned =
         session
         |> assert_has("p", at: 2)
-        |> assert_has("p", count: 3)
-        |> assert_has("p", "notice", count: 2)
+        |> assert_has("p", count: 2)
+        |> assert_has("p", "notice", count: 1)
         |> refute_has("p", text: "Hidden", at: 1, exact: false)
         |> refute_has("p", "Hidden", at: 2)
-        |> refute_has("p", count: 2)
+        |> refute_has("p", count: 3)
         |> refute_has("#missing")
         |> assert_has("#email", value: "reader", label: "Email")
         |> refute_has("#email", value: "wrong")
@@ -426,8 +429,8 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
       |> refute_has("select", label: "Missing")
       |> assert_has("input", label: "Crew reminder time", at: 1)
       |> refute_has("input[hidden]", label: "Crew reminder time")
-      |> assert_has("input", label: "Crew reminder", count: 2)
-      |> refute_has("input", label: "Crew reminder", count: 1)
+      |> assert_has("input", label: "Crew reminder", count: 1)
+      |> refute_has("input", label: "Crew reminder", count: 2)
       |> refute_has("input", label: "Crew reminder time", exact: true, at: 2)
       |> refute_has("input", label: "Crew reminder time", at: 3)
       |> refute_has("select", label: "Crew reminder", exact: true)

@@ -247,11 +247,16 @@ that passed on 0.8 act differently:
 - Visibility ignores `aria-hidden`, as in Playwright, while `<input type="hidden">`,
   descendants of `hidden`, `<title>`, `<script>`, `<template>` and similar content count
   as hidden. So a facade `assert_has("input#flag[value='true']")` on a hidden input
-  fails; use `assert_has("input#flag", value: "true")` or `count: 1`, which add no
-  visibility requirement.
+  fails; use `assert_has("input#flag", value: "true")`, which adds no visibility
+  requirement.
+- The facade's `count:` and `at:` count visible matches only, as PhoenixTest.Playwright
+  did, so `assert_has("input[type=hidden]", count: 1)` now fails. Check DOM presence with
+  a native count: `assert(facade.session, count(by_css("input[type=hidden]"), 1))`. On
+  Playwright the options of a closed `<select>` aren't visible, so count them natively too,
+  or check the selected one with `selected:`.
 - Text matching skips `<script>` and `<style>`, as in Playwright, even as the matched
-  element, so `assert_has("script", text: "...")` fails even with `count:`. Match
-  attributes with `count:` (`assert_has("script[nonce]", count: 1)`), or read the text
+  element, so `assert_has("script", text: "...")` fails. Match attributes with a native
+  count (`assert(facade.session, count(by_css("script[nonce]"), 1))`), or read the text
   with `Fluffy.text_content(facade.session, by_css("script#data"))`, on every driver.
 - `select_option` with `[]` deselects every option, and a list mixing values with
   option maps raises. `to_have_values` requires a multiple select.

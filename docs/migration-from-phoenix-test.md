@@ -126,11 +126,11 @@ The facade preserves PhoenixTest vocabulary and conveniences:
 
 - Field actions use exact labels by default. `within` scopes a callback, and
   field actions remember their owning form for `submit()`.
-- Without `count:` or a field predicate, `assert_has` and `refute_has` check
-  visibility; hidden or absent elements satisfy `refute_has`. Static and LiveView check
-  structural visibility, while Playwright checks rendered visibility. Counts and
-  field predicates add no visibility requirement, matching native assertions.
-  They retain one-based `at:` positions and familiar text and field predicates.
+- Without a field predicate, `assert_has` and `refute_has` check visibility; hidden
+  or absent elements satisfy `refute_has`. Static and LiveView check structural
+  visibility, while Playwright checks rendered visibility. `count:` and one-based
+  `at:` count visible matches only; field predicates without `at:` add no visibility
+  requirement. They retain familiar text and field predicates.
 - `assert_path` remains a path assertion; use `query_params:` when the query
   is part of the assertion.
 
@@ -229,8 +229,6 @@ The facade covers PhoenixTest's API. For what PhoenixTest.Playwright adds:
     `Fluffy.Download.save_as/2` ([Downloads](advanced-events.md#downloads)). The event comes
     when downloading starts; reading or saving waits for completion and raises on failure,
     which PhoenixTest.Playwright's read of the file checked.
-- **`assert_has` with `count:`:** PhoenixTest.Playwright counted visible elements only; the
-  facade counts hidden ones too, so pass `by_css(selector) |> filter(visible: true)` there.
 - **`assert_has` and `refute_has` with `text:`:** PhoenixTest.Playwright checked the element
   holding the text inside the selector; the facade checks the selector's element, as
   PhoenixTest does. When that element is never visible, such as a modal's zero-size
@@ -258,7 +256,7 @@ Each call below is a pipeline step:
 | `click_button("Brew")` | `click(by_role(:button, name: "Brew"))` |
 | `click_link("Potions")` | `click(by_role(:link, name: "Potions"))` |
 | `refute_has("#notice")` | `refute(visible(by_css("#notice")))` |
-| `assert_has("#notice", count: 0)` | `assert(count(by_css("#notice"), 0))` |
+| `assert_has("#notice", count: 0)` | `assert(count(by_css("#notice") \|> filter(visible: true), 0))` |
 | `assert_path("/potions")` | `assert(page_url(&(&1.path == "/potions")))` |
 | `assert_path("/potions", query_params: params)` | `assert(page_url("/potions?" <> URI.encode_query(params)))` when the query order is known, or a predicate |
 | `assert_has("title", text: "Potions", exact: true)` | `assert(page_title("Potions"))` |
@@ -271,8 +269,10 @@ When rewriting, preserve the original assertion's intent:
 - Native `visible` uses the same visibility rules but rejects multiple matches.
   For DOM presence/absence, use counts as described in [Visibility and DOM presence](assertions.md#visibility-and-dom-presence).
 - Native text, role-name, and label locators default to substring matching;
-  use `exact: true` to retain exact field labels. Native `nth` is zero-based, whereas facade `at:` is
-  one-based. Use locator composition in place of facade `within`; see
+  use `exact: true` to retain exact field labels. Native `nth` is zero-based and counts
+  hidden matches, whereas facade `at: n` is one-based among visible matches:
+  `filter(visible: true) |> nth(n - 1)`. Use locator composition in place of facade
+  `within`; see
   [Locators](locators.md#locators).
 - Native `page_title("Potions")` is an exact normalized match. Use a regex
   for an intentional substring title assertion. Native URL strings match the
