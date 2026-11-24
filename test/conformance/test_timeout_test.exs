@@ -92,13 +92,15 @@ defmodule Fluffy.Conformance.PlaywrightTestTimeoutTest do
   alias Fluffy.Event
   alias Playwright.Test.BrowserPool
 
-  @moduletag timeout: 2_000
-  # The close runs its artifact steps (CI's failure screenshots, its retry's trace) before the
-  # call fails, all in the 100ms before ExUnit's kill, which Firefox on CI outlasts.
-  @moduletag Playwright.Test.use(screenshot: :off, trace: :off)
+  # Playwright.Test closes the contexts a 20th of the timeout (at most 1s) before ExUnit's kill,
+  # and the pending call must fail in that margin, after the close and its artifact steps (CI's
+  # screenshots, its retry's trace). 100ms of a 2s timeout is too little for Firefox on CI.
+  @timeout 5_000
+  @moduletag timeout: @timeout
   @missing by_role(:button, name: "Missing")
 
-  # As upstream's worker-scoped `browser` fixture, the browser's launch is not the test's.
+  # The module holds its browser, as Playwright Test's worker-scoped `browser` fixture: its
+  # launch doesn't count against the tests' timeout.
   setup_all do
     _browser = BrowserPool.browser()
     :ok
@@ -109,7 +111,7 @@ defmodule Fluffy.Conformance.PlaywrightTestTimeoutTest do
     session = start_session(:playwright)
     error = assert_raise(Fluffy.OperationError, fn -> click(session, @missing) end)
 
-    assert error.message =~ "Test timeout of 2000ms exceeded."
+    assert error.message =~ "Test timeout of #{@timeout}ms exceeded."
     assert error.message =~ ~s|name: "Missing"|
     assert_at_test_timeout()
   end
@@ -119,7 +121,7 @@ defmodule Fluffy.Conformance.PlaywrightTestTimeoutTest do
     session = start_session(:playwright)
     error = assert_raise(ExUnit.AssertionError, fn -> expect(session, to_be_visible(@missing), timeout: :infinity) end)
 
-    assert error.message =~ "Test timeout of 2000ms exceeded."
+    assert error.message =~ "Test timeout of #{@timeout}ms exceeded."
     assert_at_test_timeout()
   end
 
@@ -129,16 +131,16 @@ defmodule Fluffy.Conformance.PlaywrightTestTimeoutTest do
     session = start_session(:playwright)
     error = assert_raise(ExUnit.AssertionError, fn -> session |> wait_for(Event.download()) |> await() end)
 
-    assert error.message =~ "Test timeout of 2000ms exceeded."
+    assert error.message =~ "Test timeout of #{@timeout}ms exceeded."
     assert error.message =~ "no matching download event"
     assert_at_test_timeout()
   end
 
-  # The backstop is the test's deadline, 100ms (a 20th of the timeout) before ExUnit's kill,
-  # which counts from the test's first setup.
+  # The backstop is the test's deadline, a 20th of the timeout (at most 1s) before ExUnit's
+  # kill, which counts from the test's first setup.
   defp assert_at_test_timeout do
     %{deadline: deadline} = Playwright.Test.info()
-    assert System.monotonic_time(:millisecond) in deadline..(deadline + 100)
+    assert System.monotonic_time(:millisecond) in deadline..(deadline + min(1000, div(@timeout, 20)))
   end
 end
 
