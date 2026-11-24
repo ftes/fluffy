@@ -147,6 +147,67 @@ defmodule Fluffy.Assert do
   defdelegate in_viewport(locator, options \\ []), to: Fluffy.Expect, as: :to_be_in_viewport
 
   @doc group: "Locator assertions"
+  @doc playwright_only: true
+  @doc "Equivalent to `Fluffy.Expect.to_have_css/4`. Requires Playwright."
+  @spec css(Fluffy.Locator.t(), String.t(), Fluffy.Expect.text_expectation(), [Fluffy.Expect.to_have_css_option()]) ::
+          Fluffy.Expect.t()
+  defdelegate css(locator, name, value, options \\ []), to: Fluffy.Expect, as: :to_have_css
+
+  @doc group: "Locator assertions"
+  @doc playwright_only: true
+  @doc "Equivalent to `Fluffy.Expect.to_have_js_property/4`. Requires Playwright."
+  @spec js_property(Fluffy.Locator.t(), String.t(), term(), [Fluffy.Expect.to_have_js_property_option()]) ::
+          Fluffy.Expect.t()
+  defdelegate js_property(locator, name, value, options \\ []), to: Fluffy.Expect, as: :to_have_js_property
+
+  @doc group: "Locator assertions"
+  @doc playwright_only: true
+  @doc "Equivalent to `Fluffy.Expect.to_have_screenshot/2`. Requires Playwright."
+  @spec match_screenshot(Fluffy.Locator.t(), [Fluffy.Expect.to_have_screenshot_option()]) :: Fluffy.Expect.t()
+  defdelegate match_screenshot(locator, options \\ []), to: Fluffy.Expect, as: :to_have_screenshot
+
+  @doc group: "Locator assertions"
+  @doc "Equivalent to `Fluffy.Expect.to_have_role/3`."
+  @spec role(Fluffy.Locator.t(), atom(), [Fluffy.Expect.to_have_role_option()]) :: Fluffy.Expect.t()
+  defdelegate role(locator, role, options \\ []), to: Fluffy.Expect, as: :to_have_role
+
+  @doc group: "Locator assertions"
+  @doc "Equivalent to `Fluffy.Expect.to_have_accessible_name/3`."
+  @spec accessible_name(Fluffy.Locator.t(), Fluffy.Expect.text_expectation(), [
+          Fluffy.Expect.to_have_accessible_name_option()
+        ]) :: Fluffy.Expect.t()
+  defdelegate accessible_name(locator, expected, options \\ []), to: Fluffy.Expect, as: :to_have_accessible_name
+
+  @doc group: "Locator assertions"
+  @doc "Equivalent to `Fluffy.Expect.to_have_accessible_description/3`."
+  @spec accessible_description(Fluffy.Locator.t(), Fluffy.Expect.text_expectation(), [
+          Fluffy.Expect.to_have_accessible_description_option()
+        ]) :: Fluffy.Expect.t()
+  defdelegate accessible_description(locator, expected, options \\ []),
+    to: Fluffy.Expect,
+    as: :to_have_accessible_description
+
+  @doc group: "Locator assertions"
+  @doc playwright_only: true
+  @doc "Equivalent to `Fluffy.Expect.to_have_accessible_error_message/3`. Requires Playwright."
+  @spec accessible_error_message(Fluffy.Locator.t(), Fluffy.Expect.text_expectation(), [
+          Fluffy.Expect.to_have_accessible_error_message_option()
+        ]) :: Fluffy.Expect.t()
+  defdelegate accessible_error_message(locator, expected, options \\ []),
+    to: Fluffy.Expect,
+    as: :to_have_accessible_error_message
+
+  @doc group: "Locator assertions"
+  @doc playwright_only: true
+  @doc "Equivalent to `Fluffy.Expect.to_match_aria_snapshot/3`. Requires Playwright."
+  @spec match_aria_snapshot(Fluffy.Locator.t(), String.t() | [Fluffy.Expect.to_match_aria_snapshot_option()], [
+          Fluffy.Expect.to_match_aria_snapshot_option()
+        ]) :: Fluffy.Expect.t()
+  defdelegate match_aria_snapshot(locator, expected_or_options, options \\ []),
+    to: Fluffy.Expect,
+    as: :to_match_aria_snapshot
+
+  @doc group: "Locator assertions"
   @doc "Equivalent to `Fluffy.Expect.to_be_checked/2`."
   @spec checked(Fluffy.Locator.t(), [Fluffy.Expect.to_be_checked_option()]) :: Fluffy.Expect.t()
   defdelegate checked(locator, options \\ []), to: Fluffy.Expect, as: :to_be_checked
@@ -230,6 +291,22 @@ defmodule Fluffy.Assert do
   @doc "Equivalent to `Fluffy.Expect.page_to_have_url/2`."
   @spec page_url(Fluffy.Page.url_expectation(), [Fluffy.Expect.page_to_have_url_option()]) :: Fluffy.Expect.t()
   defdelegate page_url(expected, options \\ []), to: Fluffy.Expect, as: :page_to_have_url
+
+  @doc group: "Page assertions"
+  @doc playwright_only: true
+  @doc "Equivalent to `Fluffy.Expect.page_to_have_screenshot/1`. Requires Playwright."
+  @spec page_match_screenshot([Fluffy.Expect.to_have_screenshot_option()]) :: Fluffy.Expect.t()
+  defdelegate page_match_screenshot(options \\ []), to: Fluffy.Expect, as: :page_to_have_screenshot
+
+  @doc group: "Page assertions"
+  @doc playwright_only: true
+  @doc "Equivalent to `Fluffy.Expect.page_to_match_aria_snapshot/2`. Requires Playwright."
+  @spec page_match_aria_snapshot(String.t() | [Fluffy.Expect.to_match_aria_snapshot_option()], [
+          Fluffy.Expect.to_match_aria_snapshot_option()
+        ]) :: Fluffy.Expect.t()
+  defdelegate page_match_aria_snapshot(expected_or_options, options \\ []),
+    to: Fluffy.Expect,
+    as: :page_to_match_aria_snapshot
 
   @doc group: "Page assertions"
   @doc "Equivalent to `Fluffy.Expect.page_to_have_opener/2`."

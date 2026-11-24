@@ -86,6 +86,7 @@ Changes since 0.8.0.
 - Actions, `reload` and expectations accept the options of their Playwright call, such as `modifiers:`, `force:`, `wait_until:`, `visible:` and `ignore_case:`; Phoenix raises `Fluffy.CapabilityError` for Playwright-only ones. `by_role` accepts Playwright's `checked:`, `disabled:`, `expanded:`, `include_hidden:`, `level:`, `pressed:`, `selected:` and `description:`.
 - A regex in a locator's `name:`, `has_text:` and `has_not_text:`, on every driver.
 - `Fluffy.Expect` gains `to_have_text`, `to_contain_text`, `to_have_attribute`, `to_have_class`, `to_contain_class`, `to_have_id`, `to_be_attached`, `to_be_hidden`, `to_be_empty`, `to_have_role`, `to_have_accessible_name` and `to_have_accessible_description` on every driver, and `to_have_css`, `to_have_js_property`, `to_have_accessible_error_message`, `to_be_in_viewport` (`Fluffy.Assert.in_viewport/2`), screenshot and aria snapshot assertions on Playwright. Snapshot names derive from the test, as in Playwright.
+- `Fluffy.Assert` names every `Fluffy.Expect` matcher: `css`, `js_property`, `role`, `accessible_name`, `accessible_description`, `accessible_error_message`, `match_aria_snapshot`, `match_screenshot`, `page_match_aria_snapshot` and `page_match_screenshot` join the others.
 - `by_role` on Phoenix knows Playwright's implicit roles, landmarks included.
 - `Fluffy.Locator.within/2`, `Fluffy.clear/3` and `Fluffy.set_checked/4` on every driver; the facade's `assert_has` and `refute_has` accept a locator.
 - `Fluffy.wait_for/3` takes a locator on Playwright.
