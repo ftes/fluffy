@@ -59,13 +59,6 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
-    # PR runs queue per leg, first come first served: the PR run that started first gets every leg, a
-    # later one's legs wait for theirs and hold no runner meanwhile. The workflow-level group still
-    # cancels a superseded run, its running and waiting legs alike. Other events (main pushes, the
-    # nightly, experiments) get a group per run, so they run unqueued as before. As the jobs below.
-    concurrency:
-      group: ${{ github.workflow }}-checks-${{ matrix.lane }}-${{ github.event_name == 'pull_request' && 'pr' || github.run_id }}
-      queue: max
     strategy:
       fail-fast: false
       matrix:
@@ -127,9 +120,6 @@ jobs:
     timeout-minutes: 25
     permissions:
       contents: read
-    concurrency:
-      group: ${{ github.workflow }}-test-${{ matrix.lane }}-${{ matrix.browser }}-${{ matrix.partition }}-${{ github.event_name == 'pull_request' && 'pr' || github.run_id }}
-      queue: max
     strategy:
       fail-fast: false
       matrix:
@@ -246,9 +236,6 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
-    concurrency:
-      group: ${{ github.workflow }}-consumer-${{ github.event_name == 'pull_request' && 'pr' || github.run_id }}
-      queue: max
     env:
       FLUFFY_ARTIFACT_DIR: tmp/fluffy-artifacts
     steps:
