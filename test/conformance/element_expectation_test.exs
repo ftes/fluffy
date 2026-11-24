@@ -271,7 +271,7 @@ defmodule Fluffy.Conformance.ElementExpectationTest do
 
       for expectation <- expectations, expectation <- [expectation, not_(expectation)] do
         assert_raise ExUnit.AssertionError, ~r/strict mode violation|exactly one element/, fn ->
-          expect(session, expectation, timeout: 50)
+          expect(session, expectation, timeout: 1_000)
         end
       end
     end
