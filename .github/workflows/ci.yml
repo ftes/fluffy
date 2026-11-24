@@ -70,7 +70,7 @@ jobs:
       # After the deps and _build restore, so a fresher PLT wins.
       - name: Restore Dialyzer PLTs
         if: matrix.lane == 'newest'
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.mix/dialyxir*.plt*
@@ -95,7 +95,7 @@ jobs:
       # PR restores main's cache but never writes the shared one.
       - name: Save deps and _build
         if: success() && github.ref == 'refs/heads/main' && steps.setup.outputs.mix-cache-hit != 'true'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           key: ${{ steps.setup.outputs.mix-cache-key }}
           path: |
@@ -238,7 +238,7 @@ jobs:
       # Per commit, as the main deps and _build: the fixture compiles Fluffy as a path dep.
       - name: Restore consumer deps and _build
         id: consumer-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           key: consumer-mix-${{ steps.setup.outputs.image }}-erlang-${{ steps.setup.outputs.erlang }}-elixir-${{ steps.setup.outputs.elixir }}-${{ env.MIX_ENV }}-${{ hashFiles('integration/consumer/mix.lock') }}-${{ github.sha }}
           restore-keys: |
@@ -254,7 +254,7 @@ jobs:
           mix test
       - name: Save consumer deps and _build
         if: success() && github.ref == 'refs/heads/main' && steps.consumer-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           key: ${{ steps.consumer-cache.outputs.cache-primary-key }}
           path: |
