@@ -353,12 +353,13 @@ defmodule Fluffy.Driver.Live do
   def mount(runtime, view, html) do
     # LiveViewTest links its client proxy to the test process, and the proxy
     # exits with the view's reason. Unlink it so a view that redirects or
-    # crashes doesn't take the test down; the view's monitor reports how it left.
+    # crashes doesn't take the test down; the view's monitor reports how it left,
+    # and the proxy's why the view closed when the proxy crashed first.
     proxy_pid = proxy_pid(view)
     Process.unlink(proxy_pid)
 
-    # The driver reads how the view left from this monitor's message.
-    monitor = State.monitor_view(view.pid)
+    monitor = State.monitor(view.pid)
+    client_monitor = State.monitor(proxy_pid)
 
     :ok = Processes.register(runtime, :live_view, view.pid)
     :ok = Processes.register(runtime, :live_view, proxy_pid)
@@ -383,7 +384,8 @@ defmodule Fluffy.Driver.Live do
       document: document,
       live_uploads: UploadState.new(),
       view: view,
-      monitor: monitor
+      monitor: monitor,
+      client_monitor: client_monitor
     }
 
     {state, redirect}
@@ -397,6 +399,7 @@ defmodule Fluffy.Driver.Live do
 
     proxy_pid = proxy_pid(state.view)
     Process.demonitor(state.monitor, [:flush])
+    Process.demonitor(state.client_monitor, [:flush])
     Processes.stop(state.view.pid, :normal)
     Processes.stop(proxy_pid, :normal)
     Processes.release(session.runtime, :live_view, state.view.pid)
@@ -762,7 +765,7 @@ defmodule Fluffy.Driver.Live do
       {^tag, ^monitor, :process, _pid, reason} = message ->
         View.leave_unread(message)
 
-        case View.view_exit(reason) do
+        case View.view_exit(state, reason) do
           {:died, reason} -> raise Fluffy.LiveViewError, reason: reason
           {:redirect, redirect} -> View.follow_redirect_result(session, {:error, redirect})
         end
