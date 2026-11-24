@@ -4,31 +4,21 @@ Start with `import Fluffy.PhoenixTest`. This facade makes Fluffy mostly a
 drop-in replacement for supported PhoenixTest helpers: keep `visit`, `fill_in`,
 `click_button`, `assert_has`, `assert_path`, `within`, and `submit` in your tests.
 You do not need to rewrite them into locators to adopt Fluffy or use Playwright.
+For what you gain, see [Why Fluffy](why-fluffy.md).
 
-## Less manual waiting
+## Drop waits Fluffy does for you
 
-With the Phoenix backend, Fluffy retries LiveView assertions and supported action
-prerequisites automatically—for example, while waiting for a button to appear or
-become enabled. PhoenixTest supports assertion waiting with an explicit positive
-`timeout:`; Fluffy also waits before actions and enables waiting by default.
-Static pages are checked immediately.
+LiveView assertions retry and supported actions wait for their target by default, for up to
+`phoenix_backend_timeout` (1 s, set under `config :fluffy`). A `timeout:` added only to wait can go
+if that's long enough; keep a longer one where the page takes longer. In the browser, a visit waits for the LiveView to connect,
+so drop `assert_has("body .phx-connected")` after each visit; keep assertions for your
+application's own loading. See [Actionability checks and waiting](actions.md#actionability-checks-and-waiting).
 
-With the Playwright backend, visiting a LiveView waits for it to connect before
-returning. Unlike PhoenixTest.Playwright, you don't need to add
-`assert_has("body .phx-connected")` after each visit. Application-specific loading
-may still need an assertion.
+## Check assertions on layout content
 
-See [Actionability checks and waiting](actions.md#actionability-checks-and-waiting)
-for supported retries, timeout options, and connection readiness.
-
-## The whole page in LiveView tests
-
-PhoenixTest's LiveView driver, like `Phoenix.LiveViewTest.render/1`, sees only the
-LiveView's own markup. Fluffy keeps the root layout around it, so `assert_has` and
-clicks also work on navigation and other layout content. Title assertions include
-`live_title` prefixes and suffixes after `@page_title` changes. Portal content is
-moved into its target as in the browser, so modals and toasts rendered with
-`<.portal>` can be asserted and clicked; LiveViewTest leaves it inside a `<template>`.
+LiveView tests see the root layout, `live_title` and portal content, as the browser does. A
+`refute_has` or `count:` that relied on layout content being absent can now fail, and title
+assertions include `live_title`'s prefix and suffix.
 See [LiveView document and patch boundaries](capabilities.md#liveview-document-and-patch-boundaries).
 
 ## Replace the import and add lifecycle setup
