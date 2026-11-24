@@ -135,9 +135,7 @@ jobs:
           persist-credentials: false
       - name: Set up toolchain and deps
         continue-on-error: true
-        uses: ./.github/actions/setup
-        with:
-          lane: newest
+        uses: ftes/ci/setup@c7549ac6ba6e6f8c96a28472d6489ae28d76c5a6 # v1.0.2
       - name: Fetch Playwright source
         continue-on-error: true
         run: mix fluffy.playwright_source

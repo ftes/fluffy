@@ -37,8 +37,8 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: true
 
-permissions:
-  contents: read
+# Each job asks for what it needs.
+permissions: {}
 
 env:
   MIX_ENV: test
@@ -56,6 +56,8 @@ jobs:
     if: &stack_top ${{ !github.event.pull_request.draft && (github.event.pull_request.stack == null || github.event.pull_request.stack.position == github.event.pull_request.stack.size) }}
     runs-on: ubuntu-26.04
     timeout-minutes: 20
+    permissions:
+      contents: read
     # PR runs queue per leg, first come first served: the PR run that started first gets every leg, a
     # later one's legs wait for theirs and hold no runner meanwhile. The workflow-level group still
     # cancels a superseded run, its running and waiting legs alike. Other events (main pushes, the
@@ -69,12 +71,28 @@ jobs:
         lane: [oldest, newest]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Set up toolchain and deps
         id: setup
-        uses: ./.github/actions/setup
+        uses: ftes/ci/setup@c7549ac6ba6e6f8c96a28472d6489ae28d76c5a6 # v1.0.2
         with:
           lane: ${{ matrix.lane }}
-      # After the deps and _build restore, so a fresher PLT wins.
+      # ftes/ci/setup's deps.get re-resolves a lock that mix.exs no longer accepts, without failing.
+      # The oldest lane must still run every floor in mix.lock.oldest, the newest the committed lock.
+      - name: Check the lane's lock held
+        env:
+          LANE: ${{ matrix.lane }}
+        run: |
+          if [[ $LANE == oldest ]]; then
+            cmp -s mix.lock mix.lock.oldest ||
+              { echo "::error::mix.lock.oldest no longer meets mix.exs; move a floor in mix.exs and mix.lock.oldest together, see CONTRIBUTING.md"; exit 1; }
+          else
+            git diff --quiet -- mix.lock ||
+              { echo "::error::mix.lock no longer meets mix.exs: run mix deps.get and commit it"; exit 1; }
+          fi
+      # After the deps and _build restore, so a fresher PLT wins. Keyed on the OTP build too: Dialyzer
+      # rejects a PLT from another build of the same version as "Old PLT file".
       - name: Restore Dialyzer PLTs
         if: matrix.lane == 'newest'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -96,15 +114,15 @@ jobs:
       # Into _build (as _build/esbuild-linux-x64), so the test jobs restore it instead of each
       # fetching it from npm for `mix assets.build`. Only when the save below runs.
       - name: Install esbuild
-        if: github.ref == 'refs/heads/main' && steps.setup.outputs.mix-cache-hit != 'true'
+        if: github.ref == 'refs/heads/main' && steps.setup.outputs.cache-hit != 'true'
         run: mix esbuild.install --if-missing
       # Last, so only a green job saves; under the key computed before deps.get. On main only: a
       # PR restores main's cache but never writes the shared one.
       - name: Save deps and _build
-        if: success() && github.ref == 'refs/heads/main' && steps.setup.outputs.mix-cache-hit != 'true'
+        if: success() && github.ref == 'refs/heads/main' && steps.setup.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          key: ${{ steps.setup.outputs.mix-cache-key }}
+          key: ${{ steps.setup.outputs.cache-key }}
           path: |
             deps
             _build
@@ -119,6 +137,8 @@ jobs:
     # The slowest job took ~3.5 min at 6 partitions (webkit, a retry included), but a cold apt
     # cache can spend up to 3 x 5 min on the browser install; a hang fails here instead of running on.
     timeout-minutes: 25
+    permissions:
+      contents: read
     concurrency:
       group: ${{ github.workflow }}-test-${{ matrix.lane }}-${{ matrix.browser }}-${{ matrix.partition }}-${{ github.event_name == 'pull_request' && 'pr' || github.run_id }}
       queue: max
@@ -168,17 +188,19 @@ jobs:
       TEST_PARTITIONS: ${{ inputs.partitions || (matrix.browser == 'chromium' && 2 || 3) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Set up toolchain and deps
         id: setup
-        uses: ./.github/actions/setup
+        uses: ftes/ci/setup@c7549ac6ba6e6f8c96a28472d6489ae28d76c5a6 # v1.0.2
         with:
           lane: ${{ matrix.lane }}
       - name: Install Playwright browser
-        uses: ./.github/actions/browser
+        uses: ftes/ci/playwright-browser@c7549ac6ba6e6f8c96a28472d6489ae28d76c5a6 # v1.0.2
         with:
           browser: ${{ matrix.browser }}
-          # On main only: a PR's cache is visible to that PR alone.
-          save-apt-cache: ${{ github.ref == 'refs/heads/main' && matrix.lane == 'newest' && matrix.partition == 1 }}
+          # One job per browser saves (the action does on main only).
+          save-apt-cache: ${{ matrix.lane == 'newest' && matrix.partition == 1 }}
       - name: Build test assets
         run: mix assets.build
       # Test failures (exit 2) are retried once, only the failed tests (`mix test --failed`);
@@ -234,6 +256,8 @@ jobs:
     if: *stack_top
     runs-on: ubuntu-26.04
     timeout-minutes: 20
+    permissions:
+      contents: read
     concurrency:
       group: ${{ github.workflow }}-consumer-${{ github.event_name == 'pull_request' && 'pr' || github.run_id }}
       queue: max
@@ -241,13 +265,13 @@ jobs:
       FLUFFY_ARTIFACT_DIR: tmp/fluffy-artifacts
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Set up toolchain and deps
         id: setup
-        uses: ./.github/actions/setup
-        with:
-          lane: newest
+        uses: ftes/ci/setup@c7549ac6ba6e6f8c96a28472d6489ae28d76c5a6 # v1.0.2
       - name: Install Playwright browser
-        uses: ./.github/actions/browser
+        uses: ftes/ci/playwright-browser@c7549ac6ba6e6f8c96a28472d6489ae28d76c5a6 # v1.0.2
       # Per commit, as the main deps and _build: the fixture compiles Fluffy as a path dep.
       - name: Restore consumer deps and _build
         id: consumer-cache
@@ -280,6 +304,8 @@ jobs:
     if: always()
     needs: [checks, test, consumer]
     runs-on: ubuntu-slim
+    timeout-minutes: 5
+    permissions: {}
     steps:
       # On the step, so a draft or a PR below the top of its stack, whose jobs above are skipped,
       # reports it green rather than skipped.

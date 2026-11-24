@@ -114,12 +114,10 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
       - name: Set up toolchain and deps
-        uses: ./.github/actions/setup
-        with:
-          lane: newest
+        uses: ftes/ci/setup@c7549ac6ba6e6f8c96a28472d6489ae28d76c5a6 # v1.0.2
       # For the current driver; Claude reinstalls the browser if the update changes it.
       - name: Install Playwright browser
-        uses: ./.github/actions/browser
+        uses: ftes/ci/playwright-browser@c7549ac6ba6e6f8c96a28472d6489ae28d76c5a6 # v1.0.2
       - name: Build test assets
         run: mix assets.build
       - name: Fetch Playwright source

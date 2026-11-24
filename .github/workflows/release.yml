@@ -14,8 +14,8 @@ on:
   push:
     tags: ["v*"]
 
-permissions:
-  contents: read
+# Each job asks for what it needs.
+permissions: {}
 
 jobs:
   verify:
@@ -70,6 +70,8 @@ jobs:
       RELEASE_TITLE: Fluffy
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false # gh authenticates with GH_TOKEN; nothing pushes with git
       # Before publishing, so a wrong tag or a missing changelog entry stages nothing on Hex.
       - name: Check the tag and extract the release notes
         run: |
@@ -85,9 +87,7 @@ jobs:
           fi
           echo "VERSION=$version" >> "$GITHUB_ENV"
       - name: Set up toolchain and deps
-        uses: ./.github/actions/setup
-        with:
-          lane: newest
+        uses: ftes/ci/setup@c7549ac6ba6e6f8c96a28472d6489ae28d76c5a6 # v1.0.2
       # No HEX_API_KEY: with one set, Hex would use it instead of the workload identity.
       - name: Publish to Hex and wait for approval
         run: mix hex.publish --yes --wait
