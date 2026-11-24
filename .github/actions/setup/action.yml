@@ -63,31 +63,32 @@ runs:
         echo "erlang-build=$(cat "$dialyzer"/ebin/*.beam | sha256sum | cut -c1-12)" >> "$GITHUB_OUTPUT"
     # deps and the whole _build (Fluffy too: Mix compares content digests, so a fresh checkout
     # recompiles only what changed, and --warnings-as-errors re-emits the manifest's warnings).
-    # Keyed per runner image (PLTs, NIFs and ERTS paths don't carry over) and toolchain. The
+    # Keyed per runner image (PLTs, NIFs and ERTS paths don't carry over) and toolchain, its Erlang
+    # build included: _build/test holds Dialyxir's deps PLT, which only fits the build that made it. The
     # checks job saves it, on main only; the commit in the key keeps _build current, and the
     # newest save wins the prefix restore.
     - name: Restore deps and _build
       id: mix-cache
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
-        key: mix-${{ steps.toolchain.outputs.image }}-erlang-${{ steps.toolchain.outputs.erlang }}-elixir-${{ steps.toolchain.outputs.elixir }}-${{ env.MIX_ENV }}-${{ hashFiles('mix.lock') }}-${{ github.sha }}
+        key: mix-${{ steps.toolchain.outputs.image }}-erlang-${{ steps.toolchain.outputs.erlang }}-${{ steps.erlang-build.outputs.erlang-build }}-elixir-${{ steps.toolchain.outputs.elixir }}-${{ env.MIX_ENV }}-${{ hashFiles('mix.lock') }}-${{ github.sha }}
         restore-keys: |
-          mix-${{ steps.toolchain.outputs.image }}-erlang-${{ steps.toolchain.outputs.erlang }}-elixir-${{ steps.toolchain.outputs.elixir }}-${{ env.MIX_ENV }}-${{ hashFiles('mix.lock') }}-
-          mix-${{ steps.toolchain.outputs.image }}-erlang-${{ steps.toolchain.outputs.erlang }}-elixir-${{ steps.toolchain.outputs.elixir }}-${{ env.MIX_ENV }}-
+          mix-${{ steps.toolchain.outputs.image }}-erlang-${{ steps.toolchain.outputs.erlang }}-${{ steps.erlang-build.outputs.erlang-build }}-elixir-${{ steps.toolchain.outputs.elixir }}-${{ env.MIX_ENV }}-${{ hashFiles('mix.lock') }}-
+          mix-${{ steps.toolchain.outputs.image }}-erlang-${{ steps.toolchain.outputs.erlang }}-${{ steps.erlang-build.outputs.erlang-build }}-elixir-${{ steps.toolchain.outputs.elixir }}-${{ env.MIX_ENV }}-
         path: |
           deps
           _build
-    # --check-locked fails when the requirements in mix.exs no longer accept the lane's lock,
-    # instead of re-resolving it: the oldest lane then still runs every floor.
-    - name: Fetch dependencies
-      id: deps-get
+    - name: Install dependencies
       shell: bash
-      run: mix deps.get --check-locked
-    # On the oldest lane mix.lock is a copy, so Mix's error names the wrong file.
-    - name: Explain a stale oldest lock
-      if: failure() && steps.deps-get.outcome == 'failure' && inputs.lane == 'oldest'
+      run: mix do deps.get + deps.compile
+    # deps.get re-resolves, without failing, a dep whose requirement the lock no longer meets.
+    - name: Check the oldest lane kept its floors
+      if: inputs.lane == 'oldest'
       shell: bash
-      run: echo "::error::mix.lock.oldest no longer meets mix.exs; move a floor in mix.exs and mix.lock.oldest together, see CONTRIBUTING.md"
-    - name: Compile dependencies
-      shell: bash
-      run: mix deps.compile
+      run: |
+        for dep in phoenix phoenix_live_view; do
+          if [ "$(grep "^  \"$dep\":" mix.lock)" != "$(grep "^  \"$dep\":" mix.lock.oldest)" ]; then
+            echo "::error::mix deps.get moved $dep off its floor in mix.lock.oldest: raise the floor in mix.exs and mix.lock.oldest together"
+            exit 1
+          fi
+        done
