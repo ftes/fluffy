@@ -63,17 +63,18 @@ runs:
         echo "erlang-build=$(cat "$dialyzer"/ebin/*.beam | sha256sum | cut -c1-12)" >> "$GITHUB_OUTPUT"
     # deps and the whole _build (Fluffy too: Mix compares content digests, so a fresh checkout
     # recompiles only what changed, and --warnings-as-errors re-emits the manifest's warnings).
-    # Keyed per runner image (PLTs, NIFs and ERTS paths don't carry over) and toolchain. The
+    # Keyed per runner image (PLTs, NIFs and ERTS paths don't carry over) and toolchain, its
+    # Erlang build included: _build/test holds Dialyxir's deps PLT, which only fits that build. The
     # checks job saves it, on main only; the commit in the key keeps _build current, and the
     # newest save wins the prefix restore.
     - name: Restore deps and _build
       id: mix-cache
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
-        key: mix-${{ steps.toolchain.outputs.image }}-erlang-${{ steps.toolchain.outputs.erlang }}-elixir-${{ steps.toolchain.outputs.elixir }}-${{ env.MIX_ENV }}-${{ hashFiles('mix.lock') }}-${{ github.sha }}
+        key: mix-${{ steps.toolchain.outputs.image }}-erlang-${{ steps.toolchain.outputs.erlang }}-${{ steps.erlang-build.outputs.erlang-build }}-elixir-${{ steps.toolchain.outputs.elixir }}-${{ env.MIX_ENV }}-${{ hashFiles('mix.lock') }}-${{ github.sha }}
         restore-keys: |
-          mix-${{ steps.toolchain.outputs.image }}-erlang-${{ steps.toolchain.outputs.erlang }}-elixir-${{ steps.toolchain.outputs.elixir }}-${{ env.MIX_ENV }}-${{ hashFiles('mix.lock') }}-
-          mix-${{ steps.toolchain.outputs.image }}-erlang-${{ steps.toolchain.outputs.erlang }}-elixir-${{ steps.toolchain.outputs.elixir }}-${{ env.MIX_ENV }}-
+          mix-${{ steps.toolchain.outputs.image }}-erlang-${{ steps.toolchain.outputs.erlang }}-${{ steps.erlang-build.outputs.erlang-build }}-elixir-${{ steps.toolchain.outputs.elixir }}-${{ env.MIX_ENV }}-${{ hashFiles('mix.lock') }}-
+          mix-${{ steps.toolchain.outputs.image }}-erlang-${{ steps.toolchain.outputs.erlang }}-${{ steps.erlang-build.outputs.erlang-build }}-elixir-${{ steps.toolchain.outputs.elixir }}-${{ env.MIX_ENV }}-
         path: |
           deps
           _build
