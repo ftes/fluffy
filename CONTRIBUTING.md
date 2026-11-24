@@ -59,25 +59,21 @@ human and agent reviews alike.
 
 ## Releasing
 
-The script needs a jj working copy colocated with git, `gh` logged in as a repo admin (to push
-`main` past its ruleset and create the tag), and `elixir` on the PATH.
+Releases run from a checkout of [ftes/ci](https://github.com/ftes/ci), with `gh` logged in as a
+repo admin (to push `main` past its ruleset and create the tag) and `jj` and `elixir` on the PATH:
 
-1. `scripts/release --dry-run <version>` runs the checks (an empty `@` on `main@origin` as last
-   fetched, a `## Unreleased` with entries, a new tag and a greater version) and prints the
-   edits.
-2. `scripts/release <version>` commits "Release <version>" (the version, the install line in
-   `docs/installation.md` and the dated changelog heading) and "Start the next release", pushes
-   them to `main` one at a time and tags the first, which starts `release.yml`. It fetches first
-   and checks again. `RELEASE_REMOTE` names another remote than `origin`.
-3. Approve the staged release on hex.pm; the workflow then creates the GitHub release.
+```sh
+# Makes both commits in a clone and prints them; pushes nothing.
+release/release.exs fluffy --dry-run <version>
+release/release.exs fluffy <version>
+```
 
-`## Unreleased` holds every change since the last final release, so after a prerelease "Start
-the next release" renames its heading back to `## Unreleased`; after a final release it adds an
-empty one. 0.9.0 also ends the release-candidate rules in `AGENTS.md`.
+It clones this repo into a temporary directory, commits "Release <version>" and "Start the next
+release", pushes `main` and tags the first commit. The tag runs CI (`ci.yml`) on the tagged
+commit; once every job passed, its publish job stages the release on Hex. Approve it on hex.pm;
+the job then creates the GitHub release.
 
-It runs locally, not as a workflow: only an admin can push to `main` past its ruleset, and a tag
-pushed with `GITHUB_TOKEN` starts no workflow. `release.yml` publishes only a commit whose CI on
-`main` passed, so the release commit is pushed on its own first, and publishing waits for its CI.
-
-`scripts/release.exs` is playwright_ex's script with Fluffy's `ReleaseScript.Config`: keep the
-rest the same in both, which is also why `mix format` leaves it out.
+`## Unreleased` gathers every change since the last final release, across the release candidates.
+For a final release, drop the `**RC only:**` entries first: the script refuses while they remain.
+0.9.0 also ends the release-candidate rules in `AGENTS.md`. `release/release.exs` lists the
+conventions it relies on.
