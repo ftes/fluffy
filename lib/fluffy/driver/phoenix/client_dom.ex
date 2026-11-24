@@ -842,13 +842,18 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM do
   # a select stays unfocused, as Playwright's select_option does not focus it.
   # LiveView resets checked state from the rendered attribute even when the box
   # has focus. So values, selections and checked state survive only unchanged
-  # renders, phx-update="ignore" and phx-trigger-action handoff. Checked and
-  # file state stand in for subtrees LiveView leaves untouched, so they only
-  # carry to the same control.
+  # renders, phx-update="ignore" and phx-trigger-action handoff. A reset value
+  # stays the current value, as morphdom sets the value property, so a trigger
+  # render that then drops the attribute still submits it. That holds only in
+  # HTML's value mode; any other input's value is its attribute. Checked and
+  # selected state aren't kept that way: the browser keeps them only for
+  # controls the user changed, which would take HTML's dirtiness flags.
+  # Checked and file state stand in for subtrees LiveView leaves untouched, so
+  # they only carry to the same control.
   defp reconcile_properties(properties, old, new, old_to_new, patched?) do
     %{}
     |> preserve_property(properties, :used, true)
-    |> preserve_current_value(properties, patched?)
+    |> preserve_current_value(properties, new, patched?)
     |> preserve_checkedness(properties, old, new, patched?)
     |> preserve_files(properties, old, new)
     |> preserve_selection(properties, old_to_new, patched?)
@@ -861,12 +866,14 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM do
     end
   end
 
-  defp preserve_current_value(reconciled, properties, patched?) do
+  defp preserve_current_value(reconciled, properties, new, patched?) do
     case Map.fetch(properties, :value) do
       {:ok, value} ->
-        if patched?,
-          do: reconciled,
-          else: Map.put(reconciled, :value, value)
+        cond do
+          not Semantics.value_mode?(new) -> reconciled
+          patched? -> Map.put(reconciled, :value, default_value(new))
+          true -> Map.put(reconciled, :value, value)
+        end
 
       :error ->
         reconciled

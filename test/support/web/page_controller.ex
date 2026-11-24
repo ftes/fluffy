@@ -179,6 +179,16 @@ defmodule Fluffy.Support.Web.PageController do
     |> Plug.Conn.send_resp(200, "student\n#{params["identity"]}\n")
   end
 
+  def enrol(conn, %{"student" => student}) do
+    send_html(conn, """
+    <main>
+      <p>Enrolled #{Plug.HTML.html_escape(student["email"])}</p>
+      <p>Password: #{Plug.HTML.html_escape(student["password"])}</p>
+      <p>Motto: #{Plug.HTML.html_escape(student["motto"])}</p>
+    </main>
+    """)
+  end
+
   def session_show(conn, _params) do
     send_html(conn, """
     <!doctype html>

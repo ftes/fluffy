@@ -87,6 +87,7 @@ defmodule Fluffy.Support.Web.Router do
       live("/patched-checks", PatchedChecksLive)
       live("/used-shift", UsedShiftLive)
       live("/submit-used", SubmitUsedLive)
+      live("/enrolment", EnrolmentLive)
       live("/no-content", NoContentLive)
       live("/clock", ClockLive)
       live("/expectations", ExpectationsLive)
@@ -116,6 +117,7 @@ defmodule Fluffy.Support.Web.Router do
     get("/show", PageController, :session_show)
     post("/hand-off", PageController, :session_hand_off)
     post("/marauders-map", PageController, :marauders_map)
+    post("/enrol", PageController, :enrol)
   end
 
   scope "/initial-connection", Web do

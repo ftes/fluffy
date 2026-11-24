@@ -123,14 +123,18 @@ in other views, unchanged components or the root layout, so a title update
 resets nothing. Checkboxes and radios reset even with focus or during their own
 `phx-change`; selects reset because Playwright's `select_option` does not focus
 them. A form during its `phx-trigger-action` handoff and content under
-`phx-update="ignore"` keep all of their local state.
+`phx-update="ignore"` keep their local state. A triggered form posts what was
+typed into its text fields and textareas even when its trigger render drops it,
+as the browser does. For its checkboxes, radios and selects, Static and LiveView
+post what the trigger render shows, while the browser keeps the choices the user
+made, since Fluffy doesn't track which controls the user changed.
 The browser also keeps the typed value of a focused input or textarea through
 any render that reaches it, its own `phx-change` reply or a later `handle_info`
 alike, unless it has `phx-patch-focused` (LiveView's `mergeFocusedInput`, which
-still applies the other attributes, such as `checked`). Static and LiveView don't
-track focus, so they reset it to the rendered value. Keep the latest submitted
-params in assigns and render the form from them (`to_form(params)`) so both
-agree, or use Playwright for such a test.
+still applies the other attributes, such as `checked`). Unlike the browser,
+Static and LiveView reset it to the rendered value, since they don't track focus:
+render the form from the latest submitted params (`to_form(params)`), as
+generated forms do, so both agree, or use Playwright for such a test.
 Checkbox/radio state carries only to a control with the same type, name, and
 value; a radio the server renders as newly checked clears its group. Files
 survive while the matched control remains a file input with the same name. Elements

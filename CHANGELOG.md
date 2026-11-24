@@ -112,6 +112,7 @@ Changes since 0.8.0.
 - On Phoenix, `to_have_value` and `to_be_empty` read `"on"` for a checkbox or radio without a `value` attribute, as browsers do, instead of `""`.
 - LiveView follows navigation as a browser does: a `push_navigate` or `redirect` from a connected mount, a redirect while Fluffy reads the view, an action on a view that navigated away, a patch partway through an action, and `phx-mounted={JS.patch(...)}` on a new view. Redirects count toward a 20-redirect limit, so a loop fails instead of hanging.
 - On Phoenix, a `phx-trigger-action` form is submitted as LiveView's client does, from mount or a pushed render.
+- On Phoenix, a `phx-trigger-action` form submits the values typed into text fields and textareas that its trigger render no longer echoes, such as phx.gen.auth's registration password, instead of `""`.
 - On Phoenix, a `204 No Content` or `205 Reset Content` answer keeps the current page; on Chromium, a `204` no longer leaves later actions waiting.
 - LiveView uploads survive renders that move or remove their form or input, follow navigations from progress callbacks, and work through a `live_file_input` linked with `form=`; `submit` and `set_input_files` wait for their target.
 - A LiveView `press` sends its keyup to the binding its target had when the press started.
