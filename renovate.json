@@ -1,94 +1,15 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:best-practices",
-    "helpers:pinGitHubActionDigestsToSemver"
-  ],
-  "enabledManagers": [
-    "mix",
-    "github-actions",
-    "asdf",
-    "custom.regex"
-  ],
-  "customManagers": [
-    {
-      "customType": "regex",
-      "description": "The esbuild binary that bundles the test assets",
-      "managerFilePatterns": [
-        "/^config/config\\.exs$/"
-      ],
-      "matchStrings": [
-        "config :esbuild,\\s+version: \"(?<currentValue>[^\"]+)\""
-      ],
-      "depNameTemplate": "esbuild",
-      "datasourceTemplate": "npm"
-    }
-  ],
-  "timezone": "Europe/Berlin",
-  "schedule": [
-    "* 0-6 * * 1"
-  ],
-  "minimumReleaseAge": "2 days",
-  "osvVulnerabilityAlerts": true,
-  "automerge": false,
-  "rangeStrategy": "replace",
-  "gitIgnoredAuthors": [
-    "41898282+github-actions[bot]@users.noreply.github.com"
-  ],
+  "extends": ["github>ftes/renovate-config:elixir-lib"],
   "packageRules": [
     {
       "description": "PlaywrightEx updates come from playwright-ex-update.yml, which classifies new members for PlaywrightMembersTest; packageName is the Hex name, or the repo for a git dep",
-      "matchManagers": [
-        "mix"
-      ],
-      "matchPackageNames": [
-        "playwright_ex",
-        "ftes/playwright_ex"
-      ],
+      "matchManagers": ["mix"],
+      "matchPackageNames": ["playwright_ex", "ftes/playwright_ex"],
       "enabled": false
-    },
-    {
-      "description": "Keep runtime updates together",
-      "matchManagers": [
-        "asdf"
-      ],
-      "groupName": "toolchain"
-    },
-    {
-      "description": "Preserve Elixir's OTP build compatibility suffix",
-      "matchManagers": [
-        "asdf"
-      ],
-      "matchDepNames": [
-        "elixir"
-      ],
-      "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)-(?<compatibility>otp-\\d+)$"
-    },
-    {
-      "description": "Support Erlang's additional patch component",
-      "matchManagers": [
-        "asdf"
-      ],
-      "matchDepNames": [
-        "erlang"
-      ],
-      "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)(?:\\.(?<patch>\\d+))?(?:\\.(?<build>\\d+))?$"
-    },
-    {
-      "description": "Preserve existing Mix support and propose wider ranges for new releases",
-      "matchManagers": [
-        "mix"
-      ],
-      "rangeStrategy": "widen"
     }
   ],
   "constraints": {
     "erlang": "29"
-  },
-  "lockFileMaintenance": {
-    "enabled": true,
-    "schedule": [
-      "* 0-6 * * 1"
-    ]
   }
 }

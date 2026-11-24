@@ -10,8 +10,8 @@ concurrency:
   group: claude-nightly
   cancel-in-progress: false
 
-permissions:
-  contents: read
+# Each job asks for what it needs.
+permissions: {}
 
 env:
   MIX_ENV: test
@@ -220,13 +220,11 @@ jobs:
           sparse-checkout: .github/actions
           persist-credentials: false
       - name: Set up toolchain and deps
-        uses: ./tmp/ci/.github/actions/setup
-        with:
-          lane: newest
+        uses: ftes/ci/setup@78e6ba9c26b2865cad995d33aadba7ccb23c9149 # v1.0.3
       # These may fail on a branch that doesn't compile; Claude then runs without them.
       - name: Install Playwright browser
         continue-on-error: true
-        uses: ./tmp/ci/.github/actions/browser
+        uses: ftes/ci/playwright-browser@78e6ba9c26b2865cad995d33aadba7ccb23c9149 # v1.0.3
       - name: Build test assets
         continue-on-error: true
         run: mix assets.build
@@ -308,9 +306,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
       - name: Set up toolchain and deps
-        uses: ./.github/actions/setup
-        with:
-          lane: newest
+        uses: ftes/ci/setup@78e6ba9c26b2865cad995d33aadba7ccb23c9149 # v1.0.3
       - name: Fetch Playwright source
         run: mix fluffy.playwright_source
       - run: git switch -c "$NIGHTLY_BRANCH"
@@ -421,9 +417,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
       - name: Set up toolchain and deps
-        uses: ./.github/actions/setup
-        with:
-          lane: newest
+        uses: ftes/ci/setup@78e6ba9c26b2865cad995d33aadba7ccb23c9149 # v1.0.3
       - name: Fetch Playwright source
         run: mix fluffy.playwright_source
       - run: git switch -c "$NIGHTLY_BRANCH"
