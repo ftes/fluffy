@@ -56,6 +56,13 @@ jobs:
     if: &stack_top ${{ !github.event.pull_request.draft && (github.event.pull_request.stack == null || github.event.pull_request.stack.position == github.event.pull_request.stack.size) }}
     runs-on: ubuntu-26.04
     timeout-minutes: 20
+    # PR runs queue per leg, first come first served: the PR run that started first gets every leg, a
+    # later one's legs wait for theirs and hold no runner meanwhile. The workflow-level group still
+    # cancels a superseded run, its running and waiting legs alike. Other events (main pushes, the
+    # nightly, experiments) get a group per run, so they run unqueued as before. As the jobs below.
+    concurrency:
+      group: ${{ github.workflow }}-checks-${{ matrix.lane }}-${{ github.event_name == 'pull_request' && 'pr' || github.run_id }}
+      queue: max
     strategy:
       fail-fast: false
       matrix:
@@ -112,6 +119,9 @@ jobs:
     # The slowest job took ~3.5 min at 6 partitions (webkit, a retry included), but a cold apt
     # cache can spend up to 3 x 5 min on the browser install; a hang fails here instead of running on.
     timeout-minutes: 25
+    concurrency:
+      group: ${{ github.workflow }}-test-${{ matrix.lane }}-${{ matrix.browser }}-${{ matrix.partition }}-${{ github.event_name == 'pull_request' && 'pr' || github.run_id }}
+      queue: max
     strategy:
       fail-fast: false
       matrix:
@@ -224,6 +234,9 @@ jobs:
     if: *stack_top
     runs-on: ubuntu-26.04
     timeout-minutes: 20
+    concurrency:
+      group: ${{ github.workflow }}-consumer-${{ github.event_name == 'pull_request' && 'pr' || github.run_id }}
+      queue: max
     env:
       FLUFFY_ARTIFACT_DIR: tmp/fluffy-artifacts
     steps:
