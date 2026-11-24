@@ -109,6 +109,8 @@ defmodule Fluffy.Conformance.LivePatchActionTest do
       |> visible("Consumed: 1")
     end
 
+    # LiveViewTest's upload client before 1.2.10 stops after the first entry (phoenix_live_view #3480).
+    if driver == :phoenix, do: @tag(requires(phoenix_live_view: ">= 1.2.10"))
     @tag driver: driver
     test "the remaining uploads go on after a patch inserts a form before theirs with #{driver}", %{driver: driver} do
       driver

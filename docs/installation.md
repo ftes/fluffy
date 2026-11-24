@@ -6,6 +6,10 @@ database. Then follow [Usage](usage.md) for your first test and shared test case
 
 ## Elixir dependency
 
+Fluffy requires Phoenix 1.7.10 or later and LiveView 1.1.32 or later. Uploading several files
+through one input on the Phoenix drivers needs LiveView 1.2.10, for a fix in
+`Phoenix.LiveViewTest`'s upload client.
+
 In `mix.exs`:
 
 ```diff

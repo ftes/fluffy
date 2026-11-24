@@ -143,6 +143,9 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
       |> expect("Completed uploads: 1" |> by_text() |> to_be_visible())
     end
 
+    # LiveViewTest's upload client before 1.2.10 stops after the first entry (phoenix_live_view #3480).
+    if driver == :phoenix, do: @tag(requires(phoenix_live_view: ">= 1.2.10"))
+
     test "auto uploads two selected files before submit with #{driver}" do
       unquote(driver)
       |> start_session()
@@ -183,6 +186,9 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
         |> to_be_visible()
       )
     end
+
+    # LiveViewTest's upload client before 1.2.10 stops after the first entry (phoenix_live_view #3480).
+    if driver == :phoenix, do: @tag(requires(phoenix_live_view: ">= 1.2.10"))
 
     test "uploads and consumes two selected files in order with #{driver}" do
       files = [fixture_path(), second_fixture_path()]

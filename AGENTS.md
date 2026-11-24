@@ -51,9 +51,10 @@ changes get no entry.
   `mix usage_rules.sync --yes`; `mix check` fails when it's stale. On Renovate's PRs a workflow
   commits it. The `phoenix` skill's rules are written for applications, so in this library
   they mainly apply to the fixtures under `test/`.
-- The compatibility floor is Elixir 1.18 on OTP 27 (`.tool-versions.oldest`) with Phoenix 1.7.24
-  and LiveView 1.2.10 (`mix.lock.oldest`), which CI's oldest lane runs. Raise a floor in
-  `mix.exs` and `mix.lock.oldest` together.
+- The compatibility floor is Elixir 1.18 on OTP 27 (`.tool-versions.oldest`) with Phoenix 1.7.10
+  and LiveView 1.1.32, and every direct runtime dependency at its floor (`mix.lock.oldest`), which CI's
+  oldest lane runs. Move a floor in `mix.exs` and `mix.lock.oldest` together; a test checks
+  they match. A test that needs a newer dependency takes `@tag requires(app: requirement)`.
 
 ## Architecture
 

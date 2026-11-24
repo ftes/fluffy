@@ -45,7 +45,7 @@ env:
 
 jobs:
   # The newest lane compiles strictly and runs the linters, generators, Dialyzer and docs. The
-  # oldest lane (the Elixir/OTP floor, and the Phoenix and LiveView floors of mix.lock.oldest) only
+  # oldest lane (the Elixir/OTP floor, and every dependency floor, locked in mix.lock.oldest) only
   # compiles, warnings allowed: newer, backwards-compatible features may warn there. Its Chromium
   # tests guard the floor, so a call to a function the floor lacks, only a warning there, fails CI
   # only where they run it. No browser or database. Saves the deps and _build cache on main.
@@ -251,7 +251,7 @@ jobs:
         working-directory: integration/consumer
         run: |
           mix deps.get
-          mix test
+          mix test --formatter ExUnit.CLIFormatter --formatter Playwright.Test.GitHubFormatter
       - name: Save consumer deps and _build
         if: success() && github.ref == 'refs/heads/main' && steps.consumer-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6

@@ -18,6 +18,7 @@ defmodule Fluffy.Support.Case do
           playwright_engine?: 1,
           put_fluffy_config: 1,
           put_playwright_config: 2,
+          requires: 1,
           with_html: 3
         ]
 
@@ -31,6 +32,26 @@ defmodule Fluffy.Support.Case do
   # A plain function, compiled before the tests, so `@tag skip:` can call it at compile time.
   # Read at call time, as the config can differ between runs (FLUFFY_BROWSER).
   def playwright_engine?(engine), do: engine == Playwright.Test.config().browser_name
+
+  # `@tag requires(app: requirement)` skips the test when the loaded `app` doesn't meet
+  # `requirement`, as on CI's oldest lane, which runs every dependency at its floor.
+  def requires(requirements) do
+    unmet =
+      for {app, requirement} <- requirements,
+          not Version.match?(loaded_version!(app), requirement),
+          do: "#{app} #{requirement}"
+
+    if unmet == [],
+      do: [requires: requirements],
+      else: [requires: requirements, skip: "requires #{Enum.join(unmet, ", ")}"]
+  end
+
+  defp loaded_version!(app) do
+    case Application.spec(app, :vsn) do
+      nil -> raise ArgumentError, "requires/1: #{inspect(app)} is not a loaded application"
+      vsn -> to_string(vsn)
+    end
+  end
 
   # The application's sandbox owners, as a generated DataCase starts them: Fluffy only
   # passes the test's sandbox to browser sessions. `setup {Fluffy.Support.Case, :start_sandbox}`.

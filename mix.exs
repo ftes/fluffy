@@ -67,13 +67,13 @@ defmodule Fluffy.MixProject do
 
   defp deps do
     [
+      # The runtime floors are what CI's oldest lane runs: mix.lock.oldest locks each one.
       {:nimble_options, "~> 1.1"},
       {:lazy_html, ">= 0.1.13 and < 1.0.0"},
-      # The floors CI's oldest lane runs, from mix.lock.oldest.
-      {:phoenix, "~> 1.7 and >= 1.7.24"},
-      {:phoenix_live_view, "~> 1.2 and >= 1.2.10"},
+      {:phoenix, "~> 1.7 and >= 1.7.10"},
+      {:phoenix_live_view, "~> 1.1 and >= 1.1.32"},
       {:playwright, "~> 1.65.0-rc.4", hex: :playwright_ex},
-      {:phoenix_ecto, "~> 4.7", optional: true},
+      {:phoenix_ecto, "~> 4.6 and >= 4.6.6", optional: true},
       {:ecto_sql, "~> 3.10", optional: true},
       {:ex_doc, "~> 0.40.3", only: :dev, runtime: false},
       {:usage_rules, "~> 1.3", only: [:dev, :test], runtime: false},
@@ -82,7 +82,7 @@ defmodule Fluffy.MixProject do
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:esbuild, "~> 0.10.1", only: [:dev, :test], runtime: false},
       {:bandit, "~> 1.0", only: :test},
-      {:postgrex, ">= 0.22.0 and < 1.0.0", only: :test}
+      {:postgrex, ">= 0.16.0 and < 1.0.0", only: :test}
     ]
   end
 

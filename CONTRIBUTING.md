@@ -1,8 +1,8 @@
 # Developing Fluffy
 
 The project pins the current local-development toolchain in `.tool-versions`.
-Fluffy's compatibility floor is Elixir 1.18 on OTP 27 with Phoenix 1.7.24 and LiveView
-1.2.10 (`.tool-versions.oldest` and `mix.lock.oldest`, which CI's oldest lane uses);
+Fluffy's compatibility floor is Elixir 1.18 on OTP 27 with Phoenix 1.7.10 and LiveView
+1.1.32 (`.tool-versions.oldest` and `mix.lock.oldest`, which CI's oldest lane uses);
 development also requires PostgreSQL. From a clean checkout:
 
 ```bash
@@ -10,10 +10,12 @@ mix setup
 mix test
 ```
 
-`mix.lock.oldest` is a lock with Phoenix and LiveView at their floors. To move one,
-require exactly the new floor in `mix.exs`, copy `mix.lock.oldest` to `mix.lock`, run
-`mix deps.update phoenix phoenix_live_view`, keep the result as `mix.lock.oldest`, and
-restore `mix.lock` and the requirement.
+`mix.lock.oldest` locks every direct runtime dependency at its floor, the lowest version its
+requirement in `mix.exs` accepts, which `DependencyFloorsTest` checks. To move one, copy
+`.tool-versions.oldest` to `.tool-versions` and `mix.lock.oldest` to `mix.lock`, require
+exactly the new floor, run `mix deps.update <dep>`, restore the requirement, and keep the
+lock as `mix.lock.oldest` once `mix deps.get --check-locked` accepts it from an empty `deps/`,
+as CI runs it. Then restore `.tool-versions` and `mix.lock`.
 
 `mix setup` installs Chromium and fetches Playwright's source, for reference, into
 `tmp/playwright-<version>`. To run the suite on Firefox or WebKit, install it with
