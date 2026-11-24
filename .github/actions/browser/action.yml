@@ -20,13 +20,13 @@ runs:
         echo "day=$(date -u +%F)" >> "$GITHUB_OUTPUT"
     # The driver (with its Node.js) is the same for every browser, so it is cached once.
     - name: Restore Playwright driver
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cache/playwright
         key: playwright-driver-${{ runner.os }}-${{ hashFiles('deps/playwright/DRIVER_VERSION', 'deps/playwright/NODE_VERSION') }}
     # Browsers depend on the driver version only, not its bundled Node.js.
     - name: Restore Playwright browser
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cache/ms-playwright
         key: playwright-browser-${{ runner.os }}-${{ hashFiles('deps/playwright/DRIVER_VERSION') }}-${{ inputs.browser }}
@@ -38,7 +38,7 @@ runs:
     # updates are picked up; restores take the newest. autoclean drops the superseded .debs.
     - name: Restore browser system packages
       id: apt-cache
-      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         key: apt-${{ inputs.browser }}-${{ hashFiles('deps/playwright/DRIVER_VERSION') }}-${{ steps.image.outputs.os }}-${{ steps.image.outputs.day }}
         restore-keys: apt-${{ inputs.browser }}-${{ hashFiles('deps/playwright/DRIVER_VERSION') }}-${{ steps.image.outputs.os }}
@@ -63,7 +63,7 @@ runs:
         exit 1
     - name: Save browser system packages
       if: inputs.save-apt-cache == 'true' && steps.apt-cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         key: ${{ steps.apt-cache.outputs.cache-primary-key }}
         path: ~/apt-cache
