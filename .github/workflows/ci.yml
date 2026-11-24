@@ -75,7 +75,7 @@ jobs:
           persist-credentials: false
       - name: Set up toolchain and deps
         id: setup
-        uses: ftes/ci/setup@c7549ac6ba6e6f8c96a28472d6489ae28d76c5a6 # v1.0.2
+        uses: ftes/ci/setup@78e6ba9c26b2865cad995d33aadba7ccb23c9149 # v1.0.3
         with:
           lane: ${{ matrix.lane }}
       # ftes/ci/setup's deps.get re-resolves a lock that mix.exs no longer accepts, without failing.
@@ -91,12 +91,6 @@ jobs:
             git diff --quiet -- mix.lock ||
               { echo "::error::mix.lock no longer meets mix.exs: run mix deps.get and commit it"; exit 1; }
           fi
-      # The deps and _build cache isn't keyed on the OTP build, so the project PLT it carries
-      # (_build/test/dialyxir*) can come from another build and fail as "Old PLT file". The PLT
-      # cache below is the only source.
-      - name: Drop the PLTs restored with _build
-        if: matrix.lane == 'newest'
-        run: rm -f _build/test/dialyxir*.plt*
       # After the deps and _build restore, so a fresher PLT wins. Keyed on the OTP build too: Dialyzer
       # rejects a PLT from another build of the same version as "Old PLT file".
       - name: Restore Dialyzer PLTs
@@ -198,11 +192,11 @@ jobs:
           persist-credentials: false
       - name: Set up toolchain and deps
         id: setup
-        uses: ftes/ci/setup@c7549ac6ba6e6f8c96a28472d6489ae28d76c5a6 # v1.0.2
+        uses: ftes/ci/setup@78e6ba9c26b2865cad995d33aadba7ccb23c9149 # v1.0.3
         with:
           lane: ${{ matrix.lane }}
       - name: Install Playwright browser
-        uses: ftes/ci/playwright-browser@c7549ac6ba6e6f8c96a28472d6489ae28d76c5a6 # v1.0.2
+        uses: ftes/ci/playwright-browser@78e6ba9c26b2865cad995d33aadba7ccb23c9149 # v1.0.3
         with:
           browser: ${{ matrix.browser }}
           # One job per browser saves (the action does on main only).
@@ -275,9 +269,9 @@ jobs:
           persist-credentials: false
       - name: Set up toolchain and deps
         id: setup
-        uses: ftes/ci/setup@c7549ac6ba6e6f8c96a28472d6489ae28d76c5a6 # v1.0.2
+        uses: ftes/ci/setup@78e6ba9c26b2865cad995d33aadba7ccb23c9149 # v1.0.3
       - name: Install Playwright browser
-        uses: ftes/ci/playwright-browser@c7549ac6ba6e6f8c96a28472d6489ae28d76c5a6 # v1.0.2
+        uses: ftes/ci/playwright-browser@78e6ba9c26b2865cad995d33aadba7ccb23c9149 # v1.0.3
       # Per commit, as the main deps and _build: the fixture compiles Fluffy as a path dep.
       - name: Restore consumer deps and _build
         id: consumer-cache
