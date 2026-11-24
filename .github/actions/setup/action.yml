@@ -9,7 +9,7 @@ inputs:
   # upstream guarantees that advertised versions are downloadable.
   mise-version:
     description: The mise version to install
-    default: "2026.8.14"
+    default: "2026.11.12"
 
 outputs:
   elixir:
@@ -18,6 +18,10 @@ outputs:
     value: ${{ steps.toolchain.outputs.erlang }}
   image:
     value: ${{ steps.toolchain.outputs.image }}
+  # For Dialyzer PLT keys: Dialyzer rejects a PLT another build of the same Erlang version made
+  # (compiled from source vs precompiled), as it stores a hash of its own beams.
+  erlang-build:
+    value: ${{ steps.erlang-build.outputs.erlang-build }}
   mix-cache-key:
     value: ${{ steps.mix-cache.outputs.cache-primary-key }}
   mix-cache-hit:
@@ -38,10 +42,25 @@ runs:
         fi
         awk '$1 == "elixir" || $1 == "erlang" { print $1 "=" $2 }' .tool-versions >> "$GITHUB_OUTPUT"
         echo "image=$ImageOS" >> "$GITHUB_OUTPUT"
+    # mise installs precompiled Erlang (builds.hex.pm) only on the Ubuntu runners it detects, up to
+    # 24.04, and compiles it from source (~5 min) on newer ones. Drop once mise detects the runner.
+    - name: Use precompiled Erlang
+      shell: bash
+      # The value is the runner's ImageOS digits, nothing a caller or PR controls.
+      run: | # zizmor: ignore[github-env]
+        if [ -z "${MISE_ERLANG_PRECOMPILED_OS:-}" ] && [[ "${ImageOS:-}" =~ ^ubuntu([0-9]{2})$ ]]; then
+          echo "MISE_ERLANG_PRECOMPILED_OS=ubuntu-${BASH_REMATCH[1]}.04" >> "$GITHUB_ENV"
+        fi
     - name: Setup toolchain
       uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78 # v5.3.0
       with:
         version: ${{ inputs.mise-version }}
+    - name: Read the Erlang build
+      id: erlang-build
+      shell: bash
+      run: |
+        dialyzer=$(erl -noshell -eval 'io:format("~s", [code:lib_dir(dialyzer)])' -s init stop)
+        echo "erlang-build=$(cat "$dialyzer"/ebin/*.beam | sha256sum | cut -c1-12)" >> "$GITHUB_OUTPUT"
     # deps and the whole _build (Fluffy too: Mix compares content digests, so a fresh checkout
     # recompiles only what changed, and --warnings-as-errors re-emits the manifest's warnings).
     # Keyed per runner image (PLTs, NIFs and ERTS paths don't carry over) and toolchain. The
