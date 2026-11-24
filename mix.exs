@@ -7,6 +7,7 @@ defmodule Fluffy.MixProject do
   @hex_url "https://hex.pm/packages/fluffy"
 
   @guides [
+    "docs/why-fluffy.md",
     "docs/installation.md",
     "docs/usage.md",
     "docs/locators.md",

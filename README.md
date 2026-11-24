@@ -9,10 +9,12 @@
 [![CI](https://github.com/ftes/fluffy/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ftes/fluffy/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.md)
 
-Fluffy tests Phoenix pages and LiveViews directly, or uses a real browser when
-needed. Fluffy's behavior is checked against a real browser to verify that tests
-run without a browser behave consistently. See the
-[capability matrix](docs/capabilities.md) for supported behavior and differences.
+Feature tests should run without a browser where they can and in one where they
+must, and behave the same either way. Fluffy runs Phoenix pages and LiveViews
+in-process with `start_session(:phoenix)`, or in a real browser through Playwright
+with `start_session(:playwright)`. You pick the backend for each test; Fluffy's
+in-process drivers are checked against the browser. See [Why Fluffy](docs/why-fluffy.md)
+and the [capability matrix](docs/capabilities.md) for what needs a browser.
 
 ```elixir
 creature_row =
@@ -131,6 +133,8 @@ backend supports.
 
 ## Guides
 
+- [Why Fluffy](docs/why-fluffy.md) — the problem it solves, how it compares with
+  PhoenixTest and PhoenixTest.Playwright, and its trade-offs
 - [Installation and runtime](docs/installation.md) — endpoint, browser,
   Ecto sandbox setup, and usage rules for coding agents
 - [Usage](docs/usage.md) — your first test, backend choice, and a shared test case
