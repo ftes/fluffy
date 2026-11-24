@@ -58,17 +58,17 @@ runs:
         path: |
           deps
           _build
-    - name: Install dependencies
+    # --check-locked fails when the requirements in mix.exs no longer accept the lane's lock,
+    # instead of re-resolving it: the oldest lane then still runs every floor.
+    - name: Fetch dependencies
+      id: deps-get
       shell: bash
-      run: mix do deps.get + deps.compile
-    # deps.get re-resolves, without failing, a dep whose requirement the lock no longer meets.
-    - name: Check the oldest lane kept its floors
-      if: inputs.lane == 'oldest'
+      run: mix deps.get --check-locked
+    # On the oldest lane mix.lock is a copy, so Mix's error names the wrong file.
+    - name: Explain a stale oldest lock
+      if: failure() && steps.deps-get.outcome == 'failure' && inputs.lane == 'oldest'
       shell: bash
-      run: |
-        for dep in phoenix phoenix_live_view; do
-          if [ "$(grep "^  \"$dep\":" mix.lock)" != "$(grep "^  \"$dep\":" mix.lock.oldest)" ]; then
-            echo "::error::mix deps.get moved $dep off its floor in mix.lock.oldest: raise the floor in mix.exs and mix.lock.oldest together"
-            exit 1
-          fi
-        done
+      run: echo "::error::mix.lock.oldest no longer meets mix.exs; move a floor in mix.exs and mix.lock.oldest together, see CONTRIBUTING.md"
+    - name: Compile dependencies
+      shell: bash
+      run: mix deps.compile
