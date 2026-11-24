@@ -14,6 +14,9 @@ env:
   # still running in the background: the review ended waiting on its reviewers and posted nothing.
   CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1"
 
+# Each job asks for what it needs.
+permissions: {}
+
 jobs:
   claude-review:
     # Claude's own PRs are the only bot PRs reviewed, and only this repository's PRs, never

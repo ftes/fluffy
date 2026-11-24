@@ -53,6 +53,7 @@ jobs:
     name: checks (${{ matrix.lane }})
     # Draft PRs skip CI until marked ready, and in a stack only the top PR runs it: it holds every
     # change below it. `pull_request` and `stack` are absent on other events. As the jobs below.
+    # Tradeoffs (re-run CI on a PR that becomes the top): ftes/ci README, "Pull request CI".
     if: &stack_top ${{ !github.event.pull_request.draft && (github.event.pull_request.stack == null || github.event.pull_request.stack.position == github.event.pull_request.stack.size) }}
     runs-on: ubuntu-26.04
     timeout-minutes: 20

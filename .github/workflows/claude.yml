@@ -13,6 +13,9 @@ on:
 env:
   MIX_ENV: test
 
+# Each job asks for what it needs.
+permissions: {}
+
 jobs:
   # Maintainers only: the action rejects anyone else, but only after the setup in `claude`. Reviews
   # only on this repository's PRs, never Renovate's; a comment's PR is checked here, before anything
