@@ -87,7 +87,7 @@ jobs:
           fi
           echo "VERSION=$version" >> "$GITHUB_ENV"
       - name: Set up toolchain and deps
-        uses: ftes/ci/setup@981edfa2436c04fe9ca46d25bc2fe1e8883c120d # v1.0.6
+        uses: ftes/ci/setup@2c3f2ed89933e28679de07afdd02f3bb80c0240d # v1.0.7
       # No HEX_API_KEY: with one set, Hex would use it instead of the workload identity.
       - name: Publish to Hex and wait for approval
         run: mix hex.publish --yes --wait
