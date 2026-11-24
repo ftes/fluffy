@@ -83,22 +83,44 @@ Locator constructors take a locator; page constructors target the active page.
 | --- | --- |
 | `assert(visible(locator))` | `expect(to_be_visible(locator))` |
 | `refute(visible(locator))` | `expect(not_(to_be_visible(locator)))` |
+| `assert(hidden(locator))` | `expect(to_be_hidden(locator))` |
+| `assert(attached(locator))` | `expect(to_be_attached(locator))` |
 | `assert(checked(locator))` | `expect(to_be_checked(locator))` |
 | `assert(enabled(locator))` | `expect(to_be_enabled(locator))` |
+| `assert(disabled(locator))` | `expect(to_be_disabled(locator))` |
+| `assert(editable(locator))` | `expect(to_be_editable(locator))` |
+| `assert(empty(locator))` | `expect(to_be_empty(locator))` |
+| `assert(focused(locator))` | `expect(to_be_focused(locator))` |
+| `assert(in_viewport(locator))` | `expect(to_be_in_viewport(locator))` |
 | `assert(count(locator, 3))` | `expect(to_have_count(locator, 3))` |
 | `assert(value(locator, "Basilisk"))` | `expect(to_have_value(locator, "Basilisk"))` |
+| `assert(values(locator, ["owl", "toad"]))` | `expect(to_have_values(locator, ["owl", "toad"]))` |
 | `assert(text(locator, "Basilisk"))` | `expect(to_have_text(locator, "Basilisk"))` |
+| `assert(contain_text(locator, "Basil"))` | `expect(to_contain_text(locator, "Basil"))` |
 | `assert(attribute(locator, "href", "/creatures"))` | `expect(to_have_attribute(locator, "href", "/creatures"))` |
-| `assert(hidden(locator))` | `expect(to_be_hidden(locator))` |
+| `assert(class(locator, "card selected"))` | `expect(to_have_class(locator, "card selected"))` |
+| `assert(contain_class(locator, "selected"))` | `expect(to_contain_class(locator, "selected"))` |
+| `assert(id(locator, "name"))` | `expect(to_have_id(locator, "name"))` |
+| `assert(css(locator, "display", "flex"))` | `expect(to_have_css(locator, "display", "flex"))` |
+| `assert(js_property(locator, "checked", true))` | `expect(to_have_js_property(locator, "checked", true))` |
+| `assert(role(locator, :button))` | `expect(to_have_role(locator, :button))` |
+| `assert(accessible_name(locator, "Register"))` | `expect(to_have_accessible_name(locator, "Register"))` |
+| `assert(accessible_description(locator, "Your full name"))` | `expect(to_have_accessible_description(locator, "Your full name"))` |
+| `assert(accessible_error_message(locator, "Too short"))` | `expect(to_have_accessible_error_message(locator, "Too short"))` |
+| `assert(match_aria_snapshot(locator, "- button"))` | `expect(to_match_aria_snapshot(locator, "- button"))` |
+| `assert(match_screenshot(locator, name: "card.png"))` | `expect(to_have_screenshot(locator, name: "card.png"))` |
 | `assert(page_url("/creatures"))` | `expect(page_to_have_url("/creatures"))` |
 | `assert(page_title("Creatures"))` | `expect(page_to_have_title("Creatures"))` |
+| `assert(page_match_aria_snapshot("- heading"))` | `expect(page_to_match_aria_snapshot("- heading"))` |
+| `assert(page_match_screenshot(name: "creatures.png"))` | `expect(page_to_have_screenshot(name: "creatures.png"))` |
+| `assert(page_opener(page))` | `expect(page_to_have_opener(page))` |
 
 Use `Fluffy.Assert.assert_event/4` or the equivalent `Fluffy.Expect.expect_event/4` for
 events. The optional assertion receives an ordinary event value; use ExUnit assertions
 on its fields. See [Advanced events and pages](advanced-events.md).
 
-The same naming pattern applies to the remaining constructors. See the
-`Fluffy.Assert` and `Fluffy.Expect` references for their complete APIs.
+See the `Fluffy.Assert` and `Fluffy.Expect` references for their options and which
+ones require Playwright.
 
 ## Options and negation
 

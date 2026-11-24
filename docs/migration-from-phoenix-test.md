@@ -227,7 +227,7 @@ The facade covers PhoenixTest's API. For what PhoenixTest.Playwright adds:
     the facade, as `Fluffy.start_session(:playwright) |> Fluffy.add_session_cookie(values) |> visit("/")`;
   - `screenshot` and `assert_screenshot`: `Fluffy.Playwright.screenshot/2` (with `path:`,
     and `full_page: true` for the old default; it returns the PNG, not the session) and
-    `Fluffy.Expect.page_to_have_screenshot/1` (with `name:`);
+    `Fluffy.Assert.page_match_screenshot/1` or `Fluffy.Expect.page_to_have_screenshot/1` (with `name:`);
   - `with_dialog`: see [Listeners and dialogs](advanced-events.md#listeners-and-dialogs);
   - `assert_download`: wait for `Fluffy.Event.download/1`, then `Fluffy.Download.read/2` or
     `Fluffy.Download.save_as/2` ([Downloads](advanced-events.md#downloads)). The event comes
