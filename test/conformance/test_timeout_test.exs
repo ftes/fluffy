@@ -90,9 +90,19 @@ defmodule Fluffy.Conformance.PlaywrightTestTimeoutTest do
   import Fluffy.Locator
 
   alias Fluffy.Event
+  alias Playwright.Test.BrowserPool
 
   @moduletag timeout: 2_000
+  # The close runs its artifact steps (CI's failure screenshots, its retry's trace) before the
+  # call fails, all in the 100ms before ExUnit's kill, which Firefox on CI outlasts.
+  @moduletag Playwright.Test.use(screenshot: :off, trace: :off)
   @missing by_role(:button, name: "Missing")
+
+  # As upstream's worker-scoped `browser` fixture, the browser's launch is not the test's.
+  setup_all do
+    _browser = BrowserPool.browser()
+    :ok
+  end
 
   @tag driver: :playwright
   test "an action that outlasts the test fails at the test timeout with playwright" do
