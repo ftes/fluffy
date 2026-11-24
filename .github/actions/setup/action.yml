@@ -18,6 +18,10 @@ outputs:
     value: ${{ steps.toolchain.outputs.erlang }}
   image:
     value: ${{ steps.toolchain.outputs.image }}
+  # For Dialyzer PLT keys: Dialyzer rejects a PLT another build of the same Erlang version made
+  # (compiled from source vs precompiled), as it stores a hash of its own beams.
+  erlang-build:
+    value: ${{ steps.erlang-build.outputs.erlang-build }}
   mix-cache-key:
     value: ${{ steps.mix-cache.outputs.cache-primary-key }}
   mix-cache-hit:
@@ -51,6 +55,12 @@ runs:
       uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78 # v5.3.0
       with:
         version: ${{ inputs.mise-version }}
+    - name: Read the Erlang build
+      id: erlang-build
+      shell: bash
+      run: |
+        dialyzer=$(erl -noshell -eval 'io:format("~s", [code:lib_dir(dialyzer)])' -s init stop)
+        echo "erlang-build=$(cat "$dialyzer"/ebin/*.beam | sha256sum | cut -c1-12)" >> "$GITHUB_OUTPUT"
     # deps and the whole _build (Fluffy too: Mix compares content digests, so a fresh checkout
     # recompiles only what changed, and --warnings-as-errors re-emits the manifest's warnings).
     # Keyed per runner image (PLTs, NIFs and ERTS paths don't carry over) and toolchain. The

@@ -75,9 +75,9 @@ jobs:
           path: |
             ~/.mix/dialyxir*.plt*
             _build/test/dialyxir*.plt*
-          key: dialyzer-${{ steps.setup.outputs.image }}-erlang-${{ steps.setup.outputs.erlang }}-elixir-${{ steps.setup.outputs.elixir }}-${{ hashFiles('mix.lock') }}
+          key: dialyzer-${{ steps.setup.outputs.image }}-erlang-${{ steps.setup.outputs.erlang }}-${{ steps.setup.outputs.erlang-build }}-elixir-${{ steps.setup.outputs.elixir }}-${{ hashFiles('mix.lock') }}
           restore-keys: |
-            dialyzer-${{ steps.setup.outputs.image }}-erlang-${{ steps.setup.outputs.erlang }}-elixir-${{ steps.setup.outputs.elixir }}-
+            dialyzer-${{ steps.setup.outputs.image }}-erlang-${{ steps.setup.outputs.erlang }}-${{ steps.setup.outputs.erlang-build }}-elixir-${{ steps.setup.outputs.elixir }}-
       # `mix lint`, as `mix check` runs it locally: formatting, strict compile, generated usage
       # rules, Credo, the docs build and Dialyzer, whose last-task args take the GitHub format.
       - name: Lint (mix lint)
