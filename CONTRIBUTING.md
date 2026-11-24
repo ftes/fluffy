@@ -16,6 +16,9 @@ requirement in `mix.exs` accepts, which `DependencyFloorsTest` checks. To move o
 exactly the new floor, run `mix deps.update <dep>`, restore the requirement, and keep the
 lock as `mix.lock.oldest` once `mix deps.get --check-locked` accepts it from an empty `deps/`,
 as CI runs it. Then restore `.tool-versions` and `mix.lock`.
+Renovate never updates `mix.lock.oldest`. When `mix.exs` no longer accepts what it locks (a raised
+floor, or a dev dependency's new major), CI's oldest lane fails at setup with "deps.get changed
+mix.lock.oldest"; update the lock as above.
 
 `mix setup` installs Chromium and fetches Playwright's source, for reference, into
 `tmp/playwright-<version>`. To run the suite on Firefox or WebKit, install it with
