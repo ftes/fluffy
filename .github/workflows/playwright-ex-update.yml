@@ -4,6 +4,9 @@ name: PlaywrightEx Update
 # upstream-update.yml does for Playwright. Renovate leaves playwright_ex to this workflow: a new
 # PlaywrightEx member fails `Fluffy.PlaywrightMembersTest` until it is classified, which Renovate
 # can't do.
+#
+# Accepted risk: Claude runs with the app token on a new PlaywrightEx release (its code, driver,
+# CHANGELOG and usage rules). PlaywrightEx is the owner's own library.
 on:
   schedule:
     - cron: "37 4 * * *"
@@ -19,8 +22,6 @@ permissions: {}
 
 env:
   MIX_ENV: test
-  # As in claude-nightly.yml.
-  CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1"
 
 jobs:
   # Cheap, no Claude: is there a newer release without a branch or PR for it?
@@ -124,9 +125,9 @@ jobs:
         run: mix fluffy.playwright_source
       - run: git switch -c "$BRANCH"
       - name: Run Claude
-        uses: ./.github/actions/claude
+        uses: ftes/ci/claude@70f3e82336c42d568193e6653b5d3e30e4693d39 # v1.0.4
         with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
             REPO: ${{ github.repository }}
             FROM: ${{ needs.check.outputs.from }} (in mix.lock: a Hex version, or a commit of PlaywrightEx's main)
@@ -165,8 +166,5 @@ jobs:
             and decisions left for a human, and the `mix check` result. Then run exactly:
               git push -u origin ${{ env.BRANCH }}
               gh pr create --draft --base main --head ${{ env.BRANCH }} --title "Update PlaywrightEx to ${{ needs.check.outputs.to }}" --body-file tmp/playwright-ex-pr.md
-
-            No attribution anywhere: no Co-Authored-By trailers or "Generated with" lines.
-          claude_args: |
-            --max-turns 150
-            --allowedTools "Skill,Read,Grep,Glob,Edit,Write,Agent,Task,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git add:*),Bash(git commit:*),Bash(mix deps.update playwright),Bash(mix deps.get),Bash(mix playwright.install:*),Bash(mix fluffy.playwright_source),Bash(mix usage_rules.sync:*),Bash(mix usage_rules.docs:*),Bash(mix usage_rules.search_docs:*),Bash(mix format:*),Bash(mix compile:*),Bash(mix credo:*),Bash(mix test:*),Bash(mix check:*),Bash(git push -u origin ${{ env.BRANCH }}),Bash(gh pr create --draft --base main --head ${{ env.BRANCH }} *)"
+          max-turns: "150"
+          allowed-tools: "Skill,Read,Grep,Glob,Edit,Write,Agent,Task,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git add:*),Bash(git commit:*),Bash(mix deps.update playwright),Bash(mix deps.get),Bash(mix playwright.install:*),Bash(mix fluffy.playwright_source),Bash(mix usage_rules.sync:*),Bash(mix usage_rules.docs:*),Bash(mix usage_rules.search_docs:*),Bash(mix format:*),Bash(mix compile:*),Bash(mix credo:*),Bash(mix test:*),Bash(mix check:*),Bash(git push -u origin ${{ env.BRANCH }}),Bash(gh pr create --draft --base main --head ${{ env.BRANCH }} *)"

@@ -15,9 +15,6 @@ permissions: {}
 
 env:
   MIX_ENV: test
-  # Runs subagents in the foreground. A headless run ends with Claude's turn, which drops any
-  # still running in the background: the survey agents never reported back.
-  CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: "1"
 
 jobs:
   # Frees slots before the cap is counted. A job, not an earlier cron: GitHub delays scheduled
@@ -57,9 +54,9 @@ jobs:
       - name: Run Claude
         id: claude
         if: steps.list.outputs.numbers != ''
-        uses: ./.github/actions/claude
+        uses: ftes/ci/claude@70f3e82336c42d568193e6653b5d3e30e4693d39 # v1.0.4
         with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
             REPO: ${{ github.repository }}
             OPEN NIGHTLY PRS, each with its branch: ${{ steps.list.outputs.listed }}
@@ -89,10 +86,9 @@ jobs:
 
             Return the PRs to redo in `redo`, each with a one-sentence `why` naming what changed on
             main. Leave it empty if none.
-          claude_args: |
-            --max-turns 60
-            --allowedTools "Skill,Read,Grep,Glob,Agent,Task,StructuredOutput,Bash(git log:*),Bash(git show:*),Bash(git diff:*),${{ steps.list.outputs.allowed }}"
-            --json-schema '{"type":"object","properties":{"redo":{"type":"array","items":{"type":"object","properties":{"number":{"type":"integer"},"why":{"type":"string"}},"required":["number","why"]}}},"required":["redo"]}'
+          max-turns: "60"
+          allowed-tools: "Skill,Read,Grep,Glob,Agent,Task,StructuredOutput,Bash(git log:*),Bash(git show:*),Bash(git diff:*),${{ steps.list.outputs.allowed }}"
+          json-schema: '{"type":"object","properties":{"redo":{"type":"array","items":{"type":"object","properties":{"number":{"type":"integer"},"why":{"type":"string"}},"required":["number","why"]}}},"required":["redo"]}'
       - name: Keep the redo verdicts of listed PRs
         id: redo
         if: ${{ !cancelled() }}
@@ -211,14 +207,6 @@ jobs:
           persist-credentials: false
           ref: ${{ matrix.pr.branch }}
           fetch-depth: 0
-      # The run's own actions, which a PR branch from before a change to them lacks. Into tmp/,
-      # which is gitignored.
-      - name: Checkout this run's actions
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          path: tmp/ci
-          sparse-checkout: .github/actions
-          persist-credentials: false
       - name: Set up toolchain and deps
         uses: ftes/ci/setup@70f3e82336c42d568193e6653b5d3e30e4693d39 # v1.0.4
       # These may fail on a branch that doesn't compile; Claude then runs without them.
@@ -247,9 +235,9 @@ jobs:
           mkdir -p tmp
           gh run view "$run" --log-failed | tail -n 5000 > tmp/ci-failed.log
       - name: Run Claude
-        uses: ./tmp/ci/.github/actions/claude
+        uses: ftes/ci/claude@70f3e82336c42d568193e6653b5d3e30e4693d39 # v1.0.4
         with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
             REPO: ${{ github.repository }}
             PR: ${{ matrix.pr.number }}
@@ -274,11 +262,8 @@ jobs:
               `git commit --allow-empty -m "Re-run CI"`, then the push above.
             - It can't be fixed without redesigning the change: run exactly
               gh pr close ${{ matrix.pr.number }} --delete-branch --comment "<one sentence on why>"
-
-            No attribution anywhere: no Co-Authored-By trailers or "Generated with" lines.
-          claude_args: |
-            --max-turns 60
-            --allowedTools "Skill,Read,Grep,Glob,Edit,Write,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git add:*),Bash(git commit:*),Bash(mix format:*),Bash(mix compile:*),Bash(mix usage_rules.docs:*),Bash(mix usage_rules.search_docs:*),Bash(mix credo:*),Bash(mix test:*),Bash(gh pr view ${{ matrix.pr.number }}),Bash(gh pr view ${{ matrix.pr.number }} *),Bash(gh pr diff ${{ matrix.pr.number }}),Bash(gh pr diff ${{ matrix.pr.number }} *),Bash(git push origin ${{ matrix.pr.branch }}),Bash(gh pr close ${{ matrix.pr.number }} *)"
+          max-turns: "60"
+          allowed-tools: "Skill,Read,Grep,Glob,Edit,Write,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git add:*),Bash(git commit:*),Bash(mix format:*),Bash(mix compile:*),Bash(mix usage_rules.docs:*),Bash(mix usage_rules.search_docs:*),Bash(mix credo:*),Bash(mix test:*),Bash(gh pr view ${{ matrix.pr.number }}),Bash(gh pr view ${{ matrix.pr.number }} *),Bash(gh pr diff ${{ matrix.pr.number }}),Bash(gh pr diff ${{ matrix.pr.number }} *),Bash(git push origin ${{ matrix.pr.branch }}),Bash(gh pr close ${{ matrix.pr.number }} *)"
 
   # Replaces each conflicted PR, and each that triage found no longer fits main, with one on a new
   # branch from main. The Claude app can't push workflow file changes, which a merge or rebase of
@@ -311,9 +296,9 @@ jobs:
         run: mix fluffy.playwright_source
       - run: git switch -c "$NIGHTLY_BRANCH"
       - name: Run Claude
-        uses: ./.github/actions/claude
+        uses: ftes/ci/claude@70f3e82336c42d568193e6653b5d3e30e4693d39 # v1.0.4
         with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
             REPO: ${{ github.repository }}
             OLD PR: ${{ matrix.pr.number }}
@@ -339,11 +324,8 @@ jobs:
               git push -u origin ${{ env.NIGHTLY_BRANCH }}
               gh pr create --base main --head ${{ env.NIGHTLY_BRANCH }} --title "<subject>" --body-file tmp/nightly-pr.md
               gh pr close ${{ matrix.pr.number }} --delete-branch --comment "Redone on current main (<WHY, shortened>); replaced by <new PR URL>."
-
-            No attribution anywhere: no Co-Authored-By trailers or "Generated with" lines.
-          claude_args: |
-            --max-turns 60
-            --allowedTools "Skill,Read,Grep,Glob,Edit,Write,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git add:*),Bash(git commit:*),Bash(mix format:*),Bash(mix compile:*),Bash(mix credo:*),Bash(mix usage_rules.docs:*),Bash(mix usage_rules.search_docs:*),Bash(gh pr view ${{ matrix.pr.number }}),Bash(gh pr view ${{ matrix.pr.number }} *),Bash(gh pr diff ${{ matrix.pr.number }}),Bash(gh pr diff ${{ matrix.pr.number }} *),Bash(git push -u origin ${{ env.NIGHTLY_BRANCH }}),Bash(gh pr create --base main --head ${{ env.NIGHTLY_BRANCH }} *),Bash(gh pr close ${{ matrix.pr.number }} *)"
+          max-turns: "60"
+          allowed-tools: "Skill,Read,Grep,Glob,Edit,Write,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git add:*),Bash(git commit:*),Bash(mix format:*),Bash(mix compile:*),Bash(mix credo:*),Bash(mix usage_rules.docs:*),Bash(mix usage_rules.search_docs:*),Bash(gh pr view ${{ matrix.pr.number }}),Bash(gh pr view ${{ matrix.pr.number }} *),Bash(gh pr diff ${{ matrix.pr.number }}),Bash(gh pr diff ${{ matrix.pr.number }} *),Bash(git push -u origin ${{ env.NIGHTLY_BRANCH }}),Bash(gh pr create --base main --head ${{ env.NIGHTLY_BRANCH }} *),Bash(gh pr close ${{ matrix.pr.number }} *)"
 
   # Enforces the cap before any toolchain is set up. Runs even if an earlier job failed: the
   # count is still right, it just finds fewer slots.
@@ -440,9 +422,9 @@ jobs:
           echo "area=$area" >> "$GITHUB_OUTPUT"
 
       - name: Run Claude
-        uses: ./.github/actions/claude
+        uses: ftes/ci/claude@70f3e82336c42d568193e6653b5d3e30e4693d39 # v1.0.4
         with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
             REPO: ${{ github.repository }}
             BRANCH: ${{ env.NIGHTLY_BRANCH }} (already checked out)
@@ -482,8 +464,5 @@ jobs:
               gh pr create --base main --head ${{ env.NIGHTLY_BRANCH }} --title "<subject>" --body-file tmp/nightly-pr.md
             Write tmp/nightly-pr.md first (tmp/ is gitignored): a few sentences on what was
             inconsistent or complex and why this is simpler.
-
-            No attribution anywhere: no Co-Authored-By trailers or "Generated with" lines.
-          claude_args: |
-            --max-turns 150
-            --allowedTools "Skill,Read,Grep,Glob,Edit,Write,Agent,Task,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git add:*),Bash(git commit:*),Bash(mix format:*),Bash(mix compile:*),Bash(mix usage_rules.docs:*),Bash(mix usage_rules.search_docs:*),Bash(mix credo:*),Bash(git push -u origin ${{ env.NIGHTLY_BRANCH }}),Bash(gh pr create --base main --head ${{ env.NIGHTLY_BRANCH }} *)"
+          max-turns: "150"
+          allowed-tools: "Skill,Read,Grep,Glob,Edit,Write,Agent,Task,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git add:*),Bash(git commit:*),Bash(mix format:*),Bash(mix compile:*),Bash(mix usage_rules.docs:*),Bash(mix usage_rules.search_docs:*),Bash(mix credo:*),Bash(git push -u origin ${{ env.NIGHTLY_BRANCH }}),Bash(gh pr create --base main --head ${{ env.NIGHTLY_BRANCH }} *)"
