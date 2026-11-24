@@ -362,6 +362,22 @@ defmodule Fluffy.Conformance.LiveFormTest do
     end
 
     @tag driver: driver
+    test "phx-trigger-action posts typed values its render drops, and a changed hidden one, with #{driver}", %{
+      driver: driver
+    } do
+      driver
+      |> start_session()
+      |> visit("/live/enrolment")
+      |> fill(by_label("Owl post"), "Harry@Hogwarts.example")
+      |> fill(by_label("Password"), "alohomora")
+      |> fill(by_label("Motto"), "Mischief managed")
+      |> click(by_role(:button, name: "Enrol at Hogwarts"))
+      |> expect("Enrolled harry@hogwarts.example" |> by_text(exact: true) |> to_be_visible())
+      |> expect("Password: alohomora" |> by_text() |> to_be_visible())
+      |> expect("Motto: Mischief managed" |> by_text() |> to_be_visible())
+    end
+
+    @tag driver: driver
     test "an unrelated Live action can trigger an external form with #{driver}", %{
       driver: driver
     } do

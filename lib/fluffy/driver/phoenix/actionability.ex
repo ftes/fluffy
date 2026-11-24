@@ -3,22 +3,7 @@ defmodule Fluffy.Driver.Phoenix.Actionability do
 
   import Fluffy.Driver.Phoenix.HTML.Semantics, only: [input_type: 1]
 
-  @fillable_input_types [
-    "color",
-    "date",
-    "datetime-local",
-    "email",
-    "month",
-    "number",
-    "password",
-    "range",
-    "search",
-    "tel",
-    "text",
-    "time",
-    "url",
-    "week"
-  ]
+  alias Fluffy.Driver.Phoenix.HTML.Semantics
 
   # The click's enabled check follows the label, see `Fluffy.Driver.Phoenix.ClientDOM.click/3`.
   def ensure_clickable!(element, action, locator) do
@@ -87,12 +72,7 @@ defmodule Fluffy.Driver.Phoenix.Actionability do
     end
   end
 
-  defp text_control?("textarea", _attributes), do: true
-
-  defp text_control?("input", attributes),
-    do: input_type(%{tag: "input", attributes: attributes}) in @fillable_input_types
-
-  defp text_control?(_tag, _attributes), do: false
+  defp text_control?(tag, attributes), do: Semantics.value_mode?(%{tag: tag, attributes: attributes})
 
   defp raise_error(action, reason, locator) do
     raise Fluffy.ActionabilityError,

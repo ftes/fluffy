@@ -17,6 +17,17 @@ defmodule Fluffy.Driver.Phoenix.HTML.Semantics do
 
   def input_type(_target), do: nil
 
+  # HTML's value mode, in which a control's value is its own, apart from its
+  # value attribute: a textarea and the text-like inputs, which are also the
+  # ones Playwright's fill accepts.
+  @value_mode_input_types ~w(
+    text search tel url email password date month week time datetime-local number range color
+  )
+
+  def value_mode?(%{tag: "textarea"}), do: true
+  def value_mode?(%{tag: "input"} = target), do: input_type(target) in @value_mode_input_types
+  def value_mode?(_target), do: false
+
   def button_type(%{tag: "button", attributes: attributes}) do
     case attributes |> attribute("type") |> Kernel.||("submit") |> String.downcase() do
       type when type in ["button", "reset", "submit"] -> type
