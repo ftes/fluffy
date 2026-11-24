@@ -14,8 +14,10 @@ defmodule Fluffy.Conformance.DefaultTimeoutTest do
   alias Fluffy.Session
   alias Fluffy.Support.HTTPFixtures
 
-  # Short, as the tests wait them out, and apart, so the time a failure took tells which one
-  # applied.
+  # Short, as the tests wait them out, and apart, so the time a Phoenix session's failure took
+  # tells which one applied. A browser's error names its timeout, and its time has no upper bound:
+  # Fluffy's reads of a new page's first document come before the action's timeout starts, and
+  # take Firefox on CI up to 250ms.
   @expect_timeout 200
   @phoenix_timeout 400
   @action_timeout 600
@@ -39,7 +41,7 @@ defmodule Fluffy.Conformance.DefaultTimeoutTest do
     session = missing_session(:playwright)
 
     {elapsed, error} = failure(fn -> expect(session, to_be_visible(@missing)) end)
-    assert elapsed in (@expect_timeout - @early)..(@phoenix_timeout - 1)
+    assert elapsed >= @expect_timeout - @early
     assert error.message =~ "Timeout: #{@expect_timeout}ms"
 
     {elapsed, error} = failure(fn -> click(session, @missing) end)
@@ -75,7 +77,7 @@ defmodule Fluffy.Conformance.DefaultTimeoutTest do
       {elapsed, error} = failure(fn -> click(session, @missing) end)
 
       if driver == :playwright do
-        assert elapsed in (300 - @early)..(@phoenix_timeout - 1)
+        assert elapsed >= 300 - @early
         assert error.message =~ "Timeout 300ms exceeded."
       else
         assert elapsed in (@phoenix_timeout - @early)..(@action_timeout - 1)
