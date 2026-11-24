@@ -91,6 +91,12 @@ jobs:
             git diff --quiet -- mix.lock ||
               { echo "::error::mix.lock no longer meets mix.exs: run mix deps.get and commit it"; exit 1; }
           fi
+      # The deps and _build cache isn't keyed on the OTP build, so the project PLT it carries
+      # (_build/test/dialyxir*) can come from another build and fail as "Old PLT file". The PLT
+      # cache below is the only source.
+      - name: Drop the PLTs restored with _build
+        if: matrix.lane == 'newest'
+        run: rm -f _build/test/dialyxir*.plt*
       # After the deps and _build restore, so a fresher PLT wins. Keyed on the OTP build too: Dialyzer
       # rejects a PLT from another build of the same version as "Old PLT file".
       - name: Restore Dialyzer PLTs
