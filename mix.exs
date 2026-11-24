@@ -72,7 +72,7 @@ defmodule Fluffy.MixProject do
       {:lazy_html, ">= 0.1.13 and < 1.0.0"},
       {:phoenix, "~> 1.7 and >= 1.7.10"},
       {:phoenix_live_view, "~> 1.1 and >= 1.1.32"},
-      {:playwright, "~> 1.65.0-rc.4", hex: :playwright_ex},
+      {:playwright, "~> 1.65.0-rc.5", hex: :playwright_ex},
       {:phoenix_ecto, "~> 4.6 and >= 4.6.6", optional: true},
       {:ecto_sql, "~> 3.10", optional: true},
       {:ex_doc, "~> 0.40.3", only: :dev, runtime: false},
