@@ -13,8 +13,9 @@
 /.pg/
 .DS_Store
 erl_crash.dump
-.claude/*
-!.claude/skills
+# Personal Claude Code setup (settings.local.json, worktrees, hooks); the skills are shared.
+/.claude/*
+!/.claude/skills
 # Left over in checkouts from before test assets were built with the Hex esbuild package.
 /node_modules/
 /.pnpm-store/
