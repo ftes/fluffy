@@ -13,7 +13,8 @@ defmodule Fluffy.Support.Web.KennelLive do
        treats: 0,
        treat_name: nil,
        treat_keys: [],
-       bones: 0
+       bones: 0,
+       heads: 1
      )}
   end
 
@@ -51,6 +52,11 @@ defmodule Fluffy.Support.Web.KennelLive do
     {:noreply, update(socket, :bones, &(&1 + 1))}
   end
 
+  # Each head reuses the first head's id, which LiveViewTest's client rejects.
+  def handle_event("grow-head", _params, socket) do
+    {:noreply, update(socket, :heads, &(&1 + 1))}
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -60,6 +66,8 @@ defmodule Fluffy.Support.Web.KennelLive do
       <p>Barks: {Enum.join(@barks, ", ")}</p>
       <p>Tune: {@tune}</p>
       <button type="button" phx-click="rename">Rename kennel</button>
+      <p :for={_head <- 1..@heads} id="fluffy-head">Head</p>
+      <button type="button" phx-click="grow-head">Grow a head</button>
       <.portal id="treat-portal" target="#portal-root">
         <div id="treat-dialog" role="dialog" aria-label="Treats">
           <p>Treats: {@treats}</p>

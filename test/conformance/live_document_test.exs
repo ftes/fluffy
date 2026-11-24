@@ -117,6 +117,16 @@ defmodule Fluffy.Conformance.LiveDocumentTest do
     end
   end
 
+  @tag driver: :phoenix
+  test "reports why LiveViewTest's client crashed rather than the view's exit with phoenix" do
+    session = :phoenix |> start_session() |> visit("/live/kennel")
+
+    error = assert_raise Fluffy.OperationError, fn -> click(session, by_role(:button, name: "Grow a head")) end
+
+    assert %Fluffy.LiveViewError{reason: {:client_crashed, {%RuntimeError{}, _stacktrace}}} = error.cause
+    assert Exception.message(error) =~ "Duplicate id found while testing LiveView: fluffy-head"
+  end
+
   # As inside the LiveView container, rather than doing nothing where window
   # bindings would hear the key in the browser.
   @tag driver: :phoenix

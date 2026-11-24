@@ -21,6 +21,10 @@ defmodule Fluffy.Driver.Live.View do
 
   @retry_interval 10
 
+  # Once a view's LiveViewTest client is gone, the view's exit and the client's
+  # are on their way, since each one stops the other, so the wait is bounded.
+  @exit_wait 100
+
   def node_identity(client_dom, target), do: Map.fetch!(ClientDOM.index(client_dom).nodes_by_id, target.id).identity
 
   # A patch keeps a node's identity but can move or remove the node, so a step
@@ -56,8 +60,11 @@ defmodule Fluffy.Driver.Live.View do
   end
 
   # Reports how the view left a call that failed on it, waiting briefly for its
-  # exit.
-  defp left_view(session), do: left_view_event(Session.page_state(session), @retry_interval)
+  # exit, or until it arrives once the client is gone.
+  defp left_view(session) do
+    state = Session.page_state(session)
+    left_view_event(state, if(client_alive?(state), do: @retry_interval, else: @exit_wait))
+  end
 
   # A redirect an event causes comes back as the event call's result, and each
   # call that sends the view an event records that it reached the view for the
@@ -125,8 +132,12 @@ defmodule Fluffy.Driver.Live.View do
   # client stopped on it, and its own code then fails on that reply. Usage
   # errors raise ArgumentError, and those stand.
   defp redirect_reply_failure?(session, exception) do
-    {_reference, _topic, proxy_pid} = Session.page_state(session).view.proxy
-    not is_struct(exception, ArgumentError) and not Process.alive?(proxy_pid)
+    not is_struct(exception, ArgumentError) and not client_alive?(Session.page_state(session))
+  end
+
+  defp client_alive?(state) do
+    {_reference, _topic, proxy_pid} = state.view.proxy
+    Process.alive?(proxy_pid)
   end
 
   def redirected(session, redirect) do
@@ -160,26 +171,52 @@ defmodule Fluffy.Driver.Live.View do
   def left_view_event(state, wait) do
     case current_redirect(state.view) do
       {:error, redirect} -> {:redirect, redirect}
-      nil -> live_view_event(state.monitor, wait)
+      nil -> live_view_event(state, wait)
     end
   end
 
-  defp live_view_event(monitor, wait) do
+  defp live_view_event(state, wait) do
     tag = State.down_tag()
+    monitor = state.monitor
 
     receive do
       {^tag, ^monitor, :process, _pid, reason} = message ->
         leave_unread(message)
-        view_exit(reason)
+        view_exit(state, reason)
     after
       wait -> :none
     end
   end
 
-  def view_exit({:shutdown, {kind, _options} = redirect}) when kind in [:redirect, :live_redirect],
+  def view_exit(_state, {:shutdown, {kind, _options} = redirect}) when kind in [:redirect, :live_redirect],
     do: {:redirect, redirect}
 
-  def view_exit(reason), do: {:died, reason}
+  def view_exit(state, reason), do: {:died, died_reason(state, reason)}
+
+  # A view closes when its LiveViewTest client exits, and a client that crashed,
+  # such as on a render with a duplicate id, says why in its own exit. That exit
+  # goes only to the process that mounted the view, so the wait is bounded.
+  defp died_reason(state, {:shutdown, :closed} = reason), do: client_crash(state) || reason
+  defp died_reason(_state, reason), do: reason
+
+  # `{:client_crashed, reason}` once the client exited abnormally, otherwise nil.
+  defp client_crash(state) do
+    tag = State.down_tag()
+    client_monitor = state.client_monitor
+
+    if not client_alive?(state) do
+      receive do
+        {^tag, ^client_monitor, :process, _pid, reason} = message ->
+          leave_unread(message)
+          if crashed?(reason), do: {:client_crashed, reason}
+      after
+        @exit_wait -> nil
+      end
+    end
+  end
+
+  # `:noproc`: the client was gone before the view was mounted, which says nothing about why.
+  defp crashed?(reason), do: reason not in [:normal, :shutdown, :noproc] and not match?({:shutdown, _}, reason)
 
   # A view leaves once, and that stays true until the session leaves its page,
   # so reading how it left leaves the message for the session's next call. A
