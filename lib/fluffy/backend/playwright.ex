@@ -57,6 +57,7 @@ defmodule Fluffy.Backend.Playwright do
       context = %Context{
         browser_context: browser_context,
         base_url: base_url,
+        endpoint: options[:endpoint],
         extra_http_headers: headers,
         action_timeout: Timeouts.no_limit(test_info.use.action_timeout),
         navigation_timeout: Timeouts.no_limit(test_info.use.navigation_timeout)
@@ -174,6 +175,9 @@ defmodule Fluffy.Backend.Playwright do
 
   @impl true
   def base_url(%Session{} = session), do: Session.context(session).base_url
+
+  @impl true
+  def endpoint(%Session{} = session), do: Session.context(session).endpoint
 
   # As in Playwright, these have no timeout.
   @impl true

@@ -97,7 +97,8 @@ Changes since 0.8.0.
 - `unwrap_and_return/2` (and `Fluffy.Playwright.unwrap_and_return/3`, facade `unwrap_and_return/2`) returns a native callback's result. A document navigated natively in a callback is adopted.
 - `Fluffy.Download.path`, `Fluffy.Download.page/1` and `Fluffy.FileChooser.page/1`.
 - On Phoenix, a link, form or redirect to another origin ends at a page with that URL, so a test can assert where the app sent it.
-- `Fluffy.base_url/1`, the session's resolved base URL, as Playwright Test's `baseURL`. [Logging in](docs/usage.md#logging-in) shows how to start a test logged in, on both backends.
+- `Fluffy.base_url/1`, the session's resolved base URL, as Playwright Test's `baseURL`.
+- `Fluffy.add_session_cookie/3` starts a test logged in on both backends: it signs the endpoint's session cookie for the given session values, with the options of the endpoint's `session_options/0` ([Logging in](docs/usage.md#logging-in)).
 - [Accessibility testing](docs/usage.md#accessibility-testing) links PlaywrightEx's axe-core recipe and its Fluffy calls.
 - [Polling and retrying blocks](docs/assertions.md#polling-and-retrying-blocks) shows `Playwright.Expect.poll!/3` and `to_pass!/2` around Fluffy calls, for a computed value or app state.
 

@@ -292,6 +292,15 @@ defmodule Fluffy.Options do
                          ]
                      )
 
+  @add_session_cookie_schema NimbleOptions.new!(
+                               session_options: [
+                                 type: :keyword_list,
+                                 doc:
+                                   "The endpoint's `Plug.Session` options, over its `session_options/0` " <>
+                                     "([Logging in](usage.md#logging-in))."
+                               ]
+                             )
+
   # A Phoenix session's `clear_cookies/2` filters; the browser's Playwright client validates its own.
   @clear_cookies_schema NimbleOptions.new!(for key <- [:domain, :name, :path], do: {key, @text_or_regex})
 
@@ -354,7 +363,8 @@ defmodule Fluffy.Options do
                       type: :atom,
                       doc:
                         "The Phoenix endpoint, over `config :fluffy, endpoint:`, that a Phoenix session " <>
-                          "dispatches to and the base URL defaults to ([Configuration](installation.md#configuration))."
+                          "dispatches to and the base URL defaults to ([Configuration](installation.md#configuration)). " <>
+                          "It also signs `Fluffy.add_session_cookie/3`'s cookie, on Playwright too."
                     ],
                     base_url: [
                       type: :string,
@@ -374,7 +384,7 @@ defmodule Fluffy.Options do
                           "as with `Phoenix.ConnTest`. Its `accept`, `accept-language` and `authorization` " <>
                           "headers, which `Phoenix.ConnTest.recycle/2` keeps, and its `user-agent` go with every " <>
                           "later request too, unless `extra_http_headers` set them. To log in on both backends, " <>
-                          "add a cookie instead ([Logging in](usage.md#logging-in))."
+                          "use `Fluffy.add_session_cookie/3` instead ([Logging in](usage.md#logging-in))."
                     ],
                     browser_context: [
                       type: :keyword_list,
@@ -464,6 +474,9 @@ defmodule Fluffy.Options do
   def file_input_schema, do: @file_input_schema
 
   @doc false
+  def add_session_cookie_schema, do: @add_session_cookie_schema
+
+  @doc false
   def exact_locator_schema, do: @exact_locator_schema
 
   @doc false
@@ -519,6 +532,9 @@ defmodule Fluffy.Options do
   @spec validate_file_input!(keyword()) :: keyword()
   def validate_file_input!(options), do: NimbleOptions.validate!(options, @file_input_schema)
 
+  @spec validate_add_session_cookie!(keyword()) :: keyword()
+  def validate_add_session_cookie!(options), do: NimbleOptions.validate!(options, @add_session_cookie_schema)
+
   @doc "`clear_cookies/2` filters as a map, a `Regex` as its `Playwright.RegExp`; a `nil` one filters nothing."
   @spec validate_clear_cookies!(keyword() | map()) :: map()
   def validate_clear_cookies!(options) do
@@ -555,7 +571,7 @@ defmodule Fluffy.Options do
         capability: :phoenix_conn,
         operation: :start_session,
         backend: :playwright,
-        detail: ":conn is an option of Phoenix sessions; add a cookie to log in on both backends"
+        detail: ":conn is an option of Phoenix sessions; use Fluffy.add_session_cookie/3 to log in on both backends"
     end
 
     if key = Enum.find([:base_url, :extra_http_headers], &Keyword.has_key?(options[:browser_context] || [], &1)) do

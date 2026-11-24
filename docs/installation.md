@@ -136,7 +136,7 @@ endpoint's URL, so it breaks a dynamic port.
   `extra_http_headers` overrides it, as in a browser.
 - **Case templates.** Put `use Playwright.Test, unquote(opts)` in the template's `using`
   ([Shared test case](usage.md#shared-test-case)).
-- **Logging in.** Add the session cookie your app signs, on both backends
+- **Logging in.** `Fluffy.add_session_cookie/3` signs the app's session cookie, on both backends
   ([Logging in](usage.md#logging-in)).
 
 ```elixir
