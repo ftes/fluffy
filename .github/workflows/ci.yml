@@ -76,7 +76,7 @@ jobs:
           persist-credentials: false
       - name: Set up toolchain and deps
         id: setup
-        uses: ftes/ci/setup@70f3e82336c42d568193e6653b5d3e30e4693d39 # v1.0.4
+        uses: ftes/ci/setup@dd50f950cf260ef6a0c33110f9906dba13bed8c7 # v1.0.5
         with:
           lane: ${{ matrix.lane }}
       # After the deps and _build restore, so a fresher PLT wins. Keyed on the OTP build too: Dialyzer
@@ -180,11 +180,11 @@ jobs:
           persist-credentials: false
       - name: Set up toolchain and deps
         id: setup
-        uses: ftes/ci/setup@70f3e82336c42d568193e6653b5d3e30e4693d39 # v1.0.4
+        uses: ftes/ci/setup@dd50f950cf260ef6a0c33110f9906dba13bed8c7 # v1.0.5
         with:
           lane: ${{ matrix.lane }}
       - name: Install Playwright browser
-        uses: ftes/ci/playwright-browser@70f3e82336c42d568193e6653b5d3e30e4693d39 # v1.0.4
+        uses: ftes/ci/playwright-browser@dd50f950cf260ef6a0c33110f9906dba13bed8c7 # v1.0.5
         with:
           browser: ${{ matrix.browser }}
           # One job per browser saves (the action does on main only).
@@ -257,9 +257,9 @@ jobs:
           persist-credentials: false
       - name: Set up toolchain and deps
         id: setup
-        uses: ftes/ci/setup@70f3e82336c42d568193e6653b5d3e30e4693d39 # v1.0.4
+        uses: ftes/ci/setup@dd50f950cf260ef6a0c33110f9906dba13bed8c7 # v1.0.5
       - name: Install Playwright browser
-        uses: ftes/ci/playwright-browser@70f3e82336c42d568193e6653b5d3e30e4693d39 # v1.0.4
+        uses: ftes/ci/playwright-browser@dd50f950cf260ef6a0c33110f9906dba13bed8c7 # v1.0.5
       # Per commit, as the main deps and _build: the fixture compiles Fluffy as a path dep.
       - name: Restore consumer deps and _build
         id: consumer-cache
