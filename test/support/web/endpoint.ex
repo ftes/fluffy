@@ -10,6 +10,8 @@ defmodule Fluffy.Support.Web.Endpoint do
     same_site: "Lax"
   ]
 
+  def session_options, do: @session_options
+
   plug(Phoenix.Ecto.SQL.Sandbox,
     header: Fluffy.Sandbox.header(),
     sandbox: Fluffy.Sandbox.allowance()

@@ -16,6 +16,8 @@ defmodule Fluffy.Backend.Contract do
   @callback subscribe_event(Session.t(), atom(), :context | reference(), pid()) ::
               {(term() -> {:ok, term()} | {:error, String.t()} | :ignore), (-> :ok)}
   @callback base_url(Session.t()) :: String.t()
+  # The Phoenix endpoint the session was started with, `nil` for a Playwright session without one.
+  @callback endpoint(Session.t()) :: module() | nil
 
   # The session's cookies, as Playwright's `browserContext` cookie methods.
   @callback add_cookies(Session.t(), [map()]) :: Session.t()

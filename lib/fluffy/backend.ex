@@ -31,6 +31,7 @@ defmodule Fluffy.Backend do
   end
 
   def base_url(session), do: dispatch(session, :base_url, [])
+  def endpoint(session), do: dispatch(session, :endpoint, [])
 
   def add_cookies(session, cookies), do: dispatch(session, :add_cookies, [cookies])
   def cookies(session, urls), do: dispatch(session, :cookies, [urls])
@@ -110,7 +111,8 @@ defmodule Fluffy.Backend do
     options |> put_base_url() |> Keyword.put(:endpoint, endpoint)
   end
 
-  defp session_options(options, :playwright), do: put_base_url(options)
+  defp session_options(options, :playwright),
+    do: options |> put_base_url() |> Keyword.put(:endpoint, option(options, :endpoint))
 
   defp put_base_url(options) do
     # As Playwright's `baseURL`, from the most specific level. An endpoint's is its `url` config's,

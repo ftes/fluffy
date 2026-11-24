@@ -221,6 +221,10 @@ The facade covers PhoenixTest's API. For what PhoenixTest.Playwright adds:
   - `add_cookies` and `clear_cookies`: `Fluffy.add_cookies/2` and `Fluffy.clear_cookies/2`;
     cookies are maps that need a `url:` (such as `Fluffy.base_url/1`), with `expires:`
     instead of `max_age:`;
+  - `add_session_cookie`: same name, other arguments. `add_session_cookie(conn, [value: values], options)`
+    becomes `Fluffy.add_session_cookie(session, values)`, with the options from the endpoint's
+    `session_options/0` ([Logging in](usage.md#logging-in)). Call it before the session enters
+    the facade, as `Fluffy.start_session(:playwright) |> Fluffy.add_session_cookie(values) |> visit("/")`;
   - `screenshot` and `assert_screenshot`: `Fluffy.Playwright.screenshot/2` (with `path:`,
     and `full_page: true` for the old default; it returns the PNG, not the session) and
     `Fluffy.Expect.page_to_have_screenshot/1` (with `name:`);
@@ -234,7 +238,6 @@ The facade covers PhoenixTest's API. For what PhoenixTest.Playwright adds:
   PhoenixTest does. When that element is never visible, such as a modal's zero-size
   wrapper, `assert_has` fails and `refute_has` passes even while the text shows, so select
   the visible element, such as the modal's `[role='dialog']`.
-- **`add_session_cookie`:** sign the cookie in-process, as in [Logging in](usage.md#logging-in).
 - **Direct `PlaywrightEx` calls:** use playwright_ex 1.65's `Playwright` API through `unwrap`,
   whose callback gets the `Playwright.Page` instead of a map. It returns JS `null` as `:null`.
 

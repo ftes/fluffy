@@ -36,6 +36,7 @@ defmodule Fluffy do
   alias Fluffy.Backend
   alias Fluffy.Event
   alias Fluffy.Event.Pending
+  alias Fluffy.Internal.SessionCookie
   alias Fluffy.SelectedFile
   alias Fluffy.Session
 
@@ -226,8 +227,7 @@ defmodule Fluffy do
       add_cookies(session, [%{name: "house", value: "gryffindor", url: base_url(session)}])
 
   Every request made afterwards sends the cookies that match it, so add them before
-  `visit/2` for the first request. To log in without the UI, see
-  [Logging in](usage.md#logging-in).
+  `visit/2` for the first request. To log in without the UI, use `add_session_cookie/3`.
 
   On Phoenix the session's cookie jar holds them; [Cookies](capabilities.md#cookies) says
   where it differs from a browser.
@@ -235,6 +235,39 @@ defmodule Fluffy do
   @spec add_cookies(Session.t(), [map()]) :: Session.t()
   def add_cookies(%Session{} = session, cookies) when is_list(cookies) do
     Backend.add_cookies(session, cookies)
+  end
+
+  @doc group: "Cookies"
+  @doc """
+  Adds the app's session cookie, holding `values` (a map or keyword list) as its session, and
+  returns the session, so a test starts logged in without the login form, on both backends:
+
+      start_session(:playwright)
+      |> add_session_cookie(%{"user_token" => token})
+      |> visit("/gringotts/vault")
+
+  The cookie, for the host of `base_url/1` and added with `add_cookies/2`, is signed or
+  encrypted with the endpoint's `Plug.Session` options and `secret_key_base`. It
+  replaces the session's current one, as a fresh login does: the app's session then
+  holds only `values`. Put it before `visit/2` for the first request, or between visits.
+
+  The cookie has every attribute the endpoint's `Plug.Session` gives it, such as `secure:`,
+  `same_site:`, `domain:` and `path:`.
+
+  The `Plug.Session` options are the endpoint's `session_options/0`, which the endpoint
+  defines with `def session_options, do: @session_options`
+  ([Logging in](usage.md#logging-in)). On Playwright, the session's `endpoint:` or the
+  configured endpoint signs the cookie, even when `base_url` points at another server.
+
+  ## Options
+
+  #{NimbleOptions.docs(Fluffy.Options.add_session_cookie_schema())}
+  """
+  @spec add_session_cookie(Session.t(), map() | keyword(), keyword()) :: Session.t()
+  def add_session_cookie(%Session{} = session, values, options \\ []) when is_map(values) or is_list(values) do
+    options = Fluffy.Options.validate_add_session_cookie!(options)
+    cookie = SessionCookie.new!(Backend.endpoint(session), values, options[:session_options], base_url(session))
+    add_cookies(session, [cookie])
   end
 
   @doc group: "Cookies"

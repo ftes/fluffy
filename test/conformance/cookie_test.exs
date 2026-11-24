@@ -9,14 +9,20 @@ defmodule Fluffy.Conformance.CookieTest do
   import Phoenix.ConnTest
 
   alias Fluffy.Support.HTTPFixtures
+  alias Fluffy.Support.Server
 
   @endpoint Fluffy.Support.Web.Endpoint
+
+  # An endpoint that does not expose its `Plug.Session` options.
+  defmodule Gringotts do
+    @moduledoc false
+  end
 
   for driver <- Drivers.backends() do
     @tag driver: driver
     test "base_url/1 is the URL paths resolve against with #{driver}", %{driver: driver} do
       session = start_session(driver)
-      assert base_url(session) == Fluffy.Support.Server.base_url()
+      assert base_url(session) == Server.base_url()
       session |> visit(base_url(session) <> "/chamber") |> expect(page_to_have_url("/chamber"))
     end
 
@@ -284,6 +290,73 @@ defmodule Fluffy.Conformance.CookieTest do
       |> expect("Static identity: Hermione" |> by_text() |> to_be_visible())
       |> visit("/live/session")
       |> expect("Live identity: Hermione" |> by_text() |> to_be_visible())
+    end
+
+    @tag driver: driver
+    test "add_session_cookie/3 before the first visit starts the session logged in with #{driver}", %{driver: driver} do
+      driver
+      |> start_session()
+      |> add_session_cookie(%{"identity" => "Hermione"})
+      |> visit("/session/show")
+      |> expect("Static identity: Hermione" |> by_text() |> to_be_visible())
+      |> visit("/live/session")
+      |> expect("Live identity: Hermione" |> by_text() |> to_be_visible())
+    end
+
+    @tag driver: driver
+    test "add_session_cookie/3 between visits replaces the session cookie with #{driver}", %{driver: driver} do
+      session =
+        driver
+        |> start_session()
+        |> visit("/session/start?identity=Ron")
+        |> expect("Live identity: Ron" |> by_text() |> to_be_visible())
+        |> add_session_cookie(identity: "Hermione")
+        |> visit("/live/session")
+        |> expect("Live identity: Hermione" |> by_text() |> to_be_visible())
+
+      assert [%{httpOnly: true, sameSite: "Lax"}] = session |> cookies() |> Enum.filter(&(&1.name == "_fluffy_test"))
+    end
+
+    @tag driver: driver
+    test "add_session_cookie/3 signs with the given session_options with #{driver}", %{driver: driver} do
+      driver
+      |> start_session()
+      |> add_session_cookie(%{"identity" => "Luna"},
+        session_options: [store: :cookie, key: "_fluffy_test", signing_salt: "fluffy-session"]
+      )
+      |> visit("/session/show")
+      |> expect("Static identity: Luna" |> by_text() |> to_be_visible())
+    end
+
+    @tag driver: driver
+    test "add_session_cookie/3 keeps the cookie attributes Plug.Session sets with #{driver}", %{driver: driver} do
+      options = [store: :cookie, key: "_fluffy_test", signing_salt: "fluffy-session"]
+
+      session =
+        driver
+        |> start_session()
+        |> add_session_cookie(%{"identity" => "Ginny"},
+          session_options: options ++ [same_site: "None", secure: true, path: "/owlery", http_only: false]
+        )
+        |> add_session_cookie(%{"identity" => "Ginny"},
+          session_options: options ++ [domain: "hogwarts.example", max_age: 3600]
+        )
+
+      host = URI.parse(base_url(session)).host
+
+      assert [subdomains, owlery] = Enum.sort_by(cookies(session), & &1.domain)
+      assert %{domain: ^host, path: "/owlery", secure: true, sameSite: "None", httpOnly: false, expires: -1} = owlery
+      assert %{domain: ".hogwarts.example", path: "/", secure: false, httpOnly: true} = subdomains
+      assert_in_delta subdomains.expires, System.system_time(:second) + 3600, 5
+    end
+
+    @tag driver: driver
+    test "add_session_cookie/3 names the endpoint change it needs with #{driver}", %{driver: driver} do
+      session = start_session(driver, endpoint: Gringotts, base_url: Server.base_url())
+
+      assert_raise ArgumentError, ~r/Gringotts does not expose.*def session_options, do: @session_options/s, fn ->
+        add_session_cookie(session, %{"identity" => "Hermione"})
+      end
     end
   end
 

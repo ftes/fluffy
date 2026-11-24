@@ -114,6 +114,9 @@ defmodule Fluffy.Backend.Phoenix do
   @impl true
   def base_url(%Session{} = session), do: http!(session).base_url
 
+  @impl true
+  def endpoint(%Session{} = session), do: http!(session).endpoint
+
   # The session's cookie jar plays the browser context's cookie store: requests send what
   # it holds when they are made, as a browser does.
   @impl true

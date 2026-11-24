@@ -205,10 +205,33 @@ end
 
 ## Logging in
 
-To start a test logged in without the login form, give its session the cookie your login
-sets. Sign it in-process with your app's own test helper, such as phx.gen.auth's
-`log_in_user/2` in `ConnCase`, and one request through the endpoint, whose `Plug.Session`
-writes the signed cookie. This works unchanged on both backends:
+To start a test logged in without the login form, add a session cookie holding the session
+values your login sets, with `Fluffy.add_session_cookie/3`. It signs the endpoint's session
+cookie in-process, on both backends:
+
+```elixir
+test "Hermione opens her vault" do
+  token = Wizards.generate_wizard_session_token(wizard_fixture(name: "Hermione"))
+
+  start_session(:playwright)
+  |> add_session_cookie(%{"wizard_token" => token})
+  |> visit("/gringotts/vault")
+  |> assert(visible(by_text("Vault 687")))
+end
+```
+
+It signs with the endpoint's `Plug.Session` options, which Fluffy reads from the endpoint's
+`session_options/0`. Add that one line to `MyAppWeb.Endpoint`, next to its
+`@session_options`, or pass `session_options:` to `add_session_cookie/3`:
+
+```elixir
+def session_options, do: @session_options
+```
+
+The cookie replaces the session's current one, as a fresh login does. When the login does
+more than set session keys, such as a remember-me cookie, run your app's own test helper,
+such as phx.gen.auth's `log_in_user/2` in `ConnCase`, and one request through the endpoint,
+then add the cookies it writes:
 
 ```elixir
 defp log_in(session, wizard) do
@@ -220,42 +243,6 @@ defp log_in(session, wizard) do
 
   Fluffy.add_cookies(session, cookies)
 end
-
-test "Hermione opens her vault" do
-  start_session(:playwright)
-  |> log_in(wizard_fixture(name: "Hermione"))
-  |> visit("/gringotts/vault")
-  |> assert(visible(by_text("Vault 687")))
-end
-```
-
-Without a login helper or a route to request, run the endpoint's `Plug.Session` on a bare
-conn and read the cookie it writes for your session values. Expose the endpoint's
-`@session_options` with `def session_options, do: @session_options` in `MyAppWeb.Endpoint`:
-
-```elixir
-defp session_cookie(session, values) do
-  options = MyAppWeb.Endpoint.session_options()
-
-  conn =
-    build_conn()
-    |> Map.put(:secret_key_base, MyAppWeb.Endpoint.config(:secret_key_base))
-    |> Plug.Session.call(Plug.Session.init(options))
-    |> Plug.Conn.fetch_session()
-
-  conn =
-    values
-    |> Enum.reduce(conn, fn {key, value}, conn -> Plug.Conn.put_session(conn, key, value) end)
-    |> Plug.Conn.send_resp(200, "")
-
-  %{
-    name: options[:key],
-    value: conn.resp_cookies[options[:key]].value,
-    url: Fluffy.base_url(session)
-  }
-end
-
-Fluffy.add_cookies(session, [session_cookie(session, %{"wizard_token" => token})])
 ```
 
 Cookies added before `visit/2` go with the first request, as in a browser. A Phoenix-only
