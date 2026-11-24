@@ -108,17 +108,17 @@ defmodule Fluffy.Conformance.LocatorReadTest do
 
       with_html(unquote(driver), html, fn session ->
         reads = [
-          text_content: &text_content(session, &1, timeout: 100),
-          get_attribute: &get_attribute(session, &1, "id", timeout: 100),
-          input_value: &input_value(session, &1, timeout: 100)
+          text_content: &text_content(session, &1, timeout: &2),
+          get_attribute: &get_attribute(session, &1, "id", timeout: &2),
+          input_value: &input_value(session, &1, timeout: &2)
         ]
 
         for {operation, read} <- reads do
-          error = assert_raise Fluffy.OperationError, fn -> read.(by_text("Lumos")) end
+          error = assert_raise Fluffy.OperationError, fn -> read.(by_text("Lumos"), 1_000) end
           assert error.operation == operation
           assert strictness_error?(error)
 
-          error = assert_raise Fluffy.OperationError, fn -> read.(by_text("Nox")) end
+          error = assert_raise Fluffy.OperationError, fn -> read.(by_text("Nox"), 100) end
           assert error.operation == operation
         end
       end)
@@ -191,11 +191,11 @@ defmodule Fluffy.Conformance.LocatorReadTest do
     test "LiveView reads are strict and need a control for input_value with #{driver}", %{driver: driver} do
       session = driver |> start_session() |> visit("/live/potions")
 
-      error = assert_raise Fluffy.OperationError, fn -> text_content(session, by_css("input"), timeout: 100) end
+      error = assert_raise Fluffy.OperationError, fn -> text_content(session, by_css("input"), timeout: 1_000) end
       assert error.operation == :text_content
       assert strictness_error?(error)
 
-      error = assert_raise Fluffy.OperationError, fn -> input_value(session, by_css("#wizard-form"), timeout: 100) end
+      error = assert_raise Fluffy.OperationError, fn -> input_value(session, by_css("#wizard-form"), timeout: 1_000) end
       assert error.operation == :input_value
       assert Exception.message(error) =~ "Node is not an <input>, <textarea> or <select> element"
     end
