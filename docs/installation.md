@@ -429,10 +429,14 @@ Phoenix Ecto's `{module, function, extra_arguments}` form. For example:
 defmodule MyApp.TestSandbox do
   def allow(repo, owner, child) do
     Ecto.Adapters.SQL.Sandbox.allow(repo, owner, child)
-    MyApp.Mocks.allow(owner, child)
+    if Process.alive?(owner), do: MyApp.Mocks.allow(owner, child)
   end
 end
 ```
+
+A browser request can outlive its test, as the browser closes after the test process
+exits, so check that the owner is alive before allowing mocks: `Mox.allow/3` with a
+dead owner never returns.
 
 Only browser requests carry the metadata. Phoenix sessions run requests in the test
 process and LiveViews with it in `$callers`, as `Phoenix.ConnTest` does, so they use its
