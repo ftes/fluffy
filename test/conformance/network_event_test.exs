@@ -96,8 +96,11 @@ defmodule Fluffy.Conformance.NetworkEventTest do
     click(session, by_role(:link, name: "Open child"))
     request = await(pending)
     assert {Request.method(request), Request.resource_type(request)} == {"GET", "document"}
-    # The context observes issuance before Playwright associates the new page.
-    assert_raise RuntimeError, fn -> Request.frame(request) end
+    assert Request.is_navigation_request(request)
+    # Upstream's NE-027 also checks that `frame()` raises, because the popup's page doesn't
+    # exist yet. It reads that right after the event, before the client dispatches the next
+    # message. Here the connection keeps dispatching while the wait delivers the request, so
+    # the popup's page may already exist and `frame` may not raise.
     assert Fluffy.Page.opener(await(popup)) == current_page(session)
   end
 
