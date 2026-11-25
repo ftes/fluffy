@@ -50,6 +50,7 @@ One test, with or without a real browser, through one Playwright-shaped API.
 <tr><th scope="row" style="text-align: left; font-weight: normal">Chromium, Firefox and WebKit</th><td align="center">✓<sup>1</sup></td><td align="center">◐<sup>2</sup></td><td align="center">–</td><td align="center">✓</td><td align="center">✓</td></tr>
 <tr><th scope="row" style="text-align: left; font-weight: normal">One library for both</th><td align="center">–<sup>1</sup></td><td align="center">–</td><td align="center">–</td><td align="center">–</td><td align="center">✓</td></tr>
 <tr><th scope="row" style="text-align: left; font-weight: normal">Same API for both</th><td align="center">◐<sup>3</sup></td><td align="center">–</td><td align="center">–</td><td align="center">–</td><td align="center">✓</td></tr>
+<tr><th scope="row" style="text-align: left; font-weight: normal">Pipeline API</th><td align="center">✓</td><td align="center">✓</td><td align="center">–</td><td align="center">–</td><td align="center">✓</td></tr>
 <tr><th scope="row" style="text-align: left; font-weight: normal">Both in one module</th><td align="center">–</td><td align="center">–</td><td align="center">–</td><td align="center">–</td><td align="center">✓</td></tr>
 <tr><td colspan="6" style="padding-top: 1.4em; font-weight: bold">Without a browser</td></tr>
 <tr><th scope="row" style="text-align: left; font-weight: normal">Checked against a real browser</th><td align="center">◐<sup>4</sup></td><td align="center">–</td><td align="center">–</td><td align="center">–</td><td align="center">✓</td></tr>
