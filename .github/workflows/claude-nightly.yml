@@ -54,7 +54,7 @@ jobs:
       - name: Run Claude
         id: claude
         if: steps.list.outputs.numbers != ''
-        uses: ftes/ci/claude@2c3f2ed89933e28679de07afdd02f3bb80c0240d # v1.0.7
+        uses: ftes/ci/claude@5820f5e1478671530b15466579268ddb941c127c # v1.0.8
         with:
           token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
@@ -208,11 +208,11 @@ jobs:
           ref: ${{ matrix.pr.branch }}
           fetch-depth: 0
       - name: Set up toolchain and deps
-        uses: ftes/ci/setup@2c3f2ed89933e28679de07afdd02f3bb80c0240d # v1.0.7
+        uses: ftes/ci/setup@5820f5e1478671530b15466579268ddb941c127c # v1.0.8
       # These may fail on a branch that doesn't compile; Claude then runs without them.
       - name: Install Playwright browser
         continue-on-error: true
-        uses: ftes/ci/playwright-browser@2c3f2ed89933e28679de07afdd02f3bb80c0240d # v1.0.7
+        uses: ftes/ci/playwright-browser@5820f5e1478671530b15466579268ddb941c127c # v1.0.8
       - name: Build test assets
         continue-on-error: true
         run: mix assets.build
@@ -235,7 +235,7 @@ jobs:
           mkdir -p tmp
           gh run view "$run" --log-failed | tail -n 5000 > tmp/ci-failed.log
       - name: Run Claude
-        uses: ftes/ci/claude@2c3f2ed89933e28679de07afdd02f3bb80c0240d # v1.0.7
+        uses: ftes/ci/claude@5820f5e1478671530b15466579268ddb941c127c # v1.0.8
         with:
           token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
@@ -291,12 +291,12 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
       - name: Set up toolchain and deps
-        uses: ftes/ci/setup@2c3f2ed89933e28679de07afdd02f3bb80c0240d # v1.0.7
+        uses: ftes/ci/setup@5820f5e1478671530b15466579268ddb941c127c # v1.0.8
       - name: Fetch Playwright source
         run: mix fluffy.playwright_source
       - run: git switch -c "$NIGHTLY_BRANCH"
       - name: Run Claude
-        uses: ftes/ci/claude@2c3f2ed89933e28679de07afdd02f3bb80c0240d # v1.0.7
+        uses: ftes/ci/claude@5820f5e1478671530b15466579268ddb941c127c # v1.0.8
         with:
           token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
@@ -399,7 +399,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
       - name: Set up toolchain and deps
-        uses: ftes/ci/setup@2c3f2ed89933e28679de07afdd02f3bb80c0240d # v1.0.7
+        uses: ftes/ci/setup@5820f5e1478671530b15466579268ddb941c127c # v1.0.8
       - name: Fetch Playwright source
         run: mix fluffy.playwright_source
       - run: git switch -c "$NIGHTLY_BRANCH"
@@ -422,7 +422,7 @@ jobs:
           echo "area=$area" >> "$GITHUB_OUTPUT"
 
       - name: Run Claude
-        uses: ftes/ci/claude@2c3f2ed89933e28679de07afdd02f3bb80c0240d # v1.0.7
+        uses: ftes/ci/claude@5820f5e1478671530b15466579268ddb941c127c # v1.0.8
         with:
           token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
