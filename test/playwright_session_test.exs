@@ -4,6 +4,7 @@ defmodule Fluffy.PlaywrightSessionTest do
   alias Fluffy.Backend.Playwright, as: PlaywrightBackend
   alias Fluffy.Driver.Playwright, as: PlaywrightDriver
   alias Fluffy.Driver.Playwright.Document
+  alias Fluffy.Driver.Playwright.Internal
   alias Fluffy.Driver.Registry, as: DriverRegistry
   alias Fluffy.Session
   alias Fluffy.Support.Server
@@ -64,6 +65,22 @@ defmodule Fluffy.PlaywrightSessionTest do
 
     assert {:error, error} = Frame.evaluate(frame, script)
     assert Document.context_destroyed?(error), Exception.message(error)
+  end
+
+  # Its own calls are internal, but report failures as the plain calls would.
+  test "an internal call fails with the plain call's error and call log" do
+    session = :playwright |> Fluffy.start_session() |> Fluffy.visit("/stage")
+    frame = Session.page_state(session).frame
+    missing = Frame.locator(frame, "#basilisk")
+
+    for {module, function, arguments} <- [
+          {Frame, :wait_for_function, [frame, "() => false", nil, [timeout: 100]]},
+          {Playwright.Locator, :evaluate, [missing, "element => element.id", nil, [timeout: 100]]}
+        ] do
+      assert {:error, plain} = apply(module, function, arguments)
+      assert {:error, internal} = Internal.call(module, function, arguments)
+      assert Exception.message(internal) == Exception.message(plain)
+    end
   end
 
   test "LiveView waits leave no handles behind" do

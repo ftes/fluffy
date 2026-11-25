@@ -21,7 +21,7 @@ defmodule Fluffy.PhoenixTest.Query do
     # Probe presence only. The selected click retains native waiting and strictness.
     native = Fluffy.Driver.Playwright.Locator.locator(frame, locator)
 
-    case Playwright.Locator.count(native) do
+    case Driver.Playwright.Internal.call(Playwright.Locator, :count, [native]) do
       {:ok, count} -> count > 0
       {:error, cause} -> raise_click_link!(locator, cause)
     end

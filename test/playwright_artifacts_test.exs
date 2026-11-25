@@ -16,19 +16,29 @@ defmodule Fluffy.PlaywrightArtifactsTest.TraceCase do
 
     on_exit(fn ->
       path = Agent.get(path, & &1)
-      trace = read_trace(path)
+      {:ok, entries} = :zip.extract(String.to_charlist(path), [:memory])
       File.rm_rf!(Path.dirname(path))
+      trace = Enum.map_join(entries, "\n", fn {_name, contents} -> contents end)
       for expected <- context[:trace_has] || [], do: assert(trace =~ expected)
       for unexpected <- context[:trace_lacks] || [], do: refute(trace =~ unexpected)
+
+      methods = action_methods(entries)
+      for expected <- context[:actions_has] || [], do: assert(expected in methods)
+      for unexpected <- context[:actions_lack] || [], do: refute(unexpected in methods)
     end)
 
     %{trace_path: path}
   end
 
-  # Every entry, as the archive of several contexts prefixes each one's `trace.trace`.
-  defp read_trace(path) do
-    {:ok, entries} = :zip.extract(String.to_charlist(path), [:memory])
-    Enum.map_join(entries, "\n", fn {_name, contents} -> contents end)
+  # The protocol methods of the actions the browser recorded, in every context's `trace.trace`
+  # (the archive prefixes each one's), each with its snapshots; `test.trace` holds the test's steps.
+  defp action_methods(entries) do
+    for {name, contents} <- entries,
+        name = List.to_string(name),
+        String.ends_with?(name, ".trace") and Path.basename(name) != "test.trace",
+        line <- String.split(contents, "\n", trim: true),
+        %{"type" => "before", "method" => method} <- [JSON.decode!(line)],
+        do: method
   end
 end
 
@@ -86,6 +96,17 @@ defmodule Fluffy.PlaywrightArtifactsTest do
     |> expect("Traced popup" |> by_text() |> to_be_visible())
 
     :playwright |> start_session(base_url: Server.base_url()) |> visit("/stage")
+  end
+
+  # Fluffy's own calls around them (its document probes and LiveView waits) are internal: no
+  # actions, so no snapshots.
+  @tag actions_has: ["goto", "click", "expect"], actions_lack: ["evaluateExpression", "waitForFunction", "addInitScript"]
+  test "records the test's actions but not Fluffy's own calls" do
+    :playwright
+    |> start_session(base_url: Server.base_url())
+    |> visit("/live/three-heads")
+    |> click(by_role(:button, name: "Play the flute"))
+    |> expect("Sleeping heads: 1" |> by_text() |> to_be_visible())
   end
 
   @tag trace_has: ["Outer workflow", "Inner operation", Path.absname(__ENV__.file)]
