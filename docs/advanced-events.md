@@ -97,7 +97,9 @@ session
 Inspect live page handles with `Fluffy.Page.url/1` and
 `Fluffy.Page.opener/1`. The opener is nil if absent or closed. `Fluffy.Playwright.current_page/1`
 returns a stable handle that survives navigation; `Fluffy.Playwright.pages/1` lists all open pages,
-including tabs discovered without an event registration. Page selection is local to each
+including tabs discovered without an event registration. A `Playwright.Page` from native
+code, such as a raw listener or `Playwright.BrowserContext.new_page!/1`, becomes a handle
+with `Fluffy.Playwright.page/2`. Page selection is local to each
 session handle: retain the result of `Fluffy.Playwright.switch_page/2`; other session handles keep
 their own selection. Closed page handles are invalid; closing a page does not change any
 session handle's selection. Explicitly switch to an open page before continuing. Closing

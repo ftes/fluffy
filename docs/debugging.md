@@ -113,7 +113,8 @@ Reach the context and frame with `Playwright.Page.context/1` and
 `Playwright.Page.main_frame/1`. A document navigated natively, inside or after the
 callback, is adopted before the next Fluffy action. Do not close the page or
 context natively; use the [event and page APIs](advanced-events.md) for lifecycle
-operations and registrations that must precede an action.
+operations and registrations that must precede an action. To act on a page you got
+natively, pass it to `Fluffy.Playwright.page/2`, then `Fluffy.Playwright.switch_page/2`.
 
 `Fluffy.Playwright.unwrap/3` passes the `%Playwright.Locator{}` for a Fluffy
 locator instead, resolved in the active page and through its frame locators, with
