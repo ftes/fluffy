@@ -111,7 +111,7 @@ defmodule Fluffy.Conformance.DownloadEventTest do
     @tag driver: driver
     test "a timeout releases its registration before the next download with #{driver}", %{driver: driver} do
       session = session(driver)
-      pending = wait_for(session, Event.download(), timeout: 0)
+      pending = wait_for(session, Event.download(), timeout: :once)
       assert_raise ExUnit.AssertionError, ~r/timeout/, fn -> await(pending) end
       expect_event(session, Event.download(), &click(&1, by_role(:link, name: "Marauder's Map", exact: true)))
     end

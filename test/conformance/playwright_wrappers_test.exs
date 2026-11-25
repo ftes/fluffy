@@ -122,12 +122,12 @@ defmodule Fluffy.Conformance.PlaywrightWrappersTest do
       end
     end
 
-    test "rejects timeout: 0, which can't check once, and takes :infinity", %{directory: directory} do
+    test "rejects timeout: :once, which can't check once, and takes :infinity", %{directory: directory} do
       session = session_for_html(:playwright, @html)
 
       for {form, {_locator, shot}} <- shots() do
         path = Path.join(directory, "#{form}.png")
-        assert_raise ArgumentError, fn -> shot.(session, path: path, timeout: 0) end
+        assert_raise ArgumentError, fn -> shot.(session, path: path, timeout: :once) end
         refute File.exists?(path)
         assert shot.(session, path: path, timeout: :infinity) == File.read!(path)
       end

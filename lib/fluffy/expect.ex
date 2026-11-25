@@ -773,7 +773,7 @@ defmodule Fluffy.Expect do
       |> expect(to_pass(fn session ->
         session
         |> click(by_role(:button, name: "Check the owlery"), timeout: 1_000)
-        |> expect(to_be_visible(by_text("A letter for Harry")), timeout: 0)
+        |> expect(to_be_visible(by_text("A letter for Harry")), timeout: :once)
       end))
 
   `expect/3` returns the session the passing attempt returned, or, if it returned something
@@ -852,11 +852,11 @@ defmodule Fluffy.Expect do
 
   # A Fluffy timeout as Playwright's (`Fluffy.Deadline.playwright/1`); without one, Playwright's
   # default. Its failure raises as every Fluffy expectation's does, with Playwright's message.
-  # `0` makes one attempt here: Playwright's loop checks its deadline before the first attempt,
-  # so the 1ms `0` becomes can make none.
+  # `:once` makes one attempt here: Playwright's loop checks its deadline before the first
+  # attempt, so the 1ms `:once` becomes can make none.
   defp retry!(%Expect{} = expectation, call, arguments, native) do
     case Keyword.fetch(expectation.options, :timeout) do
-      {:ok, 0} -> attempt!(expectation, arguments, native[:message])
+      {:ok, :once} -> attempt!(expectation, arguments, native[:message])
       {:ok, timeout} -> apply(call, arguments ++ [Keyword.put(native, :timeout, Fluffy.Deadline.playwright(timeout))])
       :error -> apply(call, arguments ++ [native])
     end

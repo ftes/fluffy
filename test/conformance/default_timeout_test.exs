@@ -123,10 +123,10 @@ defmodule Fluffy.Conformance.DefaultTimeoutTest do
     |> expect("Activated" |> by_text() |> to_be_visible())
   end
 
-  # As a call's `timeout: 0`.
+  # As a call's `timeout: :once`.
   @tag driver: :phoenix
-  test "phoenix_backend_timeout: 0 checks a Phoenix session's operations once" do
-    put_fluffy_config(phoenix_backend_timeout: 0)
+  test "phoenix_backend_timeout: :once checks a Phoenix session's operations once" do
+    put_fluffy_config(phoenix_backend_timeout: :once)
 
     session =
       :phoenix
@@ -241,21 +241,21 @@ defmodule Fluffy.Conformance.TimeoutOptionTest do
 
     # Playwright's 0 would wait for the button.
     @tag driver: driver
-    test "timeout: 0 checks an expectation once with #{driver}", %{driver: driver} do
+    test "timeout: :once checks an expectation once with #{driver}", %{driver: driver} do
       session =
         driver
         |> start_session()
         |> visit("/live/async?delay=1000")
 
-      {elapsed, _error} = failure(fn -> expect(session, to_be_visible(@appeared), timeout: 0) end)
+      {elapsed, _error} = failure(fn -> expect(session, to_be_visible(@appeared), timeout: :once) end)
       assert elapsed < 1_000
     end
   end
 
   @tag driver: :live
-  test "LiveView actions check once with timeout: 0" do
+  test "LiveView actions check once with timeout: :once" do
     session = missing_session(:phoenix)
-    {elapsed, _error} = failure(fn -> click(session, @missing, timeout: 0) end)
+    {elapsed, _error} = failure(fn -> click(session, @missing, timeout: :once) end)
     assert elapsed < 1_000
   end
 

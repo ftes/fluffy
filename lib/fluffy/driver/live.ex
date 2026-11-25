@@ -727,7 +727,7 @@ defmodule Fluffy.Driver.Live do
 
     retry = fn session, dispatch ->
       if operation != :expect and Deadline.expired?(deadline), do: raise_navigated_away(operation, arguments, deadline)
-      arguments = List.update_at(arguments, -1, &put_timeout(&1, Deadline.remaining(deadline)))
+      arguments = List.update_at(arguments, -1, &put_timeout(&1, Deadline.timeout(deadline)))
       ActionScope.after_redirects(redirects, fn -> dispatch.(session, operation, arguments) end)
     end
 

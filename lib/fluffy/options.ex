@@ -3,20 +3,26 @@ defmodule Fluffy.Options do
 
   alias Fluffy.Options.Native
 
+  # Every Fluffy timeout: `0` raises, since it checks once in Elixir and means no limit in Playwright.
+  @timeout_type [
+    type: {:custom, __MODULE__, :timeout, []},
+    type_spec: quote(do: pos_integer() | :once | :infinity),
+    type_doc: "`t:pos_integer/0` | `:once` | `:infinity`"
+  ]
+
   @timeout_options [
-    timeout: [
-      type: :timeout,
-      doc:
-        "Maximum time in milliseconds to wait for the operation. On a browser, as in Playwright Test, " <>
-          "defaults to the action timeout (navigations: the navigation timeout), no timeout unless set, " <>
-          "and for assertions to the expect timeout, 5 seconds; on Phoenix, to `phoenix_backend_timeout` " <>
-          "([Configuration](installation.md#configuration)). " <>
-          "`0` checks once, unlike Playwright, where `0` disables the timeout. Playwright actions and waits " <>
-          "reject `0` with an `ArgumentError`, as they cannot check once; so do screenshot assertions, which " <>
-          "take each screenshot within the timeout, while other Playwright assertions accept it. " <>
-          "`:infinity` disables the timeout: Playwright waits with no timeout, LiveView retries until the test " <>
-          "times out, and Static, where nothing changes, checks once."
-    ]
+    timeout:
+      @timeout_type ++
+        [
+          doc:
+            "Maximum time in milliseconds to wait for the operation. On a browser, as in Playwright Test, " <>
+              "defaults to the action timeout (navigations: the navigation timeout), no timeout unless set, " <>
+              "and for assertions to the expect timeout, 5 seconds; on Phoenix, to `phoenix_backend_timeout` " <>
+              "([Configuration](installation.md#configuration)). `:once` checks once; Playwright actions, waits " <>
+              "and screenshot assertions reject it with an `ArgumentError`, as they can't. `:infinity` is no " <>
+              "limit: LiveView retries until the test times out, and Static, where nothing changes, checks once. " <>
+              "`0` raises."
+        ]
   ]
 
   @action_schema NimbleOptions.new!(@timeout_options)
@@ -211,10 +217,10 @@ defmodule Fluffy.Options do
     to_pass:
       "Maximum time in milliseconds to retry the block. Defaults, as Playwright's `toPass`, to the test's " <>
         "timeout, not the expect timeout (`config :playwright, :test, expect: [to_pass: [timeout: ...]]` " <>
-        "sets another). `0` leaves time for one attempt and `:infinity` retries until the test times out.",
+        "sets another). `:once` makes one attempt and `:infinity` retries until the test times out.",
     poll:
       "Maximum time in milliseconds to poll. Defaults, as Playwright's `expect.poll`, to the expect timeout, " <>
-        "5 seconds, on every driver. `0` leaves time for one attempt and `:infinity` polls until the test times out."
+        "5 seconds, on every driver. `:once` makes one attempt and `:infinity` polls until the test times out."
   ]
 
   @denied_expectation_keys [:signal]
@@ -263,7 +269,7 @@ defmodule Fluffy.Options do
 
                          timeout =
                            case Keyword.fetch(@retry_timeout_docs, matcher) do
-                             {:ok, doc} -> [timeout: [type: :timeout, doc: doc]]
+                             {:ok, doc} -> [timeout: @timeout_type ++ [doc: doc]]
                              :error -> @timeout_options
                            end
 
@@ -482,9 +488,8 @@ defmodule Fluffy.Options do
   # `config :fluffy`: only what Playwright has no concept of. Timeouts, the test id attribute
   # and the base URL are Playwright Test's (`config :playwright, :test`, `Playwright.Test.use/1`).
   @config_schema NimbleOptions.new!(
-                   # A Phoenix session's timeout of operations without `timeout:`
-                   # (`Fluffy.Timeouts`); `0` checks once.
-                   phoenix_backend_timeout: [type: :timeout, default: 1_000],
+                   # A Phoenix session's timeout of operations without `timeout:` (`Fluffy.Timeouts`).
+                   phoenix_backend_timeout: @timeout_type ++ [default: 1_000],
                    endpoint: [type: :atom],
                    ecto_repos: [type: {:list, :atom}],
                    file_input_max_bytes: [type: :pos_integer, default: 10_000_000]
@@ -499,6 +504,11 @@ defmodule Fluffy.Options do
   def text_or_reg_exp(value) when is_binary(value) or is_struct(value, Playwright.RegExp), do: {:ok, value}
   def text_or_reg_exp(%Regex{} = value), do: {:ok, Playwright.RegExp.new(value)}
   def text_or_reg_exp(value), do: {:error, "expected a string or a regex, got: #{inspect(value)}"}
+
+  @doc false
+  def timeout(timeout) when (is_integer(timeout) and timeout > 0) or timeout in [:once, :infinity], do: {:ok, timeout}
+  def timeout(0), do: {:error, "0 is ambiguous: pass :once to check once or :infinity for no limit"}
+  def timeout(value), do: {:error, "expected a positive integer, :once or :infinity, got: #{inspect(value)}"}
 
   @doc false
   def session_schema, do: @session_schema

@@ -40,7 +40,7 @@ defmodule Fluffy.PublicOptionValidationTest do
   end
 
   test "event options are validated before registration", %{session: session} do
-    assert_raise NimbleOptions.ValidationError, ~r/:timeout.*non[- ]negative integer/, fn ->
+    assert_raise NimbleOptions.ValidationError, ~r/:timeout.*expected a positive integer, :once or :infinity/, fn ->
       Fluffy.wait_for(session, Event.download(), timeout: -1)
     end
 
@@ -56,7 +56,7 @@ defmodule Fluffy.PublicOptionValidationTest do
   end
 
   test "expectation option values are validated when the expectation is constructed", %{button: button} do
-    assert_raise NimbleOptions.ValidationError, ~r/:timeout.*non[- ]negative integer/, fn ->
+    assert_raise NimbleOptions.ValidationError, ~r/:timeout.*expected a positive integer, :once or :infinity/, fn ->
       Expect.to_be_visible(button, timeout: -1)
     end
 
@@ -66,15 +66,15 @@ defmodule Fluffy.PublicOptionValidationTest do
   end
 
   test "page expectation options share expectation validation" do
-    assert_raise NimbleOptions.ValidationError, ~r/:timeout.*non[- ]negative integer/, fn ->
+    assert_raise NimbleOptions.ValidationError, ~r/:timeout.*expected a positive integer, :once or :infinity/, fn ->
       Expect.page_to_have_title("Houses", timeout: -1)
     end
 
-    assert_raise NimbleOptions.ValidationError, ~r/:timeout.*non[- ]negative integer/, fn ->
+    assert_raise NimbleOptions.ValidationError, ~r/:timeout.*expected a positive integer, :once or :infinity/, fn ->
       Expect.page_to_have_url("/houses", timeout: -1)
     end
 
-    assert_raise NimbleOptions.ValidationError, ~r/:timeout.*non[- ]negative integer/, fn ->
+    assert_raise NimbleOptions.ValidationError, ~r/:timeout.*expected a positive integer, :once or :infinity/, fn ->
       Expect.page_to_have_opener(nil, timeout: -1)
     end
   end
@@ -93,7 +93,7 @@ defmodule Fluffy.PublicOptionValidationTest do
   end
 
   test "action options fail before reaching a driver", %{session: session, button: button} do
-    assert_raise NimbleOptions.ValidationError, ~r/:timeout.*non[- ]negative integer/, fn ->
+    assert_raise NimbleOptions.ValidationError, ~r/:timeout.*expected a positive integer, :once or :infinity/, fn ->
       Fluffy.click(session, button, timeout: -1)
     end
 

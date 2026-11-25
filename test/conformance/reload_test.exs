@@ -33,7 +33,7 @@ defmodule Fluffy.Conformance.ReloadTest do
 
   for driver <- Drivers.backends() do
     @tag driver: driver
-    test "reload with timeout: 0 reloads on Phoenix and is rejected on Playwright with #{driver}", %{driver: driver} do
+    test "reload with timeout: :once reloads on Phoenix and is rejected on Playwright with #{driver}", %{driver: driver} do
       fixture =
         HTTPFixtures.register_sequence([
           %{body: html("<h1>First render</h1>")},
@@ -44,15 +44,15 @@ defmodule Fluffy.Conformance.ReloadTest do
 
       if driver == :phoenix do
         session
-        |> reload(timeout: 0)
+        |> reload(timeout: :once)
         |> expect("Second render" |> by_text() |> to_be_visible())
       else
         for {operation, call} <- [
-              reload: &reload(&1, timeout: 0),
-              go_back: &Fluffy.Playwright.go_back(&1, timeout: 0),
-              go_forward: &Fluffy.Playwright.go_forward(&1, timeout: 0)
+              reload: &reload(&1, timeout: :once),
+              go_back: &Fluffy.Playwright.go_back(&1, timeout: :once),
+              go_forward: &Fluffy.Playwright.go_forward(&1, timeout: :once)
             ] do
-          assert_raise ArgumentError, ~r/^#{operation}: timeout: 0 means check once/, fn -> call.(session) end
+          assert_raise ArgumentError, ~r/^#{operation}: timeout: :once checks once/, fn -> call.(session) end
         end
 
         assert length(HTTPFixtures.requests(fixture)) == 1

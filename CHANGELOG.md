@@ -15,7 +15,7 @@ events, routes, `unwrap` callbacks, regexes and URLs, they are the port's, as in
 `use Playwright.Test` registers each test, which every session needs. Browsers come from its pool,
 and its options, timeouts, traces, screenshots, videos, steps and snapshot names follow Playwright
 Test ([Configuration](docs/installation.md#configuration)). Its `assert` and `refute` are trace
-steps, also with `use Fluffy.Assert`, which goes after `use Playwright.Test`. `:infinity` means no limit; `timeout: 0` checks once on assertions and Phoenix
+steps, also with `use Fluffy.Assert`, which goes after `use Playwright.Test`. `:infinity` means no limit; `timeout: :once` checks once on assertions and Phoenix
 actions, while Playwright actions and waits reject it.
 
 ## Phoenix drivers that act like a browser
@@ -43,7 +43,8 @@ Changes since 0.8.0.
 - The application owns the Ecto sandbox, as generated `DataCase` and `ConnCase` do: Fluffy no longer starts, adopts or stops owners, and `sandbox:` and `repos:` are gone. It adds the metadata of `config :fluffy, ecto_repos:` to browser sessions.
 - Browsers come from `Playwright.Test.BrowserPool`, configured by `config :playwright, :test` (`browser_name`, `launch_options`) and `config :playwright, :driver` (`executable:`), at most `workers` at once. `config :fluffy, :playwright` and `pool_size` are removed.
 - Configuration follows Playwright Test: `config :fluffy` keeps only `endpoint`, `ecto_repos`, `file_input_max_bytes` and the new `phoenix_backend_timeout`; its `action_timeout:`, `expect_timeout:` (of the release candidates), `timeout:` and `base_url:` are removed ([Configuration](docs/installation.md#configuration)).
-- Browser sessions take Playwright Test's timeouts from every level, tags included, and Phoenix sessions take `phoenix_backend_timeout`; `start_session(timeout:)` is removed. `timeout: 0` checks once and `:infinity` means no limit; Playwright actions and waits reject `0`, and calls with no timeout in Playwright, such as `evaluate`, `cookies` and download reads, take none ([Configuration](docs/installation.md#configuration)).
+- Browser sessions take Playwright Test's timeouts from every level, tags included, and Phoenix sessions take `phoenix_backend_timeout`; `start_session(timeout:)` is removed. Calls with no timeout in Playwright, such as `evaluate`, `cookies` and download reads, take none ([Configuration](docs/installation.md#configuration)).
+- A single check is `timeout: :once`, and `timeout: 0` raises in native calls, since it checks once in Elixir but means no limit in Playwright; the `Fluffy.PhoenixTest` facade keeps PhoenixTest's `0`. `:infinity` means no limit. Playwright actions and waits reject `:once`.
 - Set the base URL with Playwright Test's `base_url` or a session's `base_url:`; by default it is the endpoint's ([Configuration](docs/installation.md#configuration)).
 - The default base URL is the endpoint's `url` host, on its listener's scheme and port, instead of the listener's address: `http://localhost:4002`, not `http://127.0.0.1:4002`, with `phx.new`'s config. Phoenix's default `check_origin` now lets the browser's LiveView socket connect, and Phoenix sessions treat the app's own absolute URLs as same-origin when the `url` port is the listener's.
 - Phoenix sessions send the test's `extra_http_headers`, and its `locale` (`en-US` by default) and `user_agent` as Accept-Language and User-Agent, as a browser does. `start_session`'s `headers:` is now `extra_http_headers:` (a map), which replaces the test's as in Playwright; it and `base_url` go there, not in `browser_context:` ([Configuration](docs/installation.md#configuration)).

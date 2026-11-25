@@ -65,18 +65,18 @@ defmodule Fluffy.PlaywrightConfigurationTest do
     put_env(phoenix_backend_timeout: 2_000)
     assert {Timeouts.expect(), Timeouts.phoenix()} == {300, 2_000}
 
-    put_env(phoenix_backend_timeout: 0)
-    assert Timeouts.phoenix() == 0
+    put_env(phoenix_backend_timeout: :once)
+    assert Timeouts.phoenix() == :once
   end
 
-  # Playwright's `0` means no limit; Fluffy's checks once.
+  # Playwright's `0` means no limit; Fluffy's raises.
   test "Playwright's 0 is no limit" do
     put_playwright(test: [expect: [timeout: 0]])
     assert Timeouts.expect() == :infinity
   end
 
   test "rejects invalid values" do
-    for {key, value} <- [phoenix_backend_timeout: -1] do
+    for {key, value} <- [phoenix_backend_timeout: -1, phoenix_backend_timeout: 0] do
       put_env([{key, value}])
       assert_raise ArgumentError, ~r/invalid config :fluffy: .*#{key}/, &Options.config!/0
       Application.delete_env(:fluffy, key)

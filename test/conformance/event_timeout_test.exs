@@ -39,9 +39,9 @@ defmodule Fluffy.Conformance.EventTimeoutTest do
     %{fixture: fixture}
   end
 
-  for driver <- Drivers.backends(), timeout <- [0, 100] do
+  for driver <- Drivers.backends(), {timeout, sleep} <- [{:once, 0}, {100, 100}] do
     @tag driver: driver
-    test "ignores matching downloads after a #{timeout} ms deadline with #{driver}", %{
+    test "ignores matching downloads after a timeout: #{inspect(timeout)} deadline with #{driver}", %{
       driver: driver,
       fixture: fixture
     } do
@@ -52,7 +52,7 @@ defmodule Fluffy.Conformance.EventTimeoutTest do
           session,
           Event.download(&(&1.suggested_filename == "marauders_map.csv")),
           fn session ->
-            Process.sleep(unquote(timeout))
+            Process.sleep(unquote(sleep))
             click(session, by_role(:link, name: "Download"))
           end,
           timeout: unquote(timeout)

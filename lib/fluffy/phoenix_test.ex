@@ -10,7 +10,8 @@ defmodule Fluffy.PhoenixTest do
   `Fluffy.press/4` fit in the same pipeline. They don't see the `within/3` scope and
   don't change the form `submit/1` uses. The function documentation below
   defines the supported overloads and options; unsupported options raise
-  `ArgumentError`. Exact text (`exact: true`) normalizes whitespace but, unlike native
+  `ArgumentError`. As in PhoenixTest, `timeout: 0` doesn't wait: it checks once, as a native
+  `timeout: :once` does. Exact text (`exact: true`) normalizes whitespace but, unlike native
   exact matching, does not ignore soft hyphens or zero-width spaces in the page text.
 
       conn
@@ -454,7 +455,7 @@ defmodule Fluffy.PhoenixTest do
         {:ok, text} -> if options[:exact], do: text, else: Regex.compile!(Regex.escape(text))
       end
 
-    Expect.page_to_have_title(expected, Keyword.take(options, [:timeout]))
+    Expect.page_to_have_title(expected, timeout(options))
   end
 
   defp has_expectation(session, selector, options) do
@@ -494,7 +495,7 @@ defmodule Fluffy.PhoenixTest do
   end
 
   defp element_expectation(locator, options) do
-    timeout = Keyword.take(options, [:timeout])
+    timeout = timeout(options)
 
     cond do
       Keyword.has_key?(options, :selected) ->
@@ -562,7 +563,15 @@ defmodule Fluffy.PhoenixTest do
       path_parts_match?(parts, uri.path) and (is_nil(query) or query == decode_query(uri.query))
     end
 
-    Expect.page_to_have_url(expected, Keyword.take(options, [:timeout]))
+    Expect.page_to_have_url(expected, timeout(options))
+  end
+
+  # PhoenixTest's `timeout: 0` doesn't wait: Fluffy's `:once`.
+  defp timeout(options) do
+    case Keyword.take(options, [:timeout]) do
+      [timeout: 0] -> [timeout: :once]
+      timeout -> timeout
+    end
   end
 
   defp decode_query(nil), do: []

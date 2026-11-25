@@ -70,7 +70,7 @@ defmodule Fluffy.Event do
           | :request_failed
           | :request_finished
   @type t :: %__MODULE__{type: type(), predicate: (term() -> term()) | nil}
-  @type option :: {:timeout, timeout()} | {:scope, :page | :context}
+  @type option :: {:timeout, pos_integer() | :once | :infinity} | {:scope, :page | :context}
 
   for type <- @types do
     @doc playwright_only: type != :download
@@ -131,7 +131,7 @@ defmodule Fluffy.Event do
 
   defp registration(session, %__MODULE__{type: type, predicate: predicate}, options, mode)
        when type in @types and (is_nil(predicate) or is_function(predicate, 1)) do
-    schema = if mode == :wait, do: [timeout: [type: :timeout]], else: []
+    schema = if mode == :wait, do: [timeout: [type: {:custom, Fluffy.Options, :timeout, []}]], else: []
     schema = if type in @network_types, do: schema ++ [scope: [type: {:in, [:page, :context]}]], else: schema
     options = NimbleOptions.validate!(options, schema)
     source = Session.backend(session).event_source(session, type, Keyword.get(options, :scope, :page))

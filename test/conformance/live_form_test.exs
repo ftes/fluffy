@@ -552,7 +552,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
     # Returns once the view handled the message.
     :sys.get_state(view)
 
-    expect(session, Fluffy.Expect.page_to_have_url(Server.base_url() <> "/session/show"), timeout: 0)
+    expect(session, Fluffy.Expect.page_to_have_url(Server.base_url() <> "/session/show"), timeout: :once)
   end
 
   test "the Phoenix driver eagerly synchronizes a blur-debounced form mutation" do
@@ -571,8 +571,8 @@ defmodule Fluffy.Conformance.LiveFormTest do
     |> start_session()
     |> visit("/live/potions")
     |> fill(by_label("Timed", exact: true), "sent by fill")
-    |> expect("Last target: wizard/timed" |> by_text() |> to_be_visible(), timeout: 0)
-    |> expect("Event targets: wizard/timed" |> by_text() |> to_be_visible(), timeout: 0)
+    |> expect("Last target: wizard/timed" |> by_text() |> to_be_visible(), timeout: :once)
+    |> expect("Event targets: wizard/timed" |> by_text() |> to_be_visible(), timeout: :once)
   end
 
   @tag driver: :playwright
@@ -583,7 +583,7 @@ defmodule Fluffy.Conformance.LiveFormTest do
     |> start_session()
     |> visit("/live/potions")
     |> fill(debounced, "sent on blur")
-    |> expect("Last debounced: none" |> by_text(exact: true) |> to_be_visible(), timeout: 0)
+    |> expect("Last debounced: none" |> by_text(exact: true) |> to_be_visible(), timeout: :once)
     |> blur(debounced)
     |> expect("Last debounced: sent on blur" |> by_text(exact: true) |> to_be_visible())
   end

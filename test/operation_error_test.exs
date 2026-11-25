@@ -160,7 +160,7 @@ defmodule Fluffy.OperationErrorTest do
 
     for expected <- ["/diagon-alley", ~r/diagon-alley/, &(&1.path == "/diagon-alley")] do
       assert_raise ExUnit.AssertionError, ~r/to have URL/, fn ->
-        expect(session, page_to_have_url(expected, timeout: 0))
+        expect(session, page_to_have_url(expected, timeout: :once))
       end
     end
   end

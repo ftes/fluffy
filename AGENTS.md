@@ -19,8 +19,8 @@ through. Only as a last resort, when LiveView support can't work without it, add
 say why in a comment. Build Playwright selectors through the Elixir client (its
 `Frame`/`Locator`/`FrameLocator` API, `Isomorphic.LocatorUtils` and `SelectorParser`); don't write
 selector strings in Fluffy, since `internal:*` engine syntax changes between Playwright versions.
-Timeouts follow Elixir: `0` means check once and `:infinity` means no limit;
-`Fluffy.Deadline.playwright/1` maps `0` to 1ms, since Playwright's 0 means no limit.
+Timeouts: `:once` checks once, `:infinity` means no limit and `0`, which checks once in Elixir
+but means no limit in Playwright, raises; `Fluffy.Deadline.playwright/1` maps `:once` to 1ms.
 
 Phoenix upstream is the secondary reference, for the Phoenix drivers. Playwright decides what
 behavior is correct; LiveView's client JS and `Phoenix.LiveViewTest` decide how the Phoenix drivers
