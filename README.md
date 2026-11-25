@@ -118,8 +118,9 @@ conn
 |> assert_path("/creatures")
 ```
 
-Use the facade import on its own. Once a suite needs `unwrap` for more than a few
-calls, rewrite it on the native API rather than mix the two styles.
+Use the facade import on its own. Its session is a plain `Fluffy.Session`, so a native call
+such as `Fluffy.press/4` fits in the pipeline; once a suite needs more than a few, rewrite it
+on the native API rather than mix the two styles.
 
 For native tests, choose an [assertion vocabulary](docs/assertions.md):
 `use Fluffy.Assert` or `import Fluffy.Expect`.

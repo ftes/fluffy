@@ -31,7 +31,6 @@ defmodule Fluffy.Conformance.LiveFormTest do
       |> fill(by_label("First ingredient"), ~D[2026-09-30])
       |> expect("Last first: 2026-09-30" |> by_text() |> to_be_visible())
       |> Fluffy.PhoenixTest.fill_in("Final ingredient", with: %Fluffy.Support.FormValue{value: "<tag>&"})
-      |> then(fn %{session: session} -> session end)
       |> expect("Last last: custom:<tag>&" |> by_text() |> to_be_visible())
       |> select_option(by_label("Potion colours"), [%{value: :blue}, %{value: :green}])
       |> expect("Potion colours" |> by_label() |> to_have_values(["green", "blue"]))

@@ -6,8 +6,9 @@ defmodule Fluffy.PhoenixTest do
   either backend. See [Coming from PhoenixTest](migration-from-phoenix-test.md)
   for migration setup, examples, and compatibility differences.
 
-  Actions and assertions return a `Fluffy.PhoenixTest.Session`. Native Fluffy
-  APIs accept its contained `session` field. The function documentation below
+  Every function takes and returns a plain `Fluffy.Session`, so native calls such as
+  `Fluffy.press/4` fit in the same pipeline. They don't see the `within/3` scope and
+  don't change the form `submit/1` uses. The function documentation below
   defines the supported overloads and options; unsupported options raise
   `ArgumentError`. Exact text (`exact: true`) normalizes whitespace but, unlike native
   exact matching, does not ignore soft hyphens or zero-width spaces in the page text.
@@ -23,37 +24,19 @@ defmodule Fluffy.PhoenixTest do
   alias Fluffy.Expect
   alias Fluffy.Locator
   alias Fluffy.PhoenixTest.Form
-  alias Fluffy.Session, as: NativeSession
+  alias Fluffy.Session
 
   @non_file_buttons "button, input:not([type=file i]), [role]:not(input)"
 
-  defmodule Session do
-    @moduledoc """
-    The facade session, containing the native session, locator scope, and active form.
-
-    Only facade operations accept this wrapper. Regular Fluffy operations require
-    the contained session and explicit locators.
-    """
-    @enforce_keys [:session]
-    defstruct [:session, :scope, :active_form, :active_form_document]
-
-    @type t :: %__MODULE__{
-            session: NativeSession.t(),
-            scope: Locator.t() | nil,
-            active_form: Locator.t() | nil,
-            active_form_document: term()
-          }
-  end
-
-  @typedoc "A facade session, or a native session accepted when entering the facade."
-  @type session :: Session.t() | NativeSession.t()
+  @typedoc "A native `Fluffy.Session`, which also carries the facade's scope and active form."
+  @type session :: Session.t()
 
   @doc group: "Lifecycle and navigation"
   @doc "Starts an explicit Fluffy session with the selected backend."
   def start_session(backend), do: start_session(backend, [])
   @doc group: "Lifecycle and navigation"
   @doc "Starts an explicit Fluffy session with backend options."
-  def start_session(backend, options), do: %Session{session: Fluffy.start_session(backend, options)}
+  def start_session(backend, options), do: Fluffy.start_session(backend, options)
 
   @doc group: "Lifecycle and navigation"
   @doc "Stores the Phoenix endpoint on a prepared connection."
@@ -233,17 +216,17 @@ defmodule Fluffy.PhoenixTest do
   @doc group: "Actions"
   @doc """
   Runs a callback with a CSS scope. Return the updated scoped session from the callback.
-  Nested callbacks restore the outer scope. All operations retain the facade wrapper,
-  including the last interacted field's form when leaving a scope.
+  Nested callbacks restore the outer scope, and the last edited field's form is kept
+  when leaving a scope. Native calls inside the callback don't see the scope, so scope
+  their locators explicitly, such as with `Fluffy.Locator.within/2`.
   """
-  @spec within(session(), String.t(), (Session.t() -> Session.t())) :: session()
+  @spec within(session(), String.t(), (session() -> session())) :: session()
   def within(session, selector, fun) when is_function(fun, 1) do
-    session = wrap(session)
-    scoped = %{session | scope: css_locator(session, selector)}
+    scoped = put_state(session, :scope, css_locator(session, selector))
 
     case fun.(scoped) do
-      %Session{} = updated -> %{updated | scope: session.scope}
-      _ -> raise ArgumentError, "Fluffy.PhoenixTest.within/3: callback must return a Fluffy.PhoenixTest.Session"
+      %Session{} = updated -> put_state(updated, :scope, scope(session))
+      _ -> raise ArgumentError, "Fluffy.PhoenixTest.within/3: callback must return a Fluffy.Session"
     end
   end
 
@@ -252,23 +235,23 @@ defmodule Fluffy.PhoenixTest do
   Submits the form owning the most recently edited field. URL patches retain the
   active form; navigation to another document or LiveView clears it.
   """
-  @spec submit(session()) :: Session.t()
+  @spec submit(session()) :: session()
   def submit(session) do
-    session = wrap(session)
+    session = current_form(session)
 
-    case current_form(session, page_identity(session.session)) do
-      %Session{active_form: nil} ->
+    case state(session)[:form] do
+      nil ->
         raise ArgumentError,
               "Fluffy.PhoenixTest.submit/1: no active form; fill, select, check, choose, or upload a field first"
 
-      %Session{active_form: locator} = session ->
+      locator ->
         submit_form(session, locator)
     end
   end
 
   @doc group: "Actions"
   @doc "Submits an explicit CSS form selector or native form locator, inside the current `within/3` scope."
-  @spec submit(session(), String.t() | Locator.t()) :: Session.t()
+  @spec submit(session(), String.t() | Locator.t()) :: session()
   def submit(session, selector), do: submit_form(session, locator_in_scope(session, base_locator(selector)))
 
   defp submit_form(session, locator), do: session |> map_session(&Fluffy.submit(&1, locator)) |> clear_form()
@@ -294,11 +277,11 @@ defmodule Fluffy.PhoenixTest do
   Keep using the same session afterwards: on LiveView and Playwright, navigation the callback
   causes is still followed. A Static page stays as it is, whatever `Plug.Conn` the callback returns.
 
-  The result cannot carry the session wrapper back, so the form `submit/1` would use is not
-  updated. If the callback replaces that form without navigating, use `unwrap/2`.
+  No session comes back, so the form `submit/1` would use is not updated. If the callback
+  replaces that form without navigating, use `unwrap/2`.
   """
   @spec unwrap_and_return(session(), (term() -> result)) :: result when result: term()
-  def unwrap_and_return(session, fun), do: Fluffy.unwrap_and_return(wrap(session).session, fun)
+  def unwrap_and_return(session, fun), do: Fluffy.unwrap_and_return(session, fun)
 
   for {name, negated?} <- [assert_has: false, refute_has: true] do
     @doc group: "Assertions"
@@ -309,8 +292,7 @@ defmodule Fluffy.PhoenixTest do
     Static and Live use structural visibility; Playwright uses rendered visibility.
     `count:` and `at:` count visible matches only, as PhoenixTest.Playwright did. Field
     predicates without `at:` add no visibility requirement, so they check hidden inputs too;
-    for DOM presence use a native count on the native session,
-    `assert(session.session, count(locator, n))`.
+    for DOM presence use a native count, `Fluffy.Assert.assert(session, count(locator, n))`.
 
     Supports `text:`, `count:`, one-based `at:`, `value:`, `checked:`, `selected:`,
     `label:`, `exact:`, and `timeout:`. Text and label matching default to substring
@@ -397,8 +379,12 @@ defmodule Fluffy.PhoenixTest do
     locator_in_scope(session, Locator.by_css(selector))
   end
 
-  defp locator_in_scope(%Session{scope: %Locator{} = scope}, locator), do: Locator.Internal.within(scope, locator)
-  defp locator_in_scope(_session, locator), do: locator
+  defp locator_in_scope(session, locator) do
+    case scope(session) do
+      %Locator{} = scope -> Locator.Internal.within(scope, locator)
+      nil -> locator
+    end
+  end
 
   defp base_locator(selector) when is_binary(selector), do: Locator.by_css(selector)
   defp base_locator(%Locator{} = locator), do: locator
@@ -407,36 +393,47 @@ defmodule Fluffy.PhoenixTest do
     raise ArgumentError, "selector: must be a string or a Fluffy.Locator, got: #{inspect(selector)}"
   end
 
-  defp wrap(%Session{} = session), do: session
-  defp wrap(%NativeSession{} = native), do: %Session{session: native}
+  # The facade's state lives on the handle, in `Fluffy.Session`'s `private` under this
+  # module: `scope` for `within/3`, and `form` with the `form_document` it was edited on
+  # for `submit/1`.
+  defp state(%Session{private: private}), do: Map.get(private, __MODULE__, %{})
+
+  # An empty state is removed, so a handle the facade left no state on equals the native one.
+  defp put_state(%Session{private: private} = session, state) when state == %{},
+    do: %{session | private: Map.delete(private, __MODULE__)}
+
+  defp put_state(%Session{private: private} = session, state),
+    do: %{session | private: Map.put(private, __MODULE__, state)}
+
+  defp put_state(session, key, nil), do: put_state(session, Map.delete(state(session), key))
+  defp put_state(session, key, value), do: put_state(session, Map.put(state(session), key, value))
+
+  defp scope(session), do: state(session)[:scope]
 
   defp map_session(session, fun) do
-    session = wrap(session)
-    before_document = page_identity(session.session)
-    session = current_form(session, before_document)
-    native = fun.(session.session)
-    current_form(%{session | session: native}, page_identity(native))
+    session = current_form(session)
+    current_form(fun.(session))
   end
 
-  defp clear_form(session), do: %{session | active_form: nil, active_form_document: nil}
+  defp clear_form(session), do: session |> put_state(:form, nil) |> put_state(:form_document, nil)
 
-  # Another handle can navigate this shared page without updating the wrapper.
-  defp current_form(%Session{active_form_document: document} = session, document), do: session
-  defp current_form(session, _document), do: clear_form(session)
+  # Another handle, or a native call, can navigate this shared page without updating this handle.
+  defp current_form(session) do
+    if state(session)[:form_document] == page_identity(session), do: session, else: clear_form(session)
+  end
 
-  defp page_identity(native) do
-    page = NativeSession.current_page(native)
+  defp page_identity(session) do
+    page = Session.current_page(session)
     {page.id, page.document_id}
   end
 
   defp field_action(session, locator, fun) do
-    session = wrap(session)
-    before_document = page_identity(session.session)
-    form = Form.owner(session.session, locator)
+    before_document = page_identity(session)
+    form = Form.owner(session, locator)
     updated = map_session(session, fun)
 
-    if page_identity(updated.session) == before_document do
-      %{updated | active_form: form || Form.owner(updated.session, locator), active_form_document: before_document}
+    if page_identity(updated) == before_document do
+      updated |> put_state(:form, form || Form.owner(updated, locator)) |> put_state(:form_document, before_document)
     else
       clear_form(updated)
     end

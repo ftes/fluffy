@@ -11,8 +11,11 @@ defmodule Fluffy.Session do
   alias Fluffy.SessionRuntime
 
   @enforce_keys [:runtime, :active_page]
-  defstruct [:runtime, :active_page]
-  @type t :: %__MODULE__{runtime: pid(), active_page: reference()}
+  # `private` holds per-handle state for code built on sessions, keyed by module, as
+  # `Plug.Conn`'s `private` does. Fluffy itself never reads it: every operation returns the
+  # handle it was given, updated with `%{session | ...}`, so carries it through.
+  defstruct [:runtime, :active_page, private: %{}]
+  @type t :: %__MODULE__{runtime: pid(), active_page: reference(), private: map()}
 
   @doc false
   def new(backend, context, %Page.State{} = page, runtime \\ nil) do
