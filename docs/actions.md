@@ -176,19 +176,23 @@ heading = text_content(session, by_role(:heading, level: 1))
 href = get_attribute(session, by_role(:link, name: "Diagon Alley"), "href")
 owl = input_value(session, by_label("Owl"))
 creatures = all_text_contents(session, by_role(:listitem))
+page_title = title(session)
 ```
 
 `text_content` is the DOM's text, hidden and `<script>` text included; `get_attribute`
 reads the HTML attribute, or `nil` without it; `input_value` reads an input, textarea or
 select as `fill` and `select_option` left it. Each takes one strict target, while
-`all_text_contents` reads every match, without waiting.
+`all_text_contents` reads every match, without waiting, and `all` returns a locator for
+each. `title` reads the page's `<title>` and `content` its HTML
+([Page content](capabilities.md#page-content)).
 The browser's rendered text, `Fluffy.Playwright.inner_text/3` and `all_inner_texts/2`,
 requires Playwright.
 
 A read waits for its target to attach, as an action does, then reads the value once; it
 doesn't wait for the value to change. To check a value, use an assertion, which retries
 until it passes: `assert(text(by_role(:heading), "Fluffy"))` rather than comparing what
-`text_content` returned right after an action.
+`text_content` returned right after an action. To wait for an element before acting,
+without asserting, use `Fluffy.wait_for/3` with a locator and `state:`.
 
 ## Reloading
 

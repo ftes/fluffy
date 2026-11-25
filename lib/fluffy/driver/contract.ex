@@ -40,6 +40,11 @@ defmodule Fluffy.Driver.Contract do
   @callback all_text_contents(Session.t(), Locator.t(), keyword()) :: read([String.t()])
   @callback get_attribute(Session.t(), Locator.t(), String.t(), keyword()) :: read(String.t() | nil)
   @callback input_value(Session.t(), Locator.t(), keyword()) :: read(String.t())
+  # The number of current matches, which `Fluffy.all/2` turns into locators.
+  @callback all(Session.t(), Locator.t(), keyword()) :: read(non_neg_integer())
+  @callback wait_for(Session.t(), Locator.t(), keyword()) :: result()
+  @callback content(Session.t(), keyword()) :: read(String.t())
+  @callback title(Session.t(), keyword()) :: read(String.t())
   @callback open_browser(Session.t(), (String.t() -> term())) :: Session.t()
   @callback unwrap(Session.t(), (term() -> term())) :: result()
   @callback unwrap_and_return(Session.t(), (term() -> value)) :: {:return, value, result()} when value: term()

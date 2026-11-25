@@ -35,6 +35,7 @@ defmodule Fluffy.Support.Web.Router do
     get("/harness", PageController, :harness)
     get("/stage", PageController, :harness)
     get("/chamber", PageController, :static)
+    get("/notice-board", PageController, :notice_board)
     get("/actions/click", PageController, :click_source)
     get("/actions/live", PageController, :live_source)
     get("/actions/client-navigation", PageController, :client_navigation)
@@ -95,6 +96,7 @@ defmodule Fluffy.Support.Web.Router do
       live("/owlery", OwleryLive)
       live("/facade-locators/:markup", FacadeLocatorsLive)
       live("/lumos", LumosLive)
+      live("/notice-board", NoticeBoardLive)
     end
 
     live_session :fluffy_own_sandbox_hook, on_mount: Web.OwnSandboxHook do

@@ -69,6 +69,13 @@ defmodule Fluffy.Capability do
         "Exact, regular-expression, whitespace-normalized, negated, and dynamic LiveView title assertions are paired."
     },
     %{
+      id: :page_reads,
+      feature: "Page content and title, locator lists, and locator waits",
+      drivers: %{static: :structural_subset, live: :structural_subset},
+      detail:
+        "`Fluffy.content/2`, `title/2`, `all/2` and `wait_for/3` on a locator read the driver's document, with structural visibility; LiveView's `wait_for` retries against fresh renders and Static's checks once. `content` serializes the document as the browser does, without JavaScript-owned DOM, and LiveView's has no whitespace-only text between elements."
+    },
+    %{
       id: :indeterminate_checked_state,
       feature: "Indeterminate checkbox/radio DOM property",
       drivers: %{static: :browser_only, live: :browser_only},
@@ -280,10 +287,10 @@ defmodule Fluffy.Capability do
     },
     %{
       id: :playwright_only_api,
-      feature: "Page content, locator lists and waits, native locators, and download files",
+      feature: "Native locators and download files",
       drivers: %{static: :browser_only, live: :browser_only},
       detail:
-        "`Fluffy.Playwright.content/2`, `title/2`, `all/2`, `unwrap/3`, `wait_for/3` on a locator, and a download's file path and native Playwright value work on Playwright only. On Phoenix use expectations, `Fluffy.unwrap/2`, and `Fluffy.Download.read/2` or `save_as/2`."
+        "`Fluffy.Playwright.unwrap/3` and `unwrap_and_return/3` on a locator, and a download's file path and native Playwright value work on Playwright only. On Phoenix use `Fluffy.unwrap/2`, and `Fluffy.Download.read/2` or `save_as/2`."
     },
     %{
       id: :phoenix_conn,

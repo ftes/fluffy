@@ -74,6 +74,7 @@ defmodule Fluffy do
   @type text_content_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema(:text_content)))
   @type get_attribute_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema(:get_attribute)))
   @type input_value_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema(:input_value)))
+  @type content_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema(:content)))
   @type reload_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.action_schema(:reload)))
   @type file_input_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.file_input_schema()))
   @type session_option ::
@@ -364,16 +365,18 @@ defmodule Fluffy do
   With a `Fluffy.Event`, registers the wait immediately and returns a pending
   handle: await it once with `await/1`.
 
-  With a `Fluffy.Locator`, blocks until the locator reaches `state:`, by default
-  `:visible`, and returns the session. This form is Playwright only, and raises
-  `Fluffy.CapabilityError` on Phoenix. `timeout:` defaults to the action timeout
+  With a `Fluffy.Locator`, waits until the locator reaches `state:`, by default
+  `:visible`, and returns the session, as Playwright's `locator.waitFor()`. Like an
+  action, it is strict: it fails for a locator that matches several elements.
+  LiveView retries against fresh renders until `timeout:`, while Static, where nothing
+  changes, checks once, as their actions and assertions do; visibility on both is
+  structural ([Visibility and DOM presence](assertions.md#visibility-and-dom-presence)).
+  `timeout:` defaults to the action timeout, and on Phoenix to `phoenix_backend_timeout`
   ([Timeouts](installation.md#timeouts)). Prefer an `expect` when asserting what the page shows.
 
       session |> wait_for(by_role(:dialog), state: :hidden) |> click(by_role(:button))
 
   ## Locator options
-
-  Playwright-only options pass through to #{Fluffy.Options.native_reference(:wait_for)}.
 
   #{NimbleOptions.docs(Fluffy.Options.action_schema(:wait_for))}
   """
@@ -383,8 +386,10 @@ defmodule Fluffy do
 
   def wait_for(%Session{} = session, %Event{} = event, options), do: Event.wait(session, event, options)
 
-  def wait_for(%Session{} = session, %Fluffy.Locator{} = locator, options),
-    do: Fluffy.Playwright.__call__(session, :action, :playwright_only_api, :wait_for, locator, [], options)
+  def wait_for(%Session{} = session, %Fluffy.Locator{} = locator, options) do
+    options = Fluffy.Options.validate_action!(session, :wait_for, options)
+    dispatch_driver(session, :wait_for, [locator, options])
+  end
 
   @doc group: "Events"
   @doc "Consumes a pending event and returns its value. Its deadline starts at registration."
@@ -756,6 +761,60 @@ defmodule Fluffy do
   def input_value(%Session{} = session, %Fluffy.Locator{} = locator, options \\ []) do
     options = Fluffy.Options.validate_action!(session, :input_value, options)
     dispatch_driver(session, :input_value, [locator, options])
+  end
+
+  @doc group: "Reads"
+  @doc """
+  Returns one `Fluffy.Locator` per element the locator matches right now, built with
+  `Fluffy.Locator.nth/2`, as Playwright's `locator.all()`.
+
+      owls = for owl <- all(session, by_role(:listitem)), do: text_content(session, owl)
+
+  As upstream, it doesn't wait for elements to match and returns `[]` if none do, and it
+  is flaky on a list that is still changing: the elements can change between this call
+  and the use of a locator. Wait first, such as with `Fluffy.Expect.to_have_count/3`.
+  """
+  @spec all(Session.t(), Fluffy.Locator.t()) :: [Fluffy.Locator.t()]
+  def all(%Session{} = session, %Fluffy.Locator{} = locator) do
+    count = dispatch_driver(session, :all, [locator, []])
+    for index <- 0..(count - 1)//1, do: Fluffy.Locator.nth(locator, index)
+  end
+
+  @doc group: "Reads"
+  @doc """
+  Returns the HTML of the active page, its doctype and `<html>` element, as Playwright's
+  `page.content()`.
+
+  It is the document as it is now, with attributes as the page's markup and scripts left
+  them; the current value of a field filled in is not an attribute, so it isn't there.
+  On Static and LiveView, it is the document the driver holds: the server's HTML, with
+  LiveView's renders, title updates and portals applied, but not what JavaScript changes
+  in a browser, such as the classes LiveView's client adds
+  ([Page content](capabilities.md#page-content)). As in Playwright, it has no timeout.
+
+  ## Options
+
+  Playwright-only options pass through to #{Fluffy.Options.native_reference(:content)}.
+
+  #{NimbleOptions.docs(Fluffy.Options.action_schema(:content))}
+  """
+  @spec content(Session.t(), [content_option()]) :: String.t()
+  def content(%Session{} = session, options \\ []) do
+    options = Fluffy.Options.validate_action!(session, :content, options)
+    dispatch_driver(session, :content, [options])
+  end
+
+  @doc group: "Reads"
+  @doc """
+  Returns the active page's title, as Playwright's `page.title()`: the text of its
+  `<title>`, with whitespace collapsed, or `""` without one. On LiveView it includes
+  `live_title` updates. To assert it, use `Fluffy.Expect.page_to_have_title/2`, which
+  retries. As in Playwright, it has no timeout.
+  """
+  @spec title(Session.t(), []) :: String.t()
+  def title(%Session{} = session, options \\ []) do
+    Fluffy.Options.validate_untimed!(options)
+    dispatch_driver(session, :title, [[]])
   end
 
   defp dispatch_driver(session, operation, arguments), do: Backend.driver(session, operation, arguments)

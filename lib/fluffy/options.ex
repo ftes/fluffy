@@ -54,7 +54,22 @@ defmodule Fluffy.Options do
     reload: {Playwright.Page, :reload, 2},
     text_content: {Playwright.Locator, :text_content, 2},
     get_attribute: {Playwright.Locator, :get_attribute, 3},
-    input_value: {Playwright.Locator, :input_value, 2}
+    input_value: {Playwright.Locator, :input_value, 2},
+    wait_for: {Playwright.Locator, :wait_for, 2},
+    content: {Playwright.Page, :content, 2}
+  ]
+
+  # Upstream options of a cross-driver action that every driver honors, validated by Fluffy.
+  @fluffy_action_options [
+    wait_for: [
+      state: [
+        type: {:in, [:attached, :detached, :visible, :hidden]},
+        default: :visible,
+        doc:
+          "The state to wait for: `:attached` (in the DOM), `:detached` (not in the DOM), `:visible` " <>
+            "(attached and visible) or `:hidden` (detached, or attached and not visible)."
+      ]
+    ]
   ]
 
   # Playwright-only actions, whose options pass through the same way.
@@ -69,7 +84,6 @@ defmodule Fluffy.Options do
     dispatch_event: {Playwright.Locator, :dispatch_event, 4},
     select_text: {Playwright.Locator, :select_text, 2},
     scroll_into_view_if_needed: {Playwright.Locator, :scroll_into_view_if_needed, 2},
-    wait_for: {Playwright.Locator, :wait_for, 2},
     bounding_box: {Playwright.Locator, :bounding_box, 2},
     inner_text: {Playwright.Locator, :inner_text, 2},
     aria_snapshot: {Playwright.Locator, :aria_snapshot, 2},
@@ -83,7 +97,6 @@ defmodule Fluffy.Options do
     locator_screenshot: {Playwright.Locator, :screenshot, 2},
     page_screenshot: {Playwright.Page, :screenshot, 2},
     to_have_screenshot: {Playwright.Expect, :to_have_screenshot, 2},
-    content: {Playwright.Page, :content, 2},
     pdf: {Playwright.Page, :pdf, 2},
     emulate_media: {Playwright.Page, :emulate_media, 2},
     keyboard_press: {Playwright.Keyboard, :press, 3},
@@ -141,7 +154,8 @@ defmodule Fluffy.Options do
                   |> Kernel.++(@playwright_actions)
                   |> Map.new(fn {action, {module, fun, _arity}} ->
                     required = Keyword.get(@required_action_options, action, [])
-                    excluded = @fluffy_native_keys ++ @denied_native_keys ++ Keyword.keys(required)
+                    fluffy = Keyword.get(@fluffy_action_options, action, [])
+                    excluded = @fluffy_native_keys ++ @denied_native_keys ++ Keyword.keys(required ++ fluffy)
 
                     native =
                       for {key, entry} <- Native.schema(module, fun, excluded) do
@@ -149,7 +163,7 @@ defmodule Fluffy.Options do
                       end
 
                     timeout = if action in @untimed_actions, do: [], else: @timeout_options
-                    {action, NimbleOptions.new!(timeout ++ required ++ native)}
+                    {action, NimbleOptions.new!(timeout ++ required ++ fluffy ++ native)}
                   end)
                   |> Map.merge(%{
                     add_script_tag:
@@ -279,11 +293,11 @@ defmodule Fluffy.Options do
     type_doc: "`t:String.t/0` | `t:Regex.t/0` | `t:Playwright.RegExp.t/0`"
   ]
 
-  @playwright_option_keys @native_actions
-                          |> Enum.flat_map(fn {_, {module, fun, _}} ->
-                            Native.keys(module, fun, @fluffy_native_keys ++ @denied_native_keys)
+  # Each cross-driver action's options that only Playwright honors.
+  @playwright_option_keys Map.new(@native_actions, fn {action, {module, fun, _}} ->
+                            fluffy = @fluffy_action_options |> Keyword.get(action, []) |> Keyword.keys()
+                            {action, Native.keys(module, fun, @fluffy_native_keys ++ @denied_native_keys ++ fluffy)}
                           end)
-                          |> Enum.uniq()
   @expectation_schema NimbleOptions.new!(@timeout_options)
 
   @file_input_schema NimbleOptions.new!(
@@ -555,14 +569,15 @@ defmodule Fluffy.Options do
   @doc """
   Validates a cross-driver action's options for `session`. A Phoenix session raises
   `Fluffy.CapabilityError` for an option only Playwright honors, so its drivers get `timeout:`
-  at most.
+  and Fluffy's own options at most.
   """
   @spec validate_action!(Fluffy.Session.t(), atom(), keyword()) :: keyword()
   def validate_action!(%Fluffy.Session{} = session, action, options) do
     options = validate_action!(action, options)
 
     with Fluffy.Backend.Phoenix <- Fluffy.Session.backend(session),
-         key when not is_nil(key) <- Enum.find(Keyword.keys(options), &(&1 in @playwright_option_keys)) do
+         key when not is_nil(key) <-
+           Enum.find(Keyword.keys(options), &(&1 in Map.get(@playwright_option_keys, action, []))) do
       raise Fluffy.CapabilityError,
         capability: :playwright_action_options,
         operation: action,

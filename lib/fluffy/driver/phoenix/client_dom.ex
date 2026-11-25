@@ -9,34 +9,48 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM do
   alias Fluffy.Driver.Phoenix.HTML.Aria
   alias Fluffy.Driver.Phoenix.HTML.DocumentIndex
   alias Fluffy.Driver.Phoenix.HTML.Semantics
+  alias Fluffy.Driver.Phoenix.HTML.Serializer
   alias Fluffy.Driver.Phoenix.HTML.Target
+  alias Fluffy.Driver.Phoenix.Locator, as: PhoenixLocator
   alias Fluffy.Locator
 
+  # `doctype` is the document's doctype as a browser serializes it, which LazyHTML drops,
+  # or nil for a fragment or a document without one.
   @enforce_keys [:document]
-  defstruct [:document, properties: %{}]
+  defstruct [:document, :doctype, properties: %{}]
 
   @opaque t :: %__MODULE__{
             document: term(),
+            doctype: String.t() | nil,
             properties: map()
           }
 
   def from_fragment(html) when is_binary(html) do
-    html |> LazyHTML.from_fragment() |> new()
+    html |> LazyHTML.from_fragment() |> new(nil)
   end
 
   def from_document(html) when is_binary(html) do
-    html |> LazyHTML.from_document() |> new()
+    html |> LazyHTML.from_document() |> new(doctype(html))
   end
 
-  def from_document(%LazyHTML{} = document), do: new(document)
+  def from_document(%LazyHTML{} = document, doctype), do: new(document, doctype)
 
-  defp new(document) do
+  defp new(document, doctype) do
     index = index(%__MODULE__{document: document})
 
     %__MODULE__{
       document: document,
+      doctype: doctype,
       properties: enforce_radio_group_exclusivity(%{}, index, MapSet.new())
     }
+  end
+
+  # The doctype before the first element, as `XMLSerializer` writes it, by its name only.
+  defp doctype(html) do
+    case Regex.run(~r/\A\x{FEFF}?(?:\s|<!--.*?-->)*<!doctype\s+([^\s>]+)/isu, html) do
+      [_match, name] -> "<!DOCTYPE #{String.downcase(name)}>"
+      nil -> nil
+    end
   end
 
   @doc false
@@ -94,9 +108,10 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM do
           end
       end)
 
-    %__MODULE__{
-      document: new_document,
-      properties: enforce_radio_group_exclusivity(properties, new_index, locally_checked)
+    %{
+      client_dom
+      | document: new_document,
+        properties: enforce_radio_group_exclusivity(properties, new_index, locally_checked)
     }
   end
 
@@ -472,6 +487,60 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM do
 
   def get_attribute(%__MODULE__{} = client_dom, %Locator{} = locator, name),
     do: client_dom |> target!(locator) |> Semantics.get_attribute(name)
+
+  # Playwright's page.content(): the doctype and the <html> element's outerHTML, without
+  # comments around it. A fragment, which has no <html>, is its nodes.
+  def content(%__MODULE__{document: document, doctype: doctype}) do
+    tree = LazyHTML.to_tree(document)
+
+    case Enum.find(tree, &match?({"html", _attributes, _children}, &1)) do
+      nil -> Serializer.to_html(tree)
+      html -> (doctype || "") <> Serializer.to_html([html])
+    end
+  end
+
+  # document.title: the first <title>'s text, its whitespace stripped and collapsed.
+  def title(%__MODULE__{document: document}) do
+    case document |> LazyHTML.query("title") |> Enum.at(0) do
+      nil -> ""
+      title -> title |> LazyHTML.text() |> Semantics.collapse_whitespace()
+    end
+  end
+
+  # Playwright's locator.waitFor: strict, it waits for the one match to reach `state`,
+  # or, for `:detached` and `:hidden`, for none.
+  def wait_for(%__MODULE__{} = client_dom, %Locator{} = locator, state) do
+    case resolve(client_dom, locator) do
+      [] when state in [:detached, :hidden] ->
+        :ok
+
+      [element] ->
+        visible? = PhoenixLocator.structurally_visible?(aria(client_dom), element)
+
+        case {state, visible?} do
+          {:attached, _visible?} ->
+            :ok
+
+          {:visible, true} ->
+            :ok
+
+          {:hidden, false} ->
+            :ok
+
+          {:detached, _visible?} ->
+            raise Fluffy.ActionabilityError, action: :wait_for, reason: :attached, locator: locator
+
+          {:visible, false} ->
+            raise Fluffy.ActionabilityError, action: :wait_for, reason: :hidden, locator: locator
+
+          {:hidden, true} ->
+            raise Fluffy.ActionabilityError, action: :wait_for, reason: :visible, locator: locator
+        end
+
+      candidates ->
+        raise Fluffy.StrictnessError, locator: locator, candidates: candidates
+    end
+  end
 
   defp target_value(client_dom, target) do
     if target.tag == "select" do

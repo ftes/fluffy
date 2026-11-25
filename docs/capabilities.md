@@ -21,6 +21,7 @@ supports every feature not marked Phoenix only, within the boundaries described 
 | Playwright action options | - |
 | DOM assertions and strictness | equivalent |
 | Page title assertions | equivalent |
+| Page content and title, locator lists, and locator waits | structural subset |
 | Indeterminate checkbox/radio DOM property | - |
 | Focus, blur, and focus assertions | - |
 | Structural element actions | structural subset |
@@ -50,7 +51,7 @@ supports every feature not marked Phoenix only, within the boundaries described 
 | JavaScript-owned DOM and default actions | - |
 | Native invalid, submit, and formdata event ordering | - |
 | Browser-dependent form entries and submissions | - |
-| Page content, locator lists and waits, native locators, and download files | - |
+| Native locators and download files | - |
 | A prepared `Plug.Conn` for the first request | Phoenix only |
 | Per-test sessions, cleanup, and Ecto sandbox propagation | equivalent |
 | URL matching | equivalent |
@@ -141,6 +142,20 @@ without an `id` are matched by position, so id-less controls with the same name
 and value can still exchange state when a patch shifts them; give such controls
 stable ids. Use Playwright for focused input protection, focus-sensitive
 patches, blur or debounce timing, and exact browser patch behavior.
+
+### Page content
+
+`Fluffy.content/2` serializes the driver's document as a browser serializes its DOM:
+the doctype, by name only, and the `<html>` element, with attributes as they are, so a
+value typed into a field isn't there, as in the browser. It holds what the server
+rendered, with LiveView's renders, `live_title` updates and portals applied, but not what
+JavaScript changes in a browser, such as the `phx-connected` class LiveView's client adds.
+A LiveView document has no whitespace-only text between elements, as LiveViewTest renders
+it, and its `<title>` keeps the layout's whitespace until the title changes. Declarative
+shadow roots stay `<template>` elements on Phoenix, while the browser leaves them out.
+LazyHTML parses with scripting off, so markup inside `<noscript>` is parsed as elements and
+comes out normalized on Phoenix, while the browser keeps it as raw text. To compare pages
+across drivers, read or assert parts of them instead.
 
 ### LiveView document and patch boundaries
 
