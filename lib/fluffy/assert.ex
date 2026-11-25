@@ -19,7 +19,8 @@ defmodule Fluffy.Assert do
       |> refute(page_title("Error"))
 
   Locator constructors take a locator. Page constructors target the active page.
-  All constructors return `Fluffy.Expect` values, not booleans.
+  `pass/2` and `poll/3` retry a block or a value. All constructors return
+  `Fluffy.Expect` values, not booleans.
 
   Ordinary ExUnit assertions, including custom messages and pattern matching,
   retain ExUnit semantics, and are steps of the test as with `use Playwright.Test` alone
@@ -33,7 +34,7 @@ defmodule Fluffy.Assert do
   absence. Static and Live drivers check structural visibility, while Playwright
   checks rendered visibility. Refutation does not turn driver errors into success.
   """
-  @moduledoc groups: ["Running expectations", "Locator assertions", "Page assertions", "Events"]
+  @moduledoc groups: ["Running expectations", "Locator assertions", "Page assertions", "Polling and retrying", "Events"]
 
   alias Playwright.Test.Assertions
 
@@ -312,6 +313,16 @@ defmodule Fluffy.Assert do
   @doc "Equivalent to `Fluffy.Expect.page_to_have_opener/2`."
   @spec page_opener(Fluffy.Page.t() | nil, [Fluffy.Expect.option()]) :: Fluffy.Expect.t()
   defdelegate page_opener(expected, options \\ []), to: Fluffy.Expect, as: :page_to_have_opener
+
+  @doc group: "Polling and retrying"
+  @doc "Equivalent to `Fluffy.Expect.to_pass/2`."
+  @spec pass((Fluffy.Session.t() -> term()), [Fluffy.Expect.to_pass_option()]) :: Fluffy.Expect.t()
+  defdelegate pass(fun, options \\ []), to: Fluffy.Expect, as: :to_pass
+
+  @doc group: "Polling and retrying"
+  @doc "Equivalent to `Fluffy.Expect.poll/3`."
+  @spec poll((Fluffy.Session.t() -> term()), (term() -> term()), [Fluffy.Expect.poll_option()]) :: Fluffy.Expect.t()
+  defdelegate poll(fun, assertion, options \\ []), to: Fluffy.Expect
 
   @doc group: "Events"
   @doc "Equivalent to `Fluffy.Expect.expect_event/3`."

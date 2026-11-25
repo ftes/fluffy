@@ -14,9 +14,12 @@ defmodule Fluffy.Conformance.NativeOptionsTest do
 
   test "every upstream option of an expectation is classified" do
     for {matcher, {module, fun, _arity, mirrored}} <- Options.native_expectations() do
-      classified = Options.fluffy_native_keys() ++ Options.denied_expectation_keys() ++ mirrored
+      upstream = upstream_keys(module, fun)
+      # `toPass` and `expect.poll` take no `signal`.
+      denied = Enum.filter(Options.denied_expectation_keys(), &(&1 in upstream))
+      classified = Options.fluffy_native_keys() ++ denied ++ mirrored
 
-      assert Enum.sort(upstream_keys(module, fun)) == Enum.sort(classified),
+      assert Enum.sort(upstream) == Enum.sort(classified),
              "classify the upstream options of #{inspect(matcher)} in Fluffy.Options"
     end
   end

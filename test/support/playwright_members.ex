@@ -25,7 +25,6 @@ defmodule Fluffy.Support.PlaywrightMembers do
   @native_value {:unwrap, "gap: on the Playwright value of Fluffy.unwrap_and_return/2"}
   @native_event {:unwrap, "gap: listen natively inside Fluffy.unwrap/2"}
   @event_value {:unwrap, "on the Playwright value an event delivers, as in Playwright"}
-  @native_retry {:unwrap, "gap: retries any callback natively, Fluffy calls in it too"}
   @own_timeouts {:denied,
                  "the defaults are config, as in Playwright Test: the resolved action and navigation " <>
                    "timeouts, which the session sets on its context"}
@@ -102,8 +101,8 @@ defmodule Fluffy.Support.PlaywrightMembers do
           {[:to_be_ok], {:na, "APIResponse assertion"}},
           {[:soft], {:unwrap, "gap: soft matchers on the native locator of Fluffy.Playwright.unwrap/3"}},
           {[:message], {:unwrap, "gap: custom expect messages on the native locator of Fluffy.Playwright.unwrap/3"}},
-          {[:to_pass], @native_retry},
-          {[:poll], @native_retry}
+          {[:to_pass], :wrapped},
+          {[:poll], :wrapped}
         ]),
       Playwright.Page =>
         [

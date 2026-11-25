@@ -142,6 +142,10 @@ defmodule Fluffy.Expect.Internal do
     "active page to have opener #{inspect(expected)}"
   end
 
+  defp positive_description(%Expect{kind: :pass}), do: "the block to pass"
+
+  defp positive_description(%Expect{kind: :poll}), do: "the polled value to pass the assertion"
+
   defp positive_description(%Expect{target: :page, kind: :screenshot, expected: options}) do
     "active page to match the screenshot#{snapshot_file(options)}"
   end

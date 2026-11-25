@@ -200,6 +200,22 @@ defmodule Fluffy.PlaywrightArtifactsTest.AssertStepsTest do
 
     :static |> Fluffy.session_for_html("<p>Hedwig</p>") |> assert(visible(by_text("Hedwig")))
   end
+
+  @letter "A letter " <> "for Harry"
+
+  # Each is Playwright's matcher step, with the assertions in it as steps of their own.
+  @tag trace_has: [~s(Expect \\"toPass\\"), ~s(Expect \\"poll assert\\"), ~s("title":"#{@letter}")]
+  test "records pass and poll as steps" do
+    :static
+    |> Fluffy.session_for_html("<p>Hedwig</p>")
+    |> assert(
+      pass(fn session ->
+        assert(:letter, @letter)
+        assert(session, visible(by_text("Hedwig")), timeout: 0)
+      end)
+    )
+    |> assert(poll(fn _session -> 1 end, &assert(&1 == 1)))
+  end
 end
 
 defmodule Fluffy.PlaywrightArtifactsTest.AssertStepsOffTest do

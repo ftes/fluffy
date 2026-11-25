@@ -102,7 +102,7 @@ Changes since 0.8.0.
 - `Fluffy.base_url/1`, the session's resolved base URL, as Playwright Test's `baseURL`.
 - `Fluffy.add_session_cookie/3` starts a test logged in on both backends: it signs the endpoint's session cookie for the given session values, with the options of the endpoint's `session_options/0` ([Logging in](docs/usage.md#logging-in)).
 - [Accessibility testing](docs/usage.md#accessibility-testing) links PlaywrightEx's axe-core recipe and its Fluffy calls.
-- [Polling and retrying blocks](docs/assertions.md#polling-and-retrying-blocks) shows `Playwright.Expect.poll!/3` and `to_pass!/2` around Fluffy calls, for a computed value or app state.
+- `Fluffy.Expect.poll/3` and `to_pass/2` (`Fluffy.Assert.poll/3` and `pass/2`) poll a value or retry a block in a pipeline, as Playwright's `expect.poll` and `toPass`, with the session, on every driver; `not_(to_pass(fun))` (`refute(pass(fun))`) as `not.toPass` ([Polling and retrying blocks](docs/assertions.md#polling-and-retrying-blocks)).
 
 ### Changed
 
