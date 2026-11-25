@@ -25,6 +25,30 @@ defmodule Fluffy.Conformance.PageEventTest do
     assert_raise ArgumentError, ~r/another browser context/, fn -> page(session, native) end
   end
 
+  @tag driver: :playwright
+  test "page/2 adopts tabs opened through PlaywrightEx, without a Fluffy event" do
+    {session, fixture} = browser_session()
+
+    popup =
+      unwrap_and_return(session, fn native ->
+        Playwright.Page.expect_popup!(native, fn -> Playwright.Page.click!(native, "text=Details") end)
+      end)
+
+    session
+    |> switch_page(page(session, popup))
+    |> expect(:heading |> by_role(name: "Details") |> to_be_visible())
+
+    context = session |> unwrap_and_return(& &1) |> Playwright.Page.context()
+    tab = Playwright.BrowserContext.new_page!(context)
+    Playwright.Page.goto!(tab, HTTPFixtures.url(fixture, "/other"))
+    other = page(session, tab)
+    assert other in pages(session)
+
+    session
+    |> switch_page(other)
+    |> expect(page_to_have_url(HTTPFixtures.url(fixture, "/other")))
+  end
+
   for event_type <- [:page, :popup] do
     @tag driver: :playwright
     test "#{event_type} remains bound to its registration source after switching pages" do
