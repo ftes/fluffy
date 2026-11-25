@@ -16,27 +16,32 @@ defmodule Fluffy.PhoenixTest.Form do
     end
   end
 
+  # A selector of the element's form owner, or null.
+  @form_owner """
+  element => {
+    const form = element.form;
+    if (!form) return null;
+    if (form.id) return 'form#' + CSS.escape(form.id);
+    const parts = [];
+    for (let node = form; node; node = node.parentElement) {
+      const index = node.parentElement ? Array.from(node.parentElement.children).indexOf(node) + 1 : 1;
+      parts.unshift(node.localName + ':nth-child(' + index + ')');
+    }
+    return parts.join(' > ');
+  }
+  """
+
   # As a locator read, the action timeout bounds it.
   defp browser_owner(session, frame, locator) do
-    case frame
-         |> Fluffy.Driver.Playwright.Locator.locator(locator)
-         |> Playwright.Locator.evaluate(
-           """
-           element => {
-             const form = element.form;
-             if (!form) return null;
-             if (form.id) return 'form#' + CSS.escape(form.id);
-             const parts = [];
-             for (let node = form; node; node = node.parentElement) {
-               const index = node.parentElement ? Array.from(node.parentElement.children).indexOf(node) + 1 : 1;
-               parts.unshift(node.localName + ':nth-child(' + index + ')');
-             }
-             return parts.join(' > ');
-           }
-           """,
+    native = Driver.Playwright.Locator.locator(frame, locator)
+    timeout = Fluffy.Deadline.playwright_operation!(:evaluate, Fluffy.Timeouts.action(session))
+
+    case Driver.Playwright.Internal.call(Playwright.Locator, :evaluate, [
+           native,
+           @form_owner,
            nil,
-           timeout: Fluffy.Deadline.playwright_operation!(:evaluate, Fluffy.Timeouts.action(session))
-         ) do
+           [timeout: timeout]
+         ]) do
       {:ok, :null} -> nil
       {:ok, selector} -> Locator.by_css(selector)
       {:error, _error} -> nil

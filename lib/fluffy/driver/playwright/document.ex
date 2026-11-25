@@ -9,6 +9,7 @@ defmodule Fluffy.Driver.Playwright.Document do
 
   alias Fluffy.Deadline
   alias Fluffy.Driver.Playwright.Bounded
+  alias Fluffy.Driver.Playwright.Internal
   alias Fluffy.Internal.NavigationFailure
   alias Playwright.Frame
   alias Playwright.JSHandle
@@ -116,7 +117,9 @@ defmodule Fluffy.Driver.Playwright.Document do
   def probe!(frame, cursor, timeout), do: probe!(frame, cursor, timeout, Deadline.new(timeout), 5)
 
   defp probe!(frame, cursor, timeout, deadline, backoff) do
-    case Bounded.within(Deadline.remaining(deadline, 1), fn -> Frame.evaluate(frame, @probe, cursor) end) do
+    case Bounded.within(Deadline.remaining(deadline, 1), fn ->
+           Internal.call(Frame, :evaluate, [frame, @probe, cursor])
+         end) do
       {:ok, {:ok, %{"url" => url, "document" => document, "cursor" => next, "kind" => kind}}} ->
         %{url: url, document: document, cursor: next, kind: kind(kind)}
 
@@ -150,7 +153,7 @@ defmodule Fluffy.Driver.Playwright.Document do
     do: Exception.message(error) =~ "Execution context was destroyed, most likely because of a navigation"
 
   def wait_for_live_view!(frame, destination, timeout) do
-    case Frame.wait_for_function(frame, @live_view_ready, nil, timeout: timeout) do
+    case Internal.call(Frame, :wait_for_function, [frame, @live_view_ready, nil, [timeout: timeout]]) do
       {:ok, handle} ->
         release(handle)
 
@@ -171,7 +174,7 @@ defmodule Fluffy.Driver.Playwright.Document do
       .some(event => event.kind === 'redirect' && event.complete)
     """
 
-    case Frame.wait_for_function(frame, expression, cursor, timeout: timeout) do
+    case Internal.call(Frame, :wait_for_function, [frame, expression, cursor, [timeout: timeout]]) do
       {:ok, handle} ->
         release(handle)
 
@@ -191,7 +194,7 @@ defmodule Fluffy.Driver.Playwright.Document do
   def wait_for_navigations!(frame, cursor, timeout) do
     expression = "cursor => window.__fluffy?.navigations.slice(cursor).every(event => event.complete) ?? true"
 
-    case Frame.wait_for_function(frame, expression, cursor, timeout: timeout) do
+    case Internal.call(Frame, :wait_for_function, [frame, expression, cursor, [timeout: timeout]]) do
       {:ok, handle} ->
         release(handle)
 

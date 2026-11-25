@@ -8,6 +8,7 @@ defmodule Fluffy.Backend.Playwright do
   alias Fluffy.Deadline
   alias Fluffy.Driver.Playwright, as: PlaywrightDriver
   alias Fluffy.Driver.Playwright.Document
+  alias Fluffy.Driver.Playwright.Internal
   alias Fluffy.Driver.Playwright.State
   alias Fluffy.Internal.NavigationFailure
   alias Fluffy.Page
@@ -64,7 +65,8 @@ defmodule Fluffy.Backend.Playwright do
       }
 
       SessionRuntime.run(runtime, fn ->
-        _disposable = BrowserContext.add_init_script!(browser_context, Document.init_script())
+        with {:error, error} <- Internal.call(BrowserContext, :add_init_script, [browser_context, Document.init_script()]),
+             do: raise(error)
       end)
 
       listen(browser_context, runtime)
