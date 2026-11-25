@@ -190,6 +190,13 @@ for faster failures set both, as Fluffy's own suite does with 15 seconds, or low
 fails with "Test timeout of 60000ms exceeded." and its call log. It sets the timeouts on the
 test's browser contexts, so native calls in an `unwrap` callback get them too.
 
+The expect timeout also sets how often a waiting browser assertion checks again (a screenshot
+comparison has its own schedule). As in Playwright, it checks at once, after 20, 50, 100 and
+100 ms, then every 500 ms, but drops each step longer than a fifth of the timeout: under 2.5 s
+it checks every 100 ms, and more often under 500 ms. So with the default 5 s, a page that
+updates a few hundred milliseconds later, such as after a debounce, can be seen up to 500 ms
+late, while `expect: [timeout: 2_000]` checks for it every 100 ms.
+
 A Phoenix session's action retries, assertions and event waits default to
 `config :fluffy, phoenix_backend_timeout:`, 1 second: an in-process session answers at once,
 so a long wait is only for something that isn't there. Its `0` checks once, and `:infinity`
