@@ -13,18 +13,19 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM.Query do
     rewritten = rewrite(locator, marker)
 
     if rewritten == locator do
-      PhoenixLocator.resolve(document, locator)
+      PhoenixLocator.resolve(document, locator, checked_ids)
     else
       # Project current user-input state for this query only. Keep the rendered
       # attributes intact: [checked]/[selected] describe defaults, :checked the
       # current property. Return original nodes so actions and diagnostics never
       # observe the private marker or a replacement document.
-      {tree, _next_id} = document |> LazyHTML.to_tree() |> mark(checked_ids.(), marker, 0)
+      checked_ids = checked_ids.()
+      {tree, _next_id} = document |> LazyHTML.to_tree() |> mark(checked_ids, marker, 0)
       original_nodes = Map.new(LazyHTML.query(document, "*"), &{DocumentIndex.path(&1), &1})
 
       tree
       |> LazyHTML.from_tree()
-      |> PhoenixLocator.resolve_uncached(rewritten)
+      |> PhoenixLocator.resolve_uncached(rewritten, fn -> checked_ids end)
       |> Enum.map(&Map.fetch!(original_nodes, DocumentIndex.path(&1)))
     end
   end

@@ -13,25 +13,34 @@ defmodule Fluffy.Driver.Phoenix.Locator do
   # find descendants only, except that its text engine also matches the scope itself.
   @descendant_queries [:css, :attribute, :test_id]
 
-  def resolve(document, %Locator{} = locator), do: resolve(Aria.for_document(document), document, locator)
+  # `checked_ids` returns the ids of the checked inputs and selected options, as the
+  # controls' current state has them (`Fluffy.Driver.Phoenix.ClientDOM`); it is called
+  # only for a role locator's `checked:` or `selected:`.
+  def resolve(document, %Locator{} = locator, checked_ids),
+    do: resolve(Aria.for_document(document), document, locator, control_state(locator, checked_ids))
 
   # For a document built for one query, which must not evict the real document's model.
-  def resolve_uncached(document, %Locator{} = locator), do: resolve(Aria.new(document), document, locator)
+  def resolve_uncached(document, %Locator{} = locator, checked_ids),
+    do: resolve(Aria.new(document), document, locator, control_state(locator, checked_ids))
+
+  defp control_state(locator, checked_ids) do
+    if Locator.Internal.role_option?(locator, [:checked, :selected]), do: checked_ids.(), else: MapSet.new()
+  end
 
   # `root` is what the locator starts from; `aria` models the whole page, which
   # role, name and label computation looks across regardless of it.
-  defp resolve(aria, root, %Locator{} = locator) do
+  defp resolve(aria, root, %Locator{} = locator, checked) do
     Enum.reduce(locator.operations, [root], fn
       {:and, right}, candidates ->
-        matches = aria |> resolve(root, right) |> MapSet.new(&LazyHTML.css_path/1)
+        matches = aria |> resolve(root, right, checked) |> MapSet.new(&LazyHTML.css_path/1)
         Enum.filter(candidates, &MapSet.member?(matches, LazyHTML.css_path(&1)))
 
       {:or, right}, candidates ->
-        matches = MapSet.new(candidates ++ resolve(aria, root, right), &LazyHTML.css_path/1)
+        matches = MapSet.new(candidates ++ resolve(aria, root, right, checked), &LazyHTML.css_path/1)
         root |> LazyHTML.query("*") |> Enum.filter(&MapSet.member?(matches, LazyHTML.css_path(&1)))
 
       {:role, role, options}, candidates ->
-        role_matches(candidates, aria, role, options)
+        role_matches(candidates, aria, role, options, checked)
 
       {:label, text, options}, candidates ->
         label_matches(candidates, aria, text, options)
@@ -40,13 +49,13 @@ defmodule Fluffy.Driver.Phoenix.Locator do
         text_matches(candidates, aria, text, Keyword.get(options, :exact, false))
 
       {:filter, options}, candidates ->
-        filter_candidates(candidates, aria, options)
+        filter_candidates(candidates, aria, options, checked)
 
       # `child` resolves separately inside each match of `parent`, `nth` included.
       {:within, parent, child}, candidates ->
         candidates
-        |> Enum.flat_map(&resolve(aria, &1, parent))
-        |> Enum.flat_map(&resolve(aria, &1, child))
+        |> Enum.flat_map(&resolve(aria, &1, parent, checked))
+        |> Enum.flat_map(&resolve(aria, &1, child, checked))
         |> Enum.uniq_by(&LazyHTML.css_path/1)
 
       operation, candidates when elem(operation, 0) in @descendant_queries ->
@@ -102,7 +111,7 @@ defmodule Fluffy.Driver.Phoenix.Locator do
     end
   end
 
-  defp filter_candidates(candidates, aria, options) do
+  defp filter_candidates(candidates, aria, options, checked) do
     options =
       Enum.map(options, fn
         {key, text} when key in [:has_text, :has_not_text] -> {key, Internal.compile(text)}
@@ -114,25 +123,62 @@ defmodule Fluffy.Driver.Phoenix.Locator do
         {:has_text, text} -> contains_text?(text(aria, candidate), text)
         {:has_not_text, text} -> not contains_text?(text(aria, candidate), text)
         {:visible, visible?} -> structurally_visible?(aria, candidate) == visible?
-        {:has, %Locator{} = child} -> resolve(aria, candidate, child) != []
-        {:has_not, %Locator{} = child} -> resolve(aria, candidate, child) == []
+        {:has, %Locator{} = child} -> resolve(aria, candidate, child, checked) != []
+        {:has_not, %Locator{} = child} -> resolve(aria, candidate, child, checked) == []
       end)
     end)
   end
 
-  defp role_matches(scopes, aria, role, options) do
+  # Playwright's role engine (roleSelectorEngine.ts queryRole). `checked` holds the ids
+  # of checked inputs and selected options.
+  defp role_matches(scopes, aria, role, options, checked) do
+    validate_role_options!(role, options)
     role = role |> to_string() |> String.downcase()
-    expected_name = options |> Keyword.get(:name) |> Internal.compile()
+    include_hidden? = Keyword.get(options, :include_hidden, false)
     exact? = Keyword.get(options, :exact, false)
+    expected_name = options |> Keyword.get(:name) |> Internal.compile()
+    expected_description = options |> Keyword.get(:description) |> Internal.compile()
 
     scopes
     |> scoped_nodes(aria)
     |> Enum.filter(fn {node, _element} ->
-      Aria.role(aria, node) == role and not Aria.hidden?(aria, node) and
-        accessible_name_matches?(aria, node, expected_name, exact?)
+      Aria.role(aria, node) == role and Enum.all?(options, &state_matches?(aria, node, &1, checked)) and
+        (include_hidden? or not Aria.hidden?(aria, node)) and
+        accessible_text_matches?(fn -> Aria.name(aria, node, include_hidden?) end, expected_name, exact?) and
+        accessible_text_matches?(fn -> Aria.description(aria, node, include_hidden?) end, expected_description, exact?)
     end)
     |> Enum.map(fn {_node, element} -> element end)
   end
+
+  # Playwright's role engine rejects a state option for a role without that state, as it
+  # resolves the locator.
+  defp validate_role_options!(role, options) do
+    name = role |> to_string() |> String.downcase()
+
+    Enum.each(options, fn {key, _value} ->
+      roles = Aria.option_roles(key)
+
+      if roles && name not in roles do
+        locator = Locator.Internal.describe(Locator.Internal.new({:role, role, options}))
+        supported = roles |> Enum.sort() |> Enum.map_join(", ", &inspect/1)
+
+        raise ArgumentError,
+              "#{locator}: #{inspect(Atom.to_string(key))} attribute is only supported for roles: #{supported}"
+      end
+    end)
+  end
+
+  defp state_matches?(aria, node, {:checked, expected}, checked),
+    do: Aria.aria_checked(aria, node, MapSet.member?(checked, node.id)) == expected
+
+  defp state_matches?(aria, node, {:selected, expected}, checked),
+    do: Aria.selected(aria, node, MapSet.member?(checked, node.id)) == expected
+
+  defp state_matches?(aria, node, {:pressed, expected}, _checked), do: Aria.pressed(aria, node) == expected
+  defp state_matches?(aria, node, {:expanded, expected}, _checked), do: Aria.expanded(aria, node) == expected
+  defp state_matches?(aria, node, {:level, expected}, _checked), do: Aria.level(aria, node) == expected
+  defp state_matches?(aria, node, {:disabled, expected}, _checked), do: Aria.aria_disabled?(aria, node) == expected
+  defp state_matches?(_aria, _node, _option, _checked), do: true
 
   # Playwright's text engine also matches the scope itself, and keeps the deepest
   # matches: those without a matching descendant. Ids are preorder, so a match's
@@ -176,15 +222,14 @@ defmodule Fluffy.Driver.Phoenix.Locator do
     |> Enum.sort_by(fn {node, _element} -> node.id end)
   end
 
-  defp accessible_name_matches?(_aria, _node, nil, _exact?), do: true
+  # The accessible name or description, computed only when expected.
+  defp accessible_text_matches?(_text, nil, _exact?), do: true
 
-  # As upstream, a regular expression sees the normalized accessible name.
-  defp accessible_name_matches?(aria, node, %Regex{} = expected, _exact?),
-    do: Regex.match?(expected, aria |> Aria.name(node) |> StringUtils.normalize_white_space())
+  # As upstream, a regular expression sees the normalized text.
+  defp accessible_text_matches?(text, %Regex{} = expected, _exact?),
+    do: Regex.match?(expected, StringUtils.normalize_white_space(text.()))
 
-  defp accessible_name_matches?(aria, node, expected, exact?) do
-    aria |> Aria.name(node) |> text_matches?(expected, exact?)
-  end
+  defp accessible_text_matches?(text, expected, exact?), do: text_matches?(text.(), expected, exact?)
 
   defp query_scopes(scopes, selector) do
     scopes

@@ -18,24 +18,6 @@ defmodule Fluffy.Options.Native do
     for {key, option} <- module.__options__(fun), key not in excluded, do: {key, entry(option)}
   end
 
-  @doc """
-  Entries for `keys`, validated with their NimbleOptions `types`, for options that
-  Fluffy compiles itself instead of passing them to the facade. A type given as a
-  keyword list also replaces the documented `type_spec` and `type_doc`.
-  """
-  def schema(module, fun, keys, types) do
-    options = module.__options__(fun)
-
-    for key <- keys do
-      entry = entry(Keyword.fetch!(options, key))
-
-      case Keyword.fetch!(types, key) do
-        [{:type, _type} | _docs] = type -> {key, Keyword.merge(entry, type)}
-        type -> {key, Keyword.put(entry, :type, type)}
-      end
-    end
-  end
-
   defp entry(%{type_doc: type_doc, doc: doc, spec: spec}),
     do: [type: :any, type_spec: spec, type_doc: type_doc, doc: "*Playwright only.* " <> doc]
 end

@@ -18,7 +18,6 @@ supports every feature not marked Phoenix only, within the boundaries described 
 | Conformance-tested CSS locators | equivalent |
 | Text, label, and attribute locators | equivalent |
 | Structural role and accessible-name subset | structural subset |
-| Role-state locator options | - |
 | Playwright action options | - |
 | DOM assertions and strictness | equivalent |
 | Page title assertions | equivalent |

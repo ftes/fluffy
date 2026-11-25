@@ -257,14 +257,12 @@ defmodule Fluffy.Options do
                        end)
 
   # The upstream factory behind each locator constructor and how Fluffy covers its
-  # options: `fluffy` ones work on every driver, `playwright` ones compile into the
-  # Playwright selector and raise on Phoenix, and `denied` ones have a Fluffy
+  # options: `fluffy` ones work on every driver, and `denied` ones have a Fluffy
   # replacement. `by_css` takes no options; chain `filter/2` instead.
   @native_locators [
     by_role:
       {Playwright.Locator, :get_by_role, 3,
-       fluffy: [:exact, :name],
-       playwright: [:checked, :description, :disabled, :expanded, :include_hidden, :level, :pressed, :selected]},
+       fluffy: [:checked, :description, :disabled, :exact, :expanded, :include_hidden, :level, :name, :pressed, :selected]},
     by_text: {Playwright.Locator, :get_by_text, 3, fluffy: [:exact]},
     by_label: {Playwright.Locator, :get_by_label, 3, fluffy: [:exact]},
     by_placeholder: {Playwright.Locator, :get_by_placeholder, 3, fluffy: [:exact]},
@@ -280,27 +278,6 @@ defmodule Fluffy.Options do
     type_spec: quote(do: String.t() | Regex.t() | Playwright.RegExp.t()),
     type_doc: "`t:String.t/0` | `t:Regex.t/0` | `t:Playwright.RegExp.t/0`"
   ]
-
-  # Fluffy compiles locator selectors itself, so it validates what Playwright would.
-  # Text options take a string or a regex, like `name:` and `has_text:`.
-  @playwright_locator_types [
-    checked: :boolean,
-    description: @text_or_regex,
-    disabled: :boolean,
-    expanded: :boolean,
-    include_hidden: :boolean,
-    level: :integer,
-    pressed: :boolean,
-    selected: :boolean
-  ]
-
-  {module, fun, _arity, classes} = @native_locators[:by_role]
-
-  @playwright_role_locator_options Native.schema(module, fun, classes[:playwright], @playwright_locator_types)
-
-  @playwright_locator_keys @native_locators
-                           |> Enum.flat_map(fn {_, {_, _, _, classes}} -> Keyword.get(classes, :playwright, []) end)
-                           |> Enum.uniq()
 
   @playwright_option_keys @native_actions
                           |> Enum.flat_map(fn {_, {module, fun, _}} ->
@@ -339,12 +316,63 @@ defmodule Fluffy.Options do
                         )
 
   # Every role option but `name:`, which `Fluffy.Locator.Roles` takes as an argument.
+  # Fluffy compiles locator selectors itself, so it validates the types Playwright would.
   @role_shorthand_options [
-                            exact: [
-                              type: :boolean,
-                              doc: "Require an exact, case-sensitive accessible-name match."
-                            ]
-                          ] ++ @playwright_role_locator_options
+    exact: [
+      type: :boolean,
+      doc: "Require an exact, case-sensitive accessible-name and description match."
+    ],
+    checked: [
+      type: :boolean,
+      doc:
+        "Match the checked state: a checkbox or radio's current checkedness, or `aria-checked`. " <>
+          "For roles `checkbox`, `menuitemcheckbox`, `menuitemradio`, `option`, `radio`, `switch` and `treeitem`. " <>
+          "A mixed state, `aria-checked=\"mixed\"`, matches neither `true` nor `false`; an input's " <>
+          "`indeterminate` property, which only JavaScript sets, is mixed on Playwright only."
+    ],
+    selected: [
+      type: :boolean,
+      doc:
+        "Match the selected state: an option's current selectedness, or `aria-selected`. " <>
+          "For roles `columnheader`, `gridcell`, `option`, `row`, `rowheader`, `tab` and `treeitem`."
+    ],
+    disabled: [
+      type: :boolean,
+      doc:
+        "Match the disabled state: a disabled form control, also by its fieldset or optgroup, " <>
+          "or `aria-disabled` on the element or an ancestor."
+    ],
+    expanded: [
+      type: :boolean,
+      doc:
+        "Match `aria-expanded`, for roles such as `button`, `combobox`, `link` and `treeitem`. " <>
+          "Without the attribute, neither `true` nor `false` matches."
+    ],
+    pressed: [
+      type: :boolean,
+      doc: "Match `aria-pressed`, for role `button`. `\"mixed\"` matches neither `true` nor `false`."
+    ],
+    level: [
+      type: :integer,
+      doc:
+        "Match the level: an `<h1>`-`<h6>` heading's, or `aria-level`. " <>
+          "For roles `heading`, `listitem`, `row` and `treeitem`."
+    ],
+    description:
+      @text_or_regex ++
+        [
+          doc:
+            "Match the accessible description, from `aria-describedby`, `aria-description` or `title`, " <>
+              "as `name:` matches the name."
+        ],
+    include_hidden: [
+      type: :boolean,
+      doc:
+        "Also match elements hidden from assistive technology, and include hidden content in names " <>
+          "and descriptions. Static and LiveView decide what is hidden structurally, from markup, " <>
+          "as for visibility."
+    ]
+  ]
 
   @role_shorthand_schema NimbleOptions.new!(@role_shorthand_options)
 
@@ -475,9 +503,6 @@ defmodule Fluffy.Options do
 
   @doc false
   def native_locators, do: @native_locators
-
-  @doc "Locator options that only a browser can honor."
-  def playwright_locator_keys, do: @playwright_locator_keys
 
   @doc false
   def native_expectations, do: @native_expectations

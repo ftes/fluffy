@@ -4,7 +4,6 @@ defmodule Fluffy.Locator.Internal do
   # `import Fluffy.Locator` brings into tests.
 
   alias Fluffy.Locator
-  alias Fluffy.Options
 
   @doc "A locator of one operation."
   def new(operation), do: %Locator{operations: [operation]}
@@ -62,27 +61,23 @@ defmodule Fluffy.Locator.Internal do
     end)
   end
 
-  @doc """
-  The first `{key, value}` option of `locator` or a nested locator that only Playwright
-  honors, or nil.
-  """
-  def playwright_option(%Locator{operations: operations}) do
-    Enum.find_value(operations, fn
-      {:role, _role, options} -> playwright_option(options)
-      {:filter, options} -> playwright_option(options)
-      {operator, %Locator{} = inner} when operator in [:and, :or] -> playwright_option(inner)
-      {:within, parent, child} -> playwright_option(parent) || playwright_option(child)
-      _operation -> nil
-    end)
-  end
+  @doc "Whether a role locator in `locator`, nested ones included, takes one of `keys`."
+  def role_option?(%Locator{operations: operations}, keys) do
+    Enum.any?(operations, fn
+      {:role, _role, options} ->
+        Enum.any?(keys, &Keyword.has_key?(options, &1))
 
-  def playwright_option(options) when is_list(options) do
-    Enum.find_value(options, fn
-      {key, %Locator{} = inner} when key in [:has, :has_not] ->
-        playwright_option(inner)
+      {:filter, options} ->
+        Enum.any?(options, fn {_key, inner} -> is_struct(inner, Locator) and role_option?(inner, keys) end)
 
-      {key, _value} = option ->
-        if key in Options.playwright_locator_keys(), do: option
+      {operator, %Locator{} = inner} when operator in [:and, :or] ->
+        role_option?(inner, keys)
+
+      {:within, parent, child} ->
+        role_option?(parent, keys) or role_option?(child, keys)
+
+      _operation ->
+        false
     end)
   end
 

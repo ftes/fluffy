@@ -77,6 +77,7 @@ defmodule Fluffy.Support.Web.Router do
       live("/keyboard", KeyboardLive)
       live("/patching/:mode", PatchingLive)
       live("/checked-controls", CheckedControlsLive)
+      live("/role-states", RoleStatesLive)
       live("/radio-shift", RadioShiftLive)
       live("/click-checkable", ClickCheckableLive)
       live("/click-bindings", ClickBindingsLive)
