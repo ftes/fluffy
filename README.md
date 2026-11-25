@@ -94,9 +94,16 @@ setup, then [Usage](docs/usage.md) for writing tests and starting a session per 
 
 ## Coming from PhoenixTest
 
-Replace `import PhoenixTest` with `import Fluffy.PhoenixTest`, after `use Playwright.Test`.
-Existing pipelines keep familiar helpers such as `fill_in`, `click_button`, and
-`assert_has`, and their prepared connections:
+Rewrite tests on the native API above. The [migration guide](docs/migration-from-phoenix-test.md)
+maps PhoenixTest's common helpers to native steps, and PhoenixTest.Playwright's extras to
+native calls. You also get automatic waiting for LiveView actions and assertions,
+automatic LiveView connection waiting in browser tests, and LiveView tests that see
+the whole page, including the root layout, `live_title` updates, and portal content.
+
+For a plain PhoenixTest suite, or as a temporary step, the `Fluffy.PhoenixTest` facade
+keeps familiar helpers such as `fill_in`, `click_button`, and `assert_has`, and their
+prepared connections. Replace `import PhoenixTest` with `import Fluffy.PhoenixTest`, after
+`use Playwright.Test`:
 
 ```elixir
 use Playwright.Test
@@ -111,14 +118,8 @@ conn
 |> assert_path("/creatures")
 ```
 
-The facade makes Fluffy mostly a drop-in replacement for supported tests, including
-browser tests. You also get automatic waiting for LiveView actions and assertions,
-automatic LiveView connection waiting in browser tests, and LiveView tests that see
-the whole page, including the root layout, `live_title` updates, and portal content.
-
-Use the facade import on its own. The [migration guide](docs/migration-from-phoenix-test.md)
-shows complete setup, the same helpers with Playwright, and compatibility
-boundaries. Adopting the native locator API is optional.
+Use the facade import on its own. Once a suite needs `unwrap` for more than a few
+calls, rewrite it on the native API rather than mix the two styles.
 
 For native tests, choose an [assertion vocabulary](docs/assertions.md):
 `use Fluffy.Assert` or `import Fluffy.Expect`.
@@ -146,8 +147,8 @@ backend supports.
   and the native escape hatch
 - [Advanced events and pages](docs/advanced-events.md) — tabs, windows, iframe
   limitations, downloads, navigation, dialogs, and network events
-- [Coming from PhoenixTest](docs/migration-from-phoenix-test.md) — an alternate
-  starting point for existing PhoenixTest suites
+- [Coming from PhoenixTest](docs/migration-from-phoenix-test.md) — moving PhoenixTest
+  and PhoenixTest.Playwright suites to Fluffy
 - [Upgrading to 0.9](docs/upgrading.md) — what a 0.8 suite must change
 - [Capability matrix](docs/capabilities.md) — backend differences and limitations
 

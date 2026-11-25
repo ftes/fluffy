@@ -14,7 +14,7 @@ Fluffy runs Phoenix feature tests through one Playwright-shaped API, in-process 
 
 ## Choosing an API and a backend
 
-- Native API: `import Fluffy`, `import Fluffy.Locator`, `use Fluffy.Assert`. The PhoenixTest-style facade, `import Fluffy.PhoenixTest`, never goes alongside `import Fluffy`. Follow the suite.
+- Write new tests, and migrate PhoenixTest.Playwright suites, on the native API: `import Fluffy`, `import Fluffy.Locator`, `use Fluffy.Assert`. Use the PhoenixTest-style facade, `import Fluffy.PhoenixTest`, only when the user wants a minimal-diff PhoenixTest port; don't mix it with native calls through `unwrap` or `facade.session` (a test that needs them goes on the native API), and never import it alongside `import Fluffy`.
 - `start_session(:phoenix)` is the default; it picks the Static or LiveView driver per page. Use `:playwright` for JavaScript, layout and computed style, native validation, dialogs, network events, tabs or focus. Fluffy reads no test tags: pick the backend in your setup.
 - Check `docs/capabilities.md` before relying on browser behavior in a Phoenix test: what a backend can't do raises `Fluffy.CapabilityError`. LiveView ignores `phx-debounce`/`phx-throttle`, and Phoenix ignores `data-confirm`.
 - Phoenix checks structural visibility (`hidden`, `type="hidden"`), not CSS; test rendered visibility on `:playwright`.

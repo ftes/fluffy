@@ -87,8 +87,9 @@ One test, with or without a real browser, through one Playwright-shaped API.
 
 ## Switching
 
-- **PhoenixTest and PhoenixTest.Playwright:** the `Fluffy.PhoenixTest` facade keeps most calls;
-  [Coming from PhoenixTest](migration-from-phoenix-test.md) lists what to change.
+- **PhoenixTest and PhoenixTest.Playwright:** rewrite on the native API;
+  [Coming from PhoenixTest](migration-from-phoenix-test.md) maps the common calls. For a plain
+  PhoenixTest suite, or as a temporary step, the `Fluffy.PhoenixTest` facade keeps most calls.
 - **Wallaby:** no facade. `Query.css` becomes `by_css`, `Query.button` and `Query.link` become
   `by_role`; start from [Your first test](usage.md#your-first-test).
 - **Phoenix.ConnTest and Phoenix.LiveViewTest:** Fluffy builds on them, and native calls stay
