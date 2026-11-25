@@ -311,6 +311,16 @@ defmodule Fluffy.Options do
                           ]
                         )
 
+  # Every role option but `name:`, which `Fluffy.Locator.Roles` takes as an argument.
+  @role_shorthand_options [
+                            exact: [
+                              type: :boolean,
+                              doc: "Require an exact, case-sensitive accessible-name match."
+                            ]
+                          ] ++ @playwright_role_locator_options
+
+  @role_shorthand_schema NimbleOptions.new!(@role_shorthand_options)
+
   @role_locator_schema NimbleOptions.new!(
                          [
                            name:
@@ -319,12 +329,8 @@ defmodule Fluffy.Options do
                                  doc:
                                    "Restrict the role locator by accessible name. " <>
                                      "A regular expression is tested against the normalized name."
-                               ],
-                           exact: [
-                             type: :boolean,
-                             doc: "Require an exact, case-sensitive accessible-name match."
-                           ]
-                         ] ++ @playwright_role_locator_options
+                               ]
+                         ] ++ @role_shorthand_options
                        )
 
   @filter_locator_schema NimbleOptions.new!(
@@ -483,6 +489,9 @@ defmodule Fluffy.Options do
   def role_locator_schema, do: @role_locator_schema
 
   @doc false
+  def role_shorthand_schema, do: @role_shorthand_schema
+
+  @doc false
   def filter_locator_schema, do: @filter_locator_schema
 
   @spec validate_action!(keyword()) :: keyword()
@@ -549,6 +558,9 @@ defmodule Fluffy.Options do
 
   @spec validate_role_locator!(keyword()) :: keyword()
   def validate_role_locator!(options), do: NimbleOptions.validate!(options, @role_locator_schema)
+
+  @spec validate_role_shorthand!(keyword()) :: keyword()
+  def validate_role_shorthand!(options), do: NimbleOptions.validate!(options, @role_shorthand_schema)
 
   @spec validate_filter_locator!(keyword()) :: keyword()
   def validate_filter_locator!(options), do: NimbleOptions.validate!(options, @filter_locator_schema)

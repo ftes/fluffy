@@ -9,7 +9,8 @@ boundaries explicit and cover behavior changes with focused conformance tests.
 Upstream Playwright is the reference. Fluffy is modeled on Playwright and adds only what Phoenix
 LiveView needs (waiting for LiveViews to connect, following their navigations, form state). The
 exceptions are `Fluffy.submit/3` and the `Fluffy.PhoenixTest` facade, kept for suites coming from
-PhoenixTest; don't grow them into a second API. Before adding a timeout budget, retry, extra check
+PhoenixTest, and `Fluffy.Locator.Roles`, only `button/2` and `link/2` (the roles that dominate
+ported suites' lookups; no parent forms, no further roles); don't grow them into a second API. Before adding a timeout budget, retry, extra check
 or browser workaround, check what Playwright does and match it; the pinned source is in
 `tmp/playwright-<version>` (`mix setup` or `mix fluffy.playwright_source` fetches it) and dependency
 code in `deps/`, both gitignored, so Grep needs their path. Don't work around Playwright, its Elixir

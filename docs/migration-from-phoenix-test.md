@@ -40,7 +40,8 @@ session in a setup; see [Your first test](usage.md#your-first-test) and
 [Logging in](usage.md#logging-in) for a prepared connection. The `ConnCase` keeps owning
 the sandbox ([Ecto sandbox](installation.md#ecto-sandbox)).
 
-Each PhoenixTest helper, as the facade keeps it, becomes a pipeline step:
+Each PhoenixTest helper, as the facade keeps it, becomes a pipeline step (`button` and `link`
+need `import Fluffy.Locator.Roles`):
 
 | PhoenixTest | Native locator API |
 | --- | --- |
@@ -48,8 +49,8 @@ Each PhoenixTest helper, as the facade keeps it, becomes a pipeline step:
 | `select("Boomslang skin", from: "Ingredient")` | `select_option(by_label("Ingredient", exact: true), %{label: "Boomslang skin"})` |
 | `check("Ready")` | `check(by_label("Ready", exact: true))` |
 | `uncheck("Ready")` | `uncheck(by_label("Ready", exact: true))` |
-| `click_button("Brew")` | `click(by_role(:button, name: "Brew"))` |
-| `click_link("Potions")` | `click(by_role(:link, name: "Potions"))` |
+| `click_button("Brew")` | `click(button("Brew"))`, or `click(by_role(:button, name: "Brew"))` |
+| `click_link("Potions")` | `click(link("Potions"))`, or `click(by_role(:link, name: "Potions"))` |
 | `refute_has("#notice")` | `refute_has(by_css("#notice"))` |
 | `assert_has("#notice", count: 0)` | `assert(count(by_css("#notice") \|> filter(visible: true), 0))` |
 | `assert_path("/potions")` | `assert(page_url(&(&1.path == "/potions")))` |
