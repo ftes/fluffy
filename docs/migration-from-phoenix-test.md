@@ -50,7 +50,7 @@ Each PhoenixTest helper, as the facade keeps it, becomes a pipeline step:
 | `uncheck("Ready")` | `uncheck(by_label("Ready", exact: true))` |
 | `click_button("Brew")` | `click(by_role(:button, name: "Brew"))` |
 | `click_link("Potions")` | `click(by_role(:link, name: "Potions"))` |
-| `refute_has("#notice")` | `refute(visible(by_css("#notice")))` |
+| `refute_has("#notice")` | `refute_has(by_css("#notice"))` |
 | `assert_has("#notice", count: 0)` | `assert(count(by_css("#notice") \|> filter(visible: true), 0))` |
 | `assert_path("/potions")` | `assert(page_url(&(&1.path == "/potions")))` |
 | `assert_path("/potions", query_params: params)` | `assert(page_url("/potions?" <> URI.encode_query(params)))` when the query order is known, or a predicate |
@@ -61,7 +61,7 @@ Each PhoenixTest helper, as the facade keeps it, becomes a pipeline step:
 
 When rewriting, preserve the original assertion's intent:
 
-- Native `visible` uses the same visibility rules but rejects multiple matches.
+- Native `assert_has` and `refute_has` (like `visible`) use the same visibility rules but reject multiple matches.
   For DOM presence/absence, use counts as described in [Visibility and DOM presence](assertions.md#visibility-and-dom-presence).
 - Native text, role-name, and label locators default to substring matching;
   use `exact: true` to retain exact field labels. Facade `text:` without `exact: true` ignores

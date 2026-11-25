@@ -10,13 +10,14 @@ One test, with or without a real browser, through one Playwright-shaped API.
 - ✅ **[Find elements as a user does.](locators.md#locators)** By role, label and text, with or without a browser.
 - ✅ **[Failures you can debug.](debugging.md#operation-failures-and-browser-diagnostics)** A call log, an `error-context.md`, and opt-in traces and
   screenshots from the failing run itself.
-- ✅ **[No Node.js.](installation.md#playwright-setup)** `mix playwright.install` fetches the driver and the browsers.
+- ✅ **[No Node.js to install.](installation.md#playwright-setup)** `mix playwright.install` fetches a pinned Node.js, the
+  Playwright driver and the browsers: no npm, no `package.json`.
 - ✅ **[Fast tests you can trust.](#how-fluffy-stays-correct)** Fluffy's own CI checks its browser-free drivers against a real
   browser, so they behave like it, within [documented limits](capabilities.md#boundaries).
 
 ```text
                          your test
-             visit · click · fill · assert(visible(…))
+             visit · click · fill · assert_has(…)
                              │
                        Fluffy's API
               ┌──────────────┴───────────────┐

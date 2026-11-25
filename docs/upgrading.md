@@ -12,10 +12,10 @@ matched once can now match twice.
 ## Setup
 
 - Install the pinned driver and a browser with `mix playwright.install chromium`.
-  Drop the npm `playwright` package and the `assets_dir` config; Node.js is no longer
-  needed. `executable:` now takes a Playwright 1.65 CLI such as
-  `node_modules/.bin/playwright`, not `cli.js`; usually drop it and let Playwright
-  install the driver.
+  Drop the npm `playwright` package and the `assets_dir` config; you no longer install
+  Node.js or npm yourself, as the install task fetches a pinned Node.js with the driver.
+  `executable:` now takes a Playwright 1.65 CLI such as `node_modules/.bin/playwright`,
+  not `cli.js`; usually drop it and let Playwright install the driver.
 - Run the install in CI too, as `mix playwright.install chromium --with-deps` on Linux
   runners; the driver would install itself in the first browser test, but browsers do
   not; see

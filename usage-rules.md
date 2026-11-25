@@ -7,7 +7,7 @@ Fluffy runs Phoenix feature tests through one Playwright-shaped API, in-process 
 - `timeout: 0` checks once, as in Elixir, and Playwright actions reject it; `:infinity` is no limit.
 - Start sessions, not `Playwright.Case`'s `page` and `context`: `use Playwright.Test` (never `Playwright.Case` or `Fluffy.Case`) in every module that starts one, Phoenix or browser, after the app's `ConnCase` (before it, the `test/3` imports clash). It adds no imports, session or `Test` alias: start the session in a setup, e.g. `%{session: start_session(ctx[:backend] || :phoenix)}`, and tag with `@tag Playwright.Test.use(...)` in full.
 - Assert with Fluffy's assertions, not raw `Playwright.Expect` matchers, and don't call `set_default_timeout` or `set_default_navigation_timeout`: Fluffy owns the page. `Playwright.Expect.poll!/3` and `to_pass!/2` stay, for app state or a block of Fluffy calls; inside `to_pass!`, give assertions `timeout: 0`.
-- `use Fluffy.Assert` goes after `use Playwright.Test`, else `assert/2` is ambiguous.
+- `use Fluffy.Assert` goes after `use Playwright.Test`, else `assert/2` is ambiguous. Check visibility with `assert_has(locator)` and `refute_has(locator)`, not `assert(visible(locator))`.
 - Phoenix sessions time out after `config :fluffy, phoenix_backend_timeout:` (1 s), not Playwright Test's timeouts.
 - In a case template, `use Playwright.Test, unquote(opts)` goes in `using opts`; if the template's own `setup` starts the session, also add a bare `use Playwright.Test` after `use ExUnit.CaseTemplate` ([Shared test case](docs/usage.md#shared-test-case)).
 - Playwright's alias trap covers `alias Fluffy.Playwright` too: where a module uses the dependency's modules, write `Fluffy.Playwright.evaluate(...)` in full or alias it `as: FluffyPlaywright`.

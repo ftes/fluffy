@@ -26,7 +26,7 @@ defmodule MyAppWeb.CreatureTest do
     |> visit("/creatures/fluffy")
     |> fill(by_label("Keeper"), "Rubeus Hagrid")
     |> click(by_role(:button, name: "Play flute"))
-    |> assert(visible(by_text("Asleep")))
+    |> assert_has(by_text("Asleep"))
     |> assert(page_url("/creatures/fluffy"))
   end
 end
@@ -87,7 +87,7 @@ test "updates the preview rendered by a JavaScript hook" do
   start_session(:playwright)
   |> visit("/creatures/new")
   |> fill(by_label("Name"), "Basilisk")
-  |> assert(visible(by_text("Preview: Basilisk")))
+  |> assert_has(by_text("Preview: Basilisk"))
 end
 ```
 
@@ -125,7 +125,7 @@ defmodule MyAppWeb.PotionTest do
   test "lists the available potions", %{session: session} do
     session
     |> visit("/potions")
-    |> assert(visible(by_text("Polyjuice Potion")))
+    |> assert_has(by_text("Polyjuice Potion"))
   end
 
   @tag backend: :playwright
@@ -133,7 +133,7 @@ defmodule MyAppWeb.PotionTest do
     session
     |> visit("/potions")
     |> click(by_role(:button, name: "Brew potion"))
-    |> assert(visible(by_text("Potion brewed")))
+    |> assert_has(by_text("Potion brewed"))
   end
 end
 ```
@@ -216,7 +216,7 @@ test "Hermione opens her vault" do
   start_session(:playwright)
   |> add_session_cookie(%{"wizard_token" => token})
   |> visit("/gringotts/vault")
-  |> assert(visible(by_text("Vault 687")))
+  |> assert_has(by_text("Vault 687"))
 end
 ```
 
