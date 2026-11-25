@@ -228,6 +228,11 @@ The facade covers PhoenixTest's API. For what PhoenixTest.Playwright adds:
   PhoenixTest does. When that element is never visible, such as a modal's zero-size
   wrapper, `assert_has` fails and `refute_has` passes even while the text shows, so select
   the visible element, such as the modal's `[role='dialog']`.
+- **`check` and `uncheck`:** PhoenixTest.Playwright ignored Playwright's "Clicking the
+  checkbox did not change its state"; Fluffy raises it, as Playwright does, on both backends.
+  It means the app set the box back after the click, such as a hook mirroring server state:
+  click it and assert `checked` instead. A click toggles, so do this only where the test knows
+  the box's state before.
 - **Direct `PlaywrightEx` calls:** use playwright_ex 1.65's `Playwright` API through `unwrap`,
   whose callback gets the `Playwright.Page` instead of a map. It returns JS `null` as `:null`.
 
@@ -262,7 +267,9 @@ When rewriting, preserve the original assertion's intent:
 - Native `visible` uses the same visibility rules but rejects multiple matches.
   For DOM presence/absence, use counts as described in [Visibility and DOM presence](assertions.md#visibility-and-dom-presence).
 - Native text, role-name, and label locators default to substring matching;
-  use `exact: true` to retain exact field labels. Native `nth` is zero-based and counts
+  use `exact: true` to retain exact field labels. Facade `text:` without `exact: true` ignores
+  case, except on `"title"`; native `text` and `contain_text` don't, so pass `ignore_case: true`
+  to keep that. Native `nth` is zero-based and counts
   hidden matches, whereas facade `at: n` is one-based among visible matches:
   `filter(visible: true) |> nth(n - 1)`. Use locator composition in place of facade
   `within`; see
