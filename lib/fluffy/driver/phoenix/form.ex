@@ -39,13 +39,12 @@ defmodule Fluffy.Driver.Phoenix.Form do
   defp build_change(index, properties, target, submitter) do
     with form when not is_nil(form) <- form_owner(index, target),
          {:ok, dispatcher_id, only_name} <- change_dispatcher(form, target) do
-      owner_ids = form_owner_ids(index)
-      fields = successful_fields(index, properties, form, submitter, :live, owner_ids)
+      fields = successful_fields(index, properties, form, submitter, :live)
       fields = if only_name, do: Enum.filter(fields, &(elem(&1, 0) == only_name)), else: fields
 
       %{
         dispatcher_id: dispatcher_id,
-        fields: add_unused_fields(fields, index, properties, form, owner_ids),
+        fields: add_unused_fields(fields, index, properties, form),
         form_id: node_id(form),
         target_name: attribute(target.attributes, "name")
       }
@@ -139,8 +138,7 @@ defmodule Fluffy.Driver.Phoenix.Form do
     phx_submit? = attribute(form_attributes, "phx-submit") != nil
     effective_driver = if driver == :live and phx_submit?, do: :live, else: :static
 
-    owner_ids = form_owner_ids(index)
-    ensure_supported_entry_features!(index, properties, form, submitter, effective_driver, owner_ids)
+    ensure_supported_entry_features!(index, form, effective_driver)
 
     if method == :dialog do
       raise CapabilityError,
@@ -161,19 +159,27 @@ defmodule Fluffy.Driver.Phoenix.Form do
         attribute(submitter_attributes, "formaction") || attribute(form_attributes, "action") ||
           "",
       method: method,
-      fields: successful_fields(index, properties, form, submitter, effective_driver, owner_ids),
+      fields: successful_fields(index, properties, form, submitter, effective_driver),
       form_id: node_id(form),
       enctype: enctype,
       phx_submit?: phx_submit?
     }
   end
 
-  defp successful_fields(index, properties, form, submitter, driver, owner_ids) do
+  defp successful_fields(index, properties, form, submitter, driver) do
     index
-    |> DocumentIndex.targets_by_tag(["button", "input", "select", "textarea"])
-    |> Enum.filter(&owned_by_form?(&1, form, owner_ids))
+    |> form_controls(form)
     |> Enum.flat_map(&control_fields(&1, index, properties, submitter, driver))
   end
+
+  # The buttons, inputs, selects and textareas the form owns, in document order.
+  defp form_controls(index, form) do
+    index
+    |> DocumentIndex.targets_by_tag(["button", "input", "select", "textarea"])
+    |> Enum.filter(&owned_by_form?(index, &1, form))
+  end
+
+  defp owned_by_form?(index, target, form), do: Map.get(index.form_owner_ids, node_id(target)) == node_id(form)
 
   defp control_fields(target, index, properties, submitter, driver) do
     name = attribute(target.attributes, "name")
@@ -284,11 +290,11 @@ defmodule Fluffy.Driver.Phoenix.Form do
     end
   end
 
-  defp add_unused_fields(fields, index, properties, form, owner_ids) do
+  defp add_unused_fields(fields, index, properties, form) do
     if has_attribute?(attributes(form), "phx-no-unused-field") do
       fields
     else
-      unused_names = unused_names(index, properties, form, owner_ids)
+      unused_names = unused_names(index, properties, form)
 
       Enum.flat_map(fields, fn {name, _value} = field ->
         if MapSet.member?(unused_names, name),
@@ -298,10 +304,9 @@ defmodule Fluffy.Driver.Phoenix.Form do
     end
   end
 
-  defp unused_names(index, properties, form, owner_ids) do
+  defp unused_names(index, properties, form) do
     index
-    |> DocumentIndex.targets_by_tag(["button", "input", "select", "textarea"])
-    |> Enum.filter(&owned_by_form?(&1, form, owner_ids))
+    |> form_controls(form)
     |> Enum.reject(fn target ->
       attribute(target.attributes, "name") in [nil, ""] or
         target.tag == "button" or
@@ -327,8 +332,6 @@ defmodule Fluffy.Driver.Phoenix.Form do
     base = Regex.replace(~r/([^\[\]]+)(\]?)$/, base, prefix <> "\\1\\2")
     if array?, do: base <> "[]", else: base
   end
-
-  defp owned_by_form?(control, form, owner_ids), do: Map.get(owner_ids, node_id(control)) == node_id(form)
 
   defp selected_values(target, properties, index) do
     options =
@@ -386,7 +389,7 @@ defmodule Fluffy.Driver.Phoenix.Form do
 
   defp input_type(target), do: Semantics.input_type(target)
 
-  defp ensure_supported_entry_features!(index, _properties, form, _submitter, driver, owner_ids) do
+  defp ensure_supported_entry_features!(index, form, driver) do
     if Enum.any?(["onsubmit", "onformdata"], &has_attribute?(attributes(form), &1)) do
       raise CapabilityError,
         capability: :scripted_default_actions,
@@ -394,10 +397,7 @@ defmodule Fluffy.Driver.Phoenix.Form do
         detail: "inline submit/formdata handlers require Playwright"
     end
 
-    controls =
-      index
-      |> DocumentIndex.targets_by_tag(["button", "input", "select", "textarea"])
-      |> Enum.filter(&owned_by_form?(&1, form, owner_ids))
+    controls = form_controls(index, form)
 
     if Enum.any?(controls, &(attribute(&1.attributes, "dirname") not in [nil, ""])) do
       raise CapabilityError,
@@ -421,7 +421,7 @@ defmodule Fluffy.Driver.Phoenix.Form do
       |> DocumentIndex.all_targets()
       |> Enum.filter(fn target ->
         (target.tag == "object" or String.contains?(target.tag, "-")) and
-          owned_target_by_form?(target, form, index)
+          owned_by_form?(index, target, form)
       end)
 
     if unsupported_form_associated != [] do
@@ -431,15 +431,6 @@ defmodule Fluffy.Driver.Phoenix.Form do
         detail: "object and form-associated custom element entry construction requires a browser"
     end
   end
-
-  defp owned_target_by_form?(target, form, index) do
-    case form_owner(index, target) do
-      nil -> false
-      owner -> node_id(owner) == node_id(form)
-    end
-  end
-
-  defp form_owner_ids(index), do: index.form_owner_ids
 
   defp option_target(target, index) do
     %{
