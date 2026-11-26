@@ -95,28 +95,28 @@ jobs:
         # and the app can't push a merge or rebase, so the cap on redos is triage's alone.
         run: |
           list() {
-            gh pr list --state open --limit 40 --json number,headRefName,isCrossRepository,mergeable,commits,statusCheckRollup,comments,reviews \
-              --jq '[.[] | select((.isCrossRepository | not) and (.headRefName | test("^(claude|opencode)/nightly-")) and ([.comments[], .reviews[]] | all(.author.login | IN("claude", "opencode-agent", "coderabbitai")))) | {number, branch: .headRefName, mergeable, commits: (.commits | length), failing: ([.statusCheckRollup[] | select(.workflowName == "CI")] | group_by(.name) | map(max_by(.startedAt)) | any(.conclusion == "FAILURE" or .conclusion == "TIMED_OUT"))}]'
+            gh pr list --state open --limit 40 --json number,headRefName,headRefOid,isCrossRepository,mergeable,commits,statusCheckRollup,comments,reviews \
+              --jq '[.[] | select((.isCrossRepository | not) and (.headRefName | test("^(claude|opencode)/nightly-")) and ([.comments[], .reviews[]] | all(.author.login | IN("claude", "opencode-agent", "coderabbitai")))) | {number, branch: .headRefName, head: .headRefOid, mergeable, commits: (.commits | length), failing: ([.statusCheckRollup[] | select(.workflowName == "CI")] | group_by(.name) | map(max_by(.startedAt)) | any(.conclusion == "FAILURE" or .conclusion == "TIMED_OUT"))}]'
           }
           list > /dev/null
           sleep 30
           prs=$(list)
-          exhausted=$(jq -c --argjson max "$MAX_COMMITS" 'map(select(.mergeable == "MERGEABLE" and .failing and .commits >= $max) | .number)' <<< "$prs")
+          exhausted=$(jq -c --argjson max "$MAX_COMMITS" 'map(select(.mergeable == "MERGEABLE" and .failing and .commits >= $max) | {number, branch, head})' <<< "$prs")
           # Triage's redo, if still open and listed (triage may have closed it, or a human commented
           # since), not out of fixes and not a redo itself.
           recreate=$(jq -c --argjson redo "$REDO" --argjson exhausted "$exhausted" '. as $prs
-            | ($redo | map(select(.number as $n | ($prs | any(.number == $n and (.branch | test("^(claude|opencode)/nightly-[0-9]+-[0-9]+$") | not))) and ($exhausted | all(. != $n)))))
-              + map(select(.mergeable == "CONFLICTING") | {number, why: "It conflicts with main."})
+            | ($redo | map(select(. as $r | ($prs | any(.number == $r.number and .head == $r.head and .branch == $r.branch and (.branch | test("^(claude|opencode)/nightly-[0-9]+-[0-9]+$") | not))) and ($exhausted | all(.number != $r.number)))))
+              + map(select(.mergeable == "CONFLICTING") | {number, branch, head, why: "It conflicts with main."})
             | unique_by(.number)' <<< "$prs")
           others=$(jq -c --argjson recreate "$recreate" 'map(select(.number as $n | $recreate | all(.number != $n)))' <<< "$prs")
           mergeable=$(jq -c 'map(select(.mergeable == "MERGEABLE"))' <<< "$others")
           # Listing retries earlier resolutions without another commit. Only new fixes use the budget.
-          candidates=$(jq -c --argjson max "$MAX_COMMITS" 'map(select(.commits < $max) | {number, branch, failing})' <<< "$mergeable")
+          candidates=$(jq -c --argjson max "$MAX_COMMITS" 'map(select(.commits < $max) | {number, branch, head, failing})' <<< "$mergeable")
           {
             echo "recreate=$recreate"
             echo "candidates=$candidates"
             echo "review-prs=$(jq -r 'map(.number) | join(" ")' <<< "$mergeable")"
-            echo "exhausted=$(jq -r 'join(" ")' <<< "$exhausted")"
+            echo "exhausted=$exhausted"
           } >> "$GITHUB_OUTPUT"
       # Findings the review bots left unresolved, which a ruleset requiring
       # resolved conversations blocks the merge on. Should it fail, only CI failures get fixed.
@@ -134,15 +134,16 @@ jobs:
           CANDIDATES: ${{ steps.list.outputs.candidates || '[]' }}
           OPEN: ${{ steps.threads.outputs.open || '[]' }}
         run: echo "work=$(jq -cn --argjson open "$OPEN" 'env.CANDIDATES | fromjson | map(select(.failing or (.number as $n | $open | any(. == $n))))')" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.list.outputs.exhausted != '[]'
+        with:
+          persist-credentials: false
       - name: Close PRs still failing after two fixes
+        if: steps.list.outputs.exhausted != '[]'
         env:
           GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          NUMBERS: ${{ steps.list.outputs.exhausted }}
-        run: |
-          for number in $NUMBERS; do
-            gh pr close "$number" --delete-branch --comment "CI still fails after two automatic fixes."
-          done
+          EXHAUSTED: ${{ steps.list.outputs.exhausted }}
+        run: python3 .github/opencode/run.py exhausted
 
   # Pushes a fix to each PR whose CI failed, which is where a change gets tested: improve publishes
   # without running the suite, or that has open review findings, which it then answers. Only new
@@ -188,8 +189,8 @@ jobs:
           client-id: ${{ vars.OPENCODE_CLIENT_ID }}
       - name: Check out the nightly PR branch
         env:
-          BRANCH: ${{ matrix.pr.branch }}
-        run: git switch --detach "origin/$BRANCH"
+          HEAD: ${{ matrix.pr.head }}
+        run: git switch --detach "$HEAD"
       - name: Set up toolchain and deps
         uses: ftes/ci/setup@0e4b067199ea2f6a255a26ab43403f6f6acb5cb6 # v1.0.12
       # These may fail on a branch that doesn't compile; the agent then runs without them.
@@ -253,6 +254,7 @@ jobs:
     timeout-minutes: 45
     permissions:
       contents: read
+      pull-requests: read
       id-token: write
     strategy:
       fail-fast: false
@@ -280,6 +282,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           OPENCODE_API_KEY: ${{ steps.auth.outputs.token }}
           NUMBER: ${{ matrix.pr.number }}
+          OLD_BRANCH: ${{ matrix.pr.branch }}
+          OLD_HEAD: ${{ matrix.pr.head }}
           REDO_WHY: ${{ matrix.pr.why }}
         run: python3 .github/opencode/run.py recreate
 

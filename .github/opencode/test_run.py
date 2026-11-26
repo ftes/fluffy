@@ -3,6 +3,7 @@ import io
 import json
 import os
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -86,36 +87,202 @@ class GateTest(unittest.TestCase):
 
 
 class PublishTest(unittest.TestCase):
+    def pr(self, *, head="a" * 40, target="main", base="c" * 40, branch="opencode/nightly-42"):
+        return {"head": {"sha": head, "ref": branch, "repo": {"full_name": "ftes/fluffy"}},
+                "base": {"ref": target, "sha": base}, "draft": False, "state": "open",
+                "user": {"login": "alice", "type": "User"}}
+
+    def setUp(self):
+        self.enterContext(patch.object(run, "REPO", "ftes/fluffy"))
+
     def test_triage_rejects_out_of_scope_pr_before_any_write(self):
         decisions = [{"number": 42, "action": "close", "why": "Obsolete"},
                      {"number": 123, "action": "close", "why": "Different PR"}]
         with (patch.dict(os.environ, NUMBERS="42 56"),
-              patch.object(run, "context"), patch.object(run, "pr_diff"),
+              patch.object(run, "context", return_value=self.pr()), patch.object(run, "save"),
+              patch.object(run, "snapshot_diff", return_value=("base", "diff")),
+              patch.object(run, "open_nightly", return_value=True),
               patch.object(run, "agent", return_value={"decisions": decisions}),
               patch.object(run, "app_token") as token):
             with self.assertRaisesRegex(ValueError, "Invalid triage PR"):
                 run.triage("Triage")
         token.assert_not_called()
 
-    def test_approval_is_bound_to_the_reviewed_commit_and_marker_follows(self):
-        head = "a" * 40
-        fork = "b" * 40
-        pr = {"head": {"sha": head, "ref": "topic", "repo": {"full_name": "ftes/fluffy"}},
-              "base": {"ref": "main"}, "draft": False, "state": "open",
-              "user": {"login": "alice", "type": "User"}}
-        responses = [pr, [], [], pr, {}, pr, {}]
-        with (patch.object(run, "REPO", "ftes/fluffy"),
-              patch.object(run, "api", side_effect=responses) as api,
+    def test_triage_carries_inspected_head_and_skips_a_stale_close(self):
+        pr = self.pr()
+        decisions = [{"number": 42, "action": "close", "why": "Obsolete"},
+                     {"number": 56, "action": "redo", "why": "Moved code"}]
+        with (patch.dict(os.environ, NUMBERS="42 56"),
+              patch.object(run, "context", return_value=pr), patch.object(run, "save"),
+              patch.object(run, "snapshot_diff", return_value=("base", "diff")),
+              patch.object(run, "open_nightly", side_effect=[True, True, False, True]) as eligible,
+              patch.object(run, "agent", return_value={"decisions": decisions}),
+              patch.object(run, "app_token", return_value=contextlib.nullcontext("token")),
+              patch.object(run, "close") as close, patch.object(run, "output") as output):
+            run.triage("Triage")
+        close.assert_not_called()
+        self.assertEqual(eligible.call_args_list[2].kwargs, {
+            "number": 42, "branch": pr["head"]["ref"], "head": pr["head"]["sha"],
+        })
+        self.assertEqual(json.loads(output.call_args.kwargs["redo"]), [{
+            "number": 56, "branch": pr["head"]["ref"], "head": pr["head"]["sha"], "why": "Moved code",
+        }])
+
+    def review(self, *, before=None, after=None, replay=False):
+        pr = self.pr()
+        submitted = []
+        remaining_reads = iter([pr, before or pr, after or pr])
+
+        def api(path, **kw):
+            if "payload" in kw:
+                submitted.append((path, kw["payload"]))
+                return {"id": 12}
+            if path == "pulls/42":
+                return next(remaining_reads)
+            if path == "pulls/42/reviews":
+                return [{"body": submitted[0][1]["body"], "state": "APPROVED",
+                         "user": {"type": "Bot", "login": run.BOT}}] if submitted else []
+            if path == "pulls/42/reviews/12":
+                return {"state": "APPROVED"}
+            if path == "pulls/42/files":
+                return [{"filename": "lib/a.ex", "patch": "@@ -0,0 +1,1 @@\n+added"}]
+            self.assertEqual(path, "issues/42/comments")
+            return []
+
+        with (patch.object(run, "api", side_effect=api),
               patch.object(run, "app_token", return_value=contextlib.nullcontext("app-token")),
               patch.object(run, "agent", return_value={
-                  "summary": "Checked calls", "open_blocking": 0, "open_non_blocking": 0, "findings": [],
-              }),
-              patch.object(run, "git", side_effect=[fork, "diff"]),
-              patch.object(run, "gh"), patch.object(run, "save"), patch.object(run, "context"),
+                  "summary": "Checked calls", "open_blocking": 0, "open_non_blocking": 1,
+                  "findings": [{"path": " lib/a.ex ", "line": 1, "side": "RIGHT",
+                                "body": "suggestion (non-blocking): Verify the result"}],
+              }) as agent,
+              patch.object(run, "snapshot_diff", return_value=("b" * 40, "diff")),
+              patch.object(run, "gh"), patch.object(run, "save"), patch.object(run, "context", return_value=pr),
               contextlib.redirect_stdout(io.StringIO())):
-            run.review(42, head, "Review")
-        writes = [(call.args[0], call.kwargs["payload"]) for call in api.call_args_list if "payload" in call.kwargs]
-        self.assertEqual([path for path, _ in writes], ["pulls/42/reviews", "issues/42/comments"])
-        self.assertEqual(writes[0][1]["event"], "APPROVE")
-        self.assertEqual(writes[0][1]["commit_id"], head)
-        self.assertTrue(writes[1][1]["body"].endswith(f"<!-- opencode-review: {head} {fork} -->"))
+            run.review(42, pr["head"]["sha"], "Review")
+            if replay:
+                remaining_reads = iter([pr])
+                run.review(42, pr["head"]["sha"], "Review")
+            agent.assert_called_once()
+        return submitted
+
+    def test_review_posts_validated_path_and_marker_once_across_retries(self):
+        writes = self.review(replay=True)
+        self.assertEqual([path for path, _ in writes], ["pulls/42/reviews"])
+        _, review = writes[0]
+        self.assertEqual(review["event"], "APPROVE")
+        self.assertEqual(review["commit_id"], self.pr()["head"]["sha"])
+        self.assertEqual(review["comments"][0]["path"], "lib/a.ex")
+        self.assertIn("Checked calls\n\n<!-- opencode-review:", review["body"])
+
+    def test_review_rejects_changed_base_ref_or_sha_before_publishing(self):
+        for changed in (self.pr(target="stable"), self.pr(base="d" * 40)):
+            self.assertEqual(self.review(before=changed), [])
+
+    def test_stale_approval_is_dismissed_without_reviewing_the_new_head(self):
+        writes = self.review(after=self.pr(head="d" * 40))
+        self.assertEqual([path for path, _ in writes], ["pulls/42/reviews", "pulls/42/reviews/12/dismissals"])
+
+    def test_nonpublication_outcomes_can_omit_unused_fields(self):
+        self.assertEqual(run.new_pr_result("improve", {"action": "none", "body": "No good idea"}),
+                         ("none", "", "No good idea"))
+        self.assertEqual(run.new_pr_result("recreate", {"action": "close", "title": "Obsolete"}),
+                         ("close", "Obsolete", ""))
+        with self.assertRaises(ValueError):
+            run.new_pr_result("improve", {"action": "publish", "title": "Simplify"})
+
+    def test_stage_rejects_rename_out_of_protected_path(self):
+        with tempfile.TemporaryDirectory() as tmp, contextlib.chdir(tmp):
+            run.git("init", "-q")
+            path = Path(".github/workflows/test.yml")
+            path.parent.mkdir(parents=True)
+            path.write_text("name: test\n")
+            run.git("add", "-A")
+            run.git("-c", "user.name=test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false",
+                    "commit", "-qm", "initial")
+            path.rename("unprotected.yml")
+            with self.assertRaisesRegex(ValueError, "cannot publish workflow"):
+                run.stage(run.git("rev-parse", "HEAD"))
+
+    def test_recover_pushed_commit_and_create_missing_pr(self):
+        branch = "opencode/issue-12-99"
+        marker = "OpenCode-Publish: 99 opencode/issue-12-99"
+        sha = "a" * 40
+        commit = {"message": f"Improve the docs\n\nExplain the behavior.\n\n{marker}\n",
+                  "author": {"email": run.BOT_EMAIL}}
+        pr = self.pr(head=sha, branch=branch)
+        pr["html_url"] = "https://example.test/pull/555"
+        pr["user"]["login"] = run.BOT
+        with (patch.object(run, "remote_head", return_value=sha),
+              patch.object(run, "api", side_effect=[commit, [], pr, [pr]]) as api):
+            recovered = run.recover_branch(branch, marker)
+            self.assertEqual(run.publish_branch(branch, "main", recovered, "token", issue=12),
+                             (pr["html_url"], True))
+            self.assertEqual(run.publish_branch(branch, "main", recovered, "token", issue=12),
+                             (pr["html_url"], True))
+        writes = [call for call in api.call_args_list if "payload" in call.kwargs]
+        self.assertEqual(len(writes), 1)
+        self.assertEqual(writes[0].kwargs["payload"]["body"], "Explain the behavior.\n\nRefs #12")
+        with (patch.object(run, "remote_head", return_value=sha), patch.object(run, "api", return_value=commit)):
+            with self.assertRaisesRegex(ValueError, "does not belong"):
+                run.recover_branch(branch, "OpenCode-Publish: different run")
+
+    def test_absent_remote_ref_is_distinct_from_transport_error(self):
+        with patch.object(run, "git", side_effect=subprocess.CalledProcessError(2, "git")):
+            self.assertIsNone(run.remote_head("test"))
+        with patch.object(run, "git", side_effect=subprocess.CalledProcessError(128, "git")):
+            with self.assertRaises(subprocess.CalledProcessError):
+                run.remote_head("test")
+
+    def test_exhaustion_uses_latest_ci_run_and_fresh_eligibility(self):
+        item = {"number": 42, "head": "a" * 40, "branch": "opencode/nightly-42"}
+        view = {"headRefOid": item["head"], "mergeable": "MERGEABLE"}
+
+        def ci(id, status, conclusion):
+            return {"id": id, "created_at": f"2026-11-26T00:00:0{id}Z", "status": status,
+                    "conclusion": conclusion, "head_repository": {"full_name": "ftes/fluffy"}}
+
+        failure = ci(1, "completed", "failure")
+        running = ci(2, "in_progress", None)
+        with (patch.dict(os.environ, MAX_COMMITS="3", EXHAUSTED=json.dumps([item]), GH_TOKEN="token"),
+              patch.object(run, "gh", return_value=json.dumps(view)),
+              patch.object(run, "api", side_effect=[
+                  {"workflow_runs": [failure, running]}, {"workflow_runs": [failure]}, {"workflow_runs": [failure]},
+              ]),
+              patch.object(run, "open_nightly", side_effect=[False, True]) as eligible,
+              patch.object(run, "close") as close):
+            run.exhausted()  # CI is retrying
+            run.exhausted()  # no longer eligible
+            close.assert_not_called()
+            run.exhausted()
+        self.assertEqual(eligible.call_count, 2)
+        self.assertEqual(eligible.call_args.kwargs, dict(item, min_commits=3))
+        close.assert_called_once()
+
+    def test_recovered_replacement_does_not_close_after_human_takeover(self):
+        old = self.pr()
+        with (patch.dict(os.environ, GITHUB_RUN_ID="99", OLD_BRANCH=old["head"]["ref"],
+                         OLD_HEAD=old["head"]["sha"], REDO_WHY="Moved code"),
+              patch.object(run, "git"), patch.object(run, "open_nightly", side_effect=[True, True, False]),
+              patch.object(run, "recover_branch", return_value=("new-sha", "New title", "Body")),
+              patch.object(run, "app_token", return_value=contextlib.nullcontext("token")),
+              patch.object(run, "publish_branch", return_value=("https://example.test/pull/43", True)) as publish,
+              patch.object(run, "agent") as agent, patch.object(run, "close") as close,
+              contextlib.redirect_stdout(io.StringIO())):
+            run.new_pr("recreate", "opencode/nightly-99-42", "Prompt", 42)
+        publish.assert_called_once()
+        agent.assert_not_called()
+        close.assert_not_called()
+
+    def test_playwright_floor_must_match_requested_version(self):
+        with tempfile.TemporaryDirectory() as tmp, contextlib.chdir(tmp):
+            Path("integration/consumer").mkdir(parents=True)
+            lock = '  "playwright": {:hex, :playwright_ex, "1.65.0", ...}\n'
+            Path("mix.lock").write_text(lock)
+            Path("integration/consumer/mix.lock").write_text(lock)
+            floor = Path("mix.lock.oldest")
+            floor.write_text(lock.replace("1.65.0", "1.65.0-rc.6"))
+            with self.assertRaisesRegex(ValueError, "mix.lock.oldest"):
+                run.validate_playwright_version("1.65.0")
+            floor.write_text(lock)
+            run.validate_playwright_version("1.65.0")

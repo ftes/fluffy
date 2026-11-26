@@ -2,6 +2,7 @@
 
 import base64
 import contextlib
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -14,6 +15,7 @@ import urllib.request
 
 
 BOT = "opencode-agent[bot]"
+BOT_EMAIL = f"219766164+{BOT}@users.noreply.github.com"
 REVIEW_BOTS = (BOT, "claude[bot]")
 MAINTAINERS = ("OWNER", "MEMBER", "COLLABORATOR")
 REPO = os.environ.get("GITHUB_REPOSITORY")
@@ -48,12 +50,12 @@ def gh(*args, token=None, **kwargs):
     return capture("gh", *args, env=env, **kwargs)
 
 
-def api(path, *, token=None, payload=None, paginate=False):
+def api(path, *, token=None, payload=None, paginate=False, method="POST"):
     args = ["api", f"repos/{REPO}/{path}"]
     if paginate:
         args += ["--paginate", "--slurp"]
     if payload is not None:
-        args += ["--method", "POST", "--input", "-"]
+        args += ["--method", method, "--input", "-"]
     data = json.loads(gh(*args, token=token, input=json.dumps(payload) if payload is not None else None))
     return [item for page in data for item in page] if paginate else data
 
@@ -238,7 +240,8 @@ def fields(value, *keys):
 def text(value, limit, *, empty=False):
     check(type(value) is str and len(value) <= limit and "\0" not in value
           and (empty or value.strip()), "Invalid output text")
-    check(not re.search(r"<!--\s*(?:claude|opencode)-review:", value), "Reserved review marker in output")
+    check(not re.search(r"<!--\s*(?:(?:claude|opencode)-review|opencode-command):", value),
+          "Reserved review marker or command marker in output")
     return value.strip()
 
 
@@ -269,25 +272,58 @@ def patch_lines(patch):
     return valid
 
 
-def review(number, head, prompt):
+def snapshot(pr):
+    return pr["head"]["sha"], pr["base"]["ref"], pr["base"]["sha"]
+
+
+def snapshot_diff(pr):
+    head, _, base = snapshot(pr)
+    for sha in (base, head):
+        try:
+            git("cat-file", "-e", f"{sha}^{{commit}}")
+        except subprocess.CalledProcessError:
+            git("fetch", "--quiet", "--no-tags", "origin", sha, env=git_http_env(os.environ["GH_TOKEN"]))
+    merge_base = git("merge-base", base, head)
+    return merge_base, git("diff", "--no-ext-diff", "--no-textconv", "--binary", merge_base, head, raw=True)
+
+
+def previous_review(number):
+    # New reviews carry the marker themselves; continue to recognize historical summary comments.
+    items = api(f"issues/{number}/comments", paginate=True) + api(f"pulls/{number}/reviews", paginate=True)
+    for item in sorted(items, key=lambda entry: entry.get("submitted_at") or entry.get("created_at") or "", reverse=True):
+        if item.get("state") in ("DISMISSED", "PENDING") or not item["user"]:
+            continue
+        if item["user"]["type"] == "Bot" and item["user"]["login"] in REVIEW_BOTS:
+            marker = re.search(
+                r"<!-- (?:claude|opencode)-review: ([0-9a-f]{40}) ([0-9a-f]{40})"
+                r"(?: ([0-9a-f]{64}) ([0-9a-f]{40}))? -->\s*$", item["body"] or "",
+            )
+            if marker:
+                return marker.groups()
+    return None
+
+
+def active_review(pr, expected):
+    return local_pr(pr) and pr["state"] == "open" and not pr["draft"] and snapshot(pr) == expected
+
+
+def review(number, head, prompt, retargeted=False):
     pr = api(f"pulls/{number}")
-    if not local_pr(pr) or pr.get("draft") or pr["head"]["sha"] != head:
+    expected = snapshot(pr)
+    if expected[0] != head or not active_review(pr, expected):
         return
     author = pr["user"]["login"]
     check(pr["user"]["type"] != "Bot" or author in REVIEW_BOTS, "Unapproved PR author")
-    base = git("merge-base", f"origin/{pr['base']['ref']}", head)
+    base, full = snapshot_diff(pr)
+    target = hashlib.sha256(expected[1].encode()).hexdigest()
+    marker = (head, base, target, expected[2])
+    previous = previous_review(number)
+    if previous == marker:
+        return
     args = ("diff", "--no-ext-diff", "--no-textconv", "--binary")
-    full = git(*args, base, head, raw=True)
-    previous = None
-    for comment in api(f"issues/{number}/comments", paginate=True):
-        if comment["user"]["type"] == "Bot" and comment["user"]["login"] in REVIEW_BOTS:
-            marker = re.search(r"<!-- (?:claude|opencode)-review: ([0-9a-f]{40}) ([0-9a-f]{40}) -->\s*$",
-                               comment["body"])
-            if marker:
-                previous = marker.groups()
     depth = "full"
-    if previous:
-        old_head, old_base = previous
+    if previous and not retargeted and previous[2] in (None, target):
+        old_head, old_base, _, _ = previous
         try:
             git("fetch", "--quiet", "--no-tags", "origin", old_head, old_base,
                 env=git_http_env(os.environ["GH_TOKEN"]))
@@ -300,7 +336,8 @@ def review(number, head, prompt):
             depth = "increment"
         except subprocess.CalledProcessError:
             print("Previous review could not be replayed; reviewing the whole PR.")
-    context(number, comments=True)
+    if not active_review(context(number, comments=True), expected):
+        return
     resolved = gh(
         "api", "graphql", "--paginate", "-f", f"owner={REPO.split('/')[0]}", "-f", f"name={REPO.split('/')[1]}",
         "-F", f"pr={number}", "-f",
@@ -329,109 +366,144 @@ def review(number, head, prompt):
                for item in api(f"pulls/{number}/files", paginate=True)}
     counts = {"blocking": 0, "non-blocking": 0}
     seen = set()
+    comments = []
     for finding in findings:
         fields(finding, "path", "line", "side", "body")
         path, line, side = text(finding["path"], 4096), finding["line"], finding["side"]
+        if finding["path"] in patches:
+            path = finding["path"]
         check(type(line) is int and side in ("LEFT", "RIGHT") and (side, line) in patches.get(path, ()),
               "Finding does not refer to a commentable line of the current PR")
         check((path, line, side) not in seen, "Duplicate inline finding location")
         seen.add((path, line, side))
-        match = re.match(r"(?:issue|suggestion|question|nitpick|todo|thought|note) \((blocking|non-blocking)\): \S",
-                         text(finding["body"], 3000))
+        body = text(finding["body"], 3000)
+        match = re.match(r"(?:issue|suggestion|question|nitpick|todo|thought|note) \((blocking|non-blocking)\): \S", body)
         check(match, "Invalid Conventional Comments finding")
         counts[match[1]] += 1
+        comments.append(dict(path=path, line=line, side=side, body=body))
     check(blocking >= counts["blocking"] and non_blocking >= counts["non-blocking"], "Inconsistent finding counts")
     verdict = ("OK to merge." if not non_blocking else f"OK to merge ({non_blocking} non-blocking suggestions).")
     if blocking:
         verdict = f"Issues found: {blocking} blocking, {non_blocking} non-blocking."
     with app_token() as token:
-        current = api(f"pulls/{number}")
-        if current["head"]["sha"] != head or current["state"] != "open" or current["draft"]:
-            print("PR head moved; discarding review.")
+        if not active_review(api(f"pulls/{number}"), expected):
+            print("PR changed; discarding review.")
             return
         own_pr = author == BOT
         event = "COMMENT" if own_pr else ("REQUEST_CHANGES" if blocking else "APPROVE")
-        review_body = f"Verdict: {verdict}"
-        # Bind the review and inline comments to the exact reviewed commit in one API request.
-        if not own_pr or findings:
-            api(f"pulls/{number}/reviews", token=token, payload={
-                "commit_id": head, "event": event, "body": review_body, "comments": findings,
-            })
-        latest = api(f"pulls/{number}")
-        if latest["head"]["sha"] != head:
-            if event == "APPROVE" and latest["state"] == "open":
-                api(f"pulls/{number}/reviews", token=token, payload={
-                    "commit_id": latest["head"]["sha"], "event": "REQUEST_CHANGES",
-                    "body": "Verdict: the head moved during the review.",
-                })
-            print("PR head moved during review; omitting summary marker.")
-            return
         note = "\n\nNo approval or change request was submitted on the app's own PR." if own_pr else ""
-        comment = f"**{review_body}**\n\n{summary}{note}\n\n<!-- opencode-review: {head} {base} -->"
-        api(f"issues/{number}/comments", token=token, payload={"body": comment})
+        body = f"**Verdict: {verdict}**\n\n{summary}{note}\n\n<!-- opencode-review: {' '.join(marker)} -->"
+        # GitHub persists the summary, inline comments, verdict and retry marker together.
+        submitted = api(f"pulls/{number}/reviews", token=token, payload={
+            "commit_id": head, "event": event, "body": body, "comments": comments,
+        })
+        if not own_pr and not active_review(api(f"pulls/{number}"), expected):
+            path = f"pulls/{number}/reviews/{submitted['id']}"
+            if api(path)["state"] != "DISMISSED":
+                api(f"{path}/dismissals", token=token, method="PUT",
+                    payload={"message": "The PR changed during review. This verdict applies only to the reviewed snapshot."})
 
 
-def open_nightly(number, branch=None, head=None, *, max_commits=None):
-    pr = api(f"pulls/{number}")
-    if not (local_pr(pr) and pr["state"] == "open"
-            and pr["head"]["ref"].startswith(("claude/nightly-", "opencode/nightly-"))
-            and (branch is None or branch == pr["head"]["ref"])
-            and (head is None or head == pr["head"]["sha"])
-            and (max_commits is None or pr["commits"] < max_commits)):
-        return False
-    # A human taking over during the run keeps this PR out of automatic changes.
+def bots_only(number, *, closing=False):
+    authors = (*REVIEW_BOTS, "coderabbitai[bot]")
+    if closing:
+        authors += ("github-actions[bot]",)
     return all(
-        entry["user"]["type"] == "Bot" and entry["user"]["login"] in (*REVIEW_BOTS, "coderabbitai[bot]")
-        for path in (f"issues/{number}/comments", f"pulls/{number}/reviews")
+        entry["user"] and entry["user"]["type"] == "Bot"
+        and (entry["user"]["login"] in authors
+             or (path == f"pulls/{number}/comments" and entry["user"]["login"] == "github-actions[bot]"))
+        for path in (f"issues/{number}/comments", f"pulls/{number}/reviews", f"pulls/{number}/comments")
         for entry in api(path, paginate=True)
     )
+
+
+def open_nightly(number, branch, head, *, min_commits=None, max_commits=None):
+    # Read the head after the comments so a push while listing comments also invalidates the decision.
+    if not bots_only(number):
+        return False
+    pr = api(f"pulls/{number}")
+    return (local_pr(pr) and pr["state"] == "open" and pr["base"]["ref"] == "main" and pr["head"]["ref"] == branch
+            and branch.startswith(("claude/nightly-", "opencode/nightly-")) and pr["head"]["sha"] == head
+            and (min_commits is None or (pr["commits"] >= min_commits and pr["mergeable"] is True))
+            and (max_commits is None or pr["commits"] < max_commits))
 
 
 def pr_diff(number):
     save(f"{number}.diff", gh("pr", "diff", str(number), "--color", "never") + "\n")
 
 
-def close(number, reason, token):
-    print(gh("pr", "close", str(number), "--delete-branch", "--comment", reason, token=token))
+def close(number, branch, head, reason, token):
+    print(gh("pr", "close", str(number), "--comment", reason, token=token))
+    # GitHub cannot atomically close a PR conditioned on a commit. At least never delete
+    # a branch that advanced during the close, or whose author took over in the meantime.
+    if bots_only(number, closing=True):
+        push(branch, token, expected=head, delete=True)
 
 
 def triage(prompt):
     numbers = {int(number) for number in os.environ["NUMBERS"].split()}
+    inspected = {}
     for number in sorted(numbers):
-        context(number)
-        pr_diff(number)
-    result = agent("triage", f"{prompt}\nPR numbers: {', '.join(map(str, sorted(numbers)))}.",
+        pr = context(number)
+        if not local_pr(pr):
+            continue
+        branch, head = pr["head"]["ref"], pr["head"]["sha"]
+        if open_nightly(number, branch, head):
+            _, diff = snapshot_diff(pr)
+            save(f"{number}.diff", diff)
+            inspected[number] = {"number": number, "branch": branch, "head": head}
+    if not inspected:
+        return
+    result = agent("triage", f"{prompt}\nPR numbers: {', '.join(map(str, inspected))}.",
                    '{"decisions":[{"number":123,"action":"close or redo","why":"..."}]}')
     fields(result, "decisions")
     decisions = result["decisions"]
-    check(type(decisions) is list and len(decisions) <= len(numbers), "Invalid triage decisions")
+    check(type(decisions) is list and len(decisions) <= len(inspected), "Invalid triage decisions")
     seen = set()
     for decision in decisions:
         fields(decision, "number", "action", "why")
         number = decision["number"]
-        check(type(number) is int and number in numbers and number not in seen, "Invalid triage PR")
+        check(type(number) is int and number in inspected and number not in seen, "Invalid triage PR")
         seen.add(number)
         check(decision["action"] in ("close", "redo"), "Invalid triage action")
         title(decision["why"])
     redo = []
     for decision in decisions:
         number = decision["number"]
-        if not open_nightly(number):
-            continue
+        item = inspected[number]
         if decision["action"] == "redo":
-            redo.append({"number": number, "why": decision["why"]})
+            if open_nightly(**item):
+                redo.append(dict(item, why=decision["why"]))
         else:
             with app_token() as token:
-                close(number, decision["why"], token)
+                if open_nightly(**item):
+                    close(**item, reason=decision["why"], token=token)
     output(redo=json.dumps(redo, separators=(",", ":")))
+
+
+def exhausted():
+    maximum = int(os.environ["MAX_COMMITS"])
+    for item in json.loads(os.environ["EXHAUSTED"]):
+        number = item["number"]
+        view = json.loads(gh("pr", "view", str(number), "--json", "headRefOid,mergeable"))
+        if view["headRefOid"] != item["head"] or view["mergeable"] != "MERGEABLE":
+            continue
+        params = urllib.parse.urlencode(dict(head_sha=item["head"], branch=item["branch"],
+                                             event="pull_request", per_page=100))
+        runs = api(f"actions/workflows/ci.yml/runs?{params}")["workflow_runs"]
+        matching = [run for run in runs if (run["head_repository"] or {}).get("full_name") == REPO]
+        latest = max(matching, key=lambda run: (run["created_at"], run["id"]), default=None)
+        if (latest and latest["status"] == "completed" and latest["conclusion"] in ("failure", "timed_out")
+                and open_nightly(**item, min_commits=maximum)):
+            close(**item, reason="CI still fails after two automatic fixes.", token=os.environ["GH_TOKEN"])
 
 
 def stage(head):
     check(git("rev-parse", "HEAD") == head, "The agent moved HEAD")
     git("add", "-A")
-    paths = git("diff", "--cached", "--name-only", "-z").split("\0")
+    paths = git("diff", "--cached", "--name-only", "--no-renames", "-z", raw=True).split("\0")
     for path in paths:
-        check(not path.startswith((".github/", ".opencode/")) and path != ".github"
+        check(not path.startswith((".github/", ".opencode/")) and path not in (".github", ".opencode")
               and not path.startswith("opencode.json"), "Automation cannot publish workflow or agent configuration")
     return paths != [""]
 
@@ -443,29 +515,91 @@ def git_http_env(token):
                 GIT_CONFIG_VALUE_0=f"Authorization: Basic {auth}", GIT_TERMINAL_PROMPT="0")
 
 
-def push(branch, token, *, expected=""):
+def push(branch, token, *, expected="", delete=False):
     git("check-ref-format", f"refs/heads/{branch}")
     # Lease the branch to the inspected SHA (or require it not to exist for a new branch).
     ref = f"refs/heads/{branch}"
-    git("push", f"--force-with-lease={ref}:{expected}", f"https://github.com/{REPO}.git", f"HEAD:{ref}",
+    check(not delete or expected, "Branch deletion needs an exact revision")
+    source = "" if delete else "HEAD"
+    git("push", f"--force-with-lease={ref}:{expected}", f"https://github.com/{REPO}.git", f"{source}:{ref}",
         env=git_http_env(token))
 
 
-def commit(subject, head, *, empty=False):
+def commit(subject, head, *, empty=False, description=None):
     check(git("rev-parse", "HEAD") == head, "Unexpected commit parent")
-    git("-c", f"user.name={BOT}", "-c", f"user.email=219766164+{BOT}@users.noreply.github.com",
-        "-c", "commit.gpgsign=false", "commit", *(["--allow-empty"] if empty else []), "-m", subject)
+    git("-c", f"user.name={BOT}", "-c", f"user.email={BOT_EMAIL}", "-c", "commit.gpgsign=false",
+        "commit", *(["--allow-empty"] if empty else []), "-m", subject,
+        *(["--cleanup=verbatim", "-m", description] if description is not None else []))
     check(git("rev-parse", "HEAD^") == head, "Unexpected commit parent")
 
 
-def create(branch, base, subject, body, token, *, draft=False):
-    return gh("pr", "create", "--head", branch, "--base", base, "--title", subject,
-              "--body-file", "-", *(["--draft"] if draft else []), token=token, input=body)
+def publish_marker(branch, old_head=None):
+    return f"OpenCode-Publish: {os.environ['GITHUB_RUN_ID']} {branch}" + (f" {old_head}" if old_head else "")
+
+
+def remote_head(branch):
+    ref = f"refs/heads/{branch}"
+    try:
+        listing = git("ls-remote", "--exit-code", "--refs", "origin", ref)
+    except subprocess.CalledProcessError as error:
+        if error.returncode == 2:  # No matching ref
+            return None
+        raise
+    sha, remote_ref = listing.split("\t")
+    check(remote_ref == ref, "Unexpected remote branch")
+    return sha
+
+
+def recover_branch(branch, marker):
+    # The run ID is stable across attempts. Resume only a commit published for this
+    # run and branch; a new branch still uses a lease that requires it not to exist.
+    sha = remote_head(branch)
+    if not sha:
+        return None
+    remote = api(f"git/commits/{sha}")
+    message, separator, trailer = remote["message"].strip().rpartition("\n\n")
+    check(separator and trailer == marker and remote["author"]["email"] == BOT_EMAIL,
+          "Existing publication branch does not belong to this run")
+    subject, separator, body = message.partition("\n\n")
+    check(separator, "Missing publication body")
+    return sha, title(subject), text(body, 12000)
+
+
+def publish_branch(branch, base, publication, token, *, draft=False, issue=None):
+    sha, subject, body = publication
+    qualified_head = urllib.parse.quote(f"{REPO.split('/')[0]}:{branch}", safe="")
+    prs = api(f"pulls?state=all&head={qualified_head}", token=token, paginate=True)
+    if prs:
+        pr = prs[0]
+        check(len(prs) == 1 and local_pr(pr) and pr["head"]["sha"] == sha and pr["base"]["ref"] == base
+              and pr["user"]["login"] == BOT, "Existing PR does not match this publication")
+        return pr["html_url"], pr["state"] == "open"
+    if issue is not None:
+        body += f"\n\nRefs #{issue}"
+    check(remote_head(branch) == sha, "Publication branch moved")
+    pr = api("pulls", token=token, payload={"head": branch, "base": base, "title": subject,
+                                           "body": body, "draft": draft})
+    check(pr["head"]["sha"] == sha, "Publication branch moved during PR creation")
+    return pr["html_url"], True
 
 
 def command(number, branch, prompt, is_pr):
     item = context(number, is_pr, comments=True)
     head = git("rev-parse", "HEAD")
+    reply_marker = f"<!-- opencode-command: {os.environ['GITHUB_RUN_ID']} -->"
+    if any(entry["user"] and entry["user"]["login"] == BOT and (entry["body"] or "").endswith(reply_marker)
+           for entry in api(f"issues/{number}/comments", paginate=True)):
+        return
+    if not is_pr:
+        default = os.environ["DEFAULT_BRANCH"]
+        marker = publish_marker(branch)
+        recovered = recover_branch(branch, marker)
+        if recovered:
+            with app_token() as token:
+                url, _ = publish_branch(branch, default, recovered, token, issue=number)
+                api(f"issues/{number}/comments", token=token,
+                    payload={"body": f"{recovered[2]}\n\nOpened {url}.\n\n{reply_marker}"})
+            return
     if is_pr:
         if not local_pr(item) or item["state"] != "open" or item["head"]["sha"] != head or item["head"]["ref"] != branch:
             return
@@ -484,7 +618,7 @@ def command(number, branch, prompt, is_pr):
     changed = stage(head)
     if changed:
         subject = title(result["title"])
-        commit(subject, head)
+        commit(subject, head, description=None if is_pr else f"{reply}\n\n{marker}")
     else:
         text(result["title"], 200, empty=True)
     with app_token() as token:
@@ -496,10 +630,10 @@ def command(number, branch, prompt, is_pr):
         if changed:
             push(branch, token, expected=head if is_pr else "")
             if not is_pr:
-                default = os.environ["DEFAULT_BRANCH"]
-                url = create(branch, default, subject, f"{reply}\n\nRefs #{number}", token)
+                publication = git("rev-parse", "HEAD"), subject, reply
+                url, _ = publish_branch(branch, default, publication, token, issue=number)
                 reply += f"\n\nOpened {url}."
-        api(f"issues/{number}/comments", token=token, payload={"body": reply})
+        api(f"issues/{number}/comments", token=token, payload={"body": f"{reply}\n\n{reply_marker}"})
 
 
 def fix(number, branch, prompt):
@@ -529,14 +663,14 @@ def fix(number, branch, prompt):
         check(type(reply["fixed"]) is bool, "Expected a boolean fixed flag")
         text(reply["reply"], 3000)
     check(seen == (set() if action == "close" else ids), "Expected an answer for every listed thread")
-    message = title(result["message"])
+    message = title(result["message"]) if action in ("fix", "close") else text(result["message"], 200, empty=True)
     changed = stage(head)
     check((action == "fix" and changed) or action == "retry" or (action in ("none", "close") and not changed),
           "Fix decision does not match the worktree changes")
     if changed:
         verify()
         stage(head)
-        commit(message, head)
+        commit(title(message), head)
     elif action == "retry":
         commit("Re-run CI", head, empty=True)
     if not open_nightly(number, branch, head, max_commits=max_commits):
@@ -544,7 +678,8 @@ def fix(number, branch, prompt):
     if action in ("fix", "retry", "close"):
         with app_token() as token:
             if action == "close":
-                close(number, message, token)
+                if open_nightly(number, branch, head, max_commits=max_commits):
+                    close(number, branch, head, message, token)
                 return
             push(branch, token, expected=head)
     if replies:
@@ -557,57 +692,83 @@ def verify():
         subprocess.run(cmd.split(), env=env, check=True)
 
 
+def new_pr_result(mode, result):
+    allowed = {"improve": ("publish", "none"), "recreate": ("publish", "close"), "update": ("publish",)}[mode]
+    check(type(result) is dict, "Expected a PR decision")
+    action = result.get("action")
+    check(action in allowed, "Invalid PR action")
+    check(result.keys() <= {"action", "title", "body"}, "Unexpected PR decision fields")
+    subject = title(result.get("title")) if action != "none" else ""
+    body = text(result.get("body"), 12000) if action != "close" else ""
+    return action, subject, body
+
+
+def validate_playwright_version(version):
+    for name in ("mix.lock", "mix.lock.oldest", "integration/consumer/mix.lock"):
+        lock = re.search(r'^  "playwright": \{:hex, :playwright_ex, "([^"]+)"', Path(name).read_text(), re.M)
+        check(lock and lock[1] == version, f"Expected PlaywrightEx {version} in {name}")
+
+
 def new_pr(mode, branch, prompt, old_number=None):
     head = git("rev-parse", "HEAD")
-    old_head = None
-    if old_number is not None:
-        if not open_nightly(old_number):
-            return
-        old_head = context(old_number)["head"]["sha"]
-        pr_diff(old_number)
-    result = agent(mode, prompt, '{"action":"publish, close or none", "title":"...", "body":"..."}')
-    fields(result, "action", "title", "body")
-    action = result["action"]
-    allowed = {"improve": ("publish", "none"), "recreate": ("publish", "close"), "update": ("publish",)}[mode]
-    check(action in allowed, "Invalid PR action")
-    subject, body = title(result["title"]), text(result["body"], 12000)
-    changed = stage(head)
-    check(changed == (action == "publish"), "PR action does not match the worktree changes")
-    if action == "none":
-        print("No improvement selected.")
+    old = (dict(number=old_number, branch=os.environ["OLD_BRANCH"], head=os.environ["OLD_HEAD"])
+           if old_number is not None else None)
+    if old and not open_nightly(**old):
         return
-    if action == "publish":
+    marker = publish_marker(branch, old["head"] if old else None)
+    publication = recover_branch(branch, marker)
+    if not publication:
+        if old:
+            pr = context(old_number)
+            if pr["head"]["sha"] != old["head"] or pr["head"]["ref"] != old["branch"]:
+                return
+            _, diff = snapshot_diff(pr)
+            save(f"{old_number}.diff", diff)
+        shape = ('{"action":"publish","title":"...","body":"..."}; '
+                 'when allowed, use {"action":"none","body":"why"} or {"action":"close","title":"why"}')
+        action, subject, body = new_pr_result(mode, agent(mode, prompt, shape))
+        check(stage(head) == (action == "publish"), "PR action does not match the worktree changes")
+        if action == "none":
+            print("No improvement selected.")
+            return
+        if action == "close":
+            with app_token() as token:
+                if open_nightly(**old):
+                    close(**old, reason=subject, token=token)
+            return
         if mode == "update":
-            subject = f"Update PlaywrightEx to {os.environ['PLAYWRIGHT_TO']}"
-            lock = re.search(r'^  "playwright": \{:hex, :playwright_ex, "([^"]+)"', Path("mix.lock").read_text(), re.M)
-            check(lock and lock[1] == os.environ["PLAYWRIGHT_TO"], "Expected the requested PlaywrightEx release in mix.lock")
+            version = os.environ["PLAYWRIGHT_TO"]
+            subject = f"Update PlaywrightEx to {version}"
+            validate_playwright_version(version)
         else:
             verify()
-            stage(head)
-        commit(subject, head)
-    if old_number is not None and not open_nightly(old_number, head=old_head):
+            check(stage(head), "No publishable changes remain after checks")
+        commit(subject, head, description=f"{body}\n\n{marker}")
+    if old and not open_nightly(**old):
         return
     with app_token() as token:
-        if action == "close":
-            close(old_number, subject, token)
-            return
-        push(branch, token)
-        url = create(branch, "main", subject, body, token, draft=mode == "update")
+        if not publication:
+            push(branch, token)
+            publication = git("rev-parse", "HEAD"), subject, body
+        url, is_open = publish_branch(branch, "main", publication, token, draft=mode == "update")
         print(url)
-        if old_number is not None:
-            close(old_number, f"Redone on current main ({os.environ['REDO_WHY']}); replaced by {url}.", token)
+        if is_open and old and open_nightly(**old):
+            close(**old, reason=f"Redone on current main ({os.environ['REDO_WHY']}); replaced by {url}.", token=token)
 
 
 def main(mode):
     if mode == "gate":
         gate()
         return
+    if mode == "exhausted":
+        exhausted()
+        return
     CONTEXT.mkdir(parents=True, exist_ok=True)
     prompt = Path(__file__).with_name(f"{mode}.md").read_text()
     number = int(os.environ["NUMBER"]) if os.environ.get("NUMBER") else None
     branch = os.environ.get("BRANCH")
     if mode == "review":
-        review(number, os.environ["HEAD"], prompt)
+        review(number, os.environ["HEAD"], prompt, os.environ.get("RETARGETED") == "true")
     elif mode == "command":
         command(number, branch, prompt, os.environ.get("IS_PR") == "true")
     elif mode == "triage":

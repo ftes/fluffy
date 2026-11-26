@@ -2,7 +2,8 @@ Update Fluffy to the specified PlaywrightEx release from Hex. Read AGENTS.md fir
 
 1. In mix.exs require `{:playwright, "~> TO", hex: :playwright_ex}`, replacing any `github:`
    source, its options and comment. Keep the Hex package name `:playwright_ex`. Run
-   `mix deps.update playwright` and read deps/playwright/CHANGELOG.md since FROM. Run
+   `mix deps.update playwright`, update the `playwright` entry in `mix.lock.oldest` to the
+   new floor, and read deps/playwright/CHANGELOG.md since FROM. Run
    `mix deps.update playwright` in integration/consumer (use the shell tool's working
    directory), and update the version in docs/installation.md and usage-rules.md.
 2. If deps/playwright/DRIVER_VERSION changes, run `mix playwright.install chromium` and

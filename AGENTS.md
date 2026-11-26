@@ -32,8 +32,9 @@ workaround.
 
 Run `mix check` before handing off code changes. It runs what CI's checks job runs (formatting,
 warnings-as-errors compilation, the usage rules check, Credo, the docs build, Dialyzer) and the
-test suite. When reviewing a change or fixing review findings, follow
-[Reviewing](CONTRIBUTING.md#reviewing).
+test suite. The nightly improve and recreate jobs run format, compile and Credo before opening
+their PRs; CI runs the full checks and tests on those PRs. When reviewing a change or fixing
+review findings, follow [Reviewing](CONTRIBUTING.md#reviewing).
 
 0.9 is a breaking release candidate: don't add compatibility code for earlier versions or release
 candidates (deprecations, aliases, fallbacks for removed options). A change users can see gets an

@@ -7,5 +7,5 @@ or repeating closed ones; `why` holds reasons that were recorded.
 Keep observable behavior and driver boundaries. No features, bug fixes, dependency or CI
 changes, cosmetic churn or CHANGELOG entry. Run `mix format`, `mix compile --warnings-as-errors`
 and `mix credo --format oneline`. CI runs the tests. Return `publish` with an imperative title
-and a short PR body explaining what this simplifies, or `none` with the reason in the body if
-nothing is clearly worth doing.
+and a short PR body explaining what this simplifies. If nothing is clearly worth doing, return
+`none` with the reason in `body` and omit `title`.

@@ -78,8 +78,8 @@ jobs:
           elif [[ -n $prs || -n $old_prs ]]; then
             echo "::notice::PR already exists for $to"
             out update false
-          elif gh api "repos/$GH_REPO/git/ref/heads/$branch" --silent 2> /dev/null ||
-            gh api "repos/$GH_REPO/git/ref/heads/$legacy" --silent 2> /dev/null; then
+          elif gh api "repos/$GH_REPO/git/ref/heads/$legacy" --silent 2> /dev/null ||
+            { [[ $GITHUB_RUN_ATTEMPT == 1 ]] && gh api "repos/$GH_REPO/git/ref/heads/$branch" --silent 2> /dev/null; }; then
             echo "::notice::Branch already exists for $to"
             out update false
           else
@@ -93,6 +93,7 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: read
+      pull-requests: read
       id-token: write
     # For `mix check`, as in ci.yml's test job.
     services:
@@ -131,6 +132,7 @@ jobs:
       - run: git switch -c "$BRANCH"
       - name: Update and publish a draft
         env:
+          GH_TOKEN: ${{ github.token }}
           OPENCODE_API_KEY: ${{ steps.auth.outputs.token }}
           PLAYWRIGHT_FROM: ${{ needs.check.outputs.from }}
           PLAYWRIGHT_TO: ${{ needs.check.outputs.to }}
