@@ -200,8 +200,10 @@ jobs:
       # compile errors are not. The retry takes no --partitions: the failures manifest holds this
       # partition's failures only, and --partitions would split those files again. The first run's
       # failures are annotated by Playwright.Test.GitHubFormatter, with a notice summing up the
-      # run, so a green retry does not hide them. As upstream annotates every attempt, the retry
+      # run even if the retry passes. As upstream annotates every attempt, the retry
       # is annotated too, under `Retry #1`, and its summary lists a test that passed there as flaky.
+      # Before Elixir 1.21, a failing `setup_all` teardown can be missing from the manifest,
+      # so a green retry can still hide that failure: https://github.com/elixir-lang/elixir/commit/0f654791
       # `--formatter` replaces test_helper's list, so each run names its formatters. The retry
       # writes each test's artifacts to `<dir>-retry1`, next to the first run's, as Playwright
       # Test's retries do. The 10 slowest modules
