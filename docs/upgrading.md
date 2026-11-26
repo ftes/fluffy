@@ -191,7 +191,9 @@ no limit; see [Configuration](installation.md#configuration).
   `FunctionClauseError`.
 - `Fluffy.PhoenixTest` takes and returns a plain `Fluffy.Session`, and
   `Fluffy.PhoenixTest.Session` is removed: replace `facade.session` with the session itself,
-  and a match on `%Fluffy.PhoenixTest.Session{}` with `%Fluffy.Session{}`.
+  and a match on `%Fluffy.PhoenixTest.Session{}` with `%Fluffy.Session{}`. Drop helpers
+  that only unwrap and rewrap the session around native calls. Native locators still
+  need explicit scoping inside a facade `within`.
 
 ## Workarounds that can go
 

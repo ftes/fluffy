@@ -64,10 +64,15 @@ A dropdown, a select without `multiple` and with no `size` above 1, is closed, a
 closed dropdown's options have no box in a browser, so they are invisible. Static and
 LiveView treat them the same. `visible`, `assert_has`, `filter(visible: true)` and the
 facade's `count:` and `at:` don't see them: a facade `assert_has("#house option", count: 4)`
-counts 0. Count them with `count/2`, which doesn't filter visibility, as above. Role
-locators still find them, as in Playwright, and the facade's
-`assert_has("#house", selected: "Ravenclaw")` checks the selection. A list box, a
-`multiple` select or one with a `size` above 1, shows its options.
+counts 0. Native `count/2` and `attached/1` don't filter visibility. Scope a named option
+to its select, for example `by_role(house, :option, name: "Ravenclaw", exact: true)`,
+then use `assert(attached(option))` for presence or `assert(count(option, 1))` to
+check that exactly one match exists. Use `assert(count(option, 0))` for absence.
+
+In the facade, `assert_has("#house", value: "ravenclaw")` checks the current selection
+by its submitted value, and `assert_has("#house", selected: "Ravenclaw")` checks it
+by the displayed label. Both fail if the option exists but a different option is selected.
+A list box, a `multiple` select or one with a `size` above 1, shows its options.
 
 A `<datalist>` and its options are never rendered: fill its input with an option's value,
 and find the options with `count/2` or `by_role(:option, include_hidden: true)`, whose

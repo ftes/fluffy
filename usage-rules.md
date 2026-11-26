@@ -19,7 +19,7 @@ Fluffy runs Phoenix feature tests through one Playwright-shaped API, in-process 
 - `start_session(:phoenix)` is the default; it picks the Static or LiveView driver per page. Use `:playwright` for JavaScript, layout and computed style, native validation, dialogs, network events, tabs or focus. Fluffy reads no test tags: pick the backend in your setup.
 - Check `docs/capabilities.md` before relying on browser behavior in a Phoenix test: what a backend can't do raises `Fluffy.CapabilityError`. LiveView ignores `phx-debounce`/`phx-throttle`, and Phoenix ignores `data-confirm`.
 - Phoenix checks structural visibility (`hidden`, `type="hidden"`), not CSS; test rendered visibility on `:playwright`.
-- A closed dropdown's options are invisible on every driver: count them with `count/2` and assert the selection with `value/2` or `by_role(:option, selected: true)` ([Selects and options](docs/actions.md#selects-and-options)).
+- A closed dropdown's options are invisible on every driver: scope the option to its select and use `attached/1` or native `count/2` for presence. Assert the selection with `value/2` (submitted value) or `by_role(:option, selected: true)` (displayed label) ([Selects and options](docs/actions.md#selects-and-options)).
 
 ## Coming from LiveViewTest, ConnTest or PhoenixTest
 
@@ -29,12 +29,13 @@ Fluffy runs Phoenix feature tests through one Playwright-shaped API, in-process 
 - Don't assert `.phx-connected`: a Playwright `visit` waits for LiveViews to connect.
 - There is no page status assertion; on Playwright, use `Event.response`.
 - Keep the ids Phoenix templates need, but locate by them only before adding a test id. Fluffy's `by_role`, `by_label`, `by_text`, `by_test_id`, ... are Playwright's `get_by_*`; scope with the parent first, `by_role(parent, :row, name: "x")`. For buttons and links, `import Fluffy.Locator.Roles` and write `button("Save")` and `link("Home")` for `by_role(:button, name: "Save")` and `by_role(:link, name: "Home")`; scope with `by_role(parent, :link, name: "Home")`.
-- Hidden inputs fail `visible`, a plain facade `assert_has` and role locators. Assert them without visibility: `assert(value(by_css("#token"), "x"))`, `assert(count(by_css("#token"), 1))`. For a checkbox hidden behind its label, `set_checked` the label.
+- To assert visible copy, use `by_text`, or a named `by_role` for a heading or control. Avoid filtering `body` by text: that checks the container's visibility. Use a scoped text locator for the text itself and a container filter when the container is the target.
+- Hidden inputs fail `visible`, a plain facade `assert_has` and role locators. Assert them without visibility: `assert(value(by_css("#token"), "x"))`, `assert(count(by_css("#token"), 1))`. For switches or radio cards with hidden inputs, pass the visible label element to native `check` or `uncheck` as appropriate; `by_label` targets the input.
 - The app's `DataCase`/`ConnCase` owns the Ecto sandbox (`Sandbox.start_owner!`) before the session starts; a plain `Sandbox.checkout` doesn't work for browser tests. An app's own LiveView sandbox hook passes `Fluffy.Sandbox` to `Phoenix.Ecto.SQL.Sandbox.allow/2`, not `Ecto.Adapters.SQL.Sandbox`, so a session Fluffy started waits for its LiveViews to exit.
 
 ## Fluffy's own API
 
-- To use a page value, read it on any driver with `text_content`, `get_attribute`, `input_value` or `title`, not `evaluate`, and `all` for a locator per match; check values with assertions, which retry. `wait_for(session, locator, state: :hidden)` works on every driver too.
+- To use a page value, read it on any driver with `text_content`, `get_attribute`, `input_value` or `title`, not `evaluate`, and `all` for a locator per match. Use retrying assertions on the UI result instead of sleeps or JavaScript loops over DOM text; use `Fluffy.Playwright.wait_for_function` for predicates that need JavaScript. `wait_for(session, locator, state: :hidden)` works on every driver too.
 - Events: `pending = wait_for(session, Event.download())`, act, `await(pending)`, or `assert_event` in a pipeline. Downloads work on every driver, other events on Playwright.
 - A `Fluffy.Playwright.route/4` handler answers each request once and must not block: hand database work to a `Task` (it keeps the sandbox) and fulfil from there.
 - `Fluffy.unwrap/2` passes the driver's native value (`Plug.Conn`, `LiveViewTest.View`, `Playwright.Page`). In it, don't close the page or context, remove listeners, `set_content`, stop tracing, pass `no_wait_after:` or `signal:`, or consume `assert_patch`: that breaks Fluffy's tracking.
