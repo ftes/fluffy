@@ -168,7 +168,7 @@ jobs:
         id: threads
         if: steps.list.outputs.candidate-numbers != ''
         continue-on-error: true
-        uses: ftes/ci/review-threads@e59c4b0b13300a060349ceac1781be70363a0850 # review-threads (ftes/ci#16)
+        uses: ftes/ci/review-threads@0e4b067199ea2f6a255a26ab43403f6f6acb5cb6 # v1.0.12
         with:
           prs: ${{ steps.list.outputs.candidate-numbers }}
       - name: Pick the PRs to fix
@@ -259,7 +259,7 @@ jobs:
       - name: List open review findings
         id: threads
         continue-on-error: true
-        uses: ftes/ci/review-threads@e59c4b0b13300a060349ceac1781be70363a0850 # review-threads (ftes/ci#16)
+        uses: ftes/ci/review-threads@0e4b067199ea2f6a255a26ab43403f6f6acb5cb6 # v1.0.12
         with:
           prs: ${{ matrix.pr.number }}
       - name: Run Claude
@@ -301,7 +301,7 @@ jobs:
       # Replies to each finding; reacts to and resolves the fixed ones.
       - name: Answer the review findings
         if: ${{ !cancelled() && steps.claude.outputs.structured_output != '' }}
-        uses: ftes/ci/review-threads/answer@e59c4b0b13300a060349ceac1781be70363a0850 # review-threads (ftes/ci#16)
+        uses: ftes/ci/review-threads/answer@0e4b067199ea2f6a255a26ab43403f6f6acb5cb6 # v1.0.12
         with:
           pr: ${{ matrix.pr.number }}
           answers: ${{ steps.claude.outputs.structured_output }}
