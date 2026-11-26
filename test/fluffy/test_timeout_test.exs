@@ -5,6 +5,7 @@ defmodule Fluffy.TestTimeoutTest do
   use ExUnit.Case, async: true
   use Playwright.Test
 
+  alias Fluffy.Deadline
   alias Fluffy.TestTimeout
 
   @tag timeout: 10_000
@@ -16,7 +17,7 @@ defmodule Fluffy.TestTimeoutTest do
   @tag timeout: :infinity
   test "a test without a timeout has no backstop" do
     assert TestTimeout.fetch() == nil
-    assert TestTimeout.bound(:infinity) == :infinity
+    assert TestTimeout.deadline(:infinity) == :infinity
   end
 
   test "a Task of the test gets the test's backstop" do
@@ -24,22 +25,41 @@ defmodule Fluffy.TestTimeoutTest do
     assert Task.await(Task.async(&TestTimeout.fetch/0)) == test_timeout
   end
 
-  test "a process outside the test has no backstop, so a deadline stays as it is" do
+  test "a process outside the test has no backstop" do
     test = self()
+    timeout = 60_000
 
     spawn(fn ->
-      send(test, {:outside, TestTimeout.fetch(), TestTimeout.bound(:infinity), TestTimeout.bound(42)})
+      earliest = Deadline.new(timeout)
+      deadline = TestTimeout.deadline(timeout)
+      latest = Deadline.new(timeout)
+      send(test, {:outside, TestTimeout.fetch(), TestTimeout.deadline(:infinity), deadline, earliest..latest})
     end)
 
-    assert_receive {:outside, nil, :infinity, 42}
+    assert_receive {:outside, nil, :infinity, deadline, expected}
+    assert deadline in expected
   end
 
-  test "the backstop bounds a later deadline and none" do
+  test ":once is already expired" do
+    assert Deadline.expired?(TestTimeout.deadline(:once))
+  end
+
+  @tag timeout: 10_000
+  test "a shorter timeout keeps its own deadline" do
+    earliest = Deadline.new(100)
+    deadline = TestTimeout.deadline(100)
+    latest = Deadline.new(100)
     {_timeout, backstop} = TestTimeout.fetch()
 
-    assert TestTimeout.bound(:infinity) == backstop
-    assert TestTimeout.bound(backstop + 1) == backstop
-    assert TestTimeout.bound(backstop - 1) == backstop - 1
+    assert deadline in earliest..latest
+    assert deadline < backstop
+  end
+
+  test "the backstop bounds a longer or unlimited timeout" do
+    {timeout, backstop} = TestTimeout.fetch()
+
+    assert TestTimeout.deadline(:infinity) == backstop
+    assert TestTimeout.deadline(timeout + 1_000) == backstop
   end
 
   @tag timeout: 2_000

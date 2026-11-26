@@ -20,9 +20,11 @@ defmodule Fluffy.TestTimeout do
     end
   end
 
-  @doc "`deadline`, bounded by the test's backstop."
-  @spec bound(Fluffy.Deadline.t()) :: Fluffy.Deadline.t()
-  def bound(deadline) do
+  @doc "The operation's deadline from `timeout`, bounded by the test's backstop."
+  @spec deadline(Fluffy.Timeouts.t()) :: Fluffy.Deadline.t()
+  def deadline(timeout) do
+    deadline = Fluffy.Deadline.new(timeout)
+
     case {fetch(), deadline} do
       {nil, deadline} -> deadline
       {{_timeout, backstop}, :infinity} -> backstop
