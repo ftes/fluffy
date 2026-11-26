@@ -827,6 +827,12 @@ defmodule Fluffy.Playwright do
   To assert on page state, prefer `Fluffy.Expect`, which retries; a value read
   here is checked once.
 
+  Compare a returned value explicitly, never by its truthiness: JavaScript and
+  Elixir disagree on it. `null` (`:null`), `NaN` (`:nan`), `0`, `-0` and `""` are falsy in
+  JavaScript and truthy in Elixir, so `assert house` passes on them. Write
+  `assert house == "Ravenclaw"`, or keep the condition in JavaScript with
+  `wait_for_function/3`, which uses JavaScript's truthiness.
+
   Do not use this for JavaScript that owns a navigation, opens a page, starts a
   download, or installs a durable listener. Use the corresponding
   listener-before-action `Fluffy.wait_for/3` event API so lifecycle and

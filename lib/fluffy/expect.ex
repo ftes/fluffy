@@ -8,13 +8,14 @@ defmodule Fluffy.Expect do
   For ExUnit-style names, use `Fluffy.Assert`.
 
   Assertion constructors use fluent `to_be_*` names for states and `to_have_*`
-  names for properties.
+  names for properties. `to_pass/2` and `poll/3` retry a block or a value, as
+  Playwright's `toPass` and `expect.poll`.
 
   Every constructor documents its options. `expect/3` accepts the shared timeout:
 
   #{NimbleOptions.docs(Fluffy.Options.expectation_schema())}
   """
-  @moduledoc groups: ["Running expectations", "Locator assertions", "Page assertions", "Events"]
+  @moduledoc groups: ["Running expectations", "Locator assertions", "Page assertions", "Polling and retrying", "Events"]
 
   alias Fluffy.Expect
   alias Fluffy.Expect.Internal
@@ -55,6 +56,8 @@ defmodule Fluffy.Expect do
           | :in_viewport
           | :js_property
           | :opener
+          | :pass
+          | :poll
           | :role
           | :screenshot
           | :text
@@ -112,6 +115,8 @@ defmodule Fluffy.Expect do
   @type page_to_have_title_option ::
           unquote(NimbleOptions.option_typespec(Options.expectation_schema(:page_to_have_title)))
   @type page_to_have_url_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:page_to_have_url)))
+  @type to_pass_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:to_pass)))
+  @type poll_option :: unquote(NimbleOptions.option_typespec(Options.expectation_schema(:poll)))
 
   @doc group: "Running expectations"
   @doc "Executes an expectation and returns the unchanged or reconciled session."
@@ -151,8 +156,18 @@ defmodule Fluffy.Expect do
     do: Fluffy.Event.expect(session, event, action, assertion, options)
 
   @doc group: "Running expectations"
-  @doc "Negates an expectation while preserving its target and options."
+  @doc """
+  Negates an expectation while preserving its target and options.
+
+  `poll/3` can't be negated: refute in the assertion instead.
+  """
   @spec not_(t()) :: t()
+  def not_(%__MODULE__{kind: :poll}) do
+    raise ArgumentError,
+          "Fluffy.Expect.not_/1: poll/3 can't be negated, as it polls until the assertion passes; " <>
+            "refute in the assertion instead"
+  end
+
   def not_(%__MODULE__{} = expectation), do: Internal.negate(expectation)
 
   @doc group: "Locator assertions"
@@ -749,6 +764,77 @@ defmodule Fluffy.Expect do
     Internal.new(:page, :opener, expected, options)
   end
 
+  @doc group: "Polling and retrying"
+  @doc """
+  Retries a block until it stops raising, as Playwright's `expect(fn).toPass()`
+  (`Playwright.Expect.to_pass!/2`), on every driver. `fun` gets the session.
+
+      session
+      |> expect(to_pass(fn session ->
+        session
+        |> click(by_role(:button, name: "Check the owlery"), timeout: 1_000)
+        |> expect(to_be_visible(by_text("A letter for Harry")), timeout: 0)
+      end))
+
+  `expect/3` returns the session the passing attempt returned, or, if it returned something
+  else, the session it was given. Each attempt runs to the end, so give the calls inside short
+  timeouts; see [Polling and retrying blocks](assertions.md#polling-and-retrying-blocks).
+
+  Negated, as `not_(to_pass(fun))` or `refute(pass(fun))`, it retries until the block raises, as
+  Playwright's `expect(fn).not.toPass()` (`Playwright.Expect.not_to_pass!/2`), and fails at the
+  timeout if the block keeps passing.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.expectation_schema(:to_pass))}
+  """
+  @spec to_pass((Session.t() -> term()), [to_pass_option()]) :: t()
+  def to_pass(fun, options \\ []) when is_function(fun, 1) and is_list(options) do
+    {timeout, native} = Options.split_expectation!(:to_pass, options)
+    Internal.new(:page, :pass, {fun, native}, timeout)
+  end
+
+  @doc group: "Polling and retrying"
+  @doc """
+  Calls `fun` with the session again until `assertion` passes on the value it returns, as
+  Playwright's `expect.poll` (`Playwright.Expect.poll!/3`), on every driver.
+
+      session
+      |> expect(poll(fn _session -> Owlery.letters_for("Harry") end, &assert(length(&1) == 1)))
+
+  As in `Playwright.Expect.poll!/3`, the assertion raises until the value is right, such as an
+  ExUnit `assert`; what it returns is ignored. `fun` raising fails at once, so return a value and
+  leave the check to the assertion. Compare explicitly, as in `&assert(&1 == "playing")`:
+  JavaScript's `null` (`:null`), `NaN` (`:nan`), `0` and `""` are falsy there but truthy in
+  Elixir, so `&assert(&1)` passes on them. For a condition on the page alone,
+  `Fluffy.Playwright.wait_for_function/3` keeps JavaScript's truthiness. `expect/3` returns the
+  session it was given. It can't be negated: refute in the assertion instead.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.expectation_schema(:poll))}
+  """
+  @spec poll((Session.t() -> term()), (term() -> term()), [poll_option()]) :: t()
+  def poll(fun, assertion, options \\ []) when is_function(fun, 1) and is_function(assertion, 1) and is_list(options) do
+    {timeout, native} = Options.split_expectation!(:poll, options)
+    Internal.new(:page, :poll, {fun, assertion, native}, timeout)
+  end
+
+  # Playwright's retry loop runs here, around Fluffy calls: no driver evaluates it.
+  defp expect_active_page(%Session{} = session, %Expect{kind: :pass, expected: {fun, native}} = expectation) do
+    call = if expectation.negated?, do: &Playwright.Expect.not_to_pass!/2, else: &Playwright.Expect.to_pass!/2
+
+    case retry!(expectation, call, [fn -> fun.(session) end], native) do
+      %Session{} = passed -> passed
+      _value -> session
+    end
+  end
+
+  defp expect_active_page(%Session{} = session, %Expect{kind: :poll, expected: {fun, assertion, native}} = expectation) do
+    retry!(expectation, &Playwright.Expect.poll!/3, [fn -> fun.(session) end, assertion], native)
+    session
+  end
+
   defp expect_active_page(%Session{} = session, %Expect{kind: kind} = expectation)
        when kind in [:url, :title, :screenshot, :aria_snapshot] do
     Fluffy.Backend.driver(session, :expect, [expectation])
@@ -762,5 +848,52 @@ defmodule Fluffy.Expect do
 
   defp expect_active_page(_session, %Expect{} = expectation) do
     raise ArgumentError, "Fluffy.Expect.expect/3: unsupported active page expectation: #{Internal.describe(expectation)}"
+  end
+
+  # A Fluffy timeout as Playwright's (`Fluffy.Deadline.playwright/1`); without one, Playwright's
+  # default. Its failure raises as every Fluffy expectation's does, with Playwright's message.
+  # `0` makes one attempt here: Playwright's loop checks its deadline before the first attempt,
+  # so the 1ms `0` becomes can make none.
+  defp retry!(%Expect{} = expectation, call, arguments, native) do
+    case Keyword.fetch(expectation.options, :timeout) do
+      {:ok, 0} -> attempt!(expectation, arguments, native[:message])
+      {:ok, timeout} -> apply(call, arguments ++ [Keyword.put(native, :timeout, Fluffy.Deadline.playwright(timeout))])
+      :error -> apply(call, arguments ++ [native])
+    end
+  rescue
+    error in Playwright.ExpectError -> failed!(expectation, Exception.message(error), __STACKTRACE__)
+  end
+
+  # As in `Playwright.Expect.poll!/3`, `fun` raising isn't the assertion failing.
+  defp attempt!(%Expect{negated?: true} = expectation, [block], _message) do
+    block.()
+  catch
+    _kind, _reason -> :ok
+  else
+    _value -> raise ExUnit.AssertionError, message: "Expected #{Internal.describe(expectation)}\nThe block passed"
+  end
+
+  defp attempt!(expectation, [block], message), do: checked!(expectation, block, message)
+
+  defp attempt!(expectation, [fun, assertion], message) do
+    value = fun.()
+    checked!(expectation, fn -> assertion.(value) end, message)
+  end
+
+  # As Playwright's attempts: any kind fails one, and a `message:` comes first in the error.
+  defp checked!(expectation, fun, message) do
+    fun.()
+  catch
+    kind, reason ->
+      error =
+        if kind == :error,
+          do: Exception.message(Exception.normalize(:error, reason, __STACKTRACE__)),
+          else: Exception.format_banner(kind, reason)
+
+      failed!(expectation, Enum.join(List.wrap(message) ++ [error], "\n\n"), __STACKTRACE__)
+  end
+
+  defp failed!(expectation, message, stacktrace) do
+    reraise ExUnit.AssertionError, [message: "Expected #{Internal.describe(expectation)}\n" <> message], stacktrace
   end
 end

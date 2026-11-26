@@ -26,6 +26,22 @@ defmodule Fluffy.Conformance.AssertAPITest do
     |> refute(empty(note))
   end
 
+  for driver <- Drivers.html() do
+    @tag driver: driver
+    test "pass and poll delegate to to_pass and poll, and refute negates pass, with #{driver}" do
+      session = session_for_html(unquote(driver), ~s(<p id="owl">Hedwig</p><p>Errol</p>))
+      owl = by_css("#owl")
+
+      session
+      |> assert(pass(fn session -> assert(session, count(by_css("p"), 2), timeout: 0) end))
+      |> assert(pass(fn session -> assert(session, text(owl, "Hedwig"), timeout: 0) end, timeout: 1_000))
+      |> assert(poll(&text_content(&1, owl), &assert(&1 == "Hedwig")), timeout: 1_000)
+      |> refute(pass(fn session -> assert(session, text(owl, "Errol"), timeout: 0) end), timeout: 1_000)
+
+      assert_raise ArgumentError, ~r/poll\/3 can't be negated/, fn -> refute(session, poll(& &1, &assert(&1))) end
+    end
+  end
+
   test "every Fluffy.Expect matcher has a Fluffy.Assert name" do
     assert_names = Fluffy.Assert.__info__(:functions)
 
@@ -41,8 +57,9 @@ defmodule Fluffy.Conformance.AssertAPITest do
 
   # `to_be_visible` is `visible`, `to_contain_text` is `contain_text` and
   # `page_to_have_title` is `page_title`. Baseline comparisons keep `match_`, like
-  # `match_aria_snapshot`: `to_have_screenshot` is `match_screenshot`.
+  # `match_aria_snapshot`: `to_have_screenshot` is `match_screenshot`. `poll` has no prefix.
   defp assert_name("page_" <> matcher), do: "page_" <> assert_name(matcher)
+  defp assert_name("poll"), do: "poll"
   defp assert_name("to_have_screenshot"), do: "match_screenshot"
   defp assert_name("to_be_" <> name), do: name
   defp assert_name("to_have_" <> name), do: name

@@ -187,7 +187,20 @@ defmodule Fluffy.Options do
     to_be_hidden: {Playwright.Expect, :to_be_hidden, 2, []},
     to_be_empty: {Playwright.Expect, :to_be_empty, 2, []},
     page_to_have_title: {Playwright.Expect, :to_have_title, 3, []},
-    page_to_have_url: {Playwright.Expect, :to_have_url, 3, [:ignore_case]}
+    page_to_have_url: {Playwright.Expect, :to_have_url, 3, [:ignore_case]},
+    to_pass: {Playwright.Expect, :to_pass, 2, [:intervals]},
+    poll: {Playwright.Expect, :poll, 3, [:intervals, :message]}
+  ]
+
+  # `to_pass` and `poll` run Playwright's retry loop, with its deadlines, on every driver.
+  @retry_timeout_docs [
+    to_pass:
+      "Maximum time in milliseconds to retry the block. Defaults, as Playwright's `toPass`, to the test's " <>
+        "timeout, not the expect timeout (`config :playwright, :test, expect: [to_pass: [timeout: ...]]` " <>
+        "sets another). `0` leaves time for one attempt and `:infinity` retries until the test times out.",
+    poll:
+      "Maximum time in milliseconds to poll. Defaults, as Playwright's `expect.poll`, to the expect timeout, " <>
+        "5 seconds, on every driver. `0` leaves time for one attempt and `:infinity` polls until the test times out."
   ]
 
   @denied_expectation_keys [:signal]
@@ -221,12 +234,26 @@ defmodule Fluffy.Options do
     pseudo: [
       type: {:in, [:before, :after]},
       doc: "*Playwright only.* The pseudo-element to read computed styles from."
-    ]
+    ],
+    intervals: [
+      type: {:list, :non_neg_integer},
+      doc:
+        "Milliseconds to wait between attempts, the last one repeated: `[1_000, 2_000, 10_000]`. " <>
+          "Defaults to `[100, 250, 500, 1000]`."
+    ],
+    message: [type: :string, doc: "A custom message, for the step title and the error."]
   ]
 
   @expectation_schemas Map.new(@native_expectations, fn {matcher, {_module, _fun, _arity, mirrored}} ->
                          mirrored = Keyword.take(@mirrored_expectation_options, mirrored)
-                         {matcher, NimbleOptions.new!(@timeout_options ++ mirrored)}
+
+                         timeout =
+                           case Keyword.fetch(@retry_timeout_docs, matcher) do
+                             {:ok, doc} -> [timeout: [type: :timeout, doc: doc]]
+                             :error -> @timeout_options
+                           end
+
+                         {matcher, NimbleOptions.new!(timeout ++ mirrored)}
                        end)
 
   # The upstream factory behind each locator constructor and how Fluffy covers its
