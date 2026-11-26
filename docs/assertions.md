@@ -98,6 +98,11 @@ exactly one match. `use_inner_text: true` reads rendered text and requires
 Playwright, so `text` and `contain_text` raise
 `Fluffy.CapabilityError` on Static and LiveView when given it.
 
+`value` and `values` accept strings and regular expressions (`~r/…/` or
+`Playwright.RegExp`) and compare the raw control values. On a multi-select,
+`values` compares every selected option in document order, one per list entry.
+For example, `assert(session, values(by_label("Potions"), ["polyjuice", ~r/^felix-/]))`.
+
 `hidden` passes when nothing matches, as does `refute_has(locator)`.
 Negating `text`, `contain_text`, `attribute`, `class`,
 `contain_class`, `id`, or `empty` still fails when nothing matches.

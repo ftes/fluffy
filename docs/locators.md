@@ -59,15 +59,20 @@ property, which only JavaScript sets, is mixed on Playwright only; `aria-checked
 is mixed on every driver. As in Playwright, a state option the role lacks, such as
 `by_role(:link, pressed: true)`, raises when the locator resolves.
 
-Role names, `has_text:` and `has_not_text:` also take a regular expression, as in
-Playwright: the role locator tests it against the normalized accessible name, and
-the text filters against the element's raw text, so `~r/^Pro$/` does not match
-`<li> Pro </li>`. A regex is a JavaScript `RegExp` on every driver: an Elixir
+`by_text`, `by_label`, `by_placeholder`, `by_alt_text`, `by_title`, and
+`by_test_id` also accept a regular expression, including inside a locator or frame.
+Regexes ignore `exact:` and match the raw text, label, or attribute value.
+Role names and `description:` match normalized accessible text, while
+`has_text:` and `has_not_text:` match raw text. For example, `by_text(~r/^Lumos$/)`
+does not match `<li> Lumos </li>`.
+
+A regex is a JavaScript `RegExp` on every driver: an Elixir
 `Regex` becomes one with `Playwright.RegExp.new/1`, which raises `ArgumentError`
-on PCRE-only syntax such as `\A` or `(?i)`, and Static and LiveView match it as
-the browser does. Pass a `Playwright.RegExp` for JavaScript-only syntax. Two
-differences stay: without the `u` modifier the browser matches UTF-16 code units and
-Static and LiveView match code points, so `~r/^.$/` matches an emoji only on Phoenix.
+on PCRE-only syntax such as `\A` or `(?i)`. Pass a `Playwright.RegExp` for
+JavaScript-only syntax. Static and LiveView require the pattern to run in Elixir's
+regex engine; see `Playwright.RegExp` for its limits. Without the `u` modifier the
+browser matches UTF-16 code units and Static and LiveView match code points, so
+`~r/^.$/` matches an emoji only on Phoenix.
 And on OTP 27, Static and LiveView let `\w` and `\b` also match Latin-1 letters such as
 `é` (OTP 27's PCRE tables); from OTP 28 they are ASCII, as in JavaScript.
 

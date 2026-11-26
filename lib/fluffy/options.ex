@@ -511,6 +511,8 @@ defmodule Fluffy.Options do
 
   @type session_option :: unquote(NimbleOptions.option_typespec(@session_schema))
 
+  defguard is_text(value) when is_binary(value) or is_struct(value, Regex) or is_struct(value, Playwright.RegExp)
+
   @doc false
   # A string or a regex; a `Regex` becomes its `Playwright.RegExp`, raising on PCRE-only syntax.
   def text_or_reg_exp(value) when is_binary(value) or is_struct(value, Playwright.RegExp), do: {:ok, value}
