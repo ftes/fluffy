@@ -1,11 +1,10 @@
 defmodule Fluffy.Expect do
   @moduledoc """
-  Typed locator and active-page assertion values executed by
-  `Fluffy.Expect.expect/2`.
+  Typed locator and active-page assertion values. Use `Fluffy.Assert` in tests.
 
-  Page constructors use target prefixes such as `page_to_have_url/2`.
-  Import this module to use `expect/2`, `not_/1`, and all constructors.
-  For ExUnit-style names, use `Fluffy.Assert`.
+  The Playwright-style vocabulary runs these values with `expect/2` and
+  negates them with `not_/1`. Page constructors use target prefixes such as
+  `page_to_have_url/2`.
 
   Assertion constructors use fluent `to_be_*` names for states and `to_have_*`
   names for properties. `to_pass/2` and `poll/3` retry a block or a value, as

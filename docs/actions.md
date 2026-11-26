@@ -127,9 +127,7 @@ also waits for stability and the target to receive pointer events.
 
 Keep separate assertions when the state itself is the behavior under test, such as a
 button becoming enabled after a required field is filled. `assert(enabled(locator))`
-does not imply visibility, and neither does `refute(disabled(locator))`; the latter is
-the same negation as `assert(not_(disabled(locator)))` with `Fluffy.Expect.not_/1`
-imported.
+and `refute(disabled(locator))` do not check visibility.
 
 ### Form submission and keyboard actions
 
@@ -295,7 +293,7 @@ session
 ```
 
 `Fluffy.Playwright.evaluate/2` returns the JavaScript result, not the session, and
-leaves the session as it was. To assert on page state, prefer `Fluffy.Expect`, which
+leaves the session as it was. To assert on page state, prefer `Fluffy.Assert`, which
 retries. A function expression receives the optional `arg` of
 `Fluffy.Playwright.evaluate/3`, as in `Playwright.Frame.evaluate/3`. Phoenix sessions
 raise a capability error because Phoenix does not execute client code.
