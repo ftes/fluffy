@@ -274,7 +274,7 @@ jobs:
       - name: Verify external consumer fixture
         working-directory: integration/consumer
         run: |
-          mix deps.get
+          mix deps.get --check-locked
           mix test --formatter ExUnit.CLIFormatter --formatter Playwright.Test.GitHubFormatter
       - name: Save consumer deps and _build
         if: success() && github.ref == 'refs/heads/main' && steps.consumer-cache.outputs.cache-hit != 'true'

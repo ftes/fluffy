@@ -2,9 +2,7 @@ defmodule Fluffy.DependencyFloorsTest do
   use ExUnit.Case, async: true
 
   @oldest_lock Path.expand("../mix.lock.oldest", __DIR__)
-  @consumer_lock Path.expand("../integration/consumer/mix.lock", __DIR__)
   @external_resource @oldest_lock
-  @external_resource @consumer_lock
 
   # CI's oldest lane runs mix.lock.oldest, so it tests a floor only when the lock holds it.
   test "mix.lock.oldest locks every runtime dependency at its floor" do
@@ -20,15 +18,6 @@ defmodule Fluffy.DependencyFloorsTest do
 
     # nil: the dependency is missing from mix.lock.oldest.
     assert floors == Map.new(floors, fn {app, _floor} -> {app, lock[app] && elem(lock[app], 2)} end)
-  end
-
-  test "the consumer fixture locks a PlaywrightEx version Fluffy accepts" do
-    {:playwright, requirement, _options} = List.keyfind(Mix.Project.config()[:deps], :playwright, 0)
-    {lock, _binding} = Code.eval_file(@consumer_lock)
-
-    assert lock[:playwright] && Version.match?(elem(lock[:playwright], 2), requirement),
-           "integration/consumer/mix.lock must lock PlaywrightEx #{requirement}. " <>
-             "Run `mix deps.update playwright` in integration/consumer."
   end
 
   # The lowest version `requirement` names and accepts: 1.7.10 for `~> 1.7 and >= 1.7.10`,
