@@ -76,6 +76,7 @@ Changes since 0.8.0.
   - `by_role` follows Playwright's role and name rules: landmarks, lists, list items and dialogs take no name from their content.
   - Chained locators, `filter(has:)` and `within/3` search descendants only.
   - Visibility ignores `aria-hidden`, and `<input type="hidden">`, `hidden` descendants, `<title>`, `<script>`, `<template>` and similar content count as hidden. Text matching skips `<script>`, `<style>` and `<template>`.
+  - A dropdown `<select>`'s options count as hidden on Static and LiveView, as a closed dropdown's do in a browser, while role locators still find them. A facade `assert_has` on them, such as `assert_has("#house option", text: "Ravenclaw")`, and `to_be_visible` fail: check the selection with the facade's `selected:` or `by_role(:option, selected: true)` and count options natively. A failed `count:` or `at:` says how many matches are hidden ([Selects and options](docs/actions.md#selects-and-options)).
   - A `select` in a disabled `fieldset` keeps its default option, and the facade's `exact: true` no longer ignores soft hyphens and zero-width spaces.
   - Controls inside `<noscript>` are not submitted, `press` raises in layout content without key bindings, and a render resets local field state only in the views it changed.
   - `select_option` with `[]` deselects every option and rejects a list mixing values with option maps; `to_have_values` requires a multiple select; the facade's `click_button` no longer matches file inputs; LiveView `set_input_files` needs the upload's form to have an id.

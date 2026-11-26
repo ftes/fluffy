@@ -291,7 +291,8 @@ defmodule Fluffy.PhoenixTest do
     A locator resolves inside the current `within/3` scope and takes the same options.
     Multiple matches are allowed; refutation requires every match to be hidden or absent.
     Static and Live use structural visibility; Playwright uses rendered visibility.
-    `count:` and `at:` count visible matches only, as PhoenixTest.Playwright did. Field
+    `count:` and `at:` count visible matches only, as PhoenixTest.Playwright did, and their
+    failure says how many matches are hidden, such as a closed dropdown's options. Field
     predicates without `at:` add no visibility requirement, so they check hidden inputs too;
     for DOM presence use a native count, `Fluffy.Assert.assert(session, count(locator, n))`.
 
@@ -320,6 +321,9 @@ defmodule Fluffy.PhoenixTest do
     def unquote(name)(session, selector, options) when is_list(options) do
       expectation = has_expectation(session, selector, options)
       execute(session, expectation, unquote(negated?))
+    rescue
+      error in ExUnit.AssertionError ->
+        reraise %{error | message: error.message <> hidden_hint(session, selector, options)}, __STACKTRACE__
     end
 
     def unquote(name)(session, selector, text), do: unquote(name)(session, selector, text, [])
@@ -474,6 +478,15 @@ defmodule Fluffy.PhoenixTest do
       "exact: requires label: or text:"
     )
 
+    locator = matches(session, selector, options)
+    # Positions and counts take visible matches; a field predicate alone also checks hidden fields.
+    locator = if field? and !options[:at], do: locator, else: Locator.filter(locator, visible: true)
+    locator = if options[:at], do: Locator.nth(locator, options[:at] - 1), else: locator
+
+    locator |> with_text(options) |> element_expectation(options)
+  end
+
+  defp matches(session, selector, options) do
     locator = base_locator(selector)
 
     locator =
@@ -481,17 +494,24 @@ defmodule Fluffy.PhoenixTest do
         do: Locator.and_(locator, Locator.by_label(options[:label], exact: Keyword.get(options, :exact, false))),
         else: locator
 
-    locator = locator_in_scope(session, locator)
-    # Positions and counts take visible matches; a field predicate alone also checks hidden fields.
-    locator = if field? and !options[:at], do: locator, else: Locator.filter(locator, visible: true)
-    locator = if options[:at], do: Locator.nth(locator, options[:at] - 1), else: locator
+    locator_in_scope(session, locator)
+  end
 
-    locator =
-      if Keyword.has_key?(options, :text),
-        do: Locator.filter(locator, has_text: text_matcher(options[:text], Keyword.get(options, :exact, false))),
-        else: locator
+  defp with_text(locator, options) do
+    if Keyword.has_key?(options, :text),
+      do: Locator.filter(locator, has_text: text_matcher(options[:text], Keyword.get(options, :exact, false))),
+      else: locator
+  end
 
-    element_expectation(locator, options)
+  # A failed `count:` or `at:`, which take visible matches, names the hidden matches it skipped.
+  defp hidden_hint(session, selector, options) do
+    with option when option != nil <- Enum.find([:count, :at], &Keyword.has_key?(options, &1)),
+         locator = session |> matches(selector, options) |> with_text(options),
+         hidden when hidden > 0 <- length(Fluffy.all(session, Locator.filter(locator, visible: false))) do
+      "\n(#{hidden} more #{if hidden == 1, do: "match is", else: "matches are"} hidden; `#{option}:` counts visible matches)"
+    else
+      _none -> ""
+    end
   end
 
   defp element_expectation(locator, options) do

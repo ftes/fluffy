@@ -30,6 +30,7 @@ defmodule Fluffy.Support.Web.RoleStatesLive do
   <select id="wand"><option>Holly</option><option selected>Elder</option><option>Vine</option></select>
   <select aria-label="Pets" multiple><option selected>Toad</option><option>Cat</option><option selected>Rat</option></select>
   <select aria-label="Owls"><option>Hedwig</option><option>Errol</option></select>
+  <select aria-label="Patronus" size="3"><option>Stag</option><option selected>Otter</option><option>Doe</option></select>
   <input list="ingredients" aria-label="Ingredient">
   <datalist id="ingredients"><option selected>Mandrake root</option><option>Bezoar</option></datalist>
   <div role="listbox" aria-label="Brooms">

@@ -59,6 +59,24 @@ defmodule Fluffy.Conformance.RoleStateLocatorTest do
     end
 
     @tag driver: driver
+    test "a dropdown's options are hidden and a list box's visible, and both match by role with #{driver}" do
+      wand = by_label("Wand", exact: true)
+
+      unquote(driver)
+      |> session()
+      # A closed dropdown's options have no box, as in a browser; a multiple or sized select shows them.
+      |> expect(to_be_hidden(by_role(:option, name: "Elder")))
+      |> expect(to_be_visible(by_role(:option, name: "Toad")))
+      |> expect(to_be_visible(by_role(:option, name: "Otter")))
+      |> expect(wand |> by_css("option") |> filter(visible: true) |> to_have_count(0))
+      |> expect(wand |> by_css("option") |> to_have_count(3))
+      |> expect(to_have_count(by_role(:option, name: "Elder", selected: true), 1))
+      |> expect(wand |> by_role(:option, selected: true) |> to_have_text("Elder"))
+      |> expect(to_have_value(wand, "Elder"))
+      |> expect("Patronus" |> by_label() |> by_role(:option, selected: true) |> to_have_text("Otter"))
+    end
+
+    @tag driver: driver
     test "disabled: follows the attribute, aria-disabled and fieldsets with #{driver}" do
       unquote(driver)
       |> session()

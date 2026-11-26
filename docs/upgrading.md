@@ -255,9 +255,13 @@ that passed on 0.8 act differently:
   requirement.
 - The facade's `count:` and `at:` count visible matches only, as PhoenixTest.Playwright
   did, so `assert_has("input[type=hidden]", count: 1)` now fails. Check DOM presence with
-  a native count: `assert(session, count(by_css("input[type=hidden]"), 1))`. On
-  Playwright the options of a closed `<select>` aren't visible, so count them natively too,
-  or check the selected one with `selected:`.
+  a native count: `assert(session, count(by_css("input[type=hidden]"), 1))`.
+- On Static and LiveView the options of a dropdown `<select>` are now hidden, as on
+  Playwright, so `assert_has("#house option", text: "Ravenclaw")`,
+  `assert_has("option[selected]", ...)` and `to_be_visible` on them fail. Check the
+  selection with the facade's `assert_has("#house", selected: "Ravenclaw")` or
+  `by_role(:option, selected: true)`, and count options natively
+  ([Selects and options](actions.md#selects-and-options)).
 - Text matching skips `<script>` and `<style>`, as in Playwright, even as the matched
   element, so `assert_has("script", text: "...")` fails. Match attributes with a native
   count (`assert(session, count(by_css("script[nonce]"), 1))`), or read the text

@@ -191,13 +191,17 @@ defmodule Fluffy.Driver.Phoenix.HTML.Aria do
   end
 
   # What markup alone says about rendering, shared by role matching and visibility
-  # checks. `details`, `dialog`, `popover` and dropdown `select` open state is not
-  # modeled: a Phoenix test cannot change it, so their content stays visible, unlike
-  # in a browser.
-  def rendered?(%__MODULE__{} = aria, node) do
+  # checks. `details`, `dialog` and `popover` open state is not modeled: a Phoenix test
+  # cannot change it, so their content stays visible, unlike in a browser.
+  defp rendered?(%__MODULE__{} = aria, node) do
     not ignored?(node) and not hidden_in_dropdown?(aria, node) and
       closest(aria, node, &not_rendered?(aria, &1)) == nil
   end
+
+  # Visibility checks, as Playwright's isElementVisible: rendered, with a box. A dropdown's
+  # options and groups have none, as the dropdown is closed, yet role matching finds them, as
+  # roleUtils.ts isElementHiddenForAria does.
+  def visible?(%__MODULE__{} = aria, node), do: rendered?(aria, node) and not in_dropdown?(aria, node)
 
   # Role matching also honors `aria-hidden`, which visibility checks ignore.
   def hidden?(%__MODULE__{} = aria, node) do
@@ -389,6 +393,15 @@ defmodule Fluffy.Driver.Phoenix.HTML.Aria do
   defp closed_by_parent?(aria, node) do
     match?(%{tag: tag} when tag in @fallback_content_tags, parent(aria, node))
   end
+
+  defp in_dropdown?(aria, %{tag: tag} = node) when tag in ["option", "optgroup"] do
+    case closest(aria, parent(aria, node), &(&1.tag == "select")) do
+      nil -> false
+      select -> not Semantics.list_box?(select.attributes)
+    end
+  end
+
+  defp in_dropdown?(_aria, _node), do: false
 
   # Only a list box renders groups and separators; a dropdown shows its options on its own.
   defp hidden_in_dropdown?(aria, %{tag: tag} = node) when tag in ["hr", "optgroup"] do
