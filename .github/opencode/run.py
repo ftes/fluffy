@@ -19,6 +19,7 @@ REVIEW_BOTS = (BOT, LEGACY_BOT)
 MAINTAINERS = ("OWNER", "MEMBER", "COLLABORATOR")
 REPO = os.environ.get("GITHUB_REPOSITORY")
 CONTEXT = Path("tmp/opencode")
+DIFF_ARGS = ("diff", "--no-ext-diff", "--no-textconv", "--binary")
 READ_TOOLS = ("read", "glob", "grep")
 SAFE_ENV = ("PATH", "HOME", "USER", "LANG", "LC_ALL", "TMPDIR")
 
@@ -226,7 +227,18 @@ def snapshot_diff(pr):
     ensure_commit(base)
     ensure_commit(head)
     merge_base = git("merge-base", base, head)
-    return merge_base, git("diff", "--no-ext-diff", "--no-textconv", "--binary", merge_base, head, raw=True)
+    return merge_base, git(*DIFF_ARGS, merge_base, head, raw=True)
+
+
+def reviewed_diff(marker):
+    head, merge_base, _, _ = marker
+    ensure_commit(head)
+    ensure_commit(merge_base)
+    return git(*DIFF_ARGS, merge_base, head, raw=True)
+
+
+def patch_id(diff):
+    return git("patch-id", "--verbatim", input=diff)
 
 
 def review_marker(body):
@@ -281,7 +293,24 @@ def legacy_verdict(item):
     ))
 
 
-def reconcile_reviews(number, retargeted_snapshot=None, token=None):
+def last_retarget(number, ref):
+    # Read the timeline when needed. A base edit on a draft has no review job of its own.
+    event = json.loads(gh(
+        "api", "graphql", "-f", f"owner={REPO.split('/')[0]}", "-f", f"name={REPO.split('/')[1]}",
+        "-F", f"pr={number}", "-f",
+        """query=query($owner: String!, $name: String!, $pr: Int!) {
+          repository(owner: $owner, name: $name) { pullRequest(number: $pr) {
+            timelineItems(last: 1, itemTypes: [BASE_REF_CHANGED_EVENT]) {
+              nodes { ... on BaseRefChangedEvent { createdAt currentRefName } }
+            }
+          } }
+        }""",
+        "--jq", ".data.repository.pullRequest.timelineItems.nodes[0] // null",
+    ))
+    return event["createdAt"] if event and event["currentRefName"] == ref else None
+
+
+def reconcile_reviews(number, token=None):
     pr = api(f"pulls/{number}")
     expected = snapshot(pr)
     if not active_review(pr, expected):
@@ -291,24 +320,35 @@ def reconcile_reviews(number, retargeted_snapshot=None, token=None):
     items = api(f"pulls/{number}/reviews", paginate=True)
     stale = {}
     current_verdict = None
+    current_patch = None
     for item in items:
         user = item["user"] or {}
         if item["state"] not in ("APPROVED", "CHANGES_REQUESTED") or user.get("login") != BOT:
             continue
         marker = review_marker(item["body"])
         if marker and marker[2]:
-            if (marker[0], *marker[2:]) != (head, target, base):
-                stale[item["id"]] = STALE_VERDICT
-            else:
+            if (marker[0], *marker[2:]) == (head, target, base):
                 current_verdict = item["state"]
+                continue
+            if marker[2:] == (target, base):
+                try:
+                    if current_patch is None:
+                        current_patch = patch_id(snapshot_diff(pr)[1])
+                    if patch_id(reviewed_diff(marker)) == current_patch:
+                        continue
+                except subprocess.CalledProcessError:
+                    print("Could not verify unchanged diff for the previous review.")
+            stale[item["id"]] = STALE_VERDICT
     # Main's ruleset dismisses approvals when the diff changes. A same-head retarget
     # can retain a legacy approval, whose verdict did not identify the base.
-    for item in items:
-        if not legacy_verdict(item):
-            continue
+    legacy = [item for item in items if legacy_verdict(item)]
+    legacy_approvals = [item for item in legacy if item["state"] == "APPROVED" and item["commit_id"] == head]
+    retargeted_at = last_retarget(number, ref) if legacy_approvals else None
+    for item in legacy:
         if current_verdict == "APPROVED" and item["state"] == "CHANGES_REQUESTED":
             stale[item["id"]] = REPLACED_VERDICT
-        elif retargeted_snapshot == expected[:2] and item["state"] == "APPROVED" and item["commit_id"] == head:
+    for item in legacy_approvals:
+        if retargeted_at and item.get("submitted_at") and retargeted_at >= item["submitted_at"]:
             stale[item["id"]] = STALE_VERDICT
     if stale:
         with (contextlib.nullcontext(token) if token else app_token()) as credential:
@@ -330,21 +370,18 @@ def review(number, head, prompt, retargeted=False):
     previous, previous_active = previous_review(number)
     if previous_active and previous == marker:
         return
-    args = ("diff", "--no-ext-diff", "--no-textconv", "--binary")
     depth = "full"
     if previous and not retargeted and previous[2:] == marker[2:]:
         old_head, old_base, _, _ = previous
         try:
-            git("fetch", "--quiet", "--no-tags", "origin", old_head, old_base,
-                env=git_http_env(os.environ["GH_TOKEN"]))
-            old = git(*args, old_base, old_head, raw=True)
-            if git("patch-id", "--verbatim", input=old) == git("patch-id", "--verbatim", input=full):
+            old = reviewed_diff(previous)
+            if patch_id(old) == patch_id(full):
                 if previous_active:
                     print("Same changes as the previous review; skipping.")
                     return
             else:
                 replayed = git("merge-tree", "--write-tree", "--merge-base", old_base, base, old_head)
-                save("increment.diff", git(*args, replayed, head, raw=True))
+                save("increment.diff", git(*DIFF_ARGS, replayed, head, raw=True))
                 depth = "increment"
         except subprocess.CalledProcessError:
             print("Previous review could not be replayed; reviewing the whole PR.")
@@ -428,7 +465,7 @@ def main(mode):
     head = os.environ["HEAD"]
     retargeted = os.environ.get("RETARGETED") == "true"
     if mode == "reconcile-reviews":
-        reconcile_reviews(number, (head, os.environ["BASE_REF"]) if retargeted else None)
+        reconcile_reviews(number)
         return
     check(mode == "review", "Expected review or reconcile-reviews")
     CONTEXT.mkdir(parents=True, exist_ok=True)

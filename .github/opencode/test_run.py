@@ -154,6 +154,9 @@ class PublishTest(unittest.TestCase):
         ]
         with (patch.object(run, "api", side_effect=[pr, reviews, pr]),
               patch.object(run, "app_token", return_value=contextlib.nullcontext("token")),
+              patch.object(run, "snapshot_diff", return_value=("base", "current")),
+              patch.object(run, "reviewed_diff", return_value="older"),
+              patch.object(run, "patch_id", side_effect=lambda diff: diff),
               patch.object(run, "dismiss_review") as dismiss, patch.object(run, "agent") as agent):
             run.reconcile_reviews(42)
         self.assertEqual([call.args for call in dismiss.call_args_list],
@@ -162,10 +165,10 @@ class PublishTest(unittest.TestCase):
 
     def test_legacy_verdicts_only_dismissed_for_verified_retarget_or_replacement(self):
         pr = self.pr()
-        head, ref, _ = run.snapshot(pr)
+        head, _, _ = run.snapshot(pr)
         legacy = {"type": "Bot", "login": run.LEGACY_BOT}
         approval = {"id": 10, "body": "Verdict: OK to merge.", "state": "APPROVED",
-                    "user": legacy, "commit_id": head}
+                    "user": legacy, "commit_id": head, "submitted_at": "2026-11-26T10:00:00Z"}
         request = {"id": 11, "body": "Verdict: Issues found: 1 blocking, 0 non-blocking.",
                    "state": "CHANGES_REQUESTED", "user": legacy, "commit_id": "d" * 40}
         other_approval = dict(approval, id=12, body="An unrelated review")
@@ -173,14 +176,49 @@ class PublishTest(unittest.TestCase):
 
         for retarget, new_review, expected in (
             (None, [], []),
-            ((head, "some-other-base"), [], []),
-            ((head, ref), [], [(10, run.STALE_VERDICT)]),
+            ("2026-11-26T09:59:00Z", [], []),
+            ("2026-11-26T10:01:00Z", [], [(10, run.STALE_VERDICT)]),
             (None, [current], [(11, run.REPLACED_VERDICT)]),
         ):
             reviews = [approval, request, other_approval, *new_review]
             with (patch.object(run, "api", side_effect=[pr, reviews, pr]),
                   patch.object(run, "app_token", return_value=contextlib.nullcontext("token")),
+                  patch.object(run, "last_retarget", return_value=retarget) as timeline,
                   patch.object(run, "dismiss_review") as dismiss):
-                run.reconcile_reviews(42, retarget)
+                run.reconcile_reviews(42)
+            timeline.assert_called_once_with(42, "main")
             self.assertEqual([call.args for call in dismiss.call_args_list],
                              [(42, review_id, "token", message) for review_id, message in expected])
+
+    def test_draft_retarget_is_read_from_timeline_when_ready(self):
+        draft = self.pr(target="stable") | {"draft": True}
+        ready = draft | {"draft": False}
+        approval = {
+            "id": 1, "body": "Verdict: OK to merge.", "state": "APPROVED",
+            "user": {"type": "Bot", "login": run.LEGACY_BOT}, "commit_id": ready["head"]["sha"],
+            "submitted_at": "2026-11-26T10:00:00Z",
+        }
+        with (patch.object(run, "api", side_effect=[draft, ready, [approval], ready]),
+              patch.object(run, "gh", return_value='{"createdAt":"2026-11-26T10:01:00Z","currentRefName":"stable"}') as gh,
+              patch.object(run, "app_token", return_value=contextlib.nullcontext("token")),
+              patch.object(run, "dismiss_review") as dismiss):
+            run.reconcile_reviews(42)
+            dismiss.assert_not_called()
+            run.reconcile_reviews(42)
+        self.assertTrue(any("BASE_REF_CHANGED_EVENT" in arg for arg in gh.call_args.args))
+        dismiss.assert_called_once_with(42, 1, "token", run.STALE_VERDICT)
+
+    def test_same_base_unchanged_diff_keeps_verdict_and_skips_model(self):
+        pr = self.pr()
+        previous = {"id": 1, "body": self.marker(self.pr(head="e" * 40)), "state": "APPROVED",
+                    "user": {"type": "Bot", "login": run.BOT}}
+        with (patch.object(run, "api", side_effect=[pr, [previous], pr, [], [previous]]),
+              patch.object(run, "snapshot_diff", return_value=("b" * 40, "current")),
+              patch.object(run, "reviewed_diff", return_value="older"),
+              patch.object(run, "patch_id", return_value="same"),
+              patch.object(run, "app_token") as token, patch.object(run, "agent") as agent,
+              contextlib.redirect_stdout(io.StringIO())):
+            run.reconcile_reviews(42)
+            run.review(42, pr["head"]["sha"], "Review")
+        token.assert_not_called()
+        agent.assert_not_called()
