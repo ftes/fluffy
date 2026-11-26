@@ -115,6 +115,23 @@ defmodule Fluffy.Conformance.RoleStateLocatorTest do
     end
 
     @tag driver: driver
+    test "positional role names accept strings, regexes and options with #{driver}" do
+      spells = by_role(:group, name: "Spells")
+      nox = Playwright.RegExp.new("^nox$", "i")
+
+      unquote(driver)
+      |> session()
+      |> expect(to_have_count(by_role(:heading, "great"), 1))
+      |> expect(to_have_count(by_role(:heading, "Great Hall", exact: true, level: 2), 1))
+      |> expect(to_have_count(by_role(:heading, "great hall", exact: true, level: 2), 0))
+      |> expect(to_have_count(by_role(:heading, ~r/^great hall$/i, level: 2), 1))
+      |> expect(to_have_count(by_role(:heading, "Great Hall", level: 5), 0))
+      |> expect(spells |> by_role(:checkbox, ~r/./) |> to_have_count(2))
+      |> expect(spells |> by_role(:checkbox, nox, checked: true) |> to_have_count(0))
+      |> expect(spells |> by_role(:checkbox, nox, checked: false) |> to_have_count(1))
+    end
+
+    @tag driver: driver
     test "description: matches the accessible description like the name with #{driver}" do
       unquote(driver)
       |> session()
@@ -170,6 +187,22 @@ defmodule Fluffy.Conformance.RoleStateLocatorTest do
 
     assert inspect(by_role(:button, name: ~r/x/, pressed: true)) ==
              "#Fluffy.Locator<by_role(:button, name: #Playwright.RegExp</x/>, pressed: true)>"
+  end
+
+  test "a positional role name shares option validation and excludes name:" do
+    parent = by_role(:dialog)
+
+    assert_raise ArgumentError, ~r/either positionally or as name:, not both/, fn ->
+      by_role(:heading, "Potions", name: "Potions")
+    end
+
+    assert_raise ArgumentError, ~r/either positionally or as name:, not both/, fn ->
+      by_role(parent, :heading, ~r/Potions/, name: "Potions")
+    end
+
+    assert_raise NimbleOptions.ValidationError, ~r/:level/, fn ->
+      by_role(:heading, "Potions", level: "2")
+    end
   end
 
   defp session(:live), do: :phoenix |> start_session() |> visit("/live/role-states")

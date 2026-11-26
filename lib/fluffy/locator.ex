@@ -11,9 +11,10 @@ defmodule Fluffy.Locator do
   markup and the controls' current state, as `Fluffy.check/3` and
   `Fluffy.select_option/4` leave it.
 
-  A regular expression in `name:`, `description:`, `has_text:` or `has_not_text:` is a
-  JavaScript `RegExp` on every driver: a `Regex` becomes one with `Playwright.RegExp.new/1`,
-  which raises `ArgumentError` on PCRE-only syntax, or pass a `Playwright.RegExp`.
+  A regular expression used as a role name or in `description:`, `has_text:` or
+  `has_not_text:` is a JavaScript `RegExp` on every driver: a `Regex` becomes one with
+  `Playwright.RegExp.new/1`, which raises `ArgumentError` on PCRE-only syntax, or pass
+  a `Playwright.RegExp`.
 
   Role locators accept these options:
 
@@ -42,17 +43,24 @@ defmodule Fluffy.Locator do
   @type exact_option :: unquote(NimbleOptions.option_typespec(Options.exact_locator_schema()))
   @type filter_option :: unquote(NimbleOptions.option_typespec(Options.filter_locator_schema()))
 
+  @typedoc "An accessible name, as accepted by the `name:` role option."
+  @type role_name :: String.t() | Regex.t() | Playwright.RegExp.t()
+
+  defguardp is_role_name(name) when is_binary(name) or is_struct(name, Regex) or is_struct(name, Playwright.RegExp)
+
   @doc group: "Constructors"
   @doc """
   Matches elements by ARIA role, narrowed by accessible name and the role options in the
   module docs.
 
-  Pass a locator or frame scope first, as `by_role(parent, role)`, to match inside it.
-  `by_role/3` does the same and also takes options.
+  Pass the accessible name after the role or as `name:` in the options. The
+  positional form also takes trailing options; supply the name only once.
+  Pass a locator or frame scope first to match inside it.
 
-      session |> click(by_role(:button, name: "Brew potion"))
+      session |> click(by_role(:button, "Brew potion"))
 
-      by_css("#potions") |> by_role(:row, name: "Polyjuice Potion")
+      by_role(:heading, "Potions", level: 2)
+      by_css("#potions") |> by_role(:row, "Polyjuice Potion")
 
   The Phoenix backend knows the implicit roles `article`, `banner`, `blockquote`, `button`,
   `caption`, `cell`, `checkbox`, `code`, `columnheader`, `combobox`, `complementary`,
@@ -64,23 +72,50 @@ defmodule Fluffy.Locator do
   `term`, `textbox` and `time`; any other role needs an explicit `role` attribute there.
   """
   @spec by_role(atom(), [role_option()]) :: t()
+  @spec by_role(atom(), role_name()) :: t()
   @spec by_role(scope(), atom()) :: t()
-  @spec by_role(scope(), atom(), [role_option()]) :: t()
-  def by_role(role, options \\ [])
+  def by_role(role, name_or_options \\ [])
 
   def by_role(role, options) when is_atom(role) and is_list(options) do
     Internal.new({:role, role, Options.validate_role_locator!(options)})
   end
+
+  def by_role(role, name) when is_atom(role) and is_role_name(name), do: by_role(role, name: name)
 
   def by_role(parent, role) when is_struct(parent, __MODULE__) or is_struct(parent, FrameLocator) do
     by_role(parent, role, [])
   end
 
   @doc group: "Constructors"
-  @doc "Like `by_role/2`, inside `parent`, a locator or frame scope, with options."
+  @doc "Matches by role and positional name with options, or matches inside a locator or frame scope."
+  @spec by_role(atom(), role_name(), [role_option()]) :: t()
+  @spec by_role(scope(), atom(), [role_option()]) :: t()
+  @spec by_role(scope(), atom(), role_name()) :: t()
+  def by_role(role, name, options) when is_atom(role) and is_role_name(name) and is_list(options),
+    do: by_role(role, named_role_options!(name, options))
+
   def by_role(parent, role, options)
       when (is_struct(parent, __MODULE__) or is_struct(parent, FrameLocator)) and is_atom(role) and is_list(options) do
     child_query(parent, {:role, role, Options.validate_role_locator!(options)})
+  end
+
+  def by_role(parent, role, name)
+      when (is_struct(parent, __MODULE__) or is_struct(parent, FrameLocator)) and is_atom(role) and is_role_name(name),
+      do: by_role(parent, role, name: name)
+
+  @doc group: "Constructors"
+  @doc "Matches by role and positional name, with options, inside a locator or frame scope."
+  @spec by_role(scope(), atom(), role_name(), [role_option()]) :: t()
+  def by_role(parent, role, name, options)
+      when (is_struct(parent, __MODULE__) or is_struct(parent, FrameLocator)) and is_atom(role) and is_role_name(name) and
+             is_list(options), do: by_role(parent, role, named_role_options!(name, options))
+
+  defp named_role_options!(name, options) do
+    if Keyword.has_key?(options, :name) do
+      raise ArgumentError, "by_role takes the accessible name either positionally or as name:, not both"
+    end
+
+    [{:name, name} | options]
   end
 
   @doc group: "Constructors"
