@@ -69,7 +69,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Test the OpenCode review runner
+      - name: Test the OpenCode runners
         if: matrix.lane == 'newest'
         run: python3 -B -m unittest discover -s .github/opencode
       - name: Set up toolchain and deps
