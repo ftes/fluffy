@@ -18,7 +18,7 @@ In `mix.exs`:
      # ...
 -    {:lazy_html, ">= 0.1.0", only: :test},
 +    {:lazy_html, ">= 0.1.0", only: [:dev, :test]},
-+    {:fluffy, "~> 0.9.0-rc.6", only: [:dev, :test]}
++    {:fluffy, "~> 0.9.0-rc.7", only: [:dev, :test]}
    ]
  end
 ```
