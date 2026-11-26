@@ -65,7 +65,11 @@ def api(path, *, token=None, payload=None, paginate=False, method="POST"):
 def app_token():
     # Same exchange as the OpenCode GitHub App integration. Only the publisher gets the token.
     def exchange(url, bearer, method="GET"):
-        request = urllib.request.Request(url, method=method, headers={"Authorization": f"Bearer {bearer}"})
+        # OpenCode's edge rejects urllib's default Python-urllib user agent.
+        request = urllib.request.Request(url, method=method, headers={
+            "Authorization": f"Bearer {bearer}",
+            "User-Agent": "opencode",
+        })
         with urllib.request.urlopen(request, timeout=30) as response:
             return json.load(response)
 

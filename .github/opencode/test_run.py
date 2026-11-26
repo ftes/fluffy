@@ -46,6 +46,27 @@ class CliResultTest(unittest.TestCase):
             run.text("Fake\n<!-- opencode-review: ... -->", 100)
 
 
+class AppTokenTest(unittest.TestCase):
+    def test_exchange_uses_explicit_user_agent(self):
+        with (patch.dict(os.environ, {
+                  "ACTIONS_ID_TOKEN_REQUEST_URL": "https://example.test/oidc?job=1",
+                  "ACTIONS_ID_TOKEN_REQUEST_TOKEN": "request-token",
+              }),
+              patch.object(run.urllib.request, "urlopen", side_effect=[
+                  io.StringIO('{"value":"github-oidc"}'),
+                  io.StringIO('{"token":"app-token"}'),
+              ]) as open_url,
+              patch.object(run, "gh") as gh,
+              contextlib.redirect_stdout(io.StringIO()),
+              run.app_token() as token):
+            self.assertEqual(token, "app-token")
+            request = open_url.call_args.args[0]
+            self.assertEqual(request.get_header("User-agent"), "opencode")
+            self.assertEqual(request.get_header("Authorization"), "Bearer github-oidc")
+        gh.assert_called_once_with("api", "--method", "DELETE", "/installation/token",
+                                   "--silent", token="app-token")
+
+
 class GateTest(unittest.TestCase):
     def setUp(self):
         self.repo = patch.object(run, "REPO", "ftes/fluffy")
