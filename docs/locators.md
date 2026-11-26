@@ -116,24 +116,25 @@ for you. Facade `assert_has` accepts any visible match, and `refute_has` require
 no visible matches. Narrow the locator, or use `assert(count(locator, n))` when
 multiple matches are the intended assertion.
 
-### Button and link shorthands
+### Role shorthands
 
-`Fluffy.Locator.Roles` has `button` and `link`, for the most common role locators. They
-are Fluffy conveniences with no Playwright counterpart, so they need their own import.
-`button("Play flute")` is `by_role(:button, name: "Play flute")`, the same locator, and
-takes the same options, except `name:`. `Phoenix.Component` exports `link/1` and a generated
+`Fluffy.Locator.Roles` has `button`, `link`, and `heading`. These Fluffy shorthands
+need their own import. `button("Play flute")` is `by_role(:button, "Play flute")`
+and takes the same options. Pass a locator or frame scope first to match inside it.
+
+`Phoenix.Component` exports `link/1` and a generated
 `CoreComponents` exports `button/1`; where a module imports them, write
 `import Phoenix.Component, except: [link: 1]` and
 `import MyAppWeb.CoreComponents, except: [button: 1]`, or call `Fluffy.Locator.Roles.button/2`
-in full. To match inside a parent, use `by_role` itself:
+in full.
 
 ```elixir
 import Fluffy.Locator.Roles
 
 session
 |> click(button("Play flute"))
-|> click(link("Owlery", exact: true))
-|> click(by_role(by_role(:navigation), :link, name: "Owlery"))
+|> click(by_role(:navigation) |> link("Owlery", exact: true))
+|> assert_has(heading("Owlery", level: 2))
 ```
 
 ## Frames (Playwright only)
