@@ -146,7 +146,8 @@ no limit; see [Configuration](installation.md#configuration).
   `on_exit`) and use it before `use Playwright.Test`. Drop `sandbox: false` and `repos:`;
   Fluffy adds the metadata of `config :fluffy, ecto_repos:` to browser sessions. A plain
   `Sandbox.checkout` in the test process does not work for browser tests. An app that keeps its
-  own LiveView sandbox hook passes `Fluffy.Sandbox` there
+  own LiveView sandbox hook passes `Fluffy.Sandbox` there, and starts its session with Fluffy, so
+  the test waits for those LiveViews to exit
   ([Keeping your own LiveView hook](installation.md#keeping-your-own-liveview-hook)).
 - `Fluffy.Playwright.screenshot` and `pdf` return the image or PDF, as in Playwright,
   instead of the session; the path is the optional `path:`:

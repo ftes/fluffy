@@ -30,7 +30,7 @@ Fluffy runs Phoenix feature tests through one Playwright-shaped API, in-process 
 - There is no page status assertion; on Playwright, use `Event.response`.
 - Keep the ids Phoenix templates need, but locate by them only before adding a test id. Fluffy's `by_role`, `by_label`, `by_text`, `by_test_id`, ... are Playwright's `get_by_*`; scope with the parent first, `by_role(parent, :row, name: "x")`. For buttons and links, `import Fluffy.Locator.Roles` and write `button("Save")` and `link("Home")` for `by_role(:button, name: "Save")` and `by_role(:link, name: "Home")`; scope with `by_role(parent, :link, name: "Home")`.
 - Hidden inputs fail `visible`, a plain facade `assert_has` and role locators. Assert them without visibility: `assert(value(by_css("#token"), "x"))`, `assert(count(by_css("#token"), 1))`. For a checkbox hidden behind its label, `set_checked` the label.
-- The app's `DataCase`/`ConnCase` owns the Ecto sandbox (`Sandbox.start_owner!`) before the session starts; a plain `Sandbox.checkout` doesn't work for browser tests. An app's own LiveView sandbox hook passes `Fluffy.Sandbox` to `Phoenix.Ecto.SQL.Sandbox.allow/2`, not `Ecto.Adapters.SQL.Sandbox`, so the test waits for its LiveViews to exit.
+- The app's `DataCase`/`ConnCase` owns the Ecto sandbox (`Sandbox.start_owner!`) before the session starts; a plain `Sandbox.checkout` doesn't work for browser tests. An app's own LiveView sandbox hook passes `Fluffy.Sandbox` to `Phoenix.Ecto.SQL.Sandbox.allow/2`, not `Ecto.Adapters.SQL.Sandbox`, so a session Fluffy started waits for its LiveViews to exit.
 
 ## Fluffy's own API
 

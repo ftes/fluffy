@@ -456,8 +456,14 @@ ownership rules need application state. Pass `Fluffy.Sandbox` there, as
 `Phoenix.Ecto.SQL.Sandbox.allow(metadata, Fluffy.Sandbox)`, not `Ecto.Adapters.SQL.Sandbox`:
 otherwise the test doesn't wait for its LiveViews to exit, and their late database work, in
 `terminate/2` or a `pagehide` push, logs ownership errors. A hook built on Phoenix Ecto's
-example also calls it on the static render; that's fine, only LiveView processes are waited for. `Fluffy.Sandbox` grants the configured `:sandbox`, so a hook
-that passed its own allowance module moves it to `sandbox:` above.
+example also calls it on the static render; that's fine, only LiveView processes are waited for.
+
+The wait needs a session Fluffy started: `start_session(:playwright)`, or the PhoenixTest
+facade's, waits for those LiveViews to exit when the session closes. A suite that drives the
+browser with playwright_ex on its own registers them, but nothing waits for them.
+
+`Fluffy.Sandbox` grants the configured `:sandbox`, so a hook that passed its own allowance
+module moves it to `sandbox:` above.
 
 ## Upload limits
 
