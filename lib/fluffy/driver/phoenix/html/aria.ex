@@ -150,7 +150,8 @@ defmodule Fluffy.Driver.Phoenix.HTML.Aria do
                        summary table tbody td textarea tfoot th thead tr ul xmp
                      )
 
-  @context %{target: nil, labelled_by: nil, described_by: nil, label: nil, native: nil}
+  # `include_hidden` is a role locator's, and lasts the whole computation.
+  @context %{target: nil, labelled_by: nil, described_by: nil, label: nil, native: nil, include_hidden: false}
 
   # The elements `DocumentIndex.entries` holds: LazyHTML.query/2 finds no HTML template
   # content, and this leaves out the rest of what the index marks inert.
@@ -216,25 +217,27 @@ defmodule Fluffy.Driver.Phoenix.HTML.Aria do
     end
   end
 
-  # roleUtils.ts getElementAccessibleNameText.
-  def name(%__MODULE__{} = aria, node) do
+  # roleUtils.ts getElementAccessibleNameText. `include_hidden?` also names from hidden
+  # content, as for a role locator's `include_hidden:`.
+  def name(%__MODULE__{} = aria, node, include_hidden? \\ false) do
     if (role(aria, node) || "") in @naming_prohibited_roles do
       ""
     else
-      {text, _visited} = text_alternative(aria, node, %{@context | target: :self}, MapSet.new())
+      context = %{@context | target: :self, include_hidden: include_hidden?}
+      {text, _visited} = text_alternative(aria, node, context, MapSet.new())
       as_flat_string(text)
     end
   end
 
-  # roleUtils.ts getElementAccessibleDescription.
-  def description(%__MODULE__{} = aria, node) do
+  # roleUtils.ts getElementAccessibleDescription, `include_hidden?` as for `name/3`.
+  def description(%__MODULE__{} = aria, node, include_hidden? \\ false) do
     cond do
       attribute?(node, "aria-describedby") ->
         aria
         |> references(node, "aria-describedby")
         |> Enum.map_join(" ", fn id ->
           reference = fetch(aria, id)
-          context = %{@context | described_by: visibility(aria, reference)}
+          context = %{@context | described_by: visibility(aria, reference), include_hidden: include_hidden?}
           {text, _visited} = text_alternative(aria, reference, context, MapSet.new())
           text
         end)
@@ -522,17 +525,122 @@ defmodule Fluffy.Driver.Phoenix.HTML.Aria do
   end
 
   @aria_checked_roles ~w(checkbox menuitemcheckbox option radio switch menuitemradio treeitem)
+  @aria_selected_roles ~w(gridcell option row tab rowheader columnheader treeitem)
+  @aria_pressed_roles ~w(button)
+  @aria_expanded_roles ~w(
+    application button checkbox combobox gridcell link listbox menuitem row rowheader tab treeitem
+    columnheader menuitemcheckbox menuitemradio switch
+  )
+  @aria_level_roles ~w(heading listitem row treeitem)
 
-  # roleUtils.ts getCheckedWithoutMixed, given the input's checkedness. The mixed
-  # variant stays browser-only: an input's indeterminate is a property only
-  # JavaScript sets.
+  # The roles roleSelectorEngine.ts accepts a role locator's state option for, or nil
+  # for an option every role takes.
+  def option_roles(:checked), do: @aria_checked_roles
+  def option_roles(:selected), do: @aria_selected_roles
+  def option_roles(:pressed), do: @aria_pressed_roles
+  def option_roles(:expanded), do: @aria_expanded_roles
+  def option_roles(:level), do: @aria_level_roles
+  def option_roles(_option), do: nil
+
+  # roleUtils.ts getCheckedWithoutMixed, given the input's checkedness.
   def checked(%__MODULE__{} = aria, node, input_checked?) do
+    case checked_state(aria, node, input_checked?) do
+      :mixed -> false
+      checked -> checked
+    end
+  end
+
+  # roleUtils.ts getAriaChecked, given the input's checkedness. Only aria-checked can be
+  # mixed here: an input's indeterminate is a property only JavaScript sets.
+  def aria_checked(%__MODULE__{} = aria, node, input_checked?) do
+    case checked_state(aria, node, input_checked?) do
+      :error -> false
+      checked -> checked
+    end
+  end
+
+  defp checked_state(aria, node, input_checked?) do
     node = fetch(aria, node.id)
 
     cond do
-      node.tag == "input" and Semantics.input_type(node) in ["checkbox", "radio"] -> input_checked?
-      role(aria, node) in @aria_checked_roles -> String.downcase(text_attribute(node, "aria-checked")) == "true"
-      true -> :error
+      node.tag == "input" and Semantics.input_type(node) in ["checkbox", "radio"] ->
+        input_checked?
+
+      role(aria, node) in @aria_checked_roles ->
+        case String.downcase(text_attribute(node, "aria-checked")) do
+          "true" -> true
+          "mixed" -> :mixed
+          _other -> false
+        end
+
+      true ->
+        :error
+    end
+  end
+
+  # roleUtils.ts getAriaSelected, given an option's selectedness.
+  def selected(%__MODULE__{} = aria, node, option_selected?) do
+    node = fetch(aria, node.id)
+
+    cond do
+      # An option outside a select, as in a datalist, keeps the selectedness its attribute gives it.
+      node.tag == "option" and closest(aria, parent(aria, node), &(&1.tag == "select")) == nil ->
+        attribute?(node, "selected")
+
+      node.tag == "option" ->
+        option_selected?
+
+      role(aria, node) in @aria_selected_roles ->
+        String.downcase(text_attribute(node, "aria-selected")) == "true"
+
+      true ->
+        false
+    end
+  end
+
+  # roleUtils.ts getAriaPressed.
+  def pressed(%__MODULE__{} = aria, node) do
+    node = fetch(aria, node.id)
+
+    if role(aria, node) in @aria_pressed_roles do
+      case String.downcase(text_attribute(node, "aria-pressed")) do
+        "true" -> true
+        "mixed" -> :mixed
+        _other -> false
+      end
+    else
+      false
+    end
+  end
+
+  # roleUtils.ts getAriaExpanded: nil without the state. A `details` element's `open`
+  # is its attribute, which a Phoenix test cannot toggle.
+  def expanded(%__MODULE__{} = aria, node) do
+    node = fetch(aria, node.id)
+
+    cond do
+      node.tag == "details" -> attribute?(node, "open")
+      role(aria, node) not in @aria_expanded_roles -> nil
+      attribute?(node, "aria-expanded") -> String.downcase(attribute(node, "aria-expanded")) == "true"
+      true -> nil
+    end
+  end
+
+  # roleUtils.ts getAriaLevel: 0 without a level.
+  def level(%__MODULE__{} = aria, node) do
+    node = fetch(aria, node.id)
+
+    case node.tag do
+      <<"h", digit>> when digit in ?1..?6 ->
+        digit - ?0
+
+      _other ->
+        with true <- role(aria, node) in @aria_level_roles,
+             {level, ""} when level >= 1 <- node |> text_attribute("aria-level") |> String.trim() |> Integer.parse() do
+          level
+        else
+          _no_level -> 0
+        end
     end
   end
 
@@ -737,7 +845,9 @@ defmodule Fluffy.Driver.Phoenix.HTML.Aria do
       MapSet.member?(visited, node.id) ->
         {"", visited}
 
-      ignored?(node) or (hidden?(aria, node) and not hidden_reference?(context)) ->
+      # An inert node is no element in a browser, hidden or not.
+      node.inert? or
+          (not context.include_hidden and (ignored?(node) or (hidden?(aria, node) and not hidden_reference?(context)))) ->
         {"", MapSet.put(visited, node.id)}
 
       true ->
@@ -756,7 +866,7 @@ defmodule Fluffy.Driver.Phoenix.HTML.Aria do
         {"", visited}
       else
         {parts, visited} =
-          alternatives(aria, references, &%{@context | labelled_by: visibility(aria, &1)}, visited)
+          alternatives(aria, references, &%{reference_context(context) | labelled_by: visibility(aria, &1)}, visited)
 
         {Enum.join(parts, " "), visited}
       end
@@ -878,23 +988,23 @@ defmodule Fluffy.Driver.Phoenix.HTML.Aria do
       type when type in ["button", "submit", "reset"] -> {button_value(node, type), visited}
       "file" -> labels_or(aria, node, context, "Choose File", visited)
       "image" -> labels_or(aria, node, context, non_blank_attribute(node, ["alt", "title"]) || "Submit", visited)
-      _text_like -> control_name(aria, node, references, visited)
+      _text_like -> control_name(aria, node, references, context, visited)
     end
   end
 
-  defp native_name(aria, %{tag: tag} = node, [], _context, visited)
+  defp native_name(aria, %{tag: tag} = node, [], context, visited)
        when tag in ["textarea", "select", "meter", "progress"] do
-    control_name(aria, node, [], visited)
+    control_name(aria, node, [], context, visited)
   end
 
-  defp native_name(aria, %{tag: "button"} = node, [], _context, visited) do
-    if labels(aria, node) != [], do: labels_name(aria, node, visited)
+  defp native_name(aria, %{tag: "button"} = node, [], context, visited) do
+    if labels(aria, node) != [], do: labels_name(aria, node, context, visited)
   end
 
-  defp native_name(aria, %{tag: "output"} = node, [], _context, visited) do
+  defp native_name(aria, %{tag: "output"} = node, [], context, visited) do
     if labels(aria, node) == [],
       do: {text_attribute(node, "title"), visited},
-      else: labels_name(aria, node, visited)
+      else: labels_name(aria, node, context, visited)
   end
 
   defp native_name(aria, %{tag: "fieldset"} = node, [], context, visited) do
@@ -934,17 +1044,17 @@ defmodule Fluffy.Driver.Phoenix.HTML.Aria do
 
   defp labels_or(aria, node, context, fallback, visited) do
     if labels(aria, node) != [] and context.labelled_by == nil,
-      do: labels_name(aria, node, visited),
+      do: labels_name(aria, node, context, visited),
       else: {fallback, visited}
   end
 
-  defp control_name(_aria, _node, [_reference | _references], _visited), do: nil
+  defp control_name(_aria, _node, [_reference | _references], _context, _visited), do: nil
 
-  defp control_name(aria, node, [], visited) do
+  defp control_name(aria, node, [], context, visited) do
     if labels(aria, node) == [] do
       {placeholder_or_title(node), visited}
     else
-      labels_name(aria, node, visited)
+      labels_name(aria, node, context, visited)
     end
   end
 
@@ -967,10 +1077,15 @@ defmodule Fluffy.Driver.Phoenix.HTML.Aria do
   # A labelable element's `labels`, in document order.
   defp labels(aria, node), do: Map.get(aria.labels, node.id, [])
 
-  defp labels_name(aria, node, visited) do
-    {parts, visited} = alternatives(aria, labels(aria, node), &%{@context | label: visibility(aria, &1)}, visited)
+  defp labels_name(aria, node, context, visited) do
+    {parts, visited} =
+      alternatives(aria, labels(aria, node), &%{reference_context(context) | label: visibility(aria, &1)}, visited)
+
     {parts |> Enum.reject(&(&1 == "")) |> Enum.join(" "), visited}
   end
+
+  # A reference or label starts its own traversal, as roleUtils.ts does with its options.
+  defp reference_context(context), do: %{@context | include_hidden: context.include_hidden}
 
   defp caption_or_title(aria, node, tag, context, visited) do
     case first_child(aria, node, tag) do

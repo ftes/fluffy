@@ -62,18 +62,6 @@ defmodule Fluffy.Driver.Phoenix.Validation do
         driver: driver,
         detail: "frame traversal is not supported by Static and LiveView"
     end
-
-    case Locator.Internal.playwright_option(locator) do
-      nil ->
-        :ok
-
-      {key, _value} ->
-        raise CapabilityError,
-          capability: :playwright_locator_options,
-          operation: operation,
-          driver: driver,
-          detail: "#{inspect(key)} is a Playwright locator option"
-    end
   end
 
   defp validate_argument!(_driver, _operation, _argument), do: :ok

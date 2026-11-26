@@ -41,14 +41,19 @@ captions, then content for the roles Playwright names from content, then
 of a comma-separated list. It is one per suite, as in Playwright: each pooled browser gets it as
 it starts.
 Explicit ARIA roles override implicit roles. See `Fluffy.Locator.by_role/2` for the
-implicit roles the Phoenix backend knows. Phoenix computes these from markup, so
-computed CSS and live input state are Playwright only. CSS must be valid browser
-CSS; escape special characters in IDs or use a semantic/test-id locator.
+implicit roles the Phoenix backend knows. Phoenix computes roles and names from
+markup, so names ignore computed CSS and control values changed since rendering.
+CSS must be valid browser CSS; escape special characters in IDs or use a
+semantic/test-id locator.
 
-Options marked *Playwright only.* in `Fluffy.Locator`, such as
-`by_role(:button, pressed: true)` or `by_role(:heading, level: 2)`, compile into
-the browser's selector. Static and LiveView sessions raise `Fluffy.CapabilityError`
-when they resolve such a locator.
+Role state options, such as `by_role(:option, name: "Elder", selected: true)`,
+`by_role(:button, pressed: true)` or `by_role(:heading, level: 2)`, work on every
+driver. Static and LiveView read `checked:` and `selected:` from the controls' current
+state, as `check` and `select_option` leave it, and the other states from markup;
+`include_hidden:` uses their structural visibility. An input's `indeterminate`
+property, which only JavaScript sets, is mixed on Playwright only; `aria-checked="mixed"`
+is mixed on every driver. As in Playwright, a state option the role lacks, such as
+`by_role(:link, pressed: true)`, raises when the locator resolves.
 
 `name:`, `has_text:` and `has_not_text:` also take a regular expression, as in
 Playwright: `name:` tests it against the normalized accessible name, and the text
@@ -93,8 +98,8 @@ third_cells = by_css("td") |> nth(2) |> within(by_css("tr"))
 ```
 
 CSS `:checked` matches current checkbox, radio, and option state, including
-changes made by `check`, `uncheck`, and `select_option`. For example,
-`by_label("House") |> by_css("option:checked")` locates the current selection.
+changes made by `check`, `uncheck`, and `select_option`, but for the current selection
+prefer `by_label("House") |> by_role(:option, selected: true)`.
 Attribute selectors such as `[checked]` and `[selected]` still match the
 rendered HTML attributes, which can differ from the user's input.
 

@@ -45,14 +45,7 @@ defmodule Fluffy.Capability do
         live: :structural_subset
       },
       detail:
-        "Static and LiveView port Playwright's role, accessible-name and description computation to markup, for role locators, `to_have_role`, `to_have_accessible_name` and `to_have_accessible_description`. They do not interpret CSS-generated content or computed visibility."
-    },
-    %{
-      id: :playwright_locator_options,
-      feature: "Role-state locator options",
-      drivers: %{static: :browser_only, live: :browser_only},
-      detail:
-        "Options such as `pressed:` and `level:` compile into the Playwright selector. Static and LiveView raise when they resolve such a locator."
+        "Static and LiveView port Playwright's role, accessible-name and description computation to markup, for role locators and all their options, `to_have_role`, `to_have_accessible_name` and `to_have_accessible_description`. `checked:` and `selected:` read the controls' current state, and `include_hidden:` structural visibility. They do not interpret CSS-generated content, computed visibility or an input's JavaScript `indeterminate` property."
     },
     %{
       id: :playwright_action_options,

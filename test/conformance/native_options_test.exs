@@ -36,9 +36,9 @@ defmodule Fluffy.Conformance.NativeOptionsTest do
       end
 
       accepted = locator |> locator_schema() |> Map.fetch!(:schema) |> Keyword.keys()
-      supported = Keyword.get(classes, :fluffy, []) ++ Keyword.get(classes, :playwright, [])
 
-      assert supported -- accepted == [], "#{inspect(locator)} must accept its Fluffy-owned and Playwright options"
+      assert Keyword.get(classes, :fluffy, []) -- accepted == [],
+             "#{inspect(locator)} must accept its Fluffy-owned options"
 
       assert Enum.filter(Keyword.get(classes, :denied, []), &(&1 in accepted)) == [],
              "#{inspect(locator)} accepts a denied option"

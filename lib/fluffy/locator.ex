@@ -7,12 +7,12 @@ defmodule Fluffy.Locator do
       |> filter(has_text: "Polyjuice Potion")
       |> by_role(:button, name: "Inspect")
 
-  Options marked *Playwright only.* compile into the browser selector. Static and
-  LiveView sessions raise `Fluffy.CapabilityError` when they resolve a locator that
-  uses one.
+  Every option works on every driver. Static and LiveView compute role states from
+  markup and the controls' current state, as `Fluffy.check/3` and
+  `Fluffy.select_option/4` leave it.
 
-  A regular expression in `name:`, `has_text:` or `has_not_text:` is a JavaScript
-  `RegExp` on every driver: a `Regex` becomes one with `Playwright.RegExp.new/1`,
+  A regular expression in `name:`, `description:`, `has_text:` or `has_not_text:` is a
+  JavaScript `RegExp` on every driver: a `Regex` becomes one with `Playwright.RegExp.new/1`,
   which raises `ArgumentError` on PCRE-only syntax, or pass a `Playwright.RegExp`.
 
   Role locators accept these options:
