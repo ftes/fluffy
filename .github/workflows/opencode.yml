@@ -86,10 +86,6 @@ jobs:
       - run: cp -R .github/opencode "$RUNNER_TEMP/fluffy-opencode"
       - id: auth
         uses: ./.github/actions/opencode
-        with:
-          # issue_comment uses the default branch ref even when the comment is on a PR.
-          client-id: ${{ (startsWith(github.ref, 'refs/pull/') && vars.OPENCODE_PR_CLIENT_ID) || (!startsWith(github.ref, 'refs/pull/') && vars.OPENCODE_REF_CLIENT_ID) || '' }}
-          client-variable: ${{ startsWith(github.ref, 'refs/pull/') && 'OPENCODE_PR_CLIENT_ID' || 'OPENCODE_REF_CLIENT_ID' }}
       - name: Switch to the authorized worktree
         env:
           IS_PR: ${{ needs.gate.outputs.pr }}

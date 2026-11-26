@@ -1,12 +1,5 @@
 name: Set up OpenCode
 description: Install the pinned OpenCode V2 CLI and exchange GitHub OIDC for model access.
-inputs:
-  client-id:
-    description: Public OpenCode OIDC client ID matching the job's GitHub subject
-    required: true
-  client-variable:
-    description: Name of the Actions variable, for a missing configuration error
-    required: true
 outputs:
   token:
     description: Short-lived OpenCode model token
@@ -17,11 +10,10 @@ runs:
     - name: Check the OIDC client selector
       shell: bash
       env:
-        CLIENT_ID: ${{ inputs.client-id }}
-        CLIENT_VARIABLE: ${{ inputs.client-variable }}
+        CLIENT_ID: ${{ vars.OPENCODE_CLIENT_ID }}
       run: |
         if [[ -z "$CLIENT_ID" ]]; then
-          echo "::error::Set the $CLIENT_VARIABLE repository Actions variable for this GitHub OIDC subject."
+          echo "::error::Set the OPENCODE_CLIENT_ID repository Actions variable."
           exit 1
         fi
     - shell: bash
@@ -29,4 +21,4 @@ runs:
     - id: auth
       uses: ftes/ci/opencode-auth@0e4b067199ea2f6a255a26ab43403f6f6acb5cb6 # v1.0.12
       with:
-        client-id: ${{ inputs.client-id }}
+        client-id: ${{ vars.OPENCODE_CLIENT_ID }}

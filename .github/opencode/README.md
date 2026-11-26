@@ -1,12 +1,9 @@
 # OpenCode workflows
 
-The jobs use OpenCode V2 `2.4.2` and `opencode-go/kimi-k3.1-pro`. Configure these
-repository Actions variables with the public OpenCode OAuth client IDs for
-`ftes/fluffy`:
-
-- `OPENCODE_PR_CLIENT_ID`: `repo:ftes/fluffy:pull_request`.
-- `OPENCODE_REF_CLIENT_ID`: the branch/tag subjects used by scheduled and manual
-  runs and by issue and issue-comment commands (normally `repo:ftes/fluffy:ref:refs/heads/main`).
+The jobs use OpenCode V2 `2.4.2` and `opencode-go/kimi-k3.1-pro`. Set the
+repository Actions variable `OPENCODE_CLIENT_ID` to the public OpenCode OAuth
+client ID for `ftes/fluffy`. The same client ID has been verified on both
+pull-request and branch-push runs.
 
 Install the [OpenCode GitHub App](https://github.com/apps/opencode-agent) on the
 repository. CI exchanges GitHub OIDC for model access and, only for publishing,
