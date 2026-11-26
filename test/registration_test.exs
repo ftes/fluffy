@@ -31,7 +31,7 @@ defmodule Fluffy.RegistrationNativeTest do
   test "runs a Phoenix session of its own setup", %{session: session} do
     session
     |> visit("/live/fluffy")
-    |> assert(visible(by_text("Guardian head count: 0")))
+    |> assert_has(by_text("Guardian head count: 0"))
 
     assert Fluffy.Session.current_driver(session) == :live
   end
@@ -40,7 +40,7 @@ defmodule Fluffy.RegistrationNativeTest do
   test "runs a Playwright session of its own setup", %{session: session} do
     session
     |> visit("/live/fluffy")
-    |> assert(visible(by_text("Guardian head count: 0")))
+    |> assert_has(by_text("Guardian head count: 0"))
 
     assert Fluffy.Session.current_driver(session) == :playwright
   end
@@ -103,7 +103,7 @@ defmodule Fluffy.RegistrationTemplateTest do
   test "starts a Playwright session in the template's setup", %{session: session} do
     session
     |> visit("/live/fluffy")
-    |> assert(visible(by_text("Guardian head count: 0")))
+    |> assert_has(by_text("Guardian head count: 0"))
 
     assert Fluffy.Session.current_driver(session) == :playwright
   end
@@ -132,7 +132,7 @@ defmodule Fluffy.RegistrationBrowserLeaseTest do
   test "takes no browser without a Playwright session", %{session: session} do
     session
     |> visit("/live/fluffy")
-    |> assert(visible(by_text("Guardian head count: 0")))
+    |> assert_has(by_text("Guardian head count: 0"))
 
     refute holds_lease?()
   end

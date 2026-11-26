@@ -19,7 +19,7 @@ defmodule FluffyConsumer.AdoptionTest do
       |> visit("/")
       |> assert(by_role(:heading, name: "Platform Nine and Three-Quarters") |> count(1))
       |> click(by_role(:link, name: "Board the Hogwarts Express"))
-      |> assert(by_text("Welcome to Hogwarts") |> visible())
+      |> assert_has(by_text("Welcome to Hogwarts"))
       |> assert(page_url("/hogwarts"))
     end
 
@@ -60,7 +60,7 @@ defmodule FluffyConsumer.AdoptionTest do
             "document.querySelector('h1').textContent = 'Mischief managed'"
           )
       end)
-      |> assert(by_text("Mischief managed") |> visible())
+      |> assert_has(by_text("Mischief managed"))
     end
   end
 end

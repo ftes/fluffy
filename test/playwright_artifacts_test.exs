@@ -211,7 +211,7 @@ defmodule Fluffy.PlaywrightArtifactsTest.AssertStepsTest do
     |> assert(
       pass(fn session ->
         assert(:letter, @letter)
-        assert(session, visible(by_text("Hedwig")), timeout: :once)
+        assert_has(session, by_text("Hedwig"), timeout: :once)
       end)
     )
     |> assert(poll(fn _session -> 1 end, &assert(&1 == 1)))
