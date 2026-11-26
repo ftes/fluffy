@@ -70,14 +70,14 @@ that doesn't change what a test observes. Even Phoenix checks structural
 visibility; see [Visibility and DOM presence](assertions.md#visibility-and-dom-presence)
 for the distinction from browser rendering and DOM absence.
 
-Phoenix locators do not model `<details>`, `<dialog>`, `popover` and dropdown
-`<select>` open state, which a Phoenix test has no way to change: a click on a
-`<summary>` doesn't toggle its `<details>` there, nor its `open` attribute. Content inside
-a closed `<details>`, `<dialog>` or `popover`, and the options of a closed
-`<select>`, count as visible on Phoenix, so a test can reach them without opening
-them; on Playwright they must be opened first. A `refute` on that
-content fails on Phoenix. Accessible names built from such content can differ
-the same way.
+Phoenix locators do not model `<details>`, `<dialog>` and `popover` open state, which
+a Phoenix test has no way to change: a click on a `<summary>` doesn't toggle its
+`<details>` there, nor its `open` attribute. Content inside a closed `<details>`,
+`<dialog>` or `popover` counts as visible on Phoenix, so a test can reach them without
+opening them; on Playwright they must be opened first. A `refute` on that content fails on
+Phoenix. Accessible names built from such content can differ the same way. A dropdown
+`<select>` is always closed, and its options are invisible on every driver
+([Selects and options](actions.md#selects-and-options)).
 
 Phoenix does not model `inert` either. On Playwright, actions wait while the
 target or an ancestor is `inert`; on Phoenix they act on it.

@@ -42,6 +42,37 @@ session
 
 Static and LiveView raise `Fluffy.CapabilityError` for indeterminate state.
 
+### Selects and options
+
+`select_option` targets the select, not an option, and matches an option by its value or
+label; `%{value: value}` and `%{label: label}` match only one of them. Assert the selection
+with the select's value, `value/2` (`values/2` for a multiple select), or with the selected
+option's label through a role locator:
+
+```elixir
+# <select id="house"> with <option value="ravenclaw">Ravenclaw</option> and three more
+house = by_label("House")
+
+session
+|> select_option(house, "Ravenclaw")
+|> assert(value(house, "ravenclaw"))
+|> assert(house |> by_role(:option, selected: true) |> text("Ravenclaw"))
+|> assert(count(by_css("#house option"), 4))
+```
+
+A dropdown, a select without `multiple` and with no `size` above 1, is closed, and a
+closed dropdown's options have no box in a browser, so they are invisible. Static and
+LiveView treat them the same. `visible`, `assert_has`, `filter(visible: true)` and the
+facade's `count:` and `at:` don't see them: a facade `assert_has("#house option", count: 4)`
+counts 0. Count them with `count/2`, which doesn't filter visibility, as above. Role
+locators still find them, as in Playwright, and the facade's
+`assert_has("#house", selected: "Ravenclaw")` checks the selection. A list box, a
+`multiple` select or one with a `size` above 1, shows its options.
+
+A `<datalist>` and its options are never rendered: fill its input with an option's value,
+and find the options with `count/2` or `by_role(:option, include_hidden: true)`, whose
+`selected:` follows their `selected` attribute.
+
 ### Actionability checks and waiting
 
 LiveView expectations observe fresh renders and retry until they pass or reach

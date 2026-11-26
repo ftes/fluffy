@@ -235,7 +235,10 @@ The facade preserves PhoenixTest vocabulary and conveniences:
   or absent elements satisfy `refute_has`. Static and LiveView check structural
   visibility, while Playwright checks rendered visibility. `count:` and one-based
   `at:` count visible matches only; field predicates without `at:` add no visibility
-  requirement. They retain familiar text and field predicates.
+  requirement. A closed dropdown's options are never visible, so
+  `assert_has("#house option", count: n)` on a dropdown counts 0 on every driver; see
+  [Selects and options](actions.md#selects-and-options). They retain familiar text and
+  field predicates.
 - `assert_path` remains a path assertion; use `query_params:` when the query
   is part of the assertion.
 

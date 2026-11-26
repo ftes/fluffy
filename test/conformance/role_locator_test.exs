@@ -388,6 +388,11 @@ defmodule Fluffy.Conformance.RoleLocatorTest do
     {"svg desc", ~s(<svg><desc id="t">Hi</desc></svg>), false},
     {"hr in a dropdown", ~s(<select><hr id="t"></select>), false},
     {"option of a list box", ~s(<select size="3"><option id="t">A</option></select>), true},
+    {"option of a multiple select", ~s(<select multiple><option id="t">A</option></select>), true},
+    {"option of a dropdown", ~s(<select><option id="t">A</option></select>), false},
+    {"option of a size 1 dropdown", ~s(<select size="1"><option id="t">A</option></select>), false},
+    {"option in a dropdown's optgroup", ~s(<select><optgroup label="A"><option id="t">A</option></optgroup></select>),
+     false},
     {"optgroup of a dropdown", ~s(<select><optgroup id="t" label="A"></optgroup></select>), false},
     {"optgroup of a list box", ~s(<select size="3"><optgroup id="t" label="A"><option>A</option></optgroup></select>),
      true}
@@ -400,9 +405,7 @@ defmodule Fluffy.Conformance.RoleLocatorTest do
         {"content of closed details", ~s(<details><summary>S</summary><p id="t">Hi</p></details>),
          %{static: true, playwright: false}},
         {"closed dialog", ~s(<dialog id="t">Hi</dialog>), %{static: true, playwright: false}},
-        {"closed popover", ~s(<div id="t" popover>Hi</div>), %{static: true, playwright: false}},
-        {"option of a closed dropdown", ~s(<select><option id="t">A</option></select>),
-         %{static: true, playwright: false}}
+        {"closed popover", ~s(<div id="t" popover>Hi</div>), %{static: true, playwright: false}}
       ]
 
   for {case_name, html, expected} <- visibility_cases, driver <- Drivers.html() do

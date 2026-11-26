@@ -31,6 +31,29 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
     end
 
     @tag driver: driver
+    test "a failed count: or at: says how many matches are hidden with #{driver}" do
+      session =
+        unquote(driver)
+        |> locators_session("selects")
+        |> assert_has("#house option", count: 0)
+        |> refute_has("#house option")
+        |> assert_has("#house", selected: "Ravenclaw")
+
+      error = assert_raise ExUnit.AssertionError, fn -> assert_has(session, "#house option", count: 3, timeout: 0) end
+      assert error.message =~ "\n(3 more matches are hidden; `count:` counts visible matches)"
+
+      error =
+        assert_raise ExUnit.AssertionError, fn ->
+          assert_has(session, "#house option", "Ravenclaw", at: 1, timeout: 0)
+        end
+
+      assert error.message =~ "\n(1 more match is hidden; `at:` counts visible matches)"
+
+      error = assert_raise ExUnit.AssertionError, fn -> assert_has(session, "#house", count: 2, timeout: 0) end
+      refute error.message =~ "hidden"
+    end
+
+    @tag driver: driver
     test "exact text with quotes, backticks and NBSP stays a valid selector with #{driver}" do
       unquote(driver)
       |> locators_session("quotes")
