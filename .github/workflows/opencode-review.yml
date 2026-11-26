@@ -38,6 +38,8 @@ jobs:
         run: cp -R .github/opencode "$RUNNER_TEMP/fluffy-opencode"
       - id: auth
         uses: ./.github/actions/opencode
+        with:
+          client-id: ${{ vars.OPENCODE_CLIENT_ID }}
       - name: Switch to the reviewed commit
         env:
           HEAD: ${{ github.event.pull_request.head.sha }}

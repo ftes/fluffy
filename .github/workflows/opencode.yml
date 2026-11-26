@@ -86,6 +86,8 @@ jobs:
       - run: cp -R .github/opencode "$RUNNER_TEMP/fluffy-opencode"
       - id: auth
         uses: ./.github/actions/opencode
+        with:
+          client-id: ${{ vars.OPENCODE_CLIENT_ID }}
       - name: Switch to the authorized worktree
         env:
           IS_PR: ${{ needs.gate.outputs.pr }}

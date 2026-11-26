@@ -1,0 +1,20 @@
+name: OpenCode auth smoke
+on:
+  pull_request:
+    types: [synchronize]
+permissions: {}
+jobs:
+  auth:
+    if: github.event.pull_request.number == 380 && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'opencode-agent-workflows'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/opencode
+        with:
+          client-id: ${{ vars.OPENCODE_CLIENT_ID }}

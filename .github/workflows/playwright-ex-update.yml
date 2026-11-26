@@ -117,6 +117,8 @@ jobs:
           fetch-depth: 0
       - id: auth
         uses: ./.github/actions/opencode
+        with:
+          client-id: ${{ vars.OPENCODE_CLIENT_ID }}
       - name: Set up toolchain and deps
         uses: ftes/ci/setup@0e4b067199ea2f6a255a26ab43403f6f6acb5cb6 # v1.0.12
       # For the current driver; the agent reinstalls the browser if the update changes it.
