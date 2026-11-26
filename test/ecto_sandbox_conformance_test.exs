@@ -151,6 +151,19 @@ defmodule Fluffy.EctoSandboxConformanceTest do
     end
   end
 
+  test "the test waits for the LiveView a hook allowed, not for the static render's request" do
+    :playwright
+    |> start_session(base_url: Server.base_url(), endpoint: Endpoint)
+    |> visit("/live/lumos-own-hook")
+    |> expect("Lumos" |> by_text() |> to_be_visible())
+
+    # The endpoint plug and the hook's static render allow the request process first.
+    {live_view, [_ | _] = requests} = allowed_until_live_view([])
+
+    assert Registry.keys(Fluffy.Sandbox.Registry, live_view) == [self()]
+    for request <- requests, do: assert(Registry.keys(Fluffy.Sandbox.Registry, request) == [])
+  end
+
   test "uses the configured sandbox transport and allowance adapter" do
     assert Fluffy.Sandbox.header() == "user-agent"
     assert Fluffy.Sandbox.connect_info() == :user_agent
@@ -170,6 +183,14 @@ defmodule Fluffy.EctoSandboxConformanceTest do
 
     first |> visit("/database") |> expect(value |> by_text() |> to_be_visible())
     second |> visit("/database") |> expect(value |> by_text() |> to_be_visible())
+  end
+
+  defp allowed_until_live_view(requests) do
+    assert_receive {:fluffy_test_sandbox_allow, Repo, child}
+
+    if Phoenix.LiveView.Debug.liveview_process?(child),
+      do: {child, requests},
+      else: allowed_until_live_view([child | requests])
   end
 
   defp browser_session do

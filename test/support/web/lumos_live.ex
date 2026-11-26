@@ -27,14 +27,15 @@ end
 defmodule Fluffy.Support.Web.OwnSandboxHook do
   @moduledoc false
 
-  # An application's own hook, passing `Fluffy.Sandbox` to Phoenix Ecto.
+  # An application's own hook, Phoenix Ecto's example passing `Fluffy.Sandbox`. The static
+  # render takes the endpoint plug's assign, so it allows the request process too.
   def on_mount(:default, _params, _session, socket) do
-    if Phoenix.LiveView.connected?(socket) do
-      socket
-      |> Phoenix.LiveView.get_connect_info(:user_agent)
-      |> Phoenix.Ecto.SQL.Sandbox.allow(Fluffy.Sandbox)
-    end
+    socket =
+      Phoenix.Component.assign_new(socket, :phoenix_ecto_sandbox, fn ->
+        if Phoenix.LiveView.connected?(socket), do: Phoenix.LiveView.get_connect_info(socket, :user_agent)
+      end)
 
+    Phoenix.Ecto.SQL.Sandbox.allow(socket.assigns.phoenix_ecto_sandbox, Fluffy.Sandbox)
     {:cont, socket}
   end
 end

@@ -116,7 +116,7 @@ Changes since 0.8.0.
 
 ### Fixed
 
-- Before the test's sandbox owner stops, Playwright sessions started in the test process wait up to 5 seconds for the LiveViews they connected to exit, so a LiveView whose `terminate/2` uses the database no longer logs ownership errors after the test. A custom LiveView sandbox hook gets this by passing `Fluffy.Sandbox` to `Phoenix.Ecto.SQL.Sandbox.allow/2`.
+- Before the test's sandbox owner stops, Playwright sessions started in the test process wait up to 5 seconds for the LiveViews they connected to exit, so a LiveView whose `terminate/2` uses the database no longer logs ownership errors after the test. A custom LiveView sandbox hook gets this by passing `Fluffy.Sandbox` to `Phoenix.Ecto.SQL.Sandbox.allow/2`, also on the static render: only LiveView processes are waited for ([Keeping your own LiveView hook](docs/installation.md#keeping-your-own-liveview-hook)).
 - On Phoenix, `to_have_value` and `to_be_empty` read `"on"` for a checkbox or radio without a `value` attribute, as browsers do, instead of `""`.
 - LiveView follows navigation as a browser does: a `push_navigate` or `redirect` from a connected mount, a redirect while Fluffy reads the view, an action on a view that navigated away, a patch partway through an action, and `phx-mounted={JS.patch(...)}` on a new view. Redirects count toward a 20-redirect limit, so a loop fails instead of hanging.
 - On Phoenix, a `phx-trigger-action` form is submitted as LiveView's client does, from mount or a pushed render.
