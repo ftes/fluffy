@@ -4,6 +4,7 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
+  import Fluffy.Locator.Roles, only: [heading: 2, heading: 3]
   import Fluffy.Playwright
 
   alias Fluffy.FrameLocator
@@ -56,6 +57,8 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
   @tag driver: :playwright
   test "existing actions, assertions, and submit resolve inside nested frames" do
     form = """
+    <h2>Gringotts</h2>
+    <h3>Gringotts</h3>
     <form onsubmit="event.preventDefault(); document.querySelector('#status').textContent = 'Submitted'">
       <label>Email<input name="email"></label>
       <label><input type="checkbox">Updates</label>
@@ -74,6 +77,8 @@ defmodule Fluffy.Conformance.FrameLocatorTest do
 
     session
     |> expect(to_have_count(by_role(:textbox), 0))
+    |> expect(inner |> heading("Gringotts") |> to_have_count(2))
+    |> expect(inner |> heading("Gringotts", level: 2) |> to_have_count(1))
     |> expect(to_have_count(FrameLocator.owner(outer), 1))
     |> fill(email, "griphook@gringotts.example")
     |> expect(to_have_value(email, "griphook@gringotts.example"))
