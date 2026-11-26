@@ -222,3 +222,23 @@ class PublishTest(unittest.TestCase):
             run.review(42, pr["head"]["sha"], "Review")
         token.assert_not_called()
         agent.assert_not_called()
+
+    def test_unchanged_diff_retires_legacy_block_only_if_latest_verdict_approves(self):
+        pr = self.pr()
+        legacy = {"id": 1, "state": "CHANGES_REQUESTED", "user": {"type": "Bot", "login": run.LEGACY_BOT},
+                  "body": "Verdict: Issues found: 1 blocking, 0 non-blocking."}
+        approval = {"id": 2, "state": "APPROVED", "user": {"login": run.BOT},
+                    "body": self.marker(self.pr(head="e" * 40))}
+        request = dict(approval, id=3, state="CHANGES_REQUESTED", body=self.marker(pr))
+        for newest in ([], [request]):
+            with (patch.object(run, "api", side_effect=[pr, [legacy, approval, *newest], pr]),
+                  patch.object(run, "snapshot_diff", return_value=("b" * 40, "current")),
+                  patch.object(run, "reviewed_diff", return_value="older"),
+                  patch.object(run, "patch_id", return_value="same"),
+                  patch.object(run, "app_token", return_value=contextlib.nullcontext("token")),
+                  patch.object(run, "dismiss_review") as dismiss):
+                run.reconcile_reviews(42)
+            if newest:
+                dismiss.assert_not_called()
+            else:
+                dismiss.assert_called_once_with(42, 1, "token", run.REPLACED_VERDICT)

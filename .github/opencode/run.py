@@ -321,6 +321,7 @@ def reconcile_reviews(number, token=None):
     stale = {}
     current_verdict = None
     current_patch = None
+    # GitHub lists reviews chronologically; the last verdict for this diff wins.
     for item in items:
         user = item["user"] or {}
         if item["state"] not in ("APPROVED", "CHANGES_REQUESTED") or user.get("login") != BOT:
@@ -335,6 +336,7 @@ def reconcile_reviews(number, token=None):
                     if current_patch is None:
                         current_patch = patch_id(snapshot_diff(pr)[1])
                     if patch_id(reviewed_diff(marker)) == current_patch:
+                        current_verdict = item["state"]
                         continue
                 except subprocess.CalledProcessError:
                     print("Could not verify unchanged diff for the previous review.")
