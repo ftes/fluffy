@@ -21,5 +21,5 @@ mix usage_rules.search_docs "search term" -p playwright
 ## Available Mix Tasks
 
 - `mix playwright.cli` - Runs the Playwright CLI (show-trace, install --with-deps, codegen, ...)
-- `mix playwright.install` - Installs the Playwright driver (Node + playwright-core) and browsers
+- `mix playwright.install` - Installs the Playwright driver and browsers
 <!-- usage-rules-skill-end -->
