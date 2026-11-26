@@ -183,6 +183,24 @@ session
 Predicates work with every driver and with negated assertions. Keep them quick
 and nonblocking.
 
+With `use Fluffy.Assert`, use `page_path` to match only the URI path, ignoring the
+origin, fragment, and (by default) query:
+
+```elixir
+session
+|> assert(page_path("/potions"))
+|> assert(page_path("/potions", params: %{state: "brewing", page: 2}))
+|> refute(page_path("/potions", params: &Map.has_key?(&1, "finished")))
+```
+
+A `params:` map matches a subset of the decoded query in any order. Flat atom or
+string keys and scalar values are converted with `to_string/1`. A predicate gets
+the decoded map with string keys and values (`%{}` for an absent or empty query).
+Decoding uses `URI.decode_query/1`, so the last value for a repeated key wins. Use
+`page_url` to match the full URL, inspect the raw query, or check repeated pairs.
+`page_path` uses the same timeout and negation as `page_url`, testing the path and
+parameters together on each attempt.
+
 Like Playwright, Fluffy has no page status assertion. On Playwright, assert on the
 navigation's response instead:
 

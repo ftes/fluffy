@@ -53,8 +53,8 @@ need `import Fluffy.Locator.Roles`):
 | `click_link("Potions")` | `click(link("Potions"))`, or `click(by_role(:link, name: "Potions"))` |
 | `refute_has("#notice")` | `refute_has(by_css("#notice"))` |
 | `assert_has("#notice", count: 0)` | `assert(count(by_css("#notice") \|> filter(visible: true), 0))` |
-| `assert_path("/potions")` | `assert(page_url(&(&1.path == "/potions")))` |
-| `assert_path("/potions", query_params: params)` | `assert(page_url("/potions?" <> URI.encode_query(params)))` when the query order is known, or a predicate |
+| `assert_path("/potions")` | `assert(page_path("/potions"))` |
+| `assert_path("/potions", query_params: params)` | `assert(page_path("/potions", params: params))` for a flat parameter subset |
 | `assert_has("title", text: "Potions", exact: true)` | `assert(page_title("Potions"))` |
 | `reload_page()` | `reload()` |
 | `upload("Recipe", path)` | `set_input_files(by_label("Recipe", exact: true), path)` |
@@ -80,9 +80,10 @@ When rewriting, preserve the original assertion's intent:
   `within`; see
   [Locators](locators.md#locators).
 - Native `page_title("Potions")` is an exact normalized match. Use a regex
-  for an intentional substring title assertion. Native URL strings match the
-  complete URL; use a predicate such as `page_url(&(&1.path == "/x"))` to retain path-only intent. See
-  [Page assertions](assertions.md#page-assertions).
+  for an intentional substring title assertion. `page_path` matches only the path
+  and optionally a subset of flat decoded query parameters. Use a `params:` predicate
+  for full decoded map equality, or `page_url` to check the full URL or raw query.
+  See [Page assertions](assertions.md#page-assertions).
 - The native API does not track an active form. Select a form explicitly for
   `submit`, or click the intended submitter. The facade continues to support
   active-form tracking.
