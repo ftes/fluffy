@@ -11,7 +11,7 @@ from urllib.parse import quote
 import run
 
 
-MENTION = re.compile(r"(?<![\w@/])(?:@(?:opencode|claude)|/(?:opencode|oc))(?![\w-])", re.I)
+AGENT_COMMAND = re.compile(r"(?<![\w@/])/agent(?![\w/-])", re.I)
 REQUEST_KEY = {
     "issue_comment": "comment",
     "pull_request_review_comment": "comment",
@@ -27,7 +27,7 @@ def authorize(event, event_name):
     author = request.get("user") or {}
     sender = event["sender"]
     message = "\n".join(request.get(key) or "" for key in ("title", "body"))
-    if (not MENTION.search(message) or request.get("author_association") not in run.MAINTAINERS
+    if (not AGENT_COMMAND.search(message) or request.get("author_association") not in run.MAINTAINERS
             or author.get("type") != "User" or sender["type"] != "User"):
         return None
     # Assignment may be done by someone other than the issue's author.

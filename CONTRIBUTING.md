@@ -57,6 +57,11 @@ human and agent reviews alike.
 - A PR fixes its issue. Edge cases and gaps that predate it are follow-ups: note them
   instead of adding code for them in the PR.
 
+## Asking the agent
+
+Maintainers can use `/agent` followed by a request in an issue, PR comment, or review.
+The command works on pull requests from this repository.
+
 ## Releasing
 
 Releases run from a checkout of [ftes/ci](https://github.com/ftes/ci), with `gh` logged in as a

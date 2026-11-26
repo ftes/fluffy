@@ -18,16 +18,11 @@ env:
 
 jobs:
   gate:
-    # The runner validates the exact mention, author, current permission and PR target.
+    # The runner validates the exact command, author, current permission and PR target.
     if: |
       contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association || github.event.review.author_association || github.event.issue.author_association) &&
-      (contains(github.event.comment.body || github.event.review.body || github.event.issue.body || '', '@opencode') ||
-        contains(github.event.comment.body || github.event.review.body || github.event.issue.body || '', '@claude') ||
-        contains(github.event.comment.body || github.event.review.body || github.event.issue.body || '', '/oc') ||
-        contains(github.event.comment.body || github.event.review.body || github.event.issue.body || '', '/opencode') ||
-        (github.event_name == 'issues' && (contains(github.event.issue.title, '@opencode') ||
-          contains(github.event.issue.title, '@claude') || contains(github.event.issue.title, '/oc') ||
-          contains(github.event.issue.title, '/opencode'))))
+      (contains(github.event.comment.body || github.event.review.body || github.event.issue.body || '', '/agent') ||
+        (github.event_name == 'issues' && contains(github.event.issue.title, '/agent')))
     runs-on: ${{ vars.RUNNER == 'github' && 'ubuntu-26.04' || 'ubicloud-standard-2-ubuntu-2604' }}
     timeout-minutes: 5
     permissions:
@@ -61,7 +56,8 @@ jobs:
       - env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ needs.gate.outputs.number }}
-        run: gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body 'OpenCode runs only on pull requests from this repository.'
+          BODY: "`/agent` runs only on pull requests from this repository."
+        run: gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "$BODY"
 
   command:
     needs: gate
