@@ -64,12 +64,26 @@ A dropdown, a select without `multiple` and with no `size` above 1, is closed, a
 closed dropdown's options have no box in a browser, so they are invisible. Static and
 LiveView treat them the same. `visible`, `assert_has`, `filter(visible: true)` and the
 facade's `count:` and `at:` don't see them: a facade `assert_has("#house option", count: 4)`
-counts 0. Native `count/2` and `attached/1` don't filter visibility. To check DOM
-presence or absence, scope a CSS locator to the select, for example
+counts 0. Native `count/2` and `attached/1` don't filter visibility.
+
+To check which choices a dropdown offers, scope the named options to the labeled select:
+
+```elixir
+house = by_label("House", exact: true)
+
+session
+|> assert(attached(by_role(house, :option, name: "Ravenclaw", exact: true)))
+|> refute(attached(by_role(house, :option, name: "Beauxbatons", exact: true)))
+```
+
+If these checks recur, you can wrap the locator and assertion in your app's test case
+template as `assert_option(session, select_label, option_name)` and `refute_option/3`.
+
+To check DOM presence or absence even when options are hidden from the accessibility tree,
+scope a CSS locator to the select, for example
 `option = by_css(house, "option[value=ravenclaw]")`. Use `assert(attached(option))` for
 presence or `assert(count(option, 1))` for exactly one match. Use `assert(count(option, 0))`
-for absence. A role locator still finds ordinary closed options, but excludes options
-hidden from the accessibility tree, such as `<option aria-hidden="true">`.
+for absence. A role locator excludes options such as `<option aria-hidden="true">`.
 
 In the facade, `assert_has("#house", value: "ravenclaw")` checks the current selection
 by its submitted value, and `assert_has("#house", selected: "Ravenclaw")` matches the
