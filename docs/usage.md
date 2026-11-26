@@ -32,6 +32,10 @@ defmodule MyAppWeb.CreatureTest do
 end
 ```
 
+`import Fluffy.Locator.Roles` adds the shorthands `button("Play flute")` and `link("Owlery")`
+for `by_role(:button, name: "Play flute")` and `by_role(:link, name: "Owlery")`
+([Button and link shorthands](locators.md#button-and-link-shorthands)).
+
 For tests using Playwright-only helpers, also `import Fluffy.Playwright`. This
 lets you call `new_page`, `current_page`, `pages`, `switch_page`, `close_page`,
 `go_back`, `go_forward`, `hover`, `drag_to`, `press_sequentially`, `dblclick`,

@@ -4,6 +4,7 @@ defmodule Fluffy.Conformance.ClickActionTest do
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
+  import Fluffy.Locator.Roles
 
   for driver <- Drivers.backends() do
     @tag driver: driver
@@ -244,6 +245,18 @@ defmodule Fluffy.Conformance.ClickActionTest do
       session
       |> visit("/actions/click")
       |> click(by_role(:link, name: "Enter the chamber"))
+      |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
+    end
+
+    @tag driver: driver
+    test "click takes the button and link shorthands with the #{driver} backend" do
+      unquote(driver)
+      |> start_session()
+      |> visit("/live/three-heads")
+      |> click(button("Play the flute"))
+      |> expect("Sleeping heads: 1" |> by_text() |> to_be_visible())
+      |> visit("/actions/click")
+      |> click(link("Enter the chamber"))
       |> expect("The guardian sleeps" |> by_text() |> to_be_visible())
     end
   end
