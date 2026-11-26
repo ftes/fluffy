@@ -115,17 +115,17 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
       - name: Set up toolchain and deps
-        uses: ftes/ci/setup@3b7244fd1eb84225fcf94fd3f7d6cad6bb40d5c4 # v1.0.11
+        uses: ftes/ci/setup@0e4b067199ea2f6a255a26ab43403f6f6acb5cb6 # v1.0.12
       # For the current driver; Claude reinstalls the browser if the update changes it.
       - name: Install Playwright browser
-        uses: ftes/ci/playwright-browser@3b7244fd1eb84225fcf94fd3f7d6cad6bb40d5c4 # v1.0.11
+        uses: ftes/ci/playwright-browser@0e4b067199ea2f6a255a26ab43403f6f6acb5cb6 # v1.0.12
       - name: Build test assets
         run: mix assets.build
       - name: Fetch Playwright source
         run: mix fluffy.playwright_source
       - run: git switch -c "$BRANCH"
       - name: Run Claude
-        uses: ftes/ci/claude@3b7244fd1eb84225fcf94fd3f7d6cad6bb40d5c4 # v1.0.11
+        uses: ftes/ci/claude@0e4b067199ea2f6a255a26ab43403f6f6acb5cb6 # v1.0.12
         with:
           token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
