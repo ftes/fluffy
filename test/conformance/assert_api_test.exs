@@ -246,7 +246,7 @@ defmodule Fluffy.Conformance.AssertAPITest do
       |> assert_has(by_text("Status: ready"), timeout: 1_000)
       |> assert(page_url("/live/async?delay=40"))
       |> click(by_role(:button, name: "Appeared"))
-      |> assert(visible(by_text("Activated")))
+      |> assert_has(by_text("Activated"))
     end
   end
 
