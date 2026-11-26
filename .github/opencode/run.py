@@ -357,7 +357,13 @@ def review(number, head, prompt):
             api(f"pulls/{number}/reviews", token=token, payload={
                 "commit_id": head, "event": event, "body": review_body, "comments": findings,
             })
-        if api(f"pulls/{number}")["head"]["sha"] != head:
+        latest = api(f"pulls/{number}")
+        if latest["head"]["sha"] != head:
+            if event == "APPROVE" and latest["state"] == "open":
+                api(f"pulls/{number}/reviews", token=token, payload={
+                    "commit_id": latest["head"]["sha"], "event": "REQUEST_CHANGES",
+                    "body": "Verdict: the head moved during the review.",
+                })
             print("PR head moved during review; omitting summary marker.")
             return
         note = "\n\nNo approval or change request was submitted on the app's own PR." if own_pr else ""
@@ -365,12 +371,13 @@ def review(number, head, prompt):
         api(f"issues/{number}/comments", token=token, payload={"body": comment})
 
 
-def open_nightly(number, branch=None, head=None):
+def open_nightly(number, branch=None, head=None, *, max_commits=None):
     pr = api(f"pulls/{number}")
     if not (local_pr(pr) and pr["state"] == "open"
             and pr["head"]["ref"].startswith(("claude/nightly-", "opencode/nightly-"))
             and (branch is None or branch == pr["head"]["ref"])
-            and (head is None or head == pr["head"]["sha"])):
+            and (head is None or head == pr["head"]["sha"])
+            and (max_commits is None or pr["commits"] < max_commits)):
         return False
     # A human taking over during the run keeps this PR out of automatic changes.
     return all(
@@ -497,7 +504,8 @@ def command(number, branch, prompt, is_pr):
 
 def fix(number, branch, prompt):
     head = git("rev-parse", "HEAD")
-    if not open_nightly(number, branch, head):
+    max_commits = int(os.environ["MAX_COMMITS"])
+    if not open_nightly(number, branch, head, max_commits=max_commits):
         return
     context(number)
     pr_diff(number)
@@ -531,7 +539,7 @@ def fix(number, branch, prompt):
         commit(message, head)
     elif action == "retry":
         commit("Re-run CI", head, empty=True)
-    if not open_nightly(number, branch, head):
+    if not open_nightly(number, branch, head, max_commits=max_commits):
         return
     if action in ("fix", "retry", "close"):
         with app_token() as token:

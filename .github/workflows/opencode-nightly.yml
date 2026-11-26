@@ -15,6 +15,7 @@ permissions: {}
 
 env:
   MIX_ENV: test
+  MAX_COMMITS: 3
 
 jobs:
   # Frees slots before the cap is counted. A job, not an earlier cron: GitHub delays scheduled
@@ -83,7 +84,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          MAX_COMMITS: 3
           # Triage's PRs to redo on current main; none if it failed.
           REDO: ${{ needs.triage.outputs.redo || '[]' }}
         # GitHub computes mergeability on the first read after main moves, answering UNKNOWN until
