@@ -11,10 +11,16 @@ defmodule Fluffy.Locator do
   markup and the controls' current state, as `Fluffy.check/3` and
   `Fluffy.select_option/4` leave it.
 
-  A regular expression used as a role name or in `description:`, `has_text:` or
-  `has_not_text:` is a JavaScript `RegExp` on every driver: a `Regex` becomes one with
-  `Playwright.RegExp.new/1`, which raises `ArgumentError` on PCRE-only syntax, or pass
-  a `Playwright.RegExp`.
+  `by_text/2`, `by_label/2`, `by_placeholder/2`, `by_alt_text/2`, `by_title/2`,
+  and `by_test_id/1` take strings and regular expressions, including when scoped.
+  A regular expression ignores `exact:` and matches the raw text, label, or
+  attribute value. Regexes in `by_role/2` match the normalized accessible name or
+  description. `filter/2` also accepts regexes in `has_text:` and `has_not_text:`.
+
+  On every driver, `~r/…/` becomes a JavaScript regex with `Playwright.RegExp.new/1`,
+  which raises `ArgumentError` on PCRE-only syntax. You can also pass a
+  `Playwright.RegExp` directly. Static and LiveView match with Elixir's regex engine
+  and require a pattern it can run (see `Playwright.RegExp`).
 
   Role locators accept these options:
 
@@ -30,6 +36,9 @@ defmodule Fluffy.Locator do
   """
   @moduledoc groups: ["Constructors", "Refinement", "Frames"]
 
+  import Fluffy.Expect.Internal, only: [reg_exp: 1]
+  import Fluffy.Options, only: [is_text: 1]
+
   alias Fluffy.FrameLocator
   alias Fluffy.Locator.Internal
   alias Fluffy.Options
@@ -39,14 +48,13 @@ defmodule Fluffy.Locator do
 
   @type t :: %__MODULE__{operations: [term()]}
   @type scope :: t() | FrameLocator.t()
+  @type text :: String.t() | Regex.t() | Playwright.RegExp.t()
   @type role_option :: unquote(NimbleOptions.option_typespec(Options.role_locator_schema()))
   @type exact_option :: unquote(NimbleOptions.option_typespec(Options.exact_locator_schema()))
   @type filter_option :: unquote(NimbleOptions.option_typespec(Options.filter_locator_schema()))
 
   @typedoc "An accessible name, as accepted by the `name:` role option."
-  @type role_name :: String.t() | Regex.t() | Playwright.RegExp.t()
-
-  defguardp is_role_name(name) when is_binary(name) or is_struct(name, Regex) or is_struct(name, Playwright.RegExp)
+  @type role_name :: text()
 
   @doc group: "Constructors"
   @doc """
@@ -80,7 +88,7 @@ defmodule Fluffy.Locator do
     Internal.new({:role, role, Options.validate_role_locator!(options)})
   end
 
-  def by_role(role, name) when is_atom(role) and is_role_name(name), do: by_role(role, name: name)
+  def by_role(role, name) when is_atom(role) and is_text(name), do: by_role(role, name: name)
 
   def by_role(parent, role) when is_struct(parent, __MODULE__) or is_struct(parent, FrameLocator) do
     by_role(parent, role, [])
@@ -91,7 +99,7 @@ defmodule Fluffy.Locator do
   @spec by_role(atom(), role_name(), [role_option()]) :: t()
   @spec by_role(scope(), atom(), [role_option()]) :: t()
   @spec by_role(scope(), atom(), role_name()) :: t()
-  def by_role(role, name, options) when is_atom(role) and is_role_name(name) and is_list(options),
+  def by_role(role, name, options) when is_atom(role) and is_text(name) and is_list(options),
     do: by_role(role, named_role_options!(name, options))
 
   def by_role(parent, role, options)
@@ -100,14 +108,14 @@ defmodule Fluffy.Locator do
   end
 
   def by_role(parent, role, name)
-      when (is_struct(parent, __MODULE__) or is_struct(parent, FrameLocator)) and is_atom(role) and is_role_name(name),
+      when (is_struct(parent, __MODULE__) or is_struct(parent, FrameLocator)) and is_atom(role) and is_text(name),
       do: by_role(parent, role, name: name)
 
   @doc group: "Constructors"
   @doc "Matches by role and positional name, with options, inside a locator or frame scope."
   @spec by_role(scope(), atom(), role_name(), [role_option()]) :: t()
   def by_role(parent, role, name, options)
-      when (is_struct(parent, __MODULE__) or is_struct(parent, FrameLocator)) and is_atom(role) and is_role_name(name) and
+      when (is_struct(parent, __MODULE__) or is_struct(parent, FrameLocator)) and is_atom(role) and is_text(name) and
              is_list(options), do: by_role(parent, role, named_role_options!(name, options))
 
   defp named_role_options!(name, options) do
@@ -124,13 +132,13 @@ defmodule Fluffy.Locator do
 
   Pass a locator or frame scope first to match inside it; `by_text/3` also takes options.
   """
-  @spec by_text(String.t(), [exact_option()]) :: t()
-  @spec by_text(scope(), String.t()) :: t()
-  @spec by_text(scope(), String.t(), [exact_option()]) :: t()
+  @spec by_text(text(), [exact_option()]) :: t()
+  @spec by_text(scope(), text()) :: t()
+  @spec by_text(scope(), text(), [exact_option()]) :: t()
   def by_text(text, options \\ [])
 
-  def by_text(text, options) when is_binary(text) and is_list(options) do
-    Internal.new({:text, text, Options.validate_exact_locator!(options)})
+  def by_text(text, options) when is_text(text) and is_list(options) do
+    Internal.new({:text, reg_exp(text), Options.validate_exact_locator!(options)})
   end
 
   def by_text(parent, text) when is_struct(parent, __MODULE__) or is_struct(parent, FrameLocator) do
@@ -139,8 +147,8 @@ defmodule Fluffy.Locator do
 
   @doc group: "Constructors"
   @doc "Like `by_text/2`, inside `parent`, a locator or frame scope, with options."
-  def by_text(parent, text, options) when is_binary(text) and is_list(options) do
-    child_query(parent, {:text, text, Options.validate_exact_locator!(options)})
+  def by_text(parent, text, options) when is_text(text) and is_list(options) do
+    child_query(parent, {:text, reg_exp(text), Options.validate_exact_locator!(options)})
   end
 
   @doc group: "Constructors"
@@ -149,13 +157,13 @@ defmodule Fluffy.Locator do
 
   Pass a locator or frame scope first to match inside it; `by_label/3` also takes options.
   """
-  @spec by_label(String.t(), [exact_option()]) :: t()
-  @spec by_label(scope(), String.t()) :: t()
-  @spec by_label(scope(), String.t(), [exact_option()]) :: t()
+  @spec by_label(text(), [exact_option()]) :: t()
+  @spec by_label(scope(), text()) :: t()
+  @spec by_label(scope(), text(), [exact_option()]) :: t()
   def by_label(text, options \\ [])
 
-  def by_label(text, options) when is_binary(text) and is_list(options) do
-    attribute_or_label_locator(:label, text, options)
+  def by_label(text, options) when is_text(text) and is_list(options) do
+    Internal.new({:label, reg_exp(text), Options.validate_exact_locator!(options)})
   end
 
   def by_label(parent, text) when is_struct(parent, __MODULE__) or is_struct(parent, FrameLocator) do
@@ -164,8 +172,8 @@ defmodule Fluffy.Locator do
 
   @doc group: "Constructors"
   @doc "Like `by_label/2`, inside `parent`, a locator or frame scope, with options."
-  def by_label(parent, text, options) when is_binary(text) and is_list(options) do
-    child_query(parent, {:label, text, Options.validate_exact_locator!(options)})
+  def by_label(parent, text, options) when is_text(text) and is_list(options) do
+    child_query(parent, {:label, reg_exp(text), Options.validate_exact_locator!(options)})
   end
 
   @doc group: "Constructors"
@@ -174,12 +182,12 @@ defmodule Fluffy.Locator do
 
   Pass a locator or frame scope first to match inside it; `by_placeholder/3` also takes options.
   """
-  @spec by_placeholder(String.t(), [exact_option()]) :: t()
-  @spec by_placeholder(scope(), String.t()) :: t()
-  @spec by_placeholder(scope(), String.t(), [exact_option()]) :: t()
+  @spec by_placeholder(text(), [exact_option()]) :: t()
+  @spec by_placeholder(scope(), text()) :: t()
+  @spec by_placeholder(scope(), text(), [exact_option()]) :: t()
   def by_placeholder(text, options \\ [])
 
-  def by_placeholder(text, options) when is_binary(text) and is_list(options) do
+  def by_placeholder(text, options) when is_text(text) and is_list(options) do
     attribute_locator("placeholder", text, options)
   end
 
@@ -189,7 +197,7 @@ defmodule Fluffy.Locator do
 
   @doc group: "Constructors"
   @doc "Like `by_placeholder/2`, inside `parent`, a locator or frame scope, with options."
-  def by_placeholder(parent, text, options) when is_binary(text) and is_list(options) do
+  def by_placeholder(parent, text, options) when is_text(text) and is_list(options) do
     append_attribute_locator(parent, "placeholder", text, options)
   end
 
@@ -199,12 +207,12 @@ defmodule Fluffy.Locator do
 
   Pass a locator or frame scope first to match inside it; `by_alt_text/3` also takes options.
   """
-  @spec by_alt_text(String.t(), [exact_option()]) :: t()
-  @spec by_alt_text(scope(), String.t()) :: t()
-  @spec by_alt_text(scope(), String.t(), [exact_option()]) :: t()
+  @spec by_alt_text(text(), [exact_option()]) :: t()
+  @spec by_alt_text(scope(), text()) :: t()
+  @spec by_alt_text(scope(), text(), [exact_option()]) :: t()
   def by_alt_text(text, options \\ [])
 
-  def by_alt_text(text, options) when is_binary(text) and is_list(options) do
+  def by_alt_text(text, options) when is_text(text) and is_list(options) do
     attribute_locator("alt", text, options)
   end
 
@@ -214,7 +222,7 @@ defmodule Fluffy.Locator do
 
   @doc group: "Constructors"
   @doc "Like `by_alt_text/2`, inside `parent`, a locator or frame scope, with options."
-  def by_alt_text(parent, text, options) when is_binary(text) and is_list(options) do
+  def by_alt_text(parent, text, options) when is_text(text) and is_list(options) do
     append_attribute_locator(parent, "alt", text, options)
   end
 
@@ -224,12 +232,12 @@ defmodule Fluffy.Locator do
 
   Pass a locator or frame scope first to match inside it; `by_title/3` also takes options.
   """
-  @spec by_title(String.t(), [exact_option()]) :: t()
-  @spec by_title(scope(), String.t()) :: t()
-  @spec by_title(scope(), String.t(), [exact_option()]) :: t()
+  @spec by_title(text(), [exact_option()]) :: t()
+  @spec by_title(scope(), text()) :: t()
+  @spec by_title(scope(), text(), [exact_option()]) :: t()
   def by_title(text, options \\ [])
 
-  def by_title(text, options) when is_binary(text) and is_list(options) do
+  def by_title(text, options) when is_text(text) and is_list(options) do
     attribute_locator("title", text, options)
   end
 
@@ -239,13 +247,14 @@ defmodule Fluffy.Locator do
 
   @doc group: "Constructors"
   @doc "Like `by_title/2`, inside `parent`, a locator or frame scope, with options."
-  def by_title(parent, text, options) when is_binary(text) and is_list(options) do
+  def by_title(parent, text, options) when is_text(text) and is_list(options) do
     append_attribute_locator(parent, "title", text, options)
   end
 
   @doc group: "Constructors"
   @doc """
-  Matches elements whose test id equals `test_id`, as Playwright's `getByTestId`.
+  Matches elements whose test id equals a string or matches a regular expression,
+  as Playwright's `getByTestId`.
 
   The attribute is Playwright Test's `testIdAttribute` on every driver,
   `config :playwright, :test, test_id_attribute: "data-owl"` (`data-testid` by default). For
@@ -256,20 +265,20 @@ defmodule Fluffy.Locator do
       by_test_id("hedwig")
       by_css("#owlery") |> by_test_id("hedwig")
   """
-  @spec by_test_id(String.t()) :: t()
-  def by_test_id(test_id) when is_binary(test_id), do: Internal.new({:test_id, test_id})
+  @spec by_test_id(text()) :: t()
+  def by_test_id(test_id) when is_text(test_id), do: Internal.new({:test_id, reg_exp(test_id)})
 
   @doc group: "Constructors"
   @doc "Like `by_test_id/1`, inside `parent`, a locator or frame scope."
-  @spec by_test_id(scope(), String.t()) :: t()
-  @spec by_test_id(String.t(), keyword()) :: t()
+  @spec by_test_id(scope(), text()) :: t()
+  @spec by_test_id(text(), keyword()) :: t()
   def by_test_id(parent, test_id)
-      when is_binary(test_id) and (is_struct(parent, __MODULE__) or is_struct(parent, FrameLocator)),
-      do: child_query(parent, {:test_id, test_id})
+      when is_text(test_id) and (is_struct(parent, __MODULE__) or is_struct(parent, FrameLocator)),
+      do: child_query(parent, {:test_id, reg_exp(test_id)})
 
-  def by_test_id(test_id, []) when is_binary(test_id), do: by_test_id(test_id)
+  def by_test_id(test_id, []) when is_text(test_id), do: by_test_id(test_id)
 
-  def by_test_id(test_id, options) when is_binary(test_id) and is_list(options) do
+  def by_test_id(test_id, options) when is_text(test_id) and is_list(options) do
     raise ArgumentError,
           "Fluffy.Locator.by_test_id/2: takes no options, as Playwright's getByTestId: set the attribute with " <>
             ~s{`config :playwright, :test, test_id_attribute: ...`, } <>
@@ -389,20 +398,16 @@ defmodule Fluffy.Locator do
   @spec within(t(), t()) :: t()
   def within(%__MODULE__{} = locator, %__MODULE__{} = other), do: Internal.new({:within, other, locator})
 
-  defp attribute_or_label_locator(:label, text, options) do
-    Internal.new({:label, text, Options.validate_exact_locator!(options)})
-  end
-
   defp attribute_locator(attribute, text, options) do
-    Internal.new({:attribute, attribute, text, Options.validate_exact_locator!(options)})
+    Internal.new(attribute_query(attribute, text, options))
   end
 
   defp append_attribute_locator(parent, attribute, text, options) do
-    child_query(
-      parent,
-      {:attribute, attribute, text, Options.validate_exact_locator!(options)}
-    )
+    child_query(parent, attribute_query(attribute, text, options))
   end
+
+  defp attribute_query(attribute, text, options),
+    do: {:attribute, attribute, reg_exp(text), Options.validate_exact_locator!(options)}
 end
 
 defimpl Inspect, for: Fluffy.Locator do

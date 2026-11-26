@@ -16,6 +16,8 @@ defmodule Fluffy.Expect do
   """
   @moduledoc groups: ["Running expectations", "Locator assertions", "Page assertions", "Polling and retrying", "Events"]
 
+  import Fluffy.Options, only: [is_text: 1]
+
   alias Fluffy.Expect
   alias Fluffy.Expect.Internal
   alias Fluffy.Locator
@@ -26,9 +28,6 @@ defmodule Fluffy.Expect do
   defstruct [:target, :kind, :expected, :description, options: [], negated?: false]
 
   @dialyzer {:nowarn_function, expect: 3}
-
-  # An Elixir `Regex` is converted to the `Playwright.RegExp` it stands for (`text_values!/2`).
-  defguardp is_text(value) when is_binary(value) or is_struct(value, Regex) or is_struct(value, Playwright.RegExp)
 
   @type target :: {:locator, Locator.t()} | :page
 
@@ -457,15 +456,16 @@ defmodule Fluffy.Expect do
 
   @doc group: "Locator assertions"
   @doc """
-  Expects the target's input value.
+  Expects the target's input value to equal a string or match a regular
+  expression (`~r/…/` or `Playwright.RegExp`). Matching uses the raw value.
 
   ## Options
 
   #{NimbleOptions.docs(Options.expectation_schema(:to_have_value))}
   """
-  @spec to_have_value(Locator.t(), String.t(), [to_have_value_option()]) :: t()
-  def to_have_value(%Locator{} = locator, expected, options \\ []) when is_binary(expected) do
-    native_expectation(:to_have_value, {:locator, locator}, :value, expected, options)
+  @spec to_have_value(Locator.t(), text_expectation(), [to_have_value_option()]) :: t()
+  def to_have_value(%Locator{} = locator, expected, options \\ []) when is_text(expected) do
+    native_expectation(:to_have_value, {:locator, locator}, :value, Internal.reg_exp(expected), options)
   end
 
   @doc group: "Locator assertions"
@@ -473,13 +473,17 @@ defmodule Fluffy.Expect do
   Expects the selected values of a multi-select. As in Playwright, it fails on
   any other element, a single select included; use `to_have_value/3` there.
 
+  Each selected option, in document order, must match the corresponding
+  expected string or regular expression. The list can mix strings and regexes
+  and must have exactly as many entries as there are selected options.
+
   ## Options
 
   #{NimbleOptions.docs(Options.expectation_schema(:to_have_values))}
   """
-  @spec to_have_values(Locator.t(), [term()], [to_have_values_option()]) :: t()
+  @spec to_have_values(Locator.t(), [text_expectation()], [to_have_values_option()]) :: t()
   def to_have_values(%Locator{} = locator, expected, options \\ []) when is_list(expected) do
-    native_expectation(:to_have_values, {:locator, locator}, :values, expected, options)
+    native_expectation(:to_have_values, {:locator, locator}, :values, text_values!(:to_have_values, expected), options)
   end
 
   @doc group: "Locator assertions"

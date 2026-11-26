@@ -128,12 +128,12 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM.Expectation do
 
   def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :value, expected: expected}) do
     actual = ClientDOM.value(client_dom, locator)
-    {actual == expected, actual}
+    {Expect.Internal.matches?(expected, actual), actual}
   end
 
   def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :values, expected: expected}) do
     actual = ClientDOM.selected_values(client_dom, locator)
-    {actual == expected, actual}
+    {matches_in_order?(expected, actual, &Expect.Internal.matches?/2, true), actual}
   end
 
   defp evaluate_text(client_dom, locator, _expectation, expected, match, exact_length?) when is_list(expected) do

@@ -101,7 +101,7 @@ defmodule Fluffy.Driver.Phoenix.Locator do
 
     scopes
     |> query_scopes(Enum.map_join(names, ",", &"[#{escape_identifier(&1)}]"))
-    |> Enum.filter(fn element -> Enum.any?(names, &(element_attribute(element, &1) == test_id)) end)
+    |> Enum.filter(fn element -> Enum.any?(names, &attribute_matches?(element_attribute(element, &1), test_id, true)) end)
   end
 
   defp apply_operation({:nth, index}, scopes) do
@@ -180,16 +180,25 @@ defmodule Fluffy.Driver.Phoenix.Locator do
   defp state_matches?(aria, node, {:disabled, expected}, _checked), do: Aria.aria_disabled?(aria, node) == expected
   defp state_matches?(_aria, _node, _option, _checked), do: true
 
-  # Playwright's text engine also matches the scope itself, and keeps the deepest
-  # matches: those without a matching descendant. Ids are preorder, so a match's
-  # descendants are the matches up to its last_id.
+  # Playwright's text engine also matches the scope itself.
   defp text_matches(scopes, aria, text, exact?) do
-    text = Internal.compile(text)
-
     scopes
     |> Enum.flat_map(&self_and_scoped_nodes(aria, &1))
     |> Enum.uniq_by(fn {node, _element} -> node.id end)
     |> Enum.sort_by(fn {node, _element} -> node.id end)
+    |> matching_text_elements(Internal.compile(text), exact?)
+  end
+
+  # Only a matching direct child suppresses the parent. An anchored regex can
+  # match a grandchild without matching the child around it.
+  defp matching_text_elements(nodes, %Regex{} = text, _exact?) do
+    for {node, element} <- nodes, regex_text_matches?(node, text), do: element
+  end
+
+  # With strings, keep the deepest matches. Ids are preorder, so a match's
+  # descendants are the matches up to its last_id.
+  defp matching_text_elements(nodes, text, exact?) do
+    nodes
     |> Enum.filter(fn {node, _element} -> node_text_matches?(node, text, exact?) end)
     |> Enum.chunk_every(2, 1)
     |> Enum.flat_map(fn
@@ -197,6 +206,30 @@ defmodule Fluffy.Driver.Phoenix.Locator do
       [{_node, element} | _next] -> [element]
     end)
   end
+
+  defp regex_text_matches?(%{path: [{"html", _}, {"head", _} | _]}, _expected), do: false
+
+  # Playwright excludes document.head from text matching. It contributes empty
+  # text to the root and can suppress the root if the regex matches empty text.
+  defp regex_text_matches?(%{path: [{"html", _}], children: children} = node, expected) do
+    children =
+      Enum.map(children, fn
+        {"head", attributes, _children} -> {"head", attributes, []}
+        child -> child
+      end)
+
+    own_text_matches?(%{node | children: children}, expected)
+  end
+
+  defp regex_text_matches?(node, expected), do: own_text_matches?(node, expected)
+
+  defp own_text_matches?(%{children: children} = node, expected),
+    do: node_text_matches?(node, expected, false) and not Enum.any?(children, &child_text_matches?(&1, expected))
+
+  defp child_text_matches?({tag, attributes, children}, expected),
+    do: text_matches?(Semantics.text(%{tag: tag, attributes: attributes, children: children}), expected, false)
+
+  defp child_text_matches?(_text_or_comment, _expected), do: false
 
   defp self_and_scoped_nodes(%Aria{index: %{document: document}} = aria, document), do: Aria.scoped_nodes(aria, document)
   defp self_and_scoped_nodes(aria, scope), do: [{Aria.node_for(aria, scope), scope} | Aria.scoped_nodes(aria, scope)]
@@ -279,7 +312,9 @@ defmodule Fluffy.Driver.Phoenix.Locator do
   end
 
   defp attribute_matches?(nil, _expected, _exact?), do: false
-  defp attribute_matches?(actual, expected, true), do: actual == expected
+
+  defp attribute_matches?(actual, expected, exact?) when exact? or is_struct(expected, Playwright.RegExp),
+    do: Internal.matches?(expected, actual)
 
   defp attribute_matches?(actual, expected, false) do
     String.contains?(String.downcase(actual), String.downcase(expected))

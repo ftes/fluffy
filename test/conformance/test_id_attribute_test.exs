@@ -34,6 +34,7 @@ defmodule Fluffy.Conformance.TestIdAttributeTest do
       |> session_for_html(@owlery)
       |> expect("hedwig" |> by_test_id() |> to_have_text("Hedwig"))
       |> expect("errol" |> by_test_id() |> to_have_text("Errol"))
+      |> expect(~r/^(hedwig|errol)?$/ |> by_test_id() |> to_have_count(2))
     end
 
     # A name is any CSS identifier, non-ASCII characters included.

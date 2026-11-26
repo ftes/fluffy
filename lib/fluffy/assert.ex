@@ -217,12 +217,14 @@ defmodule Fluffy.Assert do
 
   @doc group: "Locator assertions"
   @doc "Equivalent to `Fluffy.Expect.to_have_value/3`."
-  @spec value(Fluffy.Locator.t(), String.t(), [Fluffy.Expect.to_have_value_option()]) :: Fluffy.Expect.t()
+  @spec value(Fluffy.Locator.t(), Fluffy.Expect.text_expectation(), [Fluffy.Expect.to_have_value_option()]) ::
+          Fluffy.Expect.t()
   defdelegate value(locator, expected, options \\ []), to: Fluffy.Expect, as: :to_have_value
 
   @doc group: "Locator assertions"
   @doc "Equivalent to `Fluffy.Expect.to_have_values/3`."
-  @spec values(Fluffy.Locator.t(), [term()], [Fluffy.Expect.to_have_values_option()]) :: Fluffy.Expect.t()
+  @spec values(Fluffy.Locator.t(), [Fluffy.Expect.text_expectation()], [Fluffy.Expect.to_have_values_option()]) ::
+          Fluffy.Expect.t()
   defdelegate values(locator, expected, options \\ []), to: Fluffy.Expect, as: :to_have_values
 
   @doc group: "Locator assertions"

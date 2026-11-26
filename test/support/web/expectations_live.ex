@@ -31,6 +31,16 @@ defmodule Fluffy.Support.Web.ExpectationsLive do
   <div hidden><p id="nested-concealed">Secret</p></div>
   <input id="hidden-input" type="hidden" value="secret">
   <svg id="vector" viewBox="0 0 10 10"></svg>
+  <section id="spellbook">
+    <label for="spell">Spell  Book</label>
+    <input id="spell" placeholder="Spell  Book" value="Lumos  Maxima">
+    <img alt="Spell  Book" title="Spell  Book" data-testid="Spell  Book">
+    <select id="potions" multiple>
+      <option value="polyjuice">Polyjuice</option>
+      <option value="felix  felicis">Felix Felicis</option>
+      <option value="veritaserum">Veritaserum</option>
+    </select>
+  </section>
   """
 
   def markup, do: @markup
