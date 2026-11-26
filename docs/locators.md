@@ -113,8 +113,9 @@ Focus requires Playwright, and LiveView renders can replace local input state; s
 Single-target actions and native visibility assertions are strict: if a locator
 matches more than one element, Fluffy reports the ambiguity instead of choosing
 for you. Facade `assert_has` accepts any visible match, and `refute_has` requires
-no visible matches. Narrow the locator, or use `assert(count(locator, n))` when
-multiple matches are the intended assertion.
+no visible matches. For multiple matches with native assertions, use
+`assert_has(locator, count: n)` to count visible matches or `assert(count(locator, n))`
+to count all DOM matches.
 
 ### Role shorthands
 

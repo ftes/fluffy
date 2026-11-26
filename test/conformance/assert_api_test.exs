@@ -5,6 +5,8 @@ defmodule Fluffy.Conformance.AssertAPITest do
   import Fluffy
   import Fluffy.Locator
 
+  alias Fluffy.Support.Web.ExpectationsLive
+
   test "element assertions delegate to their expectations, without clashing with Fluffy or Fluffy.Locator" do
     session =
       session_for_html(:static, ~s(<p id="note" class="row wide" title="Hint">Saved</p><p id="gone" hidden></p>))
@@ -227,6 +229,53 @@ defmodule Fluffy.Conformance.AssertAPITest do
     end
   end
 
+  for driver <- Drivers.all() do
+    @tag driver: driver
+    test "assert_has counts exactly the visible matches when given count: with #{driver}", %{driver: driver} do
+      session =
+        case driver do
+          :live -> :phoenix |> start_session() |> visit("/live/expectations")
+          driver -> session_for_html(driver, ExpectationsLive.markup())
+        end
+
+      items = by_css(".item, #concealed")
+      styled = by_css("#rendered span")
+
+      returned =
+        session
+        |> assert_has(items, count: 3, timeout: 100)
+        |> assert(count(items, 4))
+        |> assert_has(by_css("#concealed"), count: 0)
+        |> assert_has(by_css("#absent"), count: 0)
+        |> assert_has(styled, count: if(driver == :playwright, do: 0, else: 1))
+
+      assert returned == session
+
+      assert_raise ExUnit.AssertionError, ~r/to match 2 element|count/, fn ->
+        assert_has(session, items, count: 2, timeout: 100)
+      end
+
+      assert_raise ExUnit.AssertionError, ~r/strict mode violation|exactly one element/, fn ->
+        assert_has(session, items, timeout: 100)
+      end
+    end
+  end
+
+  test "assert_has rejects invalid counts and passes timeout through for visible counts" do
+    session = session_for_html(:static, "<p>Hedwig</p>")
+    owl = by_text("Hedwig")
+
+    for invalid <- [nil, -1, 1.0, "1"] do
+      assert_raise ArgumentError, ~r/non-negative integer for count:/, fn ->
+        assert_has(session, owl, count: invalid)
+      end
+    end
+
+    assert_raise NimbleOptions.ValidationError, ~r/:timeout/, fn ->
+      assert_has(session, owl, count: 1, timeout: 0)
+    end
+  end
+
   @tag driver: :playwright
   test "immediate browser assertions return a usable session" do
     :playwright
@@ -247,6 +296,14 @@ defmodule Fluffy.Conformance.AssertAPITest do
       |> assert(page_url("/live/async?delay=40"))
       |> click(by_role(:button, name: "Appeared"))
       |> assert(visible(by_text("Activated")))
+    end
+
+    @tag driver: driver
+    test "assert_has with count: retries Live changes with #{driver}" do
+      unquote(driver)
+      |> start_session()
+      |> visit("/live/async?delay=40")
+      |> assert_has(by_text("Status: ready"), count: 1, timeout: 1_000)
     end
   end
 

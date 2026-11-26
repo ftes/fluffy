@@ -90,6 +90,7 @@ Changes since 0.8.0.
 - A regex in a locator's `name:`, `has_text:` and `has_not_text:`, on every driver.
 - `Fluffy.Expect` gains `to_have_text`, `to_contain_text`, `to_have_attribute`, `to_have_class`, `to_contain_class`, `to_have_id`, `to_be_attached`, `to_be_hidden`, `to_be_empty`, `to_have_role`, `to_have_accessible_name` and `to_have_accessible_description` on every driver, and `to_have_css`, `to_have_js_property`, `to_have_accessible_error_message`, `to_be_in_viewport` (`Fluffy.Assert.in_viewport/2`), screenshot and aria snapshot assertions on Playwright. Snapshot names derive from the test, as in Playwright.
 - `Fluffy.Assert` names every `Fluffy.Expect` matcher: `css`, `js_property`, `role`, `accessible_name`, `accessible_description`, `accessible_error_message`, `match_aria_snapshot`, `match_screenshot`, `page_match_aria_snapshot` and `page_match_screenshot` join the others.
+- `Fluffy.Assert.assert_has` accepts `count:` for an exact number of visible matches, including zero. Without `count:`, it stays a strict single-element visibility assertion.
 - `by_role` on Phoenix knows Playwright's implicit roles, landmarks included.
 - `Fluffy.Locator.Roles`, an opt-in import with `button("Save")`, `link("Owlery")`, and `heading("Potions", level: 2)`. Each takes the same options as positional `by_role` and can start from a locator or frame scope.
 - `by_role` takes an accessible name positionally, with optional role options, as in `by_role(:heading, "Potions", level: 2)`. The same form works under a locator or frame scope.

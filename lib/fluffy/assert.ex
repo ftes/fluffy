@@ -92,13 +92,33 @@ defmodule Fluffy.Assert do
 
   @doc group: "Running expectations"
   @doc """
-  Asserts that the locator resolves to a visible element and returns the session.
+  Asserts visibility and returns the session.
 
-  Equivalent to `assert(session, visible(locator), options)`.
-  For DOM presence regardless of visibility, use a `count` expectation.
+  By default the locator must resolve to a single visible element, as in
+  `assert(session, visible(locator), options)`.
+
+  With `count: n`, asserts exactly `n` visible matches, including `0` for none.
+  This is equivalent to counting `Fluffy.Locator.filter(locator, visible: true)`.
+  Pass `timeout:` as usual. To count all DOM matches, including hidden elements,
+  use `assert(session, count(locator, n))`.
+
+  In an iframe, Playwright's visibility filter checks the child document. To
+  count only inside a visible iframe, filter its owner before `Fluffy.Locator.content_frame/1`.
   """
-  @spec assert_has(Fluffy.Session.t(), Fluffy.Locator.t(), [Fluffy.Expect.option()]) :: Fluffy.Session.t()
-  def assert_has(session, %Fluffy.Locator{} = locator, options \\ []), do: assert(session, visible(locator), options)
+  @spec assert_has(Fluffy.Session.t(), Fluffy.Locator.t(), [Fluffy.Expect.option() | {:count, non_neg_integer()}]) ::
+          Fluffy.Session.t()
+  def assert_has(session, %Fluffy.Locator{} = locator, options \\ []) do
+    case Keyword.pop_values(options, :count) do
+      {[], options} ->
+        assert(session, visible(locator), options)
+
+      {[expected], options} when is_integer(expected) and expected >= 0 ->
+        assert(session, locator |> Fluffy.Locator.filter(visible: true) |> count(expected), options)
+
+      {_counts, _options} ->
+        raise ArgumentError, "assert_has expects a single non-negative integer for count:"
+    end
+  end
 
   @doc group: "Running expectations"
   @doc """

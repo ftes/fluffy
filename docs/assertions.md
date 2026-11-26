@@ -38,14 +38,29 @@ test "registers a creature" do
 end
 ```
 
-`assert_has(locator)` is shorthand for `assert(visible(locator))`, and `refute_has(locator)`
-for `refute(visible(locator))`. Use `assert` and `refute` for every other assertion. Options
-such as `timeout:` go in the shorthand's options argument:
+`assert_has(locator)` is shorthand for the strict single-element `assert(visible(locator))`,
+and `refute_has(locator)` for `refute(visible(locator))`. Use `assert_has(locator, count: n)` to
+require exactly `n` visible matches, including `0` for none. This counts the matches of
+`filter(locator, visible: true)`: visibility is structural on Static and LiveView and rendered
+on Playwright. Use plain `assert(count(locator, n))` to count all DOM matches, including hidden
+ones. Options such as `timeout:` go in the shorthand's options argument:
 
 ```elixir
 session
 |> assert_has(by_text("Creature registered"))
+|> assert_has(by_css(".creature"), count: 3, timeout: 1_000)
 |> refute_has(by_text("Saving…"), timeout: 1_000)
+```
+
+In an iframe, Playwright's visibility filter checks the child document. It can
+count an element inside a `visibility: hidden` iframe even when `refute_has`
+passes for that element. To require the iframe itself to be visible, filter the
+owner before entering it:
+
+```elixir
+vault = by_css("#gringotts") |> filter(visible: true) |> content_frame()
+
+session |> assert_has(by_css(vault, ".vault-row"), count: 3)
 ```
 
 See [Shared test case](usage.md#shared-test-case) to centralize these imports
