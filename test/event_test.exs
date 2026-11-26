@@ -34,7 +34,7 @@ defmodule Fluffy.EventTest do
   end
 
   test "deadlines start at registration and settled outcomes survive closure", %{session: session} do
-    expired = wait_for(session, Event.download(), timeout: 0)
+    expired = wait_for(session, Event.download(), timeout: :once)
     assert_raise ExUnit.AssertionError, ~r/timeout/, fn -> await(expired) end
 
     settled = wait_for(session, Event.download())

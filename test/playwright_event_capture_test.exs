@@ -24,7 +24,7 @@ defmodule Fluffy.PlaywrightEventCaptureTest do
 
   test "a wait expires independently of await or later actions" do
     session = session_for_html(:playwright, "<h1>Events</h1>")
-    pending = wait_for(session, Event.frame_navigated(), timeout: 0)
+    pending = wait_for(session, Event.frame_navigated(), timeout: :once)
     Fluffy.Playwright.evaluate(session, "location.hash = 'too-late'; true")
     assert_raise ExUnit.AssertionError, ~r/timeout/, fn -> await(pending) end
   end

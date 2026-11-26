@@ -37,7 +37,7 @@ defmodule Fluffy.Conformance.PollTest do
 
             session
             |> click(by_role(:button, name: "Read the letter"), timeout: 100)
-            |> expect(to_be_visible(by_text("You have been accepted at Hogwarts")), timeout: 0)
+            |> expect(to_be_visible(by_text("You have been accepted at Hogwarts")), timeout: :once)
           end)
 
         assert %Fluffy.Session{} = session
@@ -116,7 +116,7 @@ defmodule Fluffy.Conformance.PollTest do
 
             session
             |> click(by_role(:button, name: "Read the letter"), timeout: 100)
-            |> expect(to_be_visible(by_text("You have been accepted at Hogwarts")), timeout: 0)
+            |> expect(to_be_visible(by_text("You have been accepted at Hogwarts")), timeout: :once)
           end)
         )
         |> expect(to_have_text(by_css("#letters"), "Letters: 1"))
@@ -147,7 +147,7 @@ defmodule Fluffy.Conformance.PollTest do
       @tag driver: driver
       test "a failing to_pass raises its last attempt's error with #{driver}", %{driver: driver} do
         {session, _attempt} = visit_owlery(driver)
-        block = fn session -> expect(session, to_be_visible(by_text("A howler")), timeout: 0) end
+        block = fn session -> expect(session, to_be_visible(by_text("A howler")), timeout: :once) end
 
         error = assert_raise ExUnit.AssertionError, fn -> expect(session, to_pass(block), timeout: 300) end
 
@@ -220,18 +220,18 @@ defmodule Fluffy.Conformance.PollTest do
       end
 
       @tag driver: driver
-      test "a negated to_pass with a timeout of 0 makes one attempt with #{driver}", %{driver: driver} do
+      test "a negated to_pass with timeout: :once makes one attempt with #{driver}", %{driver: driver} do
         session = owlery_or_html(driver)
         attempt = on_attempt(0, fn -> :ok end)
 
-        assert expect(session, not_(to_pass(fn _session -> flunk("Hedwig flew off #{attempt.()}") end)), timeout: 0) ==
+        assert expect(session, not_(to_pass(fn _session -> flunk("Hedwig flew off #{attempt.()}") end)), timeout: :once) ==
                  session
 
         assert attempt.() == 2
 
         error =
           assert_raise ExUnit.AssertionError, fn ->
-            expect(session, not_(to_pass(fn _session -> attempt.() end)), timeout: 0)
+            expect(session, not_(to_pass(fn _session -> attempt.() end)), timeout: :once)
           end
 
         assert error.message == "Expected not the block to pass\nThe block passed"
@@ -258,7 +258,7 @@ defmodule Fluffy.Conformance.PollTest do
       end
 
       @tag driver: driver
-      test "a timeout of 0 makes one attempt with #{driver}", %{driver: driver} do
+      test "timeout: :once makes one attempt with #{driver}", %{driver: driver} do
         session = owlery_or_html(driver)
 
         for build <- [
@@ -266,7 +266,7 @@ defmodule Fluffy.Conformance.PollTest do
               &poll(fn _session -> &1.() end, fn _ -> flunk("No owl yet") end)
             ] do
           attempt = on_attempt(0, fn -> :ok end)
-          error = assert_raise ExUnit.AssertionError, fn -> expect(session, build.(attempt), timeout: 0) end
+          error = assert_raise ExUnit.AssertionError, fn -> expect(session, build.(attempt), timeout: :once) end
 
           assert error.message =~ "No owl yet"
           # No retry loop: Playwright's at 1ms can time out before its first attempt.
@@ -275,11 +275,11 @@ defmodule Fluffy.Conformance.PollTest do
         end
 
         poll = poll(fn _session -> 0 end, &assert(&1 == 1), message: "an owl from Hogwarts")
-        error = assert_raise ExUnit.AssertionError, fn -> expect(session, poll, timeout: 0) end
+        error = assert_raise ExUnit.AssertionError, fn -> expect(session, poll, timeout: :once) end
         assert error.message =~ ~r/\AExpected the polled value to pass the assertion\nan owl from Hogwarts\n\n.*left:  0/s
 
         for block <- [fn _session -> throw(:hedwig) end, fn _session -> exit(:hedwig) end] do
-          error = assert_raise ExUnit.AssertionError, fn -> expect(session, to_pass(block), timeout: 0) end
+          error = assert_raise ExUnit.AssertionError, fn -> expect(session, to_pass(block), timeout: :once) end
           assert error.message =~ ~r/\AExpected the block to pass\n\*\* \((throw|exit)\) :hedwig/
         end
       end
@@ -289,7 +289,7 @@ defmodule Fluffy.Conformance.PollTest do
         session = owlery_or_html(driver)
         assert expect(session, to_pass(fn _session -> :hedwig end)) == session
 
-        for timeout <- [0, :infinity] do
+        for timeout <- [:once, :infinity] do
           assert expect(session, to_pass(fn _session -> :hedwig end), timeout: timeout) == session
           assert expect(session, poll(fn _session -> 1 end, &assert(&1 == 1)), timeout: timeout) == session
         end
@@ -347,11 +347,11 @@ defmodule Fluffy.Conformance.PollTest do
 
       assert {:error, %Playwright.ExpectError{}} =
                Playwright.Expect.to_pass(
-                 fn -> expect(session, to_be_visible(by_text("Static values: Hedwig")), timeout: 0) end,
+                 fn -> expect(session, to_be_visible(by_text("Static values: Hedwig")), timeout: :once) end,
                  timeout: 300
                )
 
-      session |> reload() |> expect(to_be_visible(by_text("Static values: Hedwig")), timeout: 0)
+      session |> reload() |> expect(to_be_visible(by_text("Static values: Hedwig")), timeout: :once)
     end
 
     @tag driver: :static
@@ -364,7 +364,7 @@ defmodule Fluffy.Conformance.PollTest do
 
         session
         |> reload()
-        |> expect(to_be_visible(by_text("Static values: Errol")), timeout: 0)
+        |> expect(to_be_visible(by_text("Static values: Errol")), timeout: :once)
       end)
     end
 
@@ -383,7 +383,7 @@ defmodule Fluffy.Conformance.PollTest do
           &assert(&1 == [["Hedwig"]])
         )
       )
-      |> expect(not_(to_be_visible(by_text("Static values: Hedwig"))), timeout: 0)
+      |> expect(not_(to_be_visible(by_text("Static values: Hedwig"))), timeout: :once)
 
       deliver = on_attempt(2, fn -> Repo.query!("UPDATE fluffy_records SET value = 'Errol'") end)
 
@@ -394,10 +394,10 @@ defmodule Fluffy.Conformance.PollTest do
 
           session
           |> reload()
-          |> expect(to_be_visible(by_text("Static values: Errol")), timeout: 0)
+          |> expect(to_be_visible(by_text("Static values: Errol")), timeout: :once)
         end)
       )
-      |> expect(to_be_visible(by_text("Static values: Errol")), timeout: 0)
+      |> expect(to_be_visible(by_text("Static values: Errol")), timeout: :once)
     end
   end
 

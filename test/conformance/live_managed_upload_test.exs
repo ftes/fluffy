@@ -607,7 +607,7 @@ defmodule Fluffy.Conformance.LiveManagedUploadTest do
     [upload_client] = upload_clients(session)
 
     assert_raise ExUnit.AssertionError, fn ->
-      expect(session, "not rendered" |> by_text() |> to_be_visible(), timeout: 0)
+      expect(session, "not rendered" |> by_text() |> to_be_visible(), timeout: :once)
     end
 
     trap_exits? = Process.flag(:trap_exit, true)

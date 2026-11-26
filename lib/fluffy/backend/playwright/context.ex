@@ -10,8 +10,8 @@ defmodule Fluffy.Backend.Playwright.Context do
           base_url: String.t(),
           endpoint: module() | nil,
           browser_context: Playwright.BrowserContext.t(),
-          action_timeout: timeout(),
-          navigation_timeout: timeout(),
+          action_timeout: Fluffy.Timeouts.t(),
+          navigation_timeout: Fluffy.Timeouts.t(),
           extra_http_headers: %{String.t() => String.t()}
         }
 end

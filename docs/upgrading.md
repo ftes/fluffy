@@ -69,13 +69,13 @@ matched once can now match twice.
 - `browser_context:`, `launch_options:` and the options of `storage_state` and cookies
   pass through to Playwright, which rejects unknown ones. Page screenshots
   validate their options as element screenshots do: `mask:` takes Fluffy locators
-  and `timeout: 0` raises.
+  and `timeout: :once` raises.
 
 ## Timeouts
 
 A browser session's timeouts follow Playwright Test and a Phoenix session's
-`config :fluffy, phoenix_backend_timeout:`; `timeout:` follows Elixir: `0` checks once and
-`:infinity` means no limit; see [Configuration](installation.md#configuration).
+`config :fluffy, phoenix_backend_timeout:`; `timeout: :once` checks once and `:infinity` means
+no limit; see [Configuration](installation.md#configuration).
 
 - `config :fluffy` is validated at startup: an unknown key, or the config of a module that
   doesn't exist, raises. Remove `playwright: false`, which does nothing.
@@ -91,13 +91,14 @@ A browser session's timeouts follow Playwright Test and a Phoenix session's
   These are browser sessions'. Without them, browser actions and navigations have no timeout,
   so the test's timeout bounds them. A Phoenix session's operations take
   `config :fluffy, phoenix_backend_timeout:` (1s by default), so a suite that raised
-  `timeout:` for both backends sets it too.
+  `timeout:` for both backends sets it too. `0` now raises: use `:once` to check once or
+  `:infinity` for no limit.
 - `config :fluffy, base_url:` is removed: set Playwright's `base_url`
   ([Configuration](installation.md#configuration)).
-- Playwright actions, waits, `reload`, `go_back` and `go_forward` raise `ArgumentError`
-  for `timeout: 0` instead of timing out after 1ms; pass a positive timeout. Assertions
-  and Phoenix actions still check once.
-- For no limit, pass `timeout: :infinity`, never Playwright's `0`.
+- In native Fluffy calls, replace `timeout: 0` with `timeout: :once`; `0` now raises, as it
+  means no timeout in Playwright. `Fluffy.PhoenixTest` facade calls keep `0`. For no limit,
+  pass `:infinity`. Playwright actions, waits, `reload`, `go_back` and `go_forward` raise
+  `ArgumentError` for `:once` instead of timing out after 1ms; pass a positive timeout.
 - Calls that have no timeout in Playwright take no `timeout:`: `Fluffy.Playwright.evaluate`
   and `storage_state`, and `Fluffy.cookies` and `clear_cookies`. Download `read` and `save_as` no longer
   end at a timeout; an unfinished download waits until the test times out.

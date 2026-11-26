@@ -33,10 +33,10 @@ defmodule Fluffy.Conformance.AssertAPITest do
       owl = by_css("#owl")
 
       session
-      |> assert(pass(fn session -> assert(session, count(by_css("p"), 2), timeout: 0) end))
-      |> assert(pass(fn session -> assert(session, text(owl, "Hedwig"), timeout: 0) end, timeout: 1_000))
+      |> assert(pass(fn session -> assert(session, count(by_css("p"), 2), timeout: :once) end))
+      |> assert(pass(fn session -> assert(session, text(owl, "Hedwig"), timeout: :once) end, timeout: 1_000))
       |> assert(poll(&text_content(&1, owl), &assert(&1 == "Hedwig")), timeout: 1_000)
-      |> refute(pass(fn session -> assert(session, text(owl, "Errol"), timeout: 0) end), timeout: 1_000)
+      |> refute(pass(fn session -> assert(session, text(owl, "Errol"), timeout: :once) end), timeout: 1_000)
 
       assert_raise ArgumentError, ~r/poll\/3 can't be negated/, fn -> refute(session, poll(& &1, &assert(&1))) end
     end
@@ -231,8 +231,8 @@ defmodule Fluffy.Conformance.AssertAPITest do
   test "immediate browser assertions return a usable session" do
     :playwright
     |> session_for_html("<p>Saved</p>")
-    |> assert(visible(by_text("Saved")), timeout: 0)
-    |> refute(page_title("Error"), timeout: 0)
+    |> assert(visible(by_text("Saved")), timeout: :once)
+    |> refute(page_title("Error"), timeout: :once)
     |> assert(visible(by_text("Saved")))
   end
 

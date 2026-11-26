@@ -199,19 +199,19 @@ late, while `expect: [timeout: 2_000]` checks for it every 100 ms.
 
 A Phoenix session's action retries, assertions and event waits default to
 `config :fluffy, phoenix_backend_timeout:`, 1 second: an in-process session answers at once,
-so a long wait is only for something that isn't there. Its `0` checks once, and `:infinity`
-waits until the test's timeout, which then fails the operation with Fluffy's error and the same
-reason. There is no per-session timeout on either backend; pass `timeout:` to a call.
+so a long wait is only for something that isn't there. Its `:infinity` waits until the test's
+timeout, which then fails the operation with Fluffy's error and the same reason. There is no
+per-session timeout on either backend; pass `timeout:` to a call.
 
-A value means what its source says: Playwright's `0` is no limit, so write `:infinity`, which
-reads the same in both configs. An operation's `timeout: 0` checks once, unlike Playwright.
-Playwright assertions check once too, but Playwright actions and waits reject `0` with an
-`ArgumentError`, as they cannot check once; pass a positive timeout. So do screenshot
-assertions, which take each screenshot within the timeout.
+A native call's `timeout:` and `phoenix_backend_timeout` take `:once` to check once and
+`:infinity` for no limit; `0` raises (`Fluffy.PhoenixTest` facade calls keep PhoenixTest's
+`0`). Playwright actions and waits reject `:once` with an `ArgumentError`, as they can't check
+once, and so do screenshot assertions, which take each screenshot within the timeout. Playwright's config keeps Playwright's meaning, where `0` is no limit: write
+`:infinity`, which reads the same in both configs.
 
-For no timeout, pass `timeout: :infinity`, never Playwright's `0`. Playwright then waits
-with no timeout, and LiveView retries and event waits go on until the test times out; Static
-checks once, as with any timeout, since nothing on its page changes.
+With `:infinity`, Playwright waits with no timeout, and LiveView retries and event waits go on
+until the test times out; Static checks once, as with any timeout, since nothing on its page
+changes.
 
 Fluffy's own reads of the page around a Playwright operation share its timeout, but get
 at least a second: a page whose main thread is blocked takes a second to report, not a

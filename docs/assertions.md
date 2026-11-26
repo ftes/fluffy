@@ -304,7 +304,7 @@ session
 |> assert(pass(fn session ->
   session
   |> click(by_role(:button, name: "Check the owlery"), timeout: 1_000)
-  |> assert_has(by_text("A letter for Harry"), timeout: 0)
+  |> assert_has(by_text("A letter for Harry"), timeout: :once)
 end))
 ```
 
@@ -321,9 +321,11 @@ Playwright.Expect.poll!(fn -> Owlery.letters_for("Harry") end, &assert(length(&1
 `pass` until the test's timeout, unless given a `timeout:`. Each attempt runs to the end: a
 Fluffy assertion or action in the callback waits for its own timeout before `pass` tries
 again, and an attempt still running at `pass`'s deadline isn't cut short, unlike in
-Playwright's JavaScript. So give the calls inside short timeouts: `timeout: 0` makes an
+Playwright's JavaScript. So give the calls inside short timeouts: `timeout: :once` makes an
 assertion check once and leaves the retrying to `pass`; actions need a short positive one,
-as Playwright actions reject `0`.
+as Playwright actions reject `:once`. Outside a retried block, use `:once` only to check that
+something already holds, such as no partial list right after a reconnect: a single check of a
+page that is still updating is flaky, so keep the default there.
 
 A LiveView or browser page updates between attempts; a Static page doesn't, as it is a
 response. On Static, poll app state, or `reload` in the callback to fetch the page again.

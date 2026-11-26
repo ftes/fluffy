@@ -253,7 +253,7 @@ defmodule Fluffy.Backend.Playwright do
   defdelegate subscribe_event(session, type, source, pid), to: Events
 
   # As in Playwright, `wait_until:` defaults to `:load`. Like an action, a
-  # navigation can't check once, so it rejects Fluffy's `timeout: 0`.
+  # navigation can't check once, so it rejects `timeout: :once`.
   defp navigation_options(session, operation, options) do
     timeout = Timeouts.operation(session, operation, options)
     Keyword.put(options, :timeout, Deadline.playwright_operation!(operation, timeout))

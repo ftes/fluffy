@@ -15,15 +15,15 @@ defmodule Fluffy.Conformance.PageURLTest do
         driver
         |> start_session()
         |> visit("/chamber")
-        |> expect(page_to_have_url("/chamber"), timeout: 0)
+        |> expect(page_to_have_url("/chamber"), timeout: :once)
 
       error =
         assert_raise ExUnit.AssertionError, fn ->
-          expect(session, page_to_have_url("/missing"), timeout: 0)
+          expect(session, page_to_have_url("/missing"), timeout: :once)
         end
 
       assert error.message =~ "/chamber"
-      expect(session, not_(page_to_have_url("/missing")), timeout: 0)
+      expect(session, not_(page_to_have_url("/missing")), timeout: :once)
     end
 
     @tag driver: driver
@@ -77,13 +77,13 @@ defmodule Fluffy.Conformance.PageURLTest do
           page_to_have_url(fn %URI{path: actual, query: query, fragment: fragment} ->
             actual == path and URI.decode_query(query)["answer"] == "42" and fragment == "summary"
           end),
-          timeout: 0
+          timeout: :once
         )
-        |> expect(not_(page_to_have_url(&(&1.path == "/missing"))), timeout: 0)
+        |> expect(not_(page_to_have_url(&(&1.path == "/missing"))), timeout: :once)
 
       error =
         assert_raise ExUnit.AssertionError, fn ->
-          expect(session, page_to_have_url(&(&1.path == "/missing")), timeout: 0)
+          expect(session, page_to_have_url(&(&1.path == "/missing")), timeout: :once)
         end
 
       assert error.message =~ path
@@ -102,10 +102,10 @@ defmodule Fluffy.Conformance.PageURLTest do
       url.path == "/chamber"
     end
 
-    expect(session, page_to_have_url(predicate), timeout: 0)
+    expect(session, page_to_have_url(predicate), timeout: :once)
 
     assert_raise ExUnit.AssertionError, fn ->
-      expect(session, not_(page_to_have_url(predicate)), timeout: 0)
+      expect(session, not_(page_to_have_url(predicate)), timeout: :once)
     end
   end
 

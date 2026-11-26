@@ -20,15 +20,33 @@ defmodule Fluffy.Conformance.TimeoutInfinityTest do
     end
   end
 
-  test "timeout: rejects other atoms" do
+  # `0` checks once in Elixir but means no limit in Playwright, so it raises on every entry.
+  test "timeout: rejects 0, naming :once and :infinity, and other atoms" do
     session = session_for_html(:static, ~s|<button>Go</button>|)
+    button = by_role(:button, name: "Go")
 
-    for operation <- [
-          fn -> click(session, by_role(:button, name: "Go"), timeout: :forever) end,
-          fn -> expect(session, :button |> by_role() |> to_be_visible(timeout: :forever)) end,
-          fn -> expect(session, to_be_visible(by_role(:button)), timeout: :forever) end
+    for {value, message} <- [
+          {0, ~r/timeout option: 0 is ambiguous: pass :once to check once or :infinity for no limit/},
+          {:forever, ~r/timeout option: expected a positive integer, :once or :infinity, got: :forever/}
+        ],
+        operation <- [
+          fn -> click(session, button, timeout: value) end,
+          fn -> expect(session, to_be_visible(button, timeout: value)) end,
+          fn -> expect(session, to_be_visible(button), timeout: value) end,
+          fn -> expect(session, to_pass(fn _session -> :ok end, timeout: value)) end,
+          fn -> expect(session, poll(fn _session -> 1 end, &assert(&1 == 1), timeout: value)) end,
+          fn -> wait_for(session, Fluffy.Event.download(), timeout: value) end
         ] do
-      assert_raise NimbleOptions.ValidationError, ~r/timeout/, operation
+      assert_raise NimbleOptions.ValidationError, message, operation
+    end
+  end
+
+  @tag driver: :playwright
+  test "timeout: rejects 0 on a Playwright action" do
+    session = session_for_html(:playwright, ~s|<button>Go</button>|)
+
+    assert_raise NimbleOptions.ValidationError, ~r/0 is ambiguous/, fn ->
+      Fluffy.Playwright.hover(session, by_role(:button), timeout: 0)
     end
   end
 end

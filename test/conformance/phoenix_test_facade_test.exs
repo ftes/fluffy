@@ -381,7 +381,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
           ],
           negated? <- [false, true] do
         expectation = if negated?, do: Expect.not_(expectation), else: expectation
-        assert_raise ExUnit.AssertionError, fn -> Expect.expect(session, expectation, timeout: 0) end
+        assert_raise ExUnit.AssertionError, fn -> Expect.expect(session, expectation, timeout: :once) end
       end
 
       unquote(driver)

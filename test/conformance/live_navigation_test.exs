@@ -500,7 +500,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     {reference, _topic, _proxy_pid} = Fluffy.Session.page_state(session).view.proxy
 
     assert_raise Fluffy.OperationError, ~r/navigated away before the action reached it/, fn ->
-      click(session, by_role(:button, name: "Lull guardian", exact: true), timeout: 0)
+      click(session, by_role(:button, name: "Lull guardian", exact: true), timeout: :once)
     end
 
     {:messages, messages} = Process.info(self(), :messages)
@@ -552,7 +552,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     send(self(), view_exit)
 
     assert_raise Fluffy.OperationError, ~r/navigated away before the action reached it/, fn ->
-      click(session, by_role(:button, name: "Lull guardian", exact: true), timeout: 0)
+      click(session, by_role(:button, name: "Lull guardian", exact: true), timeout: :once)
     end
 
     session
@@ -566,7 +566,7 @@ defmodule Fluffy.Conformance.LiveNavigationTest do
     |> start_session()
     |> visit("/live/chamber-map?async=patch-twice")
     |> await_unread_patches(:phoenix, 2, nil)
-    |> click(by_role(:link, name: "Chamber from here", exact: true), timeout: 0)
+    |> click(by_role(:link, name: "Chamber from here", exact: true), timeout: :once)
     |> expect(Fluffy.Expect.page_to_have_url("/chamber?from=late-patched"))
   end
 

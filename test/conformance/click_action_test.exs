@@ -8,7 +8,7 @@ defmodule Fluffy.Conformance.ClickActionTest do
 
   for driver <- Drivers.backends() do
     @tag driver: driver
-    test "click with timeout: 0 makes one attempt on Phoenix and is rejected on Playwright with #{driver}",
+    test "click with timeout: :once makes one attempt on Phoenix and is rejected on Playwright with #{driver}",
          %{driver: driver} do
       session =
         driver
@@ -19,14 +19,14 @@ defmodule Fluffy.Conformance.ClickActionTest do
 
       if driver == :phoenix do
         session
-        |> click(flute, timeout: 0)
+        |> click(flute, timeout: :once)
         |> expect("Sleeping heads: 1" |> by_text() |> to_be_visible())
       else
-        assert_raise ArgumentError, ~r/timeout: 0 means check once.*pass a positive timeout/, fn ->
-          click(session, flute, timeout: 0)
+        assert_raise ArgumentError, ~r/timeout: :once checks once.*pass a positive timeout/, fn ->
+          click(session, flute, timeout: :once)
         end
 
-        expect(session, "Sleeping heads: 0" |> by_text() |> to_be_visible(), timeout: 0)
+        expect(session, "Sleeping heads: 0" |> by_text() |> to_be_visible(), timeout: :once)
       end
     end
   end

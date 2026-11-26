@@ -79,6 +79,7 @@ defmodule Fluffy.Driver.Playwright.Document do
   def init_script, do: @state
 
   def bookkeeping_timeout(:infinity), do: :infinity
+  def bookkeeping_timeout(:once), do: @min_bookkeeping_timeout
   def bookkeeping_timeout(timeout) when is_integer(timeout), do: max(timeout, @min_bookkeeping_timeout)
 
   @doc "A page listener that flags the state when its main frame navigates."
