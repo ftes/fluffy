@@ -39,13 +39,17 @@ defmodule Fluffy.Sandbox do
   @doc """
   The sandbox callback Phoenix Ecto calls when a hook passes `Fluffy.Sandbox` to
   `Phoenix.Ecto.SQL.Sandbox.allow/2`; tests don't call it. It allows `child` through the
-  configured `:sandbox` and has `owner`'s test wait for the calling process to exit. Only a
-  custom LiveView hook needs it, see [Ecto sandbox](installation.md#ecto-sandbox).
+  configured `:sandbox` and, when the caller is a LiveView, has `owner`'s test wait for it to
+  exit. Only a custom LiveView hook needs it, see [Ecto sandbox](installation.md#ecto-sandbox).
   """
   @spec allow(module(), pid(), pid()) :: term()
   def allow(repo, owner, child) do
-    # Once per process, though Phoenix Ecto allows each repo.
-    if owner not in Registry.keys(@registry, self()), do: Registry.register(@registry, owner, nil)
+    # Only a LiveView exits with its browser: a hook built on Phoenix Ecto's example also allows
+    # the static render's request process, a keep-alive connection that can outlive the browser
+    # context. `liveview_process?/1` is LiveView's public check, for the label it sets before
+    # mounting. Once per process, though Phoenix Ecto allows each repo.
+    if Phoenix.LiveView.Debug.liveview_process?(self()) and owner not in Registry.keys(@registry, self()),
+      do: Registry.register(@registry, owner, nil)
 
     case allowance() do
       {module, function, arguments} -> apply(module, function, [repo, owner, child | arguments])

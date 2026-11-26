@@ -447,11 +447,17 @@ connection and mocks without an allowance.
 
 Fluffy validates this configuration when its application starts. With the
 `user-agent` header, list `:user_agent` in the socket's `connect_info` in place of
-`:x_headers`. An application may instead retain its own LiveView/channel hook when
-additional ownership rules require application state; use the same encoded metadata
-and call `Phoenix.Ecto.SQL.Sandbox.allow(metadata, Fluffy.Sandbox)` there, which also gives it
-the wait for LiveViews to exit. `Fluffy.Sandbox` grants the configured `:sandbox`, so a hook
-that passed its own allowance module moves that module to `sandbox:` above.
+`:x_headers`.
+
+### Keeping your own LiveView hook
+
+An application may keep its own LiveView hook in place of `Fluffy.Sandbox`'s, when additional
+ownership rules need application state. Pass `Fluffy.Sandbox` there, as
+`Phoenix.Ecto.SQL.Sandbox.allow(metadata, Fluffy.Sandbox)`, not `Ecto.Adapters.SQL.Sandbox`:
+otherwise the test doesn't wait for its LiveViews to exit, and their late database work, in
+`terminate/2` or a `pagehide` push, logs ownership errors. A hook built on Phoenix Ecto's
+example also calls it on the static render; that's fine, only LiveView processes are waited for. `Fluffy.Sandbox` grants the configured `:sandbox`, so a hook
+that passed its own allowance module moves it to `sandbox:` above.
 
 ## Upload limits
 
