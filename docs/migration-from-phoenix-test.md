@@ -64,12 +64,12 @@ When rewriting, preserve the original assertion's intent:
 
 - Native `assert_has` and `refute_has` (like `visible`) use the same visibility rules but reject multiple matches.
   If the old assertion searched the whole page for visible text, locate the text itself:
-  `assert_has(by_text("Shared spellbook", exact: true))`. Prefer a named role for a
+  `assert_has(by_text("Shared spellbook"))`. Prefer a named role for a
   heading, link, or control, scoped to the relevant section when needed. A filter on `body`
   checks that the body is visible and contains the text somewhere.
 - For DOM presence or absence, use `attached` or a native `count`. This matters for
   [options in a closed dropdown](actions.md#selects-and-options): assert the option
-  is present to test availability, or assert the select's value or selected label
+  is present to test availability, or assert the select's value or selected option text
   to test the selection.
 - Native text, role-name, and label locators default to substring matching;
   use `exact: true` to retain exact field labels. Facade `text:` without `exact: true` ignores

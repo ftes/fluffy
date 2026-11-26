@@ -19,7 +19,7 @@ Fluffy runs Phoenix feature tests through one Playwright-shaped API, in-process 
 - `start_session(:phoenix)` is the default; it picks the Static or LiveView driver per page. Use `:playwright` for JavaScript, layout and computed style, native validation, dialogs, network events, tabs or focus. Fluffy reads no test tags: pick the backend in your setup.
 - Check `docs/capabilities.md` before relying on browser behavior in a Phoenix test: what a backend can't do raises `Fluffy.CapabilityError`. LiveView ignores `phx-debounce`/`phx-throttle`, and Phoenix ignores `data-confirm`.
 - Phoenix checks structural visibility (`hidden`, `type="hidden"`), not CSS; test rendered visibility on `:playwright`.
-- A closed dropdown's options are invisible on every driver: scope the option to its select and use `attached/1` or native `count/2` for presence. Assert the selection with `value/2` (submitted value) or `by_role(:option, selected: true)` (displayed label) ([Selects and options](docs/actions.md#selects-and-options)).
+- A closed dropdown's options are invisible on every driver: use a select-scoped CSS locator and `attached/1` or native `count/2` to check DOM presence. Assert the selection with `value/2` (submitted value) or the text of `by_role(:option, selected: true)` ([Selects and options](docs/actions.md#selects-and-options)).
 
 ## Coming from LiveViewTest, ConnTest or PhoenixTest
 
