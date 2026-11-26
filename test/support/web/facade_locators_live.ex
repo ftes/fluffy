@@ -22,6 +22,11 @@ defmodule Fluffy.Support.Web.FacadeLocatorsLive do
     <section id="one"><form id="form-one" phx-submit="save"><input name="choice" aria-label="One"></form></section>
     <section id="two"></section>
     """,
+    "native" => """
+    <section id="one"><label>Name <input id="inner-name"></label></section>
+    <label>Name <input id="outer-name"></label>
+    <label>Notes <input id="notes"></label>
+    """,
     "quotes" => """
     <p id="apostrophe">Don't</p><p id="double">Say "hi"</p><p id="backtick">Run `mix`</p>
     <p id="nbsp">a&nbsp;b</p><p id="space">c d</p>

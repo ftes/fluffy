@@ -78,6 +78,7 @@ Changes since 0.8.0.
   - A `select` in a disabled `fieldset` keeps its default option, and the facade's `exact: true` no longer ignores soft hyphens and zero-width spaces.
   - Controls inside `<noscript>` are not submitted, `press` raises in layout content without key bindings, and a render resets local field state only in the views it changed.
   - `select_option` with `[]` deselects every option and rejects a list mixing values with option maps; `to_have_values` requires a multiple select; the facade's `click_button` no longer matches file inputs; LiveView `set_input_files` needs the upload's form to have an id.
+- The PhoenixTest facade takes and returns a plain `Fluffy.Session`, so native calls go in the same pipeline; `Fluffy.PhoenixTest.Session` and its `.session` field are removed. Native calls don't see a `within/3` scope and don't change the form `submit/1` uses.
 - The PhoenixTest facade's `assert_has` and `refute_has` count visible matches only for `count:` and `at:`, as PhoenixTest.Playwright did and as they already checked without them; a count of hidden elements becomes a native `count/2`. Field predicates without `at:` still check hidden inputs.
 
 ### Added

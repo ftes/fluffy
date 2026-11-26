@@ -5,7 +5,6 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
 
   alias Fluffy.Expect
   alias Fluffy.Locator
-  alias Fluffy.PhoenixTest.Session
   alias Fluffy.Support.FormValue
   alias Fluffy.Support.HTTPFixtures
   alias Fluffy.Support.Web.Endpoint
@@ -96,6 +95,48 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
     end
 
     @tag driver: driver
+    test "native actions and assertions run inline on a facade session with #{driver}" do
+      unquote(driver)
+      |> locators_session("native")
+      |> fill_in("#outer-name", "Name", with: "Hagrid")
+      |> Fluffy.fill(Locator.by_label("Notes"), "Keeper of keys")
+      |> Expect.expect(Expect.to_have_value(Locator.by_css("#outer-name"), "Hagrid"))
+      |> assert_has("#notes", value: "Keeper of keys")
+    end
+
+    @tag driver: driver
+    test "native calls inside within are unscoped while facade calls stay scoped with #{driver}" do
+      unquote(driver)
+      |> locators_session("native")
+      |> within("#one", fn scoped ->
+        scoped
+        # "Name" unscoped would match two fields, and Notes is outside the scope.
+        |> fill_in("Name", with: "Fang")
+        |> Fluffy.fill(Locator.by_label("Notes"), "Unscoped")
+        |> refute_has("#notes")
+        |> fill_in("Name", with: "Fang again")
+      end)
+      |> assert_has("#notes", value: "Unscoped")
+      |> assert_has("#inner-name", value: "Fang again")
+    end
+
+    @tag driver: driver
+    test "a native call after within is unscoped with #{driver}" do
+      unquote(driver)
+      |> locators_session("native")
+      |> within("#one", fn scoped ->
+        scoped
+        |> fill_in("Name", with: "Fang")
+        |> Fluffy.fill(Locator.by_css("#outer-name"), "Hagrid")
+      end)
+      # Notes is outside the scope the within callback had.
+      |> Fluffy.fill(Locator.by_label("Notes"), "Unscoped")
+      |> assert_has("#notes", value: "Unscoped")
+      |> assert_has("#inner-name", value: "Fang")
+      |> assert_has("#outer-name", value: "Hagrid")
+    end
+
+    @tag driver: driver
     test "assert_has and submit reject a selector of another type with #{driver}" do
       session = locators_session(unquote(driver), "scopes")
 
@@ -124,6 +165,28 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
     |> fill_in("One", with: "typed")
     |> within("#two", &submit/1)
     |> assert_has("#saved", text: "Saved typed")
+  end
+
+  @tag driver: :live
+  test "submit uses the active form after an interleaved native call with live" do
+    :live
+    |> locators_session("tracked")
+    |> fill_in("One", with: "typed")
+    |> Fluffy.fill(Locator.by_label("One"), "native")
+    |> submit()
+    |> assert_has("#saved", text: "Saved native")
+  end
+
+  @tag driver: :playwright
+  test "Playwright-only native calls take a facade session" do
+    session =
+      :playwright
+      |> locators_session("native")
+      |> fill_in("#outer-name", "Name", with: "Hagrid")
+      |> Fluffy.press(Locator.by_css("#outer-name"), "Tab")
+      |> assert_has("#outer-name", value: "Hagrid")
+
+    assert Fluffy.Playwright.evaluate(session, "document.activeElement.id") == "notes"
   end
 
   for driver <- Drivers.html() do
@@ -353,25 +416,15 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
       |> fill_in("Value", with: nil)
       |> assert_has("input", value: "")
       |> select("Choice", option: nil)
-      |> tap(fn %Session{session: fluffy_session} ->
-        Expect.expect(fluffy_session, Expect.to_have_values(Locator.by_label("Choice"), ["empty"]))
-      end)
+      |> Expect.expect(Expect.to_have_values(Locator.by_label("Choice"), ["empty"]))
       |> select("Choice", option: 42)
-      |> tap(fn %Session{session: fluffy_session} ->
-        Expect.expect(fluffy_session, Expect.to_have_values(Locator.by_label("Choice"), ["number"]))
-      end)
+      |> Expect.expect(Expect.to_have_values(Locator.by_label("Choice"), ["number"]))
       |> select("select", ~D[2026-09-30], from: "Choice")
-      |> tap(fn %Session{session: fluffy_session} ->
-        Expect.expect(fluffy_session, Expect.to_have_values(Locator.by_label("Choice"), ["date"]))
-      end)
+      |> Expect.expect(Expect.to_have_values(Locator.by_label("Choice"), ["date"]))
       |> select(%FormValue{value: "<tag>&"}, from: "Choice")
-      |> tap(fn %Session{session: fluffy_session} ->
-        Expect.expect(fluffy_session, Expect.to_have_values(Locator.by_label("Choice"), ["custom"]))
-      end)
+      |> Expect.expect(Expect.to_have_values(Locator.by_label("Choice"), ["custom"]))
       |> select("select", "Choice", option: [42, ~D[2026-09-30], ~c"custom:<tag>&"])
-      |> tap(fn %Session{session: fluffy_session} ->
-        Expect.expect(fluffy_session, Expect.to_have_values(Locator.by_label("Choice"), ["number", "date", "custom"]))
-      end)
+      |> Expect.expect(Expect.to_have_values(Locator.by_label("Choice"), ["number", "date", "custom"]))
     end
 
     @tag driver: driver
@@ -398,7 +451,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
         |> assert_has("#sub", checked: true, label: "Quidditch")
         |> refute_has("#sub", checked: false, label: "Join the Quidditch team", exact: true)
 
-      assert returned.session == session
+      assert returned == session
 
       assert_raise ExUnit.AssertionError, fn -> assert_has(session, "[hidden]", timeout: 0) end
       assert_raise ExUnit.AssertionError, fn -> assert_has(session, "p", "Hidden", at: 2, timeout: 0) end
@@ -512,7 +565,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
         |> select("Plans", option: ["Free", "Professional"])
         |> select("#plans", "Plans", option: ["Professional"])
 
-      Expect.expect(session.session, Expect.to_have_values(Locator.by_css("#plans"), ["pro"]))
+      Expect.expect(session, Expect.to_have_values(Locator.by_css("#plans"), ["pro"]))
 
       assert_raise Fluffy.OperationError, fn -> fill_in(session, "Email", with: "ambiguous") end
     end
@@ -530,7 +583,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
 
       updated =
         within(session, "#outer", fn outer ->
-          assert %Session{} = outer
+          assert %Fluffy.Session{} = outer
 
           outer
           |> within("#inner", fn inner ->
@@ -544,7 +597,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
           |> assert_has("input", count: 2)
         end)
 
-      assert %Session{} = updated
+      assert %Fluffy.Session{} = updated
 
       updated
       |> assert_has("#inner-name", value: "inner")
@@ -588,7 +641,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
     test "returns the callback's result from a Playwright page" do
       session = Fluffy.session_for_html(:playwright, "<p>Page</p>")
 
-      assert unwrap_and_return(%Session{session: session}, &Playwright.Page.title!/1) == "Fluffy test stage"
+      assert unwrap_and_return(session, &Playwright.Page.title!/1) == "Fluffy test stage"
     end
   end
 
@@ -669,6 +722,33 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
     end
 
     @tag driver: driver
+    test "submit uses the active form after an interleaved native call with #{driver}" do
+      fixture =
+        HTTPFixtures.register_sequence([
+          %{
+            body: """
+            <html><body><form method="post">
+              <input name="name" aria-label="Name"><input name="house" aria-label="House">
+            </form></body></html>
+            """
+          },
+          %{body: "<html><body><p>Saved</p></body></html>"}
+        ])
+
+      unquote(driver)
+      |> start_session()
+      |> visit(HTTPFixtures.path(fixture, "/start"))
+      |> fill_in("Name", with: "Hermione")
+      |> Fluffy.fill(Locator.by_label("House"), "Gryffindor")
+      |> Expect.expect(Expect.to_have_value(Locator.by_label("Name"), "Hermione"))
+      |> submit()
+      |> assert_has("p", text: "Saved")
+
+      [_source, submission] = HTTPFixtures.requests(fixture)
+      assert URI.decode_query(submission.body) == %{"name" => "Hermione", "house" => "Gryffindor"}
+    end
+
+    @tag driver: driver
     test "submit tracks the last field's owner across scopes and external form controls with #{driver}" do
       fixture =
         HTTPFixtures.register_sequence([
@@ -690,7 +770,9 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
         |> visit(HTTPFixtures.path(fixture, "/start"))
 
       assert_raise ArgumentError, ~r/no active form/, fn -> submit(session) end
-      assert_raise FunctionClauseError, fn -> apply(Fluffy, :fill, [session, Locator.by_label("First"), "native"]) end
+      # A native edit does not pick the form `submit/1` uses.
+      native = Fluffy.fill(session, Locator.by_label("First"), "native")
+      assert_raise ArgumentError, ~r/no active form/, fn -> submit(native) end
 
       updated =
         session
@@ -699,7 +781,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
         |> submit()
         |> assert_has("p", text: "Saved")
 
-      assert %Session{} = updated
+      assert %Fluffy.Session{} = updated
       assert_raise ArgumentError, ~r/no active form/, fn -> submit(updated) end
       [_source, submission] = HTTPFixtures.requests(fixture)
       assert URI.decode_query(submission.body) == %{"second" => "right form"}
@@ -1063,7 +1145,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
   test "prepared connections and scoped page operations preserve the updated connection" do
     for conn <- [Phoenix.ConnTest.build_conn(), put_endpoint(Phoenix.ConnTest.build_conn(), Endpoint)] do
       session = conn |> visit("/chamber?count=2&ready=true") |> assert_path("/chamber")
-      assert Fluffy.Session.backend(session.session) == Fluffy.Backend.Phoenix
+      assert Fluffy.Session.backend(session) == Fluffy.Backend.Phoenix
       assert_path(session, "/chamber", query_params: %{count: 2, ready: true})
       refute_path(session, "/other", query_params: %{count: 2, ready: true})
       refute_path(session, "/chamber", query_params: %{count: 3, ready: true})
@@ -1095,7 +1177,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
     end
   end
 
-  test "within rejects callbacks that discard their updated wrapper" do
+  test "within rejects callbacks that don't return a session" do
     session = Fluffy.session_for_html(:static, "<main></main>")
 
     assert_raise ArgumentError, ~r/^Fluffy.PhoenixTest.within\/3: callback must return/, fn ->

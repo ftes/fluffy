@@ -203,8 +203,8 @@ their `count:` and `at:` count visible matches only; [Locators](locators.md#loca
 covers strictness. Field predicates (`value:`, `checked:`, `selected:`) without `at:`
 add no visibility requirement, so they check hidden inputs too, and `selected:` on a select
 checks its selected option. For DOM presence, including hidden inputs or script
-elements, use a native count on the native session:
-`assert(facade.session, count(by_css("script[nonce]"), 1))`.
+elements, use a native count on the same session:
+`assert(session, count(by_css("script[nonce]"), 1))`.
 
 Phoenix does not compute CSS or browser layout: a CSS class or inline
 `display: none` alone does not make an element structurally invisible. Use

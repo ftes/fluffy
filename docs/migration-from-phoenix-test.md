@@ -9,9 +9,9 @@ maps PhoenixTest's common helpers to native steps.
 The `Fluffy.PhoenixTest` facade keeps PhoenixTest's `visit`, `fill_in`, `click_button`,
 `assert_has`, `assert_path`, `within` and `submit`, so tests change little. It fits plain
 PhoenixTest suites that use none of PhoenixTest.Playwright's extras, and works as a
-temporary step for a large suite. Anything beyond PhoenixTest's API goes through `unwrap`
-or `facade.session`; once a suite needs them for more than a few calls, rewrite it on the
-native API rather than mix the two styles. [Use the facade](#use-the-facade) covers its
+temporary step for a large suite. Anything beyond PhoenixTest's API is a native call in the
+same pipeline, since the facade's session is a plain `Fluffy.Session`; once a suite needs them
+for more than a few calls, rewrite it on the native API rather than mix the two styles. [Use the facade](#use-the-facade) covers its
 setup and differences.
 
 For what you gain, see [Why Fluffy](why-fluffy.md).
@@ -95,7 +95,7 @@ For what PhoenixTest.Playwright adds:
   session in your own setup ([Ecto sandbox](installation.md#ecto-sandbox),
   [Shared test case](usage.md#shared-test-case)). A context option
   tag such as `browser_context_opts` becomes `@tag Playwright.Test.use(...)`.
-- **Extra helpers** are native calls; on the facade, they take `facade.session`
+- **Extra helpers** are native calls, which take the facade's session as it is
   ([Using native Fluffy APIs](#using-native-fluffy-apis)).
   They take a locator where PhoenixTest.Playwright took a selector: a CSS selector goes in
   `Fluffy.Locator.by_css/1`, and `Selector.role/3` or `Selector.text/2` become `by_role/2` or
@@ -103,7 +103,7 @@ For what PhoenixTest.Playwright adds:
   - `evaluate`: `Fluffy.Playwright.evaluate/3`, with `arg:` positional and no `is_function:`;
     it returns the value instead of passing it to a callback. JavaScript run for its effect
     in a pipeline becomes `unwrap(&Playwright.Page.evaluate!(&1, js, arg))` (`Fluffy.unwrap/2`,
-    or on the facade `Fluffy.PhoenixTest.unwrap/2`, which keeps the facade session);
+    or on the facade `Fluffy.PhoenixTest.unwrap/2`);
   - `click(selector)` and `press`: `Fluffy.click/3` and `Fluffy.press/4`; `click`'s text
     argument becomes `filter(has: by_text(text))`, or `by_text(text)` chained under the
     selector before PhoenixTest.Playwright 0.16, which clicked the text itself;
@@ -114,8 +114,8 @@ For what PhoenixTest.Playwright adds:
     instead of `max_age:`;
   - `add_session_cookie`: same name, other arguments. `add_session_cookie(conn, [value: values], options)`
     becomes `Fluffy.add_session_cookie(session, values)`, with the options from the endpoint's
-    `session_options/0` ([Logging in](usage.md#logging-in)). On the facade, call it before the
-    session enters it, as `Fluffy.start_session(:playwright) |> Fluffy.add_session_cookie(values) |> visit("/")`;
+    `session_options/0` ([Logging in](usage.md#logging-in)). On the facade, pipe it in, as
+    `start_session(:playwright) |> Fluffy.add_session_cookie(values) |> visit("/")`;
   - `screenshot` and `assert_screenshot`: `Fluffy.Playwright.screenshot/2` (with `path:`,
     and `full_page: true` for the old default; it returns the PNG, not the session) and
     `Fluffy.Assert.page_match_screenshot/1` or `Fluffy.Expect.page_to_have_screenshot/1` (with `name:`);
@@ -186,8 +186,7 @@ import Fluffy.Assert, except: [assert_has: 2, assert_has: 3, refute_has: 2, refu
 import Fluffy.PhoenixTest
 ```
 
-Native assertions take the contained native session (`session.session`), while
-facade assertions take the facade session.
+Native and facade assertions take the same session, so they mix in one pipeline.
 
 ## Phoenix and browser tests in the same module
 
@@ -284,13 +283,18 @@ initial mount params. Browser tests use the application's real LiveSocket parame
 
 ### Using native Fluffy APIs
 
-Facade operations return a `Fluffy.PhoenixTest.Session` wrapper. Native Fluffy
-operations accept its contained `session` field:
+Facade operations take and return a plain `Fluffy.Session`, so native calls go in the same
+pipeline. They don't change the form `submit()` uses, and inside `within` they don't see its
+scope, so scope their locators explicitly:
 
 ```elixir
-facade = start_session(:playwright) |> visit("/potions")
-title = Fluffy.Playwright.evaluate(facade.session, "document.title")
-assert title == "Potions"
+session =
+  start_session(:playwright)
+  |> visit("/potions")
+  |> fill_in("Name", with: "Polyjuice")
+  |> Fluffy.press(Fluffy.Locator.by_label("Name"), "Tab")
+
+assert Fluffy.Playwright.evaluate(session, "document.title") == "Potions"
 ```
 
 This suits a few calls. When tests need them throughout, for browser scripting, pages

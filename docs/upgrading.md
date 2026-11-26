@@ -185,6 +185,9 @@ A browser session's timeouts follow Playwright Test and a Phoenix session's
 - Before a Phoenix session's first `visit`, page operations (actions, expectations,
   `reload`, `unwrap`, `open_browser`) raise `ArgumentError` instead of mostly
   `FunctionClauseError`.
+- `Fluffy.PhoenixTest` takes and returns a plain `Fluffy.Session`, and
+  `Fluffy.PhoenixTest.Session` is removed: replace `facade.session` with the session itself,
+  and a match on `%Fluffy.PhoenixTest.Session{}` with `%Fluffy.Session{}`.
 
 ## Workarounds that can go
 
@@ -251,13 +254,13 @@ that passed on 0.8 act differently:
   requirement.
 - The facade's `count:` and `at:` count visible matches only, as PhoenixTest.Playwright
   did, so `assert_has("input[type=hidden]", count: 1)` now fails. Check DOM presence with
-  a native count: `assert(facade.session, count(by_css("input[type=hidden]"), 1))`. On
+  a native count: `assert(session, count(by_css("input[type=hidden]"), 1))`. On
   Playwright the options of a closed `<select>` aren't visible, so count them natively too,
   or check the selected one with `selected:`.
 - Text matching skips `<script>` and `<style>`, as in Playwright, even as the matched
   element, so `assert_has("script", text: "...")` fails. Match attributes with a native
-  count (`assert(facade.session, count(by_css("script[nonce]"), 1))`), or read the text
-  with `Fluffy.text_content(facade.session, by_css("script#data"))`, on every driver.
+  count (`assert(session, count(by_css("script[nonce]"), 1))`), or read the text
+  with `Fluffy.text_content(session, by_css("script#data"))`, on every driver.
 - `select_option` with `[]` deselects every option, and a list mixing values with
   option maps raises. `to_have_values` requires a multiple select.
 - The facade's `click_button` no longer matches `<input type="file">`.

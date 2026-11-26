@@ -131,7 +131,6 @@ defmodule Fluffy.MixProject do
         ],
         "Sessions and results": [
           Fluffy.Session,
-          Fluffy.PhoenixTest.Session,
           Fluffy.Download,
           Fluffy.FileChooser,
           Fluffy.FilePayload
