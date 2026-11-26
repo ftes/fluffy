@@ -59,8 +59,9 @@ config :playwright, :test,
   # The tests write their baselines on first use: written and passed, not failed at the test's end.
   update_snapshots: :missing
 
-# CI keeps a screenshot of each failed test's pages in FLUFFY_ARTIFACT_DIR, and traces the
-# `--failed` retry, as Playwright's CI default (`trace: 'on-first-retry'`).
+# CI keeps a screenshot of each failed test's pages in FLUFFY_ARTIFACT_DIR and traces the
+# `--failed` retry when it runs, as Playwright's CI default (`trace: 'on-first-retry'`).
+# Module-level failures skip the retry.
 if artifact_dir = System.get_env("FLUFFY_ARTIFACT_DIR") do
   config :playwright, :test, output_dir: artifact_dir, screenshot: :only_on_failure, trace: :on_first_retry
 end

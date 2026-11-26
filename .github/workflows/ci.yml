@@ -193,10 +193,11 @@ jobs:
           save-apt-cache: ${{ matrix.lane == 'newest' && matrix.partition == 1 }}
       - name: Build test assets
         run: mix assets.build
-      # Test failures (exit 2) are retried once, only the failed tests (`mix test --failed`);
-      # compile errors are not. The retry takes no --partitions: the failures manifest holds this
-      # partition's failures only, and --partitions would split those files again. The first run's
-      # failures are annotated by Playwright.Test.GitHubFormatter, with a notice summing up the
+      # Individual test failures (exit 2) are retried once with `mix test --failed`. Compile
+      # errors and module-level failures skip the retry: a failed `setup_all` teardown may be
+      # missing from the failures manifest even when other tests are listed. The retry takes no
+      # --partitions: the manifest holds this partition's failures only, and --partitions would
+      # split those files again. Playwright.Test.GitHubFormatter annotates failures and sums up the
       # run, so a green retry does not hide them. As upstream annotates every attempt, the retry
       # is annotated too, under `Retry #1`, and its summary lists a test that passed there as flaky.
       # `--formatter` replaces test_helper's list, so each run names its formatters. The retry
@@ -208,6 +209,7 @@ jobs:
         id: tests
         env:
           FLUFFY_MODULE_TIMES_FILE: ${{ runner.temp }}/module-times.txt
+          FLUFFY_MODULE_FAILURES_FILE: ${{ runner.temp }}/module-failures
           LANE: ${{ matrix.lane }}
         run: |
           fluffy_test_seed=$RANDOM
@@ -226,6 +228,10 @@ jobs:
             sort -rn "$FLUFFY_MODULE_TIMES_FILE" | head -n 10
           fi
           if [[ $status != 2 ]]; then
+            exit "$status"
+          fi
+          if [[ -f "$FLUFFY_MODULE_FAILURES_FILE" ]]; then
+            echo "::notice::Skipping the failed-test retry because a test module failed."
             exit "$status"
           fi
 
