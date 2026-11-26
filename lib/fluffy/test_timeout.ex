@@ -20,13 +20,10 @@ defmodule Fluffy.TestTimeout do
     end
   end
 
-  @doc """
-  The deadline of an operation's timeout, its `timeout:` or its default (`Fluffy.Timeouts`),
-  bounded by the test's backstop. Without either, it never expires.
-  """
-  @spec deadline(timeout()) :: Fluffy.Deadline.t()
-  def deadline(timeout) do
-    case {fetch(), Fluffy.Deadline.new(timeout)} do
+  @doc "`deadline`, bounded by the test's backstop."
+  @spec bound(Fluffy.Deadline.t()) :: Fluffy.Deadline.t()
+  def bound(deadline) do
+    case {fetch(), deadline} do
       {nil, deadline} -> deadline
       {{_timeout, backstop}, :infinity} -> backstop
       {{_timeout, backstop}, deadline} -> min(deadline, backstop)

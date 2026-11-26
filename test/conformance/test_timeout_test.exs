@@ -182,6 +182,6 @@ defmodule Fluffy.Conformance.NoTestTimeoutTest do
 
   test "a test outside Playwright.Test has no test timeout" do
     assert Fluffy.TestTimeout.fetch() == nil
-    assert Fluffy.TestTimeout.deadline(:infinity) == :infinity
+    assert Fluffy.Driver.Live.Retry.deadline(:infinity) == :infinity
   end
 end

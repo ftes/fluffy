@@ -46,7 +46,10 @@ defmodule Fluffy.Driver.Live do
 
   @impl true
   def expect(%Session{} = session, %Expect{} = expectation) do
-    deadline = deadline(expectation.options)
+    deadline =
+      expectation.options
+      |> Timeouts.get(&Timeouts.phoenix/0)
+      |> Retry.deadline()
 
     result =
       eventually(session, deadline, fn session ->
@@ -552,7 +555,11 @@ defmodule Fluffy.Driver.Live do
   # it on to the new page, within its timeout. A read that finds no target, such as
   # `all_text_contents`, reads once.
   defp read(session, operation, [locator | _rest] = arguments, read) do
-    deadline = deadline(List.last(arguments))
+    deadline =
+      arguments
+      |> List.last()
+      |> Timeouts.get(&Timeouts.phoenix/0)
+      |> Retry.deadline()
 
     case eventually(session, deadline, &ActionResolver.attempt(&1, locator, read)) do
       {:redirected, session, navigation} -> retry_on_new_page(session, navigation, operation, arguments, deadline)
@@ -669,7 +676,11 @@ defmodule Fluffy.Driver.Live do
   # following a navigation leaves its session on its page with the navigation
   # unread. `arguments` are the driver call's own, which the retry repeats.
   defp act(session, operation, arguments, action) do
-    deadline = deadline(List.last(arguments))
+    deadline =
+      arguments
+      |> List.last()
+      |> Timeouts.get(&Timeouts.phoenix/0)
+      |> Retry.deadline()
 
     result =
       ActionScope.run(fn ->
@@ -722,9 +733,6 @@ defmodule Fluffy.Driver.Live do
 
     {:navigate, session, %{navigation | redirects: redirects}, retry}
   end
-
-  # An operation's deadline: its `timeout:`, else the Phoenix one, bounded by the test's.
-  defp deadline(options), do: options |> Timeouts.get(&Timeouts.phoenix/0) |> Fluffy.TestTimeout.deadline()
 
   defp put_timeout(%Expect{} = expectation, timeout), do: Expect.Internal.merge_options(expectation, timeout: timeout)
   defp put_timeout(options, timeout), do: Keyword.put(options, :timeout, timeout)

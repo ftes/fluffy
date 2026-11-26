@@ -16,7 +16,7 @@ defmodule Fluffy.TestTimeoutTest do
   @tag timeout: :infinity
   test "a test without a timeout has no backstop" do
     assert TestTimeout.fetch() == nil
-    assert TestTimeout.deadline(:infinity) == :infinity
+    assert TestTimeout.bound(:infinity) == :infinity
   end
 
   test "a Task of the test gets the test's backstop" do
@@ -28,22 +28,18 @@ defmodule Fluffy.TestTimeoutTest do
     test = self()
 
     spawn(fn ->
-      before = System.monotonic_time(:millisecond)
-      outside = {:outside, TestTimeout.fetch(), TestTimeout.deadline(:infinity), TestTimeout.deadline(42)}
-      send(test, {outside, before, System.monotonic_time(:millisecond)})
+      send(test, {:outside, TestTimeout.fetch(), TestTimeout.bound(:infinity), TestTimeout.bound(42)})
     end)
 
-    assert_receive {{:outside, nil, :infinity, deadline}, before, later}
-    assert deadline in (before + 42)..(later + 42)
+    assert_receive {:outside, nil, :infinity, 42}
   end
 
   test "the backstop bounds a later deadline and none" do
     {_timeout, backstop} = TestTimeout.fetch()
-    remaining = Fluffy.Deadline.remaining(backstop)
 
-    assert TestTimeout.deadline(:infinity) == backstop
-    assert TestTimeout.deadline(remaining + 1_000) == backstop
-    assert TestTimeout.deadline(0) < backstop
+    assert TestTimeout.bound(:infinity) == backstop
+    assert TestTimeout.bound(backstop + 1) == backstop
+    assert TestTimeout.bound(backstop - 1) == backstop - 1
   end
 
   @tag timeout: 2_000

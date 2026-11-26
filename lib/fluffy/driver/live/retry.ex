@@ -5,9 +5,12 @@ defmodule Fluffy.Driver.Live.Retry do
   alias Fluffy.Session
   alias Fluffy.TestTimeout
 
-  # `deadline` is the operation's `Fluffy.TestTimeout.deadline/1`: a retry without a limit
+  # The deadline of an operation's timeout, its `timeout:` or its default
+  # (`Fluffy.Timeouts`), bounded by the test's (`Fluffy.TestTimeout`): a retry without a limit
   # fails with Fluffy's error before ExUnit's timeout, as a Playwright call does when
-  # Playwright.Test closes its context then.
+  # Playwright.Test closes its context then. Without either, it goes on until ExUnit's.
+  def deadline(timeout), do: timeout |> Deadline.new() |> TestTimeout.bound()
+
   def run(%Session{} = session, deadline, attempt, refresh, wait_for_retry)
       when (is_integer(deadline) or deadline == :infinity) and is_function(attempt, 1) and is_function(refresh, 1) and
              is_function(wait_for_retry, 2) do
