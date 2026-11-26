@@ -9,6 +9,7 @@ import sys
 from urllib.parse import quote
 
 import run
+from publish import BOT_EMAIL, PROTECTED, commit, pull_requests, push, remote_head, stage
 
 
 AGENT_COMMAND = re.compile(r"(?<![\w@/])/agent(?![\w/-])", re.I)
@@ -18,8 +19,6 @@ REQUEST_KEY = {
     "pull_request_review": "review",
     "issues": "issue",
 }
-BOT_EMAIL = f"219766164+{run.BOT}@users.noreply.github.com"
-PROTECTED = (".git", ".github", ".opencode", ".claude", ".agents", "tmp/opencode")
 
 
 def authorize(event, event_name):
@@ -58,12 +57,6 @@ def target(event, event_name, default_branch, run_id):
     return {"run": "true", "number": number, "branch": f"opencode/issue-{number}-{run_id}"}
 
 
-def protected(path):
-    name = Path(path).name
-    return (any(path == entry or path.startswith(f"{entry}/") for entry in PROTECTED)
-            or path.startswith("opencode.json") or name.endswith(".env") or ".env." in name)
-
-
 def settings():
     config = run.config()
     config["agents"]["ci"]["steps"] = 50
@@ -72,42 +65,6 @@ def settings():
     patterns = [pattern for path in PROTECTED for pattern in (path, f"{path}/*")]
     rules.extend(run.permission("edit", pattern, "deny") for pattern in (*patterns, "opencode.json*", "*.env", "*.env.*"))
     return config
-
-
-def stage(parent):
-    run.check(run.git("rev-parse", "HEAD") == parent, "The checkout moved during the command")
-    run.git("add", "-A")
-    paths = run.git("diff", "--cached", "--name-only", "--no-renames", "-z", raw=True)
-    for path in os.fsdecode(paths).split("\0"):
-        run.check(not protected(path), "Command cannot publish changes to workflow or agent configuration")
-    return bool(paths)
-
-
-def commit(title, body, parent):
-    run.git("-c", f"user.name={run.BOT}", "-c", f"user.email={BOT_EMAIL}", "-c", "commit.gpgsign=false",
-            "commit", "--cleanup=verbatim", "-m", title, "-m", body)
-    run.check(run.git("rev-parse", "HEAD^") == parent, "Unexpected commit parent")
-    return run.git("rev-parse", "HEAD")
-
-
-def remote_head(branch):
-    ref = f"refs/heads/{branch}"
-    try:
-        listing = run.git("ls-remote", "--exit-code", "--refs", "origin", ref)
-    except subprocess.CalledProcessError as error:
-        if error.returncode == 2:
-            return None
-        raise
-    sha, remote_ref = listing.split("\t")
-    run.check(remote_ref == ref, "Unexpected remote branch")
-    return sha
-
-
-def push(branch, token, expected):
-    ref = f"refs/heads/{branch}"
-    run.git("check-ref-format", ref)
-    run.git("push", f"--force-with-lease={ref}:{expected}", f"https://github.com/{run.REPO}.git", f"HEAD:{ref}",
-            env=run.git_http_env(token))
 
 
 def one_line(value):
@@ -134,9 +91,7 @@ def recover(branch, marker, head=None):
 
 def issue_pr(number, branch, base, publication, token):
     sha, title, reply = publication
-    owner = run.REPO.split("/")[0]
-    head = quote(f"{owner}:{branch}", safe="")
-    matches = run.api(f"pulls?state=all&head={head}", token=token, paginate=True)
+    matches = pull_requests(branch, token=token)
     if matches:
         pr = matches[0]
         run.check(len(matches) == 1 and run.local_pr(pr) and pr["head"]["sha"] == sha
