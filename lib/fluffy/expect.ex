@@ -24,7 +24,7 @@ defmodule Fluffy.Expect do
   alias Fluffy.Session
 
   @enforce_keys [:target, :kind]
-  defstruct [:target, :kind, :expected, options: [], negated?: false]
+  defstruct [:target, :kind, :expected, :description, options: [], negated?: false]
 
   @dialyzer {:nowarn_function, expect: 3}
 
@@ -73,6 +73,7 @@ defmodule Fluffy.Expect do
           target: target(),
           kind: kind(),
           expected: term(),
+          description: String.t() | nil,
           options: keyword(),
           negated?: boolean()
         }

@@ -306,6 +306,18 @@ defmodule Fluffy.Options do
                           end)
   @expectation_schema NimbleOptions.new!(@timeout_options)
 
+  @page_path_schema NimbleOptions.new!(
+                      @timeout_options ++
+                        [
+                          params: [
+                            type:
+                              {:or,
+                               [{:map, {:or, [:string, :atom]}, {:or, [:string, :atom, :integer, :float]}}, {:fun, 1}]},
+                            doc: "A subset of the decoded query parameters, or a predicate over the decoded query map."
+                          ]
+                        ]
+                    )
+
   @file_input_schema NimbleOptions.new!(
                        @timeout_options ++
                          [
@@ -551,6 +563,9 @@ defmodule Fluffy.Options do
 
   @doc false
   def expectation_schema, do: @expectation_schema
+
+  @doc false
+  def page_path_schema, do: @page_path_schema
 
   @doc false
   def file_input_schema, do: @file_input_schema

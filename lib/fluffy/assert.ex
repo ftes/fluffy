@@ -38,6 +38,8 @@ defmodule Fluffy.Assert do
 
   alias Playwright.Test.Assertions
 
+  @type page_path_option :: unquote(NimbleOptions.option_typespec(Fluffy.Options.page_path_schema()))
+
   @doc group: "Running expectations"
   @doc "Imports the assertion vocabulary without conflicts with ExUnit or `Playwright.Test.Assertions`."
   defmacro __using__(_options) do
@@ -294,6 +296,40 @@ defmodule Fluffy.Assert do
   defdelegate page_url(expected, options \\ []), to: Fluffy.Expect, as: :page_to_have_url
 
   @doc group: "Page assertions"
+  @doc """
+  Expects the active page's URI path to equal `expected`, ignoring the origin and fragment.
+
+  Without `params:`, the query is ignored. A map matches a subset of the decoded query,
+  regardless of order. Flat atom or string keys and scalar values (strings, atoms, and
+  numbers) are converted with `to_string/1`. A unary predicate receives the decoded query
+  as a map with string keys and values and returns whether it matches. An absent or empty
+  query is `%{}`. Keep predicates quick and nonblocking.
+
+  Decoding follows `URI.decode_query/1`, so the last value for a repeated key wins.
+  For the full URL, raw query, or repeated pairs, use `page_url/2`.
+
+      assert(session, page_path("/potions"))
+      assert(session, page_path("/potions", params: %{state: "brewing", page: 2}))
+      refute(session, page_path("/potions", params: &Map.has_key?(&1, "finished")))
+
+  ## Options
+
+  #{NimbleOptions.docs(Fluffy.Options.page_path_schema())}
+  """
+  @spec page_path(String.t(), [page_path_option()]) :: Fluffy.Expect.t()
+  def page_path(expected, options \\ []) when is_binary(expected) and is_list(options) do
+    {params, options} = options |> NimbleOptions.validate!(Fluffy.Options.page_path_schema()) |> Keyword.pop(:params)
+    description = "active page to have path #{inspect(expected)}"
+    description = if is_nil(params), do: description, else: "#{description} with params #{inspect(params)}"
+    matches_params? = query_predicate(params)
+
+    expectation =
+      page_url(fn %URI{path: path, query: query} -> path == expected and matches_params?.(query) end, options)
+
+    %{expectation | description: description}
+  end
+
+  @doc group: "Page assertions"
   @doc playwright_only: true
   @doc "Equivalent to `Fluffy.Expect.page_to_have_screenshot/1`. Requires Playwright."
   @spec page_match_screenshot([Fluffy.Expect.to_have_screenshot_option()]) :: Fluffy.Expect.t()
@@ -345,4 +381,16 @@ defmodule Fluffy.Assert do
           Fluffy.Event.option()
         ]) :: Fluffy.Session.t()
   defdelegate assert_event(session, event, action, assertion, options), to: Fluffy.Expect, as: :expect_event
+
+  defp query_predicate(nil), do: fn _query -> true end
+
+  defp query_predicate(params) when is_map(params) do
+    pairs = Enum.map(params, fn {key, value} -> {to_string(key), to_string(value)} end)
+
+    query_predicate(fn decoded ->
+      Enum.all?(pairs, fn {key, value} -> Map.fetch(decoded, key) == {:ok, value} end)
+    end)
+  end
+
+  defp query_predicate(predicate), do: fn query -> predicate.(URI.decode_query(query || "")) end
 end

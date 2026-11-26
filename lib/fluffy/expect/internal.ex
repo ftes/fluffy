@@ -126,6 +126,8 @@ defmodule Fluffy.Expect.Internal do
 
   defp validate_options!(options), do: Options.validate_expectation!(options)
 
+  defp positive_description(%Expect{description: description}) when is_binary(description), do: description
+
   defp positive_description(%Expect{target: {:locator, locator}, kind: kind, expected: expected}) do
     "#{Locator.Internal.describe(locator)} #{locator_matcher_description(kind, expected)}"
   end
