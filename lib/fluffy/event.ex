@@ -88,8 +88,7 @@ defmodule Fluffy.Event do
     deadline =
       options
       |> Fluffy.Timeouts.get(fn -> Fluffy.Timeouts.event(session) end)
-      |> Fluffy.Deadline.new()
-      |> Fluffy.TestTimeout.bound()
+      |> Fluffy.TestTimeout.deadline()
 
     pid = Subscription.start(session, event, source, :wait, nil, deadline)
     Pending.new(pid)
