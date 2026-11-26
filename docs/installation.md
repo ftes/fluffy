@@ -245,6 +245,10 @@ For annotations of failed tests, run the first `mix test` with
 `Playwright.Test.GitHubFormatter`), listing every formatter you use, since `--formatter`
 replaces the default list.
 
+If you retry failed tests in CI, see Playwright's [retry recipe](`e:playwright:test-artifacts.md#retries`).
+Before Elixir 1.21, `mix test --failed` can miss a failure in an `on_exit` callback
+registered in `setup_all`, so a green retry may leave that failure untested.
+
 Configure the backend in `config/test.exs`. The browser and its driver are
 `Playwright.Test`'s, as are its [timeouts](#timeouts):
 
