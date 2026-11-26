@@ -63,10 +63,10 @@ need `import Fluffy.Locator.Roles`):
 When rewriting, preserve the original assertion's intent:
 
 - Native `assert_has` and `refute_has` (like `visible`) use the same visibility rules but reject multiple matches.
-  If the old assertion searched the whole page for visible text, locate the text itself:
-  `assert_has(by_text("Shared spellbook"))`. Prefer a named role for a
-  heading, link, or control, scoped to the relevant section when needed. A filter on `body`
-  checks that the body is visible and contains the text somewhere.
+  Locate the text itself, or use a named role for a heading, link, or control. Scope
+  the locator to the relevant section when possible. If any visible occurrence is
+  enough, use `assert_has(by_text("Shared spellbook") |> filter(visible: true) |> first())`.
+  A filter on `body` checks that the body is visible and contains the text somewhere.
 - For DOM presence or absence, use `attached` or a native `count`. This matters for
   [options in a closed dropdown](actions.md#selects-and-options): assert the option
   is present to test availability, or assert the select's value or selected option text
