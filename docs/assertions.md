@@ -28,7 +28,8 @@ test "registers a creature" do
   |> visit("/creatures/new")
   |> fill(by_label("Name"), "Basilisk")
   |> click(by_role(:button, name: "Register"))
-  |> assert(visible(by_text("Creature registered")))
+  |> assert_has(by_text("Creature registered"))
+  |> refute_has(by_text("Saving…"))
   |> refute(page_title("Error"))
   |> assert(page_url("/creatures/basilisk"))
 
@@ -37,9 +38,9 @@ test "registers a creature" do
 end
 ```
 
-For visibility checks, `assert_has(session, locator, options \\ [])` and
-`refute_has(session, locator, options \\ [])` are shorthand for
-`assert(session, visible(locator), options)` and its refutation:
+`assert_has(locator)` is shorthand for `assert(visible(locator))`, and `refute_has(locator)`
+for `refute(visible(locator))`. Use `assert` and `refute` for every other assertion. Options
+such as `timeout:` go in the shorthand's options argument:
 
 ```elixir
 session
@@ -295,7 +296,7 @@ session =
   Playwright.Expect.to_pass!(fn ->
     session
     |> click(by_role(:button, name: "Check the owlery"), timeout: 1_000)
-    |> assert(visible(by_text("A letter for Harry")), timeout: 0)
+    |> assert_has(by_text("A letter for Harry"), timeout: 0)
   end)
 ```
 

@@ -15,7 +15,7 @@ defmodule Fluffy.Assert do
   Inside a test with an initialized session:
 
       session
-      |> assert(visible(by_text("Creature registered")))
+      |> assert_has(by_text("Creature registered"))
       |> refute(page_title("Error"))
 
   Locator constructors take a locator. Page constructors target the active page.

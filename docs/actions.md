@@ -18,7 +18,7 @@ session
 |> assert(value(by_label("Keeper"), "Rubeus Hagrid"))
 |> assert(editable(by_label("Keeper")))
 |> assert(checked(by_label("Flute ready")))
-|> assert(visible(by_text("Creature saved")))
+|> assert_has(by_text("Creature saved"))
 ```
 
 `clear` empties a text input or textarea, like `fill` with `""`. `set_checked`
@@ -147,7 +147,7 @@ session
 |> Playwright.emulate_media(color_scheme: :dark)
 |> Playwright.dblclick(by_role(:cell, name: "Fluffy"))
 |> Keyboard.press("Enter")
-|> assert(visible(by_text("Fluffy's chamber")))
+|> assert_has(by_text("Fluffy's chamber"))
 |> Playwright.screenshot(by_css("table"), path: "tmp/creatures.png")
 ```
 
@@ -197,9 +197,9 @@ Use `Fluffy.reload/1` to reload the active document:
 ```elixir
 session
 |> visit("/chambers/secrets")
-|> assert(visible(by_role(:heading, name: "Chamber of Secrets")))
+|> assert_has(by_role(:heading, name: "Chamber of Secrets"))
 |> reload()
-|> assert(visible(by_role(:heading, name: "Chamber of Secrets")))
+|> assert_has(by_role(:heading, name: "Chamber of Secrets"))
 |> assert(page_url("/chambers/secrets"))
 ```
 
@@ -286,7 +286,7 @@ session
 # The search input has phx-debounce="500": nothing is sent yet.
 |> fill(by_label("Search"), "Lumos")
 |> Clock.run_for(500)
-|> assert(visible(by_text("1 spell found")))
+|> assert_has(by_text("1 spell found"))
 ```
 
 `Fluffy.Playwright.Clock.run_for/3` fires every timer due on the way,

@@ -17,7 +17,7 @@ defmodule Fluffy do
       |> visit("/creatures/new")
       |> fill(by_label("Name"), "Basilisk")
       |> click(by_role(:button, name: "Register"))
-      |> assert(visible(by_text("Creature registered")))
+      |> assert_has(by_text("Creature registered"))
 
   Unless a function documents additional entries, action, assertion, reload,
   and event-wait option lists accept:

@@ -332,7 +332,7 @@ route(session, "/api/prophet", &send(test, {:held, &1}))
 
 session
 |> visit("/prophet")
-|> assert("Loading" |> by_text() |> visible())
+|> assert_has("Loading" |> by_text())
 
 assert_receive {:held, route}
 Route.fulfill!(route, json: %{title: "Evening Edition"})

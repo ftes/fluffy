@@ -25,7 +25,7 @@ creature_row =
 start_session(:phoenix)
 |> visit("/creatures")
 |> click(by_role(creature_row, :button, name: "Play flute"))
-|> assert(visible(by_role(creature_row, :cell, name: "Asleep")))
+|> assert_has(by_role(creature_row, :cell, name: "Asleep"))
 ```
 
 This example assumes the imports and test setup below. Locators are reusable

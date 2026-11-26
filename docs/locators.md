@@ -16,7 +16,7 @@ Prefer locators that describe the interface as a user experiences it:
 session
 |> fill(by_label("Name"), "Basilisk")
 |> click(by_role(:button, name: "Register"))
-|> assert(visible(by_text("Creature registered")))
+|> assert_has(by_text("Creature registered"))
 ```
 
 Locators are values, so they can be scoped and reused:

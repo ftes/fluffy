@@ -82,7 +82,7 @@ session
 |> unwrap(fn %Phoenix.LiveViewTest.View{} = view ->
   Phoenix.LiveViewTest.render_hook(view, "open-chamber", %{"phrase" => "open"})
 end)
-|> assert(visible(by_text("Chamber opened")))
+|> assert_has(by_text("Chamber opened"))
 ```
 
 To read a value instead, use `Fluffy.unwrap_and_return/2`. It returns the
@@ -124,7 +124,7 @@ callback's result instead:
 ```elixir
 session
 |> Fluffy.Playwright.unwrap(by_role(:button, name: "Rename"), &Playwright.Locator.dblclick!/1)
-|> assert(visible(by_label("Name")))
+|> assert_has(by_label("Name"))
 ```
 
 A `Fluffy.Download` and `Fluffy.FileChooser` keep their Playwright counterpart private;
