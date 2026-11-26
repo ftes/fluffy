@@ -47,7 +47,7 @@ Static and LiveView raise `Fluffy.CapabilityError` for indeterminate state.
 `select_option` targets the select, not an option, and matches an option by its value or
 label; `%{value: value}` and `%{label: label}` match only one of them. Assert the selection
 with the select's value, `value/2` (`values/2` for a multiple select), or with the selected
-option's label through a role locator:
+option's text through a role locator:
 
 ```elixir
 # <select id="house"> with <option value="ravenclaw">Ravenclaw</option> and three more
@@ -64,10 +64,18 @@ A dropdown, a select without `multiple` and with no `size` above 1, is closed, a
 closed dropdown's options have no box in a browser, so they are invisible. Static and
 LiveView treat them the same. `visible`, `assert_has`, `filter(visible: true)` and the
 facade's `count:` and `at:` don't see them: a facade `assert_has("#house option", count: 4)`
-counts 0. Count them with `count/2`, which doesn't filter visibility, as above. Role
-locators still find them, as in Playwright, and the facade's
-`assert_has("#house", selected: "Ravenclaw")` checks the selection. A list box, a
-`multiple` select or one with a `size` above 1, shows its options.
+counts 0. Native `count/2` and `attached/1` don't filter visibility. To check DOM
+presence or absence, scope a CSS locator to the select, for example
+`option = by_css(house, "option[value=ravenclaw]")`. Use `assert(attached(option))` for
+presence or `assert(count(option, 1))` for exactly one match. Use `assert(count(option, 0))`
+for absence. A role locator still finds ordinary closed options, but excludes options
+hidden from the accessibility tree, such as `<option aria-hidden="true">`.
+
+In the facade, `assert_has("#house", value: "ravenclaw")` checks the current selection
+by its submitted value, and `assert_has("#house", selected: "Ravenclaw")` matches the
+selected option's normalized text. It does not read the option's `label` attribute, which
+can override what is displayed. Neither assertion passes just because an option is available.
+A list box, a `multiple` select or one with a `size` above 1, shows its options.
 
 A `<datalist>` and its options are never rendered: fill its input with an option's value,
 and find the options with `count/2` or `by_role(:option, include_hidden: true)`, whose

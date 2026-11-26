@@ -63,7 +63,14 @@ need `import Fluffy.Locator.Roles`):
 When rewriting, preserve the original assertion's intent:
 
 - Native `assert_has` and `refute_has` (like `visible`) use the same visibility rules but reject multiple matches.
-  For DOM presence/absence, use counts as described in [Visibility and DOM presence](assertions.md#visibility-and-dom-presence).
+  Locate the text itself, or use a named role for a heading, link, or control. Scope
+  the locator to the relevant section when possible. If any visible occurrence is
+  enough, use `assert_has(by_text("Shared spellbook") |> filter(visible: true) |> first())`.
+  A filter on `body` checks that the body is visible and contains the text somewhere.
+- For DOM presence or absence, use `attached` or a native `count`. This matters for
+  [options in a closed dropdown](actions.md#selects-and-options): assert the option
+  is present to test availability, or assert the select's value or selected option text
+  to test the selection.
 - Native text, role-name, and label locators default to substring matching;
   use `exact: true` to retain exact field labels. Facade `text:` without `exact: true` ignores
   case, except on `"title"`; native `text` and `contain_text` don't, so pass `ignore_case: true`
@@ -133,7 +140,16 @@ For what PhoenixTest.Playwright adds:
   checkbox did not change its state"; Fluffy raises it, as Playwright does, on both backends.
   It means the app set the box back after the click, such as a hook mirroring server state:
   click it and assert `checked` instead. A click toggles, so do this only where the test knows
-  the box's state before.
+  the box's state before. For a switch or radio card whose input is hidden, pass the
+  visible label element to the native `check` or `uncheck`, for example
+  `check(by_css("label[for=terms]"))`. `by_label("Accept the terms")` would locate the
+  input, rather than the label element the user clicks.
+- **Hand-written waits:** replace sleeps and JavaScript loops over page text with an
+  assertion on the resulting UI. For example, after submitting a form expected to fail,
+  wait for the rejection message before checking that a database row is unchanged;
+  a check of the row alone could pass before the save runs. Use `Fluffy.Playwright.wait_for_function`
+  for a condition that needs browser-side JavaScript, `poll` for a value outside the DOM,
+  or `pass` to retry a block of assertions.
 - **Direct `PlaywrightEx` calls:** use playwright_ex 1.65's `Playwright` API through `unwrap`,
   whose callback gets the `Playwright.Page` instead of a map. It returns JS `null` as `:null`.
 

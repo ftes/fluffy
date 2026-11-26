@@ -412,7 +412,11 @@ closes.
 A LiveView's process exits shortly after its browser closes, so the test waits, up to 5 seconds,
 for the LiveViews its browser sessions connected to exit before the owner stops: their
 `terminate/2` can still use the database. This covers sessions started in the test process or its
-`setup`, not from a Task.
+`setup`, not from a Task. This wait runs after the test process has exited, so it
+does not keep that process's Mox stubs alive. If a test action triggers work that
+uses a stub, wait for that work before returning. For work triggered by browser
+teardown itself, such as a `pagehide` push when the session closes in `on_exit`,
+use a test adapter that stays available through teardown.
 
 The defaults are the `x-fluffy-sandbox` header and
 `Ecto.Adapters.SQL.Sandbox`. Applications that already use Phoenix Ecto's
