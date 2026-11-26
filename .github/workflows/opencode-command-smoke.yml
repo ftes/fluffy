@@ -1,0 +1,35 @@
+name: OpenCode command smoke
+
+on:
+  pull_request:
+    types: [opened]
+
+permissions: {}
+
+jobs:
+  smoke:
+    if: github.event.pull_request.draft && github.event.pull_request.user.login == github.repository_owner && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'opencode-maintainer-commands'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check the gate token can read collaborator permissions
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACTOR: ${{ github.event.pull_request.user.login }}
+        run: gh api "repos/$GITHUB_REPOSITORY/collaborators/$ACTOR/permission" --jq .permission | grep -E '^(admin|maintain|write)$'
+      - name: Test the command gate and publisher
+        run: python3 -B -m unittest discover -s .github/opencode
+      - id: auth
+        uses: ./.github/actions/opencode
+        with:
+          client-id: ${{ vars.OPENCODE_CLIENT_ID }}
+      - name: Verify an OpenCode token was returned
+        env:
+          OPENCODE_API_KEY: ${{ steps.auth.outputs.token }}
+        run: test -n "$OPENCODE_API_KEY"
