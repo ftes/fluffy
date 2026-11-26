@@ -30,8 +30,9 @@ def check(condition, message):
 
 
 def capture(*args, raw=False, **kwargs):
-    value = subprocess.check_output(args, text=True, **kwargs)
-    return value if raw else value.strip()
+    if raw:
+        return subprocess.check_output(args, **kwargs)
+    return subprocess.check_output(args, text=True, **kwargs).strip()
 
 
 def git(*args, **kwargs):
@@ -87,7 +88,11 @@ def trusted(comment):
 
 
 def save(name, value):
-    (CONTEXT / name).write_text(value if isinstance(value, str) else json.dumps(value, ensure_ascii=False))
+    path = CONTEXT / name
+    if isinstance(value, bytes):
+        path.write_bytes(value)
+    else:
+        path.write_text(value if isinstance(value, str) else json.dumps(value, ensure_ascii=False))
 
 
 def context(number):
@@ -237,10 +242,6 @@ def reviewed_diff(marker):
     return git(*DIFF_ARGS, merge_base, head, raw=True)
 
 
-def patch_id(diff):
-    return git("patch-id", "--verbatim", input=diff)
-
-
 def review_marker(body):
     match = re.search(
         r"<!-- (?:claude|opencode)-review: ([0-9a-f]{40}) ([0-9a-f]{40})"
@@ -320,7 +321,7 @@ def reconcile_reviews(number, token=None):
     items = api(f"pulls/{number}/reviews", paginate=True)
     stale = {}
     current_verdict = None
-    current_patch = None
+    current_diff = None
     # GitHub lists reviews chronologically; the last verdict for this diff wins.
     for item in items:
         user = item["user"] or {}
@@ -333,18 +334,18 @@ def reconcile_reviews(number, token=None):
                 continue
             if marker[2:] == (target, base):
                 try:
-                    if current_patch is None:
-                        current_patch = patch_id(snapshot_diff(pr)[1])
-                    if patch_id(reviewed_diff(marker)) == current_patch:
+                    if current_diff is None:
+                        current_diff = snapshot_diff(pr)[1]
+                    if reviewed_diff(marker) == current_diff:
                         current_verdict = item["state"]
                         continue
                 except subprocess.CalledProcessError:
                     print("Could not verify unchanged diff for the previous review.")
             stale[item["id"]] = STALE_VERDICT
-    # Main's ruleset dismisses approvals when the diff changes. A same-head retarget
-    # can retain a legacy approval, whose verdict did not identify the base.
+    # Main's ruleset dismisses approvals when the diff changes. A retarget can keep
+    # a legacy approval, whose verdict did not identify the base.
     legacy = [item for item in items if legacy_verdict(item)]
-    legacy_approvals = [item for item in legacy if item["state"] == "APPROVED" and item["commit_id"] == head]
+    legacy_approvals = [item for item in legacy if item["state"] == "APPROVED"]
     retargeted_at = last_retarget(number, ref) if legacy_approvals else None
     for item in legacy:
         if current_verdict == "APPROVED" and item["state"] == "CHANGES_REQUESTED":
@@ -377,7 +378,7 @@ def review(number, head, prompt, retargeted=False):
         old_head, old_base, _, _ = previous
         try:
             old = reviewed_diff(previous)
-            if patch_id(old) == patch_id(full):
+            if old == full:
                 if previous_active:
                     print("Same changes as the previous review; skipping.")
                     return

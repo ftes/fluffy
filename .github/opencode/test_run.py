@@ -154,9 +154,8 @@ class PublishTest(unittest.TestCase):
         ]
         with (patch.object(run, "api", side_effect=[pr, reviews, pr]),
               patch.object(run, "app_token", return_value=contextlib.nullcontext("token")),
-              patch.object(run, "snapshot_diff", return_value=("base", "current")),
-              patch.object(run, "reviewed_diff", return_value="older"),
-              patch.object(run, "patch_id", side_effect=lambda diff: diff),
+              patch.object(run, "snapshot_diff", return_value=("base", b"@@ -20 +20 @@\n-old\n+new\n")),
+              patch.object(run, "reviewed_diff", return_value=b"@@ -1 +1 @@\n-old\n+new\n"),
               patch.object(run, "dismiss_review") as dismiss, patch.object(run, "agent") as agent):
             run.reconcile_reviews(42)
         self.assertEqual([call.args for call in dismiss.call_args_list],
@@ -169,6 +168,7 @@ class PublishTest(unittest.TestCase):
         legacy = {"type": "Bot", "login": run.LEGACY_BOT}
         approval = {"id": 10, "body": "Verdict: OK to merge.", "state": "APPROVED",
                     "user": legacy, "commit_id": head, "submitted_at": "2026-11-26T10:00:00Z"}
+        older_approval = dict(approval, id=14, commit_id="d" * 40)
         request = {"id": 11, "body": "Verdict: Issues found: 1 blocking, 0 non-blocking.",
                    "state": "CHANGES_REQUESTED", "user": legacy, "commit_id": "d" * 40}
         other_approval = dict(approval, id=12, body="An unrelated review")
@@ -177,10 +177,10 @@ class PublishTest(unittest.TestCase):
         for retarget, new_review, expected in (
             (None, [], []),
             ("2026-11-26T09:59:00Z", [], []),
-            ("2026-11-26T10:01:00Z", [], [(10, run.STALE_VERDICT)]),
+            ("2026-11-26T10:01:00Z", [], [(10, run.STALE_VERDICT), (14, run.STALE_VERDICT)]),
             (None, [current], [(11, run.REPLACED_VERDICT)]),
         ):
-            reviews = [approval, request, other_approval, *new_review]
+            reviews = [approval, request, other_approval, older_approval, *new_review]
             with (patch.object(run, "api", side_effect=[pr, reviews, pr]),
                   patch.object(run, "app_token", return_value=contextlib.nullcontext("token")),
                   patch.object(run, "last_retarget", return_value=retarget) as timeline,
@@ -213,9 +213,8 @@ class PublishTest(unittest.TestCase):
         previous = {"id": 1, "body": self.marker(self.pr(head="e" * 40)), "state": "APPROVED",
                     "user": {"type": "Bot", "login": run.BOT}}
         with (patch.object(run, "api", side_effect=[pr, [previous], pr, [], [previous]]),
-              patch.object(run, "snapshot_diff", return_value=("b" * 40, "current")),
-              patch.object(run, "reviewed_diff", return_value="older"),
-              patch.object(run, "patch_id", return_value="same"),
+              patch.object(run, "snapshot_diff", return_value=("b" * 40, b"same diff")),
+              patch.object(run, "reviewed_diff", return_value=b"same diff"),
               patch.object(run, "app_token") as token, patch.object(run, "agent") as agent,
               contextlib.redirect_stdout(io.StringIO())):
             run.reconcile_reviews(42)
@@ -232,9 +231,8 @@ class PublishTest(unittest.TestCase):
         request = dict(approval, id=3, state="CHANGES_REQUESTED", body=self.marker(pr))
         for newest in ([], [request]):
             with (patch.object(run, "api", side_effect=[pr, [legacy, approval, *newest], pr]),
-                  patch.object(run, "snapshot_diff", return_value=("b" * 40, "current")),
-                  patch.object(run, "reviewed_diff", return_value="older"),
-                  patch.object(run, "patch_id", return_value="same"),
+                  patch.object(run, "snapshot_diff", return_value=("b" * 40, b"same diff")),
+                  patch.object(run, "reviewed_diff", return_value=b"same diff"),
                   patch.object(run, "app_token", return_value=contextlib.nullcontext("token")),
                   patch.object(run, "dismiss_review") as dismiss):
                 run.reconcile_reviews(42)
