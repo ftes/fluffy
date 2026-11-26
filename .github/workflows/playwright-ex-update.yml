@@ -49,8 +49,8 @@ jobs:
           EVENT: ${{ github.event_name }}
         # Hex's latest_version is the highest release, pre-releases included. A git dep on
         # PlaywrightEx's main waits for a release that contains the locked commit. The branch, or a
-        # PR from it, means the release is handled; a dispatch retries one whose PR was closed
-        # (delete the branch first).
+        # PR from it means the release is handled. If a publication stopped after pushing,
+        # the update job verifies and resumes the release branch.
         run: |
           out() { echo "$1=$2" | tee -a "$GITHUB_OUTPUT"; }
           lock=$(sed -nE 's/^  "playwright": \{:(hex|git), [^,]+, "([^"]+)".*/\1 \2/p' mix.lock)
@@ -78,9 +78,8 @@ jobs:
           elif [[ -n $prs || -n $old_prs ]]; then
             echo "::notice::PR already exists for $to"
             out update false
-          elif gh api "repos/$GH_REPO/git/ref/heads/$legacy" --silent 2> /dev/null ||
-            { [[ $GITHUB_RUN_ATTEMPT == 1 ]] && gh api "repos/$GH_REPO/git/ref/heads/$branch" --silent 2> /dev/null; }; then
-            echo "::notice::Branch already exists for $to"
+          elif gh api "repos/$GH_REPO/git/ref/heads/$legacy" --silent 2> /dev/null; then
+            echo "::notice::Legacy branch already exists for $to"
             out update false
           else
             out update true

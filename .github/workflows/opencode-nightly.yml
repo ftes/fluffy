@@ -95,8 +95,8 @@ jobs:
         # and the app can't push a merge or rebase, so the cap on redos is triage's alone.
         run: |
           list() {
-            gh pr list --state open --limit 40 --json number,headRefName,headRefOid,isCrossRepository,mergeable,commits,statusCheckRollup,comments,reviews \
-              --jq '[.[] | select((.isCrossRepository | not) and (.headRefName | test("^(claude|opencode)/nightly-")) and ([.comments[], .reviews[]] | all(.author.login | IN("claude", "opencode-agent", "coderabbitai")))) | {number, branch: .headRefName, head: .headRefOid, mergeable, commits: (.commits | length), failing: ([.statusCheckRollup[] | select(.workflowName == "CI")] | group_by(.name) | map(max_by(.startedAt)) | any(.conclusion == "FAILURE" or .conclusion == "TIMED_OUT"))}]'
+            gh pr list --state open --base main --limit 40 --json number,baseRefOid,headRefName,headRefOid,isCrossRepository,mergeable,commits,statusCheckRollup,comments,reviews \
+              --jq '[.[] | select((.isCrossRepository | not) and (.headRefName | test("^(claude|opencode)/nightly-")) and ([.comments[], .reviews[]] | all(.author.login | IN("claude", "opencode-agent", "coderabbitai")))) | {number, branch: .headRefName, head: .headRefOid, base: .baseRefOid, mergeable, commits: (.commits | length), failing: ([.statusCheckRollup[] | select(.workflowName == "CI")] | group_by(.name) | map(max_by(.startedAt)) | any(.conclusion == "FAILURE" or .conclusion == "TIMED_OUT"))}]'
           }
           list > /dev/null
           sleep 30
@@ -105,8 +105,8 @@ jobs:
           # Triage's redo, if still open and listed (triage may have closed it, or a human commented
           # since), not out of fixes and not a redo itself.
           recreate=$(jq -c --argjson redo "$REDO" --argjson exhausted "$exhausted" '. as $prs
-            | ($redo | map(select(. as $r | ($prs | any(.number == $r.number and .head == $r.head and .branch == $r.branch and (.branch | test("^(claude|opencode)/nightly-[0-9]+-[0-9]+$") | not))) and ($exhausted | all(.number != $r.number)))))
-              + map(select(.mergeable == "CONFLICTING") | {number, branch, head, why: "It conflicts with main."})
+            | ($redo | map(select(. as $r | ($prs | any(.number == $r.number and .head == $r.head and .base == $r.base and .branch == $r.branch and (.branch | test("^(claude|opencode)/nightly-[0-9]+-[0-9]+$") | not))) and ($exhausted | all(.number != $r.number)))))
+              + map(select(.mergeable == "CONFLICTING") | {number, branch, head, base, why: "It conflicts with main."})
             | unique_by(.number)' <<< "$prs")
           others=$(jq -c --argjson recreate "$recreate" 'map(select(.number as $n | $recreate | all(.number != $n)))' <<< "$prs")
           mergeable=$(jq -c 'map(select(.mergeable == "MERGEABLE"))' <<< "$others")
@@ -210,13 +210,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           BRANCH: ${{ matrix.pr.branch }}
+          NUMBER: ${{ matrix.pr.number }}
         run: |
-          # This repository's runs of the checked-out commit only.
-          head=$(git rev-parse HEAD)
-          # shellcheck disable=SC2016 # jq's $ENV
-          run=$(gh api -X GET "repos/$GH_REPO/actions/workflows/ci.yml/runs" -f branch="$BRANCH" -f head_sha="$head" -f event=pull_request -f per_page=100 \
-            --jq '[.workflow_runs[] | select(.head_repository.full_name == $ENV.GH_REPO)][0].id // empty')
-          if [[ -z $run ]]; then echo "::error::No CI run of $BRANCH at $head."; exit 1; fi
+          run=$(python3 "$RUNNER_TEMP/fluffy-opencode/run.py" nightly-ci-run)
+          if [[ -z $run ]]; then echo "::error::No CI run of PR #$NUMBER at $(git rev-parse HEAD)."; exit 1; fi
           mkdir -p tmp
           gh run view "$run" --log-failed | tail -n 5000 > tmp/ci-failed.log
       # Should it fail, only fix CI.
@@ -284,6 +281,7 @@ jobs:
           NUMBER: ${{ matrix.pr.number }}
           OLD_BRANCH: ${{ matrix.pr.branch }}
           OLD_HEAD: ${{ matrix.pr.head }}
+          OLD_BASE: ${{ matrix.pr.base }}
           REDO_WHY: ${{ matrix.pr.why }}
         run: python3 .github/opencode/run.py recreate
 

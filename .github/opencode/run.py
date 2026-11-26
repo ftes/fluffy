@@ -23,7 +23,8 @@ CONTEXT = Path("tmp/opencode")
 MIX_CHECKS = ("mix format", "mix compile --warnings-as-errors", "mix credo --format oneline")
 READ_TOOLS = ("read", "glob", "grep")
 SAFE_ENV = (
-    "PATH", "HOME", "USER", "LANG", "LC_ALL", "TMPDIR", "MIX_ENV", "MISE_DATA_DIR",
+    "PATH", "HOME", "USER", "LANG", "LC_ALL", "TMPDIR", "MIX_ENV", "MIX_HOME", "MIX_ARCHIVES",
+    "MISE_DATA_DIR", "MISE_TRUSTED_CONFIG_PATHS", "MISE_YES",
     "PLAYWRIGHT_BROWSERS_PATH", "FLUFFY_BROWSER", "FLUFFY_DB_HOST", "FLUFFY_DB_PORT",
     "FLUFFY_DB_USER", "FLUFFY_DB_PASSWORD", "FLUFFY_DB_NAME",
 )
@@ -89,8 +90,9 @@ def save(name, value):
     (CONTEXT / name).write_text(value if isinstance(value, str) else json.dumps(value, ensure_ascii=False))
 
 
-def context(number, pr=True, *, comments=False):
-    item = api(f"{'pulls' if pr else 'issues'}/{number}")
+def context(number, pr=True, *, comments=False, item=None):
+    if item is None:
+        item = api(f"{'pulls' if pr else 'issues'}/{number}")
     # PR titles/descriptions and diffs are task data. The only discussion we collect is trusted.
     data = {key: item.get(key) for key in ("number", "title", "body", "state", "html_url")}
     if pr:
@@ -276,35 +278,78 @@ def snapshot(pr):
     return pr["head"]["sha"], pr["base"]["ref"], pr["base"]["sha"]
 
 
+def ensure_commit(sha):
+    try:
+        git("cat-file", "-e", f"{sha}^{{commit}}")
+    except subprocess.CalledProcessError:
+        git("fetch", "--quiet", "--no-tags", "origin", sha, env=git_http_env(os.environ["GH_TOKEN"]))
+
+
 def snapshot_diff(pr):
     head, _, base = snapshot(pr)
-    for sha in (base, head):
-        try:
-            git("cat-file", "-e", f"{sha}^{{commit}}")
-        except subprocess.CalledProcessError:
-            git("fetch", "--quiet", "--no-tags", "origin", sha, env=git_http_env(os.environ["GH_TOKEN"]))
+    ensure_commit(base)
+    ensure_commit(head)
     merge_base = git("merge-base", base, head)
     return merge_base, git("diff", "--no-ext-diff", "--no-textconv", "--binary", merge_base, head, raw=True)
+
+
+def review_marker(body):
+    match = re.search(
+        r"<!-- (?:claude|opencode)-review: ([0-9a-f]{40}) ([0-9a-f]{40})"
+        r"(?: ([0-9a-f]{64}) ([0-9a-f]{40}))? -->\s*$", body or "",
+    )
+    return match.groups() if match else None
 
 
 def previous_review(number):
     # New reviews carry the marker themselves; continue to recognize historical summary comments.
     items = api(f"issues/{number}/comments", paginate=True) + api(f"pulls/{number}/reviews", paginate=True)
     for item in sorted(items, key=lambda entry: entry.get("submitted_at") or entry.get("created_at") or "", reverse=True):
-        if item.get("state") in ("DISMISSED", "PENDING") or not item["user"]:
+        if item.get("state") == "PENDING" or not item["user"]:
             continue
         if item["user"]["type"] == "Bot" and item["user"]["login"] in REVIEW_BOTS:
-            marker = re.search(
-                r"<!-- (?:claude|opencode)-review: ([0-9a-f]{40}) ([0-9a-f]{40})"
-                r"(?: ([0-9a-f]{64}) ([0-9a-f]{40}))? -->\s*$", item["body"] or "",
-            )
+            marker = review_marker(item["body"])
             if marker:
-                return marker.groups()
-    return None
+                return marker, item.get("state") != "DISMISSED"
+    return None, False
 
 
 def active_review(pr, expected):
     return local_pr(pr) and pr["state"] == "open" and not pr["draft"] and snapshot(pr) == expected
+
+
+def dismiss_review(number, review_id, token):
+    path = f"pulls/{number}/reviews/{review_id}"
+    if api(path)["state"] not in ("APPROVED", "CHANGES_REQUESTED"):
+        return
+    try:
+        api(f"{path}/dismissals", token=token, method="PUT",
+            payload={"message": "The PR snapshot changed. This verdict applies only to the previous snapshot."})
+    except subprocess.CalledProcessError:
+        if api(path)["state"] != "DISMISSED":  # GitHub may dismiss it concurrently.
+            raise
+
+
+def reconcile_reviews(number):
+    pr = api(f"pulls/{number}")
+    expected = snapshot(pr)
+    if not active_review(pr, expected):
+        return
+    head, ref, base = expected
+    target = hashlib.sha256(ref.encode()).hexdigest()
+    stale = []
+    for item in api(f"pulls/{number}/reviews", paginate=True):
+        user = item["user"] or {}
+        if item["state"] not in ("APPROVED", "CHANGES_REQUESTED") or user.get("login") != BOT:
+            continue
+        marker = review_marker(item["body"])
+        if marker and marker[2] and (marker[0], *marker[2:]) != (head, target, base):
+            stale.append(item["id"])
+    if stale:
+        with app_token() as token:
+            if active_review(api(f"pulls/{number}"), expected):
+                for review_id in stale:
+                    dismiss_review(number, review_id, token)
 
 
 def review(number, head, prompt, retargeted=False):
@@ -317,23 +362,25 @@ def review(number, head, prompt, retargeted=False):
     base, full = snapshot_diff(pr)
     target = hashlib.sha256(expected[1].encode()).hexdigest()
     marker = (head, base, target, expected[2])
-    previous = previous_review(number)
-    if previous == marker:
+    previous, previous_active = previous_review(number)
+    if previous_active and previous == marker:
         return
     args = ("diff", "--no-ext-diff", "--no-textconv", "--binary")
     depth = "full"
-    if previous and not retargeted and previous[2] in (None, target):
+    if previous and not retargeted and previous[2:] == marker[2:]:
         old_head, old_base, _, _ = previous
         try:
             git("fetch", "--quiet", "--no-tags", "origin", old_head, old_base,
                 env=git_http_env(os.environ["GH_TOKEN"]))
             old = git(*args, old_base, old_head, raw=True)
             if git("patch-id", "--verbatim", input=old) == git("patch-id", "--verbatim", input=full):
-                print("Same changes as the previous review; skipping.")
-                return
-            replayed = git("merge-tree", "--write-tree", "--merge-base", old_base, base, old_head)
-            save("increment.diff", git(*args, replayed, head, raw=True))
-            depth = "increment"
+                if previous_active:
+                    print("Same changes as the previous review; skipping.")
+                    return
+            else:
+                replayed = git("merge-tree", "--write-tree", "--merge-base", old_base, base, old_head)
+                save("increment.diff", git(*args, replayed, head, raw=True))
+                depth = "increment"
         except subprocess.CalledProcessError:
             print("Previous review could not be replayed; reviewing the whole PR.")
     if not active_review(context(number, comments=True), expected):
@@ -341,7 +388,7 @@ def review(number, head, prompt, retargeted=False):
     resolved = gh(
         "api", "graphql", "--paginate", "-f", f"owner={REPO.split('/')[0]}", "-f", f"name={REPO.split('/')[1]}",
         "-F", f"pr={number}", "-f",
-        """query($owner: String!, $name: String!, $pr: Int!, $endCursor: String) {
+        """query=query($owner: String!, $name: String!, $pr: Int!, $endCursor: String) {
           repository(owner: $owner, name: $name) { pullRequest(number: $pr) {
             reviewThreads(first: 100, after: $endCursor) {
               pageInfo { hasNextPage endCursor }
@@ -398,10 +445,7 @@ def review(number, head, prompt, retargeted=False):
             "commit_id": head, "event": event, "body": body, "comments": comments,
         })
         if not own_pr and not active_review(api(f"pulls/{number}"), expected):
-            path = f"pulls/{number}/reviews/{submitted['id']}"
-            if api(path)["state"] != "DISMISSED":
-                api(f"{path}/dismissals", token=token, method="PUT",
-                    payload={"message": "The PR changed during review. This verdict applies only to the reviewed snapshot."})
+            dismiss_review(number, submitted["id"], token)
 
 
 def bots_only(number, *, closing=False):
@@ -417,15 +461,20 @@ def bots_only(number, *, closing=False):
     )
 
 
-def open_nightly(number, branch, head, *, min_commits=None, max_commits=None):
-    # Read the head after the comments so a push while listing comments also invalidates the decision.
+def open_nightly(number, branch=None, head=None, *, base=None, min_commits=None, max_commits=None):
+    # Read the snapshot after the comments so a push while listing comments invalidates the decision.
     if not bots_only(number):
-        return False
+        return None
     pr = api(f"pulls/{number}")
-    return (local_pr(pr) and pr["state"] == "open" and pr["base"]["ref"] == "main" and pr["head"]["ref"] == branch
-            and branch.startswith(("claude/nightly-", "opencode/nightly-")) and pr["head"]["sha"] == head
+    actual_branch = pr["head"]["ref"]
+    if (local_pr(pr) and pr["state"] == "open" and pr["base"]["ref"] == "main"
+            and actual_branch.startswith(("claude/nightly-", "opencode/nightly-"))
+            and (branch is None or actual_branch == branch) and (head is None or pr["head"]["sha"] == head)
+            and (base is None or pr["base"]["sha"] == base)
             and (min_commits is None or (pr["commits"] >= min_commits and pr["mergeable"] is True))
-            and (max_commits is None or pr["commits"] < max_commits))
+            and (max_commits is None or pr["commits"] < max_commits)):
+        return pr
+    return None
 
 
 def pr_diff(number):
@@ -444,14 +493,13 @@ def triage(prompt):
     numbers = {int(number) for number in os.environ["NUMBERS"].split()}
     inspected = {}
     for number in sorted(numbers):
-        pr = context(number)
-        if not local_pr(pr):
-            continue
-        branch, head = pr["head"]["ref"], pr["head"]["sha"]
-        if open_nightly(number, branch, head):
+        pr = open_nightly(number)
+        if pr:
+            context(number, item=pr)
             _, diff = snapshot_diff(pr)
             save(f"{number}.diff", diff)
-            inspected[number] = {"number": number, "branch": branch, "head": head}
+            inspected[number] = {"number": number, "branch": pr["head"]["ref"],
+                                 "head": pr["head"]["sha"], "base": pr["base"]["sha"]}
     if not inspected:
         return
     result = agent("triage", f"{prompt}\nPR numbers: {', '.join(map(str, inspected))}.",
@@ -477,8 +525,16 @@ def triage(prompt):
         else:
             with app_token() as token:
                 if open_nightly(**item):
-                    close(**item, reason=decision["why"], token=token)
+                    close(number, item["branch"], item["head"], decision["why"], token)
     output(redo=json.dumps(redo, separators=(",", ":")))
+
+
+def nightly_ci_run(number, branch, head):
+    params = urllib.parse.urlencode(dict(head_sha=head, branch=branch, event="pull_request", per_page=100))
+    runs = api(f"actions/workflows/ci.yml/runs?{params}")["workflow_runs"]
+    matching = [run for run in runs if (run["head_repository"] or {}).get("full_name") == REPO
+                and any(pr["number"] == number for pr in run.get("pull_requests") or ())]
+    return max(matching, key=lambda run: (run["created_at"], run["id"]), default=None)
 
 
 def exhausted():
@@ -488,11 +544,7 @@ def exhausted():
         view = json.loads(gh("pr", "view", str(number), "--json", "headRefOid,mergeable"))
         if view["headRefOid"] != item["head"] or view["mergeable"] != "MERGEABLE":
             continue
-        params = urllib.parse.urlencode(dict(head_sha=item["head"], branch=item["branch"],
-                                             event="pull_request", per_page=100))
-        runs = api(f"actions/workflows/ci.yml/runs?{params}")["workflow_runs"]
-        matching = [run for run in runs if (run["head_repository"] or {}).get("full_name") == REPO]
-        latest = max(matching, key=lambda run: (run["created_at"], run["id"]), default=None)
+        latest = nightly_ci_run(**item)
         if (latest and latest["status"] == "completed" and latest["conclusion"] in ("failure", "timed_out")
                 and open_nightly(**item, min_commits=maximum)):
             close(**item, reason="CI still fails after two automatic fixes.", token=os.environ["GH_TOKEN"])
@@ -533,8 +585,9 @@ def commit(subject, head, *, empty=False, description=None):
     check(git("rev-parse", "HEAD^") == head, "Unexpected commit parent")
 
 
-def publish_marker(branch, old_head=None):
-    return f"OpenCode-Publish: {os.environ['GITHUB_RUN_ID']} {branch}" + (f" {old_head}" if old_head else "")
+def publish_marker(branch, old=None):
+    marker = f"OpenCode-Publish: {os.environ['GITHUB_RUN_ID']} {branch}"
+    return f"{marker} {old['head']} {old['base']}" if old else marker
 
 
 def remote_head(branch):
@@ -550,16 +603,20 @@ def remote_head(branch):
     return sha
 
 
-def recover_branch(branch, marker):
-    # The run ID is stable across attempts. Resume only a commit published for this
-    # run and branch; a new branch still uses a lease that requires it not to exist.
+def recover_branch(branch, marker, *, release=None):
+    # Only the PlaywrightEx release branch is shared by independent runs.
     sha = remote_head(branch)
     if not sha:
         return None
     remote = api(f"git/commits/{sha}")
     message, separator, trailer = remote["message"].strip().rpartition("\n\n")
-    check(separator and trailer == marker and remote["author"]["email"] == BOT_EMAIL,
-          "Existing publication branch does not belong to this run")
+    release_marker = (release and branch == f"opencode/playwright-ex-{release}"
+                      and re.fullmatch(rf"OpenCode-Publish: [0-9]+ {re.escape(branch)}", trailer))
+    check(separator and (trailer == marker or release_marker) and remote["author"]["email"] == BOT_EMAIL,
+          "Existing publication branch does not belong to this run or release")
+    if release:
+        ensure_commit(sha)
+        validate_playwright_version(release, revision=sha)
     subject, separator, body = message.partition("\n\n")
     check(separator, "Missing publication body")
     return sha, title(subject), text(body, 12000)
@@ -639,10 +696,13 @@ def command(number, branch, prompt, is_pr):
 def fix(number, branch, prompt):
     head = git("rev-parse", "HEAD")
     max_commits = int(os.environ["MAX_COMMITS"])
-    if not open_nightly(number, branch, head, max_commits=max_commits):
+    pr = open_nightly(number, branch, head, max_commits=max_commits)
+    if not pr:
         return
-    context(number)
-    pr_diff(number)
+    base = pr["base"]["sha"]
+    context(number, item=pr)
+    _, diff = snapshot_diff(pr)
+    save(f"{number}.diff", diff)
     listed = Path(f"tmp/review-threads/{number}.json")
     ids = {thread["id"] for thread in json.loads(listed.read_text())} if listed.exists() else set()
     failing = os.environ["FAILING"] == "true"
@@ -673,12 +733,12 @@ def fix(number, branch, prompt):
         commit(title(message), head)
     elif action == "retry":
         commit("Re-run CI", head, empty=True)
-    if not open_nightly(number, branch, head, max_commits=max_commits):
+    if not open_nightly(number, branch, head, base=base, max_commits=max_commits):
         return
     if action in ("fix", "retry", "close"):
         with app_token() as token:
             if action == "close":
-                if open_nightly(number, branch, head, max_commits=max_commits):
+                if open_nightly(number, branch, head, base=base, max_commits=max_commits):
                     close(number, branch, head, message, token)
                 return
             push(branch, token, expected=head)
@@ -703,25 +763,29 @@ def new_pr_result(mode, result):
     return action, subject, body
 
 
-def validate_playwright_version(version):
+def validate_playwright_version(version, *, revision=None):
     for name in ("mix.lock", "mix.lock.oldest", "integration/consumer/mix.lock"):
-        lock = re.search(r'^  "playwright": \{:hex, :playwright_ex, "([^"]+)"', Path(name).read_text(), re.M)
+        content = git("show", f"{revision}:{name}", raw=True) if revision else Path(name).read_text()
+        lock = re.search(r'^  "playwright": \{:hex, :playwright_ex, "([^"]+)"', content, re.M)
         check(lock and lock[1] == version, f"Expected PlaywrightEx {version} in {name}")
 
 
 def new_pr(mode, branch, prompt, old_number=None):
     head = git("rev-parse", "HEAD")
-    old = (dict(number=old_number, branch=os.environ["OLD_BRANCH"], head=os.environ["OLD_HEAD"])
+    old = (dict(number=old_number, branch=os.environ["OLD_BRANCH"], head=os.environ["OLD_HEAD"],
+                base=os.environ["OLD_BASE"])
            if old_number is not None else None)
     if old and not open_nightly(**old):
         return
-    marker = publish_marker(branch, old["head"] if old else None)
-    publication = recover_branch(branch, marker)
+    marker = publish_marker(branch, old)
+    release = os.environ["PLAYWRIGHT_TO"] if mode == "update" else None
+    publication = recover_branch(branch, marker, release=release)
     if not publication:
         if old:
-            pr = context(old_number)
-            if pr["head"]["sha"] != old["head"] or pr["head"]["ref"] != old["branch"]:
+            pr = open_nightly(**old)
+            if not pr:
                 return
+            context(old_number, item=pr)
             _, diff = snapshot_diff(pr)
             save(f"{old_number}.diff", diff)
         shape = ('{"action":"publish","title":"...","body":"..."}; '
@@ -734,12 +798,11 @@ def new_pr(mode, branch, prompt, old_number=None):
         if action == "close":
             with app_token() as token:
                 if open_nightly(**old):
-                    close(**old, reason=subject, token=token)
+                    close(old_number, old["branch"], old["head"], subject, token)
             return
         if mode == "update":
-            version = os.environ["PLAYWRIGHT_TO"]
-            subject = f"Update PlaywrightEx to {version}"
-            validate_playwright_version(version)
+            subject = f"Update PlaywrightEx to {release}"
+            validate_playwright_version(release)
         else:
             verify()
             check(stage(head), "No publishable changes remain after checks")
@@ -753,7 +816,8 @@ def new_pr(mode, branch, prompt, old_number=None):
         url, is_open = publish_branch(branch, "main", publication, token, draft=mode == "update")
         print(url)
         if is_open and old and open_nightly(**old):
-            close(**old, reason=f"Redone on current main ({os.environ['REDO_WHY']}); replaced by {url}.", token=token)
+            close(old_number, old["branch"], old["head"],
+                  f"Redone on current main ({os.environ['REDO_WHY']}); replaced by {url}.", token)
 
 
 def main(mode):
@@ -762,6 +826,14 @@ def main(mode):
         return
     if mode == "exhausted":
         exhausted()
+        return
+    if mode == "reconcile-reviews":
+        reconcile_reviews(int(os.environ["NUMBER"]))
+        return
+    if mode == "nightly-ci-run":
+        run = nightly_ci_run(int(os.environ["NUMBER"]), os.environ["BRANCH"], git("rev-parse", "HEAD"))
+        if run and run["status"] == "completed" and run["conclusion"] in ("failure", "timed_out"):
+            print(run["id"])
         return
     CONTEXT.mkdir(parents=True, exist_ok=True)
     prompt = Path(__file__).with_name(f"{mode}.md").read_text()
