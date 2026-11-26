@@ -31,9 +31,8 @@ available metadata. Use ordinary assertions when failure details matter.
 
 ## Pipeline expectations
 
-`Fluffy.Assert.assert_event/3` and `Fluffy.Expect.expect_event/3` register before
-invoking the action, await a matching event, optionally inspect it, and return the input
-session:
+`Fluffy.Assert.assert_event/3` registers before invoking the action, awaits a
+matching event, optionally inspects it, and returns the input session:
 
 ```elixir
 session

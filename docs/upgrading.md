@@ -207,8 +207,7 @@ Most `unwrap` callbacks that called Playwright with the handle's `frame_id`,
   `dataset`: `Fluffy.text_content(session, locator)` or
   `Fluffy.get_attribute(session, locator, "data-state")`, which work on Phoenix too. For
   other JavaScript on an element, `Fluffy.Playwright.evaluate(session, locator, expression)`.
-- `Frame.expect(expression: "to.be.in.viewport")`: `Fluffy.Assert.in_viewport/2` or
-  `Fluffy.Expect.to_be_in_viewport/2`.
+- `Frame.expect(expression: "to.be.in.viewport")`: `|> assert(in_viewport(locator))`.
 - `Page.route`: `Fluffy.Playwright.route/4`, whose handler gets the `Playwright.Route`.
 - `BrowserContext.clock_install` and `clock_fast_forward`:
   `Fluffy.Playwright.Clock.install/2` and `fast_forward/3`.
@@ -263,7 +262,7 @@ that passed on 0.8 act differently:
   a native count: `assert(session, count(by_css("input[type=hidden]"), 1))`.
 - On Static and LiveView the options of a dropdown `<select>` are now hidden, as on
   Playwright, so `assert_has("#house option", text: "Ravenclaw")`,
-  `assert_has("option[selected]", ...)` and `to_be_visible` on them fail. Check the
+  `assert_has("option[selected]", ...)` and native visibility assertions on them fail. Check the
   selection with the facade's `assert_has("#house", selected: "Ravenclaw")` or
   `by_role(:option, selected: true)`, and count options natively
   ([Selects and options](actions.md#selects-and-options)).
@@ -272,14 +271,14 @@ that passed on 0.8 act differently:
   count (`assert(session, count(by_css("script[nonce]"), 1))`), or read the text
   with `Fluffy.text_content(session, by_css("script#data"))`, on every driver.
 - `select_option` with `[]` deselects every option, and a list mixing values with
-  option maps raises. `to_have_values` requires a multiple select.
+  option maps raises. The `values` assertion requires a multiple select.
 - The facade's `click_button` no longer matches `<input type="file">`.
 - LiveView `set_input_files` raises unless the upload's form has an id.
 - A `phx-trigger-action` form is submitted from mount or a pushed render, as LiveView's
   client does, and a link, form or redirect to another origin ends at a page with that URL
   ([Leaving the app](capabilities.md#leaving-the-app)) instead of raising. A test that
   asserted on the page before such a navigation, say a flash shown on the way to a sign-in
-  provider, now ends at the target: assert where the app sent it with `page_to_have_url`,
+  provider, now ends at the target: assert where the app sent it with `page_url`,
   and the flash in a controller or LiveView test.
 
 Rarer differences follow the browser too: some implicit roles and accessible names

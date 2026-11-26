@@ -3,10 +3,9 @@ defmodule Fluffy do
   Pipeable feature testing for Phoenix applications.
 
   Start a session with the Phoenix (`:phoenix`) or Playwright (`:playwright`)
-  backend, then compose locators, actions, expectations, and event waits.
-  Import `Fluffy.Expect` for expectations, or use `Fluffy.Assert` for
-  ExUnit-style assertions. The
-  Phoenix backend selects its Static (`Phoenix.ConnTest`) or LiveView
+  backend, then compose locators, actions, assertions, and event waits. Use
+  `Fluffy.Assert` for ExUnit-style assertions. The Phoenix backend selects its
+  Static (`Phoenix.ConnTest`) or LiveView
   (`Phoenix.LiveViewTest`) driver for each page; the Playwright backend uses the
   Playwright driver.
 

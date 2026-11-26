@@ -231,12 +231,12 @@ so a test can assert where the app sent it, as with `Phoenix.ConnTest.redirected
 ```elixir
 session
 |> click(by_role(:button, name: "Floo to the Ministry"))
-|> expect(page_to_have_url(~r"^https://ministry\.example/floo\?"))
+|> assert(page_url(~r"^https://ministry\.example/floo\?"))
 ```
 
 Only URL expectations and `visit` back into the app work on that page; everything else raises
 `Fluffy.CapabilityError` (`:external_navigation`), as does `visit` to another origin. Use
-`page_to_have_url`, since `assert_path` ignores the host. On Playwright the browser loads the external page; stub it with
+`page_url` to include the host. On Playwright the browser loads the external page; stub it with
 `Fluffy.Playwright.route/4`, which catches a link's or form's target but not a redirect's.
 
 ### Browser baseline
@@ -330,9 +330,9 @@ fails when Playwright adds or removes one.
   `bounding_box`, `aria_snapshot`, `drop`, `all`, `Fluffy.Locator.within/2`, locator
   `evaluate`, `evaluate_all` and `wait_for_function`, `set_viewport_size`,
   `viewport_size`, `emulate_media`, `pdf`, `bring_to_front`, `content`, `title`,
-  the expectations in `Fluffy.Expect`, including `to_have_css`,
-  `to_have_js_property`, `to_have_role`, the accessible name, description and error
-  message assertions, `to_match_aria_snapshot` and `to_have_screenshot`, navigation,
+  the assertions in `Fluffy.Assert`, including `css`, `js_property`, `role`,
+  the accessible name, description and error message assertions,
+  `match_aria_snapshot` and `match_screenshot`, navigation,
   page management, cookies, storage state, including `set_storage_state`,
   `local_storage` and `session_storage`, permissions, geolocation, offline mode,
   HTTP credentials, extra HTTP headers, request routing, including `unroute_all`,
@@ -341,7 +341,7 @@ fails when Playwright adds or removes one.
   `Fluffy.Playwright.Clock`, keyboard and mouse input in `Fluffy.Playwright.Keyboard`
   and `Fluffy.Playwright.Mouse`, the events in `Fluffy.Event`, and the values they
   deliver, including response bodies. Their options pass through as documented.
-  `to_have_screenshot` and `to_match_aria_snapshot` (without an inline snapshot) find
+  `match_screenshot` and `match_aria_snapshot` (without an inline snapshot) find
   their file by `name:` or the test's name, through `Playwright.Test`, or at `path:`.
 - **Unwrap:** everything else page-, locator-, or value-local, such as
   `aria_snapshot_json`, HAR routing, and response timing. For reads like

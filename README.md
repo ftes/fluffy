@@ -122,8 +122,7 @@ Use the facade import on its own. Its session is a plain `Fluffy.Session`, so a 
 such as `Fluffy.press/4` fits in the pipeline; once a suite needs more than a few, rewrite it
 on the native API rather than mix the two styles.
 
-For native tests, choose an [assertion vocabulary](docs/assertions.md):
-`use Fluffy.Assert` or `import Fluffy.Expect`.
+For native tests, use `Fluffy.Assert` for [assertions](docs/assertions.md).
 
 ## Beyond page interactions
 
@@ -142,8 +141,7 @@ backend supports.
 - [Usage](docs/usage.md) — your first test, backend choice, and a shared test case
 - [Locators and frames](docs/locators.md) — finding elements and reaching into iframes
 - [Actions and waiting](docs/actions.md) — actions, waiting, uploads, and controlling time
-- [Assertions](docs/assertions.md) — imported `assert`/`refute` and `expect`
-  vocabularies compared, visibility, and page assertions
+- [Assertions](docs/assertions.md) — `assert` and `refute`, visibility, and page assertions
 - [Debugging and native access](docs/debugging.md) — failures, browser diagnostics,
   and the native escape hatch
 - [Advanced events and pages](docs/advanced-events.md) — tabs, windows, iframe

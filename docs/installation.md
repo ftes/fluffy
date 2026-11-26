@@ -155,9 +155,9 @@ config :playwright, :test,
 defmodule MyAppWeb.OwleryTest do
   use MyAppWeb.ConnCase, async: true
   use Playwright.Test
+  use Fluffy.Assert
 
   import Fluffy
-  import Fluffy.Expect
   import Fluffy.Locator
 
   # Waits at most `phoenix_backend_timeout` for the button and the text.
@@ -166,7 +166,7 @@ defmodule MyAppWeb.OwleryTest do
     |> start_session()
     |> visit("/owlery")
     |> click(by_role(:button, name: "Send owl"))
-    |> expect("Hedwig is on her way" |> by_text() |> to_be_visible())
+    |> assert_has(by_text("Hedwig is on her way"))
   end
 
   # Playwright's timeouts and context options, overridden for this test.
@@ -176,7 +176,7 @@ defmodule MyAppWeb.OwleryTest do
     |> start_session()
     |> visit("/owlery")
     |> click(by_role(:button, name: "Send owl"))
-    |> expect("Hedwig is on her way" |> by_text() |> to_be_visible())
+    |> assert_has(by_text("Hedwig is on her way"))
   end
 end
 ```

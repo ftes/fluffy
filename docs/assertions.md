@@ -2,13 +2,6 @@
 
 The snippets assume the imports from [Your first test](usage.md#your-first-test) and an initialized `session`.
 
-Fluffy's native locator API offers two vocabularies for the same assertions. The guides use
-`assert` and `refute`; choose `expect` if you prefer Playwright-style names.
-Both construct the same expectation values and preserve driver behavior,
-retries, timeout options, diagnostics, and the returned session.
-
-## ExUnit style
-
 Place `use Fluffy.Assert` after `use Playwright.Test` (or the case template that has it). It
 imports the constructors and takes over only the conflicting `assert/2` and `refute/2`
 imports. Ordinary ExUnit assertions, pattern bindings, custom messages, and other helpers
@@ -51,79 +44,8 @@ session
 See [Shared test case](usage.md#shared-test-case) to centralize these imports
 and the session setup.
 
-## Expect style
-
-Use `import Fluffy.Expect` in place of `use Fluffy.Assert`. Actions and locators
-keep their names; assertion constructors use `to_be_*` and `to_have_*`.
-
-```elixir
-use ExUnit.Case, async: true
-use Playwright.Test
-
-import Fluffy
-import Fluffy.Expect
-import Fluffy.Locator
-
-test "registers a creature" do
-  start_session(:phoenix)
-  |> visit("/creatures/new")
-  |> fill(by_label("Name"), "Basilisk")
-  |> click(by_role(:button, name: "Register"))
-  |> expect(to_be_visible(by_text("Creature registered")))
-  |> expect(not_(page_to_have_title("Error")))
-  |> expect(page_to_have_url("/creatures/basilisk"))
-end
-```
-
-## Naming comparison
-
-The following calls are pipeline steps, with the session supplied by `|>`.
-Locator constructors take a locator; page constructors target the active page.
-
-| ExUnit style | Expect style |
-| --- | --- |
-| `assert(visible(locator))` | `expect(to_be_visible(locator))` |
-| `refute(visible(locator))` | `expect(not_(to_be_visible(locator)))` |
-| `assert(hidden(locator))` | `expect(to_be_hidden(locator))` |
-| `assert(attached(locator))` | `expect(to_be_attached(locator))` |
-| `assert(checked(locator))` | `expect(to_be_checked(locator))` |
-| `assert(enabled(locator))` | `expect(to_be_enabled(locator))` |
-| `assert(disabled(locator))` | `expect(to_be_disabled(locator))` |
-| `assert(editable(locator))` | `expect(to_be_editable(locator))` |
-| `assert(empty(locator))` | `expect(to_be_empty(locator))` |
-| `assert(focused(locator))` | `expect(to_be_focused(locator))` |
-| `assert(in_viewport(locator))` | `expect(to_be_in_viewport(locator))` |
-| `assert(count(locator, 3))` | `expect(to_have_count(locator, 3))` |
-| `assert(value(locator, "Basilisk"))` | `expect(to_have_value(locator, "Basilisk"))` |
-| `assert(values(locator, ["owl", "toad"]))` | `expect(to_have_values(locator, ["owl", "toad"]))` |
-| `assert(text(locator, "Basilisk"))` | `expect(to_have_text(locator, "Basilisk"))` |
-| `assert(contain_text(locator, "Basil"))` | `expect(to_contain_text(locator, "Basil"))` |
-| `assert(attribute(locator, "href", "/creatures"))` | `expect(to_have_attribute(locator, "href", "/creatures"))` |
-| `assert(class(locator, "card selected"))` | `expect(to_have_class(locator, "card selected"))` |
-| `assert(contain_class(locator, "selected"))` | `expect(to_contain_class(locator, "selected"))` |
-| `assert(id(locator, "name"))` | `expect(to_have_id(locator, "name"))` |
-| `assert(css(locator, "display", "flex"))` | `expect(to_have_css(locator, "display", "flex"))` |
-| `assert(js_property(locator, "checked", true))` | `expect(to_have_js_property(locator, "checked", true))` |
-| `assert(role(locator, :button))` | `expect(to_have_role(locator, :button))` |
-| `assert(accessible_name(locator, "Register"))` | `expect(to_have_accessible_name(locator, "Register"))` |
-| `assert(accessible_description(locator, "Your full name"))` | `expect(to_have_accessible_description(locator, "Your full name"))` |
-| `assert(accessible_error_message(locator, "Too short"))` | `expect(to_have_accessible_error_message(locator, "Too short"))` |
-| `assert(match_aria_snapshot(locator, "- button"))` | `expect(to_match_aria_snapshot(locator, "- button"))` |
-| `assert(match_screenshot(locator, name: "card.png"))` | `expect(to_have_screenshot(locator, name: "card.png"))` |
-| `assert(page_url("/creatures"))` | `expect(page_to_have_url("/creatures"))` |
-| `assert(page_title("Creatures"))` | `expect(page_to_have_title("Creatures"))` |
-| `assert(page_match_aria_snapshot("- heading"))` | `expect(page_to_match_aria_snapshot("- heading"))` |
-| `assert(page_match_screenshot(name: "creatures.png"))` | `expect(page_to_have_screenshot(name: "creatures.png"))` |
-| `assert(page_opener(page))` | `expect(page_to_have_opener(page))` |
-| `assert(pass(fn session -> ... end))` | `expect(to_pass(fn session -> ... end))` |
-| `assert(poll(fn session -> ... end, &assert(&1 == 1)))` | `expect(poll(fn session -> ... end, &assert(&1 == 1)))` |
-
-Use `Fluffy.Assert.assert_event/4` or the equivalent `Fluffy.Expect.expect_event/4` for
-events. The optional assertion receives an ordinary event value; use ExUnit assertions
-on its fields. See [Advanced events and pages](advanced-events.md).
-
-See the `Fluffy.Assert` and `Fluffy.Expect` references for their options and which
-ones require Playwright.
+See `Fluffy.Assert` for all assertion constructors, their options, and which ones
+require Playwright. For `assert_event`, see [Advanced events and pages](advanced-events.md).
 
 ## Options and negation
 
@@ -132,21 +54,19 @@ precedence, and both forms return the updated session:
 
 ```elixir
 session
-|> assert(visible(by_text("Creature registered"), timeout: 1_000))
-|> refute(visible(by_text("Saving…")), timeout: 1_000)
+|> assert(page_title("Creatures", timeout: 1_000))
+|> refute(page_title("Error"), timeout: 1_000)
 ```
 
-`refute(session, expectation)` executes the negated expectation, just like
-`expect(session, not_(expectation))`. It preserves driver errors rather than
-turning them into successful refutations. Retrying drivers wait until the
-negative condition holds; they do not require it to hold for the entire timeout.
+`refute(session, expectation)` executes the negated expectation and preserves
+driver errors. Retrying drivers wait until the negative condition holds; they do
+not require it to hold for the entire timeout.
 Event values use ordinary ExUnit assertions; event waiting is documented in
 [Advanced events and pages](advanced-events.md).
 
 Refuting visibility accepts an absent or invisible element. See
 [Visibility and DOM presence](#visibility-and-dom-presence) for absence
 checks, hidden elements, and the structural versus rendered visibility rules.
-Choosing a vocabulary does not change those driver boundaries.
 
 ## Text, attributes, and state
 
@@ -178,7 +98,7 @@ exactly one match. `use_inner_text: true` reads rendered text and requires
 Playwright, so `text` and `contain_text` raise
 `Fluffy.CapabilityError` on Static and LiveView when given it.
 
-`hidden` passes when nothing matches, as does `refute(visible(locator))`.
+`hidden` passes when nothing matches, as does `refute_has(locator)`.
 Negating `text`, `contain_text`, `attribute`, `class`,
 `contain_class`, `id`, or `empty` still fails when nothing matches.
 
@@ -218,10 +138,10 @@ Choose the assertion that expresses the intended behavior:
 
 ```elixir
 # Require a visible element.
-session |> assert(visible(by_css("#notice")))
+session |> assert_has(by_css("#notice"))
 
 # Allow the element to be absent or invisible.
-session |> refute(visible(by_css("#notice")))
+session |> refute_has(by_css("#notice"))
 
 # Require DOM absence, including hidden elements.
 session |> assert(count(by_css("#notice"), 0))
@@ -280,7 +200,7 @@ session
 Fluffy's assertions retry on their own, so prefer them. For what isn't one locator or page
 assertion, such as a computed value or app state, use Playwright's
 [`expect.poll` and `toPass`](https://playwright.dev/docs/test-assertions#expectpoll). In a
-pipeline, `poll` and `pass` (`poll` and `to_pass` with `import Fluffy.Expect`) run
+pipeline, `poll` and `pass` run
 `Playwright.Expect.poll!/3` and `Playwright.Expect.to_pass!/2` with the session, on every driver.
 `poll` calls its function again until the assertion passes on the value it returns; as upstream,
 the assertion raises until the value is right, and a function that raises fails at once, so
@@ -291,7 +211,7 @@ the page alone, `Fluffy.Playwright.wait_for_function/3` keeps JavaScript's truth
 retries whatever its block raises.
 Both return the session (`pass` the one its passing attempt returned, if any) and fail like
 other assertions, with the last error in the message. `refute(pass(fun))`
-(`not_(to_pass(fun))`) runs `Playwright.Expect.not_to_pass!/2`: it retries until the block
+runs `Playwright.Expect.not_to_pass!/2`: it retries until the block
 raises and fails at the timeout while it keeps passing. `poll` can't be refuted: refute in its
 assertion.
 
