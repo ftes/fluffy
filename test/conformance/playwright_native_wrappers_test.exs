@@ -625,25 +625,6 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
     end
   end
 
-  describe "all" do
-    test "returns one locator per current match, usable on its own" do
-      session = session_for_html(:playwright, "<ul><li>One</li><li>Two</li></ul>")
-
-      assert [first, second] = Fluffy.Playwright.all(session, by_css("li"))
-      assert %Fluffy.Locator{} = first
-
-      session
-      |> expect(to_have_text(first, "One"))
-      |> expect(to_have_text(second, "Two"))
-    end
-
-    test "does not wait, and returns [] without a match" do
-      session = session_for_html(:playwright, "<p>Harness</p>")
-
-      assert Fluffy.Playwright.all(session, by_css("li")) == []
-    end
-  end
-
   describe "drop" do
     test "drops data on the target and returns the session" do
       session =
@@ -783,18 +764,23 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
   end
 
   describe "page output" do
-    test "content returns the page's HTML" do
+    test "content passes include_shadow: through" do
       session = session_for_html(:playwright, "<p id='here'>Harness</p>")
 
-      assert Fluffy.Playwright.content(session) =~ "Harness"
-      assert Fluffy.Playwright.content(session, include_shadow: true) =~ ~s(id="here")
+      Fluffy.Playwright.evaluate(
+        session,
+        "document.querySelector('#here').attachShadow({mode: 'open'}).innerHTML = '<b>Shadowed</b>'"
+      )
+
+      refute content(session) =~ "Shadowed"
+      assert content(session, include_shadow: true) =~ "<b>Shadowed</b>"
     end
 
-    test "title returns the page's title" do
+    test "title reads the title page code sets" do
       session = session_for_html(:playwright, "<p>Harness</p>")
       Fluffy.Playwright.evaluate(session, "document.title = 'A title'")
 
-      assert Fluffy.Playwright.title(session) == "A title"
+      assert title(session) == "A title"
     end
 
     test "bring_to_front returns the session" do
@@ -820,8 +806,8 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
 
       for option <- [signal: :none, timeout: 1_000],
           call <- [
-            &Fluffy.Playwright.content(session, &1),
-            &Fluffy.Playwright.title(session, &1),
+            &content(session, &1),
+            &title(session, &1),
             &Fluffy.Playwright.bring_to_front(session, &1),
             &Fluffy.Playwright.local_storage(session, &1),
             &Fluffy.Playwright.session_storage(session, &1),
@@ -958,16 +944,12 @@ defmodule Fluffy.Conformance.PlaywrightNativeWrappersTest do
           fn -> Fluffy.Playwright.add_style_tag(session, content: "p {}") end,
           fn -> Fluffy.Playwright.wait_for_load_state(session) end,
           fn -> Fluffy.Playwright.unroute_all(session) end,
-          fn -> wait_for(session, p) end,
           fn -> Fluffy.Playwright.evaluate(session, p, "1") end,
           fn -> Fluffy.Playwright.evaluate_all(session, p, "1") end,
           fn -> Fluffy.Playwright.wait_for_function(session, p, "true") end,
-          fn -> Fluffy.Playwright.all(session, p) end,
           fn -> Fluffy.Playwright.drop(session, p, %{data: %{"text/plain" => "x"}}) end,
           fn -> Fluffy.Playwright.pdf(session) end,
           fn -> Fluffy.Playwright.bring_to_front(session) end,
-          fn -> Fluffy.Playwright.content(session) end,
-          fn -> Fluffy.Playwright.title(session) end,
           fn -> Fluffy.Playwright.set_storage_state(session, %{}) end,
           fn -> Fluffy.Playwright.local_storage(session) end,
           fn -> Fluffy.Playwright.session_storage(session) end,

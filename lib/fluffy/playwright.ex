@@ -67,7 +67,6 @@ defmodule Fluffy.Playwright do
           unquote(NimbleOptions.option_typespec(Options.action_schema(:locator_wait_for_function)))
   @type drop_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:drop)))
   @type pdf_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:pdf)))
-  @type content_option :: unquote(NimbleOptions.option_typespec(Options.action_schema(:content)))
 
   @doc group: "Lifecycle and navigation"
   @doc playwright_only: true
@@ -431,23 +430,6 @@ defmodule Fluffy.Playwright do
   def aria_snapshot(%Session{} = session, %Fluffy.Locator{} = locator, options),
     do: __call__(session, :read, :computed_browser_semantics, :aria_snapshot, locator, [], options)
 
-  @doc group: "Page inspection"
-  @doc playwright_only: true
-  @doc """
-  Returns one `Fluffy.Locator` per element the locator matches right now, built with `Fluffy.Locator.nth/2`.
-
-  As in Playwright, this does not wait for elements to match and returns `[]` if none
-  do, and it is flaky on a list that is still changing: the elements can change
-  between this call and the use of a locator. Wait first, such as with
-  `Fluffy.Expect.to_have_count/3`. Phoenix sessions raise `Fluffy.CapabilityError`.
-  """
-  @spec all(Session.t(), Fluffy.Locator.t()) :: [Fluffy.Locator.t()]
-  def all(%Session{} = session, %Fluffy.Locator{} = locator) do
-    CapabilityError.require_playwright!(session, :playwright_only_api, :all)
-    count = unwrap_and_return(session, locator, &Playwright.Locator.count!/1)
-    for index <- 0..(count - 1)//1, do: Fluffy.Locator.nth(locator, index)
-  end
-
   @doc group: "Actions"
   @doc playwright_only: true
   @doc """
@@ -500,34 +482,6 @@ defmodule Fluffy.Playwright do
     CapabilityError.require_playwright!(session, :pages, :bring_to_front)
     Options.validate_untimed!(options)
     page_action(session, :bring_to_front, &Playwright.Page.bring_to_front/1)
-  end
-
-  @doc group: "Page inspection"
-  @doc playwright_only: true
-  @doc """
-  Returns the full HTML of the active page, including the doctype.
-
-  ## Options
-
-  Playwright-only options pass through to #{Options.native_reference(:content)}.
-
-  #{NimbleOptions.docs(Options.action_schema(:content))}
-  """
-  @spec content(Session.t(), [content_option()]) :: String.t()
-  def content(%Session{} = session, options \\ []) do
-    CapabilityError.require_playwright!(session, :playwright_only_api, :content)
-    native = Options.validate_action!(:content, options)
-    page_read(session, :content, &Playwright.Page.content(&1, native))
-  end
-
-  @doc group: "Page inspection"
-  @doc playwright_only: true
-  @doc "Returns the active page's title. To assert it, use `Fluffy.Expect.page_to_have_title/2`."
-  @spec title(Session.t(), []) :: String.t()
-  def title(%Session{} = session, options \\ []) do
-    CapabilityError.require_playwright!(session, :playwright_only_api, :title)
-    Options.validate_untimed!(options)
-    page_read(session, :title, &Playwright.Page.title/1)
   end
 
   @doc group: "Page inspection"

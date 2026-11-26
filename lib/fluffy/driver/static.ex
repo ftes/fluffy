@@ -153,6 +153,13 @@ defmodule Fluffy.Driver.Static do
       detail: "Static pages do not support keyboard events"
   end
 
+  # Like an action, a wait checks once.
+  @impl true
+  def wait_for(%Session{} = session, %Locator{} = locator, options \\ []) do
+    :ok = session |> client_dom() |> ClientDOM.wait_for(locator, Keyword.fetch!(options, :state))
+    session
+  end
+
   # Reads, like actions, check once.
   @impl true
   def text_content(%Session{} = session, %Locator{} = locator, _options \\ []),
@@ -169,6 +176,16 @@ defmodule Fluffy.Driver.Static do
   @impl true
   def input_value(%Session{} = session, %Locator{} = locator, _options \\ []),
     do: read(session, &ClientDOM.input_value(&1, locator))
+
+  @impl true
+  def all(%Session{} = session, %Locator{} = locator, _options \\ []),
+    do: read(session, &length(ClientDOM.resolve(&1, locator)))
+
+  @impl true
+  def content(%Session{} = session, _options \\ []), do: read(session, &ClientDOM.content/1)
+
+  @impl true
+  def title(%Session{} = session, _options \\ []), do: read(session, &ClientDOM.title/1)
 
   defp read(session, fun), do: {:return, fun.(client_dom(session)), session}
 

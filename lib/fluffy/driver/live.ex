@@ -372,7 +372,7 @@ defmodule Fluffy.Driver.Live do
     {client_dom, redirect} =
       try do
         case Document.render(document, view) do
-          {:ok, composed} -> {ClientDOM.from_document(composed), nil}
+          {:ok, composed} -> {ClientDOM.from_document(composed, Document.doctype()), nil}
           {:error, redirect} -> {mounted_client_dom(html), redirect}
         end
       catch
@@ -391,7 +391,7 @@ defmodule Fluffy.Driver.Live do
     {state, redirect}
   end
 
-  defp mounted_client_dom(html), do: html |> LazyHTML.from_document() |> ClientDOM.from_document()
+  defp mounted_client_dom(html), do: html |> LazyHTML.from_document() |> ClientDOM.from_document(Document.doctype())
 
   @doc "Stops the LiveView of a page whose document the backend replaces, with its upload clients."
   def release(%Session{} = session, %Page.State{driver: :live, state: state}) do
@@ -524,6 +524,32 @@ defmodule Fluffy.Driver.Live do
   def input_value(%Session{} = session, %Locator{} = locator, options \\ []),
     do: read(session, :input_value, [locator, options], &ClientDOM.input_value(&1, locator))
 
+  @impl true
+  def all(%Session{} = session, %Locator{} = locator, options \\ []),
+    do: read(session, :all, [locator, options], &length(ClientDOM.resolve(&1, locator)))
+
+  @impl true
+  def content(%Session{} = session, options \\ []), do: page_read(session, :content, options, &ClientDOM.content/1)
+
+  @impl true
+  def title(%Session{} = session, options \\ []), do: page_read(session, :title, options, &ClientDOM.title/1)
+
+  # As in Playwright, a wait retries on fresh renders until its target reaches its state,
+  # as an expectation does, and goes on on the page a navigation it finds lands on.
+  @impl true
+  def wait_for(%Session{} = session, %Locator{} = locator, options \\ []) do
+    deadline = options |> Timeouts.get(&Timeouts.phoenix/0) |> Retry.deadline()
+    wait = &ClientDOM.wait_for(&1, locator, Keyword.fetch!(options, :state))
+
+    case eventually(session, deadline, &ActionResolver.attempt(&1, locator, wait)) do
+      {:redirected, session, navigation} ->
+        retry_on_new_page(session, navigation, :wait_for, [locator, options], deadline)
+
+      {%Session{} = session, :ok} ->
+        session
+    end
+  end
+
   # As in Playwright, a read waits for its target to attach, on fresh renders as an
   # expectation does, and returns the value it first reads. A navigation it finds sends
   # it on to the new page, within its timeout. A read that finds no target, such as
@@ -537,6 +563,17 @@ defmodule Fluffy.Driver.Live do
 
     case eventually(session, deadline, &ActionResolver.attempt(&1, locator, read)) do
       {:redirected, session, navigation} -> retry_on_new_page(session, navigation, operation, arguments, deadline)
+      {%Session{} = session, value} -> {:return, value, session}
+    end
+  end
+
+  # A page read reads the latest render once, on the page a navigation it finds lands on.
+  # As in Playwright, it has no timeout.
+  defp page_read(session, operation, options, read) do
+    deadline = Retry.deadline(:infinity)
+
+    case eventually(session, deadline, &{:ok, {&1, read.(client_dom(&1))}}) do
+      {:redirected, session, navigation} -> retry_on_new_page(session, navigation, operation, [options], deadline)
       {%Session{} = session, value} -> {:return, value, session}
     end
   end

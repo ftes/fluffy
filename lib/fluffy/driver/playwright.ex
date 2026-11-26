@@ -312,6 +312,10 @@ defmodule Fluffy.Driver.Playwright do
         BrowserLocator.all_text_contents(native)
       end)
 
+  @impl true
+  def all(%Session{} = session, %Locator{} = locator, _options \\ []),
+    do: locator_read(session, :all, locator, [], fn native, _remaining -> BrowserLocator.count(native) end)
+
   def all_inner_texts(%Session{} = session, %Locator{} = locator),
     do:
       locator_read(session, :all_inner_texts, locator, [], fn native, _remaining ->
@@ -368,6 +372,16 @@ defmodule Fluffy.Driver.Playwright do
       BrowserLocator.evaluate_all(native_locator, expression, arg)
     end)
   end
+
+  @impl true
+  def wait_for(%Session{} = session, %Locator{} = locator, options \\ []),
+    do: locator_action(session, :wait_for, locator, options, &BrowserLocator.wait_for(&1, native(options, &2)))
+
+  @impl true
+  def content(%Session{} = session, options \\ []), do: page_read(session, :content, &BrowserPage.content(&1, options))
+
+  @impl true
+  def title(%Session{} = session, _options \\ []), do: page_read(session, :title, &BrowserPage.title/1)
 
   # As in Playwright, a page read has no timeout and waits while a script blocks the page.
   def page_read(session, operation, fun) do

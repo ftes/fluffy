@@ -294,7 +294,7 @@ session =
   |> fill_in("Name", with: "Polyjuice")
   |> Fluffy.press(Fluffy.Locator.by_label("Name"), "Tab")
 
-assert Fluffy.Playwright.evaluate(session, "document.title") == "Potions"
+assert Fluffy.Playwright.evaluate(session, "document.readyState") == "complete"
 ```
 
 This suits a few calls. When tests need them throughout, for browser scripting, pages

@@ -35,6 +35,35 @@ defmodule Fluffy.Support.Web.PageController do
     """)
   end
 
+  # Markup whose serialization differs from LazyHTML's own: comments around <html>, void
+  # elements, escapes and raw text. No script runs, so the browser's DOM is the markup's.
+  def notice_board(conn, _params) do
+    send_html(conn, """
+    <!-- Posted by Argus Filch -->
+    <!doctype html>
+    <html lang="en">
+      <head>
+        <meta charset="utf-8">
+        <title>
+          Hogwarts   notice board
+        </title>
+      </head>
+      <body>
+        <h1 title='The "official" board' data-houses="Gryffindor &amp; Slytherin">Notices &amp; owls</h1>
+        <p>Fred&nbsp;&amp;&nbsp;George's<br>Wizard Wheezes &lt;opening soon&gt;</p>
+        <img alt="A snowy owl">
+        <form>
+          <input name="owl" value="Errol" aria-label="Owl">
+          <label><input type="checkbox" name="post">Owl post</label>
+          <textarea name="letter" aria-label="Letter">Dear Harry</textarea>
+        </form>
+        <svg viewBox="0 0 10 10"><circle r="1"/></svg>
+        <script type="text/plain">if (owls < 3 && post) send("Hedwig")</script></body>
+    </html>
+    <!-- Taken down at midnight -->
+    """)
+  end
+
   # Renders a LiveView at a URL that does not route to it, so LiveView rejects
   # its connection as unauthorized, as after a live_session change.
   def unrouted_live(conn, _params) do

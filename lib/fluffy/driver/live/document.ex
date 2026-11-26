@@ -64,8 +64,14 @@ defmodule Fluffy.Driver.Live.Document do
     |> LazyHTML.from_document()
   end
 
+  # LiveViewTest's HTML has no doctype, so the document has the one Phoenix layouts write.
+  @doctype "<!DOCTYPE html>"
+
+  @spec doctype() :: String.t()
+  def doctype, do: @doctype
+
   # LazyHTML.from_tree/1 is far slower than serializing and parsing again.
-  defp serialize(tree), do: "<!DOCTYPE html>" <> LazyHTML.Tree.to_html(tree)
+  defp serialize(tree), do: @doctype <> LazyHTML.Tree.to_html(tree)
 
   defp split(layout, [view_marker, title_marker]) do
     markers = Regex.compile!("(#{Regex.escape(view_marker)}|#{Regex.escape(title_marker)})")

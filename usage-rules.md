@@ -33,7 +33,7 @@ Fluffy runs Phoenix feature tests through one Playwright-shaped API, in-process 
 
 ## Fluffy's own API
 
-- To use a page value, read it on any driver with `text_content`, `get_attribute` or `input_value`, not `evaluate`; check values with assertions, which retry.
+- To use a page value, read it on any driver with `text_content`, `get_attribute`, `input_value` or `title`, not `evaluate`, and `all` for a locator per match; check values with assertions, which retry. `wait_for(session, locator, state: :hidden)` works on every driver too.
 - Events: `pending = wait_for(session, Event.download())`, act, `await(pending)`, or `assert_event` in a pipeline. Downloads work on every driver, other events on Playwright.
 - A `Fluffy.Playwright.route/4` handler answers each request once and must not block: hand database work to a `Task` (it keeps the sandbox) and fulfil from there.
 - `Fluffy.unwrap/2` passes the driver's native value (`Plug.Conn`, `LiveViewTest.View`, `Playwright.Page`). In it, don't close the page or context, remove listeners, `set_content`, stop tracing, pass `no_wait_after:` or `signal:`, or consume `assert_patch`: that breaks Fluffy's tracking.

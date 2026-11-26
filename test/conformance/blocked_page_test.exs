@@ -46,7 +46,7 @@ defmodule Fluffy.Conformance.BlockedPageTest do
 
     error =
       assert_raise Fluffy.OperationError, ~r/did not respond to Fluffy's document check within 1000ms/, fn ->
-        Playwright.content(session)
+        content(session)
       end
 
     # The public call, as a failure of Playwright's own in it reports.
