@@ -651,9 +651,6 @@ defmodule Fluffy.Options do
   @spec validate_role_locator!(keyword()) :: keyword()
   def validate_role_locator!(options), do: NimbleOptions.validate!(options, @role_locator_schema)
 
-  @spec validate_role_shorthand!(keyword()) :: keyword()
-  def validate_role_shorthand!(options), do: NimbleOptions.validate!(options, @role_shorthand_schema)
-
   @spec validate_filter_locator!(keyword()) :: keyword()
   def validate_filter_locator!(options), do: NimbleOptions.validate!(options, @filter_locator_schema)
 
