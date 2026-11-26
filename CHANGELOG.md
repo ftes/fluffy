@@ -92,6 +92,7 @@ Changes since 0.8.0.
 - `Fluffy.Assert` names every `Fluffy.Expect` matcher: `css`, `js_property`, `role`, `accessible_name`, `accessible_description`, `accessible_error_message`, `match_aria_snapshot`, `match_screenshot`, `page_match_aria_snapshot` and `page_match_screenshot` join the others.
 - `by_role` on Phoenix knows Playwright's implicit roles, landmarks included.
 - `Fluffy.Locator.Roles`, an opt-in import with `button("Save")` and `link("Owlery")`, shorthands for `by_role(:button, name: "Save")` and `by_role(:link, name: "Owlery")` that take the same options.
+- `by_role` takes an accessible name positionally, with optional role options, as in `by_role(:heading, "Potions", level: 2)`. The same form works under a locator or frame scope.
 - `Fluffy.Locator.within/2`, `Fluffy.clear/3` and `Fluffy.set_checked/4` on every driver; the facade's `assert_has` and `refute_has` accept a locator.
 - `Fluffy.wait_for/3` takes a locator and `state:`, as Playwright's `locator.waitFor()`, on every driver: LiveView retries against fresh renders and Static checks once.
 - Locator reads, as Playwright's: `Fluffy.text_content/3`, `get_attribute/4`, `input_value/3`, `all_text_contents/2` and `all/2` on every driver, and `Fluffy.Playwright.inner_text/3` and `all_inner_texts/2`. Like upstream, they wait for the element but not for its value; assertions still retry.

@@ -23,11 +23,15 @@ Locators are values, so they can be scoped and reused:
 
 ```elixir
 potions = by_css("#potions")
-potion = by_role(potions, :row, name: "Polyjuice Potion")
+potion = potions |> by_role(:row, "Polyjuice Potion")
 
 session
-|> click(by_role(potion, :button, name: "Inspect"))
+|> click(by_role(potion, :button, "Inspect"))
 ```
+
+`by_role(:heading, "Potions", level: 2)` is the same as
+`by_role(:heading, name: "Potions", level: 2)`. The positional name also works
+when starting from another locator or a frame, and can be a regular expression.
 
 Available constructors are `by_role`, `by_text`, `by_label`,
 `by_placeholder`, `by_alt_text`, `by_title`, `by_test_id`, and `by_css`.
@@ -55,9 +59,9 @@ property, which only JavaScript sets, is mixed on Playwright only; `aria-checked
 is mixed on every driver. As in Playwright, a state option the role lacks, such as
 `by_role(:link, pressed: true)`, raises when the locator resolves.
 
-`name:`, `has_text:` and `has_not_text:` also take a regular expression, as in
-Playwright: `name:` tests it against the normalized accessible name, and the text
-filters against the element's raw text, so `~r/^Pro$/` does not match
+Role names, `has_text:` and `has_not_text:` also take a regular expression, as in
+Playwright: the role locator tests it against the normalized accessible name, and
+the text filters against the element's raw text, so `~r/^Pro$/` does not match
 `<li> Pro </li>`. A regex is a JavaScript `RegExp` on every driver: an Elixir
 `Regex` becomes one with `Playwright.RegExp.new/1`, which raises `ArgumentError`
 on PCRE-only syntax such as `\A` or `(?i)`, and Static and LiveView match it as
