@@ -29,6 +29,7 @@ defmodule Fluffy.Driver.Live do
   alias Fluffy.Locator
   alias Fluffy.Page
   alias Fluffy.Session
+  alias Fluffy.TestTimeout
   alias Fluffy.Timeouts
   # StringUtils is internal to Playwright, which is pinned.
   alias Playwright.Isomorphic.StringUtils
@@ -46,10 +47,7 @@ defmodule Fluffy.Driver.Live do
 
   @impl true
   def expect(%Session{} = session, %Expect{} = expectation) do
-    deadline =
-      expectation.options
-      |> Timeouts.get(&Timeouts.phoenix/0)
-      |> Retry.deadline()
+    deadline = deadline(expectation.options)
 
     result =
       eventually(session, deadline, fn session ->
@@ -538,7 +536,7 @@ defmodule Fluffy.Driver.Live do
   # as an expectation does, and goes on on the page a navigation it finds lands on.
   @impl true
   def wait_for(%Session{} = session, %Locator{} = locator, options \\ []) do
-    deadline = options |> Timeouts.get(&Timeouts.phoenix/0) |> Retry.deadline()
+    deadline = deadline(options)
     wait = &ClientDOM.wait_for(&1, locator, Keyword.fetch!(options, :state))
 
     case eventually(session, deadline, &ActionResolver.attempt(&1, locator, wait)) do
@@ -555,11 +553,7 @@ defmodule Fluffy.Driver.Live do
   # it on to the new page, within its timeout. A read that finds no target, such as
   # `all_text_contents`, reads once.
   defp read(session, operation, [locator | _rest] = arguments, read) do
-    deadline =
-      arguments
-      |> List.last()
-      |> Timeouts.get(&Timeouts.phoenix/0)
-      |> Retry.deadline()
+    deadline = deadline(List.last(arguments))
 
     case eventually(session, deadline, &ActionResolver.attempt(&1, locator, read)) do
       {:redirected, session, navigation} -> retry_on_new_page(session, navigation, operation, arguments, deadline)
@@ -570,7 +564,7 @@ defmodule Fluffy.Driver.Live do
   # A page read reads the latest render once, on the page a navigation it finds lands on.
   # As in Playwright, it has no timeout.
   defp page_read(session, operation, options, read) do
-    deadline = Retry.deadline(:infinity)
+    deadline = TestTimeout.deadline(:infinity)
 
     case eventually(session, deadline, &{:ok, {&1, read.(client_dom(&1))}}) do
       {:redirected, session, navigation} -> retry_on_new_page(session, navigation, operation, [options], deadline)
@@ -676,11 +670,7 @@ defmodule Fluffy.Driver.Live do
   # following a navigation leaves its session on its page with the navigation
   # unread. `arguments` are the driver call's own, which the retry repeats.
   defp act(session, operation, arguments, action) do
-    deadline =
-      arguments
-      |> List.last()
-      |> Timeouts.get(&Timeouts.phoenix/0)
-      |> Retry.deadline()
+    deadline = deadline(List.last(arguments))
 
     result =
       ActionScope.run(fn ->
@@ -734,13 +724,15 @@ defmodule Fluffy.Driver.Live do
     {:navigate, session, %{navigation | redirects: redirects}, retry}
   end
 
+  defp deadline(options), do: options |> Timeouts.get(&Timeouts.phoenix/0) |> TestTimeout.deadline()
+
   defp put_timeout(%Expect{} = expectation, timeout), do: Expect.Internal.merge_options(expectation, timeout: timeout)
   defp put_timeout(options, timeout), do: Keyword.put(options, :timeout, timeout)
 
   defp raise_navigated_away(operation, arguments, deadline) do
     [action: action_label(operation, arguments), reason: :navigated_away, locator: hd(arguments)]
     |> Fluffy.ActionabilityError.exception()
-    |> Fluffy.TestTimeout.explain(deadline)
+    |> TestTimeout.explain(deadline)
     |> raise()
   end
 
