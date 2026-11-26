@@ -18,7 +18,7 @@ def pr(branch=BRANCH, repo=REPO, head=HEAD, state="open"):
     return {"state": state, "head": {"sha": head, "ref": branch, "repo": {"full_name": repo}}}
 
 
-def request(body="@opencode fix the test", association="OWNER", author=MEMBER):
+def request(body="/agent fix the test", association="OWNER", author=MEMBER):
     return {"body": body, "author_association": association, "user": author}
 
 
@@ -26,14 +26,14 @@ class GateTest(unittest.TestCase):
     def setUp(self):
         self.enterContext(patch.object(run, "REPO", REPO))
 
-    def test_all_existing_events_and_mentions(self):
+    def test_agent_command_on_all_existing_events(self):
         issue = {"number": 32}
         pull_request = {"number": 32}
         events = (
-            ("issue_comment", {"comment": request("@claude fix"), "issue": issue}, False),
-            ("issues", {"issue": issue | request(None) | {"title": "/opencode fix"}}, False),
-            ("pull_request_review_comment", {"comment": request("/oc fix"), "pull_request": pull_request}, True),
-            ("pull_request_review", {"review": request("@opencode fix"), "pull_request": pull_request}, True),
+            ("issue_comment", {"comment": request("/agent fix"), "issue": issue}, False),
+            ("issues", {"issue": issue | request(None) | {"title": "/agent fix"}}, False),
+            ("pull_request_review_comment", {"comment": request("/agent fix"), "pull_request": pull_request}, True),
+            ("pull_request_review", {"review": request("/agent fix"), "pull_request": pull_request}, True),
             ("issue_comment", {"comment": request(), "issue": issue | {"pull_request": {"url": "pulls/32"}}}, True),
         )
         for event_name, data, is_pr in events:
@@ -44,12 +44,20 @@ class GateTest(unittest.TestCase):
                 self.assertEqual(result["branch"], BRANCH if is_pr else "opencode/issue-32-99")
                 self.assertEqual(result.get("pr"), "true" if is_pr else None)
 
-    def test_deny_outsiders_bots_and_inexact_mentions(self):
-        for denied in (request(association="NONE"), request("/octopus"), request(author=MEMBER | {"type": "Bot"})):
+    def test_deny_outsiders_and_bots(self):
+        for denied in (request(association="NONE"), request(author=MEMBER | {"type": "Bot"})):
             event = {"sender": MEMBER, "comment": denied, "issue": {"number": 32}}
             with patch.object(run, "api") as api:
                 self.assertEqual(command.target(event, "issue_comment", "main", "99"), {})
             api.assert_not_called()
+
+    def test_reject_legacy_and_inexact_commands(self):
+        for body in ("@claude fix", "@opencode fix", "/oc fix", "/opencode fix",
+                     "/agentic", "/agent-help", "docs/agent", "/agent/status"):
+            with self.subTest(body=body), patch.object(run, "api") as api:
+                event = {"sender": MEMBER, "comment": request(body), "issue": {"number": 32}}
+                self.assertEqual(command.target(event, "issue_comment", "main", "99"), {})
+                api.assert_not_called()
 
     def test_assigned_issue_requires_write_access_for_the_sender_and_author(self):
         event = {"sender": MEMBER, "issue": {"number": 32} | request(author=MEMBER | {"login": "bob"})}
