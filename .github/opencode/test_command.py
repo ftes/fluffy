@@ -1,0 +1,138 @@
+import contextlib
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+import command
+import run
+
+
+REPO = "ftes/fluffy"
+HEAD = "a" * 40
+BRANCH = "feature"
+MEMBER = {"login": "alice", "type": "User"}
+
+
+def pr(branch=BRANCH, repo=REPO, head=HEAD, state="open"):
+    return {"state": state, "head": {"sha": head, "ref": branch, "repo": {"full_name": repo}}}
+
+
+def request(body="@opencode fix the test", association="OWNER", author=MEMBER):
+    return {"body": body, "author_association": association, "user": author}
+
+
+class GateTest(unittest.TestCase):
+    def setUp(self):
+        self.enterContext(patch.object(run, "REPO", REPO))
+
+    def test_all_existing_events_and_mentions(self):
+        issue = {"number": 32}
+        pull_request = {"number": 32}
+        events = (
+            ("issue_comment", {"comment": request("@claude fix"), "issue": issue}, False),
+            ("issues", {"issue": issue | request(None) | {"title": "/opencode fix"}}, False),
+            ("pull_request_review_comment", {"comment": request("/oc fix"), "pull_request": pull_request}, True),
+            ("pull_request_review", {"review": request("@opencode fix"), "pull_request": pull_request}, True),
+            ("issue_comment", {"comment": request(), "issue": issue | {"pull_request": {"url": "pulls/32"}}}, True),
+        )
+        for event_name, data, is_pr in events:
+            with self.subTest(event=event_name, is_pr=is_pr), patch.object(
+                run, "api", side_effect=[{"permission": "write"}, pr()]
+            ):
+                result = command.target(data | {"sender": MEMBER}, event_name, "main", "99")
+                self.assertEqual(result["branch"], BRANCH if is_pr else "opencode/issue-32-99")
+                self.assertEqual(result.get("pr"), "true" if is_pr else None)
+
+    def test_deny_outsiders_bots_and_inexact_mentions(self):
+        for denied in (request(association="NONE"), request("/octopus"), request(author=MEMBER | {"type": "Bot"})):
+            event = {"sender": MEMBER, "comment": denied, "issue": {"number": 32}}
+            with patch.object(run, "api") as api:
+                self.assertEqual(command.target(event, "issue_comment", "main", "99"), {})
+            api.assert_not_called()
+
+    def test_assigned_issue_requires_write_access_for_the_sender_and_author(self):
+        event = {"sender": MEMBER, "issue": {"number": 32} | request(author=MEMBER | {"login": "bob"})}
+        with patch.object(run, "api", side_effect=[{"permission": "write"}, {"permission": "read"}]) as api:
+            self.assertEqual(command.target(event, "issues", "main", "99"), {})
+        self.assertEqual([call.args[0] for call in api.call_args_list],
+                         ["collaborators/alice/permission", "collaborators/bob/permission"])
+
+    def test_fork_notice_and_protected_targets(self):
+        event = {"sender": MEMBER, "comment": request(), "issue": {"number": 32, "pull_request": {"url": "pulls/32"}}}
+        cases = (pr(repo="fork/fluffy"), pr(branch="renovate/update"), pr(branch="main"), pr(state="closed"))
+        for candidate in cases:
+            with patch.object(run, "api", side_effect=[{"permission": "admin"}, candidate]):
+                expected = {"fork": "true", "number": 32} if candidate["head"]["repo"]["full_name"] != REPO else {}
+                self.assertEqual(command.target(event, "issue_comment", "main", "99"), expected)
+        inline = {"sender": MEMBER, "comment": request(), "pull_request": {"number": 32}}
+        with patch.object(run, "api", side_effect=[{"permission": "admin"}, cases[0]]):
+            self.assertEqual(command.target(inline, "pull_request_review_comment", "main", "99"), {})
+
+
+class PublishTest(unittest.TestCase):
+    def setUp(self):
+        self.enterContext(patch.object(run, "REPO", REPO))
+
+    def test_edit_mode_does_not_enable_shell_or_change_review_mode(self):
+        allowed = {rule["action"] for rule in command.settings()["permissions"] if rule["effect"] == "allow"}
+        self.assertEqual(allowed, {"edit", "glob", "grep", "read"})
+        self.assertEqual(run.config()["share"], "disabled")
+        self.assertNotIn("edit", {rule["action"] for rule in run.config()["permissions"]})
+
+    def test_git_stage_rejects_renaming_a_workflow_out_of_protected_paths(self):
+        with tempfile.TemporaryDirectory() as directory, contextlib.chdir(directory):
+            run.git("init", "-q")
+            workflow = Path(".github/workflows/example.yml")
+            workflow.parent.mkdir(parents=True)
+            workflow.write_text("name: example\n")
+            run.git("add", "-A")
+            run.git("-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false",
+                    "commit", "-qm", "base")
+            workflow.rename("example.yml")
+            with self.assertRaisesRegex(ValueError, "cannot publish"):
+                command.stage(run.git("rev-parse", "HEAD"))
+
+    def test_pr_change_does_not_push_or_reply_if_head_moves(self):
+        replies = [pr(), [], pr(head="b" * 40)]
+        with (patch.object(run, "api", side_effect=replies) as api,
+              patch.object(run, "git", side_effect=[HEAD, ""]),
+              patch.object(run, "context"), patch.object(run, "save"), patch.object(run, "gh"),
+              patch.object(run, "snapshot_diff", return_value=("base", b"diff")),
+              patch.object(run, "agent", return_value={"title": "Fix the test", "reply": "Updated."}),
+              patch.object(command, "recover", return_value=None),
+              patch.object(command, "commit", return_value="c" * 40),
+              patch.object(command, "stage", return_value=True),
+              patch.object(command, "push") as push,
+              patch.object(run, "app_token", return_value=contextlib.nullcontext("token"))):
+            command.command(32, BRANCH, "main", True, "99", "Prompt", request())
+        push.assert_not_called()
+        self.assertTrue(all("payload" not in call.kwargs for call in api.call_args_list))
+
+    def test_pr_change_uses_the_inspected_head_as_the_push_lease(self):
+        with (patch.object(run, "api", side_effect=[pr(), [], pr(), {}]) as api,
+              patch.object(run, "git", side_effect=[HEAD, ""]),
+              patch.object(run, "context"), patch.object(run, "save"), patch.object(run, "gh"),
+              patch.object(run, "snapshot_diff", return_value=("base", b"diff")),
+              patch.object(run, "agent", return_value={"title": "Fix the test", "reply": "Updated."}),
+              patch.object(command, "recover", return_value=None),
+              patch.object(command, "commit", return_value="c" * 40),
+              patch.object(command, "stage", return_value=True),
+              patch.object(command, "push") as push,
+              patch.object(run, "app_token", return_value=contextlib.nullcontext("token"))):
+            command.command(32, BRANCH, "main", True, "99", "Prompt", request())
+        push.assert_called_once_with(BRANCH, "token", HEAD)
+        self.assertEqual(api.call_args.kwargs["payload"]["body"], "Updated.\n\n<!-- opencode-command: 99 -->")
+
+    def test_issue_publication_recovers_without_repeating_model_or_push(self):
+        branch = "opencode/issue-32-99"
+        with (patch.object(run, "api", side_effect=[[], {}]) as api, patch.object(run, "git", return_value=HEAD),
+              patch.object(run, "agent") as agent, patch.object(command, "push") as push,
+              patch.object(command, "recover", return_value=(HEAD, "Fix the test", "Updated.")),
+              patch.object(command, "issue_pr", return_value="https://example.test/pull/33") as publish,
+              patch.object(run, "app_token", return_value=contextlib.nullcontext("token"))):
+            command.command(32, branch, "main", False, "99", "Prompt", request())
+        agent.assert_not_called()
+        push.assert_not_called()
+        publish.assert_called_once()
+        self.assertIn("Opened https://example.test/pull/33", api.call_args.kwargs["payload"]["body"])
