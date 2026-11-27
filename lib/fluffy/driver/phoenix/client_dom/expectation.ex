@@ -48,7 +48,7 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM.Expectation do
         {actual == "", actual}
 
       target ->
-        actual = Semantics.text(target)
+        actual = Semantics.text_content(target)
         {String.trim(actual) == "", actual}
     end)
   end

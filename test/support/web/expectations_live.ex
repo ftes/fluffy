@@ -22,6 +22,8 @@ defmodule Fluffy.Support.Web.ExpectationsLive do
   <div id="blank">
   </div>
   <div id="comment"><!-- skipped --></div>
+  <div id="script-only"><script type="application/json">"Lumos"</script></div>
+  <div id="style-only"><style>.cloak { visibility: hidden; }</style></div>
   <input id="vacant">
   <input id="filled" value="x">
   <textarea id="area"></textarea>
