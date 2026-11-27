@@ -112,7 +112,7 @@ Changes since 0.8.0.
 
 ### Changed
 
-- Phoenix visibility assertions distinguish a missing element from a hidden match. Single-target assertions and actions show other accessible names in scope for a missing named role.
+- On Phoenix, `to_be_visible` distinguishes a missing element from a hidden match. When a named role is missing, `to_be_visible` and single-target actions can suggest other accessible names in scope.
 - Playwright `submit` waits like a Playwright action, for its navigation to commit.
 - Most of Fluffy's own error messages start with the call that raised them, such as `Fluffy.set_input_files/4: ...`.
 - Playwright traces show only the test's own actions: Fluffy's document checks and LiveView waits are internal Playwright calls, with no trace entries or DOM snapshots.
