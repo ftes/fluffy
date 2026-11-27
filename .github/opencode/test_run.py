@@ -146,8 +146,8 @@ class PublishTest(unittest.TestCase):
               patch.object(run, "gh") as gh, patch.object(run, "save"), patch.object(run, "context", return_value=pr),
               patch.object(run, "reconcile_reviews") as reconcile,
               contextlib.redirect_stdout(io.StringIO())):
-            expected, marker, depth = run.prepare_review(42, pr["head"]["sha"])
-            self.assertEqual(depth, "full")
+            expected, merge_base = run.prepare_review(42, pr["head"]["sha"])
+            marker = run.snapshot_marker(expected, merge_base)
             result = {
                 "summary": "Checked calls", "open_blocking": 0, "open_non_blocking": 1,
                 "findings": [{"path": " lib/a.ex ", "line": 1, "side": "RIGHT",
@@ -193,7 +193,7 @@ class PublishTest(unittest.TestCase):
         identity = "" if legacy else f" {hashlib.sha256(target.encode()).hexdigest()} {base}"
         return f"<!-- opencode-review: {head} {merge_base}{identity} -->"
 
-    def test_previous_review_without_matching_recorded_base_requires_full_review(self):
+    def test_previous_review_without_matching_recorded_base_does_not_skip_a_new_review(self):
         for legacy in (False, True):
             prior = {"body": self.marker(self.pr(base="e" * 40), legacy=legacy), "state": "APPROVED",
                      "user": {"type": "Bot", "login": run.BOT}}

@@ -44,7 +44,7 @@ class ReviewWorkflowTest(unittest.TestCase):
             Path("source.ex").write_text("from working tree\n")
             self.assertEqual(review.changed_sources(base, "HEAD", 1024), {"source.ex": "from head\n"})
 
-    def test_full_and_incremental_context_keep_binary_notices_and_text_hunks(self):
+    def test_review_context_uses_the_full_current_diff_with_binary_notices(self):
         with tempfile.TemporaryDirectory() as tmp, contextlib.chdir(tmp):
             directory = Path(tmp)
             run.git("init", "-q")
@@ -82,11 +82,11 @@ class ReviewWorkflowTest(unittest.TestCase):
                 self.assertIn(b"GIT binary patch", run.reviewed_diff(marker))
                 self.assertTrue(review.prepare(42, head, False, directory))
                 data = json.loads((directory / "review-input.json").read_text())["data"]
-                self.assertEqual(data["mode"], "increment")
-                for diff in (data["diff"], data["increment"]):
-                    self.assertIn("Binary files ", diff)
-                    self.assertIn("+after", diff)
-                    self.assertNotIn("GIT binary patch", diff)
+                self.assertEqual(set(data), {"pr", "resolved_threads", "diff", "changed_source"})
+                self.assertIn("Binary files ", data["diff"])
+                self.assertIn("@@ -0,0 +1 @@", data["diff"])
+                self.assertIn("+after", data["diff"])
+                self.assertNotIn("GIT binary patch", data["diff"])
                 (directory / "review-input.json").unlink()
                 with patch.object(review, "MAX_CONTEXT", 100):
                     with self.assertRaisesRegex(ValueError, "review this PR manually"):

@@ -64,15 +64,13 @@ def prepare(number, head, retargeted, directory):
     prepared = run.prepare_review(number, head, retargeted)
     if prepared is None:
         return False
-    expected, marker, depth = prepared
-    data = {"mode": depth, "pr": json.loads((run.CONTEXT / f"{number}.json").read_text()),
+    expected, merge_base = prepared
+    data = {"pr": json.loads((run.CONTEXT / f"{number}.json").read_text()),
             "resolved_threads": (run.CONTEXT / "resolved.jsonl").read_text(),
             "diff": (run.CONTEXT / "pr.diff").read_bytes().decode(errors="replace")}
-    if depth == "increment":
-        data["increment"] = (run.CONTEXT / "increment.diff").read_bytes().decode(errors="replace")
     budget = MAX_CONTEXT - len(json.dumps(data)) - 64
     run.check(budget >= 0, "PR review context is too large; review this PR manually.")
-    data["changed_source"] = changed_sources(marker[1], head, budget)
+    data["changed_source"] = changed_sources(merge_base, head, budget)
     (directory / "review-input.json").write_text(json.dumps({"snapshot": expected, "data": data}))
     return True
 

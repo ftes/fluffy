@@ -421,21 +421,13 @@ def prepare_review(number, head, retargeted=False):
     previous, previous_active = previous_review(number)
     if previous_active and previous == marker:
         return
-    depth = "full"
-    if previous and not retargeted and previous[2:] == marker[2:]:
-        old_head, old_base, _, _ = previous
+    if previous_active and not retargeted and previous[2:] == marker[2:]:
         try:
-            old = reviewed_diff(previous)
-            if old == full:
-                if previous_active:
-                    print("Same changes as the previous review; skipping.")
-                    return
-            else:
-                replayed = git("merge-tree", "--write-tree", "--merge-base", old_base, base, old_head)
-                save("increment.diff", git(*TEXT_DIFF_ARGS, replayed, head, raw=True))
-                depth = "increment"
+            if reviewed_diff(previous) == full:
+                print("Same changes as the previous review; skipping.")
+                return
         except subprocess.CalledProcessError:
-            print("Previous review could not be replayed; reviewing the whole PR.")
+            print("Could not verify unchanged diff for the previous review.")
     if not active_review(context(number), expected):
         return
     resolved = gh(
@@ -453,7 +445,7 @@ def prepare_review(number, head, retargeted=False):
     )
     save("resolved.jsonl", resolved)
     save("pr.diff", git(*TEXT_DIFF_ARGS, base, head, raw=True))
-    return expected, marker, depth
+    return expected, base
 
 
 def publish_review(number, expected, marker, result):
