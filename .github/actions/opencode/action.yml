@@ -23,6 +23,6 @@ runs:
     - shell: bash
       run: npm install --global @opencode/cli@2.4.2
     - id: auth
-      uses: ftes/ci/opencode-auth@e53e22699f50c88157237931a10500d367cca47c # v1.0.13
+      uses: ftes/ci/opencode-auth@41939eef91514e8ac6b33a1d6e7923edc42f4628 # v1.0.14
       with:
         client-id: ${{ inputs.client-id }}
