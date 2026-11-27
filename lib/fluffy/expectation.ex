@@ -17,7 +17,7 @@ defmodule Fluffy.Expectation do
   def count_message(locator, expected, actual, candidates) do
     String.trim("""
     Expected #{Locator.Internal.describe(locator)} to match #{expected} element(s), but it matched #{actual}.
-    #{candidate_section(candidates)}
+    #{candidate_section(candidates, "Candidates")}
     """)
   end
 
@@ -28,13 +28,13 @@ defmodule Fluffy.Expectation do
   def strictness_message(locator, candidates) do
     String.trim("""
     Expected #{Locator.Internal.describe(locator)} to resolve to exactly one element, but it matched #{length(candidates)}.
-    #{candidate_section(candidates)}
+    #{candidate_section(candidates, "Candidates")}
     """)
   end
 
-  defp candidate_section([]), do: "Candidates: none"
+  def candidate_section([], heading), do: "#{heading}: none"
 
-  defp candidate_section(candidates) do
+  def candidate_section(candidates, heading) do
     snippets =
       candidates
       |> Enum.take(5)
@@ -42,7 +42,7 @@ defmodule Fluffy.Expectation do
       |> Enum.map_join("\n", fn {candidate, index} -> "  #{index}. #{snippet(candidate)}" end)
 
     suffix = if length(candidates) > 5, do: "\n  …", else: ""
-    "Candidates:\n" <> snippets <> suffix
+    "#{heading}:\n" <> snippets <> suffix
   end
 
   def snippet(candidate) do

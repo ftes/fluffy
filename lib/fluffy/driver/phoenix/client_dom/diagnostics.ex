@@ -25,10 +25,19 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM.Diagnostics do
       case diagnostic_query(error.locator) do
         {:role, _, _, _} = query -> other_names(client_dom, query)
         {:label, text, options, scope} -> label_evidence(client_dom, scope, text, options)
-        nil -> ""
+        nil -> before_filter(client_dom, error.locator)
       end
 
     %{error | message: error.message <> detail}
+  end
+
+  defp before_filter(client_dom, locator) do
+    with {{:filter, [has_text: _]}, prefix} <- List.pop_at(locator.operations, -1),
+         [_ | _] = matches <- ClientDOM.resolve(client_dom, %{locator | operations: prefix}) do
+      "\n" <> Fluffy.Expectation.candidate_section(matches, "Matches before filter")
+    else
+      _ -> ""
+    end
   end
 
   # Relax only the terminal query, retaining its roots even inside within/2.
