@@ -111,18 +111,16 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM.Expectation do
     end)
   end
 
-  def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :disabled}) do
-    actual = ClientDOM.disabled?(client_dom, locator)
-    {actual, actual}
+  def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: kind} = expectation)
+      when kind in [:enabled, :disabled] do
+    with_element(client_dom, locator, expectation, fn target ->
+      actual = ClientDOM.disabled?(client_dom, target) == (kind == :disabled)
+      {actual, actual}
+    end)
   end
 
   def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :editable}) do
     actual = ClientDOM.editable?(client_dom, locator)
-    {actual, actual}
-  end
-
-  def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :enabled}) do
-    actual = not ClientDOM.disabled?(client_dom, locator)
     {actual, actual}
   end
 
