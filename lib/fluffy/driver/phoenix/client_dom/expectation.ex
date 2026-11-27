@@ -181,17 +181,28 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM.Expectation do
 
   # The Live driver only formats the terminal attempt. Use that same snapshot
   # for the scoped name lookup and the page text.
-  defp missing(client_dom, locator) do
-    {:diagnostic,
-     fn ->
-       {last, scope} = List.pop_at(locator.operations, -1)
-       missing_context(client_dom, locator, scope, last)
-     end}
+  defp missing(client_dom, locator), do: {:diagnostic, fn -> missing_context(client_dom, role_query(locator)) end}
+
+  # Drop only the final role's name, retaining the query roots for within/2
+  # and its nested locators (including filter and composition operands).
+  defp role_query(locator) do
+    case List.pop_at(locator.operations, -1) do
+      {{:role, role, options}, scope} ->
+        other = %{locator | operations: scope ++ [{:role, role, Keyword.delete(options, :name)}]}
+        {:role, role, options, other}
+
+      {{:within, parent, child}, scope} ->
+        with {:role, role, options, other} <- role_query(child) do
+          {:role, role, options, %{locator | operations: scope ++ [{:within, parent, other}]}}
+        end
+
+      _ ->
+        :no_role
+    end
   end
 
-  defp missing_context(client_dom, locator, scope, {:role, role, options}) do
+  defp missing_context(client_dom, {:role, role, options, other}) do
     if Keyword.has_key?(options, :name) do
-      other = %{locator | operations: scope ++ [{:role, role, Keyword.delete(options, :name)}]}
       aria = Aria.for_document(client_dom.document)
 
       names =
@@ -209,7 +220,7 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM.Expectation do
     end
   end
 
-  defp missing_context(client_dom, _locator, _scope, _last) do
+  defp missing_context(client_dom, :no_role) do
     text = client_dom.document |> Semantics.document_text() |> StringUtils.normalize_white_space()
     "No element matched.\nPage text: #{inspect(text, printable_limit: 500)}"
   end

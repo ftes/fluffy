@@ -83,13 +83,17 @@ defmodule Fluffy.Conformance.LocatorDiagnosticsTest do
       <button>Accio</button>
       """)
 
-    locator = "section" |> by_css() |> by_role(:button, "Expelliarmus")
-    error = assert_raise ExUnit.AssertionError, fn -> expect(session, to_be_visible(locator)) end
-    assert error.message =~ Fluffy.Locator.Internal.describe(locator)
-    assert error.message =~ ~s(Other button names in scope: "Lumos")
-    refute error.message =~ "Cast"
-    refute error.message =~ "Nox"
-    refute error.message =~ "Accio"
+    scope = by_css("section")
+    role = by_role(:button, "Expelliarmus")
+
+    for locator <- [by_role(scope, :button, "Expelliarmus"), within(role, scope)] do
+      error = assert_raise ExUnit.AssertionError, fn -> expect(session, to_be_visible(locator)) end
+      assert error.message =~ Fluffy.Locator.Internal.describe(locator)
+      assert error.message =~ ~s(Other button names in scope: "Lumos")
+      refute error.message =~ "Cast"
+      refute error.message =~ "Nox"
+      refute error.message =~ "Accio"
+    end
   end
 
   @tag driver: :playwright
