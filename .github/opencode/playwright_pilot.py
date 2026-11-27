@@ -14,9 +14,6 @@ import playwright_update as update
 import publish
 import run
 
-sys.path.append(str(Path(__file__).resolve().parents[2] / "dev"))
-
-
 BRANCH_PREFIX = run.PLAYWRIGHT_PILOT_BRANCH
 MODEL = "claude-agent/ci-sonnet"
 BODY = "Bumps the PlaywrightEx requirement and lockfiles, syncs usage rules, and checks the Fluffy member inventory."
@@ -57,9 +54,9 @@ def may_publish(release, base):
 
 
 def select_release(release, base, parent):
-    from playwright_release import LOCK, lock_entry, version_key
-
-    previous = lock_entry(LOCK)
+    entries = re.findall(update.HEX_LOCK, Path("mix.lock").read_text(), re.M)
+    run.check(len(entries) == 1, "Expected one PlaywrightEx Hex entry in mix.lock")
+    previous = entries[0]
     target = version_key(release)
     locked = version_key(previous)
     if target == locked:
@@ -70,6 +67,12 @@ def select_release(release, base, parent):
     if may_publish(release, base):
         return previous
     return None
+
+
+def version_key(value):
+    core, _, prerelease = update.version(value).partition("-")
+    identifiers = tuple((0, int(part)) if part.isdigit() else (1, part) for part in prerelease.split("."))
+    return tuple(map(int, core.split("."))), not prerelease, identifiers
 
 
 def prepare_context(previous, release, parent, run_id):
@@ -179,23 +182,22 @@ def classify(context):
 
 
 def verify(release, previous, parent, run_id):
-    from playwright_release import mix, prepare
-
     update.check_verifier()
     run.check(not os.environ.get("CLAUDE_CODE_OAUTH_TOKEN"), "The verifier must not have a model credential")
     proposal = load_input("proposal", run_id, parent, release, "classifications")["classifications"]
     classifications = update_classifications(update.blob(parent, CLASSIFICATIONS), proposal)
-    # The tested preparation script pins the exact release during dependency resolution.
-    prepare(release)
-    update.update_files(previous, release)
+    mix_env = os.environ | {"MIX_ENV": "test"}
+    # The preparation script pins the exact release during dependency resolution.
+    subprocess.run(["elixir", "dev/playwright_release.exs", "prepare", release], env=mix_env, check=True)
+    update.update_release_notes(previous, release)
     if proposal:
         Path(CLASSIFICATIONS).write_text(classifications)
-    mix("playwright.install", "--with-deps", "chromium")
+    subprocess.run(["mix", "playwright.install", "--with-deps", "chromium"], env=mix_env, check=True)
     run.git("add", "-A")
     tree = run.git("write-tree")
     files = update.changed_files(parent, tree, allowed=UPDATE_FILES)
     checked_files({"files": files, "body": BODY}, release)
-    mix("check")
+    subprocess.run(["mix", "check"], env=mix_env, check=True)
     run.git("add", "-A")
     run.check(run.git("write-tree") == tree, "Verification changed the files it checked")
     update.write_artifact("verified", run_id, parent, release, files=files, body=BODY)

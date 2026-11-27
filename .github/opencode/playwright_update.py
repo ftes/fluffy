@@ -196,6 +196,10 @@ def update_files(previous, release):
     config, matches = re.subn(pattern, f'      {{:playwright, "~> {release}", hex: :playwright_ex}},', config, flags=re.M)
     run.check(matches == 1, "Cannot replace the PlaywrightEx dependency")
     exists.write_text(config)
+    update_release_notes(previous, release)
+
+
+def update_release_notes(previous, release):
     for name in ("docs/installation.md", "usage-rules.md"):
         path = Path(name)
         original = path.read_text()

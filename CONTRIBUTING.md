@@ -50,7 +50,7 @@ with an existing pilot PR is skipped. If a run pushes the branch
 but stops before opening the PR, inspect the branch before removing it and dispatching again.
 
 To prepare the requirement, lockfiles and usage rules locally, run
-`python3 dev/playwright_release.py prepare <version>`.
+`elixir dev/playwright_release.exs prepare <version>`.
 
 ## Terms
 
