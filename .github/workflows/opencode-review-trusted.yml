@@ -16,6 +16,7 @@ concurrency:
     format('{0}-{1}', github.event.workflow_run.head_repository.id, github.event.workflow_run.head_branch) ||
     github.run_id }}
   cancel-in-progress: false
+  queue: max
 
 env:
   GIT_CONFIG_NOSYSTEM: '1'

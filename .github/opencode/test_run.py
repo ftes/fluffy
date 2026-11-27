@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 import run
 
@@ -141,6 +141,7 @@ class PublishTest(unittest.TestCase):
         with (patch.object(run, "api", side_effect=api),
               patch.object(run, "app_token", return_value=contextlib.nullcontext("app-token")),
               patch.object(run, "snapshot_diff", return_value=("b" * 40, "diff")),
+              patch.object(run, "git", return_value=b"diff"),
               patch.object(run, "gh") as gh, patch.object(run, "save"), patch.object(run, "context", return_value=pr),
               patch.object(run, "reconcile_reviews") as reconcile,
               contextlib.redirect_stdout(io.StringIO())):
@@ -151,13 +152,18 @@ class PublishTest(unittest.TestCase):
                 "findings": [{"path": " lib/a.ex ", "line": 1, "side": "RIGHT",
                               "body": "suggestion (non-blocking): Verify the result"}],
             }
-            run.publish_review(42, expected, marker, result)
             if replay:
+                reconcile.side_effect = [ValueError("Cleanup failed"), None]
+                with self.assertRaisesRegex(ValueError, "Cleanup failed"):
+                    run.publish_review(42, expected, marker, result)
                 remaining_reads = iter([pr, pr])
                 self.assertIsNone(run.prepare_review(42, pr["head"]["sha"]))
                 run.publish_review(42, expected, marker, result)
+                self.assertEqual(reconcile.call_args_list, [call(42, token="app-token"), call(42)])
+            else:
+                run.publish_review(42, expected, marker, result)
+                self.assertEqual(reconcile.call_count, int(before is None and after is None))
             self.assertTrue(any(arg.startswith("query=query(") for arg in gh.call_args.args))
-            self.assertEqual(reconcile.call_count, int(before is None and after is None))
         return submitted
 
     def test_review_posts_validated_path_and_marker_once_across_retries(self):

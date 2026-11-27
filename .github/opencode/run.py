@@ -19,7 +19,8 @@ REVIEW_BOTS = (BOT, LEGACY_BOT)
 MAINTAINERS = ("OWNER", "MEMBER", "COLLABORATOR")
 REPO = os.environ.get("GITHUB_REPOSITORY")
 CONTEXT = Path("tmp/opencode")
-DIFF_ARGS = ("diff", "--no-ext-diff", "--no-textconv", "--binary")
+TEXT_DIFF_ARGS = ("diff", "--no-ext-diff", "--no-textconv")
+DIFF_ARGS = (*TEXT_DIFF_ARGS, "--binary")
 READ_TOOLS = ("read", "glob", "grep")
 SAFE_ENV = ("PATH", "HOME", "USER", "LANG", "LC_ALL", "TMPDIR")
 PLAYWRIGHT_PILOT_BRANCH = "opencode/playwright-ex-pilot-"
@@ -420,7 +421,7 @@ def prepare_review(number, head, retargeted=False):
                     return
             else:
                 replayed = git("merge-tree", "--write-tree", "--merge-base", old_base, base, old_head)
-                save("increment.diff", git(*DIFF_ARGS, replayed, head, raw=True))
+                save("increment.diff", git(*TEXT_DIFF_ARGS, replayed, head, raw=True))
                 depth = "increment"
         except subprocess.CalledProcessError:
             print("Previous review could not be replayed; reviewing the whole PR.")
@@ -440,13 +441,16 @@ def prepare_review(number, head, retargeted=False):
         "--jq", '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved)',
     )
     save("resolved.jsonl", resolved)
-    save("pr.diff", full)
+    save("pr.diff", git(*TEXT_DIFF_ARGS, base, head, raw=True))
     return expected, marker, depth
 
 
 def publish_review(number, expected, marker, result):
     pr = api(f"pulls/{number}")
-    if not active_review(pr, expected) or previous_review(number) == (marker, True):
+    if not active_review(pr, expected):
+        return
+    if previous_review(number) == (marker, True):
+        reconcile_reviews(number)
         return
     fields(result, "summary", "open_blocking", "open_non_blocking", "findings")
     summary = text(result["summary"], 12000)

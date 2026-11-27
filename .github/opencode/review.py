@@ -1,5 +1,6 @@
 """Send a data-only PR snapshot to Claude Code and publish via the existing review contract."""
 
+import io
 import json
 import os
 from pathlib import Path
@@ -70,7 +71,7 @@ def prepare(number, head, retargeted, directory):
     if depth == "increment":
         data["increment"] = (run.CONTEXT / "increment.diff").read_bytes().decode(errors="replace")
     budget = MAX_CONTEXT - len(json.dumps(data)) - 64
-    run.check(budget >= 0, "PR review context is too large")
+    run.check(budget >= 0, "PR review context is too large; review this PR manually.")
     data["changed_source"] = changed_sources(marker[1], head, budget)
     (directory / "review-input.json").write_text(json.dumps({"snapshot": expected, "data": data}))
     return True
@@ -111,7 +112,7 @@ def infer(data):
             cwd=cwd, env=env, input=prompt, text=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=True,
         )
     try:
-        events = response.stdout.splitlines()
+        events = list(io.StringIO(response.stdout))
         run.check(not any(json.loads(line)["type"] == "tool_use" for line in events), "Unexpected tool use")
         return run.result_from_events(events)
     except (KeyError, ValueError) as error:
