@@ -54,7 +54,7 @@ class ImprovementPilotTest(unittest.TestCase):
                     pilot.read_files(path, identity, ORIGINAL, "tree")
 
     def test_wrapping_cannot_introduce_a_markdown_block(self):
-        for marker in ("- a list", "1. a list", "## a heading", "---"):
+        for marker in ("- a list", "1. a list", "## a heading", "===", "-", "***"):
             with self.subTest(marker=marker), self.assertRaisesRegex(ValueError, "single prose paragraph"):
                 pilot.wrap("x" * 88 + " " + marker)
 
