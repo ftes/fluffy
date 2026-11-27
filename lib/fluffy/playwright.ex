@@ -681,8 +681,8 @@ defmodule Fluffy.Playwright do
   return value is ignored, and a document it navigates is adopted.
 
       session
-      |> Fluffy.Playwright.unwrap(by_role(:button, name: "Edit"), &Playwright.Locator.dblclick!/1)
-      |> expect(to_be_visible(by_label("Title")))
+      |> Fluffy.Playwright.unwrap(button("Edit"), &Playwright.Locator.dblclick!/1)
+      |> assert_has(by_label("Title"))
 
   Prefer Playwright bang functions inside the callback when failure should
   stop the test. Phoenix sessions raise `Fluffy.CapabilityError`.

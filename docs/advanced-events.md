@@ -6,12 +6,13 @@ Register before the triggering action, then await an ordinary value:
 use Fluffy.Assert
 import Fluffy
 import Fluffy.Locator
+import Fluffy.Locator.Roles
 import Fluffy.Playwright
 alias Fluffy.{Dialog, Download, Event, FileChooser, Frame, Page, Request, Response}
 alias Playwright.Route
 
 pending = wait_for(session, Event.download())
-click(session, by_role(:button, name: "Download the Marauder's Map"))
+click(session, button("Download the Marauder's Map"))
 download = await(pending)
 assert download.suggested_filename == "marauders_map.csv"
 assert Download.read(download) =~ "student,house"
@@ -38,13 +39,13 @@ matching event, optionally inspects it, and returns the input session:
 session
 |> assert_event(
   Event.download(),
-  &click(&1, by_role(:button, name: "Download the Marauder's Map")),
+  &click(&1, button("Download the Marauder's Map")),
   fn download ->
     assert download.suggested_filename == "marauders_map.csv"
     assert Download.read(download) =~ "student,house"
   end
 )
-|> click(by_role(:button, name: "Continue"))
+|> click(button("Continue"))
 ```
 
 The assertion callback and options are optional. With four arguments, pass either
@@ -82,7 +83,7 @@ loading. Subsequent actions and assertions handle readiness.
 ```elixir
 main = current_page(session)
 pending = wait_for(session, Event.popup())
-click(session, by_role(:link, name: "Open the Daily Prophet"))
+click(session, link("Open the Daily Prophet"))
 prophet = await(pending)
 
 session
@@ -110,7 +111,7 @@ page's handle once it closes, by its own script or `Fluffy.Playwright.close_page
 
 ```elixir
 popup
-|> assert_event(Event.close(), &click(&1, by_role(:button, name: "Sign permission slip")))
+|> assert_event(Event.close(), &click(&1, button("Sign permission slip")))
 |> switch_page(main)
 ```
 
@@ -144,7 +145,7 @@ For navigation outcomes on either backend, use ordinary page assertions:
 
 ```elixir
 session
-|> click(by_role(:link, name: "Continue"))
+|> click(link("Continue"))
 |> assert(page_url("/next"))
 ```
 
@@ -184,7 +185,7 @@ session
   assert Dialog.message(dialog) == "Vanish this potion?"
   Dialog.accept!(dialog)
 end)
-|> assert_event(Event.dialog(), &click(&1, by_role(:button, name: "Vanish")))
+|> assert_event(Event.dialog(), &click(&1, button("Vanish")))
 ```
 
 Use `Dialog.accept!(dialog, "prompt text")` for prompts or `Dialog.dismiss!(dialog)`.
@@ -197,8 +198,8 @@ a persistent catch-all handler when needed:
 accept_dialog = &Dialog.accept!/1
 session
 |> on(Event.dialog(), accept_dialog)
-|> click(by_role(:button, name: "Vanish first potion"))
-|> click(by_role(:button, name: "Vanish second potion"))
+|> click(button("Vanish first potion"))
+|> click(button("Vanish second potion"))
 |> off(Event.dialog(), accept_dialog)
 ```
 
@@ -221,7 +222,7 @@ alias Playwright.Response
 session
 |> assert_event(
   Event.response(&String.ends_with?(Response.url(&1), "/api/prophet")),
-  &click(&1, by_role(:button, name: "Refresh")),
+  &click(&1, button("Refresh")),
   fn response -> assert Response.status(response) == 200 end,
   scope: :context
 )
@@ -257,7 +258,7 @@ alias Playwright.ConsoleMessage
 session
 |> assert_event(
   Event.console(&(ConsoleMessage.type(&1) == "error")),
-  &click(&1, by_role(:button, name: "Refresh")),
+  &click(&1, button("Refresh")),
   fn message -> assert ConsoleMessage.text(message) =~ "stale edition" end
 )
 ```
@@ -347,7 +348,7 @@ whose JavaScript opens a chooser, register first and pass the returned value dir
 
 ```elixir
 pending = wait_for(session, Event.file_chooser())
-click(session, by_role(:button, name: "Choose portrait"))
+click(session, button("Choose portrait"))
 chooser = await(pending)
 assert FileChooser.multiple?(chooser) == false
 set_input_files(session, chooser, "test/support/fixtures/portrait.png")

@@ -159,13 +159,14 @@ defmodule MyAppWeb.OwleryTest do
 
   import Fluffy
   import Fluffy.Locator
+  import Fluffy.Locator.Roles
 
   # Waits at most `phoenix_backend_timeout` for the button and the text.
   test "sends an owl" do
     :phoenix
     |> start_session()
     |> visit("/owlery")
-    |> click(by_role(:button, name: "Send owl"))
+    |> click(button("Send owl"))
     |> assert_has(by_text("Hedwig is on her way"))
   end
 
@@ -175,7 +176,7 @@ defmodule MyAppWeb.OwleryTest do
     :playwright
     |> start_session()
     |> visit("/owlery")
-    |> click(by_role(:button, name: "Send owl"))
+    |> click(button("Send owl"))
     |> assert_has(by_text("Hedwig is on her way"))
   end
 end
@@ -183,35 +184,17 @@ end
 
 ### Timeouts
 
-A browser session's defaults are Playwright Test's. Without an action or navigation timeout,
-the test's timeout bounds them (ExUnit's default is 60 seconds, against Playwright Test's 30, so
-for faster failures set both, as Fluffy's own suite does with 15 seconds, or lower ExUnit's
-`timeout:`). Playwright.Test then closes the test's contexts just before, so a call that hangs
-fails with "Test timeout of 60000ms exceeded." and its call log. It sets the timeouts on the
-test's browser contexts, so native calls in an `unwrap` callback get them too.
+- **Phoenix:** `config :fluffy, phoenix_backend_timeout: 1_000` sets the default
+  for actions, assertions and event waits. Static page checks run once.
+- **Playwright:** set `action_timeout`, `navigation_timeout` and `expect: [timeout: ...]`
+  under `config :playwright, :test`. Native calls in `unwrap` inherit the context's
+  timeouts. Without an action or navigation timeout, the test timeout bounds the wait
+  (ExUnit defaults to 60 seconds). Browser assertions default to 5 seconds.
 
-The expect timeout also sets how often a waiting browser assertion checks again (a screenshot
-comparison has its own schedule). As in Playwright, it checks at once, after 20, 50, 100 and
-100 ms, then every 500 ms, but drops each step longer than a fifth of the timeout: under 2.5 s
-it checks every 100 ms, and more often under 500 ms. So with the default 5 s, a page that
-updates a few hundred milliseconds later, such as after a debounce, can be seen up to 500 ms
-late, while `expect: [timeout: 2_000]` checks for it every 100 ms.
-
-A Phoenix session's action retries, assertions and event waits default to
-`config :fluffy, phoenix_backend_timeout:`, 1 second: an in-process session answers at once,
-so a long wait is only for something that isn't there. Its `:infinity` waits until the test's
-timeout, which then fails the operation with Fluffy's error and the same reason. There is no
-per-session timeout on either backend; pass `timeout:` to a call.
-
-A native call's `timeout:` and `phoenix_backend_timeout` take `:once` to check once and
-`:infinity` for no limit; `0` raises (`Fluffy.PhoenixTest` facade calls keep PhoenixTest's
-`0`). Playwright actions and waits reject `:once` with an `ArgumentError`, as they can't check
-once, and so do screenshot assertions, which take each screenshot within the timeout. Playwright's config keeps Playwright's meaning, where `0` is no limit: write
-`:infinity`, which reads the same in both configs.
-
-With `:infinity`, Playwright waits with no timeout, and LiveView retries and event waits go on
-until the test times out; Static checks once, as with any timeout, since nothing on its page
-changes.
+Override a single operation with `timeout:`. Use `:once` for an immediate check
+and `:infinity` for no operation deadline; the test deadline still applies.
+Playwright actions, waits and screenshot assertions reject `:once`. Fluffy rejects `0`;
+in Playwright configuration `0` means no limit.
 
 Fluffy's own reads of the page around a Playwright operation share its timeout, but get
 at least a second: a page whose main thread is blocked takes a second to report, not a
@@ -222,8 +205,7 @@ As in Playwright, calls that have no timeout there have none in Fluffy and take 
 `timeout:`: page `evaluate`, `content` and `title`, page-wide keyboard and mouse input,
 clock calls, context setters, closing a page, `unroute_all`, and reading a download or a
 response body. Page `evaluate`, context setters, closing a page, `unroute_all`, stopping a
-trace, network and download reads, and the PhoenixTest facade's link lookup in
-`click_link/4` wait on a blocked page until the test times out. The others first check the
+trace, and network and download reads wait on a blocked page until the test times out. The others first check the
 page's document, so on a page that is already blocked they fail after the action timeout,
 or a second if that is shorter, and with none at the test's timeout.
 
@@ -466,8 +448,7 @@ otherwise the test doesn't wait for its LiveViews to exit, and their late databa
 `terminate/2` or a `pagehide` push, logs ownership errors. A hook built on Phoenix Ecto's
 example also calls it on the static render; that's fine, only LiveView processes are waited for.
 
-The wait needs a session Fluffy started: `start_session(:playwright)`, or the PhoenixTest
-facade's, waits for those LiveViews to exit when the session closes. A suite that drives the
+The wait needs a session Fluffy started. Closing it waits for those LiveViews to exit. A suite that drives the
 browser with playwright_ex on its own registers them, but nothing waits for them.
 
 `Fluffy.Sandbox` grants the configured `:sandbox`, so a hook that passed its own allowance

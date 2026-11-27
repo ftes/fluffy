@@ -2,71 +2,26 @@
 
 The snippets assume the imports from [Your first test](usage.md#your-first-test) and an initialized `session`.
 
-Place `use Fluffy.Assert` after `use Playwright.Test` (or the case template that has it). It
-imports the constructors and takes over only the conflicting `assert/2` and `refute/2`
-imports. Ordinary ExUnit assertions, pattern bindings, custom messages, and other helpers
-remain available, and each `assert` and `refute` is a step of the test's trace, as with
-`use Playwright.Test` alone, unless it has `assert_steps: false`.
-
-```elixir
-use ExUnit.Case, async: true
-use Playwright.Test
-use Fluffy.Assert
-
-import Fluffy
-import Fluffy.Locator
-
-test "registers a creature" do
-  start_session(:phoenix)
-  |> visit("/creatures/new")
-  |> fill(by_label("Name"), "Basilisk")
-  |> click(by_role(:button, name: "Register"))
-  |> assert_has(by_text("Creature registered"))
-  |> refute_has(by_text("Saving…"))
-  |> refute(page_title("Error"))
-  |> assert(page_url("/creatures/basilisk"))
-
-  assert {:ok, name} = {:ok, "Basilisk"}
-  assert name == "Basilisk", "ordinary ExUnit assertions still work"
-end
-```
-
-`assert_has(locator)` is shorthand for `assert(visible(locator))`, and `refute_has(locator)`
-for `refute(visible(locator))`. Use `assert` and `refute` for every other assertion. Options
-such as `timeout:` go in the shorthand's options argument:
+Use `assert_has` and `refute_has` for visibility. For other conditions, pipe the
+session into `assert` or `refute` with a constructor from `Fluffy.Assert`:
 
 ```elixir
 session
+|> click(button("Register"))
 |> assert_has(by_text("Creature registered"))
-|> refute_has(by_text("Saving…"), timeout: 1_000)
+|> refute_has(by_text("Saving…"))
+|> assert(page_path("/creatures/basilisk"))
 ```
 
-See [Shared test case](usage.md#shared-test-case) to centralize these imports
-and the session setup.
-
-See `Fluffy.Assert` for all assertion constructors, their options, and which ones
-require Playwright. For `assert_event`, see [Advanced events and pages](advanced-events.md).
+Ordinary ExUnit assertions still work, including pattern bindings and custom messages.
+Assertions appear in the test trace unless `assert_steps: false` is set.
 
 ## Options and negation
 
-Options can go on the constructor or execution call. Execution options take
-precedence, and both forms return the updated session:
-
-```elixir
-session
-|> assert(page_title("Creatures", timeout: 1_000))
-|> refute(page_title("Error"), timeout: 1_000)
-```
-
-`refute(session, expectation)` executes the negated expectation and preserves
-driver errors. Retrying drivers wait until the negative condition holds; they do
-not require it to hold for the entire timeout.
-Event values use ordinary ExUnit assertions; event waiting is documented in
-[Advanced events and pages](advanced-events.md).
-
-Refuting visibility accepts an absent or invisible element. See
-[Visibility and DOM presence](#visibility-and-dom-presence) for absence
-checks, hidden elements, and the structural versus rendered visibility rules.
+Pass options on the assertion, for example `assert_has(by_text("Ready"), timeout: 1_000)`.
+Execution options override options on the constructor. `refute` waits until the negative
+condition holds; it doesn't require that condition to hold for the whole timeout or
+turn a driver error into success. For events, use [assert_event](advanced-events.md#pipeline-expectations).
 
 ## Text, attributes, and state
 
@@ -78,7 +33,7 @@ session
 |> assert(text(by_role(:heading), "Creature saved"))
 |> assert(contain_text(by_role(:alert), ~r/\d+ spells/))
 |> assert(text(by_css("li"), ["Fluffy", "Norbert"]))
-|> assert(attribute(by_role(:link, name: "Docs"), "href", "/docs"))
+|> assert(attribute(link("Docs"), "href", "/docs"))
 |> assert(class(by_css("#card"), "card selected"))
 |> assert(contain_class(by_css("#card"), "selected"))
 |> assert(id(by_label("Name"), "name"))
@@ -124,14 +79,6 @@ rendering as invisible: a `hidden` attribute on the element or an ancestor, an
 in a browser ([Selects and options](actions.md#selects-and-options)).
 `aria-hidden="true"` does not count, as in Playwright: it only keeps an element out of
 `by_role`.
-
-The PhoenixTest-style facade's `assert_has` and `refute_has` check visibility, and
-their `count:` and `at:` count visible matches only; [Locators](locators.md#locators)
-covers strictness. Field predicates (`value:`, `checked:`, `selected:`) without `at:`
-add no visibility requirement, so they check hidden inputs too, and `selected:` on a select
-checks its selected option. For DOM presence, including hidden inputs or script
-elements, use a native count on the same session:
-`assert(session, count(by_css("script[nonce]"), 1))`.
 
 Phoenix does not compute CSS or browser layout: a CSS class or inline
 `display: none` alone does not make an element structurally invisible. Use
@@ -213,30 +160,21 @@ navigation's response instead:
 session
 |> assert_event(
   Fluffy.Event.response(&String.ends_with?(Playwright.Response.url(&1), "/potions")),
-  &click(&1, by_role(:link, name: "Potions")),
+  &click(&1, link("Potions")),
   fn response -> assert Playwright.Response.status(response) == 200 end
 )
 ```
 
 ## Polling and retrying blocks
 
-Fluffy's assertions retry on their own, so prefer them. For what isn't one locator or page
-assertion, such as a computed value or app state, use Playwright's
-[`expect.poll` and `toPass`](https://playwright.dev/docs/test-assertions#expectpoll). In a
-pipeline, `poll` and `pass` run
-`Playwright.Expect.poll!/3` and `Playwright.Expect.to_pass!/2` with the session, on every driver.
-`poll` calls its function again until the assertion passes on the value it returns; as upstream,
-the assertion raises until the value is right, and a function that raises fails at once, so
-return a value and leave the check to the assertion. Compare explicitly, as in
-`&assert(&1 == "playing")`: JavaScript `null` (`:null`), `NaN` (`:nan`), `0` and `""` are truthy in
-Elixir, so `&assert(&1)` passes on them, as a JavaScript condition would not. For a condition on
-the page alone, `Fluffy.Playwright.wait_for_function/3` keeps JavaScript's truthiness. `pass`
-retries whatever its block raises.
-Both return the session (`pass` the one its passing attempt returned, if any) and fail like
-other assertions, with the last error in the message. `refute(pass(fun))`
-runs `Playwright.Expect.not_to_pass!/2`: it retries until the block
-raises and fails at the timeout while it keeps passing. `poll` can't be refuted: refute in its
-assertion.
+Prefer a locator or page assertion for UI state. For anything else, choose what to retry:
+
+- `assert(poll(read, check))` reads a value and retries when the check raises. If the
+  read raises, the test fails immediately. Compare JavaScript values explicitly:
+  `:null`, `:nan`, `0` and `""` are truthy in Elixir. Use `Fluffy.Playwright.wait_for_function/3`
+  for a condition that should run in JavaScript.
+- `assert(pass(fun))` retries the whole block when it raises. `refute(pass(fun))`
+  retries until the block raises. To negate a poll, use `refute` inside its check.
 
 ```elixir
 session
@@ -248,29 +186,15 @@ session
 # Retry a block until it passes.
 |> assert(pass(fn session ->
   session
-  |> click(by_role(:button, name: "Check the owlery"), timeout: 1_000)
+  |> click(button("Check the owlery"), timeout: 1_000)
   |> assert_has(by_text("A letter for Harry"), timeout: :once)
 end))
 ```
 
-Outside a pipeline, call `Playwright.Expect.poll!/3` and `Playwright.Expect.to_pass!/2` with
-Elixir callbacks directly. They fail with `Playwright.ExpectError`, and `to_pass!` returns the
-passing attempt's value; `Playwright.Expect.poll/3` and `Playwright.Expect.to_pass/2` return
-`:ok` or `{:ok, value}` and `{:error, error}` instead of raising.
-
-```elixir
-Playwright.Expect.poll!(fn -> Owlery.letters_for("Harry") end, &assert(length(&1) == 1))
-```
-
-`poll` retries for Playwright's expect timeout (5 s by default, `config :playwright, :test, expect:`) and
-`pass` until the test's timeout, unless given a `timeout:`. Each attempt runs to the end: a
-Fluffy assertion or action in the callback waits for its own timeout before `pass` tries
-again, and an attempt still running at `pass`'s deadline isn't cut short, unlike in
-Playwright's JavaScript. So give the calls inside short timeouts: `timeout: :once` makes an
-assertion check once and leaves the retrying to `pass`; actions need a short positive one,
-as Playwright actions reject `:once`. Outside a retried block, use `:once` only to check that
-something already holds, such as no partial list right after a reconnect: a single check of a
-page that is still updating is flaky, so keep the default there.
+`poll` uses Playwright's expect timeout (default 5 s); `pass` uses the test timeout.
+Override either with `timeout:`. An attempt runs to completion, even past the deadline.
+Inside `pass`, give actions a short positive timeout and assertions `timeout: :once`
+so the block owns the retry. Outside a retry, keep the default for a page still updating.
 
 A LiveView or browser page updates between attempts; a Static page doesn't, as it is a
 response. On Static, poll app state, or `reload` in the callback to fetch the page again.

@@ -1,20 +1,12 @@
 # Coming from PhoenixTest
 
-Rewrite your tests on Fluffy's native API. This is the recommended path for
-PhoenixTest.Playwright suites: the helpers PhoenixTest.Playwright adds, such as `evaluate`,
-keyboard input, cookies and direct Playwright calls, are native Fluffy calls, so the
-whole suite reads in one style. [Rewrite on the native API](#rewrite-on-the-native-api)
-maps PhoenixTest's common helpers to native steps.
-
-The `Fluffy.PhoenixTest` facade keeps PhoenixTest's `visit`, `fill_in`, `click_button`,
-`assert_has`, `assert_path`, `within` and `submit`, so tests change little. It fits plain
-PhoenixTest suites that use none of PhoenixTest.Playwright's extras, and works as a
-temporary step for a large suite. Anything beyond PhoenixTest's API is a native call in the
-same pipeline, since the facade's session is a plain `Fluffy.Session`; once a suite needs them
-for more than a few calls, rewrite it on the native API rather than mix the two styles. [Use the facade](#use-the-facade) covers its
-setup and differences.
-
-For what you gain, see [Why Fluffy](why-fluffy.md).
+- **[Rewrite on the native API](#rewrite-on-the-native-api)** for a suite that
+  reads like new Fluffy tests. Choose this for PhoenixTest.Playwright: browser
+  operations such as `evaluate`, keyboard input and cookies are native Fluffy calls.
+- **[Use the facade](#use-the-facade)** for a minimal-diff PhoenixTest port.
+  `Fluffy.PhoenixTest` keeps helpers such as `fill_in`, `click_button` and `within`.
+  Its session accepts occasional native calls; prefer a native rewrite if you
+  need them throughout a test.
 
 ## Drop waits Fluffy does for you
 
@@ -49,8 +41,8 @@ need `import Fluffy.Locator.Roles`):
 | `select("Boomslang skin", from: "Ingredient")` | `select_option(by_label("Ingredient", exact: true), %{label: "Boomslang skin"})` |
 | `check("Ready")` | `check(by_label("Ready", exact: true))` |
 | `uncheck("Ready")` | `uncheck(by_label("Ready", exact: true))` |
-| `click_button("Brew")` | `click(button("Brew"))`, or `click(by_role(:button, name: "Brew"))` |
-| `click_link("Potions")` | `click(link("Potions"))`, or `click(by_role(:link, name: "Potions"))` |
+| `click_button("Brew")` | `click(button("Brew"))` |
+| `click_link("Potions")` | `click(link("Potions"))` |
 | `refute_has("#notice")` | `refute_has(by_css("#notice"))` |
 | `assert_has("#notice", count: 0)` | `assert(count(by_css("#notice") \|> filter(visible: true), 0))` |
 | `assert_path("/potions")` | `assert(page_path("/potions"))` |
@@ -254,8 +246,9 @@ The facade preserves PhoenixTest vocabulary and conveniences:
   `at:` count visible matches only; field predicates without `at:` add no visibility
   requirement. A closed dropdown's options are never visible, so
   `assert_has("#house option", count: n)` on a dropdown counts 0 on every driver; see
-  [Selects and options](actions.md#selects-and-options). They retain familiar text and
-  field predicates.
+  [Selects and options](actions.md#selects-and-options). On the select itself, `value:` checks
+  the submitted value; `selected:` checks the selected option's normalized text, not its `label` attribute.
+- Facade calls keep PhoenixTest's `timeout: 0` for a single check. Use `timeout: :once` on native assertions.
 - `assert_path` remains a path assertion; use `query_params:` when the query
   is part of the assertion.
 

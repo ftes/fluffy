@@ -39,7 +39,7 @@ test "brews Polyjuice" do
   |> step("Brew Polyjuice Potion", fn session ->
     session
     |> fill(by_label("Boomslang skin"), "3")
-    |> click(by_role(:button, name: "Brew"))
+    |> click(button("Brew"))
   end)
 end
 ```
@@ -123,7 +123,7 @@ callback's result instead:
 
 ```elixir
 session
-|> Fluffy.Playwright.unwrap(by_role(:button, name: "Rename"), &Playwright.Locator.dblclick!/1)
+|> Fluffy.Playwright.unwrap(button("Rename"), &Playwright.Locator.dblclick!/1)
 |> assert_has(by_label("Name"))
 ```
 

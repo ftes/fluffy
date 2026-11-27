@@ -15,7 +15,7 @@ Prefer locators that describe the interface as a user experiences it:
 ```elixir
 session
 |> fill(by_label("Name"), "Basilisk")
-|> click(by_role(:button, name: "Register"))
+|> click(button("Register"))
 |> assert_has(by_text("Creature registered"))
 ```
 
@@ -26,7 +26,7 @@ potions = by_css("#potions")
 potion = potions |> by_role(:row, "Polyjuice Potion")
 
 session
-|> click(by_role(potion, :button, "Inspect"))
+|> click(button(potion, "Inspect"))
 ```
 
 `by_role(:heading, "Potions", level: 2)` is the same as
@@ -50,7 +50,7 @@ markup, so names ignore computed CSS and control values changed since rendering.
 CSS must be valid browser CSS; escape special characters in IDs or use a
 semantic/test-id locator.
 
-Role state options, such as `by_role(:option, name: "Elder", selected: true)`,
+Role state options, such as `by_role(:option, "Elder", selected: true)`,
 `by_role(:button, pressed: true)` or `by_role(:heading, level: 2)`, work on every
 driver. Static and LiveView read `checked:` and `selected:` from the controls' current
 state, as `check` and `select_option` leave it, and the other states from markup;
@@ -94,7 +94,7 @@ Use `Fluffy.Locator.or_/2` to match elements found by either locator, once each 
 document order. Actions stay strict, so they fail if the result is more than one element:
 
 ```elixir
-accio = by_role(:button, name: "Accio") |> or_(by_role(:link, name: "Accio"))
+accio = button("Accio") |> or_(link("Accio"))
 ```
 
 `Fluffy.Locator.within/2` scopes a locator to each match of another. Unlike a scoped
@@ -117,8 +117,7 @@ Focus requires Playwright, and LiveView renders can replace local input state; s
 
 Single-target actions and native visibility assertions are strict: if a locator
 matches more than one element, Fluffy reports the ambiguity instead of choosing
-for you. Facade `assert_has` accepts any visible match, and `refute_has` requires
-no visible matches. Narrow the locator, or use `assert(count(locator, n))` when
+for you. Narrow the locator, or use `assert(count(locator, n))` when
 multiple matches are the intended assertion.
 
 ### Role shorthands
@@ -156,7 +155,7 @@ email = by_label(gringotts, "Email")
 session
 |> fill(email, "griphook@gringotts.example")
 |> assert(value(email, "griphook@gringotts.example"))
-|> click(by_role(gringotts, :button, name: "Withdraw"))
+|> click(button(gringotts, "Withdraw"))
 ```
 
 Each frame boundary is strict: if multiple iframes match, an action or assertion inside
@@ -167,7 +166,7 @@ converting it with `Fluffy.Locator.content_frame/1`:
 ```elixir
 gringotts = by_title("Gringotts") |> first() |> content_frame()
 vault = frame_locator(gringotts, "#vault")
-withdraw_button = by_role(vault, :button, name: "Withdraw")
+withdraw_button = button(vault, "Withdraw")
 iframe_element = Fluffy.FrameLocator.owner(gringotts)
 ```
 

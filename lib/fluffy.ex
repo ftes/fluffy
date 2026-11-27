@@ -9,13 +9,15 @@ defmodule Fluffy do
   (`Phoenix.LiveViewTest`) driver for each page; the Playwright backend uses the
   Playwright driver.
 
+  For the imports used below, see [Your first test](usage.md#your-first-test).
+
   Configuration is Playwright Test's, with `config :fluffy` only for what Playwright has no
   concept of; see [Configuration](installation.md#configuration).
 
       start_session(:phoenix)
       |> visit("/creatures/new")
       |> fill(by_label("Name"), "Basilisk")
-      |> click(by_role(:button, name: "Register"))
+      |> click(button("Register"))
       |> assert_has(by_text("Creature registered"))
 
   Unless a function documents additional entries, action, assertion, reload,
@@ -117,7 +119,7 @@ defmodule Fluffy do
       |> step("Brew Polyjuice Potion", fn session ->
         session
         |> fill(by_label("Boomslang skin"), "3")
-        |> click(by_role(:button, name: "Brew"))
+        |> click(button("Brew"))
       end)
 
   It is `Playwright.Test.step/3` at this call, on every driver: the step, with the operations
@@ -514,9 +516,9 @@ defmodule Fluffy do
       pending = wait_for(session, Fluffy.Event.file_chooser())
 
       session
-      |> click(by_role(:button, name: "Upload"))
+      |> click(button("Upload"))
       |> set_input_files(await(pending), "test/fixtures/homework.pdf")
-      |> click(by_role(:button, name: "Save"))
+      |> click(button("Save"))
 
   Register the wait before clicking the button. `await/1` returns the chooser;
   `set_input_files/4` fills its input and returns the session.
@@ -710,8 +712,8 @@ defmodule Fluffy do
   Playwright's `locator.allTextContents()`.
 
   As upstream, it doesn't wait for elements to match and returns `[]` if none do. It
-  takes no timeout. Wait first with an assertion, such as `Fluffy.Expect.to_have_count/3`,
-  or assert the texts with `Fluffy.Expect.to_have_text/3` and a list.
+  takes no timeout. Wait first with an assertion, such as `Fluffy.Assert.count/3`,
+  or assert the texts with `Fluffy.Assert.text/3` and a list.
   """
   @spec all_text_contents(Session.t(), Fluffy.Locator.t()) :: [String.t()]
   def all_text_contents(%Session{} = session, %Fluffy.Locator{} = locator),
@@ -725,7 +727,7 @@ defmodule Fluffy do
   It reads the attribute as the HTML has it, not a control's current value: use
   `input_value/3` for that. It waits and raises as `text_content/3` does.
 
-      href = get_attribute(session, by_role(:link, name: "Hogwarts"), "href")
+      href = get_attribute(session, link("Hogwarts"), "href")
 
   ## Options
 
@@ -771,7 +773,7 @@ defmodule Fluffy do
 
   As upstream, it doesn't wait for elements to match and returns `[]` if none do, and it
   is flaky on a list that is still changing: the elements can change between this call
-  and the use of a locator. Wait first, such as with `Fluffy.Expect.to_have_count/3`.
+  and the use of a locator. Wait first, such as with `Fluffy.Assert.count/3`.
   """
   @spec all(Session.t(), Fluffy.Locator.t()) :: [Fluffy.Locator.t()]
   def all(%Session{} = session, %Fluffy.Locator{} = locator) do
@@ -807,7 +809,7 @@ defmodule Fluffy do
   @doc """
   Returns the active page's title, as Playwright's `page.title()`: the text of its
   `<title>`, with whitespace collapsed, or `""` without one. On LiveView it includes
-  `live_title` updates. To assert it, use `Fluffy.Expect.page_to_have_title/2`, which
+  `live_title` updates. To assert it, use `Fluffy.Assert.page_title/2`, which
   retries. As in Playwright, it has no timeout.
   """
   @spec title(Session.t(), []) :: String.t()

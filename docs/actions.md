@@ -2,9 +2,9 @@
 
 The snippets assume the imports from [Your first test](usage.md#your-first-test) and an initialized `session`.
 
-## Actions and expectations
+## Actions and assertions
 
-Actions and expectations use the same API on both backends:
+Act on the control, then assert the result:
 
 ```elixir
 session
@@ -12,12 +12,7 @@ session
 |> fill(by_label("Keeper"), "Rubeus Hagrid")
 |> check(by_label("Flute ready"))
 |> select_option(by_label("Status"), %{label: "Asleep"})
-|> click(by_role(:button, name: "Save creature"))
-|> assert(enabled(by_role(:button, name: "Save creature")))
-|> assert(disabled(by_label("Species")))
-|> assert(value(by_label("Keeper"), "Rubeus Hagrid"))
-|> assert(editable(by_label("Keeper")))
-|> assert(checked(by_label("Flute ready")))
+|> click(button("Save creature"))
 |> assert_has(by_text("Creature saved"))
 ```
 
@@ -60,11 +55,9 @@ session
 |> assert(count(by_css("#house option"), 4))
 ```
 
-A dropdown, a select without `multiple` and with no `size` above 1, is closed, and a
-closed dropdown's options have no box in a browser, so they are invisible. Static and
-LiveView treat them the same. `visible`, `assert_has`, `filter(visible: true)` and the
-facade's `count:` and `at:` don't see them: a facade `assert_has("#house option", count: 4)`
-counts 0. Native `count/2` and `attached/1` don't filter visibility.
+A closed dropdown's options have no box and are invisible on all drivers.
+Use `attached` or `count` to check availability; `assert_has` checks visibility.
+List boxes (`multiple` or `size` greater than 1) display their options.
 
 To check which choices a dropdown offers, scope the named options to the labeled select:
 
@@ -72,8 +65,8 @@ To check which choices a dropdown offers, scope the named options to the labeled
 house = by_label("House", exact: true)
 
 session
-|> assert(attached(by_role(house, :option, name: "Ravenclaw", exact: true)))
-|> refute(attached(by_role(house, :option, name: "Beauxbatons", exact: true)))
+|> assert(attached(by_role(house, :option, "Ravenclaw", exact: true)))
+|> refute(attached(by_role(house, :option, "Beauxbatons", exact: true)))
 ```
 
 If these checks recur, you can wrap the locator and assertion in your app's test case
@@ -84,12 +77,6 @@ scope a CSS locator to the select, for example
 `option = by_css(house, "option[value=ravenclaw]")`. Use `assert(attached(option))` for
 presence or `assert(count(option, 1))` for exactly one match. Use `assert(count(option, 0))`
 for absence. A role locator excludes options such as `<option aria-hidden="true">`.
-
-In the facade, `assert_has("#house", value: "ravenclaw")` checks the current selection
-by its submitted value, and `assert_has("#house", selected: "Ravenclaw")` matches the
-selected option's normalized text. It does not read the option's `label` attribute, which
-can override what is displayed. Neither assertion passes just because an option is available.
-A list box, a `multiple` select or one with a `size` above 1, shows its options.
 
 A `<datalist>` and its options are never rendered: fill its input with an option's value,
 and find the options with `count/2` or `by_role(:option, include_hidden: true)`, whose
@@ -117,7 +104,7 @@ directly and assert the result, without first asserting that the target is ready
 ```elixir
 session
 |> fill(by_label("Potion name"), "Polyjuice Potion")
-|> click(by_role(:button, name: "Save potion"))
+|> click(button("Save potion"))
 |> assert(page_url("/potions"))
 ```
 
@@ -190,16 +177,16 @@ For character-by-character browser typing, use `Fluffy.Playwright.press_sequenti
 `Fluffy.CapabilityError` on Phoenix:
 
 ```elixir
-alias Fluffy.Playwright
+import Fluffy.Playwright
 alias Fluffy.Playwright.Keyboard
 
 session
-|> Playwright.set_viewport_size(%{width: 390, height: 844})
-|> Playwright.emulate_media(color_scheme: :dark)
-|> Playwright.dblclick(by_role(:cell, name: "Fluffy"))
+|> set_viewport_size(%{width: 390, height: 844})
+|> emulate_media(color_scheme: :dark)
+|> dblclick(by_role(:cell, "Fluffy"))
 |> Keyboard.press("Enter")
 |> assert_has(by_text("Fluffy's chamber"))
-|> Playwright.screenshot(by_css("table"), path: "tmp/creatures.png")
+|> screenshot(by_css("table"), path: "tmp/creatures.png")
 ```
 
 As in Playwright, page-wide input and `dispatch_event` do not wait for a navigation
@@ -224,7 +211,7 @@ They work on every driver:
 
 ```elixir
 heading = text_content(session, by_role(:heading, level: 1))
-href = get_attribute(session, by_role(:link, name: "Diagon Alley"), "href")
+href = get_attribute(session, link("Diagon Alley"), "href")
 owl = input_value(session, by_label("Owl"))
 creatures = all_text_contents(session, by_role(:listitem))
 page_title = title(session)
@@ -252,9 +239,9 @@ Use `Fluffy.reload/1` to reload the active document:
 ```elixir
 session
 |> visit("/chambers/secrets")
-|> assert_has(by_role(:heading, name: "Chamber of Secrets"))
+|> assert_has(heading("Chamber of Secrets"))
 |> reload()
-|> assert_has(by_role(:heading, name: "Chamber of Secrets"))
+|> assert_has(heading("Chamber of Secrets"))
 |> assert(page_url("/chambers/secrets"))
 ```
 
@@ -271,7 +258,7 @@ managed LiveView upload lifecycle:
 ```elixir
 session
 |> set_input_files(by_label("Evidence"), ["diary-front.pdf", "diary-back.pdf"])
-|> click(by_role(:button, name: "Upload"))
+|> click(button("Upload"))
 ```
 
 The named fixture files must exist. The path list preserves selection order. Pass `[]` to clear the input. Use a
@@ -286,7 +273,7 @@ payload = %Fluffy.FilePayload{
 
 session
 |> set_input_files(by_label("Potion ledger"), payload)
-|> click(by_role(:button, name: "Upload"))
+|> click(button("Upload"))
 ```
 
 One path or payload, a homogeneous list of either, and `[]` are accepted.
@@ -305,13 +292,13 @@ Use `Fluffy.Playwright.evaluate/3` when a Playwright test needs a value from
 the active page:
 
 ```elixir
-alias Fluffy.Playwright
+import Fluffy.Playwright
 
-data_url = Playwright.evaluate(session, "document.querySelector('canvas').toDataURL()")
+data_url = evaluate(session, "document.querySelector('canvas').toDataURL()")
 assert data_url =~ "data:image/png"
 
 session
-|> click(by_role(:button, name: "Reveal diary message"))
+|> click(button("Reveal diary message"))
 ```
 
 `Fluffy.Playwright.evaluate/2` returns the JavaScript result, not the session, and

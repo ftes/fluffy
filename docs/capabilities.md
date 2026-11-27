@@ -230,7 +230,7 @@ so a test can assert where the app sent it, as with `Phoenix.ConnTest.redirected
 
 ```elixir
 session
-|> click(by_role(:button, name: "Floo to the Ministry"))
+|> click(button("Floo to the Ministry"))
 |> assert(page_url(~r"^https://ministry\.example/floo\?"))
 ```
 

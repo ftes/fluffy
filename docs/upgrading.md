@@ -16,13 +16,8 @@ matched once can now match twice.
   Node.js or npm yourself, as the install task fetches a pinned Node.js with the driver.
   `executable:` now takes a Playwright 1.65 CLI such as `node_modules/.bin/playwright`,
   not `cli.js`; usually drop it and let Playwright install the driver.
-- Run the install in CI too, as `mix playwright.install chromium --with-deps` on Linux
-  runners; the driver would install itself in the first browser test, but browsers do
-  not; see
-  [GitHub Actions](`e:playwright:debugging-and-ci.md#github-actions`). In Microsoft's
-  Playwright image, whose tag must match `Playwright.Driver.version/0`, `--no-browsers`
-  is enough: the driver finds the image's browsers. For a system browser, as on Nix, pass
-  `--no-browsers` and set `launch_options: [executable_path: ...]` or `channel:`; see
+- Replace the CI browser install too: use `mix playwright.install chromium --with-deps`
+  on Linux runners. For Microsoft's Playwright image or a system browser, follow
   [Playwright setup](installation.md#playwright-setup).
 - Prefer `only: [:dev, :test]` to `only: :test`, so Playwright's Mix tasks and
   `mix usage_rules.sync` work in `:dev`, and widen the `lazy_html` line `phx.new`
@@ -223,7 +218,7 @@ The other callbacks get a `%Playwright.Page{}`; Playwright's
 [changelog](`e:playwright:changelog.md`) lists its 1.65 breaking changes.
 
 On Phoenix, `by_role` knows the landmark roles, so a `by_css("nav")` stand-in becomes
-`by_role(:navigation)`, and a named `<section>` is `by_role(:region, name: "...")`.
+`by_role(:navigation)`, and a named `<section>` is `by_role(:region, "...")`.
 
 ## Phoenix behavior
 
