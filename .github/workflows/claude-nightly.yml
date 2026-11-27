@@ -356,7 +356,7 @@ jobs:
             echo "prs=$recent"
           } >> "$GITHUB_OUTPUT"
 
-  improve:
+  improve_plan:
     needs: capacity
     if: ${{ !cancelled() && needs.capacity.outputs.has-slot == 'true'
       && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
@@ -364,18 +364,14 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: read
-      pull-requests: read
       id-token: write
+    outputs:
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ env.BASE_BRANCH }}
+          ref: ${{ github.sha }}
           persist-credentials: false
-          fetch-depth: 0
-      - name: Set up toolchain and deps
-        uses: ftes/ci/setup@0e4b067199ea2f6a255a26ab43403f6f6acb5cb6 # v1.0.12
-      - name: Fetch Playwright source
-        run: mix fluffy.playwright_source
       - name: Pick tonight's focus area
         id: focus
         # By day of the year, so successive nights look at different parts of the code.
@@ -394,19 +390,21 @@ jobs:
           echo "::notice::Focus: $area"
           echo "area=$area" >> "$GITHUB_OUTPUT"
 
-      - name: Improve
-        uses: ftes/ci/opencode-scheduled@8386c6cbd07ae70efb0071c9cacdd04ffe7b5b6f # ftes/ci#18
+      - name: Plan and edit without running project code
+        id: plan
+        uses: ftes/ci/opencode-scheduled@205c385de116ec3661f87e777bb03fbc8ed2ff6f
         with:
-          mode: improve
+          mode: plan-improve
           client-id: ${{ vars.OPENCODE_CLIENT_ID }}
           base: ${{ env.BASE_BRANCH }}
+          base-sha: ${{ github.sha }}
+          candidate-dir: ${{ runner.temp }}/nightly-improvement
           prompt: |
             Find the single most valuable improvement to this codebase's simplicity or consistency
             for one pull request, the kind a senior maintainer would be glad to merge.
             Pick it in or touching FOCUS: each night looks at a different part of the codebase.
 
-            1. Read AGENTS.md and enough of lib/ and test/ to know the prevailing patterns. Use
-               subagents to survey separate areas in parallel.
+            1. Read AGENTS.md and enough of lib/ and test/ to know the prevailing patterns.
             2. Look for duplicated logic that belongs in one place, dead code, needless indirection
                or options, and one concept handled or named differently across modules or drivers.
             3. Rank the candidates by how much simpler or more uniform the code becomes for how
@@ -421,9 +419,8 @@ jobs:
             only formatting, comments or renames to taste. Users see no change, so, as AGENTS.md
             says, CHANGELOG.md gets no entry.
 
-            Run `mix format`, `mix compile --warnings-as-errors` and `mix credo --format oneline`;
-            they must pass. Tests can't run here, in place of AGENTS.md's `mix check`: CI runs them
-            on the PR, and a later nightly run fixes any failure.
+            Format the edits to match the surrounding code. A separate job checks formatting,
+            compilation and Credo without publication credentials. The whole test suite runs on the PR.
 
             If nothing is clearly worth a maintainer's time, stop without pushing and say why. No
             PR is a good result; a marginal PR is not.
@@ -432,3 +429,75 @@ jobs:
 
             Previous nightly PRs: ${{ needs.capacity.outputs.prs }}
             Focus: ${{ steps.focus.outputs.area }}
+      - name: Upload the candidate
+        id: upload
+        if: steps.plan.outputs.candidate == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: nightly-improvement-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/nightly-improvement/
+          if-no-files-found: error
+          retention-days: 7
+
+  improve_check:
+    needs: improve_plan
+    if: needs.improve_plan.outputs.artifact-id != ''
+    runs-on: ${{ vars.RUNNER == 'github' && 'ubuntu-26.04' || 'ubicloud-standard-2-ubuntu-2604' }}
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.improve_plan.outputs.artifact-id }}
+          path: ${{ runner.temp }}/nightly-improvement
+          merge-multiple: true
+      - name: Apply the candidate to the checked-out base
+        uses: ftes/ci/opencode-scheduled@205c385de116ec3661f87e777bb03fbc8ed2ff6f
+        with:
+          mode: verify-improve
+          client-id: ${{ vars.OPENCODE_CLIENT_ID }}
+          base: ${{ env.BASE_BRANCH }}
+          base-sha: ${{ github.sha }}
+          candidate-dir: ${{ runner.temp }}/nightly-improvement
+      - name: Set up toolchain and deps
+        uses: ftes/ci/setup@0e4b067199ea2f6a255a26ab43403f6f6acb5cb6 # v1.0.12
+      - name: Check the exact edits that will be published
+        shell: bash
+        run: |
+          mix format --check-formatted
+          mix compile --warnings-as-errors
+          mix credo --format oneline
+
+  improve_publish:
+    needs: [improve_plan, improve_check]
+    if: needs.improve_check.result == 'success' && needs.improve_plan.outputs.artifact-id != ''
+    runs-on: ${{ vars.RUNNER == 'github' && 'ubuntu-26.04' || 'ubicloud-standard-2-ubuntu-2604' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      # Download the plan job's immutable artifact ID, never a result uploaded by the check job.
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.improve_plan.outputs.artifact-id }}
+          path: ${{ runner.temp }}/nightly-improvement
+          merge-multiple: true
+      - name: Revalidate and publish without running project code
+        uses: ftes/ci/opencode-scheduled@205c385de116ec3661f87e777bb03fbc8ed2ff6f
+        with:
+          mode: publish-improve
+          client-id: ${{ vars.OPENCODE_CLIENT_ID }}
+          base: ${{ env.BASE_BRANCH }}
+          base-sha: ${{ github.sha }}
+          candidate-dir: ${{ runner.temp }}/nightly-improvement
