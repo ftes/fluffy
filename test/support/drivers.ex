@@ -11,7 +11,7 @@ defmodule Fluffy.Support.Drivers do
   # The Phoenix drivers.
   def phoenix, do: [:static, :live]
 
-  # The drivers `Fluffy.session_for_html/2` loads a page into (`with_html/3`): the in-process
+  # The drivers `Fluffy.Support.Case.session_for_html/2` loads a page into (`with_html/3`): the in-process
   # DOM, which Static and LiveView share, and the browser.
   def html, do: [:static, :playwright]
 

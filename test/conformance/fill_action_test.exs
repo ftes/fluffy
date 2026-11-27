@@ -236,11 +236,14 @@ defmodule Fluffy.Conformance.FillActionTest do
     end
 
     @tag driver: driver
+    # Native reset is a documented driver difference (docs/capabilities.md, Forms and files).
     test "only Playwright resets current properties from form defaults with #{driver}" do
       html = """
       <form>
         <label>Name <input value="initial"></label>
         <label><input type="checkbox" checked>Enabled</label>
+        <label><input type="radio" name="colour" value="red" checked>Red</label>
+        <label><input type="radio" name="colour" value="blue">Blue</label>
         <label>Notes <textarea>original</textarea></label>
         <label>Plan
           <select>
@@ -256,6 +259,7 @@ defmodule Fluffy.Conformance.FillActionTest do
         session
         |> fill(by_label("Name"), "changed")
         |> uncheck(by_role(:checkbox, name: "Enabled"))
+        |> check(by_label("Blue"))
         |> fill(by_label("Notes"), "changed")
         |> select_option(by_label("Plan"), "pro")
         |> click(by_role(:button, name: "Reset"))
@@ -263,6 +267,11 @@ defmodule Fluffy.Conformance.FillActionTest do
           "Name"
           |> by_label()
           |> to_have_value(if(unquote(driver) == :playwright, do: "initial", else: "changed"))
+        )
+        |> expect(
+          ~s(input[type="radio"]:checked)
+          |> by_css()
+          |> to_have_value(if(unquote(driver) == :playwright, do: "red", else: "blue"))
         )
         |> expect(:checkbox |> by_role(name: "Enabled") |> to_be_checked(checked: unquote(driver) == :playwright))
         |> expect(

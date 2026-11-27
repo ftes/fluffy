@@ -218,7 +218,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
       parents = Locator.or_(Locator.by_css(".a"), Locator.by_css(".b"))
 
       unquote(driver)
-      |> Fluffy.session_for_html("""
+      |> session_for_html("""
       <section id="one"><div class="a"><p>In</p></div></section>
       <div class="b"><p>Out</p></div>
       """)
@@ -232,9 +232,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
     field = Locator.by_css(frame, "input")
 
     :playwright
-    |> Fluffy.session_for_html(
-      ~s(<section id="one"><iframe srcdoc="<label>Email <input value='a'></label>"></iframe></section>)
-    )
+    |> session_for_html(~s(<section id="one"><iframe srcdoc="<label>Email <input value='a'></label>"></iframe></section>))
     |> within("#one", fn scoped ->
       for {locator, options} <- [
             {Locator.and_(field, Locator.by_css("input")), []},
@@ -255,7 +253,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
     @tag driver: driver
     test "exact text assertions preserve CSS candidates, counts, positions, and scopes with #{driver}" do
       unquote(driver)
-      |> Fluffy.session_for_html("""
+      |> session_for_html("""
       <table><tr><th>Day type</th><th> Day </th><th hidden><span>Day</span></th><th>day</th></tr></table>
       <div><span>Day</span> type</div>
       <p>
@@ -278,7 +276,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
     @tag driver: driver
     test "counts and positions take visible matches while field predicates check hidden fields with #{driver}" do
       session =
-        Fluffy.session_for_html(unquote(driver), """
+        session_for_html(unquote(driver), """
         <p hidden>Hidden</p><p>Visible</p><p>Also visible</p>
         <input hidden value="secret"><input id="public" value="public">
         <input id="checked" hidden type="checkbox" checked>
@@ -312,7 +310,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
     @tag driver: driver
     test "selected option labels track current selection with #{driver}" do
       unquote(driver)
-      |> Fluffy.session_for_html("""
+      |> session_for_html("""
       <section id="plans"><select aria-label="Plan">
         <option value="free">Free</option>
         <optgroup label="Paid"><option value="pro" label="Paid plan">Professional</option></optgroup>
@@ -385,7 +383,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
 
     @tag driver: driver
     test "facade visibility accepts any visible match while native assertions remain strict with #{driver}" do
-      session = Fluffy.session_for_html(unquote(driver), "<p hidden>Hidden</p><p>Visible</p><p>Also visible</p>")
+      session = session_for_html(unquote(driver), "<p hidden>Hidden</p><p>Visible</p><p>Also visible</p>")
 
       session
       |> assert_has("p")
@@ -408,13 +406,13 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
       end
 
       unquote(driver)
-      |> Fluffy.session_for_html("<p hidden>One</p><p hidden>Two</p>")
+      |> session_for_html("<p hidden>One</p><p hidden>Two</p>")
       |> refute_has("p")
     end
 
     @tag driver: driver
     test "locator unions deduplicate matches and retain document order with #{driver}" do
-      native = Fluffy.session_for_html(unquote(driver), "<p id='first'>One</p><p>Two</p>")
+      native = session_for_html(unquote(driver), "<p id='first'>One</p><p>Two</p>")
       locator = Locator.or_(Locator.by_text("Two"), Locator.by_css("p"))
       Expect.expect(native, Expect.to_have_count(locator, 2))
       Expect.expect(native, Expect.to_have_count(Locator.and_(Locator.first(locator), Locator.by_css("#first")), 1))
@@ -423,7 +421,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
     @tag driver: driver
     test "form actions delegate String.Chars values to native actions with #{driver}" do
       unquote(driver)
-      |> Fluffy.session_for_html("""
+      |> session_for_html("""
       <input aria-label="Value">
       <select aria-label="Choice" multiple>
         <option value="empty"></option>
@@ -453,7 +451,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
     @tag driver: driver
     test "presence, text, positions, counts, and field predicates with #{driver}" do
       session =
-        Fluffy.session_for_html(unquote(driver), """
+        session_for_html(unquote(driver), """
         <p hidden>Hidden notice</p><p>Visible notice</p><p>Other</p>
         <label for="email">Email address</label><input id="email" value="reader">
         <label for="other">Email address</label><input id="other" value="other">
@@ -487,7 +485,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
     @tag driver: driver
     test "labels filter presence, absence, counts, text, and positions with #{driver}" do
       session =
-        Fluffy.session_for_html(unquote(driver), """
+        session_for_html(unquote(driver), """
         <input aria-label="Outside only">
         <section>
           <input aria-label="Other">
@@ -533,7 +531,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
     @tag driver: driver
     test "at: positions among label-matching controls with #{driver}" do
       unquote(driver)
-      |> Fluffy.session_for_html("""
+      |> session_for_html("""
       <label for="a">Other</label><input id="a" value="a">
       <label for="b">Email</label><input id="b" value="b">
       <label for="c">Email</label><input id="c" value="c">
@@ -546,7 +544,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
     @tag driver: driver
     test "field action overloads, exact labels, and CSS intersections with #{driver}" do
       session =
-        Fluffy.session_for_html(unquote(driver), """
+        session_for_html(unquote(driver), """
         <label for="email">Email</label><input id="email">
         <label for="backup">Email backup</label><input id="backup">
         <label for="duplicate">Email</label><input id="duplicate">
@@ -596,7 +594,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
     @tag driver: driver
     test "nested scopes retain mutations and restore the outer scope with #{driver}" do
       session =
-        Fluffy.session_for_html(unquote(driver), """
+        session_for_html(unquote(driver), """
         <section id="outer">
           <input aria-label="Name" id="outer-name">
           <section id="inner"><input aria-label="Name" id="inner-name"></section>
@@ -662,7 +660,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
 
     @tag driver: :playwright
     test "returns the callback's result from a Playwright page" do
-      session = Fluffy.session_for_html(:playwright, "<p>Page</p>")
+      session = session_for_html(:playwright, "<p>Page</p>")
 
       assert unwrap_and_return(session, &Playwright.Page.title!/1) == "Fluffy test stage"
     end
@@ -1201,7 +1199,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
   end
 
   test "within rejects callbacks that don't return a session" do
-    session = Fluffy.session_for_html(:static, "<main></main>")
+    session = session_for_html(:static, "<main></main>")
 
     assert_raise ArgumentError, ~r/^Fluffy.PhoenixTest.within\/3: callback must return/, fn ->
       within(session, "main", fn _ -> :ok end)
@@ -1209,7 +1207,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
   end
 
   test "unsupported combinations and invalid options fail explicitly before driver execution" do
-    session = Fluffy.session_for_html(:static, "<main></main>")
+    session = session_for_html(:static, "<main></main>")
 
     for {options, message} <- [
           {[selected: 42], ~r/selected: must be a string/},
@@ -1270,7 +1268,7 @@ defmodule Fluffy.Conformance.PhoenixTestFacadeTest do
     |> visit("/live/facade-locators/#{markup}")
   end
 
-  defp locators_session(driver, markup), do: Fluffy.session_for_html(driver, FacadeLocatorsLive.markup(markup))
+  defp locators_session(driver, markup), do: session_for_html(driver, FacadeLocatorsLive.markup(markup))
 
   # Static serves the markup as a plain page; Live and Playwright visit the LiveView.
   defp quotes_page(:static) do

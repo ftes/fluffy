@@ -7,7 +7,7 @@ defmodule Fluffy.PublicOptionValidationTest do
   alias Fluffy.Locator
 
   setup do
-    session = Fluffy.session_for_html(:static, "<button>Save</button>")
+    session = Fluffy.Support.Case.session_for_html(:static, "<button>Save</button>")
     %{session: session, button: Locator.by_role(:button, name: "Save")}
   end
 

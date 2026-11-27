@@ -6,7 +6,7 @@ defmodule Fluffy.PlaywrightDriverLossTest do
   import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
-  import Fluffy.Support.Case, only: [monitor_running: 1]
+  import Fluffy.Support.Case, only: [monitor_running: 1, session_for_html: 2]
 
   alias Playwright.Test.BrowserPool
 

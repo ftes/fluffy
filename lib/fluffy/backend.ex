@@ -10,11 +10,6 @@ defmodule Fluffy.Backend do
     Fluffy.Backend.Registry.module(name).start_session(options)
   end
 
-  @doc false
-  def static_html_session(html) when is_binary(html) do
-    Fluffy.Backend.Phoenix.session_for_html(html)
-  end
-
   def close_session(%Session{} = session), do: Fluffy.SessionRuntime.close(session.runtime)
 
   def new_page(session), do: dispatch(session, :new_page, [])

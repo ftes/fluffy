@@ -168,14 +168,6 @@ defmodule Fluffy.Driver.Playwright do
     do: {Map.fetch!(@value_assertions, kind), [expected], []}
 
   @impl true
-  def set_html(%Session{} = session, html) when is_binary(html) do
-    frame = Session.page_state(session).frame
-    expression = "html => { document.querySelector('#fluffy-test-root').innerHTML = html }"
-    with {:error, error} <- Frame.evaluate(frame, expression, html), do: raise(error)
-    session
-  end
-
-  @impl true
   def click(%Session{} = session, %Locator{} = locator, options \\ []) do
     locator_action(session, :click, locator, options, &BrowserLocator.click(&1, native(options, &2)))
   end

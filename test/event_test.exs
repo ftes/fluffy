@@ -8,7 +8,7 @@ defmodule Fluffy.EventTest do
   alias Fluffy.SessionRuntime
 
   setup do
-    [session: Fluffy.Backend.static_html_session("<p>Events</p>")]
+    [session: session_for_html(:static, "<p>Events</p>")]
   end
 
   test "independent waits can observe one event, consume once, and reuse values", %{session: session} do
@@ -50,7 +50,7 @@ defmodule Fluffy.EventTest do
     SessionRuntime.close_page(session.runtime, session.active_page)
     assert_raise ExUnit.AssertionError, ~r/page is closed/, fn -> await(pending) end
 
-    session = Fluffy.Backend.static_html_session("<p>Second session</p>")
+    session = session_for_html(:static, "<p>Second session</p>")
     pending = wait_for(session, Event.download())
     close_session(session)
     assert_raise ExUnit.AssertionError, ~r/session is closed/, fn -> await(pending) end
@@ -263,7 +263,7 @@ defmodule Fluffy.EventTest do
   end
 
   test "scoped events preserve in-process changes despite ignored action returns" do
-    session = Fluffy.Backend.static_html_session("<input aria-label='Name'>")
+    session = session_for_html(:static, "<input aria-label='Name'>")
 
     expect_event(session, Event.download(), fn input ->
       Fluffy.fill(input, Fluffy.Locator.by_label("Name"), "Hermione")

@@ -5,6 +5,6 @@ defmodule Fluffy.Backend.Phoenix.Context do
   defstruct [:http]
 
   @type t :: %__MODULE__{
-          http: Fluffy.Backend.Phoenix.HTTP.Client.t() | nil
+          http: Fluffy.Backend.Phoenix.HTTP.Client.t()
         }
 end

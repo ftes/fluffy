@@ -14,7 +14,6 @@ defmodule Fluffy.Conformance.CheckedLocatorTest do
         <label><input id="enabled" type="checkbox" checked> Enabled</label>
         <label><input id="red" type="radio" name="colour" checked> Red</label>
         <label><input id="blue" type="radio" name="colour"> Blue</label>
-        <button type="reset">Reset</button>
       </form>
       """
 
@@ -28,9 +27,6 @@ defmodule Fluffy.Conformance.CheckedLocatorTest do
       |> expect("input[checked]" |> by_css() |> to_have_count(2))
       |> expect("form" |> by_css() |> filter(has: by_css("#blue:checked")) |> to_have_count(1))
       |> expect("form" |> by_css() |> filter(has_not: by_css("#red:checked")) |> to_have_count(1))
-      |> click(by_role(:button, name: "Reset"))
-      |> expect("#enabled:checked, #red:checked" |> by_css() |> to_have_count(if(driver == :playwright, do: 2, else: 0)))
-      |> expect("#blue:checked" |> by_css() |> to_have_count(if(driver == :playwright, do: 0, else: 1)))
     end
 
     @tag driver: driver

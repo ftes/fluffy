@@ -1,7 +1,6 @@
 defmodule Fluffy.Conformance.TemplateContentTest do
   use Fluffy.Support.Case, async: true
 
-  import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
 

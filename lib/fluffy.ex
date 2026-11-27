@@ -164,20 +164,6 @@ defmodule Fluffy do
     dispatch_driver(session, :open_browser, [open_fun])
   end
 
-  @doc false
-  def session_for_html(driver, html, options \\ [])
-
-  def session_for_html(:static, html, _options) do
-    Backend.static_html_session(html)
-  end
-
-  def session_for_html(:playwright, html, options) do
-    :playwright
-    |> Backend.start_session(options)
-    |> Backend.visit("/harness")
-    |> set_html(html)
-  end
-
   @doc group: "Lifecycle and navigation"
   @doc """
   Navigates the active page to `path` and returns the updated session.
@@ -413,11 +399,6 @@ defmodule Fluffy do
   @doc "Removes the most recently registered listener matching this source, event type, and handler."
   @spec off(Session.t(), Event.t(), (term() -> term()), [{:scope, :page | :context}]) :: Session.t()
   def off(%Session{} = session, %Event{} = event, handler, options \\ []), do: Event.off(session, event, handler, options)
-
-  @doc false
-  def set_html(%Session{} = session, html) do
-    dispatch_driver(session, :set_html, [html])
-  end
 
   @doc group: "Actions"
   @doc """

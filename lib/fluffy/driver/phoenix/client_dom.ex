@@ -25,10 +25,6 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM do
             properties: map()
           }
 
-  def from_fragment(html) when is_binary(html) do
-    html |> LazyHTML.from_fragment() |> new(nil)
-  end
-
   def from_document(html) when is_binary(html) do
     html |> LazyHTML.from_document() |> new(doctype(html))
   end
