@@ -18,13 +18,11 @@ def protected(path):
             or path.startswith("opencode.json") or name.endswith(".env") or ".env." in name)
 
 
-def stage(parent, *, allow_generated_skills=False):
+def stage(parent):
     run.check(run.git("rev-parse", "HEAD") == parent, "The checkout moved during the run")
     run.git("add", "-A")
     paths = run.git("diff", "--cached", "--name-only", "--no-renames", "-z", raw=True)
     for path in os.fsdecode(paths).split("\0"):
-        if allow_generated_skills and path.startswith(".agents/skills/"):
-            path = path.removeprefix(".agents/skills/")
         run.check(not protected(path), "Automation cannot publish changes to workflow or agent configuration")
     return bool(paths)
 
