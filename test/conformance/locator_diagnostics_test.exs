@@ -59,9 +59,37 @@ defmodule Fluffy.Conformance.LocatorDiagnosticsTest do
   test "Static click rejects a missing locator" do
     session = session_for_html(:static, "<button>Cancel</button>")
 
-    assert_raise Fluffy.OperationError, ~r/it matched 0.*Candidates: none/s, fn ->
+    assert_raise Fluffy.OperationError, ~r/No element matched by_role/, fn ->
       click(session, by_role(:button, name: "Save", exact: true))
     end
+  end
+
+  test "visibility failures distinguish a hidden match from a missing element" do
+    session = session_for_html(:static, ~s(<button hidden>Stupefy</button>))
+
+    hidden = assert_raise ExUnit.AssertionError, fn -> expect(session, to_be_visible(by_css("button"))) end
+    assert hidden.message =~ "Matched a hidden element: <button hidden"
+    assert hidden.message =~ "Stupefy</button>"
+
+    missing = assert_raise ExUnit.AssertionError, fn -> expect(session, not_(to_be_hidden(by_css("a")))) end
+    assert missing.message =~ "No element matched."
+    refute missing.message =~ "Matched a hidden element"
+  end
+
+  test "missing named roles show accessible names from the requested scope" do
+    session =
+      session_for_html(:static, """
+      <section><button aria-label="Lumos">Cast</button><button hidden>Nox</button></section>
+      <button>Accio</button>
+      """)
+
+    locator = "section" |> by_css() |> by_role(:button, "Expelliarmus")
+    error = assert_raise ExUnit.AssertionError, fn -> expect(session, to_be_visible(locator)) end
+    assert error.message =~ Fluffy.Locator.Internal.describe(locator)
+    assert error.message =~ ~s(Other button names in scope: "Lumos")
+    refute error.message =~ "Cast"
+    refute error.message =~ "Nox"
+    refute error.message =~ "Accio"
   end
 
   @tag driver: :playwright

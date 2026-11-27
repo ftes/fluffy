@@ -66,6 +66,8 @@ defmodule Fluffy.Driver.Phoenix.HTML.Semantics do
   # template's content, which is not part of the document.
   def text(%{tag: tag, attributes: attributes, children: children}), do: tree_text({tag, attributes, children})
 
+  def document_text(document), do: document |> LazyHTML.to_tree() |> Enum.map_join(&tree_text/1)
+
   defp tree_text({tag, _attributes, _children}) when tag in ~w(script noscript style template), do: ""
 
   defp tree_text({"input", attributes, _children}) do

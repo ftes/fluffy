@@ -20,15 +20,18 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM.Expectation do
     {Expect.Internal.title_matches?(expected, actual), actual}
   end
 
-  def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :visible}) do
-    actual = count_visible(client_dom, strict_candidates!(client_dom, locator))
-    {actual > 0, actual}
-  end
+  def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: kind}) when kind in [:visible, :hidden] do
+    case strict_candidates!(client_dom, locator) do
+      [] ->
+        {kind == :hidden, missing(client_dom, locator)}
 
-  # An empty locator passes `to_be_hidden` and, negated, still fails, as in Playwright.
-  def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :hidden}) do
-    actual = count_visible(client_dom, strict_candidates!(client_dom, locator))
-    {actual == 0, actual}
+      [element] ->
+        visible? = PhoenixLocator.structurally_visible?(Aria.for_document(client_dom.document), element)
+        state = if visible?, do: "visible", else: "hidden"
+
+        {visible? == (kind == :visible),
+         {:diagnostic, fn -> "Matched a #{state} element: #{Fluffy.Expectation.snippet(element)}" end}}
+    end
   end
 
   def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :attached}) do
@@ -163,7 +166,7 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM.Expectation do
   # Without an element, neither the assertion nor its negation can pass.
   defp with_element(client_dom, locator, %Expect{negated?: negated?}, fun) do
     case ClientDOM.targets(client_dom, locator) do
-      [] -> {negated?, :not_found}
+      [] -> {negated?, missing(client_dom, locator)}
       [target] -> fun.(target)
       targets -> strictness_error!(locator, Enum.map(targets, & &1.element))
     end
@@ -176,11 +179,39 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM.Expectation do
     end)
   end
 
-  defp count_visible(_client_dom, []), do: 0
+  # The Live driver only formats the terminal attempt. Use that same snapshot
+  # for the scoped name lookup and the page text.
+  defp missing(client_dom, locator) do
+    {:diagnostic,
+     fn ->
+       {last, scope} = List.pop_at(locator.operations, -1)
+       missing_context(client_dom, locator, scope, last)
+     end}
+  end
 
-  defp count_visible(client_dom, candidates) do
-    aria = Aria.for_document(client_dom.document)
-    Enum.count(candidates, &PhoenixLocator.structurally_visible?(aria, &1))
+  defp missing_context(client_dom, locator, scope, {:role, role, options}) do
+    if Keyword.has_key?(options, :name) do
+      other = %{locator | operations: scope ++ [{:role, role, Keyword.delete(options, :name)}]}
+      aria = Aria.for_document(client_dom.document)
+
+      names =
+        client_dom
+        |> ClientDOM.resolve(other)
+        |> Enum.take(5)
+        |> Enum.map_join(", ", fn element ->
+          node = Aria.node_for(aria, element)
+          inspect(Aria.name(aria, node, options[:include_hidden] || false), printable_limit: 180)
+        end)
+
+      if names == "", do: "No element matched.", else: "No element matched. Other #{role} names in scope: #{names}"
+    else
+      "No element matched."
+    end
+  end
+
+  defp missing_context(client_dom, _locator, _scope, _last) do
+    text = client_dom.document |> Semantics.document_text() |> StringUtils.normalize_white_space()
+    "No element matched.\nPage text: #{inspect(text, printable_limit: 500)}"
   end
 
   defp strict_candidates!(client_dom, locator) do

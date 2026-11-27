@@ -122,6 +122,9 @@ defmodule Fluffy.Expect.Internal do
   end
 
   @doc "The failure message of `expectation` when it got `actual`."
+  def failure_message(%Expect{} = expectation, {:diagnostic, format}),
+    do: "Expected #{describe(expectation)}\n#{format.()}"
+
   def failure_message(%Expect{} = expectation, actual), do: "Expected #{describe(expectation)}, got #{inspect(actual)}"
 
   defp validate_options!(options), do: Options.validate_expectation!(options)
