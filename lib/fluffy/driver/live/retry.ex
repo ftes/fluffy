@@ -56,8 +56,10 @@ defmodule Fluffy.Driver.Live.Retry do
     end
   end
 
-  defp exception({:strictness, locator, candidates}),
-    do: Fluffy.StrictnessError.exception(locator: locator, candidates: candidates)
+  defp exception({:missing, client_dom, locator}) do
+    error = Fluffy.StrictnessError.exception(locator: locator, candidates: [])
+    Fluffy.Driver.Phoenix.ClientDOM.Diagnostics.missing_action(client_dom, error)
+  end
 
   defp exception({:exception, exception}), do: exception
 

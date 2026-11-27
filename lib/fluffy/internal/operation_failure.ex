@@ -73,9 +73,21 @@ defmodule Fluffy.Internal.OperationFailure do
       driver: Session.current_driver(session),
       operation: operation,
       locator: locator,
-      cause: cause
+      cause: action_cause(session, cause)
     )
   end
+
+  # Live has already formatted its final retry, which can see a later render
+  # than the session that started this operation.
+  defp action_cause(session, %StrictnessError{candidates: []} = cause) do
+    if Session.current_driver(session) == :static do
+      Fluffy.Driver.Phoenix.ClientDOM.Diagnostics.missing_action(Session.page_state(session).client_dom, cause)
+    else
+      cause
+    end
+  end
+
+  defp action_cause(_session, cause), do: cause
 
   @doc "The public call's name for a Phoenix driver operation; the Playwright driver holds its own."
   def public_operation(:set_checked, [_locator, true | _]), do: :check

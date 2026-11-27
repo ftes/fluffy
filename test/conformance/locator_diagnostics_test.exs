@@ -56,12 +56,22 @@ defmodule Fluffy.Conformance.LocatorDiagnosticsTest do
     assert error.message =~ "<button>Save draft</button>"
   end
 
-  test "Static click rejects a missing locator" do
-    session = session_for_html(:static, "<button>Cancel</button>")
+  test "Static click suggests accessible names within the missing role's scope" do
+    session =
+      session_for_html(:static, """
+      <section><button aria-labelledby="spell">Cast</button><button hidden>Nox</button></section>
+      <span id="spell">Lumos</span><button>Accio</button>
+      """)
 
-    assert_raise Fluffy.OperationError, ~r/No element matched by_role/, fn ->
-      click(session, by_role(:button, name: "Save", exact: true))
-    end
+    locator = within(by_role(:button, "Expelliarmus"), by_css("section"))
+    error = assert_raise Fluffy.OperationError, fn -> click(session, locator) end
+
+    assert %Fluffy.StrictnessError{locator: ^locator, candidates: []} = error.cause
+    assert error.message =~ "No element matched"
+    assert error.message =~ ~s(Other button names in scope: "Lumos")
+    refute error.message =~ "Cast"
+    refute error.message =~ "Nox"
+    refute error.message =~ "Accio"
   end
 
   test "visibility failures distinguish a hidden match from a missing element" do

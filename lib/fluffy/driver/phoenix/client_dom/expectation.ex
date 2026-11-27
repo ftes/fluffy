@@ -181,49 +181,8 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM.Expectation do
 
   # The Live driver only formats the terminal attempt. Use that same snapshot
   # for the scoped name lookup and the page text.
-  defp missing(client_dom, locator), do: {:diagnostic, fn -> missing_context(client_dom, role_query(locator)) end}
-
-  # Drop only the final role's name, retaining the query roots for within/2
-  # and its nested locators (including filter and composition operands).
-  defp role_query(locator) do
-    case List.pop_at(locator.operations, -1) do
-      {{:role, role, options}, scope} ->
-        other = %{locator | operations: scope ++ [{:role, role, Keyword.delete(options, :name)}]}
-        {:role, role, options, other}
-
-      {{:within, parent, child}, scope} ->
-        with {:role, role, options, other} <- role_query(child) do
-          {:role, role, options, %{locator | operations: scope ++ [{:within, parent, other}]}}
-        end
-
-      _ ->
-        :no_role
-    end
-  end
-
-  defp missing_context(client_dom, {:role, role, options, other}) do
-    if Keyword.has_key?(options, :name) do
-      aria = Aria.for_document(client_dom.document)
-
-      names =
-        client_dom
-        |> ClientDOM.resolve(other)
-        |> Enum.take(5)
-        |> Enum.map_join(", ", fn element ->
-          node = Aria.node_for(aria, element)
-          inspect(Aria.name(aria, node, options[:include_hidden] || false), printable_limit: 180)
-        end)
-
-      if names == "", do: "No element matched.", else: "No element matched. Other #{role} names in scope: #{names}"
-    else
-      "No element matched."
-    end
-  end
-
-  defp missing_context(client_dom, :no_role) do
-    text = client_dom.document |> Semantics.document_text() |> StringUtils.normalize_white_space()
-    "No element matched.\nPage text: #{inspect(text, printable_limit: 500)}"
-  end
+  defp missing(client_dom, locator),
+    do: {:diagnostic, fn -> ClientDOM.Diagnostics.missing_assertion(client_dom, locator) end}
 
   defp strict_candidates!(client_dom, locator) do
     candidates = ClientDOM.resolve(client_dom, locator)
