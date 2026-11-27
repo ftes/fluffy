@@ -16,7 +16,12 @@ import run
 
 DOC = "docs/locators.md"
 SECTION = "\n### Combining locators\n\n"
-ORIGINAL_LEAD = "`filter(has: ...)`"
+ORIGINAL_PARAGRAPH = (
+    "`filter(has: ...)` keeps each row containing a matching descendant. To match two "
+    "descriptions of the **same element**, use `Fluffy.Locator.and_/2`. For alternatives, "
+    'use `button("Accio") |> or_(link("Accio"))`. Single-target actions and visibility '
+    "assertions fail if both match; use `assert(count(locator, n))` to check a collection."
+)
 TITLE = "Clarify how combined locators match"
 BODY = "Clarifies the difference between matching a descendant and matching the same element. The documentation build passed before publication."
 PROMPT = """Improve the first prose paragraph under “Combining locators” only.
@@ -51,7 +56,7 @@ def wrap(paragraph):
 def validate_file(original, changed):
     run.check(type(changed) is str, "The proposal must be text")
     before, previous, after = paragraph_parts(original)
-    run.check(previous.startswith(ORIGINAL_LEAD), "The original paragraph has already changed")
+    run.check(previous.replace("\n", " ") == ORIGINAL_PARAGRAPH, "The original paragraph has already changed")
     run.check(changed.startswith(before) and changed.endswith(after), "Proposal changes text outside the chosen paragraph")
     replacement = changed[len(before):-len(after)]
     run.check(replacement == wrap(replacement.replace("\n", " ")) and
@@ -63,7 +68,7 @@ def infer(parent):
     guide = update.blob(parent, DOC)
     guidance = update.blob(parent, "AGENTS.md")
     before, previous, after = paragraph_parts(guide)
-    if not previous.startswith(ORIGINAL_LEAD):
+    if previous.replace("\n", " ") != ORIGINAL_PARAGRAPH:
         print("The locator paragraph has already changed.")
         return None
     context = json.dumps({"guide": guide, "guidance": guidance})

@@ -9,9 +9,9 @@ import improvement_pilot as pilot
 import run
 
 
-ORIGINAL = f"# Locators\n{pilot.SECTION}`filter(has: ...)` keeps matching rows.\n\nThe next paragraph.\n"
+ORIGINAL = f"# Locators\n{pilot.SECTION}{pilot.ORIGINAL_PARAGRAPH}\n\nThe next paragraph.\n"
 PROSE = 'Use the descendant filter. `button("Accio") |> or_(link("Accio"))` matches either.'
-CHANGED = ORIGINAL.replace("`filter(has: ...)` keeps matching rows.", PROSE)
+CHANGED = ORIGINAL.replace(pilot.ORIGINAL_PARAGRAPH, PROSE)
 BASE = "a" * 40
 HEAD = "b" * 40
 TREE = "c" * 40
@@ -26,11 +26,14 @@ class ImprovementPilotTest(unittest.TestCase):
                 self.assertEqual(pilot.infer(BASE), expected)
 
     def test_an_already_reworded_paragraph_skips_inference(self):
-        with (patch.object(pilot.update, "blob", return_value=CHANGED),
+        edited = ORIGINAL.replace("to check a collection", "to count all matches")
+        with (patch.object(pilot.update, "blob", return_value=edited),
               patch.object(pilot.playwright_pilot, "claude_json") as model,
               contextlib.redirect_stdout(io.StringIO())):
             self.assertIsNone(pilot.infer(BASE))
         model.assert_not_called()
+        with self.assertRaisesRegex(ValueError, "original paragraph has already changed"):
+            pilot.validate_file(edited, edited.replace("to count all matches", "to check a collection"))
 
     def test_rejects_extra_files_and_markup(self):
         for file in (ORIGINAL, CHANGED + "\nNew material\n", CHANGED.replace(PROSE, "<script>bad</script>"),
