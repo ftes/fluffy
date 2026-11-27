@@ -44,8 +44,9 @@ in `AGENTS.md`.
 
 Maintainers can run **PlaywrightEx Update Pilot** on the default branch from Actions with an
 exact newer Hex release. It checks the prepared update with `mix check` before opening a draft
-with the normal PR checks. Review the member classifications and release notes before marking
-it ready. A repeated release with an existing pilot PR is skipped. If a run pushes the branch
+with the normal PR checks. PlaywrightEx dependency and inventory changes use manual review.
+Review the member classifications and release notes before marking it ready. A repeated release
+with an existing pilot PR is skipped. If a run pushes the branch
 but stops before opening the PR, inspect the branch before removing it and dispatching again.
 
 To prepare the requirement, lockfiles and usage rules locally, run

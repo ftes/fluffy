@@ -3,10 +3,55 @@ import hashlib
 import io
 import json
 import os
+from pathlib import Path
+import tempfile
 import unittest
 from unittest.mock import patch
 
 import run
+
+
+class PrivilegedSetupTest(unittest.TestCase):
+    def test_guard_matches_commit_contents_even_on_a_stack_or_copy(self):
+        with tempfile.TemporaryDirectory() as directory, contextlib.chdir(directory):
+            run.git("init", "-q")
+            pin = '      {:playwright, "~> 1.65.0-rc.6", hex: :playwright_ex},\n'
+            lock = '  "playwright": {:hex, :playwright_ex, "1.65.0-rc.6", ...},\n'
+            for name in run.PLAYWRIGHT_SETUP_INPUTS:
+                path = Path(name)
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(pin if name == "mix.exs" else lock)
+
+            def commit(subject):
+                run.git("add", "-A")
+                run.git("-c", "user.name=Test", "-c", "user.email=test@example.com",
+                        "-c", "commit.gpgsign=false", "commit", "-qm", subject)
+                return run.git("rev-parse", "HEAD")
+
+            base = commit("base")
+            self.assertFalse(run.privileged_setup_allowed(base, base, f"{run.PLAYWRIGHT_PILOT_BRANCH}1.65.0"))
+            Path("mix.exs").write_text("  @version \"0.9.1\"\n" + pin)
+            ordinary = commit("unrelated version change")
+            self.assertTrue(run.privileged_setup_allowed(base, ordinary, "feature"))
+
+            Path("mix.lock").write_text(lock.replace("-rc.6", ""))
+            pilot = commit("updated package")
+            Path("README.md").write_text("feature\n")
+            stacked = commit("stacked feature")
+            self.assertFalse(run.privileged_setup_allowed(base, pilot, "copied-update"))
+            self.assertFalse(run.privileged_setup_allowed(base, stacked, "stacked-feature"))
+
+            run.git("switch", "--detach", base)
+            Path("mix.lock").write_text(lock.replace("-rc.6", "-rc.7"))
+            newer_default = commit("default branch advances separately")
+            self.assertTrue(run.privileged_setup_allowed(newer_default, ordinary, "feature"))
+            self.assertFalse(run.privileged_setup_allowed(newer_default, stacked, "stacked-feature"))
+
+            Path("mix.lock").write_text(lock)
+            inventory = Path(run.PLAYWRIGHT_CLASSIFICATIONS)
+            inventory.parent.mkdir(parents=True, exist_ok=True)
+            inventory.write_text("{}\n")
+            self.assertFalse(run.privileged_setup_allowed(base, commit("copied inventory"), "feature"))
 
 
 class CliResultTest(unittest.TestCase):

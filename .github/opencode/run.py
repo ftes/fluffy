@@ -22,6 +22,15 @@ CONTEXT = Path("tmp/opencode")
 DIFF_ARGS = ("diff", "--no-ext-diff", "--no-textconv", "--binary")
 READ_TOOLS = ("read", "glob", "grep")
 SAFE_ENV = ("PATH", "HOME", "USER", "LANG", "LC_ALL", "TMPDIR")
+PLAYWRIGHT_PILOT_BRANCH = "opencode/playwright-ex-pilot-"
+PLAYWRIGHT_MEMBERS = "test/support/playwright_members.ex"
+PLAYWRIGHT_CLASSIFICATIONS = "test/support/playwright_classifications.json"
+PLAYWRIGHT_SETUP_INPUTS = {
+    "mix.exs": r'^[ \t]*\{:playwright\b.*$',
+    "mix.lock": r'^[ \t]*"playwright".*$',
+    "mix.lock.oldest": r'^[ \t]*"playwright".*$',
+    "integration/consumer/mix.lock": r'^[ \t]*"playwright".*$',
+}
 
 
 def check(condition, message):
@@ -229,6 +238,25 @@ def ensure_commit(sha):
         git("cat-file", "-e", f"{sha}^{{commit}}")
     except subprocess.CalledProcessError:
         git("fetch", "--quiet", "--no-tags", "origin", sha, env=git_http_env(os.environ["GH_TOKEN"]))
+
+
+def privileged_setup_allowed(trusted, head, branch):
+    if branch.startswith(PLAYWRIGHT_PILOT_BRANCH):
+        return False
+    check(all(re.fullmatch(r"[0-9a-f]{40}", sha) for sha in (trusted, head)), "Invalid setup commit")
+    ensure_commit(head)
+    # Compare to trusted default-branch history, even when the PR targets a stack
+    # or the default branch has since moved. This inspects blobs, not candidate code.
+    base = git("merge-base", trusted, head)
+    for path, pattern in PLAYWRIGHT_SETUP_INPUTS.items():
+        if any(not git("ls-tree", sha, "--", path).startswith("100644 blob ") for sha in (base, head)):
+            return False
+        default_entries = re.findall(pattern, git("show", f"{base}:{path}", raw=True).decode(), re.M)
+        head_entries = re.findall(pattern, git("show", f"{head}:{path}", raw=True).decode(), re.M)
+        if len(default_entries) != 1 or default_entries != head_entries:
+            return False
+    return not git("diff", "--name-only", "--no-renames", base, head, "--",
+                   PLAYWRIGHT_MEMBERS, PLAYWRIGHT_CLASSIFICATIONS)
 
 
 def snapshot_diff(pr):
@@ -468,6 +496,16 @@ def git_http_env(token):
 
 
 def main(mode):
+    if mode in ("setup-gate", "require-safe-setup"):
+        allowed = privileged_setup_allowed(git("rev-parse", "HEAD"), os.environ["HEAD"], os.environ["HEAD_BRANCH"])
+        if not allowed:
+            print("PlaywrightEx update or inventory changes require unprivileged CI and manual review.")
+        if mode == "require-safe-setup":
+            check(allowed, "Candidate setup declined")
+        elif allowed:
+            with open(os.environ["GITHUB_OUTPUT"], "a") as stream:
+                print("allowed=true", file=stream)
+        return
     number = int(os.environ["NUMBER"])
     head = os.environ["HEAD"]
     retargeted = os.environ.get("RETARGETED") == "true"

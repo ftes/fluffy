@@ -86,14 +86,14 @@ class PlaywrightPilotTest(unittest.TestCase):
     def test_model_uses_private_profile_and_only_the_oauth_credential(self):
         events = [
             {"type": "step_start"},
-            {"type": "text", "part": {"text": '{"patch":""}'}},
+            {"type": "text", "part": {"text": '{}'}},
             {"type": "step_finish", "part": {"reason": "stop"}},
         ]
         result = subprocess.CompletedProcess([], 0, stdout="\n".join(map(json.dumps, events)))
         with (patch.dict(os.environ, CLAUDE_CODE_OAUTH_TOKEN="test", GH_TOKEN="unavailable",
                          OPENCODE_API_KEY="unavailable", ANTHROPIC_API_KEY="unavailable", PWD="/checkout"),
               patch.object(subprocess, "run", return_value=result) as cli):
-            self.assertEqual(pilot.classify({"inventory": "reference"}), "")
+            self.assertEqual(pilot.classify({"inventory": "reference"}), {})
         auth, request = cli.call_args_list
         self.assertEqual(auth.args[0], ["opencode", "--standalone", "auth", "login", "claude-agent", "--method",
                                         "claude-login"])
@@ -108,3 +108,16 @@ class PlaywrightPilotTest(unittest.TestCase):
         self.assertEqual(config["providers"]["claude-agent"]["models"]["ci-sonnet"]["modelID"], "sonnet")
         self.assertEqual(config["permissions"], [run.permission("*", effect="deny")])
         self.assertIn(run.permission("tool.use", effect="deny"), config["policies"])
+
+    def test_classifications_are_typed_data_and_cannot_replace_inventory_code(self):
+        proposal = {"members": {"Playwright.Page": {"old_member": None, "new_member": ["unwrap", "gap"]}}}
+        self.assertEqual(json.loads(pilot.update_classifications("{}", proposal)), proposal)
+        for invalid in ({"patch": "arbitrary source"},
+                        {"members": {"System": {"cmd": ["wrapped"]}}},
+                        {"members": {"Playwright.Page": {"title": ["renamed", "System"]}}}):
+            with self.assertRaises(ValueError):
+                pilot.validate_classifications(invalid)
+        files = {name: f'  "playwright": {{:hex, :playwright_ex, "{RELEASE}", ...}}\n' for name in update.LOCKFILES}
+        files |= {"mix.exs": f'{{:playwright, "~> {RELEASE}", hex: :playwright_ex}}', "CHANGELOG.md": "Updated.\n"}
+        with self.assertRaisesRegex(ValueError, "Unexpected update paths"):
+            pilot.checked_files({"files": files | {update.INVENTORY: "arbitrary source"}, "body": pilot.BODY}, RELEASE)

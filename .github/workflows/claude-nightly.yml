@@ -220,14 +220,26 @@ jobs:
           --health-timeout 5s
           --health-retries 30
     steps:
-      - name: Checkout repository
+      - name: Checkout trusted default branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Else checkout's read-only token can override the app token Claude pushes with: from v6
           # it sits in an includeIf file claude-code-action doesn't clear, so the push gets a 403.
           persist-credentials: false
-          ref: ${{ matrix.pr.branch }}
+          ref: ${{ github.event.repository.default_branch }}
           fetch-depth: 0
+      - name: Check and switch to the exact nightly PR head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          HEAD_BRANCH: ${{ matrix.pr.branch }}
+          NUMBER: ${{ matrix.pr.number }}
+        run: |
+          HEAD=$(gh api "repos/$GH_REPO/pulls/$NUMBER" --jq \
+            'select(.state == "open" and .head.repo.full_name == env.GH_REPO and .head.ref == env.HEAD_BRANCH) | .head.sha')
+          export HEAD
+          python3 -B .github/opencode/run.py require-safe-setup
+          git switch -c "$HEAD_BRANCH" "$HEAD"
       - name: Set up toolchain and deps
         uses: ftes/ci/setup@41939eef91514e8ac6b33a1d6e7923edc42f4628 # v1.0.14
       # These may fail on a branch that doesn't compile; Claude then runs without them.

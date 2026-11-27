@@ -35,6 +35,8 @@ jobs:
       pr: ${{ steps.gate.outputs.pr }}
       number: ${{ steps.gate.outputs.number }}
       branch: ${{ steps.gate.outputs.branch }}
+      head: ${{ steps.gate.outputs.head }}
+      trusted: ${{ steps.gate.outputs.trusted }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -78,7 +80,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.repository.default_branch }}
+          ref: ${{ needs.gate.outputs.trusted }}
           persist-credentials: false
           fetch-depth: 0
       - run: cp -R .github/opencode "$RUNNER_TEMP/fluffy-opencode"
@@ -90,9 +92,12 @@ jobs:
         env:
           IS_PR: ${{ needs.gate.outputs.pr }}
           BRANCH: ${{ needs.gate.outputs.branch }}
+          HEAD: ${{ needs.gate.outputs.head }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           if [[ "$IS_PR" == true ]]; then
-            git switch --detach "origin/$BRANCH"
+            python3 -B -c 'import os, sys; sys.path.insert(0, ".github/opencode"); import run; run.ensure_commit(os.environ["HEAD"])'
+            git switch --detach "$HEAD"
           else
             git switch -c "$BRANCH"
           fi

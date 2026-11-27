@@ -36,31 +36,45 @@ jobs:
     env:
       NUMBER: ${{ github.event.pull_request.number }}
       HEAD: ${{ github.event.pull_request.head.sha }}
+      HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
       RETARGETED: ${{ github.event.action == 'edited' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
           fetch-depth: 0
+      - name: Check the immutable PR head before setup
+        id: setup
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -B .github/opencode/run.py setup-gate
       - name: Save the runner before switching to the PR head
+        if: steps.setup.outputs.allowed == 'true'
         run: cp -R .github/opencode "$RUNNER_TEMP/fluffy-opencode"
       - name: Dismiss superseded verdicts
+        if: steps.setup.outputs.allowed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 "$RUNNER_TEMP/fluffy-opencode/run.py" reconcile-reviews
       - id: auth
+        if: steps.setup.outputs.allowed == 'true'
         uses: ./.github/actions/opencode
         with:
           client-id: ${{ vars.OPENCODE_CLIENT_ID }}
       - name: Switch to the reviewed commit
+        if: steps.setup.outputs.allowed == 'true'
         run: git switch --detach "$HEAD"
       - name: Set up toolchain and deps
+        if: steps.setup.outputs.allowed == 'true'
         continue-on-error: true
         uses: ftes/ci/setup@41939eef91514e8ac6b33a1d6e7923edc42f4628 # v1.0.14
       - name: Fetch Playwright source
+        if: steps.setup.outputs.allowed == 'true'
         continue-on-error: true
         run: mix fluffy.playwright_source
       - name: Review and publish
+        if: steps.setup.outputs.allowed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           OPENCODE_API_KEY: ${{ steps.auth.outputs.token }}

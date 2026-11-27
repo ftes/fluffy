@@ -38,7 +38,8 @@ def authorize(event, event_name):
 
 
 def eligible(pr, default_branch):
-    return run.local_pr(pr) and pr["state"] == "open" and pr["head"]["ref"] != default_branch
+    return (run.local_pr(pr) and pr["state"] == "open" and pr["head"]["ref"] != default_branch
+            and not pr["head"]["ref"].startswith(run.PLAYWRIGHT_PILOT_BRANCH))
 
 
 def target(event, event_name, default_branch, run_id):
@@ -52,7 +53,7 @@ def target(event, event_name, default_branch, run_id):
         if repo is None or repo["full_name"] != run.REPO:
             return {"fork": "true", "number": number} if event_name == "issue_comment" else {}
         if eligible(pr, default_branch):
-            return {"run": "true", "pr": "true", "number": number, "branch": pr["head"]["ref"]}
+            return {"run": "true", "pr": "true", "number": number, "branch": pr["head"]["ref"], "head": pr["head"]["sha"]}
         return {}
     return {"run": "true", "number": number, "branch": f"opencode/issue-{number}-{run_id}"}
 
@@ -163,6 +164,13 @@ def main(mode):
     run_id = os.environ["GITHUB_RUN_ID"]
     if mode == "gate":
         outputs = target(event, event_name, default_branch, run_id)
+        if outputs.get("run") == "true":
+            trusted = run.git("rev-parse", "HEAD")
+            if outputs.get("pr") == "true" and not run.privileged_setup_allowed(trusted, outputs["head"], outputs["branch"]):
+                print("PlaywrightEx update or inventory changes require unprivileged CI and manual review.")
+                outputs = {}
+            else:
+                outputs["trusted"] = trusted
         with open(os.environ["GITHUB_OUTPUT"], "a") as file:
             for key, value in outputs.items():
                 run.check("\n" not in str(value) and "\r" not in str(value), "Invalid gate output")
