@@ -112,7 +112,7 @@ Changes since 0.8.0.
 
 ### Changed
 
-- On Phoenix, `to_be_visible` distinguishes a missing element from a hidden match. When a named role is missing, `to_be_visible` and single-target actions can suggest other accessible names in scope.
+- On Phoenix, `to_be_visible` distinguishes a missing element from a hidden match. `to_be_attached` reports a missing element or shows the element that unexpectedly matched. Both assertions and single-target actions can suggest other accessible names in scope when a named role is missing.
 - When a single-target Phoenix action misses a `by_label` query, it can suggest other labels in scope and identify a matching HTML label with no associated control.
 - When a Phoenix action finds no match for a locator ending in `filter(has_text: ...)`, it shows up to five elements that matched before the filter.
 - Playwright `submit` waits like a Playwright action, for its navigation to commit.

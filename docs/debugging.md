@@ -9,7 +9,9 @@ test trace. The examples use the setup from [Your first test](usage.md#your-firs
 the page missed. On Playwright, read the received values, timeout and call log:
 these describe the check when it ran, without reconstructing a later DOM.
 On Phoenix, a failed `to_be_visible` assertion tells you whether the locator matched
-nothing or matched a hidden element. If a named role locator matched nothing,
+nothing or matched a hidden element. `to_be_attached` checks for a match regardless
+of visibility: a failure reports a missing element or, when you expected no match,
+shows the element that matched. If a named role locator matched nothing,
 look for other accessible names for that role in the locator’s scope.
 
 **Did the action fail?** `Fluffy.OperationError` records the operation, backend,
@@ -18,8 +20,9 @@ driver, locator (or file chooser), and underlying `cause`:
 - On Playwright, a native exception such as `Playwright.TimeoutError` carries
   the call log. On Phoenix, strictness and actionability errors identify the
   matching candidates or structural reason; `Fluffy.LiveViewError` means the
-  view exited. LiveView reports the final failure after its retries. If an action
-  finds no match for a named role, check the other accessible names in its scope.
+  view exited. LiveView reports the final failure after its retries. If a single-target
+  Phoenix action finds no match for a named role, the error can suggest other
+  accessible names when elements with that role exist in scope.
   For `by_label`, look for other labels in scope or a matching `<label>` with
   no associated control.
 - If a click found its target but the navigation failed, the navigation error

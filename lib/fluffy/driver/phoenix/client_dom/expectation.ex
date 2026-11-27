@@ -35,8 +35,10 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM.Expectation do
   end
 
   def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :attached}) do
-    actual = client_dom |> strict_candidates!(locator) |> length()
-    {actual > 0, actual}
+    case strict_candidates!(client_dom, locator) do
+      [] -> {false, missing(client_dom, locator)}
+      [element] -> {true, {:diagnostic, fn -> "Matched an element: #{Fluffy.Expectation.snippet(element)}" end}}
+    end
   end
 
   def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :empty} = expectation) do

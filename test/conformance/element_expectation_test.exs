@@ -297,6 +297,26 @@ defmodule Fluffy.Conformance.ElementExpectationTest do
     end
   end
 
+  for driver <- Drivers.phoenix() do
+    @tag driver: driver
+    test "attachment failures describe the missing or matched element with #{driver}", %{driver: driver} do
+      session = session(driver)
+      locator = by_role(by_css("#buttons"), :button, "Nox")
+
+      missing = assert_raise ExUnit.AssertionError, fn -> expect(session, to_be_attached(locator), timeout: :once) end
+      assert missing.message =~ ~s(name: "Nox")
+      assert missing.message =~ ~s(No element matched. Other button names in scope: "Send", "Clear")
+
+      matched =
+        assert_raise ExUnit.AssertionError, fn ->
+          expect(session, not_(to_be_attached(by_css("#concealed"))), timeout: :once)
+        end
+
+      assert matched.message =~ "Matched an element: <p"
+      assert matched.message =~ "Secret</p>"
+    end
+  end
+
   @tag driver: :live
   test "within resolves nth per parent on a LiveView" do
     item = by_css("li")
