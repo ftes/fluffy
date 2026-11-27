@@ -19,6 +19,7 @@ env:
 
 jobs:
   check:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ${{ vars.RUNNER == 'github' && 'ubuntu-26.04' || 'ubicloud-standard-2-ubuntu-2604' }}
     timeout-minutes: 5
     permissions:
@@ -29,10 +30,11 @@ jobs:
       from: ${{ steps.check.outputs.from }}
       release: ${{ steps.check.outputs.release }}
       base-sha: ${{ steps.check.outputs.base-sha }}
+      expected-head: ${{ steps.check.outputs.expected-head }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.repository.default_branch }}
+          ref: ${{ github.sha }}
           sparse-checkout: |
             mix.lock
             .github/opencode
@@ -44,15 +46,51 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: python3 -B .github/opencode/playwright_update.py check
 
-  update:
+  propose:
     needs: check
-    if: needs.check.outputs.mode == 'new' || needs.check.outputs.mode == 'recover'
-    runs-on: ${{ vars.RUNNER == 'github' && 'ubuntu-26.04' || 'ubicloud-standard-2-ubuntu-2604' }}
-    timeout-minutes: 60
+    if: needs.check.outputs.mode == 'new'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     permissions:
       contents: read
-      pull-requests: read
-      id-token: write
+      id-token: write # Also grants the App audience; no Mix, agent shell or project code runs here.
+    outputs:
+      artifact: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.check.outputs.base-sha }}
+          persist-credentials: false
+      - id: auth
+        uses: ./.github/actions/opencode
+        with:
+          client-id: ${{ vars.OPENCODE_CLIENT_ID }}
+      - name: Propose the member inventory as text
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OPENCODE_API_KEY: ${{ steps.auth.outputs.token }}
+          PLAYWRIGHT_FROM: ${{ needs.check.outputs.from }}
+          PLAYWRIGHT_TO: ${{ needs.check.outputs.release }}
+          BASE_SHA: ${{ needs.check.outputs.base-sha }}
+        run: python3 -B .github/opencode/playwright_update.py propose
+      - id: upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-proposal-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/proposal.json
+          if-no-files-found: error
+
+  verify:
+    needs: [check, propose]
+    if: needs.check.outputs.mode == 'new'
+    runs-on: ${{ vars.RUNNER == 'github' && 'ubuntu-26.04' || 'ubicloud-standard-2-ubuntu-2604' }}
+    timeout-minutes: 60
+    # Dependencies, generated Mix files and tests run only in this job.
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      artifact: ${{ steps.upload.outputs.artifact-id }}
     services:
       postgres:
         image: postgres:18.6@sha256:e3d24f6906d0760bf4da0dae872415391ededefad23fd471c47dc53b0ddf3c42
@@ -70,31 +108,51 @@ jobs:
         with:
           ref: ${{ needs.check.outputs.base-sha }}
           persist-credentials: false
-          fetch-depth: 0
-      # Recovery only validates the pushed commit and opens the missing draft.
-      # New updates run Mix against code from the owner's PlaywrightEx package.
+      - name: Check that the verifier has no OIDC
+        run: python3 -B .github/opencode/playwright_update.py check-verifier
       - name: Set up toolchain and deps
-        if: needs.check.outputs.mode == 'new'
         uses: ftes/ci/setup@e53e22699f50c88157237931a10500d367cca47c # v1.0.13
-      - name: Install Playwright browser
-        if: needs.check.outputs.mode == 'new'
-        uses: ftes/ci/playwright-browser@e53e22699f50c88157237931a10500d367cca47c # v1.0.13
-      - name: Build test assets and fetch Playwright source
-        if: needs.check.outputs.mode == 'new'
-        run: |
-          mix assets.build
-          mix fluffy.playwright_source
-      - id: auth
-        if: needs.check.outputs.mode == 'new'
-        uses: ./.github/actions/opencode
-        with:
-          client-id: ${{ vars.OPENCODE_CLIENT_ID }}
-      - name: Publish the update as a draft
+      - name: Prepare and verify the dependency update
         env:
           GH_TOKEN: ${{ github.token }}
-          OPENCODE_API_KEY: ${{ steps.auth.outputs.token }}
-          MODE: ${{ needs.check.outputs.mode }}
+          ARTIFACT_ID: ${{ needs.propose.outputs.artifact }}
           PLAYWRIGHT_FROM: ${{ needs.check.outputs.from }}
           PLAYWRIGHT_TO: ${{ needs.check.outputs.release }}
           BASE_SHA: ${{ needs.check.outputs.base-sha }}
-        run: python3 -B .github/opencode/playwright_update.py update
+        run: python3 -B .github/opencode/playwright_update.py verify
+      - id: upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-verified-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/verified.json
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    needs: [check, verify]
+    if: ${{ !cancelled() && needs.check.result == 'success' && (needs.check.outputs.mode == 'recover' || needs.verify.result == 'success') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+      id-token: write
+    env:
+      GIT_CONFIG_NOSYSTEM: '1'
+      GIT_CONFIG_GLOBAL: /dev/null
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.check.outputs.base-sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Publish the update as a draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ needs.verify.outputs.artifact }}
+          MODE: ${{ needs.check.outputs.mode }}
+          PLAYWRIGHT_TO: ${{ needs.check.outputs.release }}
+          BASE_SHA: ${{ needs.check.outputs.base-sha }}
+          EXPECTED_HEAD: ${{ needs.check.outputs.expected-head }}
+        run: python3 -B .github/opencode/playwright_update.py publish
