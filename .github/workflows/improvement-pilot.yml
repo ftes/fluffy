@@ -1,22 +1,24 @@
-name: Fluffy Improvement Pilot
+name: Fluffy Improvement Pilot Replay
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [improvement-pilot-replay-v2]
 
 permissions: {}
 
 concurrency:
-  group: fluffy-improvement-pilot
+  group: fluffy-improvement-pilot-replay
   cancel-in-progress: false
 
 env:
-  BASE_BRANCH: ${{ github.event.repository.default_branch }}
+  BASE_BRANCH: improvement-pilot-replay-v2
 
 jobs:
   infer:
     if: >-
-      github.repository == 'ftes/fluffy' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
-      github.actor == github.triggering_actor
+      github.repository == 'ftes/fluffy' && github.event.created &&
+      github.ref == 'refs/heads/improvement-pilot-replay-v2' &&
+      github.actor == 'ftes' && github.triggering_actor == 'ftes' && github.run_attempt == 1
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
