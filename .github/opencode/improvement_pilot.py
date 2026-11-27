@@ -7,6 +7,7 @@ import re
 import subprocess
 import sys
 import textwrap
+from urllib.parse import quote
 
 import playwright_pilot
 import playwright_update as update
@@ -116,10 +117,18 @@ def verify(parent, files):
     return tree
 
 
+def has_open_improvement(base):
+    prs = run.api(f"pulls?state=open&base={quote(base, safe='')}", paginate=True)
+    return any(run.local_pr(pr) and pr["head"]["ref"].startswith(run.IMPROVEMENT_PILOT_BRANCH) for pr in prs)
+
+
 def publish_draft(parent, base, run_id, files, tree):
     branch = f"{run.IMPROVEMENT_PILOT_BRANCH}{run_id}"
     if publish.remote_head(branch) or publish.pull_requests(branch):
         print("This run already has a publication branch or PR; inspect it before retrying.")
+        return
+    if has_open_improvement(base):
+        print("An improvement PR is already open for this base.")
         return
     update.stage_replacements(parent, files)
     run.check(run.git("write-tree") == tree, "The candidate does not match the checked tree")
@@ -150,6 +159,11 @@ def main(mode):
     if mode == "select":
         playwright_pilot.check_actor()
         run.check(publish.remote_head(base) == parent, "The base branch moved; start a fresh run")
+        if has_open_improvement(base):
+            print("An improvement PR is already open for this base.")
+            return
+        with open(os.environ["GITHUB_OUTPUT"], "a") as stream:
+            print("eligible=true", file=stream)
     elif mode == "infer":
         files = infer(parent)
         if files is not None:

@@ -21,6 +21,7 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
+      pull-requests: read
     outputs:
       proposal: ${{ steps.upload.outputs.artifact-id }}
     steps:
@@ -29,14 +30,17 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
       - name: Check maintainer and base
+        id: select
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 -B .github/opencode/improvement_pilot.py select
       - name: Install pinned OpenCode and Claude Code
+        if: steps.select.outputs.eligible == 'true'
         run: | # zizmor: ignore[adhoc-packages] (exact CLI versions, before model authentication)
           npm install --prefix "$RUNNER_TEMP/pilot-tools" --no-audit --no-fund \
             @opencode/cli@2.4.2 @anthropic-ai/claude-code@2.1.332
       - name: Ask Claude Code Sonnet to propose a paragraph or decline
+        if: steps.select.outputs.eligible == 'true'
         id: infer
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

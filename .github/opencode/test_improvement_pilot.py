@@ -58,6 +58,7 @@ class ImprovementPilotTest(unittest.TestCase):
         with (patch.object(pilot.update, "stage_replacements") as stage,
               patch.object(pilot.publish, "remote_head", side_effect=[HEAD, None]),
               patch.object(pilot.publish, "pull_requests", return_value=[]),
+              patch.object(pilot, "has_open_improvement", return_value=False),
               patch.object(run, "git", return_value="unverified tree"),
               patch.object(run, "app_token") as token,
               contextlib.redirect_stdout(io.StringIO())):
@@ -66,6 +67,16 @@ class ImprovementPilotTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "checked tree"):
                 pilot.publish_draft(BASE, "main", "99", files, TREE)
             token.assert_not_called()
+
+    def test_publish_skips_an_open_improvement_from_another_run(self):
+        existing = {"head": {"ref": BRANCH, "repo": {"full_name": "ftes/fluffy"}}}
+        with (patch.object(run, "REPO", "ftes/fluffy"), patch.object(run, "api", return_value=[existing]) as api,
+              patch.object(pilot.publish, "remote_head", return_value=None),
+              patch.object(pilot.publish, "pull_requests", return_value=[]),
+              patch.object(run, "app_token") as token, contextlib.redirect_stdout(io.StringIO())):
+            pilot.publish_draft(BASE, "main", "100", {pilot.DOC: CHANGED}, TREE)
+        api.assert_called_once_with("pulls?state=open&base=main", paginate=True)
+        token.assert_not_called()
 
     def test_publish_creates_one_draft_for_the_exact_base_and_head(self):
         repo = {"full_name": "ftes/fluffy"}
@@ -77,6 +88,7 @@ class ImprovementPilotTest(unittest.TestCase):
               patch.object(pilot.update, "stage_replacements"),
               patch.object(pilot.publish, "remote_head", side_effect=[None, BASE, BASE, BASE, HEAD]),
               patch.object(pilot.publish, "pull_requests", return_value=[]),
+              patch.object(pilot, "has_open_improvement", return_value=False),
               patch.object(run, "git", return_value=TREE),
               patch.object(pilot.publish, "commit", return_value=HEAD),
               patch.object(run, "app_token", return_value=contextlib.nullcontext("app")),

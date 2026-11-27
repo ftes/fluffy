@@ -57,6 +57,7 @@ To prepare the requirement, lockfiles and usage rules locally, run
 Maintainers can run **Fluffy Improvement Pilot** on the default branch from Actions.
 Claude Code can propose one documentation improvement to the locator guide or decline.
 It skips inference if the paragraph's text has changed, ignoring line wrapping.
+It also skips if an improvement pilot PR is already open against the same base.
 An isolated docs build checks any proposal before a draft opens with normal PR checks.
 Review and decide what to do with the draft yourself. If a run pushes a branch but does
 not open a draft, inspect it before trying again.
