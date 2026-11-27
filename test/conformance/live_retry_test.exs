@@ -11,6 +11,18 @@ defmodule Fluffy.Conformance.LiveRetryTest do
 
   for driver <- Drivers.backends() do
     @tag driver: driver
+    test "to_be_enabled waits for an absent button to appear with #{driver}", %{driver: driver} do
+      button = by_role(:button, name: "Appearing action")
+
+      driver
+      |> start_session()
+      |> visit("/live/action-retries")
+      |> expect(to_have_count(button, 0))
+      |> click(by_role(:button, name: "Release appearing button"))
+      |> expect(to_be_enabled(button), timeout: @action_timeout)
+    end
+
+    @tag driver: driver
     test "waits for an asynchronous Live render with #{driver}", %{driver: driver} do
       session = start_session(driver)
 

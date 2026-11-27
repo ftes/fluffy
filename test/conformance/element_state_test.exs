@@ -168,15 +168,17 @@ defmodule Fluffy.Conformance.ElementStateTest do
     end
 
     @tag driver: driver
-    test "checked and editable follow a label to its control with #{driver}" do
+    test "control states follow a label to its control with #{driver}" do
       html = """
-      <label><input type="checkbox" checked> Join Dumbledore's Army</label>
+      <label><input type="checkbox" checked disabled> Join Dumbledore's Army</label>
       <label for="password">Password to the common room</label><input id="password" readonly>
       """
 
       with_html(unquote(driver), html, fn session ->
         session
         |> expect("Join Dumbledore's Army" |> by_text() |> to_be_checked())
+        |> expect("Join Dumbledore's Army" |> by_text() |> to_be_disabled())
+        |> expect(not_(to_be_enabled(by_text("Join Dumbledore's Army"))))
         |> expect("Password to the common room" |> by_text() |> to_be_editable(editable: false))
       end)
     end

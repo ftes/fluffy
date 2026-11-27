@@ -564,8 +564,8 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM do
   end
 
   @doc false
-  def disabled?(%__MODULE__{} = client_dom, %Locator{} = locator) do
-    target_disabled?(client_dom, control!(client_dom, locator))
+  def disabled?(%__MODULE__{} = client_dom, %Target{} = target) do
+    target_disabled?(client_dom, follow_label(client_dom, target))
   end
 
   defp target_disabled?(client_dom, target), do: Aria.aria_disabled?(aria(client_dom), target)
