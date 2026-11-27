@@ -76,7 +76,7 @@ defmodule Fluffy.Playwright.Clock do
       |> Clock.pause_at(~U[2024-02-02 10:00:00Z])
       |> fill(by_label("Spell"), "Lumos")
       |> Clock.run_for(500)
-      |> expect(to_be_visible(by_text("Lumos found")))
+      |> assert_has(by_text("Lumos found"))
   """
   @spec run_for(Session.t(), ticks(), []) :: Session.t()
   def run_for(%Session{} = session, ticks, options \\ []) do

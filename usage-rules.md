@@ -1,42 +1,24 @@
 # Fluffy usage rules
 
-Fluffy runs Phoenix feature tests through one Playwright-shaped API, in-process or in a real browser. These rules build on Playwright's (sync both as one skill, see "Usage rules for coding agents" in `docs/installation.md`) and cover only what differs. Read the guides before relying on a feature: `mix usage_rules.docs Fluffy` or hexdocs.pm/fluffy.
+Use these alongside Playwright's rules (`deps/fluffy/docs/installation.md`). For the guides matching your installed version, read `deps/fluffy/docs/`.
 
-## Where Fluffy differs from Playwright's rules
+## Starting a test
 
-- `timeout: :once` checks once, `:infinity` is no limit and `0` raises (facade calls keep `0`); Playwright actions reject `:once`. Use `:once` inside a retried block (`pass`), where the block does the retrying, or to check that something already holds with no wait; never to shorten a check of a page that is still updating, which is then flaky.
-- Start sessions, not `Playwright.Case`'s `page` and `context`: `use Playwright.Test` (never `Playwright.Case` or `Fluffy.Case`) in every module that starts one, Phoenix or browser, after the app's `ConnCase` (before it, the `test/3` imports clash). It adds no imports, session or `Test` alias: start the session in a setup, e.g. `%{session: start_session(ctx[:backend] || :phoenix)}`, and tag with `@tag Playwright.Test.use(...)` in full.
-- Assert with Fluffy's assertions, not raw `Playwright.Expect` matchers, and don't call `set_default_timeout` or `set_default_navigation_timeout`: Fluffy owns the page. Retry app state or a block of Fluffy calls with `assert(poll(fun, assertion))` and `assert(pass(fun))` in a pipeline, `Playwright.Expect.poll!/3` and `to_pass!/2` outside one.
-- Never test a JavaScript value by truthiness in Elixir: `null` and `NaN` arrive as `:null` and `:nan`, and they, `0` and `""` are truthy in Elixir, so `assert(value)` or a `poll` assertion `&assert(&1)` passes on them. Compare explicitly (`&assert(&1 == "playing")`), or keep the condition in JavaScript with `Fluffy.Playwright.wait_for_function/3`.
-- `use Fluffy.Assert` goes after `use Playwright.Test`, else `assert/2` is ambiguous. Check visibility with `assert_has(locator)` and `refute_has(locator)`, not `assert(visible(locator))`.
-- Phoenix sessions time out after `config :fluffy, phoenix_backend_timeout:` (1 s), not Playwright Test's timeouts.
-- In a case template, `use Playwright.Test, unquote(opts)` goes in `using opts`; if the template's own `setup` starts the session, also add a bare `use Playwright.Test` after `use ExUnit.CaseTemplate` ([Shared test case](docs/usage.md#shared-test-case)).
-- Playwright's alias trap covers `alias Fluffy.Playwright` too: where a module uses the dependency's modules, write `Fluffy.Playwright.evaluate(...)` in full or alias it `as: FluffyPlaywright`.
+- Test setup (`deps/fluffy/docs/usage.md`): use the app's `ConnCase`, then `use Playwright.Test`, then `use Fluffy.Assert`, in that order. Both backends need `Playwright.Test`; neither gets a session, Fluffy imports or a `Test` alias from it. Start the session explicitly. Write `@tag Playwright.Test.use(...)` in full.
+- Shared case templates (`deps/fluffy/docs/usage.md`): forward `opts` to `use Playwright.Test` in `using`. If the template's own `setup` starts sessions, it also needs a bare `use Playwright.Test` in its body. Fluffy doesn't read a `backend` tag; your setup does.
+- Sandbox (`deps/fluffy/docs/installation.md`): the app's case must start the sandbox owner before the session. A plain checkout won't work in browser tests. A custom LiveView hook must allow through `Fluffy.Sandbox` for a Fluffy-started session to wait for its LiveViews at teardown.
 
-## Choosing an API and a backend
+## Writing tests
 
-- Write new tests, and migrate PhoenixTest.Playwright suites, on the native API: `import Fluffy`, `import Fluffy.Locator`, `use Fluffy.Assert`. Use the PhoenixTest-style facade, `import Fluffy.PhoenixTest`, only when the user wants a minimal-diff PhoenixTest port; keep native calls in it to a few (a test that needs more goes on the native API), and never import it alongside `import Fluffy`.
-- `start_session(:phoenix)` is the default; it picks the Static or LiveView driver per page. Use `:playwright` for JavaScript, layout and computed style, native validation, dialogs, network events, tabs or focus. Fluffy reads no test tags: pick the backend in your setup.
-- Check `docs/capabilities.md` before relying on browser behavior in a Phoenix test: what a backend can't do raises `Fluffy.CapabilityError`. LiveView ignores `phx-debounce`/`phx-throttle`, and Phoenix ignores `data-confirm`.
-- Phoenix checks structural visibility (`hidden`, `type="hidden"`), not CSS; test rendered visibility on `:playwright`.
-- A closed dropdown's options are invisible on every driver: use a select-scoped CSS locator and `attached/1` or native `count/2` to check DOM presence. Assert the selection with `value/2` (submitted value) or the text of `by_role(:option, selected: true)` ([Selects and options](docs/actions.md#selects-and-options)).
+- Locators (`deps/fluffy/docs/locators.md`): use `by_*`, not `get_by_*`. Import `Fluffy.Locator.Roles` for `button`, `link` and `heading`; pass a parent or frame first to scope them. Locate visible copy itself, not `body` filtered by its text. Prefer an existing ID to adding a test ID when a user-facing locator won't work.
+- Assertions (`deps/fluffy/docs/assertions.md`): use `assert_has` / `refute_has` for visibility and `assert` / `refute` for other conditions. A read is a snapshot. For eventual app state or a block of actions, use `session |> assert(poll(...))` or `session |> assert(pass(...))`. Compare JavaScript values explicitly: `:null`, `:nan`, `0` and `""` are all truthy in Elixir.
+- Waiting (`deps/fluffy/docs/actions.md`): skip sleeps, `render_async`, manual redirects and `.phx-connected` checks. Assert the resulting page. Static checks once. Use `set_input_files` even for a `live_file_input`.
+- Timeouts (`deps/fluffy/docs/installation.md`): don't change the native page's defaults. Phoenix uses `phoenix_backend_timeout`. Native calls reject `0`. Use `:once` only for an immediate check or inside a retried block; Playwright actions reject it. Facade assertions use `0` instead.
+- Driver capabilities (`deps/fluffy/docs/capabilities.md`): choose Playwright for CSS visibility, JavaScript, focus and browser events. Phoenix ignores `data-confirm` and LiveView debounce/throttle. For HTTP status, inspect a browser response event.
+- Hidden elements (`deps/fluffy/docs/assertions.md`): check hidden inputs with a CSS locator and `value` or `count`. For a styled checkbox or radio, act on the visible label element; `by_label` targets the input. Closed dropdown options (`deps/fluffy/docs/actions.md`) are invisible even in a browser: distinguish available options from the current selection.
 
-## Coming from LiveViewTest, ConnTest or PhoenixTest
+## Native calls and existing suites
 
-- Phoenix's "LiveView tests" rules don't apply to feature tests: fill and click as users do, assert the text they see, and reach `Phoenix.LiveViewTest` only through `unwrap`.
-- No `render_async`, `follow_redirect`, `assert_redirect` or `assert_patch`: LiveView actions and assertions retry and Fluffy follows navigation, so assert the resulting page (`page_url("/creatures")`). Static checks once.
-- Upload with `set_input_files`, also on a `live_file_input`.
-- Don't assert `.phx-connected`: a Playwright `visit` waits for LiveViews to connect.
-- There is no page status assertion; on Playwright, use `Event.response`.
-- Keep the ids Phoenix templates need, but locate by them only before adding a test id. Fluffy's `by_role`, `by_label`, `by_text`, `by_test_id`, ... are Playwright's `get_by_*`; scope with the parent first, `by_role(parent, :row, name: "x")`. For buttons and links, `import Fluffy.Locator.Roles` and write `button("Save")` and `link("Home")` for `by_role(:button, name: "Save")` and `by_role(:link, name: "Home")`; scope with `by_role(parent, :link, name: "Home")`.
-- To assert visible copy, use `by_text`, or a named `by_role` for a heading or control. Avoid filtering `body` by text: that checks the container's visibility. Use a scoped text locator for the text itself and a container filter when the container is the target.
-- Hidden inputs fail `visible`, a plain facade `assert_has` and role locators. Assert them without visibility: `assert(value(by_css("#token"), "x"))`, `assert(count(by_css("#token"), 1))`. For switches or radio cards with hidden inputs, pass the visible label element to native `check` or `uncheck` as appropriate; `by_label` targets the input.
-- The app's `DataCase`/`ConnCase` owns the Ecto sandbox (`Sandbox.start_owner!`) before the session starts; a plain `Sandbox.checkout` doesn't work for browser tests. An app's own LiveView sandbox hook passes `Fluffy.Sandbox` to `Phoenix.Ecto.SQL.Sandbox.allow/2`, not `Ecto.Adapters.SQL.Sandbox`, so a session Fluffy started waits for its LiveViews to exit.
-
-## Fluffy's own API
-
-- To use a page value, read it on any driver with `text_content`, `get_attribute`, `input_value` or `title`, not `evaluate`, and `all` for a locator per match. Use retrying assertions on the UI result instead of sleeps or JavaScript loops over DOM text; use `Fluffy.Playwright.wait_for_function` for predicates that need JavaScript. `wait_for(session, locator, state: :hidden)` works on every driver too.
-- Events: `pending = wait_for(session, Event.download())`, act, `await(pending)`, or `assert_event` in a pipeline. Downloads work on every driver, other events on Playwright.
-- A `Fluffy.Playwright.route/4` handler answers each request once and must not block: hand database work to a `Task` (it keeps the sandbox) and fulfil from there.
-- `Fluffy.unwrap/2` passes the driver's native value (`Plug.Conn`, `LiveViewTest.View`, `Playwright.Page`). In it, don't close the page or context, remove listeners, `set_content`, stop tracing, pass `no_wait_after:` or `signal:`, or consume `assert_patch`: that breaks Fluffy's tracking.
-- Actions fail with `Fluffy.OperationError` (the driver's error is its `cause`). `Fluffy.step/3` names a trace step and `Fluffy.open_browser/1` opens the current page, on any driver.
+- Native access (`deps/fluffy/docs/debugging.md`): prefer Fluffy's reads and actions to `evaluate` or `unwrap`. Don't consume LiveView navigation notifications, close or replace the native page, remove listeners, stop tracing, or pass `no_wait_after:` or `signal:`. Don't alias `Fluffy.Playwright` as `Playwright` where you use the dependency's modules.
+- Events and routing (`deps/fluffy/docs/advanced-events.md`): register before acting, or use `assert_event`. Downloads work on all drivers. Answer each routed request once; delegate database work to a `Task` so the handler doesn't block.
+- PhoenixTest migration (`deps/fluffy/docs/migration-from-phoenix-test.md`): use native Fluffy for new tests and PhoenixTest.Playwright ports. Use `Fluffy.PhoenixTest` only for a minimal-diff port; never import it alongside `Fluffy`. Check the guide for facade-specific visibility, counts and timeout semantics.

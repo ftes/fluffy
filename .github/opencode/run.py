@@ -158,9 +158,9 @@ def result_from_events(events):
     return json.loads("".join(chunks))
 
 
-def agent(prompt, shape, *, settings=None):
+def agent(prompt, shape, *, settings=None, tool_env=()):
     with tempfile.TemporaryDirectory() as tmp:
-        env = {key: os.environ[key] for key in SAFE_ENV if key in os.environ}
+        env = {key: os.environ[key] for key in (*SAFE_ENV, *tool_env) if key in os.environ}
         env.update(
             XDG_CONFIG_HOME=f"{tmp}/config", XDG_DATA_HOME=f"{tmp}/data",
             XDG_CACHE_HOME=f"{tmp}/cache", XDG_STATE_HOME=f"{tmp}/state",

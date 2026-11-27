@@ -2,9 +2,9 @@
 
 The snippets assume the imports from [Your first test](usage.md#your-first-test) and an initialized `session`.
 
-## Actions and expectations
+## Actions and assertions
 
-Actions and expectations use the same API on both backends:
+Act on the control, then assert the result:
 
 ```elixir
 session
@@ -12,84 +12,39 @@ session
 |> fill(by_label("Keeper"), "Rubeus Hagrid")
 |> check(by_label("Flute ready"))
 |> select_option(by_label("Status"), %{label: "Asleep"})
-|> click(by_role(:button, name: "Save creature"))
-|> assert(enabled(by_role(:button, name: "Save creature")))
-|> assert(disabled(by_label("Species")))
-|> assert(value(by_label("Keeper"), "Rubeus Hagrid"))
-|> assert(editable(by_label("Keeper")))
-|> assert(checked(by_label("Flute ready")))
+|> click(button("Save creature"))
 |> assert_has(by_text("Creature saved"))
 ```
 
-`clear` empties a text input or textarea, like `fill` with `""`. `set_checked`
-takes the desired state as a boolean, for a test that computes it. Both work on
-every driver.
-
-`fill` accepts any value implementing `String.Chars`, such as numbers, dates,
-and custom structs. `select_option` also converts option values and labels,
-including those in `%{value: value}` and `%{label: label}` requests. Conversion
-uses `to_string/1` without HTML escaping; `%{index: index}` remains numeric.
-Lists in `select_option` represent multiple options. To select a single
-charlist value, use `%{value: charlist}` (or `%{label: charlist}` for its label).
-
-Use `checked(locator, checked: false)` for an unchecked control. The
-browser-owned indeterminate state is Playwright only:
-
-```elixir
-session
-|> assert(checked(by_label("All ingredients"), indeterminate: true))
-```
-
-Static and LiveView raise `Fluffy.CapabilityError` for indeterminate state.
+`fill` converts any `String.Chars` value to text; `clear` empties the field.
+Use `set_checked` when the desired checkbox state is a boolean variable.
+Assert an unchecked control with `assert(checked(locator, checked: false))`.
+Checking for `indeterminate: true` requires Playwright.
 
 ### Selects and options
 
-`select_option` targets the select, not an option, and matches an option by its value or
-label; `%{value: value}` and `%{label: label}` match only one of them. Assert the selection
-with the select's value, `value/2` (`values/2` for a multiple select), or with the selected
-option's text through a role locator:
-
-```elixir
-# <select id="house"> with <option value="ravenclaw">Ravenclaw</option> and three more
-house = by_label("House")
-
-session
-|> select_option(house, "Ravenclaw")
-|> assert(value(house, "ravenclaw"))
-|> assert(house |> by_role(:option, selected: true) |> text("Ravenclaw"))
-|> assert(count(by_css("#house option"), 4))
-```
-
-A dropdown, a select without `multiple` and with no `size` above 1, is closed, and a
-closed dropdown's options have no box in a browser, so they are invisible. Static and
-LiveView treat them the same. `visible`, `assert_has`, `filter(visible: true)` and the
-facade's `count:` and `at:` don't see them: a facade `assert_has("#house option", count: 4)`
-counts 0. Native `count/2` and `attached/1` don't filter visibility.
-
-To check which choices a dropdown offers, scope the named options to the labeled select:
-
 ```elixir
 house = by_label("House", exact: true)
+ravenclaw = by_role(house, :option, "Ravenclaw", exact: true)
 
 session
-|> assert(attached(by_role(house, :option, name: "Ravenclaw", exact: true)))
-|> refute(attached(by_role(house, :option, name: "Beauxbatons", exact: true)))
+|> assert(attached(ravenclaw))
+|> assert(count(by_role(house, :option), 4))
+|> select_option(house, %{label: "Ravenclaw"})
+|> assert(value(house, "ravenclaw"))
+|> assert(text(by_role(house, :option, selected: true), "Ravenclaw"))
 ```
 
-If these checks recur, you can wrap the locator and assertion in your app's test case
-template as `assert_option(session, select_label, option_name)` and `refute_option/3`.
+**Available choices:** `attached` checks that the named option exists; `count` checks
+how many the select offers. Use `refute(attached(option))` for an absent choice.
+A closed dropdown's options have no visible box; a list box (`multiple` or
+`size` greater than 1) displays its options. Role queries exclude `aria-hidden`
+options. To count every option in the DOM, use `by_css(house, "option")`.
 
-To check DOM presence or absence even when options are hidden from the accessibility tree,
-scope a CSS locator to the select, for example
-`option = by_css(house, "option[value=ravenclaw]")`. Use `assert(attached(option))` for
-presence or `assert(count(option, 1))` for exactly one match. Use `assert(count(option, 0))`
-for absence. A role locator excludes options such as `<option aria-hidden="true">`.
-
-In the facade, `assert_has("#house", value: "ravenclaw")` checks the current selection
-by its submitted value, and `assert_has("#house", selected: "Ravenclaw")` matches the
-selected option's normalized text. It does not read the option's `label` attribute, which
-can override what is displayed. Neither assertion passes just because an option is available.
-A list box, a `multiple` select or one with a `size` above 1, shows its options.
+**Current selection:** act on the select, then assert its value or the selected
+option's text. For a multiple select, pass the complete list of choices and assert
+`values` instead of `value`. A bare string matches either value or label; see
+`Fluffy.select_option/4` for explicit value, label, and index requests.
 
 A `<datalist>` and its options are never rendered: fill its input with an option's value,
 and find the options with `count/2` or `by_role(:option, include_hidden: true)`, whose
@@ -97,32 +52,23 @@ and find the options with `count/2` or `by_role(:option, include_hidden: true)`,
 
 ### Actionability checks and waiting
 
-LiveView expectations observe fresh renders and retry until they pass or reach
-their deadline. Supported LiveView actions also retry transient missing or
-actionability failures, as listed below. Waiting is enabled by default; pass
-`timeout:` to an action or expectation to change its deadline. As in Playwright Test,
-it defaults to the [configured](installation.md#configuration) timeout: Playwright's on a
-browser, `phoenix_backend_timeout` on Phoenix.
-Static checks are immediate. Playwright uses the browser's native waiting behavior.
-
-When a Playwright visit finds LiveView roots, it waits for every root, including
-nested views, to connect and finish joining. Application-specific loading may
-still need an assertion.
-
-Playwright already checks each action's prerequisites and waits automatically
-for the target to be ready. As elsewhere in Fluffy, Playwright is the model we
-follow, with the Phoenix-specific limits described below. Usually you can act
-directly and assert the result, without first asserting that the target is ready:
-
 ```elixir
 session
 |> fill(by_label("Potion name"), "Polyjuice Potion")
-|> click(by_role(:button, name: "Save potion"))
+|> click(button("Save potion"))
 |> assert(page_url("/potions"))
 ```
 
-The Phoenix backend checks HTML structure and control state. Each action
-requires exactly one matching target, with these additional checks:
+Click directly and assert the outcome. Playwright waits for each action's
+prerequisites; for example, the button must be stable and receive pointer events.
+A Playwright visit also waits for every LiveView root (including nested views)
+to join. Assert application-specific results separately.
+
+Static checks once. LiveView assertions retry on fresh renders; actions retry
+missing targets and the conditions below, except that `set_input_files` checks
+once. Pass `timeout:` to override the [configured deadline](installation.md#timeouts)
+(Playwright's timeout or `phoenix_backend_timeout`). Both Phoenix drivers require
+one target and check HTML structure and control state:
 
 | Action | Phoenix checks | LiveView also retries while… |
 | --- | --- | --- |
@@ -132,53 +78,32 @@ requires exactly one matching target, with these additional checks:
 | `select_option` | enabled select; requested options exist and are enabled | the select is disabled or a requested option is missing |
 | `set_input_files` | file input; multiple files require `multiple` | checks immediately, including target lookup |
 
-For `click`, `fill`, `check` / `uncheck`, and `select_option`, LiveView also
-retries missing targets until the action deadline. Ambiguous locators and invalid control types fail immediately. Static checks immediately
-without waiting for later changes. A checkbox already in the requested state
-needs no mutation; unchecking a checked radio is invalid.
-
-These are action-specific rules, not a blanket visibility requirement. Phoenix
-`fill` does not check visibility, and `set_input_files` intentionally accepts
-hidden or disabled file inputs. Locator matching may itself exclude hidden
-elements; see [Visibility and DOM presence](assertions.md#visibility-and-dom-presence).
-
-Phoenix does not compute CSS layout or detect overlapping elements.
-Playwright uses the browser's action-specific checks: for example, `fill`
-waits for rendered visibility, enablement, and editability, while `click`
-also waits for stability and the target to receive pointer events.
-
-Keep separate assertions when the state itself is the behavior under test, such as a
-button becoming enabled after a required field is filled. `assert(enabled(locator))`
-and `refute(disabled(locator))` do not check visibility.
+Ambiguity and invalid control types fail immediately. A checkbox already in the
+requested state needs no change; unchecking a checked radio is invalid.
+Phoenix does not compute layout or overlap: `fill` does not check visibility,
+and `set_input_files` accepts hidden or disabled inputs. The locator may still
+exclude hidden elements; see [Visibility and DOM presence](assertions.md#visibility-and-dom-presence).
+Assert `enabled` separately if enablement itself matters; it does not imply visibility.
 
 ### Form submission and keyboard actions
 
-Use `submit(form_locator)` when the intent is native form submission without a
-specific submitter. Click the intended submit button when its `name=value` or
-override attributes matter. `press(locator, "Enter")` performs implicit form submission only with Playwright.
-Submissions use the latest DOM ownership and control state in document order.
-Removed or disabled controls are omitted; renamed and newly inserted controls
-use their current names and owners. Duplicate names preserve their order,
-hidden inputs remain independent entries, and readonly controls submit even
-though they cannot be filled. Multiple selections replace the selected set.
-See [Forms and files](capabilities.md#forms-and-files) for validation, reset-button,
-and serialization boundaries.
-
-`Fluffy.press/4` presses natively with Playwright, only invokes bound key handlers
-with LiveView, and is unsupported on Static; see
-[LiveView timing and keyboard events](capabilities.md#liveview-timing-and-keyboard-events).
-
 ```elixir
-# LiveView: invoke bound handlers with key = "Backspace"; do not delete text.
-session |> press(by_label("Search"), "Backspace")
-
-# Playwright: select the text, then delete it through native keyboard behavior.
 session
-|> press(by_label("Search"), "ControlOrMeta+A")
-|> press(by_label("Search"), "Backspace")
+|> fill(by_label("Owl message"), "Meet me in the Owlery")
+|> click(button("Send by owl"))
+|> assert_has(by_text("Message sent"))
 ```
 
-For character-by-character browser typing, use `Fluffy.Playwright.press_sequentially/4`.
+Click the intended submit button to include its `name=value` and honor overrides
+such as `formaction`. Use `submit(form_locator)` to submit without a specific
+button. Controls submit in document order with their current names, values, and
+form owners. Removed and disabled controls are omitted; readonly and hidden
+controls are included, and duplicate names keep their order. See
+[Forms and files](capabilities.md#forms-and-files) for validation and reset behavior.
+
+Use Playwright to submit implicitly with `press(locator, "Enter")` or edit text
+with `"Backspace"`. On LiveView, `press` invokes bound key handlers only; Static
+does not support it. See [LiveView timing and keyboard events](capabilities.md#liveview-timing-and-keyboard-events).
 
 ### Playwright-only actions
 
@@ -190,16 +115,16 @@ For character-by-character browser typing, use `Fluffy.Playwright.press_sequenti
 `Fluffy.CapabilityError` on Phoenix:
 
 ```elixir
-alias Fluffy.Playwright
+import Fluffy.Playwright
 alias Fluffy.Playwright.Keyboard
 
 session
-|> Playwright.set_viewport_size(%{width: 390, height: 844})
-|> Playwright.emulate_media(color_scheme: :dark)
-|> Playwright.dblclick(by_role(:cell, name: "Fluffy"))
+|> set_viewport_size(%{width: 390, height: 844})
+|> emulate_media(color_scheme: :dark)
+|> dblclick(by_role(:cell, "Fluffy"))
 |> Keyboard.press("Enter")
 |> assert_has(by_text("Fluffy's chamber"))
-|> Playwright.screenshot(by_css("table"), path: "tmp/creatures.png")
+|> screenshot(by_css("table"), path: "tmp/creatures.png")
 ```
 
 As in Playwright, page-wide input and `dispatch_event` do not wait for a navigation
@@ -223,8 +148,8 @@ To use a value from the page in the test, read it, as with Playwright's locator 
 They work on every driver:
 
 ```elixir
-heading = text_content(session, by_role(:heading, level: 1))
-href = get_attribute(session, by_role(:link, name: "Diagon Alley"), "href")
+chamber = text_content(session, heading("Chamber of Secrets", level: 1))
+href = get_attribute(session, link("Diagon Alley"), "href")
 owl = input_value(session, by_label("Owl"))
 creatures = all_text_contents(session, by_role(:listitem))
 page_title = title(session)
@@ -239,9 +164,9 @@ each. `title` reads the page's `<title>` and `content` its HTML
 The browser's rendered text, `Fluffy.Playwright.inner_text/3` and `all_inner_texts/2`,
 requires Playwright.
 
-A read waits for its target to attach, as an action does, then reads the value once; it
-doesn't wait for the value to change. To check a value, use an assertion, which retries
-until it passes: `assert(text(by_role(:heading), "Fluffy"))` rather than comparing what
+A single-target read waits for attachment on LiveView and Playwright; Static
+checks once. It doesn't wait for the value to change. To check a value, use
+`assert(session, text(by_role(:status), "Creature saved"))` rather than comparing what
 `text_content` returned right after an action. To wait for an element before acting,
 without asserting, use `Fluffy.wait_for/3` with a locator and `state:`.
 
@@ -252,9 +177,9 @@ Use `Fluffy.reload/1` to reload the active document:
 ```elixir
 session
 |> visit("/chambers/secrets")
-|> assert_has(by_role(:heading, name: "Chamber of Secrets"))
+|> assert_has(heading("Chamber of Secrets"))
 |> reload()
-|> assert_has(by_role(:heading, name: "Chamber of Secrets"))
+|> assert_has(heading("Chamber of Secrets"))
 |> assert(page_url("/chambers/secrets"))
 ```
 
@@ -271,7 +196,7 @@ managed LiveView upload lifecycle:
 ```elixir
 session
 |> set_input_files(by_label("Evidence"), ["diary-front.pdf", "diary-back.pdf"])
-|> click(by_role(:button, name: "Upload"))
+|> click(button("Upload"))
 ```
 
 The named fixture files must exist. The path list preserves selection order. Pass `[]` to clear the input. Use a
@@ -286,7 +211,7 @@ payload = %Fluffy.FilePayload{
 
 session
 |> set_input_files(by_label("Potion ledger"), payload)
-|> click(by_role(:button, name: "Upload"))
+|> click(button("Upload"))
 ```
 
 One path or payload, a homogeneous list of either, and `[]` are accepted.
@@ -305,13 +230,13 @@ Use `Fluffy.Playwright.evaluate/3` when a Playwright test needs a value from
 the active page:
 
 ```elixir
-alias Fluffy.Playwright
+import Fluffy.Playwright
 
-data_url = Playwright.evaluate(session, "document.querySelector('canvas').toDataURL()")
+data_url = evaluate(session, "document.querySelector('canvas').toDataURL()")
 assert data_url =~ "data:image/png"
 
 session
-|> click(by_role(:button, name: "Reveal diary message"))
+|> click(button("Reveal diary message"))
 ```
 
 `Fluffy.Playwright.evaluate/2` returns the JavaScript result, not the session, and

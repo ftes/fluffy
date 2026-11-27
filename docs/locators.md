@@ -4,122 +4,65 @@ The snippets assume the imports from [Your first test](usage.md#your-first-test)
 
 ## Locators
 
-Prefer locators that describe the interface as a user experiences it:
-
-1. Use a label for a form control.
-2. Use a role and accessible name for an interactive element.
-3. Use text for rendered content, with a visibility assertion when needed.
-4. Use a test ID when user-facing names are ambiguous.
-5. Use CSS for structure that has no user-facing identity.
-
 ```elixir
 session
 |> fill(by_label("Name"), "Basilisk")
-|> click(by_role(:button, name: "Register"))
+|> click(button("Register"))
 |> assert_has(by_text("Creature registered"))
 ```
 
-Locators are values, so they can be scoped and reused:
+Use the field's label, the button's accessible name, or the text the reader should
+see. If several controls have the same name, scope the action to the relevant
+row, card, or form:
 
 ```elixir
-potions = by_css("#potions")
-potion = potions |> by_role(:row, "Polyjuice Potion")
+potion = by_role(:row) |> filter(has: by_role(:cell, "Polyjuice Potion", exact: true))
 
-session
-|> click(by_role(potion, :button, "Inspect"))
+session |> click(button(potion, "Inspect"))
 ```
 
-`by_role(:heading, "Potions", level: 2)` is the same as
-`by_role(:heading, name: "Potions", level: 2)`. The positional name also works
-when starting from another locator or a frame, and can be a regular expression.
+If no user-facing name distinguishes the target, use `Fluffy.Locator.by_test_id/1`
+(the attribute is configured suite-wide) or `by_css` for unnamed structure.
+CSS must be valid browser CSS, including escapes for special characters in IDs.
 
-Available constructors are `by_role`, `by_text`, `by_label`,
-`by_placeholder`, `by_alt_text`, `by_title`, `by_test_id`, and `by_css`.
-Text, role-name, and label matching default to normalized substring matching;
-use `exact: true` for a complete match. Role names follow accessible-name
-precedence: `aria-labelledby`, then `aria-label`, then native labels and
-captions, then content for the roles Playwright names from content, then
-`title`. Landmarks, lists, list items and dialogs are not named by their content.
-`by_test_id` reads Playwright Test's `testIdAttribute` on every driver,
-`config :playwright, :test, test_id_attribute: "data-owl"` (`data-testid` by default), or any
-of a comma-separated list. It is one per suite, as in Playwright: each pooled browser gets it as
-it starts.
-Explicit ARIA roles override implicit roles. See `Fluffy.Locator.by_role/2` for the
-implicit roles the Phoenix backend knows. Phoenix computes roles and names from
-markup, so names ignore computed CSS and control values changed since rendering.
-CSS must be valid browser CSS; escape special characters in IDs or use a
-semantic/test-id locator.
+### Combining locators
 
-Role state options, such as `by_role(:option, name: "Elder", selected: true)`,
-`by_role(:button, pressed: true)` or `by_role(:heading, level: 2)`, work on every
-driver. Static and LiveView read `checked:` and `selected:` from the controls' current
-state, as `check` and `select_option` leave it, and the other states from markup;
-`include_hidden:` uses their structural visibility. An input's `indeterminate`
-property, which only JavaScript sets, is mixed on Playwright only; `aria-checked="mixed"`
-is mixed on every driver. As in Playwright, a state option the role lacks, such as
-`by_role(:link, pressed: true)`, raises when the locator resolves.
+`filter(has: ...)` keeps each row containing a matching descendant. To match two
+descriptions of the **same element**, use `Fluffy.Locator.and_/2`. For alternatives,
+use `button("Accio") |> or_(link("Accio"))`. Single-target actions and visibility
+assertions fail if both match; use `assert(count(locator, n))` to check a collection.
 
-`by_text`, `by_label`, `by_placeholder`, `by_alt_text`, `by_title`, and
-`by_test_id` also accept a regular expression, including inside a locator or frame.
-Regexes ignore `exact:` and match the raw text, label, or attribute value.
-Role names and `description:` match normalized accessible text, while
-`has_text:` and `has_not_text:` match raw text. For example, `by_text(~r/^Lumos$/)`
-does not match `<li> Lumos </li>`.
+Use `first`, `last`, or zero-based `nth` when position matters.
+`by_css("td") |> nth(2) |> within(by_css("tr"))` picks the third cell **in each
+row**; `by_css("tr") |> by_css("td") |> nth(2)` picks one cell overall.
 
-A regex is a JavaScript `RegExp` on every driver: an Elixir
-`Regex` becomes one with `Playwright.RegExp.new/1`, which raises `ArgumentError`
-on PCRE-only syntax such as `\A` or `(?i)`. Pass a `Playwright.RegExp` for
-JavaScript-only syntax. Static and LiveView require the pattern to run in Elixir's
-regex engine; see `Playwright.RegExp` for its limits. Without the `u` modifier the
-browser matches UTF-16 code units and Static and LiveView match code points, so
-`~r/^.$/` matches an emoji only on Phoenix.
-And on OTP 27, Static and LiveView let `\w` and `\b` also match Latin-1 letters such as
-`é` (OTP 27's PCRE tables); from OTP 28 they are ASCII, as in JavaScript.
+### Matching names and state
 
-Refine a locator with `filter`, `first`, `last`, or zero-based `nth`.
-Use `and_` to require both locators to match the same element:
+Text, labels, and role names match normalized substrings by default; pass
+`exact: true` for the whole string. A valid explicit role usually overrides the
+implicit one; a focusable button with `role="none"` still matches a button
+(see `Fluffy.Locator.by_role/2`). For names, `aria-labelledby` takes precedence
+over `aria-label`, then native labels and captions, then content where the role
+allows it, then `title`. A dialog, landmark, list, or list item does not take
+its name from its contents. Phoenix derives names from markup, ignoring computed
+CSS and changes to control values since rendering.
 
-```elixir
-email = by_css("#email") |> and_(by_label("Email", exact: true))
-```
+`checked:` and `selected:` match current control state, as does CSS `:checked`;
+`[checked]` and `[selected]` match rendered attributes. See
+[Selects and options](actions.md#selects-and-options) for a selection example.
+Phoenix reads other role states from markup and uses structural visibility for
+`include_hidden:`. `aria-checked="mixed"` works everywhere; a JavaScript-set
+`indeterminate` property requires Playwright. A state unsupported by the role
+raises when the locator resolves. See [Focus and client state](capabilities.md#focus-and-client-state)
+for what survives a LiveView render.
 
-The right locator resolves from the original query root, not inside the left
-matches. Inside a `has` or `has_not` filter, it resolves from that filter's
-candidate. Intersections preserve the left locator's order and can be chained.
-For frames, the right locator can be relative to the left locator's frame or
-use the same frame prefix. Playwright validates frame compatibility when the
-locator resolves; intersections across different frames are unsupported.
-
-Use `Fluffy.Locator.or_/2` to match elements found by either locator, once each in
-document order. Actions stay strict, so they fail if the result is more than one element:
-
-```elixir
-accio = by_role(:button, name: "Accio") |> or_(by_role(:link, name: "Accio"))
-```
-
-`Fluffy.Locator.within/2` scopes a locator to each match of another. Unlike a scoped
-`by_css(parent, "td")`, where a following `nth`, `first`, or `last` picks from all the
-matches together, it picks separately inside each match, so this matches the third cell
-of every row:
-
-```elixir
-third_cells = by_css("td") |> nth(2) |> within(by_css("tr"))
-```
-
-CSS `:checked` matches current checkbox, radio, and option state, including
-changes made by `check`, `uncheck`, and `select_option`, but for the current selection
-prefer `by_label("House") |> by_role(:option, selected: true)`.
-Attribute selectors such as `[checked]` and `[selected]` still match the
-rendered HTML attributes, which can differ from the user's input.
-
-Focus requires Playwright, and LiveView renders can replace local input state; see
-[Focus and client state](capabilities.md#focus-and-client-state).
-
-Single-target actions and native visibility assertions are strict: if a locator
-matches more than one element, Fluffy reports the ambiguity instead of choosing
-for you. Facade `assert_has` accepts any visible match, and `refute_has` requires
-no visible matches. Narrow the locator, or use `assert(count(locator, n))` when
-multiple matches are the intended assertion.
+`Fluffy.Locator` lists the constructors, options, and regex rules. For example,
+`by_text(~r/^Lumos$/)` matches raw text and misses `<li> Lumos </li>`, whereas
+role-name regexes match normalized accessible text. Use JavaScript regex syntax
+that Elixir also supports for cross-driver tests. Without `u`, `~r/^.$/`
+matches an emoji on Phoenix but not in the browser (code points vs. UTF-16 code
+units). On OTP 27, Phoenix `\w` and `\b` also treat Latin-1 letters as word
+characters; from OTP 28 they use ASCII as in JavaScript.
 
 ### Role shorthands
 
@@ -156,7 +99,7 @@ email = by_label(gringotts, "Email")
 session
 |> fill(email, "griphook@gringotts.example")
 |> assert(value(email, "griphook@gringotts.example"))
-|> click(by_role(gringotts, :button, name: "Withdraw"))
+|> click(button(gringotts, "Withdraw"))
 ```
 
 Each frame boundary is strict: if multiple iframes match, an action or assertion inside
@@ -167,7 +110,7 @@ converting it with `Fluffy.Locator.content_frame/1`:
 ```elixir
 gringotts = by_title("Gringotts") |> first() |> content_frame()
 vault = frame_locator(gringotts, "#vault")
-withdraw_button = by_role(vault, :button, name: "Withdraw")
+withdraw_button = button(vault, "Withdraw")
 iframe_element = Fluffy.FrameLocator.owner(gringotts)
 ```
 

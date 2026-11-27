@@ -1,33 +1,31 @@
 # Usage
 
-Start each test with the Phoenix (`:phoenix`) or Playwright (`:playwright`)
-backend. The Phoenix backend automatically selects the Static
-(`Phoenix.ConnTest`) or LiveView (`Phoenix.LiveViewTest`) driver for each page
-and can transition between them as the user navigates. Use Playwright when the
-behavior depends on JavaScript or other browser-owned capabilities.
+After [installation](installation.md), start a session, visit a page, and interact
+with it through locators. The same test can run in-process or in a browser.
 
 ## Your first test
 
-Add `use Playwright.Test` after `use ExUnit.Case` (or your `ConnCase`, see
-[Shared test case](#shared-test-case)), then import the actions and locators;
-`use Fluffy.Assert`, after `use Playwright.Test`, imports the assertion vocabulary:
+Use your `ConnCase` or `DataCase` to start the [Ecto sandbox owner](installation.md#ecto-sandbox)
+before `Playwright.Test` registers the test. Without a sandbox, `ExUnit.Case`
+also works. Put `Fluffy.Assert` last.
 
 ```elixir
 defmodule MyAppWeb.CreatureTest do
-  use ExUnit.Case, async: true
+  use MyAppWeb.ConnCase, async: true
   use Playwright.Test
   use Fluffy.Assert
 
   import Fluffy
   import Fluffy.Locator
+  import Fluffy.Locator.Roles
 
   test "puts Fluffy to sleep" do
     start_session(:phoenix)
     |> visit("/creatures/fluffy")
     |> fill(by_label("Keeper"), "Rubeus Hagrid")
-    |> click(by_role(:button, name: "Play flute"))
+    |> click(button("Play flute"))
     |> assert_has(by_text("Asleep"))
-    |> assert(page_url("/creatures/fluffy"))
+    |> assert(page_path("/creatures/fluffy"))
   end
 end
 ```
@@ -35,35 +33,13 @@ end
 `import Fluffy.Locator.Roles` adds [role shorthands](locators.md#role-shorthands) such as
 `button("Play flute")`, `link("Owlery")`, and `heading("Potions", level: 2)`.
 
-For tests using Playwright-only helpers, also `import Fluffy.Playwright`. This
-lets you call `new_page`, `current_page`, `pages`, `switch_page`, `close_page`,
-`go_back`, `go_forward`, `hover`, `drag_to`, `press_sequentially`, `dblclick`,
-and the other browser actions without module qualifiers:
-
-```elixir
-import Fluffy
-import Fluffy.Locator
-import Fluffy.Playwright
-
-start_session(:playwright)
-|> visit("/creatures/fluffy")
-|> press_sequentially(by_label("Keeper"), "Hagrid", delay: 20)
-```
-
-Actions and assertions return a `Fluffy.Session` handle for pipelines. Evolving
-state belongs to the session runtime: existing handles see action results even
-when the returned handle is discarded. Use each session sequentially from its
-owning test process; concurrent use of the same session is unsupported.
+For browser-only actions, also `import Fluffy.Playwright`.
+Actions and assertions return a `Fluffy.Session` for the next pipeline step. Existing
+handles see the latest page even if you discard a return value. Use each session
+sequentially from its owning test process.
 
 For page selection, handle lifetime, and user isolation, see
 [Pages, popups, and frames](advanced-events.md#pages-popups-and-frames).
-
-The examples describe an illustrative Hogwarts application; routes, controls,
-and event handlers must exist in the application under test.
-
-Complete [Installation and runtime](installation.md) before running these
-examples. That guide owns endpoint, browser, and lifecycle/sandbox configuration.
-For PhoenixTest-style helpers, follow [Coming from PhoenixTest](migration-from-phoenix-test.md).
 
 ## Choosing a backend
 
@@ -98,53 +74,13 @@ See the [capability matrix](capabilities.md) for backend differences.
 
 ## Shared test case
 
-`use Playwright.Test` registers the test, which every session, Phoenix or Playwright,
-needs: one started outside a registered test raises. The imports and sessions are yours.
-Keep the `ConnCase` for fixtures, routes and the sandbox, and use it first: used after
-`use Playwright.Test`, its `use ExUnit.Case` imports `test` again and the module fails to
-compile on an ambiguous `test/3`. Its options, such as `trace: :on` or context options
-like `locale:`, are for the module; tag a describe block or a test with
-`Playwright.Test.use/1`, such as `@tag Playwright.Test.use(trace: :on)` (see
-`Playwright.Test`).
+Use your `ConnCase` first for fixtures, routes and the sandbox. Then `use Playwright.Test`
+registers the test for either backend; reversing the order makes `test/3` ambiguous.
+Configure Playwright per test with `@tag Playwright.Test.use(trace: :on)`.
 
-A setup can start a session per test, here Phoenix by default and the backend of a
-`backend` tag otherwise. The tag is the setup's own, so name it as you like. Use
-`@moduletag backend: :playwright` for an entire module, `@describetag` for a
-describe block, or `@tag` for one test—without a separate browser test module:
-
-```elixir
-defmodule MyAppWeb.PotionTest do
-  use MyAppWeb.ConnCase, async: true
-  use Playwright.Test
-  use Fluffy.Assert
-
-  import Fluffy
-  import Fluffy.Locator
-
-  setup context do
-    %{session: start_session(context[:backend] || :phoenix)}
-  end
-
-  test "lists the available potions", %{session: session} do
-    session
-    |> visit("/potions")
-    |> assert_has(by_text("Polyjuice Potion"))
-  end
-
-  @tag backend: :playwright
-  test "brews a potion through a JavaScript hook", %{session: session} do
-    session
-    |> visit("/potions")
-    |> click(by_role(:button, name: "Brew potion"))
-    |> assert_has(by_text("Potion brewed"))
-  end
-end
-```
-
-To share this across modules, put `use Playwright.Test` in your own case template's
-`using`, with the imports and the session setup after it there; the template's own
-`setup`, here the sandbox owner's, runs before them. It forwards the module's options, so
-`use MyAppWeb.FeatureCase, async: true, trace: :on` works:
+The case below starts a Phoenix session by default. Its setup reads `backend` from the
+test context, so `@tag backend: :playwright` selects a browser for one test. Use
+`@describetag` or `@moduletag` to apply the same choice more widely.
 
 ```elixir
 defmodule MyAppWeb.FeatureCase do
@@ -157,6 +93,7 @@ defmodule MyAppWeb.FeatureCase do
 
       import Fluffy
       import Fluffy.Locator
+      import Fluffy.Locator.Roles
 
       setup context do
         %{session: start_session(context[:backend] || :phoenix)}
@@ -171,40 +108,13 @@ defmodule MyAppWeb.FeatureCase do
 end
 ```
 
-A template that brings your `ConnCase` in its `using` instead, for the sandbox and fixtures,
-forwards the options to both: `use MyAppWeb.ConnCase, unquote(opts)`, then
-`use Playwright.Test, unquote(opts)`. `ExUnit.CaseTemplate` passes `use ExUnit.Case` only its
-own keys (`async`, `group`, `parameterize`), and `use Playwright.Test` ignores those, so a
-`trace: :on` that only reaches the `ConnCase` is dropped without a warning.
+If `using` also brings in your `ConnCase`, forward `unquote(opts)` to both it and
+`Playwright.Test`; Playwright options such as `trace:` are otherwise dropped.
 
-When the template's own `setup` starts the session, also put `use Playwright.Test` right after
-`use ExUnit.CaseTemplate`. A template's own `setup` callbacks run before those its `using`
-brings in, so the test is then registered before them (a Playwright session started before
-the registration makes it raise). The line in `using` stays, as it brings the `test` macro
-to each module and takes the options; Playwright.Test registers the test once. The one in the body
-takes none:
-
-```elixir
-defmodule MyAppWeb.FeatureCase do
-  use ExUnit.CaseTemplate
-  use Playwright.Test
-
-  using opts do
-    quote do
-      use Playwright.Test, unquote(opts)
-      use Fluffy.Assert
-
-      import Fluffy
-      import Fluffy.Locator
-    end
-  end
-
-  setup tags do
-    MyApp.DataCase.setup_sandbox(tags)
-    %{session: Fluffy.start_session(tags[:backend] || :phoenix)}
-  end
-end
-```
+If the template's **own** `setup` starts the session, also add a bare `use Playwright.Test`
+right after `use ExUnit.CaseTemplate`. That setup runs before callbacks from `using`
+and needs the test registered already. Keep the line in `using` for the test macro
+and module options.
 
 ## Logging in
 
@@ -255,7 +165,7 @@ prepared conn's test session goes with the first request.
 ## Accessibility testing
 
 Follow PlaywrightEx's
-[Accessibility testing](https://hexdocs.pm/playwright_ex/testing-with-exunit.html#accessibility-testing)
+[Accessibility testing](https://hexdocs.pm/playwright_ex/1.65.0-rc.6/testing-with-exunit.html#accessibility-testing)
 recipe on a Playwright session, with `Fluffy.Playwright.add_script_tag/2` and
 `Fluffy.Playwright.evaluate/2` in place of its `Page` calls:
 

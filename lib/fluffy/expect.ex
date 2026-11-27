@@ -1,16 +1,8 @@
 defmodule Fluffy.Expect do
   @moduledoc """
-  Typed locator and active-page assertion values. Use `Fluffy.Assert` in tests.
-
-  The Playwright-style vocabulary runs these values with `expect/2` and
-  negates them with `not_/1`. Page constructors use target prefixes such as
-  `page_to_have_url/2`.
-
-  Assertion constructors use fluent `to_be_*` names for states and `to_have_*`
-  names for properties. `to_pass/2` and `poll/3` retry a block or a value, as
-  Playwright's `toPass` and `expect.poll`.
-
-  Every constructor documents its options. `expect/3` accepts the shared timeout:
+  Typed expectations backing `Fluffy.Assert`. In tests, follow the
+  [Assertions guide](assertions.md). Each constructor below documents the
+  options for its corresponding assertion. All share this execution option:
 
   #{NimbleOptions.docs(Fluffy.Options.expectation_schema())}
   """
@@ -300,7 +292,7 @@ defmodule Fluffy.Expect do
   Asserts that a screenshot of the target matches a baseline image, a `.png` or `.webp`
   file. Requires Playwright, including when negated.
 
-      expect(session, to_have_screenshot(by_role(:main), name: "main.png"))
+      session |> assert(match_screenshot(by_role(:main), name: "main.png"))
 
   `Playwright.Test` resolves `name:` (or, without one, the test's name) to a file, as Playwright does; see "Snapshots" in its docs. A
   missing baseline is written there and fails the test at the end of its body, as in
@@ -390,7 +382,7 @@ defmodule Fluffy.Expect do
   Asserts the target's ARIA snapshot against `expected`, the snapshot as YAML text, or
   against a snapshot file in its place. Requires Playwright, including when negated.
 
-      expect(session, to_match_aria_snapshot(by_css("body"), name: "body.aria.yml"))
+      session |> assert(match_aria_snapshot(by_css("body"), name: "body.aria.yml"))
 
   An empty `expected` fails with the current snapshot in its message, to paste in.
 
@@ -710,9 +702,7 @@ defmodule Fluffy.Expect do
   URL as a `%URI{}`, as Playwright passes a `URL`, and returns whether it matches. Keep
   predicates quick and nonblocking.
 
-      expect(session, page_to_have_url("/creatures/fluffy"))
-      expect(session, page_to_have_url(~r{/creatures/[a-z]+$}))
-      expect(session, page_to_have_url(&(&1.path == "/creatures")))
+  See [Page assertions](assertions.md#page-assertions) for examples.
 
   ## Assertion options
 
@@ -773,13 +763,6 @@ defmodule Fluffy.Expect do
   Retries a block until it stops raising, as Playwright's `expect(fn).toPass()`
   (`Playwright.Expect.to_pass!/2`), on every driver. `fun` gets the session.
 
-      session
-      |> expect(to_pass(fn session ->
-        session
-        |> click(by_role(:button, name: "Check the owlery"), timeout: 1_000)
-        |> expect(to_be_visible(by_text("A letter for Harry")), timeout: :once)
-      end))
-
   `expect/3` returns the session the passing attempt returned, or, if it returned something
   else, the session it was given. Each attempt runs to the end, so give the calls inside short
   timeouts; see [Polling and retrying blocks](assertions.md#polling-and-retrying-blocks).
@@ -803,16 +786,8 @@ defmodule Fluffy.Expect do
   Calls `fun` with the session again until `assertion` passes on the value it returns, as
   Playwright's `expect.poll` (`Playwright.Expect.poll!/3`), on every driver.
 
-      session
-      |> expect(poll(fn _session -> Owlery.letters_for("Harry") end, &assert(length(&1) == 1)))
-
-  As in `Playwright.Expect.poll!/3`, the assertion raises until the value is right, such as an
-  ExUnit `assert`; what it returns is ignored. `fun` raising fails at once, so return a value and
-  leave the check to the assertion. Compare explicitly, as in `&assert(&1 == "playing")`:
-  JavaScript's `null` (`:null`), `NaN` (`:nan`), `0` and `""` are falsy there but truthy in
-  Elixir, so `&assert(&1)` passes on them. For a condition on the page alone,
-  `Fluffy.Playwright.wait_for_function/3` keeps JavaScript's truthiness. `expect/3` returns the
-  session it was given. It can't be negated: refute in the assertion instead.
+  A raising assertion retries; a raising `fun` fails immediately. The result is
+  the input session. See [Polling and retrying blocks](assertions.md#polling-and-retrying-blocks).
 
   ## Options
 

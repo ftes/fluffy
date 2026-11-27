@@ -1,19 +1,12 @@
 name: PlaywrightEx Update
 
-# Opens a draft PR updating PlaywrightEx to its newest Hex release, as PlaywrightEx's own
-# upstream-update.yml does for Playwright. Renovate leaves playwright_ex to this workflow: a new
-# PlaywrightEx member fails `Fluffy.PlaywrightMembersTest` until it is classified, which Renovate
-# can't do.
-#
-# Accepted risk: Claude runs with the app token on a new PlaywrightEx release (its code, driver,
-# CHANGELOG and usage rules). PlaywrightEx is the owner's own library.
+# Renovate leaves playwright_ex to this workflow: a new PlaywrightEx member
+# fails Fluffy.PlaywrightMembersTest until it is classified.
 on:
   schedule:
     - cron: "37 4 * * *"
   workflow_dispatch:
 
-# One run at a time and no cancelling: a queued run waits for the update in progress, then finds
-# its branch and stops in `check`.
 concurrency:
   group: playwright-ex-update
   cancel-in-progress: false
@@ -22,76 +15,82 @@ permissions: {}
 
 env:
   MIX_ENV: test
+  BASE_BRANCH: ${{ github.event.repository.default_branch }}
 
 jobs:
-  # Cheap, no Claude: is there a newer release without a branch or PR for it?
   check:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ${{ vars.RUNNER == 'github' && 'ubuntu-26.04' || 'ubicloud-standard-2-ubuntu-2604' }}
     timeout-minutes: 5
     permissions:
       contents: read
-      pull-requests: read # gh pr list (dedup)
+      pull-requests: read
     outputs:
-      update: ${{ steps.check.outputs.update }}
+      mode: ${{ steps.check.outputs.mode }}
       from: ${{ steps.check.outputs.from }}
-      to: ${{ steps.check.outputs.to }}
-      branch: ${{ steps.check.outputs.branch }}
+      release: ${{ steps.check.outputs.release }}
+      base-sha: ${{ steps.check.outputs.base-sha }}
+      expected-head: ${{ steps.check.outputs.expected-head }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          sparse-checkout: mix.lock
+          ref: ${{ github.sha }}
+          sparse-checkout: |
+            mix.lock
+            .github/opencode
           sparse-checkout-cone-mode: false
           persist-credentials: false
       - name: Find a newer PlaywrightEx release
         id: check
         env:
           GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          EVENT: ${{ github.event_name }}
-        # Hex's latest_version is the highest release, pre-releases included. A git dep on
-        # PlaywrightEx's main waits for a release that contains the locked commit. The branch, or a
-        # PR from it, means the release is handled; a dispatch retries one whose PR was closed
-        # (delete the branch first).
-        run: |
-          out() { echo "$1=$2" | tee -a "$GITHUB_OUTPUT"; }
-          lock=$(sed -nE 's/^  "playwright": \{:(hex|git), [^,]+, "([^"]+)".*/\1 \2/p' mix.lock)
-          read -r kind from <<< "$lock"
-          to=$(curl -fsSL --retry 3 https://hex.pm/api/packages/playwright_ex | jq -r .latest_version)
-          [[ -n $from && -n $to ]] || { echo "::error::cannot read mix.lock or Hex"; exit 1; }
-          out from "$from"
-          out to "$to"
-          if [[ $kind == hex ]]; then
-            newer=$([[ $to != "$from" ]] && echo true || echo false)
-          else
-            status=$(gh api "repos/ftes/playwright_ex/compare/$from...v$to" --jq .status)
-            newer=$([[ $status == ahead || $status == identical ]] && echo true || echo false)
-          fi
-          branch="claude/playwright-ex-$to"
-          out branch "$branch"
-          states=$([[ $EVENT == workflow_dispatch ]] && echo open || echo all)
-          prs=$(gh pr list --head "$branch" --state "$states" --json url --jq 'map(.url) | join(" ")')
-          if [[ $newer != true ]]; then
-            echo "::notice::$to doesn't update the locked $from"
-            out update false
-          elif [[ -n $prs ]]; then
-            echo "::notice::PR exists: $prs"
-            out update false
-          elif gh api "repos/$GH_REPO/git/ref/heads/$branch" --silent 2> /dev/null; then
-            echo "::notice::Branch $branch exists"
-            out update false
-          else
-            out update true
-          fi
+        run: python3 -B .github/opencode/playwright_update.py check
 
-  update:
+  propose:
     needs: check
-    if: needs.check.outputs.update == 'true'
-    runs-on: ${{ vars.RUNNER == 'github' && 'ubuntu-26.04' || 'ubicloud-standard-2-ubuntu-2604' }}
-    timeout-minutes: 60
+    if: needs.check.outputs.mode == 'new'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     permissions:
       contents: read
-      id-token: write # Exchanged for the Claude app token, which pushes and opens the PR.
-    # For `mix check`, as in ci.yml's test job.
+      id-token: write # Also grants the App audience; no Mix, agent shell or project code runs here.
+    outputs:
+      artifact: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.check.outputs.base-sha }}
+          persist-credentials: false
+      - id: auth
+        uses: ./.github/actions/opencode
+        with:
+          client-id: ${{ vars.OPENCODE_CLIENT_ID }}
+      - name: Propose the member inventory as text
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OPENCODE_API_KEY: ${{ steps.auth.outputs.token }}
+          PLAYWRIGHT_FROM: ${{ needs.check.outputs.from }}
+          PLAYWRIGHT_TO: ${{ needs.check.outputs.release }}
+          BASE_SHA: ${{ needs.check.outputs.base-sha }}
+        run: python3 -B .github/opencode/playwright_update.py propose
+      - id: upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-proposal-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/proposal.json
+          if-no-files-found: error
+
+  verify:
+    needs: [check, propose]
+    if: needs.check.outputs.mode == 'new'
+    runs-on: ${{ vars.RUNNER == 'github' && 'ubuntu-26.04' || 'ubicloud-standard-2-ubuntu-2604' }}
+    timeout-minutes: 60
+    # Dependencies, generated Mix files and tests run only in this job.
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      artifact: ${{ steps.upload.outputs.artifact-id }}
     services:
       postgres:
         image: postgres:18.6@sha256:e3d24f6906d0760bf4da0dae872415391ededefad23fd471c47dc53b0ddf3c42
@@ -104,67 +103,56 @@ jobs:
           --health-interval 1s
           --health-timeout 5s
           --health-retries 30
-    env:
-      BRANCH: ${{ needs.check.outputs.branch }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Else checkout's read-only token can override the app token Claude pushes with: from v6
-          # it sits in an includeIf file claude-code-action doesn't clear, so the push gets a 403.
+          ref: ${{ needs.check.outputs.base-sha }}
+          persist-credentials: false
+      - name: Check that the verifier has no OIDC
+        run: python3 -B .github/opencode/playwright_update.py check-verifier
+      - name: Set up toolchain and deps
+        uses: ftes/ci/setup@e53e22699f50c88157237931a10500d367cca47c # v1.0.13
+      - name: Prepare and verify the dependency update
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ needs.propose.outputs.artifact }}
+          PLAYWRIGHT_FROM: ${{ needs.check.outputs.from }}
+          PLAYWRIGHT_TO: ${{ needs.check.outputs.release }}
+          BASE_SHA: ${{ needs.check.outputs.base-sha }}
+        run: python3 -B .github/opencode/playwright_update.py verify
+      - id: upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-verified-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/verified.json
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    needs: [check, verify]
+    if: ${{ !cancelled() && needs.check.result == 'success' && (needs.check.outputs.mode == 'recover' || needs.verify.result == 'success') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+      id-token: write
+    env:
+      GIT_CONFIG_NOSYSTEM: '1'
+      GIT_CONFIG_GLOBAL: /dev/null
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.check.outputs.base-sha }}
           persist-credentials: false
           fetch-depth: 0
-      - name: Set up toolchain and deps
-        uses: ftes/ci/setup@0e4b067199ea2f6a255a26ab43403f6f6acb5cb6 # v1.0.12
-      # For the current driver; Claude reinstalls the browser if the update changes it.
-      - name: Install Playwright browser
-        uses: ftes/ci/playwright-browser@0e4b067199ea2f6a255a26ab43403f6f6acb5cb6 # v1.0.12
-      - name: Build test assets
-        run: mix assets.build
-      - name: Fetch Playwright source
-        run: mix fluffy.playwright_source
-      - run: git switch -c "$BRANCH"
-      - name: Run Claude
-        uses: ftes/ci/claude@0e4b067199ea2f6a255a26ab43403f6f6acb5cb6 # v1.0.12
-        with:
-          token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          prompt: |
-            REPO: ${{ github.repository }}
-            FROM: ${{ needs.check.outputs.from }} (in mix.lock: a Hex version, or a commit of PlaywrightEx's main)
-            TO: ${{ needs.check.outputs.to }}
-            BRANCH: ${{ env.BRANCH }} (already checked out, from main)
-
-            PlaywrightEx TO is on Hex. Update Fluffy to it and open a draft PR. Read AGENTS.md
-            first.
-
-            1. In mix.exs, require `{:playwright, "~> TO", hex: :playwright_ex}`, replacing any
-               `github:` source with its options and comment. Keep `hex: :playwright_ex`: the Hex
-               package `playwright` is a different library.
-               Run `mix deps.update playwright`, then read what deps/playwright/CHANGELOG.md lists
-               since FROM. In integration/consumer, run `mix deps.update playwright` too, and update
-               the version shown in docs/installation.md and usage-rules.md.
-            2. If the update changed deps/playwright/DRIVER_VERSION, run
-               `mix playwright.install chromium` and `mix fluffy.playwright_source`.
-            3. Run `mix test test/playwright_members_test.exs`. Classify each new PlaywrightEx member
-               and event in test/support/playwright_members.ex, as its header describes, and drop
-               removed ones. Wrap one in Fluffy only when it's a small, obvious extension of what
-               Fluffy already wraps; otherwise classify it, with "gap:" for an API candidate.
-            4. Run `mix usage_rules.sync --yes`.
-            5. Run `mix check` (Chromium; Postgres is up) and fix what the update breaks, following
-               AGENTS.md. Don't weaken or skip a test to get it green. Rerun failed tests once with
-               `mix test --failed`; one that still fails and that the update didn't cause is
-               reported in the PR body, not hidden.
-            6. Under `## Unreleased` in CHANGELOG.md (add it below the overview, above the newest
-               release, if it's missing), in the style of the existing entries:
-               "Requires PlaywrightEx TO", and anything else users see change.
-
-            If the update needs a decision beyond this, like a breaking PlaywrightEx change or a
-            larger Fluffy API, still open the PR with what you have and say what's left.
-
-            To publish, commit with "Update PlaywrightEx to TO" as the subject and write
-            tmp/playwright-ex-pr.md (tmp/ is gitignored): a few sentences on what changed, the gaps
-            and decisions left for a human, and the `mix check` result. Then run exactly:
-              git push -u origin ${{ env.BRANCH }}
-              gh pr create --draft --base main --head ${{ env.BRANCH }} --title "Update PlaywrightEx to ${{ needs.check.outputs.to }}" --body-file tmp/playwright-ex-pr.md
-          max-turns: "150"
-          allowed-tools: "Skill,Read,Grep,Glob,Edit,Write,Agent,Task,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git add:*),Bash(git commit:*),Bash(mix deps.update playwright),Bash(mix deps.get),Bash(mix playwright.install:*),Bash(mix fluffy.playwright_source),Bash(mix usage_rules.sync:*),Bash(mix usage_rules.docs:*),Bash(mix usage_rules.search_docs:*),Bash(mix format:*),Bash(mix compile:*),Bash(mix credo:*),Bash(mix test:*),Bash(mix check:*),Bash(git push -u origin ${{ env.BRANCH }}),Bash(gh pr create --draft --base main --head ${{ env.BRANCH }} *)"
+      - name: Publish the update as a draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ needs.verify.outputs.artifact }}
+          MODE: ${{ needs.check.outputs.mode }}
+          PLAYWRIGHT_TO: ${{ needs.check.outputs.release }}
+          BASE_SHA: ${{ needs.check.outputs.base-sha }}
+          EXPECTED_HEAD: ${{ needs.check.outputs.expected-head }}
+        run: python3 -B .github/opencode/playwright_update.py publish
