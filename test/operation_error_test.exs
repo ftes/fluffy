@@ -133,13 +133,6 @@ defmodule Fluffy.OperationErrorTest do
       assert_raise NimbleOptions.ValidationError, fn -> click(session, button, unsupported: true) end
       assert_raise ExUnit.AssertionError, fn -> expect(session, to_have_count(button, 2), timeout: 50) end
 
-      session =
-        if unquote(driver) == :static do
-          :phoenix |> start_session(endpoint: Fluffy.Support.Web.Endpoint) |> visit("/chamber")
-        else
-          session
-        end
-
       original = RuntimeError.exception("user callback failed")
       assert ^original = assert_raise(RuntimeError, fn -> unwrap(session, fn _ -> raise original end) end)
       structural = Fluffy.StrictnessError.exception(locator: button, candidates: [])
