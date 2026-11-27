@@ -22,6 +22,15 @@ defmodule Fluffy.Support.Web.OwleryLive do
     <main>
       <p id="letters">Letters: {@letters}</p>
       <button :if={@letters > 0} type="button" phx-click="read">Read the letter</button>
+      <fieldset :if={@letters > 0}>
+        <input id="recipient" aria-label="Recipient" type="text" value="Harry" />
+        <input id="sealed" aria-label="Sealed" type="checkbox" checked />
+        <select id="supplies" aria-label="Supplies" multiple>
+          <option selected value="wand">Wand</option>
+          <option value="quill">Quill</option>
+          <option selected value="robes">Robes</option>
+        </select>
+      </fieldset>
       <p :if={@read?}>You have been accepted at Hogwarts</p>
     </main>
     """
