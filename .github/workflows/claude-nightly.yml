@@ -54,7 +54,7 @@ jobs:
       - name: Run Claude
         id: claude
         if: steps.list.outputs.numbers != ''
-        uses: ftes/ci/claude@e53e22699f50c88157237931a10500d367cca47c # v1.0.13
+        uses: ftes/ci/claude@41939eef91514e8ac6b33a1d6e7923edc42f4628 # v1.0.14
         with:
           token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
@@ -169,7 +169,7 @@ jobs:
         id: threads
         if: steps.list.outputs.review-prs != ''
         continue-on-error: true
-        uses: ftes/ci/review-threads@e53e22699f50c88157237931a10500d367cca47c # v1.0.13
+        uses: ftes/ci/review-threads@41939eef91514e8ac6b33a1d6e7923edc42f4628 # v1.0.14
         with:
           prs: ${{ steps.list.outputs.review-prs }}
       - name: Pick the PRs to fix
@@ -229,11 +229,11 @@ jobs:
           ref: ${{ matrix.pr.branch }}
           fetch-depth: 0
       - name: Set up toolchain and deps
-        uses: ftes/ci/setup@e53e22699f50c88157237931a10500d367cca47c # v1.0.13
+        uses: ftes/ci/setup@41939eef91514e8ac6b33a1d6e7923edc42f4628 # v1.0.14
       # These may fail on a branch that doesn't compile; Claude then runs without them.
       - name: Install Playwright browser
         continue-on-error: true
-        uses: ftes/ci/playwright-browser@e53e22699f50c88157237931a10500d367cca47c # v1.0.13
+        uses: ftes/ci/playwright-browser@41939eef91514e8ac6b33a1d6e7923edc42f4628 # v1.0.14
       - name: Build test assets
         continue-on-error: true
         run: mix assets.build
@@ -260,12 +260,12 @@ jobs:
       - name: List open review findings
         id: threads
         continue-on-error: true
-        uses: ftes/ci/review-threads@e53e22699f50c88157237931a10500d367cca47c # v1.0.13
+        uses: ftes/ci/review-threads@41939eef91514e8ac6b33a1d6e7923edc42f4628 # v1.0.14
         with:
           prs: ${{ matrix.pr.number }}
       - name: Run Claude
         id: claude
-        uses: ftes/ci/claude@e53e22699f50c88157237931a10500d367cca47c # v1.0.13
+        uses: ftes/ci/claude@41939eef91514e8ac6b33a1d6e7923edc42f4628 # v1.0.14
         with:
           token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
@@ -302,7 +302,7 @@ jobs:
       # Replies to each finding; reacts to and resolves the fixed ones.
       - name: Answer the review findings
         if: ${{ !cancelled() && steps.claude.outputs.structured_output != '' }}
-        uses: ftes/ci/review-threads/answer@e53e22699f50c88157237931a10500d367cca47c # v1.0.13
+        uses: ftes/ci/review-threads/answer@41939eef91514e8ac6b33a1d6e7923edc42f4628 # v1.0.14
         with:
           pr: ${{ matrix.pr.number }}
           answers: ${{ steps.claude.outputs.structured_output }}
@@ -333,12 +333,12 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
       - name: Set up toolchain and deps
-        uses: ftes/ci/setup@e53e22699f50c88157237931a10500d367cca47c # v1.0.13
+        uses: ftes/ci/setup@41939eef91514e8ac6b33a1d6e7923edc42f4628 # v1.0.14
       - name: Fetch Playwright source
         run: mix fluffy.playwright_source
       - run: git switch -c "$NIGHTLY_BRANCH"
       - name: Run Claude
-        uses: ftes/ci/claude@e53e22699f50c88157237931a10500d367cca47c # v1.0.13
+        uses: ftes/ci/claude@41939eef91514e8ac6b33a1d6e7923edc42f4628 # v1.0.14
         with:
           token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
@@ -441,7 +441,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
       - name: Set up toolchain and deps
-        uses: ftes/ci/setup@e53e22699f50c88157237931a10500d367cca47c # v1.0.13
+        uses: ftes/ci/setup@41939eef91514e8ac6b33a1d6e7923edc42f4628 # v1.0.14
       - name: Fetch Playwright source
         run: mix fluffy.playwright_source
       - run: git switch -c "$NIGHTLY_BRANCH"
@@ -464,7 +464,7 @@ jobs:
           echo "area=$area" >> "$GITHUB_OUTPUT"
 
       - name: Run Claude
-        uses: ftes/ci/claude@e53e22699f50c88157237931a10500d367cca47c # v1.0.13
+        uses: ftes/ci/claude@41939eef91514e8ac6b33a1d6e7923edc42f4628 # v1.0.14
         with:
           token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
