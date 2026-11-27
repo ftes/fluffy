@@ -712,8 +712,8 @@ defmodule Fluffy do
   Playwright's `locator.allTextContents()`.
 
   As upstream, it doesn't wait for elements to match and returns `[]` if none do. It
-  takes no timeout. Wait first with an assertion, such as `Fluffy.Assert.count/3`,
-  or assert the texts with `Fluffy.Assert.text/3` and a list.
+  takes no timeout. Wait first with `assert(session, count(locator, 2))`, or check
+  the texts directly with `assert(session, text(locator, ["Fluffy", "Norbert"]))`.
   """
   @spec all_text_contents(Session.t(), Fluffy.Locator.t()) :: [String.t()]
   def all_text_contents(%Session{} = session, %Fluffy.Locator{} = locator),
@@ -773,7 +773,7 @@ defmodule Fluffy do
 
   As upstream, it doesn't wait for elements to match and returns `[]` if none do, and it
   is flaky on a list that is still changing: the elements can change between this call
-  and the use of a locator. Wait first, such as with `Fluffy.Assert.count/3`.
+  and the use of a locator. Wait first with an assertion such as `assert(session, count(locator, 2))`.
   """
   @spec all(Session.t(), Fluffy.Locator.t()) :: [Fluffy.Locator.t()]
   def all(%Session{} = session, %Fluffy.Locator{} = locator) do
@@ -809,8 +809,8 @@ defmodule Fluffy do
   @doc """
   Returns the active page's title, as Playwright's `page.title()`: the text of its
   `<title>`, with whitespace collapsed, or `""` without one. On LiveView it includes
-  `live_title` updates. To assert it, use `Fluffy.Assert.page_title/2`, which
-  retries. As in Playwright, it has no timeout.
+  `live_title` updates. This read takes no timeout. To wait for a title instead,
+  use `assert(session, page_title("Owlery"))`.
   """
   @spec title(Session.t(), []) :: String.t()
   def title(%Session{} = session, options \\ []) do
