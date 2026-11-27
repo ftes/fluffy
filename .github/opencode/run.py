@@ -24,6 +24,7 @@ DIFF_ARGS = (*TEXT_DIFF_ARGS, "--binary")
 READ_TOOLS = ("read", "glob", "grep")
 SAFE_ENV = ("PATH", "HOME", "USER", "LANG", "LC_ALL", "TMPDIR")
 PLAYWRIGHT_PILOT_BRANCH = "opencode/playwright-ex-pilot-"
+IMPROVEMENT_PILOT_BRANCH = "opencode/improvement-pilot-"
 PLAYWRIGHT_MEMBERS = "test/support/playwright_members.ex"
 PLAYWRIGHT_CLASSIFICATIONS = "test/support/playwright_classifications.json"
 PLAYWRIGHT_MANUAL_REVIEW = "PlaywrightEx update or inventory changes require unprivileged CI and manual review."

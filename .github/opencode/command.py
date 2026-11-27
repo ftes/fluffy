@@ -39,7 +39,7 @@ def authorize(event, event_name):
 
 def eligible(pr, default_branch):
     return (run.local_pr(pr) and pr["state"] == "open" and pr["head"]["ref"] != default_branch
-            and not pr["head"]["ref"].startswith(run.PLAYWRIGHT_PILOT_BRANCH))
+            and not pr["head"]["ref"].startswith((run.PLAYWRIGHT_PILOT_BRANCH, run.IMPROVEMENT_PILOT_BRANCH)))
 
 
 def target(event, event_name, default_branch, run_id):
