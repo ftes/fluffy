@@ -1,8 +1,9 @@
 # Installation and runtime
 
-For in-process Phoenix tests, add Fluffy and configure your endpoint. For browser
-tests, also [install a browser](#playwright-setup) and, if the app uses Ecto,
-[share the test transaction](#ecto-sandbox). Then run [your first test](usage.md#your-first-test).
+Add Fluffy and configure your Phoenix endpoint. If your tests use the
+[Ecto sandbox](#ecto-sandbox), start a sandbox owner for either backend.
+For browser tests, also [install a browser](#playwright-setup). Then run
+[your first test](usage.md#your-first-test).
 
 ## Elixir dependency
 
@@ -116,11 +117,20 @@ for headed runs and console output.
 
 ## Ecto sandbox
 
-Phoenix sessions use the test's sandbox connection: requests run in the test
-process and LiveViews have it in `$callers`. Browser requests arrive over HTTP,
-so Fluffy sends sandbox metadata that lets the endpoint and LiveViews use the
-same transaction. In `config/test.exs`, name the repositories and enable the
-test-only plug and hooks:
+Use your app's `ConnCase` or `DataCase` before `use Playwright.Test`. Keep its
+generated sandbox setup on both backends: start an owner per test and stop it
+in `on_exit`.
+
+```elixir
+def setup_sandbox(tags) do
+  pid = Ecto.Adapters.SQL.Sandbox.start_owner!(MyApp.Repo, shared: not tags[:async])
+  on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(pid) end)
+end
+```
+
+That's enough for Phoenix: requests run in the test process and LiveViews have
+it in `$callers`. **For browser tests**, the HTTP endpoint and LiveViews need
+the test's sandbox metadata. Enable the test-only plug and hooks in `config/test.exs`:
 
 ```elixir
 config :my_app, sql_sandbox: true
@@ -167,17 +177,6 @@ live_session :require_authenticated_user,
     if(Application.compile_env(:my_app, :sql_sandbox), do: [Fluffy.Sandbox], else: []) ++
       [{MyAppWeb.UserAuth, :ensure_authenticated}] do
   # routes
-end
-```
-
-The application owns the sandbox, as with `Phoenix.ConnTest`: keep the generated
-DataCase setup, which starts an owner for each test and stops it in `on_exit`, and use
-your `ConnCase` (or `DataCase`) before `use Playwright.Test`:
-
-```elixir
-def setup_sandbox(tags) do
-  pid = Ecto.Adapters.SQL.Sandbox.start_owner!(MyApp.Repo, shared: not tags[:async])
-  on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(pid) end)
 end
 ```
 
@@ -283,7 +282,9 @@ config :playwright, :test,
 
 With the tunnel, keep the endpoint-derived URL. Without it, set `base_url` to
 an address the browser can reach, such as `http://host.docker.internal:4002`,
-and allow that origin in the endpoint's `check_origin`. Both the initial
+bind the endpoint's HTTP listener to an interface reachable from the browser,
+and allow that origin in the endpoint's `check_origin`. A loopback-only listener
+won't accept connections from another host. Both the initial
 request carrying the sandbox header and the LiveView socket must reach the app.
 For a port supplied at runtime, configure the override in `config/runtime.exs`
 inside `if config_env() == :test`. See Playwright's
@@ -309,9 +310,15 @@ browser = Playwright.Test.BrowserPool.browser(headless: false, launch_options: [
 start_session(:playwright, browser: browser) |> visit("/creatures")
 ```
 
-The trace includes browser console messages and uncaught page errors. To log
+The trace includes browser console messages and uncaught page errors. To print
 console messages during the test, register a listener before the action:
-`on(session, Event.console(), &Logger.info(Playwright.ConsoleMessage.text(&1)))`.
+
+```elixir
+on(session, Fluffy.Event.console(), fn message ->
+  IO.puts(Playwright.ConsoleMessage.text(message))
+end)
+```
+
 See [Debugging](debugging.md) and Playwright's
 [debugging one test](`e:playwright:test-artifacts.md#debugging-one-test`).
 
@@ -335,10 +342,12 @@ that inherit the context's timeouts. Browser assertions default to five seconds.
 Without an action or navigation timeout the ExUnit test timeout bounds the
 wait (60 seconds by default).
 
-On Fluffy operations that accept `timeout:`, use `:once` to check immediately
-or `:infinity` for no operation deadline. The test deadline still applies.
-Playwright actions, waits and screenshot assertions reject `:once`. Fluffy
-rejects `timeout: 0`; `0` in Playwright configuration means no limit.
+Native assertions and event waits accept `timeout: :once` for an immediate check.
+Playwright actions, locator waits and screenshot assertions reject `:once`.
+Use `:infinity` for no operation deadline; the test deadline still applies.
+Native calls reject `timeout: 0`. In Playwright configuration `0` means no limit;
+[PhoenixTest facade assertions](migration-from-phoenix-test.md#what-stays-familiar-and-what-to-check)
+use it for an immediate check.
 
 The wait for a LiveView to connect shares the navigation timeout. Fluffy's
 document checks around a browser operation share its timeout but get at least
@@ -360,12 +369,15 @@ action's `max_bytes:` option.
 
 ## Usage rules for coding agents
 
-[`usage_rules`](https://hexdocs.pm/usage_rules) syncs rules only for direct
-dependencies. To include Playwright's rules with Fluffy's, add this dependency
-in `mix.exs` (Fluffy's requirement selects the version):
+Add [`usage_rules`](https://hexdocs.pm/usage_rules) to your dev dependencies.
+It syncs only direct dependencies, so also list Playwright to include its rules
+with Fluffy's (Fluffy's requirement selects the Playwright version):
 
 ```elixir
-{:playwright, ">= 0.0.0", hex: :playwright_ex, only: [:dev, :test]}
+[
+  {:usage_rules, "~> 1.3", only: :dev, runtime: false},
+  {:playwright, ">= 0.0.0", hex: :playwright_ex, only: [:dev, :test]}
+]
 ```
 
 Keep `hex: :playwright_ex`: `playwright` on Hex is another library.
@@ -391,4 +403,4 @@ usage_rules: [
 ]
 ```
 
-Run `mix usage_rules.sync` after adding or upgrading the dependencies.
+Run `mix deps.get`, then `mix usage_rules.sync` after adding or upgrading the dependencies.

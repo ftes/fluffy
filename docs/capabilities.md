@@ -296,8 +296,9 @@ values and no `_unused_` params, so every field reads as used. Use Playwright
 when a test depends on `used_input?` or on local text the server has not
 rendered at the time files are selected.
 
-Native picker UI, external uploaders, directories, drag-and-drop, and arbitrary
-`FileList` mutation are unsupported. `Fluffy.Event.file_chooser/1` requires Playwright
+Native picker UI, external uploaders, directories and arbitrary `FileList`
+mutation are unsupported. To test a file drop handler on Playwright, use
+`Fluffy.Playwright.drop/4`. `Fluffy.Event.file_chooser/1` requires Playwright
 because application JavaScript opens the chooser.
 
 ### Native escape hatch

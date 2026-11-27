@@ -5,12 +5,13 @@ with it through locators. The same test can run in-process or in a browser.
 
 ## Your first test
 
-Keep the `use` lines in this order: your `ConnCase` (or `ExUnit.Case`),
-`Playwright.Test` to register the test, and `Fluffy.Assert` for assertions.
+Use your `ConnCase` or `DataCase` to start the [Ecto sandbox owner](installation.md#ecto-sandbox)
+before `Playwright.Test` registers the test. Without a sandbox, `ExUnit.Case`
+also works. Put `Fluffy.Assert` last.
 
 ```elixir
 defmodule MyAppWeb.CreatureTest do
-  use ExUnit.Case, async: true
+  use MyAppWeb.ConnCase, async: true
   use Playwright.Test
   use Fluffy.Assert
 
@@ -164,7 +165,7 @@ prepared conn's test session goes with the first request.
 ## Accessibility testing
 
 Follow PlaywrightEx's
-[Accessibility testing](https://hexdocs.pm/playwright_ex/testing-with-exunit.html#accessibility-testing)
+[Accessibility testing](https://hexdocs.pm/playwright_ex/1.65.0-rc.6/testing-with-exunit.html#accessibility-testing)
 recipe on a Playwright session, with `Fluffy.Playwright.add_script_tag/2` and
 `Fluffy.Playwright.evaluate/2` in place of its `Page` calls:
 

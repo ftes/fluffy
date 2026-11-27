@@ -49,7 +49,7 @@ ARIA snapshot. To replay the actions, run
 every page of every session in the test. Steps nest and link to source on all
 drivers; a Phoenix-only trace contains steps but no browser pages. To keep
 traces only for failures, configure `trace: :retain_on_failure`
-([Playwright setup](installation.md#playwright-setup)).
+([CI](installation.md#ci)).
 
 ### Inspect the current page
 
@@ -121,9 +121,8 @@ the same navigation handling. `Fluffy.Playwright.unwrap_and_return/3` returns th
 callback's result instead:
 
 ```elixir
-session
-|> Fluffy.Playwright.unwrap(button("Rename"), &Playwright.Locator.dblclick!/1)
-|> assert_has(by_label("Name"))
+html = Fluffy.Playwright.unwrap_and_return(session, by_css("#prophecy"), &Playwright.Locator.inner_html!/1)
+assert html =~ "<em>Lumos</em>"
 ```
 
 A `Fluffy.Download` and `Fluffy.FileChooser` keep their Playwright counterpart private;

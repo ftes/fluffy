@@ -39,7 +39,8 @@ row**; `by_css("tr") |> by_css("td") |> nth(2)` picks one cell overall.
 ### Matching names and state
 
 Text, labels, and role names match normalized substrings by default; pass
-`exact: true` for the whole string. An explicit role overrides the implicit one
+`exact: true` for the whole string. A valid explicit role usually overrides the
+implicit one; a focusable button with `role="none"` still matches a button
 (see `Fluffy.Locator.by_role/2`). For names, `aria-labelledby` takes precedence
 over `aria-label`, then native labels and captions, then content where the role
 allows it, then `title`. A dialog, landmark, list, or list item does not take

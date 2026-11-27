@@ -14,13 +14,15 @@ session
 ```
 
 Ordinary ExUnit assertions still work, including pattern bindings and custom messages.
-Assertions appear in the test trace unless `assert_steps: false` is set.
+`assert_steps: false` disables ExUnit assertion steps in the trace; Playwright
+still records its native matcher calls.
 
 ## Options and negation
 
-Pass options on the assertion, for example `assert_has(by_text("Ready"), timeout: 1_000)`.
-Execution options override options on the constructor. `refute` waits until the negative
-condition holds; it doesn't require that condition to hold for the whole timeout or
+Pass options on the assertion, for example `session |> assert_has(by_text("Ready"), timeout: 1_000)`.
+Execution options override options on the constructor. On LiveView and Playwright,
+`refute` waits until the negative condition holds; Static checks once. Refutation
+doesn't require that condition to hold for the whole timeout or
 turn a driver error into success. For events, use [assert_event](advanced-events.md#pipeline-expectations).
 
 ## Text, attributes, and state
@@ -48,8 +50,9 @@ has already lost whitespace-only nodes (on LiveView, `<b>a</b> <i>b</i>` reads
 For example, `assert(session, values(by_label("Potions"), ["polyjuice", ~r/^felix-/]))`.
 
 `hidden` passes when nothing matches, as does `refute_has(locator)`.
-Negating `text`, `contain_text`, `attribute`, `class`,
-`contain_class`, `id`, or `empty` still fails when nothing matches.
+Negating a single-target text, attribute, class, ID or empty check still fails
+if the element is missing. A list assertion compares the matches as a collection:
+if you refute a nonempty list of texts, an empty collection passes.
 
 On Static and LiveView, attribute names match exactly. `empty` can differ from a
 browser for checkbox, radio, range or color inputs and script-only elements.
@@ -70,8 +73,9 @@ session |> refute_has(by_css("#notice"))
 session |> assert(count(by_css("#notice"), 0))
 ```
 
-If the element must **stay in the DOM but be invisible**, assert `attached` first,
-then `refute_has`. Use CSS for presence checks: role locators can exclude hidden
+To require an element that is **both present and invisible**, use
+`assert(session, count(by_css("#notice") |> filter(visible: false), 1))`.
+Use CSS for presence checks: role locators can exclude hidden
 elements, including those marked `aria-hidden="true"`. That attribute alone does
 not hide the element visually.
 
@@ -104,7 +108,7 @@ and a function gets the URL as a `%URI{}`, as Playwright passes a `URL`:
 
 ```elixir
 session
-|> assert(page_url("/potions"))
+|> assert(page_url("/potions?state=brewing"))
 |> assert(page_url(~r{/potions\?state=brewing}))
 |> assert(page_url(&(URI.decode_query(&1.query || "")["state"] == "brewing")))
 ```
@@ -146,11 +150,11 @@ session
 
 Prefer a locator or page assertion for UI state. For anything else, choose what to retry:
 
-- `assert(poll(read, check))` reads a value and retries when the check raises. If the
+- `session |> assert(poll(read, check))` reads a value and retries when the check raises. If the
   read raises, the test fails immediately. Compare JavaScript values explicitly:
   `:null`, `:nan`, `0` and `""` are truthy in Elixir. Use `Fluffy.Playwright.wait_for_function/3`
   for a condition that should run in JavaScript.
-- `assert(pass(fun))` retries the whole block when it raises. `refute(pass(fun))`
+- `session |> assert(pass(fun))` retries the whole block when it raises. `session |> refute(pass(fun))`
   retries until the block raises. To negate a poll, use `refute` inside its check.
 
 ```elixir

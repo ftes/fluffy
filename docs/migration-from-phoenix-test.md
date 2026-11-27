@@ -100,19 +100,20 @@ When rewriting, preserve the original assertion's intent:
     in a pipeline becomes `unwrap(&Playwright.Page.evaluate!(&1, js, arg))` (`Fluffy.unwrap/2`,
     or on the facade `Fluffy.PhoenixTest.unwrap/2`);
   - `click(selector)` and `press`: `Fluffy.click/3` and `Fluffy.press/4`; `click`'s text
-    argument becomes `filter(has: by_text(text))`, or `by_text(text)` chained under the
+    argument becomes `filter(has: by_text(text) |> filter(visible: true))`, or `by_text(text)` chained under the
     selector before PhoenixTest.Playwright 0.16, which clicked the text itself;
   - `type`: `Fluffy.Playwright.press_sequentially/4`;
   - `drag`: `Fluffy.Playwright.drag_to/4`;
   - `add_cookies` and `clear_cookies`: `Fluffy.add_cookies/2` and `Fluffy.clear_cookies/2`;
-    cookies are maps that need a `url:` (such as `Fluffy.base_url/1`), with `expires:`
-    instead of `max_age:`;
+    give each cookie a `url:` (such as `Fluffy.base_url(session)`) or both `domain:`
+    and `path:`. Convert relative `max_age:` seconds to an absolute Unix timestamp
+    in seconds for `expires:`;
   - `add_session_cookie`: same name, other arguments. `add_session_cookie(conn, [value: values], options)`
     becomes `Fluffy.add_session_cookie(session, values)`, with the options from the endpoint's
     `session_options/0` ([Logging in](usage.md#logging-in)). On the facade, pipe it in, as
     `start_session(:playwright) |> Fluffy.add_session_cookie(values) |> visit("/")`;
   - `screenshot`: `Fluffy.Playwright.screenshot/2` (with `path:` and
-    `full_page: true` for the old default; it returns the PNG);
+    `full_page: true` for the old default; it returns the image bytes);
   - `assert_screenshot`: `|> assert(page_match_screenshot(name: "owlery.png"))`;
   - `with_dialog`: see [Listeners and dialogs](advanced-events.md#listeners-and-dialogs);
   - `assert_download`: wait for `Fluffy.Event.download/1`, then `Fluffy.Download.read/2` or

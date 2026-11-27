@@ -28,8 +28,9 @@ session
 ```
 
 Omit the final callback if the event alone is enough. Options such as `timeout:`
-can follow either callback. Both callbacks run once in the caller; their return
-values are ignored. The pipeline keeps its page selection, even if the action
+can follow either callback. The action runs once in the caller. If the action
+succeeds and the event matches, the assertion callback runs once there too.
+Return values are ignored. The pipeline keeps its page selection, even if the action
 switches pages. Callback failures propagate and the registration is released.
 
 ## Capture an event value
@@ -209,7 +210,10 @@ session
 |> assert_event(
   Event.response(&String.ends_with?(Response.url(&1), "/api/prophet")),
   &click(&1, button("Refresh")),
-  fn response -> assert Response.status(response) == 200 end,
+  fn response ->
+    assert Response.status(response) == 200
+    assert Response.json!(response)["title"] == "Evening Edition"
+  end,
   scope: :context
 )
 ```
@@ -221,22 +225,13 @@ and request-finished events accept `scope:`.
 
 Requests signal issuance; responses signal status and headers, without waiting for
 the response body. The values are a `Playwright.Request` and a `Playwright.Response`;
-read them with Playwright's functions, which have no timeout. A
-body is read from the browser, which waits for the response to end:
-
-```elixir
-assert Response.ok(response)
-assert Response.json!(response) == %{"saved" => true}
-```
+read them with Playwright's functions. Reading the body with `Response.json!/1`
+waits for the response to end and takes no timeout.
 
 `Event.request_failed()` and `Event.request_finished()` resolve with the request
 once it fails or its response body has downloaded. An HTTP error status is a
-finished request, not a failed one. Read the reason with
-`Playwright.Request.failure/1`:
-
-```elixir
-%{errorText: reason} = Playwright.Request.failure(request)
-```
+finished request, not a failed one. In a request-failed event callback,
+`Playwright.Request.failure/1` gives the failure reason as `%{errorText: reason}`.
 
 ## Console, page errors, and page lifecycle
 

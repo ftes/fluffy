@@ -680,9 +680,9 @@ defmodule Fluffy.Playwright do
   is not checked for strictness until the callback uses it. The callback's
   return value is ignored, and a document it navigates is adopted.
 
-      session
-      |> Fluffy.Playwright.unwrap(button("Edit"), &Playwright.Locator.dblclick!/1)
-      |> assert_has(by_label("Title"))
+  For example, highlight the target while debugging a headed test:
+
+      session |> Fluffy.Playwright.unwrap(button("Edit"), &Playwright.Locator.highlight!/1)
 
   Prefer Playwright bang functions inside the callback when failure should
   stop the test. Phoenix sessions raise `Fluffy.CapabilityError`.
@@ -700,7 +700,7 @@ defmodule Fluffy.Playwright do
 
   Like `unwrap/3`, including the reconcile after the callback, but for reads:
 
-      text = Fluffy.Playwright.unwrap_and_return(session, by_css("#status"), &Playwright.Locator.text_content!/1)
+      html = Fluffy.Playwright.unwrap_and_return(session, by_css("#prophecy"), &Playwright.Locator.inner_html!/1)
 
   Phoenix sessions raise `Fluffy.CapabilityError`.
   """

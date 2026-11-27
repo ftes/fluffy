@@ -16,24 +16,20 @@ matched once can now match twice.
   not `cli.js`; usually drop it and let Playwright install the driver.
 - Replace the CI browser install too: use `mix playwright.install chromium --with-deps`
   on Linux runners. For Microsoft's Playwright image or a system browser, follow
-  [Playwright setup](installation.md#playwright-setup).
+  [Troubleshooting](installation.md#troubleshooting).
 - Prefer `only: [:dev, :test]` to `only: :test`, so Playwright's Mix tasks and
   `mix usage_rules.sync` work in `:dev`, and widen the `lazy_html` line `phx.new`
   generates to match. List Playwright too for its usage rules; see
-  [Elixir dependency](installation.md#elixir-dependency).
+  [Usage rules for coding agents](installation.md#usage-rules-for-coding-agents).
 
-  ```diff
-  -    {:lazy_html, ">= 0.1.0", only: :test},
-  -    {:fluffy, "~> 0.8.0", only: :test}
-  +    {:lazy_html, ">= 0.1.0", only: [:dev, :test]},
-  +    {:fluffy, "~> 0.9.0", only: [:dev, :test]}
-  ```
+  Use the [current Fluffy dependency entry](installation.md#elixir-dependency)
+  in place of the 0.8 requirement.
 - Fluffy requires Phoenix 1.7.10 or later and LiveView 1.1.32 or later; LiveView 1.0 is no
   longer supported. Upgrade them first, raising your requirements where they hold an
   older version back.
 - PlaywrightEx is renamed `Playwright` (app `:playwright`, modules `Playwright.*`; the Hex
   package stays `playwright_ex`). If you list it, replace `{:playwright_ex, ...}` with the
-  line from [Elixir dependency](installation.md#elixir-dependency), where `hex: :playwright_ex`
+  line from [Usage rules for coding agents](installation.md#usage-rules-for-coding-agents), where `hex: :playwright_ex`
   is required, rename `config :playwright_ex` to `config :playwright`, and run
   `mix deps.unlock --unused`. `alias Fluffy.Playwright` now shadows `Playwright.*`, so
   don't alias it where you call the dependency, such as in `@tag Playwright.Test.use(...)`.
@@ -42,7 +38,7 @@ matched once can now match twice.
   longer part of accessible names.
 - Browser console messages are no longer logged, as in Playwright, and `js_logger:`,
   custom loggers and `Fluffy.Playwright.ConsoleLogger` are gone. To log them, register
-  a listener: `on(session, Event.console(), &Logger.info(Playwright.ConsoleMessage.text(&1)))`.
+  a [console listener](installation.md#troubleshooting).
 - Browser sessions use Playwright's `en-US` locale instead of `en`, and Phoenix sessions,
   which sent no Accept-Language before, now send the test's `locale` (`en-US` by default)
   unless a `conn:` sets its own. An app that picks its language from the request can render
@@ -59,8 +55,8 @@ matched once can now match twice.
 - Browser launch gets Playwright's 3-minute default instead of `timeout:`. A
   `launch_options: [timeout: ...]` that raised the limit on 0.8 now shortens it and can
   fail a loaded machine with `browserType.launch: Timeout ... exceeded`, so drop it.
-- Move browser settings from `config :fluffy, :playwright` to `config :playwright, :test`
-  (`browser_name:`, `launch_options:`). Set a custom CLI with `config :playwright, :driver,
+- Move browser settings from `config :fluffy, :playwright` to `config :playwright, :test`.
+  Rename `engine:` to `browser_name:` and keep `launch_options:`. Set a custom CLI with `config :playwright, :driver,
   executable: ...` in `config/config.exs`. Drop `pool_size`: each test gets its browser
   from `Playwright.Test.BrowserPool.browser/1`, up to [`workers`](`e:playwright:test-artifacts.md#workers`) at once.
 - `browser_context:`, `launch_options:` and the options of `storage_state` and cookies
@@ -120,7 +116,8 @@ matched once can now match twice.
 - Replace `Fluffy.Playwright.trace/2`, `artifact_dir` and `trace_dir` with Playwright Test's
   artifact settings. For the suite, use `config :playwright, :test, trace: :retain_on_failure,
   screenshot: :only_on_failure`. For a module, use `use Playwright.Test, trace: :on`;
-  for a describe or test, use `@describetag` or `@tag Playwright.Test.use(trace: :on)`.
+  for a describe use `@describetag Playwright.Test.use(trace: :on)`, and for a test
+  use `@tag Playwright.Test.use(trace: :on)`.
   `screenshot:` and `video:` work the same way. Artifacts go to `test-results/<test>/`;
   failed operations no longer write HTML or error text.
 - Fluffy no longer starts or adopts Ecto sandbox owners: keep the generated DataCase

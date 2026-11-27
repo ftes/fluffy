@@ -164,9 +164,9 @@ each. `title` reads the page's `<title>` and `content` its HTML
 The browser's rendered text, `Fluffy.Playwright.inner_text/3` and `all_inner_texts/2`,
 requires Playwright.
 
-A read waits for its target to attach, as an action does, then reads the value once; it
-doesn't wait for the value to change. To check a value, use an assertion, which retries
-until it passes: `assert(text(by_role(:status), "Creature saved"))` rather than comparing what
+A single-target read waits for attachment on LiveView and Playwright; Static
+checks once. It doesn't wait for the value to change. To check a value, use
+`assert(session, text(by_role(:status), "Creature saved"))` rather than comparing what
 `text_content` returned right after an action. To wait for an element before acting,
 without asserting, use `Fluffy.wait_for/3` with a locator and `state:`.
 
