@@ -18,7 +18,7 @@ LOCKFILES = ("mix.lock", "mix.lock.oldest", "integration/consumer/mix.lock")
 HEX_LOCK = r'^  "playwright": \{:hex, :playwright_ex, "([^"]+)"'
 GIT_LOCK = r'^  "playwright": \{:git, "[^"]+", "([0-9a-f]{40})"'
 VERSION = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?")
-INVENTORY = "test/support/playwright_members.ex"
+INVENTORY = run.PLAYWRIGHT_MEMBERS
 DEPENDENCY = r'^[ \t]*\{:playwright, "~> ([^"]+)", hex: :playwright_ex\},?$'
 GIT_DEPENDENCY = r'^[ \t]*\{:playwright, github: "ftes/playwright_ex"[^}\n]*\},?$'
 UPDATE_FILES = (
@@ -132,17 +132,17 @@ def blob(revision, path):
     return run.git("show", f"{revision}:{path}", raw=True).decode()
 
 
-def changed_files(parent, revision):
+def changed_files(parent, revision, *, allowed=UPDATE_FILES):
     paths = os.fsdecode(run.git("diff", "--name-only", "-z", "--no-renames", parent, revision, raw=True))
     names = paths.split("\0")[:-1]
-    run.check(set(names) <= set(UPDATE_FILES), "Unexpected changed paths in the update")
+    run.check(set(names) <= set(allowed), "Unexpected changed paths in the update")
     return {name: blob(revision, name) for name in names}
 
 
-def checked_files(data, release):
+def checked_files(data, release, *, allowed=UPDATE_FILES):
     files = data["files"]
     run.check(type(files) is dict and set(LOCKFILES + ("mix.exs", "CHANGELOG.md")) <= files.keys()
-              and files.keys() <= set(UPDATE_FILES),
+              and files.keys() <= set(allowed),
               "Unexpected update paths or missing required files")
     run.check(all(type(value) is str and "\0" not in value for value in files.values()),
               "Update files must be text")
@@ -196,6 +196,10 @@ def update_files(previous, release):
     config, matches = re.subn(pattern, f'      {{:playwright, "~> {release}", hex: :playwright_ex}},', config, flags=re.M)
     run.check(matches == 1, "Cannot replace the PlaywrightEx dependency")
     exists.write_text(config)
+    update_release_notes(previous, release)
+
+
+def update_release_notes(previous, release):
     for name in ("docs/installation.md", "usage-rules.md"):
         path = Path(name)
         original = path.read_text()

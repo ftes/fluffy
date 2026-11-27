@@ -1,4 +1,7 @@
 import contextlib
+import io
+import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -43,6 +46,7 @@ class GateTest(unittest.TestCase):
                 result = command.target(data | {"sender": MEMBER}, event_name, "main", "99")
                 self.assertEqual(result["branch"], BRANCH if is_pr else "opencode/issue-32-99")
                 self.assertEqual(result.get("pr"), "true" if is_pr else None)
+                self.assertEqual(result.get("head"), HEAD if is_pr else None)
 
     def test_deny_outsiders_and_bots(self):
         for denied in (request(association="NONE"), request(author=MEMBER | {"type": "Bot"})):
@@ -68,7 +72,8 @@ class GateTest(unittest.TestCase):
 
     def test_fork_notice_and_protected_targets(self):
         event = {"sender": MEMBER, "comment": request(), "issue": {"number": 32, "pull_request": {"url": "pulls/32"}}}
-        cases = (pr(repo="fork/fluffy"), pr(branch="renovate/update"), pr(branch="main"), pr(state="closed"))
+        cases = (pr(repo="fork/fluffy"), pr(branch="renovate/update"), pr(branch="main"), pr(state="closed"),
+                 pr(branch=f"{run.PLAYWRIGHT_PILOT_BRANCH}1.65.0"))
         for candidate in cases:
             with patch.object(run, "api", side_effect=[{"permission": "admin"}, candidate]):
                 expected = {"fork": "true", "number": 32} if candidate["head"]["repo"]["full_name"] != REPO else {}
@@ -76,6 +81,27 @@ class GateTest(unittest.TestCase):
         inline = {"sender": MEMBER, "comment": request(), "pull_request": {"number": 32}}
         with patch.object(run, "api", side_effect=[{"permission": "admin"}, cases[0]]):
             self.assertEqual(command.target(inline, "pull_request_review_comment", "main", "99"), {})
+
+    def test_gate_only_passes_the_exact_approved_head_and_trusted_commit(self):
+        event = {"sender": MEMBER, "comment": request(),
+                 "issue": {"number": 32, "pull_request": {"url": "pulls/32"}}}
+        base = "b" * 40
+        with tempfile.TemporaryDirectory() as directory:
+            event_path = Path(directory) / "event.json"
+            event_path.write_text(json.dumps(event))
+            output = Path(directory) / "output"
+            with patch.dict(os.environ, GITHUB_EVENT_PATH=str(event_path), GITHUB_OUTPUT=str(output),
+                            GITHUB_EVENT_NAME="issue_comment", DEFAULT_BRANCH="main", GITHUB_RUN_ID="99"):
+                for allowed in (False, True):
+                    with (patch.object(run, "api", side_effect=[{"permission": "admin"}, pr()]),
+                          patch.object(run, "git", return_value=base),
+                          patch.object(run, "privileged_setup_allowed", return_value=allowed) as guard,
+                          contextlib.redirect_stdout(io.StringIO())):
+                        command.main("gate")
+                    guard.assert_called_once_with(base, HEAD, BRANCH)
+                    actual = dict(line.split("=", 1) for line in output.read_text().splitlines())
+                    self.assertEqual(actual, {"run": "true", "pr": "true", "number": "32", "branch": BRANCH,
+                                              "head": HEAD, "trusted": base} if allowed else {})
 
 
 class PublishTest(unittest.TestCase):

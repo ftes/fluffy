@@ -15,6 +15,8 @@ defmodule Fluffy.Support.PlaywrightMembers do
   alias Fluffy.Playwright.Keyboard
   alias Fluffy.Playwright.Mouse
 
+  @classifications_path Path.join(__DIR__, "playwright_classifications.json")
+
   @legacy {:na, "selector-string duplicate of a Locator member"}
   @discouraged {:na, "deprecated or discouraged upstream"}
   @tooling {:na, "debugging or authoring tool"}
@@ -68,7 +70,9 @@ defmodule Fluffy.Support.PlaywrightMembers do
   def counterparts(_module), do: []
 
   @doc "Facade modules and their members, `[{[fun], classification}]`."
-  def members do
+  def members, do: apply_classifications(member_table(), "members")
+
+  defp member_table do
     %{
       Playwright.Locator =>
         [
@@ -231,7 +235,9 @@ defmodule Fluffy.Support.PlaywrightMembers do
   end
 
   @doc "Facade modules with events (`@type event`) and their events, `[{[event], classification}]`."
-  def events do
+  def events, do: apply_classifications(event_table(), "events")
+
+  defp event_table do
     %{
       Playwright.Page => [
         {~w(close console crash dialog dom_content_loaded download file_chooser frame_attached frame_detached
@@ -247,6 +253,37 @@ defmodule Fluffy.Support.PlaywrightMembers do
       ]
     }
   end
+
+  # The pilot supplies names and classification data. Keep executable inventory logic here.
+  defp apply_classifications(table, kind) do
+    overrides = @classifications_path |> File.read!() |> Jason.decode!() |> Map.get(kind, %{})
+
+    Enum.reduce(overrides, table, fn {module, changes}, table ->
+      module = Module.concat([module])
+      changes = Map.new(changes, fn {name, classification} -> {String.to_atom(name), classification} end)
+
+      groups =
+        for {names, classification} <- Map.get(table, module, []),
+            remaining = Enum.reject(names, &Map.has_key?(changes, &1)),
+            remaining != [],
+            do: {remaining, classification}
+
+      additions =
+        for {name, classification} <- Enum.sort(changes), classification != nil do
+          {[name], data_classification(classification)}
+        end
+
+      case groups ++ additions do
+        [] -> Map.delete(table, module)
+        groups -> Map.put(table, module, groups)
+      end
+    end)
+  end
+
+  defp data_classification(["wrapped"]), do: :wrapped
+  defp data_classification(["unwrap", reason]), do: {:unwrap, reason}
+  defp data_classification(["denied", reason]), do: {:denied, reason}
+  defp data_classification(["na", reason]), do: {:na, reason}
 
   @doc """
   Wrapped members whose upstream call takes `timeout:` but whose options Fluffy does not
