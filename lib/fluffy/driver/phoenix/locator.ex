@@ -248,7 +248,8 @@ defmodule Fluffy.Driver.Phoenix.Locator do
     |> Enum.map(fn {_node, element} -> element end)
   end
 
-  defp scoped_nodes(scopes, aria) do
+  @doc false
+  def scoped_nodes(scopes, aria) do
     scopes
     |> Enum.flat_map(&Aria.scoped_nodes(aria, &1))
     |> Enum.uniq_by(fn {node, _element} -> node.id end)
@@ -296,15 +297,16 @@ defmodule Fluffy.Driver.Phoenix.Locator do
   # `filter/2`'s `has_text:` is a case-insensitive substring or a regex, as in Playwright.
   defp contains_text?(actual, expected), do: text_matches?(actual, expected, false)
 
-  defp text_matches?(nil, _expected, _exact?), do: false
+  @doc false
+  def text_matches?(nil, _expected, _exact?), do: false
 
   # As upstream, a regular expression ignores `exact?` and sees the text as is.
-  defp text_matches?(actual, %Regex{} = expected, _exact?), do: Regex.match?(expected, actual)
+  def text_matches?(actual, %Regex{} = expected, _exact?), do: Regex.match?(expected, actual)
 
-  defp text_matches?(actual, expected, true),
+  def text_matches?(actual, expected, true),
     do: StringUtils.normalize_white_space(actual) == StringUtils.normalize_white_space(expected)
 
-  defp text_matches?(actual, expected, false) do
+  def text_matches?(actual, expected, false) do
     actual
     |> StringUtils.normalize_white_space()
     |> String.downcase()

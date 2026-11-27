@@ -20,6 +20,8 @@ driver, locator (or file chooser), and underlying `cause`:
   matching candidates or structural reason; `Fluffy.LiveViewError` means the
   view exited. LiveView reports the final failure after its retries. If an action
   finds no match for a named role, check the other accessible names in its scope.
+  For `by_label`, look for other labels in scope or a matching `<label>` with
+  no associated control.
 - If a click found its target but the navigation failed, the navigation error
   has `locator: nil`, just as for `visit` or `reload`. Fluffy supplies a reason
   for failures it detects, such as too many redirects or a view that never connected.
