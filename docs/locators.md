@@ -27,10 +27,12 @@ CSS must be valid browser CSS, including escapes for special characters in IDs.
 
 ### Combining locators
 
-`filter(has: ...)` keeps each row containing a matching descendant. To match two
-descriptions of the **same element**, use `Fluffy.Locator.and_/2`. For alternatives,
-use `button("Accio") |> or_(link("Accio"))`. Single-target actions and visibility
-assertions fail if both match; use `assert(count(locator, n))` to check a collection.
+Use `filter(has: ...)` when the target contains something else: it keeps each element,
+such as a row, that has a matching descendant. Use `Fluffy.Locator.and_/2` when two
+descriptions must both match the **same element**, not one inside the other. For
+alternatives, use `button("Accio") |> or_(link("Accio"))`. Single-target actions and
+visibility assertions fail if both match; use `assert(count(locator, n))` to check a
+collection.
 
 Use `first`, `last`, or zero-based `nth` when position matters.
 `by_css("td") |> nth(2) |> within(by_css("tr"))` picks the third cell **in each
