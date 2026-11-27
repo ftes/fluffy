@@ -25,33 +25,22 @@ turn a driver error into success. For events, use [assert_event](advanced-events
 
 ## Text, attributes, and state
 
-`Fluffy.Assert` asserts text, attributes, classes, ids, and states the same way
-on every driver:
+To check the creature roster, assert on the list items themselves. A list of
+expected texts checks every match in document order:
 
 ```elixir
+roster = by_role(:list, "Creatures")
+
 session
-|> assert(text(by_role(:heading), "Creature saved"))
-|> assert(contain_text(by_role(:alert), ~r/\d+ spells/))
-|> assert(text(by_css("li"), ["Fluffy", "Norbert"]))
-|> assert(attribute(link("Docs"), "href", "/docs"))
-|> assert(class(by_css("#card"), "card selected"))
-|> assert(contain_class(by_css("#card"), "selected"))
-|> assert(id(by_label("Name"), "name"))
-|> assert(attached(by_css("#card")))
-|> assert(hidden(by_text("Saving")))
-|> assert(empty(by_label("Notes")))
+|> assert(text(by_role(roster, :listitem), ["Fluffy", "Norbert"]))
+|> assert(attribute(link("Creature care"), "href", "/creatures/care"))
 ```
 
-A string compares normalized whitespace in the text; a regular expression sees
-it as is. LiveView text can differ in whitespace-only nodes between elements:
-`<b>a</b> <i>b</i>` reads "ab" there. A regular expression is a JavaScript
-`RegExp` on every driver, as in [Locators](locators.md): PCRE-only syntax raises
-`ArgumentError`, and a `Playwright.RegExp` takes JavaScript-only syntax.
-`ignore_case:` takes precedence over a regular expression's own flag.
-A list checks each matched element in order, while any other form requires
-exactly one match. `use_inner_text: true` reads rendered text and requires
-Playwright, so `text` and `contain_text` raise
-`Fluffy.CapabilityError` on Static and LiveView when given it.
+A single expected text requires exactly one element. Strings normalize whitespace;
+a [regular expression](locators.md#locators) sees the raw text, unless the driver
+has already lost whitespace-only nodes (on LiveView, `<b>a</b> <i>b</i>` reads
+`"ab"`). `ignore_case:` overrides the regex flag. For rendered text, use
+`use_inner_text: true` on Playwright.
 
 `value` and `values` accept strings and regular expressions (`~r/…/` or
 `Playwright.RegExp`) and compare the raw control values. On a multi-select,
@@ -62,31 +51,13 @@ For example, `assert(session, values(by_label("Potions"), ["polyjuice", ~r/^feli
 Negating `text`, `contain_text`, `attribute`, `class`,
 `contain_class`, `id`, or `empty` still fails when nothing matches.
 
-Known limits: on Static and LiveView, `empty` can differ from a browser for
-a checkbox, radio, range or color input and a script-only element, and attribute
-names match exactly; on Playwright, `submit` can return early when a submit handler
-that does not cancel changes the URL in the document (`pushState`, `replaceState`,
-`location.hash`), so use a retrying `assert` afterwards.
+On Static and LiveView, attribute names match exactly. `empty` can differ from a
+browser for checkbox, radio, range or color inputs and script-only elements.
 
 ## Visibility and DOM presence
 
-Even the `:phoenix` backend checks **structural visibility**, rather than just
-DOM presence. Its Static and LiveView drivers treat what markup alone keeps from
-rendering as invisible: a `hidden` attribute on the element or an ancestor, an
-`<input type="hidden">`, elements a browser never displays such as `<script>`,
-`<style>`, `<template>` or `<datalist>`, fallback content such as a
-`<video>`'s children, and the options of a closed dropdown `<select>`, which have no box
-in a browser ([Selects and options](actions.md#selects-and-options)).
-`aria-hidden="true"` does not count, as in Playwright: it only keeps an element out of
-`by_role`.
-
-Phoenix does not compute CSS or browser layout: a CSS class or inline
-`display: none` alone does not make an element structurally invisible. Use
-`:playwright` to test rendered visibility. Open state is not modeled either:
-see [Boundaries](capabilities.md#boundaries) for `<details>`, `<dialog>` and
-`popover`.
-
-Choose the assertion that expresses the intended behavior:
+After dismissing a notice, do you care that the user can't see it, or that
+the app removed the element? Choose the assertion accordingly:
 
 ```elixir
 # Require a visible element.
@@ -99,10 +70,16 @@ session |> refute_has(by_css("#notice"))
 session |> assert(count(by_css("#notice"), 0))
 ```
 
-To require an element to remain in the DOM but be invisible, assert
-`count(by_css("#notice"), 1)` before refuting its visibility. Use a CSS locator
-for these presence checks; role locators can exclude structurally hidden
-elements before the assertion runs.
+If the element must **stay in the DOM but be invisible**, assert `attached` first,
+then `refute_has`. Use CSS for presence checks: role locators can exclude hidden
+elements, including those marked `aria-hidden="true"`. That attribute alone does
+not hide the element visually.
+
+Phoenix checks **structural visibility**: a `hidden` ancestor, a hidden input,
+non-rendered elements such as `<script>`, media fallback content and
+[closed dropdown options](actions.md#selects-and-options) are invisible. CSS alone
+(`display: none`, for example) doesn't count. Use Playwright for rendered visibility
+and [open or closed dialogs and details](capabilities.md#when-to-choose-playwright).
 
 ## Page assertions
 

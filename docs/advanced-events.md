@@ -1,39 +1,18 @@
 # Advanced events and pages
 
-Register before the triggering action, then await an ordinary value:
+Use `assert_event` to check what an action triggered. Use `wait_for` and `await`
+when you need the value afterwards, for example to switch to a popup. With the
+setup from [Your first test](usage.md#your-first-test), add:
 
 ```elixir
-use Fluffy.Assert
-import Fluffy
-import Fluffy.Locator
-import Fluffy.Locator.Roles
 import Fluffy.Playwright
-alias Fluffy.{Dialog, Download, Event, FileChooser, Frame, Page, Request, Response}
-alias Playwright.Route
-
-pending = wait_for(session, Event.download())
-click(session, button("Download the Marauder's Map"))
-download = await(pending)
-assert download.suggested_filename == "marauders_map.csv"
-assert Download.read(download) =~ "student,house"
+alias Fluffy.{Download, Event, FileChooser}
 ```
-
-Each wait has an independent source, predicate, and deadline. The deadline starts
-at registration, as Playwright's `waitForEvent`, unless `timeout:` is supplied: a browser's
-action timeout, or a Phoenix session's short `phoenix_backend_timeout`, so register a Phoenix
-wait just before the action that triggers it ([Configuration](installation.md#configuration)). Await
-once; reuse the returned value freely. Separate waits can observe the same event.
-A settled event outcome survives subsequent timeout or source closure. A still-pending
-wait reports timeout, page closure, or session closure through `await`.
-
-Constructors accept an optional unary predicate. False and nil skip an event;
-predicate failures propagate through `await`. Keep predicates short and inspect
-available metadata. Use ordinary assertions when failure details matter.
 
 ## Pipeline expectations
 
-`Fluffy.Assert.assert_event/3` registers before invoking the action, awaits a
-matching event, optionally inspects it, and returns the input session:
+Assert that clicking the map button starts a download, then check its contents.
+`assert_event` registers before the click so it catches even an immediate download:
 
 ```elixir
 session
@@ -48,11 +27,32 @@ session
 |> click(button("Continue"))
 ```
 
-The assertion callback and options are optional. With four arguments, pass either
-an assertion callback or options. Both callbacks run once in the caller process;
-their return values are ignored. Actions update shared state, while the enclosing
-pipeline retains its original page selection. The helper releases its registration
-on every exit and preserves callback errors.
+Omit the final callback if the event alone is enough. Options such as `timeout:`
+can follow either callback. Both callbacks run once in the caller; their return
+values are ignored. The pipeline keeps its page selection, even if the action
+switches pages. Callback failures propagate and the registration is released.
+
+## Capture an event value
+
+Register just before the action, then await once. You can reuse the returned
+value, for example to save a download outside the session:
+
+```elixir
+pending = wait_for(session, Event.download())
+click(session, button("Download the Marauder's Map"))
+map = await(pending)
+Download.save_as(map, "marauders_map.csv")
+```
+
+The deadline starts at registration. Unless you pass `timeout:`, it uses the
+browser's action timeout or Phoenix's short `phoenix_backend_timeout`
+([Configuration](installation.md#configuration)). Separate waits can match the
+same event. An already settled result survives timeout or page or session closure;
+`await` reports those failures for a wait that was still pending.
+
+Use an event predicate to select among several events, then assert on the
+matched value for a useful failure message. A false or nil predicate skips an
+event; a raised error propagates through `await`.
 
 ## Downloads
 
@@ -70,15 +70,9 @@ JavaScript-generated downloads require Playwright.
 
 ## Pages, popups, and frames
 
-A page is a browser tab or window. A popup is a page opened by another page;
-ordinary `target="_blank"` tabs count. Each browser context owns a session's
-cookies and storage. Frames are documents inside a page, including its main frame
-and any child iframes.
-
-`Event.popup()` observes pages opened by the selected page at registration.
-`Event.page()` observes any new page in the context. Both may return handles for
-the same physical page. The event resolves immediately; the page may still be
-loading. Subsequent actions and assertions handle readiness.
+To follow a `target="_blank"` link in Playwright, remember the opener and wait
+for its popup. The event can arrive before the new page finishes loading; assert
+on the page after switching to it:
 
 ```elixir
 main = current_page(session)
@@ -94,23 +88,23 @@ session
 |> switch_page(main)
 ```
 
-Inspect live page handles with `Fluffy.Page.url/1` and
-`Fluffy.Page.opener/1`. The opener is nil if absent or closed. `Fluffy.Playwright.current_page/1`
-returns a stable handle that survives navigation; `Fluffy.Playwright.pages/1` lists all open pages,
-including tabs discovered without an event registration. A `Playwright.Page` from native
-code, such as a raw listener or `Playwright.BrowserContext.new_page!/1`, becomes a handle
-with `Fluffy.Playwright.page/2`. Page selection is local to each
-session handle: retain the result of `Fluffy.Playwright.switch_page/2`; other session handles keep
-their own selection. Closed page handles are invalid; closing a page does not change any
-session handle's selection. Explicitly switch to an open page before continuing. Closing
-an opener leaves its child pages alive.
+`Event.popup()` watches the page selected at registration; `Event.page()` watches
+the whole context. Both can report the same tab. `pages(session)` lists open tabs
+even without a wait. A page handle survives navigation; read its current URL or
+opener with `Fluffy.Page.url/1` or `Fluffy.Page.opener/1`.
+
+Keep the result of `switch_page` when you want to keep acting in that tab. Each
+session handle keeps its own selection. Closing a page invalidates its page
+handle without selecting another tab. Its children stay open, with a nil opener.
 
 As in Playwright, an action that closes its own page succeeds, except on Firefox, which
 fails it with a closed-page error. `Event.close()` resolves with the selected
-page's handle once it closes, by its own script or `Fluffy.Playwright.close_page/2`:
+page's handle once it closes, by its own script or `Fluffy.Playwright.close_page/2`.
+For a popup that closes itself, sign the slip **instead of** calling `close_page()`:
 
 ```elixir
-popup
+session
+|> switch_page(prophet)
 |> assert_event(Event.close(), &click(&1, button("Sign permission slip")))
 |> switch_page(main)
 ```
@@ -130,8 +124,7 @@ session
 ```
 
 Pages share cookies and storage; start another session for an independent user.
-Retain `current_page(session)` to return to the initial page, and use `pages(session)`
-to list open handles. Phoenix follows links and submits forms in the current page,
+Phoenix follows links and submits forms in the current page,
 ignoring `target` and `formtarget`; page creation and closing require Playwright.
 
 Frame locators query iframe contents without switching pages. Playwright-only
@@ -156,25 +149,9 @@ For reloading either backend, see [Reloading](actions.md#reloading).
 
 ## Listeners and dialogs
 
-`on(session, event, handler)` registers a persistent listener. `once` removes its
-registration before invoking the first matching handler; it does not require an
-event to occur. All three listener operations return the input session.
-`off(session, event, handler)` removes only the most recent registration matching
-the source, event type, and handler; the predicate does not affect removal.
-Repeated registrations require repeated removal calls.
-
-Each listener handles matching events in delivery order. Different listeners run
-independently; relative ordering is unspecified. Handlers and predicates execute
-outside the session runtime and browser connection, linked to the registering
-caller so unhandled failures fail that caller. They have that caller in `$callers`,
-so Ecto sandbox queries and mocks work there as in the test. Registration completes before
-returning. Listeners have no deadline and are cleaned up when removed or when
-their owner or session closes.
-
-Dialogs require Playwright. As in Playwright, events other than page events,
-downloads and file choosers deliver Playwright's values, here a
-`Playwright.Dialog`. Handle them on arrival because an unresolved dialog blocks
-the triggering action:
+To confirm a browser dialog, register a listener that answers it **during** the
+click. A wait alone would leave the click blocked. `once` handles the next match;
+`assert_event` separately checks that the dialog actually appeared:
 
 ```elixir
 alias Playwright.Dialog
@@ -208,13 +185,22 @@ Once registered, handlers must resolve dialogs; a rejected predicate leaves the
 dialog unresolved. A wait observes without accepting or dismissing. Independent
 handlers and waits can observe the same dialog; ensure only one handler resolves it.
 
+`on`, `once` and `off` return the session. Registration completes before the
+next action. `once` unregisters before invoking its handler; `off` removes the
+latest registration with the same source, event type and handler, ignoring its
+predicate. Listeners have no deadline and end when removed or their owner or
+session closes.
+
+Each listener receives matches in order; separate listeners run independently.
+Handlers and predicates run outside the session runtime and browser connection,
+linked to the caller so unhandled errors fail the test. They inherit `$callers`
+for sandbox queries and mocks.
+
 ## Requests and responses
 
-Request and response events require Playwright. Page scope, the default, includes
-child frames; `scope: :context` observes all pages, including a popup's first request.
-Sources remain bound when switching pages. Use the same source and scope for `off`.
-`request_failed` and `request_finished` take the same scope. Other events reject `scope:`:
-page events always observe the context, while all others bind to the selected page.
+To check what the Daily Prophet API returned, select the response by URL and
+assert on its status. Use `scope: :context` to catch requests from any tab,
+including a popup's first request:
 
 ```elixir
 alias Playwright.Response
@@ -227,6 +213,11 @@ session
   scope: :context
 )
 ```
+
+Network events require Playwright. By default they watch the selected page
+and its child frames. Switching pages doesn't move a registration; use the
+original source and scope for `off`. Only request, response, request-failed
+and request-finished events accept `scope:`.
 
 Requests signal issuance; responses signal status and headers, without waiting for
 the response body. The values are a `Playwright.Request` and a `Playwright.Response`;
@@ -275,16 +266,18 @@ with a `Playwright.Frame`, like `Event.frame_navigated()`.
 
 ## Routing requests
 
-`Fluffy.Playwright.route/4` intercepts matching requests of the session's browser
-context, including popups, before they reach the network. It is
-`Playwright.BrowserContext.route/4`: register routes before the action that sends
-the request, and answer the `Playwright.Route` the handler receives once:
+To test the potions list without its API, register a route before visiting.
+It intercepts matching requests across the browser context, including popups.
+Answer each `Playwright.Route` once:
 
 ```elixir
+alias Playwright.Route
+
 session
 |> route("/api/potions", fn route -> Route.fulfill!(route, json: [%{name: "Felix Felicis"}]) end)
 |> route(~r{/api/owls$}, fn route -> Route.abort!(route) end)
 |> visit("/potions")
+|> assert_has(by_text("Felix Felicis"))
 ```
 
 `url` is what Playwright's `route` takes: a glob string (resolved against
@@ -332,10 +325,11 @@ route(session, "/api/prophet", &send(test, {:held, &1}))
 
 session
 |> visit("/prophet")
-|> assert_has("Loading" |> by_text())
+|> assert_has(by_text("Loading"))
 
 assert_receive {:held, route}
 Route.fulfill!(route, json: %{title: "Evening Edition"})
+assert_has(session, by_text("Evening Edition"))
 ```
 
 As in Playwright, a request never answered hangs until the action waiting for it
@@ -350,7 +344,7 @@ whose JavaScript opens a chooser, register first and pass the returned value dir
 pending = wait_for(session, Event.file_chooser())
 click(session, button("Choose portrait"))
 chooser = await(pending)
-assert FileChooser.multiple?(chooser) == false
+refute FileChooser.multiple?(chooser)
 set_input_files(session, chooser, "test/support/fixtures/portrait.png")
 ```
 

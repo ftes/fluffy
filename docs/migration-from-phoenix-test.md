@@ -82,8 +82,6 @@ When rewriting, preserve the original assertion's intent:
 
 ## Coming from PhoenixTest.Playwright
 
-For what PhoenixTest.Playwright adds:
-
 - **Setup:** drop `PhoenixTest.Playwright.Supervisor` from `test_helper.exs` and replace
   `config :phoenix_test` as [Installation and runtime](installation.md) shows: `timeout`
   becomes `action_timeout`, `navigation_timeout` and `expect: [timeout: ...]`, `trace: true`
@@ -95,11 +93,8 @@ For what PhoenixTest.Playwright adds:
   session in your own setup ([Ecto sandbox](installation.md#ecto-sandbox),
   [Shared test case](usage.md#shared-test-case)). A context option
   tag such as `browser_context_opts` becomes `@tag Playwright.Test.use(...)`.
-- **Extra helpers** are native calls, which take the facade's session as it is
-  ([Using native Fluffy APIs](#using-native-fluffy-apis)).
-  They take a locator where PhoenixTest.Playwright took a selector: a CSS selector goes in
-  `Fluffy.Locator.by_css/1`, and `Selector.role/3` or `Selector.text/2` become `by_role/2` or
-  `by_text/2`. They don't see the facade's `within` scope, so scope the locator yourself.
+- **Extra helpers:** use [native calls](#using-native-fluffy-apis). Replace CSS selectors
+  with `by_css/1`, `Selector.role/3` with `by_role/2`, and `Selector.text/2` with `by_text/2`.
   - `evaluate`: `Fluffy.Playwright.evaluate/3`, with `arg:` positional and no `is_function:`;
     it returns the value instead of passing it to a callback. JavaScript run for its effect
     in a pipeline becomes `unwrap(&Playwright.Page.evaluate!(&1, js, arg))` (`Fluffy.unwrap/2`,
@@ -116,9 +111,9 @@ For what PhoenixTest.Playwright adds:
     becomes `Fluffy.add_session_cookie(session, values)`, with the options from the endpoint's
     `session_options/0` ([Logging in](usage.md#logging-in)). On the facade, pipe it in, as
     `start_session(:playwright) |> Fluffy.add_session_cookie(values) |> visit("/")`;
-   - `screenshot`: `Fluffy.Playwright.screenshot/2` (with `path:` and
-     `full_page: true` for the old default; it returns the PNG);
-   - `assert_screenshot`: `|> assert(page_match_screenshot(name: "owlery.png"))`;
+  - `screenshot`: `Fluffy.Playwright.screenshot/2` (with `path:` and
+    `full_page: true` for the old default; it returns the PNG);
+  - `assert_screenshot`: `|> assert(page_match_screenshot(name: "owlery.png"))`;
   - `with_dialog`: see [Listeners and dialogs](advanced-events.md#listeners-and-dialogs);
   - `assert_download`: wait for `Fluffy.Event.download/1`, then `Fluffy.Download.read/2` or
     `Fluffy.Download.save_as/2` ([Downloads](advanced-events.md#downloads)). The event comes
@@ -148,13 +143,11 @@ For what PhoenixTest.Playwright adds:
 
 ## Use the facade
 
-Replace `import PhoenixTest` with `import Fluffy.PhoenixTest`, including imports
-in your shared case module. Import the facade on its own; mixing it with
-`import Fluffy` introduces overlapping function names.
-
-After completing [Installation and runtime](installation.md), keep your application's
-`ConnCase`, and add `use Playwright.Test` after it. A prepared connection can still be piped
-directly into `Fluffy.PhoenixTest.visit/2`:
+Follow [Installation and runtime](installation.md). Keep your `ConnCase`, fixtures,
+authentication and [sandbox owner](installation.md#ecto-sandbox). Add `use Playwright.Test`
+after `ConnCase` and replace `import PhoenixTest` with `import Fluffy.PhoenixTest`,
+including in your shared case. Avoid `import Fluffy`: the names overlap.
+Pipe your prepared connection into `visit/2` to start a Phoenix session:
 
 ```elixir
 defmodule MyAppWeb.PotionTest do
@@ -176,10 +169,6 @@ defmodule MyAppWeb.PotionTest do
 end
 ```
 
-Keep existing fixture and authentication setup. The `ConnCase` keeps owning the
-sandbox (`start_owner!`); the required endpoint and sandbox configuration lives in
-[Installation and runtime](installation.md#ecto-sandbox).
-
 ## Using native assertions alongside the facade
 
 The facade's `assert_has` and `refute_has` accept selectors or a `%Fluffy.Locator{}`
@@ -195,44 +184,30 @@ import Fluffy.Assert, except: [assert_has: 2, assert_has: 3, refute_has: 2, refu
 import Fluffy.PhoenixTest
 ```
 
-Native and facade assertions take the same session, so they mix in one pipeline.
-
 ## Phoenix and browser tests in the same module
 
-Piping a connection into `Fluffy.PhoenixTest.visit/2` always starts a Phoenix session.
-To choose a backend, start a session explicitly. The same facade calls work with both:
+To use both backends with the same facade calls, start the session in setup
+instead of passing a connection to `visit/2`. The setup reads the tag; Fluffy
+does not select a backend from tags itself:
 
 ```elixir
-defmodule MyAppWeb.PotionTest do
-  use MyAppWeb.ConnCase, async: true
-  use Playwright.Test
-  import Fluffy.PhoenixTest
+setup context do
+  %{session: start_session(context[:backend] || :phoenix)}
+end
 
-  setup context do
-    %{session: start_session(context[:backend] || :phoenix)}
-  end
-
-  test "lists the available potions", %{session: session} do
-    session
-    |> visit("/potions")
-    |> assert_has("h2", text: "Polyjuice Potion")
-  end
-
-  @tag backend: :playwright
-  test "brews a potion through a JavaScript hook", %{session: session} do
-    session
-    |> visit("/potions")
-    |> click_button("Brew potion")
-    |> assert_has("#notice", text: "Potion brewed")
-  end
+@tag backend: :playwright
+test "brews a potion through a JavaScript hook", %{session: session} do
+  session
+  |> visit("/potions")
+  |> click_button("Brew potion")
+  |> assert_has("#notice", text: "Potion brewed")
 end
 ```
 
-The setup above interprets the tag; Fluffy does not select a backend from tags
-by itself. To share it across tests, move `use Playwright.Test`, the facade import and this
-setup into your case template's `using` (see [Shared test case](usage.md#shared-test-case)).
-Module and describe tags work with the same setup. See [Choosing a backend](usage.md#choosing-a-backend) for guidance
-and [Playwright setup](installation.md#playwright-setup) for browser installation.
+Untagged tests use Phoenix; module and describe tags work too. To share this setup,
+move it, `use Playwright.Test` and the facade import into your case template's `using`
+([Shared test case](usage.md#shared-test-case)). See [Choosing a backend](usage.md#choosing-a-backend)
+and [Playwright setup](installation.md#playwright-setup).
 
 ## What stays familiar, and what to check
 
@@ -289,10 +264,9 @@ conn
 |> visit("/chambers/secrets")
 ```
 
-The prepared connection applies to the first request only, except that its `accept`,
-`accept-language` and `authorization` headers go with every request, as
-`Phoenix.ConnTest.recycle/2` keeps them, and so does its `user-agent`, as a browser's would. Connect params do not carry across later navigation, and `Fluffy.PhoenixTest.unwrap/2` runs too late to supply
-initial mount params. Browser tests use the application's real LiveSocket parameters.
+Only `accept`, `accept-language`, `authorization` and `user-agent` carry over to later
+requests. Connect params apply only to the initial mount; `unwrap/2` is too late to
+set them. Browser tests use the application's real LiveSocket parameters.
 
 ### Using native Fluffy APIs
 
@@ -310,6 +284,4 @@ session =
 assert Fluffy.Playwright.evaluate(session, "document.readyState") == "complete"
 ```
 
-This suits a few calls. When tests need them throughout, for browser scripting, pages
-or events, [rewrite on the native API](#rewrite-on-the-native-api) rather than mix the two
-styles. See [Advanced events and pages](advanced-events.md) for those workflows.
+For browser scripting across pages and events, see [Advanced events and pages](advanced-events.md).
