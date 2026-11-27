@@ -248,7 +248,7 @@ The facade preserves PhoenixTest vocabulary and conveniences:
   `assert_has("#house option", count: n)` on a dropdown counts 0 on every driver; see
   [Selects and options](actions.md#selects-and-options). On the select itself, `value:` checks
   the submitted value; `selected:` checks the selected option's normalized text, not its `label` attribute.
-- Facade calls keep PhoenixTest's `timeout: 0` for a single check. Use `timeout: :once` on native assertions.
+- For a single check, pass `timeout: 0` to a facade assertion and `timeout: :once` to a native assertion. Each rejects the other's spelling.
 - `assert_path` remains a path assertion; use `query_params:` when the query
   is part of the assertion.
 

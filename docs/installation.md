@@ -191,9 +191,9 @@ end
   timeouts. Without an action or navigation timeout, the test timeout bounds the wait
   (ExUnit defaults to 60 seconds). Browser assertions default to 5 seconds.
 
-Override a single operation with `timeout:`. Use `:once` for an immediate check
+Override a single native operation with `timeout:`. Use `:once` for an immediate check
 and `:infinity` for no operation deadline; the test deadline still applies.
-Playwright actions, waits and screenshot assertions reject `:once`. Fluffy rejects `0`;
+Playwright actions, waits and screenshot assertions reject `:once`. Native calls reject `0`;
 in Playwright configuration `0` means no limit.
 
 Fluffy's own reads of the page around a Playwright operation share its timeout, but get
