@@ -31,6 +31,11 @@ clock operations, and Playwright page handling around `unwrap`. The callback's
 own errors, invalid arguments, unsupported capabilities and programming errors
 pass through.
 
+When a Phoenix action finds no match for a locator ending in `filter(has_text: ...)`,
+look for **Matches before filter**. It shows up to five elements that matched the
+preceding locator in the same scope. If that locator also matched nothing, the
+section is omitted.
+
 ### Replay the failing step
 
 Tag the test to record a trace. Name the sequence you want to find in the viewer:
