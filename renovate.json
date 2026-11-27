@@ -3,7 +3,7 @@
   "extends": ["github>ftes/renovate-config:elixir-lib"],
   "packageRules": [
     {
-      "description": "PlaywrightEx updates come from playwright-ex-update.yml, which classifies new members for PlaywrightMembersTest; packageName is the Hex name, or the repo for a git dep",
+      "description": "Maintainers update PlaywrightEx after checking the API inventory; playwright-ex-release.yml reports new Hex versions",
       "matchManagers": ["mix"],
       "matchPackageNames": ["playwright_ex", "ftes/playwright_ex"],
       "enabled": false

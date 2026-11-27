@@ -62,6 +62,21 @@ human and agent reviews alike.
 Maintainers can use `/agent` followed by a request in an issue, PR comment, or review.
 The command works on pull requests from this repository.
 
+## Updating PlaywrightEx
+
+The [PlaywrightEx Release workflow](https://github.com/ftes/fluffy/actions/workflows/playwright-ex-release.yml)
+reports newer Hex releases in its run summary. It announces a version once while its Actions cache
+marker is retained. Check locally with `python3 dev/playwright_release.py discover`.
+
+From a clean checkout with the usual Fluffy toolchain, run
+`python3 dev/playwright_release.py prepare <version>`. It updates `mix.exs`, `mix.lock`,
+`mix.lock.oldest`, and `integration/consumer/mix.lock`, then runs `mix setup` and syncs the
+generated usage rules. If the new package needs other floor changes, follow the oldest-lock steps
+above. CI also verifies the floor with the oldest toolchain.
+
+Review the upstream changes, classify members and events in `test/support/playwright_members.ex`
+as needed, and update the changelog or docs if appropriate. Run `mix check` before opening the PR.
+
 ## Releasing
 
 Releases run from a checkout of [ftes/ci](https://github.com/ftes/ci), with `gh` logged in as a

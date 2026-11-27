@@ -1,0 +1,53 @@
+name: PlaywrightEx Release
+
+on:
+  schedule:
+    - cron: "37 4 * * *"
+
+concurrency: playwright-ex-release
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /mix.lock
+            /dev/playwright_release.py
+      - name: Check Hex for a newer release
+        id: release
+        run: python3 -B dev/playwright_release.py discover
+      - name: Look up the announcement marker
+        id: announced
+        if: steps.release.outputs.latest != ''
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/playwright-ex-announced
+          key: playwright-ex-announced-${{ steps.release.outputs.latest }}
+          lookup-only: true
+      - name: Report the release
+        if: steps.release.outputs.latest != '' && steps.announced.outputs.cache-hit != 'true'
+        env:
+          LOCKED: ${{ steps.release.outputs.locked }}
+          LATEST: ${{ steps.release.outputs.latest }}
+        run: |
+          line="PlaywrightEx $LATEST is available (locked: $LOCKED)."
+          echo "::notice::$line"
+          {
+            echo "$line"
+            echo
+            echo "[Hex release](https://hex.pm/packages/playwright_ex/$LATEST) · [Upstream changes](https://github.com/ftes/playwright_ex/compare/v$LOCKED...v$LATEST)"
+          } >> "$GITHUB_STEP_SUMMARY"
+          touch "$RUNNER_TEMP/playwright-ex-announced"
+      - name: Remember the announcement
+        if: steps.release.outputs.latest != '' && steps.announced.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/playwright-ex-announced
+          key: ${{ steps.announced.outputs.cache-primary-key }}
