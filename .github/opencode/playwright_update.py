@@ -209,7 +209,13 @@ def update_files(previous, release):
     changelog.write_text(changed)
 
 
+def check_verifier():
+    run.check(not any(name in os.environ for name in ("ACTIONS_ID_TOKEN_REQUEST_URL", "ACTIONS_ID_TOKEN_REQUEST_TOKEN")),
+              "The dependency verification job must not have OIDC")
+
+
 def verify(artifact, previous, release, parent, run_id):
+    check_verifier()
     run.check(run.git("rev-parse", "HEAD") == parent, "Unexpected update base")
     proposal = read_artifact(artifact, "proposal", run_id, parent, release)
     body = run.text(proposal["body"], 12000)
@@ -231,7 +237,7 @@ def verify(artifact, previous, release, parent, run_id):
     finally:
         Path("mix.lock").write_text(newest)
     subprocess.run(["mix", "deps.update", "playwright"], cwd="integration/consumer", check=True)
-    for args in (("assets.build",), ("playwright.install", "chromium"), ("fluffy.playwright_source",),
+    for args in (("assets.build",), ("playwright.install", "--with-deps", "chromium"), ("fluffy.playwright_source",),
                  ("usage_rules.sync", "--yes"), ("format",), ("check",)):
         subprocess.run(["mix", *args], check=True)
     run.git("add", "-A")
@@ -308,6 +314,9 @@ def publish_update(mode, release, base, parent, run_id, artifact, expected_head)
 
 
 def main(mode):
+    if mode == "check-verifier":
+        check_verifier()
+        return
     if mode == "check":
         values, note = check_release(os.environ["GITHUB_EVENT_NAME"])
         print(note)

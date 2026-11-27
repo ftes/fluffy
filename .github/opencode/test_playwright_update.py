@@ -1,6 +1,7 @@
 import contextlib
 import io
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -146,6 +147,22 @@ class PlaywrightUpdateTest(unittest.TestCase):
             with patch.object(run, "gh", return_value=archive(data, ".git/config")):
                 with self.assertRaisesRegex(ValueError, "Unexpected artifact files"):
                     updater.read_artifact("10", "verified", "9", BASE, RELEASE)
+
+    def test_model_configuration_does_not_execute_project_code(self):
+        config = updater.settings()
+        allowed = {rule["action"] for rule in config["permissions"] if rule["effect"] == "allow"}
+        self.assertEqual(allowed, {"read", "glob", "grep"})
+        self.assertFalse(config["formatter"])
+        self.assertFalse(config["lsp"])
+        for action in ("plugin.use", "mcp.use", "skill.use"):
+            self.assertIn(run.permission(action, effect="deny"), config["policies"])
+
+    def test_verify_refuses_to_run_any_project_code_with_oidc(self):
+        with (patch.dict(os.environ, ACTIONS_ID_TOKEN_REQUEST_TOKEN="token"),
+              patch.object(updater.subprocess, "run") as shell):
+            with self.assertRaisesRegex(ValueError, "must not have OIDC"):
+                updater.verify("10", "1.64.0", RELEASE, BASE, "9")
+        shell.assert_not_called()
 
     def test_cannot_publish_runner_scripts_executables_or_new_paths(self):
         for path in (".git/config", ".github/opencode/playwright_update.py", "lib/other.ex"):
