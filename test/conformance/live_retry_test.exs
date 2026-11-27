@@ -47,6 +47,15 @@ defmodule Fluffy.Conformance.LiveRetryTest do
     refute error.message =~ "Status: waiting"
   end
 
+  test "a missing Live click suggests button names from the final render" do
+    session = :phoenix |> start_session() |> visit("/live/async?delay=40")
+    locator = by_role(:button, "Expelliarmus")
+    error = assert_raise Fluffy.OperationError, fn -> click(session, locator, timeout: 300) end
+
+    assert %Fluffy.StrictnessError{locator: ^locator, candidates: []} = error.cause
+    assert error.message =~ ~s(Other button names in scope: "Appeared")
+  end
+
   test "Live locator strictness is terminal rather than retried" do
     session = :phoenix |> start_session() |> visit("/live/fluffy")
     started_at = System.monotonic_time(:millisecond)

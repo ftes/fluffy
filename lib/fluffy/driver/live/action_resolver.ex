@@ -10,7 +10,7 @@ defmodule Fluffy.Driver.Live.ActionResolver do
   rescue
     error in Fluffy.StrictnessError ->
       case error.candidates do
-        [] -> {:retry, {:strictness, locator, []}}
+        [] -> {:retry, {:missing, Session.page_state(session).client_dom, locator}}
         _ambiguous -> reraise(error, __STACKTRACE__)
       end
   end
