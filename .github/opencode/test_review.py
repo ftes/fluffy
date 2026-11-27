@@ -74,6 +74,7 @@ class ReviewWorkflowTest(unittest.TestCase):
             with (patch.object(run, "REPO", "ftes/fluffy"),
                   patch.object(run, "CONTEXT", directory),
                   patch.object(run, "api", return_value=pr),
+                  patch.object(run, "privileged_setup_allowed", return_value=True),
                   patch.object(run, "previous_review", return_value=(marker, True)),
                   patch.object(run, "context", side_effect=context),
                   patch.object(run, "gh", return_value="")):

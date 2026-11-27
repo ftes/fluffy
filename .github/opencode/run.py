@@ -26,6 +26,7 @@ SAFE_ENV = ("PATH", "HOME", "USER", "LANG", "LC_ALL", "TMPDIR")
 PLAYWRIGHT_PILOT_BRANCH = "opencode/playwright-ex-pilot-"
 PLAYWRIGHT_MEMBERS = "test/support/playwright_members.ex"
 PLAYWRIGHT_CLASSIFICATIONS = "test/support/playwright_classifications.json"
+PLAYWRIGHT_MANUAL_REVIEW = "PlaywrightEx update or inventory changes require unprivileged CI and manual review."
 PLAYWRIGHT_SETUP_INPUTS = {
     "mix.exs": r'^[ \t]*\{:playwright\b.*$',
     "mix.lock": r'^[ \t]*"playwright".*$',
@@ -400,10 +401,20 @@ def snapshot_marker(expected, merge_base):
     return head, merge_base, hashlib.sha256(ref.encode()).hexdigest(), base
 
 
+def review_candidate_allowed(pr):
+    head = pr["head"]
+    allowed = privileged_setup_allowed(git("rev-parse", "HEAD"), head["sha"], head["ref"])
+    if not allowed:
+        print(PLAYWRIGHT_MANUAL_REVIEW)
+    return allowed
+
+
 def prepare_review(number, head, retargeted=False):
     pr = api(f"pulls/{number}")
     expected = snapshot(pr)
     if expected[0] != head or not active_review(pr, expected):
+        return
+    if not review_candidate_allowed(pr):
         return
     base, full = snapshot_diff(pr)
     marker = snapshot_marker(expected, base)
@@ -452,6 +463,8 @@ def publish_review(number, expected, marker, result):
     if previous_review(number) == (marker, True):
         reconcile_reviews(number)
         return
+    if not review_candidate_allowed(pr):
+        return
     fields(result, "summary", "open_blocking", "open_non_blocking", "findings")
     summary = text(result["summary"], 12000)
     blocking, non_blocking = result["open_blocking"], result["open_non_blocking"]
@@ -482,7 +495,8 @@ def publish_review(number, expected, marker, result):
     if blocking:
         verdict = f"Issues found: {blocking} blocking, {non_blocking} non-blocking."
     with app_token() as token:
-        if not active_review(api(f"pulls/{number}"), expected):
+        current = api(f"pulls/{number}")
+        if not active_review(current, expected) or current["head"]["ref"] != pr["head"]["ref"]:
             print("PR changed; discarding review.")
             return
         own_pr = pr["user"]["login"] == BOT
@@ -511,7 +525,7 @@ def main(mode):
     if mode in ("setup-gate", "require-safe-setup"):
         allowed = privileged_setup_allowed(git("rev-parse", "HEAD"), os.environ["HEAD"], os.environ["HEAD_BRANCH"])
         if not allowed:
-            print("PlaywrightEx update or inventory changes require unprivileged CI and manual review.")
+            print(PLAYWRIGHT_MANUAL_REVIEW)
         if mode == "require-safe-setup":
             check(allowed, "Candidate setup declined")
         elif allowed:

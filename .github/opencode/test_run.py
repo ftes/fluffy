@@ -142,6 +142,7 @@ class PublishTest(unittest.TestCase):
               patch.object(run, "app_token", return_value=contextlib.nullcontext("app-token")),
               patch.object(run, "snapshot_diff", return_value=("b" * 40, "diff")),
               patch.object(run, "git", return_value=b"diff"),
+              patch.object(run, "privileged_setup_allowed", return_value=True),
               patch.object(run, "gh") as gh, patch.object(run, "save"), patch.object(run, "context", return_value=pr),
               patch.object(run, "reconcile_reviews") as reconcile,
               contextlib.redirect_stdout(io.StringIO())):
@@ -179,6 +180,9 @@ class PublishTest(unittest.TestCase):
         for changed in (self.pr(target="stable"), self.pr(base="d" * 40)):
             self.assertEqual(self.review(before=changed), [])
 
+    def test_review_stops_if_the_head_branch_is_renamed_before_publishing(self):
+        self.assertEqual(self.review(before=self.pr(branch=f"{run.PLAYWRIGHT_PILOT_BRANCH}1.65.0")), [])
+
     def test_stale_approval_is_dismissed_without_reviewing_the_new_head(self):
         writes = self.review(after=self.pr(head="d" * 40))
         self.assertEqual([path for path, _ in writes], ["pulls/42/reviews", "pulls/42/reviews/12/dismissals"])
@@ -195,8 +199,26 @@ class PublishTest(unittest.TestCase):
                      "user": {"type": "Bot", "login": run.BOT}}
             self.assertEqual(len(self.review(prior=[prior])), 1)
 
-    def test_reconciliation_dismisses_superseded_app_verdicts_before_model_access(self):
-        pr = self.pr()
+    def test_guard_excludes_exact_candidate_from_inference_and_publication(self):
+        pr = self.pr(branch=f"{run.PLAYWRIGHT_PILOT_BRANCH}1.65.0")
+        expected = run.snapshot(pr)
+        marker = run.snapshot_marker(expected, "b" * 40)
+        trusted = "e" * 40
+        with (patch.object(run, "api", return_value=pr),
+              patch.object(run, "previous_review", return_value=(None, False)),
+              patch.object(run, "git", return_value=trusted),
+              patch.object(run, "privileged_setup_allowed", return_value=False) as guard,
+              patch.object(run, "snapshot_diff") as diff,
+              patch.object(run, "app_token") as token,
+              contextlib.redirect_stdout(io.StringIO())):
+            self.assertIsNone(run.prepare_review(42, expected[0]))
+            run.publish_review(42, expected, marker, None)
+        self.assertEqual(guard.call_args_list, [call(trusted, expected[0], pr["head"]["ref"])] * 2)
+        diff.assert_not_called()
+        token.assert_not_called()
+
+    def test_reconciliation_dismisses_superseded_app_verdicts_even_on_an_excluded_branch(self):
+        pr = self.pr(branch=f"{run.PLAYWRIGHT_PILOT_BRANCH}1.65.0")
         app = {"login": run.BOT}
         reviews = [
             {"id": 1, "body": self.marker(self.pr(head="e" * 40)), "state": "APPROVED", "user": app},
@@ -265,6 +287,7 @@ class PublishTest(unittest.TestCase):
         previous = {"id": 1, "body": self.marker(self.pr(head="e" * 40)), "state": "APPROVED",
                     "user": {"type": "Bot", "login": run.BOT}}
         with (patch.object(run, "api", side_effect=[pr, [previous], pr, [], [previous]]),
+              patch.object(run, "review_candidate_allowed", return_value=True),
               patch.object(run, "snapshot_diff", return_value=("b" * 40, b"same diff")),
               patch.object(run, "reviewed_diff", return_value=b"same diff"),
               patch.object(run, "app_token") as token,

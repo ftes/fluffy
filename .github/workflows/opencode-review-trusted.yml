@@ -23,6 +23,7 @@ env:
   GIT_CONFIG_GLOBAL: /dev/null
 
 jobs:
+  # Reconcile even when the current head needs manual review under the PlaywrightEx guard.
   reconcile:
     if: >-
       github.event.workflow_run.event == 'pull_request' &&
