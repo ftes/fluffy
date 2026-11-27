@@ -17,6 +17,7 @@ defmodule Fluffy.Conformance.SelectOptionActionTest do
       |> session_for_html(html)
       |> select_option(field, [])
       |> expect(to_have_values(field, []))
+      |> expect(not_(to_have_values(field, ["red"])))
     end
 
     @tag driver: driver

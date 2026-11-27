@@ -221,6 +221,8 @@ that passed on 0.8 act differently:
   click the label, sending its `phx-click` too.
 - As in Playwright, `disabled` only disables native form controls, so a `disabled` link
   or `div` is clickable, while text inside a disabled button is disabled too.
+- Use `to_have_value` on an input, textarea, select or its label. For other elements,
+  assert their text or `value` attribute instead.
 - Events carry what the browser sends: the form's current serialization, so an
   unchecked checkbox no longer sends its rendered value, a control's current `value`,
   and a `JS.push` `target:`. Clicking a checkbox or radio also sends its form's

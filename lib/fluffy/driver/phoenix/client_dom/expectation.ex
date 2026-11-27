@@ -43,8 +43,8 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM.Expectation do
 
   def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :empty} = expectation) do
     with_element(client_dom, locator, expectation, fn
-      %{tag: tag} when tag in ["input", "textarea"] ->
-        actual = ClientDOM.value(client_dom, locator)
+      %{tag: tag} = target when tag in ["input", "textarea"] ->
+        actual = ClientDOM.target_value(client_dom, target)
         {actual == "", actual}
 
       target ->
@@ -112,30 +112,35 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM.Expectation do
   end
 
   def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: kind} = expectation)
-      when kind in [:enabled, :disabled] do
+      when kind in [:enabled, :disabled, :editable, :checked, :value, :values] do
     with_element(client_dom, locator, expectation, fn target ->
-      actual = ClientDOM.disabled?(client_dom, target) == (kind == :disabled)
-      {actual, actual}
+      control = ClientDOM.follow_label(client_dom, target)
+      evaluate_control(client_dom, control, locator, kind, expectation.expected)
     end)
   end
 
-  def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :editable}) do
-    actual = ClientDOM.editable?(client_dom, locator)
+  defp evaluate_control(client_dom, control, _locator, kind, _expected) when kind in [:enabled, :disabled] do
+    actual = ClientDOM.target_disabled?(client_dom, control) == (kind == :disabled)
     {actual, actual}
   end
 
-  def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :checked, expected: expected}) do
-    actual = ClientDOM.checked?(client_dom, locator)
+  defp evaluate_control(client_dom, control, locator, :editable, _expected) do
+    actual = ClientDOM.editable?(client_dom, control, locator)
+    {actual, actual}
+  end
+
+  defp evaluate_control(client_dom, control, locator, :checked, expected) do
+    actual = ClientDOM.checked?(client_dom, control, locator)
     {actual == (expected == :checked), actual}
   end
 
-  def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :value, expected: expected}) do
-    actual = ClientDOM.value(client_dom, locator)
+  defp evaluate_control(client_dom, control, locator, :value, expected) do
+    actual = ClientDOM.input_value(client_dom, control, locator, :not_input_element)
     {Expect.Internal.matches?(expected, actual), actual}
   end
 
-  def evaluate(client_dom, %Expect{target: {:locator, locator}, kind: :values, expected: expected}) do
-    actual = ClientDOM.selected_values(client_dom, locator)
+  defp evaluate_control(client_dom, control, locator, :values, expected) do
+    actual = ClientDOM.selected_values(client_dom, control, locator)
     {matches_in_order?(expected, actual, &Expect.Internal.matches?/2, true), actual}
   end
 

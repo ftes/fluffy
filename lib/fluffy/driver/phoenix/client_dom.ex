@@ -455,8 +455,10 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM do
 
   # Playwright's checked state, which raises for an element without one.
   def checked?(%__MODULE__{} = client_dom, %Locator{} = locator) do
-    target = control!(client_dom, locator)
+    checked?(client_dom, control!(client_dom, locator), locator)
+  end
 
+  def checked?(%__MODULE__{} = client_dom, %Target{} = target, locator) do
     case Aria.checked(aria(client_dom), target, checked_target?(client_dom, target)) do
       :error -> raise Fluffy.ActionabilityError, action: :read_checked, reason: :not_checkbox_or_radio, locator: locator
       checked -> checked
@@ -468,10 +470,12 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM do
   # Playwright's inputValue: the value of the control the target retargets to, which
   # must be an input, textarea or select.
   def input_value(%__MODULE__{} = client_dom, %Locator{} = locator) do
-    target = control!(client_dom, locator)
+    input_value(client_dom, control!(client_dom, locator), locator, :not_input)
+  end
 
+  def input_value(%__MODULE__{} = client_dom, %Target{} = target, locator, invalid_reason) do
     if target.tag not in ["input", "textarea", "select"] do
-      raise Fluffy.ActionabilityError, action: :input_value, reason: :not_input, locator: locator
+      raise Fluffy.ActionabilityError, action: :input_value, reason: invalid_reason, locator: locator
     end
 
     target_value(client_dom, target)
@@ -542,7 +546,8 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM do
     end
   end
 
-  defp target_value(client_dom, target) do
+  @doc false
+  def target_value(client_dom, target) do
     if target.tag == "select" do
       client_dom |> selected_values_for_target(target) |> List.first() || ""
     else
@@ -553,9 +558,7 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM do
   end
 
   # As in Playwright, only a multiple select has values, enabled or not.
-  def selected_values(%__MODULE__{} = client_dom, %Locator{} = locator) do
-    target = control!(client_dom, locator)
-
+  def selected_values(%__MODULE__{} = client_dom, %Target{} = target, locator) do
     if target.tag != "select" or not has_attribute?(target.attributes, "multiple") do
       raise Fluffy.ActionabilityError, action: :read_value, reason: :not_multiple_select, locator: locator
     end
@@ -564,11 +567,7 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM do
   end
 
   @doc false
-  def disabled?(%__MODULE__{} = client_dom, %Target{} = target) do
-    target_disabled?(client_dom, follow_label(client_dom, target))
-  end
-
-  defp target_disabled?(client_dom, target), do: Aria.aria_disabled?(aria(client_dom), target)
+  def target_disabled?(client_dom, target), do: Aria.aria_disabled?(aria(client_dom), target)
 
   defp aria(client_dom), do: Aria.for_document(client_dom.document)
 
@@ -582,7 +581,8 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM do
 
   @no_follow_label_tags ~w(a input textarea button select option optgroup)
 
-  defp follow_label(client_dom, target) do
+  @doc false
+  def follow_label(client_dom, target) do
     aria = aria(client_dom)
 
     target =
@@ -608,9 +608,7 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM do
 
   # Playwright's editable state, which raises for an element without a readonly state.
   @doc false
-  def editable?(%__MODULE__{} = client_dom, %Locator{} = locator) do
-    target = control!(client_dom, locator)
-
+  def editable?(%__MODULE__{} = client_dom, %Target{} = target, locator) do
     case Aria.readonly(aria(client_dom), target) do
       :error -> raise Fluffy.ActionabilityError, action: :read_editable, reason: :no_readonly_state, locator: locator
       readonly -> not readonly and not target_disabled?(client_dom, target)

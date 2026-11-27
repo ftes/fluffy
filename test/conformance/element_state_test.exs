@@ -172,6 +172,8 @@ defmodule Fluffy.Conformance.ElementStateTest do
       html = """
       <label><input type="checkbox" checked disabled> Join Dumbledore's Army</label>
       <label for="password">Password to the common room</label><input id="password" readonly>
+      <label for="houses">Houses</label>
+      <select id="houses" multiple><option selected>Gryffindor</option></select>
       """
 
       with_html(unquote(driver), html, fn session ->
@@ -180,6 +182,21 @@ defmodule Fluffy.Conformance.ElementStateTest do
         |> expect("Join Dumbledore's Army" |> by_text() |> to_be_disabled())
         |> expect(not_(to_be_enabled(by_text("Join Dumbledore's Army"))))
         |> expect("Password to the common room" |> by_text() |> to_be_editable(editable: false))
+        |> expect("Houses" |> by_text() |> to_have_value("Gryffindor"))
+        |> expect("Houses" |> by_text() |> to_have_values(["Gryffindor"]))
+      end)
+    end
+
+    @tag driver: driver
+    test "to_have_value rejects a non-input even when negated with #{driver}" do
+      with_html(unquote(driver), "<div>Accio</div>", fn session ->
+        value = to_have_value(by_text("Accio"), "")
+
+        for expectation <- [value, not_(value)] do
+          assert_raise ExUnit.AssertionError, ~r/Error: Not an input element/, fn ->
+            expect(session, expectation)
+          end
+        end
       end)
     end
 

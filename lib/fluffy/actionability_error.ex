@@ -15,7 +15,8 @@ defmodule Fluffy.ActionabilityError do
     no_readonly_state:
       "Element is not an <input>, <textarea>, <select> or [contenteditable] and does not have a role allowing [aria-readonly]",
     not_multiple_select: "Not a select element with a multiple attribute",
-    not_input: "Node is not an <input>, <textarea> or <select> element"
+    not_input: "Node is not an <input>, <textarea> or <select> element",
+    not_input_element: "Not an input element"
   }
 
   @impl true

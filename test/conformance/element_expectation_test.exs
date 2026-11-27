@@ -12,11 +12,21 @@ defmodule Fluffy.Conformance.ElementExpectationTest do
 
   for driver <- Drivers.all() do
     @tag driver: driver
-    test "enabled and disabled require a match even when negated with #{driver}", %{driver: driver} do
+    test "control expectations require a match even when negated with #{driver}", %{driver: driver} do
       session = session(driver)
 
-      for state <- [to_be_enabled(@miss), to_be_disabled(@miss)], expectation <- [state, not_(state)] do
-        assert_raise ExUnit.AssertionError, ~r/to be (enabled|disabled)/, fn ->
+      for state <- [
+            to_be_enabled(@miss),
+            to_be_disabled(@miss),
+            to_be_editable(@miss),
+            to_be_checked(@miss),
+            to_be_checked(@miss, checked: false),
+            to_have_value(@miss, ""),
+            to_have_values(@miss, []),
+            to_have_values(@miss, ["wand"])
+          ],
+          expectation <- [state, not_(state)] do
+        assert_raise ExUnit.AssertionError, ~r/No element matched|element\(s\) not found/, fn ->
           expect(session, expectation, timeout: 50)
         end
       end
@@ -276,6 +286,10 @@ defmodule Fluffy.Conformance.ElementExpectationTest do
         to_be_attached(items),
         to_be_enabled(items),
         to_be_disabled(items),
+        to_be_editable(items),
+        to_be_checked(items),
+        to_have_value(items, ""),
+        to_have_values(items, []),
         to_be_hidden(items),
         to_be_empty(items)
       ]
