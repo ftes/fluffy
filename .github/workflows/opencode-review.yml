@@ -12,10 +12,12 @@ env:
 jobs:
   review:
     # Same-repo setup code runs in this job; no fork or Renovate branch gets OIDC access.
+    # The PlaywrightEx pilot keeps the updated dependency out of privileged jobs, including on promotion.
     if: >-
       (github.event.action != 'edited' || github.event.changes.base.ref.from != null) &&
       !github.event.pull_request.draft &&
       !startsWith(github.head_ref, 'renovate/') &&
+      !startsWith(github.head_ref, 'opencode/playwright-ex-pilot-') &&
       (github.event.pull_request.user.type != 'Bot' ||
         contains(fromJSON('["claude[bot]","opencode-agent[bot]"]'), github.event.pull_request.user.login)) &&
       github.event.pull_request.head.repo.full_name == github.repository
