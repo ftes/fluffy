@@ -31,6 +31,8 @@ The entry below lists them under Breaking; the upgrade guide shows how to move a
 
 ## Unreleased
 
+- Requires PlaywrightEx 1.65.0-rc.6.
+
 Changes since 0.8.0.
 
 ### Breaking
