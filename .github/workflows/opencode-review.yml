@@ -62,4 +62,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           OPENCODE_API_KEY: ${{ steps.auth.outputs.token }}
+          OPENCODE_MODEL: ${{ vars.OPENCODE_MODEL }}
         run: python3 "$RUNNER_TEMP/fluffy-opencode/run.py" review

@@ -10,6 +10,21 @@ import run
 
 
 class CliResultTest(unittest.TestCase):
+    def test_model_is_passed_as_a_cli_argument_with_a_default_for_unset_and_empty_values(self):
+        for settings, model in (
+            ({}, "opencode-go/kimi-k3.1-pro"),
+            ({"OPENCODE_MODEL": ""}, "opencode-go/kimi-k3.1-pro"),
+            ({"OPENCODE_MODEL": "provider/model#variant"}, "provider/model#variant"),
+        ):
+            with (self.subTest(settings=settings),
+                  patch.dict(os.environ, {"OPENCODE_API_KEY": "model-token", **settings}, clear=True),
+                  patch.object(run.subprocess, "run") as cli,
+                  patch.object(run, "result_from_events", return_value={})):
+                run.agent("Prompt", "{}")
+            args = cli.call_args.args[0]
+            self.assertEqual(args[-2], f"--model={model}")
+            self.assertNotIn("OPENCODE_MODEL", cli.call_args.kwargs["env"])
+
     def test_final_completed_step_is_the_only_result(self):
         events = [
             {"type": "step_start"},

@@ -106,5 +106,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           OPENCODE_API_KEY: ${{ steps.auth.outputs.token }}
+          OPENCODE_MODEL: ${{ vars.OPENCODE_MODEL }}
           BRANCH: ${{ needs.gate.outputs.branch }}
         run: python3 "$RUNNER_TEMP/fluffy-opencode/command.py" command
