@@ -4,42 +4,52 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM.Diagnostics do
   alias Fluffy.Driver.Phoenix.ClientDOM
   alias Fluffy.Driver.Phoenix.HTML.Aria
   alias Fluffy.Driver.Phoenix.HTML.Semantics
+  alias Fluffy.Driver.Phoenix.Locator, as: PhoenixLocator
+  alias Fluffy.Expect.Internal
   alias Fluffy.StrictnessError
   alias Playwright.Isomorphic.StringUtils
 
   def missing_assertion(client_dom, locator) do
-    case role_query(locator) do
-      :no_role ->
+    case diagnostic_query(locator) do
+      {:role, _, _, _} = query ->
+        "No element matched." <> other_names(client_dom, query)
+
+      _ ->
         text = client_dom.document |> Semantics.document_text() |> StringUtils.normalize_white_space()
         "No element matched.\nPage text: #{inspect(text, printable_limit: 500)}"
-
-      query ->
-        "No element matched." <> other_names(client_dom, query)
     end
   end
 
   def missing_action(client_dom, %StrictnessError{candidates: []} = error) do
-    %{error | message: error.message <> other_names(client_dom, role_query(error.locator))}
+    detail =
+      case diagnostic_query(error.locator) do
+        {:role, _, _, _} = query -> other_names(client_dom, query)
+        {:label, text, options, scope} -> label_evidence(client_dom, scope, text, options)
+        nil -> ""
+      end
+
+    %{error | message: error.message <> detail}
   end
 
-  # Drop only the final role's name, retaining its query roots and other filters.
-  defp role_query(locator) do
+  # Relax only the terminal query, retaining its roots even inside within/2.
+  defp diagnostic_query(locator) do
     case List.pop_at(locator.operations, -1) do
       {{:role, role, options}, scope} ->
         other = %{locator | operations: scope ++ [{:role, role, Keyword.delete(options, :name)}]}
         {:role, role, options, other}
 
+      {{:label, text, options}, scope} ->
+        {:label, text, options, %{locator | operations: scope}}
+
       {{:within, parent, child}, scope} ->
-        with {:role, role, options, other} <- role_query(child) do
-          {:role, role, options, %{locator | operations: scope ++ [{:within, parent, other}]}}
+        with {kind, expected, options, other} <- diagnostic_query(child) do
+          {kind, expected, options, %{locator | operations: scope ++ [{:within, parent, other}]}}
         end
 
       _ ->
-        :no_role
+        nil
     end
   end
-
-  defp other_names(_client_dom, :no_role), do: ""
 
   defp other_names(client_dom, {:role, role, options, other}) do
     if Keyword.has_key?(options, :name) do
@@ -59,4 +69,45 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM.Diagnostics do
       ""
     end
   end
+
+  defp label_evidence(client_dom, scope, text, options) do
+    aria = Aria.for_document(client_dom.document)
+
+    nodes =
+      client_dom
+      |> ClientDOM.resolve(scope)
+      |> PhoenixLocator.scoped_nodes(aria)
+      |> Enum.map(&elem(&1, 0))
+
+    expected = Internal.compile(text)
+    exact? = Keyword.get(options, :exact, false)
+
+    orphan =
+      Enum.find(nodes, fn node ->
+        node.tag == "label" and PhoenixLocator.text_matches?(Semantics.text(node), expected, exact?) and
+          is_nil(Aria.label_control_id(aria, node))
+      end)
+
+    labels =
+      nodes
+      |> Stream.flat_map(&Aria.element_labels(aria, &1))
+      |> Stream.map(&StringUtils.normalize_white_space/1)
+      |> Stream.reject(&(&1 == ""))
+      |> Stream.uniq()
+      |> Enum.take(5)
+
+    orphan_detail(orphan) <> other_labels(labels)
+  end
+
+  defp orphan_detail(nil), do: ""
+
+  defp orphan_detail(node) do
+    text = node |> Semantics.text() |> StringUtils.normalize_white_space()
+    " A matching label (#{inspect(text, printable_limit: 180)}) has no associated control."
+  end
+
+  defp other_labels([]), do: ""
+
+  defp other_labels(labels),
+    do: " Other labels in scope: " <> Enum.map_join(labels, ", ", &inspect(&1, printable_limit: 180))
 end
