@@ -118,7 +118,7 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM do
       raise Fluffy.ActionabilityError, action: :click, reason: :disabled, locator: locator
     end
 
-    Actionability.ensure_clickable!(target.element, :click, locator)
+    Actionability.ensure_clickable!(target, :click, locator)
 
     clicks(client_dom, target, driver)
   end
@@ -356,12 +356,7 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM do
   def set_input_files(%__MODULE__{} = client_dom, %Locator{} = locator, selected_files) when is_list(selected_files) do
     target = control!(client_dom, locator)
 
-    Actionability.ensure_file_input_files!(
-      target.element,
-      selected_files,
-      :set_input_files,
-      locator
-    )
+    Actionability.ensure_file_input_files!(target, selected_files, :set_input_files, locator)
 
     %{
       client_dom
@@ -387,7 +382,7 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM do
       when is_boolean(desired) do
     target = target!(client_dom, locator)
     control = follow_label(client_dom, target)
-    Actionability.ensure_checkable!(control.element, checked_action(desired), locator)
+    Actionability.ensure_checkable!(control, checked_action(desired), locator)
 
     cond do
       checked_target?(client_dom, control) == desired ->
@@ -416,7 +411,7 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM do
   def select_option(%__MODULE__{} = client_dom, %Locator{} = locator, requested) do
     target = control!(client_dom, locator)
     ensure_target_enabled!(client_dom, target, :select_option, locator)
-    Actionability.ensure_selectable!(target.element, :select_option, locator)
+    Actionability.ensure_selectable!(target, :select_option, locator)
 
     options = select_options(client_dom, target)
     requested = List.wrap(requested)
@@ -625,8 +620,9 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM do
         client_dom |> selected_options_for_target(target) |> Enum.map(& &1.id)
 
       target ->
-        type = String.downcase(attribute(target.attributes, "type") || "")
-        if type in ["checkbox", "radio"] and checked_target?(client_dom, target), do: [target.id], else: []
+        if input_type(target) in ["checkbox", "radio"] and checked_target?(client_dom, target),
+          do: [target.id],
+          else: []
     end)
     |> MapSet.new()
   end
@@ -959,7 +955,7 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM do
   defp preserve_files(reconciled, properties, old, new) do
     case Map.fetch(properties, :files) do
       {:ok, files} ->
-        if file_input?(new) and same_control?(old, new),
+        if input_type(new) == "file" and same_control?(old, new),
           do: Map.put(reconciled, :files, files),
           else: reconciled
 
@@ -977,12 +973,6 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM do
         reconciled
     end
   end
-
-  defp file_input?(%{tag: "input", attributes: attributes}) do
-    attributes |> attribute("type") |> Kernel.||("text") |> String.downcase() == "file"
-  end
-
-  defp file_input?(_node), do: false
 
   defp put_property(properties, id, name, value) do
     Map.update(properties, id, %{name => value}, &Map.put(&1, name, value))
@@ -1007,7 +997,7 @@ defmodule Fluffy.Driver.Phoenix.ClientDOM do
         raise Fluffy.ActionabilityError, action: action, reason: :readonly, locator: locator
 
       false ->
-        Actionability.ensure_fillable!(target.element, Aria.content_editable?(aria(client_dom), target), action, locator)
+        Actionability.ensure_fillable!(target, Aria.content_editable?(aria(client_dom), target), action, locator)
     end
   end
 

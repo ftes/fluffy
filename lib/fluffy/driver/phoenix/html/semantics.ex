@@ -71,8 +71,9 @@ defmodule Fluffy.Driver.Phoenix.HTML.Semantics do
   defp tree_text({tag, _attributes, _children}) when tag in ~w(script noscript style template), do: ""
 
   defp tree_text({"input", attributes, _children}) do
-    type = String.downcase(attribute(attributes, "type") || "")
-    if type in ~w(submit button reset), do: attribute(attributes, "value") || "", else: ""
+    if input_type(%{tag: "input", attributes: attributes}) in ~w(submit button reset),
+      do: attribute(attributes, "value") || "",
+      else: ""
   end
 
   defp tree_text({_tag, _attributes, children}), do: Enum.map_join(children, &tree_text/1)
