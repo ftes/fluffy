@@ -39,7 +39,7 @@ def check_actor():
               "Only the original maintainer can rerun this pilot")
     actor = quote(os.environ["GITHUB_ACTOR"], safe="")
     role = run.api(f"collaborators/{actor}/permission")["role_name"]
-    run.check(role in ("admin", "maintain"), "The PlaywrightEx pilot requires the repository maintain or admin role")
+    run.check(role in ("admin", "maintain"), "The pilot requires the repository maintain or admin role")
 
 
 def may_publish(release, base):
@@ -146,7 +146,7 @@ def model_settings():
     }
 
 
-def classify(context):
+def claude_json(prompt):
     update.check_verifier()
     token = os.environ.get("CLAUDE_CODE_OAUTH_TOKEN")
     run.check(token, "CLAUDE_CODE_OAUTH_TOKEN is required")
@@ -168,17 +168,20 @@ def classify(context):
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
         result = subprocess.run(
             [*opencode, "run", "--archived", "--format", "json", "--agent", "ci", "--model", MODEL],
-            cwd=cwd, env=env, input=PROMPT + "\n" + json.dumps(context), text=True,
+            cwd=cwd, env=env, input=prompt, text=True,
             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=True,
         )
     try:
         events = [json.loads(line) for line in result.stdout.splitlines()]
         run.check(not any(event["type"] in ("tool_use", "error") for event in events),
                   "Unexpected tool use or provider error")
-        proposal = validate_classifications(run.result_from_events(result.stdout.splitlines()))
+        return run.result_from_events(result.stdout.splitlines())
     except (KeyError, ValueError) as error:
-        raise ValueError("OpenCode did not return a valid inventory proposal") from error
-    return proposal
+        raise ValueError("Claude Code did not return a complete JSON response") from error
+
+
+def classify(context):
+    return validate_classifications(claude_json(PROMPT + "\n" + json.dumps(context)))
 
 
 def verify(release, previous, parent, run_id):

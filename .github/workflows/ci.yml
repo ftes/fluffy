@@ -53,14 +53,15 @@ jobs:
   # only where they run it. No browser or database. Saves the deps and _build cache on main.
   checks:
     name: checks (${{ matrix.lane }})
-    # Draft PRs skip CI until marked ready, except the PlaywrightEx pilot's own App drafts.
+    # Draft PRs skip CI until marked ready, except the pilots' own App drafts.
     # In a stack only the top PR runs it: it holds every change below it.
     # Tradeoffs (re-run CI on a PR that becomes the top): ftes/ci README, "Pull request CI".
     if: &stack_top >-
       (!github.event.pull_request.draft ||
         (github.event.pull_request.user.login == 'opencode-agent[bot]' &&
          github.event.pull_request.head.repo.full_name == github.repository &&
-         startsWith(github.event.pull_request.head.ref, 'opencode/playwright-ex-pilot-'))) &&
+         (startsWith(github.event.pull_request.head.ref, 'opencode/playwright-ex-pilot-') ||
+          startsWith(github.event.pull_request.head.ref, 'opencode/improvement-pilot-')))) &&
       (github.event.pull_request.stack == null || github.event.pull_request.stack.position == github.event.pull_request.stack.size)
     runs-on: ${{ vars.RUNNER == 'github' && 'ubuntu-26.04' || 'ubicloud-standard-2-ubuntu-2604' }}
     timeout-minutes: 20

@@ -73,7 +73,7 @@ class GateTest(unittest.TestCase):
     def test_fork_notice_and_protected_targets(self):
         event = {"sender": MEMBER, "comment": request(), "issue": {"number": 32, "pull_request": {"url": "pulls/32"}}}
         cases = (pr(repo="fork/fluffy"), pr(branch="renovate/update"), pr(branch="main"), pr(state="closed"),
-                 pr(branch=f"{run.PLAYWRIGHT_PILOT_BRANCH}1.65.0"))
+                 pr(branch=f"{run.PLAYWRIGHT_PILOT_BRANCH}1.65.0"), pr(branch=f"{run.IMPROVEMENT_PILOT_BRANCH}99"))
         for candidate in cases:
             with patch.object(run, "api", side_effect=[{"permission": "admin"}, candidate]):
                 expected = {"fork": "true", "number": 32} if candidate["head"]["repo"]["full_name"] != REPO else {}
