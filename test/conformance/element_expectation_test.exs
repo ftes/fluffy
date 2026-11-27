@@ -12,6 +12,17 @@ defmodule Fluffy.Conformance.ElementExpectationTest do
 
   for driver <- Drivers.all() do
     @tag driver: driver
+    test "enabled and disabled require a match even when negated with #{driver}", %{driver: driver} do
+      session = session(driver)
+
+      for state <- [to_be_enabled(@miss), to_be_disabled(@miss)], expectation <- [state, not_(state)] do
+        assert_raise ExUnit.AssertionError, ~r/to be (enabled|disabled)/, fn ->
+          expect(session, expectation, timeout: 50)
+        end
+      end
+    end
+
+    @tag driver: driver
     test "to_have_text compares normalized text with #{driver}", %{driver: driver} do
       spaced = by_css("#spaced")
 
@@ -263,6 +274,8 @@ defmodule Fluffy.Conformance.ElementExpectationTest do
         to_contain_class(items, "item"),
         to_have_id(items, ""),
         to_be_attached(items),
+        to_be_enabled(items),
+        to_be_disabled(items),
         to_be_hidden(items),
         to_be_empty(items)
       ]

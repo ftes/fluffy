@@ -11,6 +11,18 @@ defmodule Fluffy.Conformance.LiveRetryTest do
 
   for driver <- Drivers.backends() do
     @tag driver: driver
+    test "to_be_enabled waits for an absent button to appear with #{driver}", %{driver: driver} do
+      button = by_role(:button, name: "Appearing action")
+
+      driver
+      |> start_session()
+      |> visit("/live/action-retries")
+      |> expect(to_have_count(button, 0))
+      |> click(by_role(:button, name: "Release appearing button"))
+      |> expect(to_be_enabled(button), timeout: @action_timeout)
+    end
+
+    @tag driver: driver
     test "waits for an asynchronous Live render with #{driver}", %{driver: driver} do
       session = start_session(driver)
 
@@ -28,6 +40,36 @@ defmodule Fluffy.Conformance.LiveRetryTest do
       |> visit("/live/async?delay=40")
       |> click(by_role(:button, name: "Appeared"), timeout: @action_timeout)
       |> expect("Activated" |> by_text() |> to_be_visible(), timeout: @action_timeout)
+    end
+  end
+
+  @tag driver: :phoenix
+  test "the same enabled assertion retries after observing a missing button" do
+    topic = "owlery-#{System.unique_integer([:positive])}"
+    session = :phoenix |> start_session() |> visit("/live/owlery?topic=#{topic}")
+    button = by_role(:button, name: "Read the letter")
+    expect(session, to_have_count(button, 0))
+
+    caller = self()
+    matcher = {Fluffy.Driver.Phoenix.ClientDOM.Expectation, :evaluate, 2}
+
+    # Only the owl can mount the button. Release it after this assertion's first
+    # unsuccessful evaluation, even if the test process is paused before expect.
+    release =
+      Task.async(fn ->
+        assert_receive {:trace, ^caller, :return_from, ^matcher, {false, _actual}}, 5_000
+        Phoenix.PubSub.broadcast(Fluffy.TestPubSub, topic, :owl)
+      end)
+
+    trace = :trace.session_create(:missing_button, release.pid, [])
+
+    try do
+      1 = :trace.function(trace, matcher, [{:_, [], [{:return_trace}]}], [])
+      1 = :trace.process(trace, caller, true, [:call, :arity])
+      expect(session, to_be_enabled(button), timeout: @action_timeout)
+      assert :ok = Task.await(release)
+    after
+      :trace.session_destroy(trace)
     end
   end
 
