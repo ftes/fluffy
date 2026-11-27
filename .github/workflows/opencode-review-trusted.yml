@@ -1,0 +1,116 @@
+name: OpenCode Automatic Review
+
+# workflow_run always loads this workflow and its checkout from the default
+# branch. The source run contributes metadata only, never code or artifacts.
+on: # zizmor: ignore[dangerous-triggers] (default-branch code; only GitHub metadata crosses from the source run)
+  workflow_run:
+    workflows: [OpenCode Review]
+    types: [completed]
+
+permissions: {}
+
+# Hold the lock through reconciliation and the post-submit snapshot check.
+concurrency:
+  group: >-
+    automatic-review-${{ startsWith(github.event.workflow_run.display_title, 'Review ') &&
+    format('{0}-{1}', github.event.workflow_run.head_repository.id, github.event.workflow_run.head_branch) ||
+    github.run_id }}
+  cancel-in-progress: false
+
+env:
+  GIT_CONFIG_NOSYSTEM: '1'
+  GIT_CONFIG_GLOBAL: /dev/null
+
+jobs:
+  reconcile:
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      startsWith(github.event.workflow_run.display_title, 'Review ')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      id-token: write
+    outputs:
+      number: ${{ steps.reconcile.outputs.number }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify the request and dismiss superseded verdicts
+        id: reconcile
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -B .github/opencode/review.py reconcile
+
+  infer:
+    needs: reconcile
+    if: needs.reconcile.outputs.number != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+    outputs:
+      artifact: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Read the exact PR snapshot as text
+        id: prepare
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -B .github/opencode/review.py prepare
+      - name: Install pinned OpenCode and Claude Code
+        if: steps.prepare.outputs.ready == 'true'
+        run: | # zizmor: ignore[adhoc-packages] (exact CLI versions)
+          npm install --prefix "$RUNNER_TEMP/review-tools" --no-audit --no-fund \
+            @opencode/cli@2.4.2 @anthropic-ai/claude-code@2.1.332
+      - name: Review with Claude Code Sonnet
+        if: steps.prepare.outputs.ready == 'true'
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: PATH="$RUNNER_TEMP/review-tools/node_modules/.bin:$PATH" python3 -B .github/opencode/review.py infer
+      - id: upload
+        if: steps.prepare.outputs.ready == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: automatic-review-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/review-result.json
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: [reconcile, infer]
+    if: needs.infer.outputs.artifact != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.infer.outputs.artifact }}
+          path: ${{ runner.temp }}/review-output
+      - name: Validate and publish the review
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -B .github/opencode/review.py publish

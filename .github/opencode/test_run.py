@@ -120,7 +120,7 @@ class PublishTest(unittest.TestCase):
     def review(self, *, before=None, after=None, replay=False, prior=None):
         pr = self.pr()
         submitted = []
-        remaining_reads = iter([pr, before or pr, after or pr])
+        remaining_reads = iter([pr, pr, before or pr, after or pr])
 
         def api(path, **kw):
             if "payload" in kw:
@@ -140,21 +140,22 @@ class PublishTest(unittest.TestCase):
 
         with (patch.object(run, "api", side_effect=api),
               patch.object(run, "app_token", return_value=contextlib.nullcontext("app-token")),
-              patch.object(run, "agent", return_value={
-                  "summary": "Checked calls", "open_blocking": 0, "open_non_blocking": 1,
-                  "findings": [{"path": " lib/a.ex ", "line": 1, "side": "RIGHT",
-                                "body": "suggestion (non-blocking): Verify the result"}],
-              }) as agent,
               patch.object(run, "snapshot_diff", return_value=("b" * 40, "diff")),
               patch.object(run, "gh") as gh, patch.object(run, "save"), patch.object(run, "context", return_value=pr),
               patch.object(run, "reconcile_reviews") as reconcile,
               contextlib.redirect_stdout(io.StringIO())):
-            run.review(42, pr["head"]["sha"], "Review")
+            expected, marker, depth = run.prepare_review(42, pr["head"]["sha"])
+            self.assertEqual(depth, "full")
+            result = {
+                "summary": "Checked calls", "open_blocking": 0, "open_non_blocking": 1,
+                "findings": [{"path": " lib/a.ex ", "line": 1, "side": "RIGHT",
+                              "body": "suggestion (non-blocking): Verify the result"}],
+            }
+            run.publish_review(42, expected, marker, result)
             if replay:
-                remaining_reads = iter([pr])
-                run.review(42, pr["head"]["sha"], "Review")
-            agent.assert_called_once()
-            self.assertIn("Review mode: full.", agent.call_args.args[0])
+                remaining_reads = iter([pr, pr])
+                self.assertIsNone(run.prepare_review(42, pr["head"]["sha"]))
+                run.publish_review(42, expected, marker, result)
             self.assertTrue(any(arg.startswith("query=query(") for arg in gh.call_args.args))
             self.assertEqual(reconcile.call_count, int(before is None and after is None))
         return submitted
@@ -260,12 +261,11 @@ class PublishTest(unittest.TestCase):
         with (patch.object(run, "api", side_effect=[pr, [previous], pr, [], [previous]]),
               patch.object(run, "snapshot_diff", return_value=("b" * 40, b"same diff")),
               patch.object(run, "reviewed_diff", return_value=b"same diff"),
-              patch.object(run, "app_token") as token, patch.object(run, "agent") as agent,
+              patch.object(run, "app_token") as token,
               contextlib.redirect_stdout(io.StringIO())):
             run.reconcile_reviews(42)
-            run.review(42, pr["head"]["sha"], "Review")
+            self.assertIsNone(run.prepare_review(42, pr["head"]["sha"]))
         token.assert_not_called()
-        agent.assert_not_called()
 
     def test_unchanged_diff_retires_legacy_block_only_if_latest_verdict_approves(self):
         pr = self.pr()

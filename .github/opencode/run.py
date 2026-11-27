@@ -296,7 +296,9 @@ def previous_review(number):
 
 
 def active_review(pr, expected):
-    return local_pr(pr) and pr["state"] == "open" and not pr["draft"] and snapshot(pr) == expected
+    user = pr["user"]
+    return (local_pr(pr) and pr["state"] == "open" and not pr["draft"] and snapshot(pr) == expected
+            and (user["type"] != "Bot" or user["login"] in REVIEW_BOTS))
 
 
 def dismiss_review(number, review_id, token, message):
@@ -392,16 +394,18 @@ def reconcile_reviews(number, token=None):
                     dismiss_review(number, review_id, credential, message)
 
 
-def review(number, head, prompt, retargeted=False):
+def snapshot_marker(expected, merge_base):
+    head, ref, base = expected
+    return head, merge_base, hashlib.sha256(ref.encode()).hexdigest(), base
+
+
+def prepare_review(number, head, retargeted=False):
     pr = api(f"pulls/{number}")
     expected = snapshot(pr)
     if expected[0] != head or not active_review(pr, expected):
         return
-    author = pr["user"]["login"]
-    check(pr["user"]["type"] != "Bot" or author in REVIEW_BOTS, "Unapproved PR author")
     base, full = snapshot_diff(pr)
-    target = hashlib.sha256(expected[1].encode()).hexdigest()
-    marker = (head, base, target, expected[2])
+    marker = snapshot_marker(expected, base)
     previous, previous_active = previous_review(number)
     if previous_active and previous == marker:
         return
@@ -437,9 +441,13 @@ def review(number, head, prompt, retargeted=False):
     )
     save("resolved.jsonl", resolved)
     save("pr.diff", full)
-    result = agent(f"{prompt}\nReview mode: {depth}. PR context: {CONTEXT}/{number}.json.",
-                   '{"summary":"...", "open_blocking":0, "open_non_blocking":0, '
-                   '"findings":[{"path":"...", "line":123, "side":"RIGHT", "body":"issue (blocking): ..."}]}')
+    return expected, marker, depth
+
+
+def publish_review(number, expected, marker, result):
+    pr = api(f"pulls/{number}")
+    if not active_review(pr, expected) or previous_review(number) == (marker, True):
+        return
     fields(result, "summary", "open_blocking", "open_non_blocking", "findings")
     summary = text(result["summary"], 12000)
     blocking, non_blocking = result["open_blocking"], result["open_non_blocking"]
@@ -473,13 +481,13 @@ def review(number, head, prompt, retargeted=False):
         if not active_review(api(f"pulls/{number}"), expected):
             print("PR changed; discarding review.")
             return
-        own_pr = author == BOT
+        own_pr = pr["user"]["login"] == BOT
         event = "COMMENT" if own_pr else ("REQUEST_CHANGES" if blocking else "APPROVE")
         note = "\n\nNo approval or change request was submitted on the app's own PR." if own_pr else ""
         body = f"**Verdict: {verdict}**\n\n{summary}{note}\n\n<!-- opencode-review: {' '.join(marker)} -->"
         # GitHub persists the summary, inline comments, verdict and retry marker together.
         submitted = api(f"pulls/{number}/reviews", token=token, payload={
-            "commit_id": head, "event": event, "body": body, "comments": comments,
+            "commit_id": expected[0], "event": event, "body": body, "comments": comments,
         })
         if not own_pr:
             if not active_review(api(f"pulls/{number}"), expected):
@@ -506,15 +514,8 @@ def main(mode):
             with open(os.environ["GITHUB_OUTPUT"], "a") as stream:
                 print("allowed=true", file=stream)
         return
-    number = int(os.environ["NUMBER"])
-    head = os.environ["HEAD"]
-    retargeted = os.environ.get("RETARGETED") == "true"
-    if mode == "reconcile-reviews":
-        reconcile_reviews(number)
-        return
-    check(mode == "review", "Expected review or reconcile-reviews")
-    CONTEXT.mkdir(parents=True, exist_ok=True)
-    review(number, head, Path(__file__).with_name("review.md").read_text(), retargeted)
+    check(mode == "reconcile-reviews", "Expected setup-gate, require-safe-setup or reconcile-reviews")
+    reconcile_reviews(int(os.environ["NUMBER"]))
 
 
 if __name__ == "__main__":
