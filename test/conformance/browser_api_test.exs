@@ -131,7 +131,7 @@ defmodule Fluffy.Conformance.BrowserAPITest do
   @tag driver: :playwright
   test "hover, drag, and typing emit native browser events" do
     session =
-      Fluffy.session_for_html(:playwright, """
+      session_for_html(:playwright, """
       <button onmouseover="this.textContent='Hovered'">Hover me</button>
       <input aria-label="Text" onkeydown="window.keys=(window.keys||0)+1">
       <div draggable="true" id="source">Drag me</div>
@@ -150,10 +150,10 @@ defmodule Fluffy.Conformance.BrowserAPITest do
 
   @tag driver: :playwright
   test "typing is strict and reconciles navigation" do
-    session = Fluffy.session_for_html(:playwright, "<input><input>")
+    session = session_for_html(:playwright, "<input><input>")
     error = assert_raise Fluffy.OperationError, fn -> press_sequentially(session, by_css("input"), "x", timeout: 100) end
     assert error.operation == :press_sequentially
-    session = Fluffy.set_html(session, ~s(<input oninput="location.href='/chamber'">))
+    session = set_html(session, ~s(<input oninput="location.href='/chamber'">))
 
     session
     |> press_sequentially(by_css("input"), "x")

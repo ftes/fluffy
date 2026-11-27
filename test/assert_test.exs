@@ -40,7 +40,7 @@ defmodule Fluffy.AssertTest do
   end
 
   test "typed expectations and session expressions are evaluated once" do
-    session = Fluffy.session_for_html(:static, "<p>Response</p>")
+    session = Fluffy.Support.Case.session_for_html(:static, "<p>Response</p>")
 
     session_fun = fn ->
       send(self(), :session_evaluated)
@@ -78,7 +78,7 @@ defmodule Fluffy.AssertTest.QualifiedTest do
   alias Fluffy.AssertTest.QualifiedHelper
 
   test "Fluffy.Assert's assert/2 and refute/2 can be called qualified, without require" do
-    session = Fluffy.session_for_html(:static, "<p>Hedwig</p>")
+    session = Fluffy.Support.Case.session_for_html(:static, "<p>Hedwig</p>")
 
     assert %Fluffy.Session{} = session |> QualifiedHelper.owl_arrives() |> QualifiedHelper.no_howler()
     assert QualifiedHelper.letter(:owl) == true

@@ -2,12 +2,12 @@ defmodule Fluffy.SessionRuntimeTest do
   use ExUnit.Case, async: true
   use Playwright.Test
 
-  import Fluffy.Support.Case, only: [monitor_running: 1]
+  import Fluffy.Support.Case, only: [monitor_running: 1, session_for_html: 2]
 
   alias Fluffy.SessionRuntime
 
   test "event routing respects source and type, and removal is idempotent" do
-    session = Fluffy.session_for_html(:static, "<p>Events</p>")
+    session = session_for_html(:static, "<p>Events</p>")
     runtime = session.runtime
     assert :ok = SessionRuntime.subscribe(runtime, self(), session.active_page, :download, nil)
     SessionRuntime.emit_event(runtime, :context, :download, :wrong_source)
@@ -23,7 +23,7 @@ defmodule Fluffy.SessionRuntimeTest do
   end
 
   test "page errors leave the runtime usable" do
-    session = Fluffy.session_for_html(:static, "<input aria-label='Name'>")
+    session = session_for_html(:static, "<input aria-label='Name'>")
     runtime = session.runtime
     assert {:error, _} = SessionRuntime.page(runtime, make_ref())
     assert {:error, _} = SessionRuntime.put_page_state(runtime, make_ref(), %{})
@@ -56,7 +56,7 @@ defmodule Fluffy.SessionRuntimeTest do
   end
 
   test "state survives discarded handles and session shutdown is idempotent" do
-    session = Fluffy.session_for_html(:static, "<input aria-label='Name'>")
+    session = session_for_html(:static, "<input aria-label='Name'>")
     Fluffy.fill(session, Fluffy.Locator.by_label("Name"), "Hermione")
     Fluffy.Expect.expect(session, Fluffy.Expect.to_have_value(Fluffy.Locator.by_label("Name"), "Hermione"))
     assert :ok = Fluffy.Backend.close_session(session)

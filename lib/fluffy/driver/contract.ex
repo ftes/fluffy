@@ -20,7 +20,6 @@ defmodule Fluffy.Driver.Contract do
 
   @callback validate_operation!(Session.t(), atom(), list()) :: :ok
 
-  @callback set_html(Session.t(), String.t()) :: result()
   @callback expect(Session.t(), Expect.t()) :: result()
   @callback click(Session.t(), Locator.t(), keyword()) :: result()
   @callback submit(Session.t(), Locator.t(), keyword()) :: result()
@@ -48,6 +47,4 @@ defmodule Fluffy.Driver.Contract do
   @callback open_browser(Session.t(), (String.t() -> term())) :: Session.t()
   @callback unwrap(Session.t(), (term() -> term())) :: result()
   @callback unwrap_and_return(Session.t(), (term() -> value)) :: {:return, value, result()} when value: term()
-
-  @optional_callbacks set_html: 2
 end

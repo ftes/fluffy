@@ -134,7 +134,9 @@ defmodule Fluffy.PlaywrightArtifactsTest do
   @tag trace_has: ["set_input_files", "setInputFiles"], trace_lacks: [@secret]
   test "does not copy in-memory upload contents into the trace" do
     :playwright
-    |> session_for_html(~s(<label>Attachment <input type="file"></label>), base_url: Server.base_url())
+    |> Fluffy.Support.Case.session_for_html(~s(<label>Attachment <input type="file"></label>),
+      base_url: Server.base_url()
+    )
     |> set_input_files(by_label("Attachment"), %FilePayload{
       name: "private.txt",
       bytes: @secret,
@@ -170,6 +172,8 @@ defmodule Fluffy.PlaywrightArtifactsTest.AssertStepsTest do
 
   import Fluffy.Locator
 
+  alias Fluffy.Support.Case
+
   setup %{trace_path: path} do
     trace_path = Playwright.Test.output_path("trace.zip")
     Agent.update(path, fn _ -> trace_path end)
@@ -198,7 +202,7 @@ defmodule Fluffy.PlaywrightArtifactsTest.AssertStepsTest do
     refute(nil, @howler)
     refute match?({:ok, _}, Process.get(:owl_post))
 
-    :static |> Fluffy.session_for_html("<p>Hedwig</p>") |> assert(visible(by_text("Hedwig")))
+    :static |> Case.session_for_html("<p>Hedwig</p>") |> assert(visible(by_text("Hedwig")))
   end
 
   @letter "A letter " <> "for Harry"
@@ -207,7 +211,7 @@ defmodule Fluffy.PlaywrightArtifactsTest.AssertStepsTest do
   @tag trace_has: [~s(Expect \\"toPass\\"), ~s(Expect \\"poll assert\\"), ~s("title":"#{@letter}")]
   test "records pass and poll as steps" do
     :static
-    |> Fluffy.session_for_html("<p>Hedwig</p>")
+    |> Case.session_for_html("<p>Hedwig</p>")
     |> assert(
       pass(fn session ->
         assert(:letter, @letter)
@@ -237,6 +241,6 @@ defmodule Fluffy.PlaywrightArtifactsTest.AssertStepsOffTest do
     assert 1 + 1 == 2
     assert(:letter, @owl)
 
-    :static |> Fluffy.session_for_html("<p>Hedwig</p>") |> assert(visible(by_text("Hedwig")))
+    :static |> Fluffy.Support.Case.session_for_html("<p>Hedwig</p>") |> assert(visible(by_text("Hedwig")))
   end
 end

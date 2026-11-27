@@ -14,7 +14,7 @@ defmodule Fluffy.Driver.Static do
 
   @impl true
   def open_browser(%Session{} = session, open_fun) do
-    endpoint = if Session.context(session).http, do: Session.context(session).http.endpoint
+    endpoint = Session.context(session).http.endpoint
     document = Session.page_state(session).client_dom.document
     Fluffy.OpenBrowser.write(document, Fluffy.OpenBrowser.static_asset_resolver(endpoint), open_fun)
     session
@@ -23,12 +23,6 @@ defmodule Fluffy.Driver.Static do
   @impl true
   def validate_operation!(session, operation, arguments),
     do: Fluffy.Driver.Phoenix.Validation.validate_operation!(session, operation, arguments)
-
-  @impl true
-  def set_html(%Session{} = session, html) when is_binary(html) do
-    state = Map.put(Session.page_state(session), :client_dom, ClientDOM.from_fragment(html))
-    Session.put_page_state(session, state)
-  end
 
   @impl true
   def expect(%Session{} = session, %Expect{} = expectation) do
@@ -41,8 +35,7 @@ defmodule Fluffy.Driver.Static do
 
       %Expect{target: :page, kind: :url, expected: expected} ->
         actual = Session.current_page(session).url
-        # A session for HTML has no server, so no base URL.
-        base_url = with %{base_url: base_url} <- Session.context(session).http, do: base_url
+        base_url = Session.context(session).http.base_url
         Expect.Internal.assert!(expectation, Expect.Internal.url_matches?(expected, base_url, actual), actual)
 
       %Expect{} ->

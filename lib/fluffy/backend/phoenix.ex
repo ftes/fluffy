@@ -72,20 +72,6 @@ defmodule Fluffy.Backend.Phoenix do
   defp conn_header(nil, _name), do: nil
   defp conn_header(conn, name), do: conn |> Plug.Conn.get_req_header(name) |> List.first()
 
-  @doc false
-  def session_for_html(html) when is_binary(html) do
-    page = %Page.State{
-      driver: :static,
-      state: %StaticState{client_dom: ClientDOM.from_fragment(html)}
-    }
-
-    Session.new(
-      __MODULE__,
-      %Context{http: nil},
-      page
-    )
-  end
-
   @impl true
   def page_snapshot(_context, page), do: page
 
@@ -112,35 +98,27 @@ defmodule Fluffy.Backend.Phoenix do
   def runtime_event(_context, _message), do: :ignore
 
   @impl true
-  def base_url(%Session{} = session), do: http!(session).base_url
+  def base_url(%Session{} = session), do: Session.context(session).http.base_url
 
   @impl true
-  def endpoint(%Session{} = session), do: http!(session).endpoint
+  def endpoint(%Session{} = session), do: Session.context(session).http.endpoint
 
   # The session's cookie jar plays the browser context's cookie store: requests send what
   # it holds when they are made, as a browser does.
   @impl true
   def add_cookies(%Session{} = session, cookies) do
-    http = http!(session)
+    http = Session.context(session).http
     put_http(session, %{http | cookie_jar: CookieJar.add_cookies(http.cookie_jar, cookies)})
   end
 
   @impl true
-  def cookies(%Session{} = session, urls), do: CookieJar.cookies(http!(session).cookie_jar, urls)
+  def cookies(%Session{} = session, urls), do: CookieJar.cookies(Session.context(session).http.cookie_jar, urls)
 
   @impl true
   def clear_cookies(%Session{} = session, options) when is_list(options) or is_map(options) do
     filters = Fluffy.Options.validate_clear_cookies!(options)
-    http = http!(session)
+    http = Session.context(session).http
     put_http(session, %{http | cookie_jar: CookieJar.clear_cookies(http.cookie_jar, filters)})
-  end
-
-  # A session_for_html/2 session makes no requests.
-  defp http!(session) do
-    case Session.context(session).http do
-      %HTTPClient{} = http -> http
-      nil -> raise ArgumentError, "a session of session_for_html/2 has no base URL or cookies"
-    end
   end
 
   @impl true

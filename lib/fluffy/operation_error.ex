@@ -4,7 +4,8 @@ defmodule Fluffy.OperationError do
 
   `backend` is `:phoenix` or `:playwright`; `driver` is the page's driver when the operation
   failed, so `:unvisited` if a Phoenix session's first `visit` failed before any page loaded.
-  `operation` names the public call and `locator` is the query,
+  `operation` names the public call (`set_checked` reports the `:check` or `:uncheck` action it performs).
+  `locator` is the query,
   `Fluffy.FileChooser` handle, or `nil` for an operation on the page as a whole, such
   as a failed navigation. `cause` retains a native Playwright error, a structured Phoenix
   `Fluffy.StrictnessError`, `Fluffy.ActionabilityError` or `Fluffy.LiveViewError`, or,

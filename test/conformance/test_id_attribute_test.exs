@@ -3,7 +3,6 @@ defmodule Fluffy.Conformance.TestIdAttributeTest do
   # read it, and each pooled Playwright driver gets it as it starts.
   use Fluffy.Support.Case, async: false
 
-  import Fluffy
   import Fluffy.Expect
   import Fluffy.Locator
   import Fluffy.Playwright, only: [unwrap_and_return: 3]

@@ -19,6 +19,9 @@ defmodule Fluffy.Support.Case do
           put_fluffy_config: 1,
           put_playwright_config: 2,
           requires: 1,
+          session_for_html: 2,
+          session_for_html: 3,
+          set_html: 2,
           with_html: 3
         ]
 
@@ -27,7 +30,29 @@ defmodule Fluffy.Support.Case do
   end
 
   # Runs `fun` on a session of `driver` (`Fluffy.Support.Drivers.html/0`) showing `html`.
-  def with_html(driver, html, fun), do: fun.(Fluffy.session_for_html(driver, html))
+  def with_html(driver, html, fun), do: fun.(session_for_html(driver, html))
+
+  def session_for_html(driver, html, options \\ []) do
+    backend = if driver == :static, do: :phoenix, else: driver
+    backend |> Fluffy.start_session(options) |> Fluffy.visit("/harness") |> set_html(html)
+  end
+
+  def set_html(session, html) do
+    case Fluffy.Session.current_driver(session) do
+      :static ->
+        dom = Fluffy.Driver.Phoenix.ClientDOM.from_document(LazyHTML.from_fragment(html), nil)
+        Fluffy.Session.put_page_state(session, %{Fluffy.Session.page_state(session) | client_dom: dom})
+
+      :playwright ->
+        Fluffy.Playwright.evaluate(
+          session,
+          "html => { document.querySelector('#fluffy-test-root').innerHTML = html }",
+          html
+        )
+
+        session
+    end
+  end
 
   # A plain function, compiled before the tests, so `@tag skip:` can call it at compile time.
   # Read at call time, as the config can differ between runs (FLUFFY_BROWSER).
