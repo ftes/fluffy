@@ -55,6 +55,7 @@ jobs:
     if: needs.infer.outputs.proposal != ''
     runs-on: ${{ vars.RUNNER == 'github' && 'ubuntu-26.04' || 'ubicloud-standard-2-ubuntu-2604' }}
     timeout-minutes: 30
+    # GitHub denies cache reads and writes, including those requested by setup actions.
     cache-mode: none
     permissions:
       contents: read

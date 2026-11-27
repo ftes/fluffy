@@ -16,6 +16,7 @@ import run
 
 DOC = "docs/locators.md"
 SECTION = "\n### Combining locators\n\n"
+ORIGINAL_LEAD = "`filter(has: ...)`"
 TITLE = "Clarify how combined locators match"
 BODY = "Clarifies the difference between matching a descendant and matching the same element. The documentation build passed before publication."
 PROMPT = """Improve the first prose paragraph under “Combining locators” only.
@@ -33,8 +34,7 @@ MAX_ARTIFACT = 16 * 1024
 def paragraph_parts(source):
     start, heading, section = source.partition(SECTION)
     paragraph, gap, rest = section.partition("\n\n")
-    run.check(heading and gap and paragraph.startswith("`filter(has: ...)`"),
-              "The locator paragraph changed shape; review it manually")
+    run.check(heading and gap, "The locator paragraph changed shape; review it manually")
     return start + heading, paragraph, gap + rest
 
 
@@ -51,6 +51,7 @@ def wrap(paragraph):
 def validate_file(original, changed):
     run.check(type(changed) is str, "The proposal must be text")
     before, previous, after = paragraph_parts(original)
+    run.check(previous.startswith(ORIGINAL_LEAD), "The original paragraph has already changed")
     run.check(changed.startswith(before) and changed.endswith(after), "Proposal changes text outside the chosen paragraph")
     replacement = changed[len(before):-len(after)]
     run.check(replacement == wrap(replacement.replace("\n", " ")) and
@@ -61,14 +62,17 @@ def validate_file(original, changed):
 def infer(parent):
     guide = update.blob(parent, DOC)
     guidance = update.blob(parent, "AGENTS.md")
-    parts = paragraph_parts(guide)
+    before, previous, after = paragraph_parts(guide)
+    if not previous.startswith(ORIGINAL_LEAD):
+        print("The locator paragraph has already changed.")
+        return None
     context = json.dumps({"guide": guide, "guidance": guidance})
     run.check(len(context) <= 32 * 1024, "The pilot context is too large")
     proposal = playwright_pilot.claude_json(PROMPT + "\n" + context)
     if proposal == {}:
+        print("Claude Code declined to propose a change.")
         return None
     run.fields(proposal, "paragraph")
-    before, _, after = parts
     changed = before + wrap(proposal["paragraph"]) + after
     validate_file(guide, changed)
     return {DOC: changed}
@@ -81,6 +85,7 @@ def write_artifact(path, data):
 
 
 def read_files(path, identity, original, *extra):
+    # The Actions artifact ID selects the file; check its run, base and content here.
     with path.open("rb") as stream:
         raw = stream.read(MAX_ARTIFACT + 1)
     run.check(len(raw) <= MAX_ARTIFACT, "Pilot artifact is too large")
@@ -142,9 +147,7 @@ def main(mode):
         run.check(publish.remote_head(base) == parent, "The base branch moved; start a fresh run")
     elif mode == "infer":
         files = infer(parent)
-        if files is None:
-            print("Claude Code declined to propose a change.")
-        else:
+        if files is not None:
             write_artifact(directory / "proposal.json", identity | {"files": files})
             with open(os.environ["GITHUB_OUTPUT"], "a") as stream:
                 print("proposed=true", file=stream)

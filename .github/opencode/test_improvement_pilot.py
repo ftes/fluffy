@@ -25,6 +25,13 @@ class ImprovementPilotTest(unittest.TestCase):
                   patch.object(pilot.playwright_pilot, "claude_json", return_value=result)):
                 self.assertEqual(pilot.infer(BASE), expected)
 
+    def test_an_already_reworded_paragraph_skips_inference(self):
+        with (patch.object(pilot.update, "blob", return_value=CHANGED),
+              patch.object(pilot.playwright_pilot, "claude_json") as model,
+              contextlib.redirect_stdout(io.StringIO())):
+            self.assertIsNone(pilot.infer(BASE))
+        model.assert_not_called()
+
     def test_rejects_extra_files_and_markup(self):
         for file in (ORIGINAL, CHANGED + "\nNew material\n", CHANGED.replace(PROSE, "<script>bad</script>"),
                      CHANGED.replace(PROSE, "One line.\n\nSecond paragraph."),
