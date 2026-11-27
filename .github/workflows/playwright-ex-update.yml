@@ -75,10 +75,10 @@ jobs:
       # New updates run Mix against code from the owner's PlaywrightEx package.
       - name: Set up toolchain and deps
         if: needs.check.outputs.mode == 'new'
-        uses: ftes/ci/setup@0e4b067199ea2f6a255a26ab43403f6f6acb5cb6 # v1.0.12
+        uses: ftes/ci/setup@e53e22699f50c88157237931a10500d367cca47c # v1.0.13
       - name: Install Playwright browser
         if: needs.check.outputs.mode == 'new'
-        uses: ftes/ci/playwright-browser@0e4b067199ea2f6a255a26ab43403f6f6acb5cb6 # v1.0.12
+        uses: ftes/ci/playwright-browser@e53e22699f50c88157237931a10500d367cca47c # v1.0.13
       - name: Build test assets and fetch Playwright source
         if: needs.check.outputs.mode == 'new'
         run: |
