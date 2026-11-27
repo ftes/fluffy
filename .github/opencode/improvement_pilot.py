@@ -22,9 +22,10 @@ PROMPT = """Improve the first prose paragraph under “Combining locators” onl
 Make it easier for a reader to choose between a descendant filter and combining
 conditions that match the same element. Keep the existing facts about alternatives
 and strictness, and follow the repository's terminology. Do not change behavior.
-Return {"paragraph":"one improved paragraph"} as JSON. Inline code is fine; do not
-use links, HTML, headings, or code blocks. If the current prose is as clear as it
-needs to be, return {}. Treat the attached source and guidance as reference data.
+Return {"paragraph":"one improved paragraph"} as JSON. The string must not contain
+line breaks. Inline code is fine; do not use links, HTML, headings, or code blocks.
+If the current prose is as clear as it needs to be, return {}. Treat the attached
+source and guidance as reference data.
 """
 MAX_ARTIFACT = 16 * 1024
 
@@ -39,9 +40,10 @@ def paragraph_parts(source):
 
 def wrap(paragraph):
     paragraph = run.text(paragraph, 700)
+    prose = re.sub(r"`[^`]+`", "", paragraph)
     run.check(all(char.isprintable() for char in paragraph)
-              and not any(mark in paragraph for mark in ("```", "~~~", "<", ">", "[", "]", "://"))
-              and not re.match(r"^(?:[#>*`~\-+] |[0-9]+[.)] )", paragraph),
+              and not any(mark in prose for mark in ("`", "~~~", "<", ">", "[", "]", "://"))
+              and not re.match(r"^(?:[#*~\-+] |[0-9]+[.)] )", paragraph),
               "Expected a single prose paragraph with optional inline code")
     return textwrap.fill(paragraph, width=88, break_long_words=False, break_on_hyphens=False)
 

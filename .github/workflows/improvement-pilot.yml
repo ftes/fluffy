@@ -11,8 +11,6 @@ concurrency:
 
 env:
   BASE_BRANCH: ${{ github.event.repository.default_branch }}
-  GIT_CONFIG_NOSYSTEM: '1'
-  GIT_CONFIG_GLOBAL: /dev/null
 
 jobs:
   infer:
@@ -105,4 +103,6 @@ jobs:
       - name: Open one draft for maintainer review
         env:
           GH_TOKEN: ${{ github.token }}
+          GIT_CONFIG_NOSYSTEM: '1'
+          GIT_CONFIG_GLOBAL: /dev/null
         run: python3 -B .github/opencode/improvement_pilot.py publish

@@ -10,7 +10,7 @@ import run
 
 
 ORIGINAL = f"# Locators\n{pilot.SECTION}`filter(has: ...)` keeps matching rows.\n\nThe next paragraph.\n"
-PROSE = "Use the descendant filter to select rows by their contents."
+PROSE = 'Use the descendant filter. `button("Accio") |> or_(link("Accio"))` matches either.'
 CHANGED = ORIGINAL.replace("`filter(has: ...)` keeps matching rows.", PROSE)
 BASE = "a" * 40
 HEAD = "b" * 40
@@ -25,7 +25,7 @@ class ImprovementPilotTest(unittest.TestCase):
                   patch.object(pilot.playwright_pilot, "claude_json", return_value=result)):
                 self.assertEqual(pilot.infer(BASE), expected)
 
-    def test_rejects_extra_edits_modes_and_markup(self):
+    def test_rejects_extra_files_and_markup(self):
         for file in (ORIGINAL, CHANGED + "\nNew material\n", CHANGED.replace(PROSE, "<script>bad</script>"),
                      CHANGED.replace(PROSE, "One line.\n\nSecond paragraph."),
                      CHANGED.replace(PROSE, "~~~elixir\nIO.puts(:bad)\n~~~")):
