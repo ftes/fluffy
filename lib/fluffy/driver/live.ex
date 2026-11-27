@@ -19,8 +19,6 @@ defmodule Fluffy.Driver.Live do
   alias Fluffy.Driver.Live.View
   alias Fluffy.Driver.Phoenix.ClientDOM
   alias Fluffy.Driver.Phoenix.Form
-  alias Fluffy.Driver.Phoenix.HTML.DocumentIndex
-  alias Fluffy.Driver.Phoenix.HTML.Semantics
   alias Fluffy.Driver.Phoenix.HTML.Target
   alias Fluffy.Expect
   alias Fluffy.Internal.Navigation
@@ -31,8 +29,6 @@ defmodule Fluffy.Driver.Live do
   alias Fluffy.Session
   alias Fluffy.TestTimeout
   alias Fluffy.Timeouts
-  # StringUtils is internal to Playwright, which is pinned.
-  alias Playwright.Isomorphic.StringUtils
 
   @impl true
   def open_browser(%Session{} = session, open_fun) do
@@ -56,7 +52,7 @@ defmodule Fluffy.Driver.Live do
             {:ok, session}
 
           {:ok, _passed?, actual} ->
-            {:retry, Expect.Internal.failure_message(expectation, actual)}
+            {:retry, {:expectation, expectation, actual}}
         end
       end)
 
@@ -593,20 +589,11 @@ defmodule Fluffy.Driver.Live do
   defp evaluate_expectation(%Session{} = session, %Expect{} = expectation) do
     {passed?, actual} = ClientDOM.Expectation.evaluate(client_dom(session), expectation)
 
-    actual =
-      if expectation.kind == :visible and actual == 0, do: document_text(session), else: actual
-
     {:ok, passed?, actual}
   end
 
   defp client_dom(session), do: session |> Session.page_state() |> Map.fetch!(:client_dom)
   defp document(session), do: session |> client_dom() |> Map.fetch!(:document)
-
-  # The page's text as Playwright reads it, without <template> content.
-  defp document_text(session) do
-    {:ok, root} = session |> client_dom() |> ClientDOM.index() |> DocumentIndex.fetch_by_id(0)
-    root |> Semantics.text() |> StringUtils.normalize_white_space()
-  end
 
   defp resolve_live_action(session, locator, deadline, action) do
     case Retry.run_current(

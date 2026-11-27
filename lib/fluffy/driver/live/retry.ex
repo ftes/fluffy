@@ -60,5 +60,7 @@ defmodule Fluffy.Driver.Live.Retry do
     do: Fluffy.StrictnessError.exception(locator: locator, candidates: candidates)
 
   defp exception({:exception, exception}), do: exception
-  defp exception(message) when is_binary(message), do: ExUnit.AssertionError.exception(message: message)
+
+  defp exception({:expectation, expectation, actual}),
+    do: ExUnit.AssertionError.exception(message: Fluffy.Expect.Internal.failure_message(expectation, actual))
 end

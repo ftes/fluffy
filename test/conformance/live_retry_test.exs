@@ -37,12 +37,14 @@ defmodule Fluffy.Conformance.LiveRetryTest do
     error =
       assert_raise ExUnit.AssertionError, fn ->
         session
-        |> visit("/live/async?delay=1000")
-        |> expect("Status: impossible" |> by_text() |> to_be_visible(), timeout: 20)
+        |> visit("/live/async?delay=20")
+        |> expect("Status: impossible" |> by_text() |> to_be_visible(), timeout: 300)
       end
 
     assert error.message =~ "Status: impossible"
-    assert error.message =~ "Status: waiting"
+    assert error.message =~ "No element matched."
+    assert error.message =~ "Status: ready"
+    refute error.message =~ "Status: waiting"
   end
 
   test "Live locator strictness is terminal rather than retried" do

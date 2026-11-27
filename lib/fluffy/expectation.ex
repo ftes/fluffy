@@ -21,6 +21,10 @@ defmodule Fluffy.Expectation do
     """)
   end
 
+  def strictness_message(locator, []) do
+    "No element matched #{Locator.Internal.describe(locator)}."
+  end
+
   def strictness_message(locator, candidates) do
     String.trim("""
     Expected #{Locator.Internal.describe(locator)} to resolve to exactly one element, but it matched #{length(candidates)}.
@@ -41,7 +45,7 @@ defmodule Fluffy.Expectation do
     "Candidates:\n" <> snippets <> suffix
   end
 
-  defp snippet(candidate) do
+  def snippet(candidate) do
     candidate
     |> LazyHTML.to_html(skip_whitespace_nodes: true)
     |> String.replace(~r/\s+/u, " ")
