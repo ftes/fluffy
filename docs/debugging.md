@@ -8,7 +8,7 @@ test trace. The examples use the setup from [Your first test](usage.md#your-firs
 **Did the assertion fail?** `ExUnit.AssertionError` tells you which condition
 the page missed. On Playwright, read the received values, timeout and call log:
 these describe the check when it ran, without reconstructing a later DOM.
-On Phoenix, a failed visibility assertion tells you whether the locator matched
+On Phoenix, a failed `to_be_visible` assertion tells you whether the locator matched
 nothing or matched a hidden element. If a named role locator matched nothing,
 look for other accessible names for that role in the locator’s scope.
 
