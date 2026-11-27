@@ -1,35 +1,33 @@
 # Debugging and native access
 
-The snippets assume the imports from [Your first test](usage.md#your-first-test) and an initialized `session`.
+Start with the failure message. If the sequence of actions matters, open the
+test trace. The examples use the setup from [Your first test](usage.md#your-first-test).
 
 ## Operation failures and browser diagnostics
 
-Element-action failures raise `Fluffy.OperationError` across drivers. Rescue it
-uniformly and inspect `backend`, `driver`, `operation`, `locator` (or file-chooser
-handle), and `cause` for details. This includes `submit` and file selection, failed
-navigations on both backends (`visit`, `reload`, and the navigation an action starts,
-with `locator: nil`), and on Playwright also history navigation, clock calls, and the
-page handling around an `unwrap` callback, whose own errors pass through.
+**Did the assertion fail?** `ExUnit.AssertionError` tells you which condition
+the page missed. On Playwright, read the received values, timeout and call log:
+these describe the check when it ran, without reconstructing a later DOM.
 
-For Playwright, `cause` is the native Playwright exception (such as
-`Playwright.TimeoutError`), including its call log. For Phoenix, it retains `Fluffy.StrictnessError` or
-`Fluffy.ActionabilityError`, including structural reasons and candidates, or
-`Fluffy.LiveViewError` when the LiveView exited. When Fluffy finds a navigation failed,
-such as a response the browser would abort, too many redirects, or LiveViews that did
-not connect, `cause` is a message saying why. LiveView
-finishes its action retries before wrapping the final failure. Browser failures
-are not classified by parsing messages or inspecting a later DOM snapshot.
+**Did the action fail?** `Fluffy.OperationError` records the operation, backend,
+driver, locator (or file chooser), and underlying `cause`:
 
-Invalid arguments, unsupported capabilities, and unexpected programming errors
-are not wrapped in `Fluffy.OperationError`.
+- On Playwright, a native exception such as `Playwright.TimeoutError` carries
+  the call log. On Phoenix, strictness and actionability errors identify the
+  matching candidates or structural reason; `Fluffy.LiveViewError` means the
+  view exited. LiveView reports the final failure after its retries.
+- If a click found its target but the navigation failed, the navigation error
+  has `locator: nil`, just as for `visit` or `reload`. Fluffy supplies a reason
+  for failures it detects, such as too many redirects or a view that never connected.
 
-Failed assertions remain `ExUnit.AssertionError`. Browser assertion messages
-include the expected condition and Playwright's received values, timeout details,
-and call log. No candidate markup is reconstructed after browser failure.
+The same error wrapper covers file selection, `submit`, browser history and
+clock operations, and Playwright page handling around `unwrap`. The callback's
+own errors, invalid arguments, unsupported capabilities and programming errors
+pass through.
 
-Trace a test with `@tag Playwright.Test.use(trace: :on)` (or `trace: :retain_on_failure` in the
-config, see [Playwright setup](installation.md#playwright-setup)), and name its steps
-with `Fluffy.step/3`:
+### Replay the failing step
+
+Tag the test to record a trace. Name the sequence you want to find in the viewer:
 
 ```elixir
 @tag Playwright.Test.use(trace: :on)
@@ -39,22 +37,27 @@ test "brews Polyjuice" do
   |> step("Brew Polyjuice Potion", fn session ->
     session
     |> fill(by_label("Boomslang skin"), "3")
-    |> click(by_role(:button, name: "Brew"))
+    |> click(button("Brew"))
   end)
+  |> assert_has(by_text("Polyjuice Potion is ready"))
 end
 ```
 
-The test's one `trace.zip` covers every page of all its sessions; open it with
-`mix playwright.cli show-trace test-results/<test>/trace.zip`. A failed test also gets
-`error-context.md` there: its errors, source and an aria snapshot of its page. Steps nest and link to
-their source; they are `Playwright.Test.step/3`'s, on every driver. A Phoenix-only
-trace has the steps but no pages.
+Open `test-results/<test>/error-context.md` for the failure, source and page's
+ARIA snapshot. To replay the actions, run
+`mix playwright.cli show-trace test-results/<test>/trace.zip`. One trace covers
+every page of every session in the test. Steps nest and link to source on all
+drivers; a Phoenix-only trace contains steps but no browser pages. To keep
+traces only for failures, configure `trace: :retain_on_failure`
+([CI](installation.md#ci)).
 
-As in Playwright, `Fluffy.Playwright.screenshot/2` returns the PNG, and `path:` also
-writes it to a file:
+### Inspect the current page
+
+For a layout problem, capture the rendered browser page. `screenshot/2` returns
+the PNG bytes; `path:` also saves them:
 
 ```elixir
-Playwright.screenshot(session, path: "tmp/screenshots/polyjuice.png", full_page: true)
+Fluffy.Playwright.screenshot(session, path: "tmp/screenshots/polyjuice.png", full_page: true)
 ```
 
 `Fluffy.open_browser/1` opens an HTML snapshot of the active page in your default
@@ -67,15 +70,15 @@ session
 |> open_browser()
 ```
 
-See [Playwright setup](installation.md#playwright-setup) for console logging,
-traces, screenshots and videos. See [Advanced events and pages](advanced-events.md)
+See [CI](installation.md#ci) to keep traces, screenshots and videos from failures,
+or [Troubleshooting](installation.md#troubleshooting) to log browser output. See [Advanced events and pages](advanced-events.md)
 for downloads, popups, dialogs, and network events.
 
 ## Native escape hatch
 
-Use `Fluffy.unwrap/2` for an uncommon driver-native operation that has no first-class
-Fluffy API. It returns the reconciled session, so the pipeline can continue, but the
-callback value is intentionally driver-specific:
+When a test needs an operation Fluffy doesn't expose, use `Fluffy.unwrap/2` to
+perform it and continue the pipeline. For example, trigger a LiveView hook and
+assert on what the student sees:
 
 ```elixir
 session
@@ -85,33 +88,29 @@ end)
 |> assert_has(by_text("Chamber opened"))
 ```
 
-To read a value instead, use `Fluffy.unwrap_and_return/2`. It returns the
-callback's result. On LiveView and Playwright pages it reconciles the page like
-`Fluffy.unwrap/2`, including redirects the callback causes, so keep using the same
-session afterwards; a Static page stays as it is, whatever conn the callback returns:
+To read a native value, use `Fluffy.unwrap_and_return/2`:
 
 ```elixir
 html = unwrap_and_return(session, &Phoenix.LiveViewTest.render/1)
+assert html =~ "Chamber opened"
 ```
 
-The callback receives the current `%Plug.Conn{}` on a Static page, a
-`%Phoenix.LiveViewTest.View{}` on a LiveView page, or a
-`%Playwright.Page{}` on a Playwright page.
+The active driver determines what the callback receives and how to continue:
 
-A Static `Fluffy.unwrap/2` callback must return its updated `Plug.Conn` because
-connections are immutable, while a Static `Fluffy.unwrap_and_return/2` callback may
-return anything and leaves the conn alone. LiveView and Playwright `Fluffy.unwrap/2`
-callback results are ignored: Fluffy retains and reconciles the original View or Page. Exceptions, throws, and exits pass
-through unchanged. Prefer Playwright bang functions inside the callback when
-failure should stop the test.
-
-Do not consume `assert_patch` or `assert_redirect` notifications inside a LiveView
-callback: Fluffy uses them to reconcile navigation. Assert the resulting page or URL
-after `Fluffy.unwrap/2`.
+- **Static:** the callback receives a `%Plug.Conn{}`. Return the updated conn
+  from `unwrap` to keep changes. `unwrap_and_return` can return any value and
+  leaves the session's conn alone.
+- **LiveView:** the callback receives a `%Phoenix.LiveViewTest.View{}`. Both
+  helpers reconcile the original view, including redirects. Leave `assert_patch`
+  and `assert_redirect` notifications for Fluffy; assert the resulting page or URL
+  afterwards.
+- **Playwright:** the callback receives a `%Playwright.Page{}`. Both helpers
+  keep tracking that page after navigation. Use bang functions when failure
+  should stop the test. Callback exceptions, throws and exits propagate on every driver.
 
 Reach the context and frame with `Playwright.Page.context/1` and
-`Playwright.Page.main_frame/1`. A document navigated natively, inside or after the
-callback, is adopted before the next Fluffy action. Do not close the page or
+`Playwright.Page.main_frame/1`. Fluffy adopts a natively navigated document
+before the next action. Do not close the page or
 context natively; use the [event and page APIs](advanced-events.md) for lifecycle
 operations and registrations that must precede an action. To act on a page you got
 natively, pass it to `Fluffy.Playwright.page/2`, then `Fluffy.Playwright.switch_page/2`.
@@ -122,9 +121,8 @@ the same navigation handling. `Fluffy.Playwright.unwrap_and_return/3` returns th
 callback's result instead:
 
 ```elixir
-session
-|> Fluffy.Playwright.unwrap(by_role(:button, name: "Rename"), &Playwright.Locator.dblclick!/1)
-|> assert_has(by_label("Name"))
+html = Fluffy.Playwright.unwrap_and_return(session, by_css("#prophecy"), &Playwright.Locator.inner_html!/1)
+assert html =~ "<em>Lumos</em>"
 ```
 
 A `Fluffy.Download` and `Fluffy.FileChooser` keep their Playwright counterpart private;

@@ -178,30 +178,15 @@ Fluffy does not use it.
 
 ### Tabs, windows, and iframes
 
-The Playwright backend exposes page handles for browser tabs and popup windows.
-All public page-management helpers live in `Fluffy.Playwright` and reject Phoenix
-sessions. Phoenix retains one current document internally; use shared page URL,
-and title assertions to inspect it.
-`Fluffy.Playwright.new_page/1` returns a handle; `Fluffy.Playwright.switch_page/2` selects it for subsequent actions.
-Use [frame locators](locators.md#frames-playwright-only) to query iframe contents with
-Playwright. Page switching does not select an iframe, and frame locators do not
-change the active page.
+**Tabs and windows:** Phoenix has one current document. A `target="_blank"` link
+opens there; a click with `modifiers:` raises `Fluffy.CapabilityError`. To test that
+a link actually opens a new tab, use the Playwright [popup recipe](advanced-events.md#pages-popups-and-frames).
 
-On Phoenix, a link with `target="_blank"` opens in that one document, so a test can
-still follow it; a click with `modifiers:` raises `Fluffy.CapabilityError`, as other
-Playwright options do. A test that should behave the same on Playwright handles the new
-tab there with `Fluffy.Event.popup/0`.
-
-Static works on the response HTML and LiveView on its rendered document. Both can
-query an iframe element and its attributes, but do not load its `src` or parse its
-`srcdoc` as a child document, so ordinary locators cannot find elements inside it.
-They do not flatten iframe contents into the parent document or ignore frame boundaries:
-executing a frame-traversing query raises `Fluffy.CapabilityError`. Visit the
-embedded route directly to test it independently with Phoenix; use Playwright
-to test the embedding behavior, including interactions between the parent page and
-iframe. See
-[Pages, popups, and frames](advanced-events.md#pages-popups-and-frames)
-for how pages, browser contexts, and frames relate.
+**Iframes:** Static and LiveView can inspect the `<iframe>` element and its
+attributes, but do not load `src` or parse `srcdoc`. A query that traverses the
+frame raises `Fluffy.CapabilityError`. Visit the embedded route directly on Phoenix,
+or use [frame locators](locators.md#frames-playwright-only) to test the embedding
+behavior on Playwright.
 
 ### Cookies
 
@@ -230,7 +215,7 @@ so a test can assert where the app sent it, as with `Phoenix.ConnTest.redirected
 
 ```elixir
 session
-|> click(by_role(:button, name: "Floo to the Ministry"))
+|> click(button("Floo to the Ministry"))
 |> assert(page_url(~r"^https://ministry\.example/floo\?"))
 ```
 
@@ -276,6 +261,10 @@ Native reset-button behavior requires Playwright. Static and LiveView clicks do
 not restore form defaults or clear file selections. LiveView reset buttons with
 `phx-click` still dispatch their server event.
 
+On Playwright, `submit` can return before a submit handler's same-document URL
+change (`pushState`, `replaceState`, `location.hash`) is observed if the handler
+doesn't cancel submission. Assert the resulting URL with a retrying page assertion.
+
 A LiveView click sends the closest `phx-click`, the target's or an ancestor's,
 and then takes the default action of the closest button or link, as a browser
 does: a submit button submits its form and a link is followed. Only `href="#"`
@@ -307,8 +296,9 @@ values and no `_unused_` params, so every field reads as used. Use Playwright
 when a test depends on `used_input?` or on local text the server has not
 rendered at the time files are selected.
 
-Native picker UI, external uploaders, directories, drag-and-drop, and arbitrary
-`FileList` mutation are unsupported. `Fluffy.Event.file_chooser/1` requires Playwright
+Native picker UI, external uploaders, directories and arbitrary `FileList`
+mutation are unsupported. To test a file drop handler on Playwright, use
+`Fluffy.Playwright.drop/4`. `Fluffy.Event.file_chooser/1` requires Playwright
 because application JavaScript opens the chooser.
 
 ### Native escape hatch
@@ -321,28 +311,10 @@ because application JavaScript opens the chooser.
 Fluffy classifies every member of the Playwright facade it builds on, and a test
 fails when Playwright adds or removes one.
 
-- **Wrapped:** locator builders (`get_by_role` as `by_role`, and so on), the
-  cross-driver actions, including `clear` and `set_checked`, the locator reads
-  `text_content`, `get_attribute`, `input_value`, `all_text_contents`, `inner_text`
-  and `all_inner_texts`, `hover`, `drag_to`,
-  `press_sequentially`, `focus`, `blur`, `dblclick`, `tap`, `dispatch_event`,
-  `select_text`, `scroll_into_view_if_needed`, `wait_for` on a locator,
-  `bounding_box`, `aria_snapshot`, `drop`, `all`, `Fluffy.Locator.within/2`, locator
-  `evaluate`, `evaluate_all` and `wait_for_function`, `set_viewport_size`,
-  `viewport_size`, `emulate_media`, `pdf`, `bring_to_front`, `content`, `title`,
-  the assertions in `Fluffy.Assert`, including `css`, `js_property`, `role`,
-  the accessible name, description and error message assertions,
-  `match_aria_snapshot` and `match_screenshot`, navigation,
-  page management, cookies, storage state, including `set_storage_state`,
-  `local_storage` and `session_storage`, permissions, geolocation, offline mode,
-  HTTP credentials, extra HTTP headers, request routing, including `unroute_all`,
-  tracing, page and element screenshots, page evaluation, init scripts, script and
-  style tags, `wait_for_function` and `wait_for_load_state` on the page, the clock in
-  `Fluffy.Playwright.Clock`, keyboard and mouse input in `Fluffy.Playwright.Keyboard`
-  and `Fluffy.Playwright.Mouse`, the events in `Fluffy.Event`, and the values they
-  deliver, including response bodies. Their options pass through as documented.
-  `match_screenshot` and `match_aria_snapshot` (without an inline snapshot) find
-  their file by `name:` or the test's name, through `Playwright.Test`, or at `path:`.
+- **Wrapped:** start with `Fluffy`, `Fluffy.Locator`, `Fluffy.Assert` and
+  `Fluffy.Event` for cross-driver operations. `Fluffy.Playwright` documents
+  browser-only actions, reads, pages and context settings; `Fluffy.Playwright.Clock`,
+  `Fluffy.Playwright.Keyboard` and `Fluffy.Playwright.Mouse` cover time and input.
 - **Unwrap:** everything else page-, locator-, or value-local, such as
   `aria_snapshot_json`, HAR routing, and response timing. For reads like
   `inner_html` or `is_visible`, `Fluffy.unwrap_and_return/2` and

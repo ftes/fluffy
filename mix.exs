@@ -115,14 +115,14 @@ defmodule Fluffy.MixProject do
           Fluffy.Locator,
           Fluffy.Locator.Roles,
           Fluffy.FrameLocator,
-          Fluffy.Expect,
           Fluffy.Assert,
-          Fluffy.PhoenixTest,
+          Fluffy.Expect,
           Fluffy.Page,
           Fluffy.Event,
           Fluffy.Event.Pending,
           Fluffy.Sandbox
         ],
+        "PhoenixTest migration": [Fluffy.PhoenixTest],
         Playwright: [
           Fluffy.Playwright,
           Fluffy.Playwright.Clock,

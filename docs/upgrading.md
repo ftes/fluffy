@@ -1,9 +1,7 @@
 # Upgrading to 0.9
 
-Fluffy 0.9 runs on Playwright (Hex package `playwright_ex`), a port of the official
-Playwright client with a pinned Playwright 1.65 driver. It follows Playwright more closely, and its Phoenix
-drivers follow LiveView's client. This guide lists what a 0.8 suite must change, as one
-step from 0.8; the [changelog](../CHANGELOG.md) has the details.
+To upgrade a 0.8 suite to 0.9, switch to the pinned Playwright 1.65 driver and check
+the API and behavior changes below. See the [changelog](../CHANGELOG.md) for details.
 
 From an earlier release, also read the changelog up to 0.8. The 0.8 change most likely
 to bite: LiveView sessions see the root layout and portal content, so a locator that
@@ -16,31 +14,22 @@ matched once can now match twice.
   Node.js or npm yourself, as the install task fetches a pinned Node.js with the driver.
   `executable:` now takes a Playwright 1.65 CLI such as `node_modules/.bin/playwright`,
   not `cli.js`; usually drop it and let Playwright install the driver.
-- Run the install in CI too, as `mix playwright.install chromium --with-deps` on Linux
-  runners; the driver would install itself in the first browser test, but browsers do
-  not; see
-  [GitHub Actions](`e:playwright:debugging-and-ci.md#github-actions`). In Microsoft's
-  Playwright image, whose tag must match `Playwright.Driver.version/0`, `--no-browsers`
-  is enough: the driver finds the image's browsers. For a system browser, as on Nix, pass
-  `--no-browsers` and set `launch_options: [executable_path: ...]` or `channel:`; see
-  [Playwright setup](installation.md#playwright-setup).
+- Replace the CI browser install too: use `mix playwright.install chromium --with-deps`
+  on Linux runners. For Microsoft's Playwright image or a system browser, follow
+  [Troubleshooting](installation.md#troubleshooting).
 - Prefer `only: [:dev, :test]` to `only: :test`, so Playwright's Mix tasks and
   `mix usage_rules.sync` work in `:dev`, and widen the `lazy_html` line `phx.new`
   generates to match. List Playwright too for its usage rules; see
-  [Elixir dependency](installation.md#elixir-dependency).
+  [Usage rules for coding agents](installation.md#usage-rules-for-coding-agents).
 
-  ```diff
-  -    {:lazy_html, ">= 0.1.0", only: :test},
-  -    {:fluffy, "~> 0.8.0", only: :test}
-  +    {:lazy_html, ">= 0.1.0", only: [:dev, :test]},
-  +    {:fluffy, "~> 0.9.0", only: [:dev, :test]}
-  ```
+  Use the [current Fluffy dependency entry](installation.md#elixir-dependency)
+  in place of the 0.8 requirement.
 - Fluffy requires Phoenix 1.7.10 or later and LiveView 1.1.32 or later; LiveView 1.0 is no
   longer supported. Upgrade them first, raising your requirements where they hold an
   older version back.
 - PlaywrightEx is renamed `Playwright` (app `:playwright`, modules `Playwright.*`; the Hex
   package stays `playwright_ex`). If you list it, replace `{:playwright_ex, ...}` with the
-  line from [Elixir dependency](installation.md#elixir-dependency), where `hex: :playwright_ex`
+  line from [Usage rules for coding agents](installation.md#usage-rules-for-coding-agents), where `hex: :playwright_ex`
   is required, rename `config :playwright_ex` to `config :playwright`, and run
   `mix deps.unlock --unused`. `alias Fluffy.Playwright` now shadows `Playwright.*`, so
   don't alias it where you call the dependency, such as in `@tag Playwright.Test.use(...)`.
@@ -49,7 +38,7 @@ matched once can now match twice.
   longer part of accessible names.
 - Browser console messages are no longer logged, as in Playwright, and `js_logger:`,
   custom loggers and `Fluffy.Playwright.ConsoleLogger` are gone. To log them, register
-  a listener: `on(session, Event.console(), &Logger.info(Playwright.ConsoleMessage.text(&1)))`.
+  a [console listener](installation.md#troubleshooting).
 - Browser sessions use Playwright's `en-US` locale instead of `en`, and Phoenix sessions,
   which sent no Accept-Language before, now send the test's `locale` (`en-US` by default)
   unless a `conn:` sets its own. An app that picks its language from the request can render
@@ -66,6 +55,10 @@ matched once can now match twice.
 - Browser launch gets Playwright's 3-minute default instead of `timeout:`. A
   `launch_options: [timeout: ...]` that raised the limit on 0.8 now shortens it and can
   fail a loaded machine with `browserType.launch: Timeout ... exceeded`, so drop it.
+- Move browser settings from `config :fluffy, :playwright` to `config :playwright, :test`.
+  Rename `engine:` to `browser_name:` and keep `launch_options:`. Set a custom CLI with `config :playwright, :driver,
+  executable: ...` in `config/config.exs`. Drop `pool_size`: each test gets its browser
+  from `Playwright.Test.BrowserPool.browser/1`, up to [`workers`](`e:playwright:test-artifacts.md#workers`) at once.
 - `browser_context:`, `launch_options:` and the options of `storage_state` and cookies
   pass through to Playwright, which rejects unknown ones. Page screenshots
   validate their options as element screenshots do: `mask:` takes Fluffy locators
@@ -73,26 +66,18 @@ matched once can now match twice.
 
 ## Timeouts
 
-A browser session's timeouts follow Playwright Test and a Phoenix session's
-`config :fluffy, phoenix_backend_timeout:`; `timeout: :once` checks once and `:infinity` means
-no limit; see [Configuration](installation.md#configuration).
-
 - `config :fluffy` is validated at startup: an unknown key, or the config of a module that
   doesn't exist, raises. Remove `playwright: false`, which does nothing.
-- `start_session(timeout:)`, `config :fluffy, timeout:` and `config :fluffy, :playwright`
-  are removed; the old config raises at startup. Set Playwright Test's defaults instead, in
-  Playwright's config for the whole suite:
+- Remove `start_session(timeout:)` and split the old suite timeout by backend:
 
   ```diff
   -config :fluffy, timeout: 2_000, playwright: [timeout: 15_000]
+  +config :fluffy, phoenix_backend_timeout: 2_000
   +config :playwright, :test, action_timeout: 15_000, navigation_timeout: 15_000, expect: [timeout: 5_000]
   ```
 
-  These are browser sessions'. Without them, browser actions and navigations have no timeout,
-  so the test's timeout bounds them. A Phoenix session's operations take
-  `config :fluffy, phoenix_backend_timeout:` (1s by default), so a suite that raised
-  `timeout:` for both backends sets it too. `0` now raises: use `:once` to check once or
-  `:infinity` for no limit.
+  The Phoenix default is 1 s. Without an action or navigation timeout, browser actions
+  and navigations are bounded only by the test's timeout.
 - `config :fluffy, base_url:` is removed: set Playwright's `base_url`
   ([Configuration](installation.md#configuration)).
 - In native Fluffy calls, replace `timeout: 0` with `timeout: :once`; `0` now raises, as it
@@ -116,31 +101,25 @@ no limit; see [Configuration](installation.md#configuration).
   maps use Playwright's camelCase keys (`httpOnly:`, `sameSite:`, `partitionKey:`). A snake_case
   one such as `http_only:` raises. And `storage_state/2` returns atom keys:
   `state["cookies"]` becomes `state.cookies`.
-- `Fluffy.HTTPEvent` is gone: request and response events deliver a
-  `Playwright.Request` and `Playwright.Response`, as do the other browser events
-  (dialog, console, page error, frame, worker and WebSocket) their Playwright values,
-  as in Playwright. Read them with Playwright's functions, such as
+- Replace `Fluffy.HTTPEvent` with `Playwright.Request` or `Playwright.Response`.
+  Dialog, console, page error, frame, worker and WebSocket events also deliver their
+  native Playwright values. Read them with functions such as
   `Playwright.Response.status/1` and `Playwright.Dialog.accept!/1`, and turn their
   page into a `Fluffy.Page` with `Fluffy.Playwright.page/2`.
 - `Fluffy.Download`'s `read!` and `save_as!` are `read` and `save_as`. Only the
   documented fields of `Fluffy.Download` remain public.
 - `page_status`, `page_to_have_status` and `Fluffy.Page.status` are removed, as in
   Playwright; on Playwright, assert on `Fluffy.Event.response/1` instead.
-- Configure the browser with `config :playwright, :test, browser_name: ..., launch_options:
-  ...` (`config :playwright, :driver, executable: ...` in `config/config.exs` for a CLI)
-  instead of `config :fluffy, :playwright`, which is removed. `pool_size` goes too: each
-  test takes its own browser from `Playwright.Test.BrowserPool.browser/1`, at most `workers`
-  at once
-  ([Workers](`e:playwright:test-artifacts.md#workers`)).
-- `Fluffy.Playwright.trace/2`, `artifact_dir` and `trace_dir` are removed. Traces,
-  screenshots and videos come from `Playwright.Test`: set
-  `config :playwright, :test, trace: :retain_on_failure, screenshot: :only_on_failure`
-  and replace `setup context do Fluffy.Test.setup(context) end` with `use Playwright.Test` after
-  your `ConnCase` (or in your case template, see `Playwright.Test`). Every module that starts a
-  session needs it, Phoenix-only and `Fluffy.PhoenixTest` ones too: a session started outside a
-  registered test raises;
-  record a module with `use Playwright.Test, trace: :on` and a describe block or test with `@tag Playwright.Test.use(trace: :on)` (or `screenshot:`, `video:`). Files go to
-  `test-results/<test>/`; a failed operation no longer writes HTML or the error text.
+- Replace `setup context do Fluffy.Test.setup(context) end` with `use Playwright.Test`
+  after `ConnCase`, directly or in your case template. Starting a session outside a
+  registered test raises, including for Phoenix-only and facade suites.
+- Replace `Fluffy.Playwright.trace/2`, `artifact_dir` and `trace_dir` with Playwright Test's
+  artifact settings. For the suite, use `config :playwright, :test, trace: :retain_on_failure,
+  screenshot: :only_on_failure`. For a module, use `use Playwright.Test, trace: :on`;
+  for a describe use `@describetag Playwright.Test.use(trace: :on)`, and for a test
+  use `@tag Playwright.Test.use(trace: :on)`.
+  `screenshot:` and `video:` work the same way. Artifacts go to `test-results/<test>/`;
+  failed operations no longer write HTML or error text.
 - Fluffy no longer starts or adopts Ecto sandbox owners: keep the generated DataCase
   setup (`Sandbox.start_owner!(repo, shared: not tags[:async])` and `stop_owner` in
   `on_exit`) and use it before `use Playwright.Test`. Drop `sandbox: false` and `repos:`;
@@ -223,7 +202,7 @@ The other callbacks get a `%Playwright.Page{}`; Playwright's
 [changelog](`e:playwright:changelog.md`) lists its 1.65 breaking changes.
 
 On Phoenix, `by_role` knows the landmark roles, so a `by_css("nav")` stand-in becomes
-`by_role(:navigation)`, and a named `<section>` is `by_role(:region, name: "...")`.
+`by_role(:navigation)`, and a named `<section>` is `by_role(:region, "...")`.
 
 ## Phoenix behavior
 
