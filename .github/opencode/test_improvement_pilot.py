@@ -53,6 +53,11 @@ class ImprovementPilotTest(unittest.TestCase):
                     pilot.write_artifact(path, data | change)
                     pilot.read_files(path, identity, ORIGINAL, "tree")
 
+    def test_wrapping_cannot_introduce_a_markdown_block(self):
+        for marker in ("- a list", "1. a list", "## a heading", "---"):
+            with self.subTest(marker=marker), self.assertRaisesRegex(ValueError, "single prose paragraph"):
+                pilot.wrap("x" * 88 + " " + marker)
+
     def test_publish_requires_the_checked_tree_and_never_reuses_a_branch(self):
         files = {pilot.DOC: CHANGED}
         with (patch.object(pilot.update, "stage_replacements") as stage,

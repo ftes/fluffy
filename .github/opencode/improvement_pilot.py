@@ -47,11 +47,12 @@ def paragraph_parts(source):
 def wrap(paragraph):
     paragraph = run.text(paragraph, 700)
     prose = re.sub(r"`[^`]+`", "", paragraph)
+    filled = textwrap.fill(paragraph, width=88, break_long_words=False, break_on_hyphens=False)
     run.check(all(char.isprintable() for char in paragraph)
               and not any(mark in prose for mark in ("`", "~~~", "<", ">", "[", "]", "://"))
-              and not re.match(r"^(?:[#*~\-+] |[0-9]+[.)] )", paragraph),
+              and not re.search(r"^(?:#{1,6}(?: |$)|[*~+\-] |[0-9]+[.)] |(?:-{3,}|\*{3,}|_{3,})$)", filled, re.M),
               "Expected a single prose paragraph with optional inline code")
-    return textwrap.fill(paragraph, width=88, break_long_words=False, break_on_hyphens=False)
+    return filled
 
 
 def validate_file(original, changed):
