@@ -63,6 +63,8 @@ page: Static and LiveView (the Phoenix drivers) or Playwright. What only a brows
 Besides correctness, review a change for simplicity, consistency and scope. This applies to
 human and agent reviews alike.
 
+Automatic OpenCode review runs on ready pull requests from this repository. CI runs the tests.
+
 - Prefer the change that removes or shares code over one that adds a parallel path; a rule all
   drivers follow belongs in one place, not in each driver.
 - Follow how the codebase already does the same thing. A new pattern needs a reason.
