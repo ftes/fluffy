@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 import run
 
@@ -120,7 +120,7 @@ class PublishTest(unittest.TestCase):
     def review(self, *, before=None, after=None, replay=False, prior=None):
         pr = self.pr()
         submitted = []
-        remaining_reads = iter([pr, before or pr, after or pr])
+        remaining_reads = iter([pr, pr, before or pr, after or pr])
 
         def api(path, **kw):
             if "payload" in kw:
@@ -140,23 +140,31 @@ class PublishTest(unittest.TestCase):
 
         with (patch.object(run, "api", side_effect=api),
               patch.object(run, "app_token", return_value=contextlib.nullcontext("app-token")),
-              patch.object(run, "agent", return_value={
-                  "summary": "Checked calls", "open_blocking": 0, "open_non_blocking": 1,
-                  "findings": [{"path": " lib/a.ex ", "line": 1, "side": "RIGHT",
-                                "body": "suggestion (non-blocking): Verify the result"}],
-              }) as agent,
               patch.object(run, "snapshot_diff", return_value=("b" * 40, "diff")),
+              patch.object(run, "git", return_value=b"diff"),
+              patch.object(run, "privileged_setup_allowed", return_value=True),
               patch.object(run, "gh") as gh, patch.object(run, "save"), patch.object(run, "context", return_value=pr),
               patch.object(run, "reconcile_reviews") as reconcile,
               contextlib.redirect_stdout(io.StringIO())):
-            run.review(42, pr["head"]["sha"], "Review")
+            expected, merge_base = run.prepare_review(42, pr["head"]["sha"])
+            marker = run.snapshot_marker(expected, merge_base)
+            result = {
+                "summary": "Checked calls", "open_blocking": 0, "open_non_blocking": 1,
+                "findings": [{"path": " lib/a.ex ", "line": 1, "side": "RIGHT",
+                              "body": "suggestion (non-blocking): Verify the result"}],
+            }
             if replay:
-                remaining_reads = iter([pr])
-                run.review(42, pr["head"]["sha"], "Review")
-            agent.assert_called_once()
-            self.assertIn("Review mode: full.", agent.call_args.args[0])
+                reconcile.side_effect = [ValueError("Cleanup failed"), None]
+                with self.assertRaisesRegex(ValueError, "Cleanup failed"):
+                    run.publish_review(42, expected, marker, result)
+                remaining_reads = iter([pr, pr])
+                self.assertIsNone(run.prepare_review(42, pr["head"]["sha"]))
+                run.publish_review(42, expected, marker, result)
+                self.assertEqual(reconcile.call_args_list, [call(42, token="app-token"), call(42)])
+            else:
+                run.publish_review(42, expected, marker, result)
+                self.assertEqual(reconcile.call_count, int(before is None and after is None))
             self.assertTrue(any(arg.startswith("query=query(") for arg in gh.call_args.args))
-            self.assertEqual(reconcile.call_count, int(before is None and after is None))
         return submitted
 
     def test_review_posts_validated_path_and_marker_once_across_retries(self):
@@ -172,6 +180,9 @@ class PublishTest(unittest.TestCase):
         for changed in (self.pr(target="stable"), self.pr(base="d" * 40)):
             self.assertEqual(self.review(before=changed), [])
 
+    def test_review_stops_if_the_head_branch_is_renamed_before_publishing(self):
+        self.assertEqual(self.review(before=self.pr(branch=f"{run.PLAYWRIGHT_PILOT_BRANCH}1.65.0")), [])
+
     def test_stale_approval_is_dismissed_without_reviewing_the_new_head(self):
         writes = self.review(after=self.pr(head="d" * 40))
         self.assertEqual([path for path, _ in writes], ["pulls/42/reviews", "pulls/42/reviews/12/dismissals"])
@@ -182,14 +193,32 @@ class PublishTest(unittest.TestCase):
         identity = "" if legacy else f" {hashlib.sha256(target.encode()).hexdigest()} {base}"
         return f"<!-- opencode-review: {head} {merge_base}{identity} -->"
 
-    def test_previous_review_without_matching_recorded_base_requires_full_review(self):
+    def test_previous_review_without_matching_recorded_base_does_not_skip_a_new_review(self):
         for legacy in (False, True):
             prior = {"body": self.marker(self.pr(base="e" * 40), legacy=legacy), "state": "APPROVED",
                      "user": {"type": "Bot", "login": run.BOT}}
             self.assertEqual(len(self.review(prior=[prior])), 1)
 
-    def test_reconciliation_dismisses_superseded_app_verdicts_before_model_access(self):
-        pr = self.pr()
+    def test_guard_excludes_exact_candidate_from_inference_and_publication(self):
+        pr = self.pr(branch=f"{run.PLAYWRIGHT_PILOT_BRANCH}1.65.0")
+        expected = run.snapshot(pr)
+        marker = run.snapshot_marker(expected, "b" * 40)
+        trusted = "e" * 40
+        with (patch.object(run, "api", return_value=pr),
+              patch.object(run, "previous_review", return_value=(None, False)),
+              patch.object(run, "git", return_value=trusted),
+              patch.object(run, "privileged_setup_allowed", return_value=False) as guard,
+              patch.object(run, "snapshot_diff") as diff,
+              patch.object(run, "app_token") as token,
+              contextlib.redirect_stdout(io.StringIO())):
+            self.assertIsNone(run.prepare_review(42, expected[0]))
+            run.publish_review(42, expected, marker, None)
+        self.assertEqual(guard.call_args_list, [call(trusted, expected[0], pr["head"]["ref"])] * 2)
+        diff.assert_not_called()
+        token.assert_not_called()
+
+    def test_reconciliation_dismisses_superseded_app_verdicts_even_on_an_excluded_branch(self):
+        pr = self.pr(branch=f"{run.PLAYWRIGHT_PILOT_BRANCH}1.65.0")
         app = {"login": run.BOT}
         reviews = [
             {"id": 1, "body": self.marker(self.pr(head="e" * 40)), "state": "APPROVED", "user": app},
@@ -258,14 +287,14 @@ class PublishTest(unittest.TestCase):
         previous = {"id": 1, "body": self.marker(self.pr(head="e" * 40)), "state": "APPROVED",
                     "user": {"type": "Bot", "login": run.BOT}}
         with (patch.object(run, "api", side_effect=[pr, [previous], pr, [], [previous]]),
+              patch.object(run, "review_candidate_allowed", return_value=True),
               patch.object(run, "snapshot_diff", return_value=("b" * 40, b"same diff")),
               patch.object(run, "reviewed_diff", return_value=b"same diff"),
-              patch.object(run, "app_token") as token, patch.object(run, "agent") as agent,
+              patch.object(run, "app_token") as token,
               contextlib.redirect_stdout(io.StringIO())):
             run.reconcile_reviews(42)
-            run.review(42, pr["head"]["sha"], "Review")
+            self.assertIsNone(run.prepare_review(42, pr["head"]["sha"]))
         token.assert_not_called()
-        agent.assert_not_called()
 
     def test_unchanged_diff_retires_legacy_block_only_if_latest_verdict_approves(self):
         pr = self.pr()

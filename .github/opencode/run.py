@@ -19,12 +19,14 @@ REVIEW_BOTS = (BOT, LEGACY_BOT)
 MAINTAINERS = ("OWNER", "MEMBER", "COLLABORATOR")
 REPO = os.environ.get("GITHUB_REPOSITORY")
 CONTEXT = Path("tmp/opencode")
-DIFF_ARGS = ("diff", "--no-ext-diff", "--no-textconv", "--binary")
+TEXT_DIFF_ARGS = ("diff", "--no-ext-diff", "--no-textconv")
+DIFF_ARGS = (*TEXT_DIFF_ARGS, "--binary")
 READ_TOOLS = ("read", "glob", "grep")
 SAFE_ENV = ("PATH", "HOME", "USER", "LANG", "LC_ALL", "TMPDIR")
 PLAYWRIGHT_PILOT_BRANCH = "opencode/playwright-ex-pilot-"
 PLAYWRIGHT_MEMBERS = "test/support/playwright_members.ex"
 PLAYWRIGHT_CLASSIFICATIONS = "test/support/playwright_classifications.json"
+PLAYWRIGHT_MANUAL_REVIEW = "PlaywrightEx update or inventory changes require unprivileged CI and manual review."
 PLAYWRIGHT_SETUP_INPUTS = {
     "mix.exs": r'^[ \t]*\{:playwright\b.*$',
     "mix.lock": r'^[ \t]*"playwright".*$',
@@ -296,7 +298,9 @@ def previous_review(number):
 
 
 def active_review(pr, expected):
-    return local_pr(pr) and pr["state"] == "open" and not pr["draft"] and snapshot(pr) == expected
+    user = pr["user"]
+    return (local_pr(pr) and pr["state"] == "open" and not pr["draft"] and snapshot(pr) == expected
+            and (user["type"] != "Bot" or user["login"] in REVIEW_BOTS))
 
 
 def dismiss_review(number, review_id, token, message):
@@ -392,34 +396,38 @@ def reconcile_reviews(number, token=None):
                     dismiss_review(number, review_id, credential, message)
 
 
-def review(number, head, prompt, retargeted=False):
+def snapshot_marker(expected, merge_base):
+    head, ref, base = expected
+    return head, merge_base, hashlib.sha256(ref.encode()).hexdigest(), base
+
+
+def review_candidate_allowed(pr):
+    head = pr["head"]
+    allowed = privileged_setup_allowed(git("rev-parse", "HEAD"), head["sha"], head["ref"])
+    if not allowed:
+        print(PLAYWRIGHT_MANUAL_REVIEW)
+    return allowed
+
+
+def prepare_review(number, head, retargeted=False):
     pr = api(f"pulls/{number}")
     expected = snapshot(pr)
     if expected[0] != head or not active_review(pr, expected):
         return
-    author = pr["user"]["login"]
-    check(pr["user"]["type"] != "Bot" or author in REVIEW_BOTS, "Unapproved PR author")
+    if not review_candidate_allowed(pr):
+        return
     base, full = snapshot_diff(pr)
-    target = hashlib.sha256(expected[1].encode()).hexdigest()
-    marker = (head, base, target, expected[2])
+    marker = snapshot_marker(expected, base)
     previous, previous_active = previous_review(number)
     if previous_active and previous == marker:
         return
-    depth = "full"
-    if previous and not retargeted and previous[2:] == marker[2:]:
-        old_head, old_base, _, _ = previous
+    if previous_active and not retargeted and previous[2:] == marker[2:]:
         try:
-            old = reviewed_diff(previous)
-            if old == full:
-                if previous_active:
-                    print("Same changes as the previous review; skipping.")
-                    return
-            else:
-                replayed = git("merge-tree", "--write-tree", "--merge-base", old_base, base, old_head)
-                save("increment.diff", git(*DIFF_ARGS, replayed, head, raw=True))
-                depth = "increment"
+            if reviewed_diff(previous) == full:
+                print("Same changes as the previous review; skipping.")
+                return
         except subprocess.CalledProcessError:
-            print("Previous review could not be replayed; reviewing the whole PR.")
+            print("Could not verify unchanged diff for the previous review.")
     if not active_review(context(number), expected):
         return
     resolved = gh(
@@ -436,10 +444,19 @@ def review(number, head, prompt, retargeted=False):
         "--jq", '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved)',
     )
     save("resolved.jsonl", resolved)
-    save("pr.diff", full)
-    result = agent(f"{prompt}\nReview mode: {depth}. PR context: {CONTEXT}/{number}.json.",
-                   '{"summary":"...", "open_blocking":0, "open_non_blocking":0, '
-                   '"findings":[{"path":"...", "line":123, "side":"RIGHT", "body":"issue (blocking): ..."}]}')
+    save("pr.diff", git(*TEXT_DIFF_ARGS, base, head, raw=True))
+    return expected, base
+
+
+def publish_review(number, expected, marker, result):
+    pr = api(f"pulls/{number}")
+    if not active_review(pr, expected):
+        return
+    if previous_review(number) == (marker, True):
+        reconcile_reviews(number)
+        return
+    if not review_candidate_allowed(pr):
+        return
     fields(result, "summary", "open_blocking", "open_non_blocking", "findings")
     summary = text(result["summary"], 12000)
     blocking, non_blocking = result["open_blocking"], result["open_non_blocking"]
@@ -470,16 +487,17 @@ def review(number, head, prompt, retargeted=False):
     if blocking:
         verdict = f"Issues found: {blocking} blocking, {non_blocking} non-blocking."
     with app_token() as token:
-        if not active_review(api(f"pulls/{number}"), expected):
+        current = api(f"pulls/{number}")
+        if not active_review(current, expected) or current["head"]["ref"] != pr["head"]["ref"]:
             print("PR changed; discarding review.")
             return
-        own_pr = author == BOT
+        own_pr = pr["user"]["login"] == BOT
         event = "COMMENT" if own_pr else ("REQUEST_CHANGES" if blocking else "APPROVE")
         note = "\n\nNo approval or change request was submitted on the app's own PR." if own_pr else ""
         body = f"**Verdict: {verdict}**\n\n{summary}{note}\n\n<!-- opencode-review: {' '.join(marker)} -->"
         # GitHub persists the summary, inline comments, verdict and retry marker together.
         submitted = api(f"pulls/{number}/reviews", token=token, payload={
-            "commit_id": head, "event": event, "body": body, "comments": comments,
+            "commit_id": expected[0], "event": event, "body": body, "comments": comments,
         })
         if not own_pr:
             if not active_review(api(f"pulls/{number}"), expected):
@@ -499,22 +517,15 @@ def main(mode):
     if mode in ("setup-gate", "require-safe-setup"):
         allowed = privileged_setup_allowed(git("rev-parse", "HEAD"), os.environ["HEAD"], os.environ["HEAD_BRANCH"])
         if not allowed:
-            print("PlaywrightEx update or inventory changes require unprivileged CI and manual review.")
+            print(PLAYWRIGHT_MANUAL_REVIEW)
         if mode == "require-safe-setup":
             check(allowed, "Candidate setup declined")
         elif allowed:
             with open(os.environ["GITHUB_OUTPUT"], "a") as stream:
                 print("allowed=true", file=stream)
         return
-    number = int(os.environ["NUMBER"])
-    head = os.environ["HEAD"]
-    retargeted = os.environ.get("RETARGETED") == "true"
-    if mode == "reconcile-reviews":
-        reconcile_reviews(number)
-        return
-    check(mode == "review", "Expected review or reconcile-reviews")
-    CONTEXT.mkdir(parents=True, exist_ok=True)
-    review(number, head, Path(__file__).with_name("review.md").read_text(), retargeted)
+    check(mode == "reconcile-reviews", "Expected setup-gate, require-safe-setup or reconcile-reviews")
+    reconcile_reviews(int(os.environ["NUMBER"]))
 
 
 if __name__ == "__main__":
