@@ -109,10 +109,10 @@ def infer(data):
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
         response = subprocess.run(
             [*opencode, "run", "--archived", "--format", "json", "--agent", "ci", "--model", MODEL],
-            cwd=cwd, env=env, input=prompt, text=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=True,
+            cwd=cwd, env=env, input=prompt.encode(), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=True,
         )
     try:
-        events = list(io.StringIO(response.stdout))
+        events = list(io.StringIO(response.stdout.decode()))
         run.check(not any(json.loads(line)["type"] == "tool_use" for line in events), "Unexpected tool use")
         return run.result_from_events(events)
     except (KeyError, ValueError) as error:

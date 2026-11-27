@@ -100,24 +100,29 @@ class ReviewWorkflowTest(unittest.TestCase):
             {"type": "step_finish", "part": {"reason": "stop"}},
         ]
 
+        separator = "\n"
+
         def cli(args, **kwargs):
             self.assertEqual(list(kwargs["cwd"].iterdir()), [])
             return subprocess.CompletedProcess(
-                args, 0, stdout="".join(json.dumps(event, ensure_ascii=False) + "\n" for event in events),
+                args, 0, stdout="".join(json.dumps(event, ensure_ascii=False) + separator for event in events).encode(),
             )
 
         with (patch.dict(os.environ, CLAUDE_CODE_OAUTH_TOKEN="test", GH_TOKEN="hidden",
                          ACTIONS_ID_TOKEN_REQUEST_TOKEN="hidden", OPENCODE_API_KEY="hidden"),
               patch.object(subprocess, "run", side_effect=cli) as command):
             self.assertEqual(review.infer({"diff": "reference"}), result)
-        login, request = command.call_args_list
+            login, request = command.call_args_list
+            separator = "\r"
+            with self.assertRaisesRegex(ValueError, "did not return a complete JSON review"):
+                review.infer({"diff": "reference"})
         self.assertEqual(login.args[0], ["opencode", "--standalone", "auth", "login", "claude-agent",
                                          "--method", "claude-login"])
         self.assertEqual(request.args[0][-2:], ["--model", review.MODEL])
         env = request.kwargs["env"]
         self.assertFalse(env.keys() & {"GH_TOKEN", "ACTIONS_ID_TOKEN_REQUEST_TOKEN", "OPENCODE_API_KEY"})
         self.assertEqual(env["CLAUDE_CODE_OAUTH_TOKEN"], "test")
-        self.assertIn('"diff": "reference"', request.kwargs["input"])
+        self.assertIn(b'"diff": "reference"', request.kwargs["input"])
         settings = json.loads(env["OPENCODE_CONFIG_CONTENT"])
         self.assertEqual(settings["providers"]["claude-agent"]["models"]["ci-sonnet"]["modelID"], "sonnet")
         self.assertEqual(settings["permissions"], [run.permission("*", effect="deny")])
