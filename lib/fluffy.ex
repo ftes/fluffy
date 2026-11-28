@@ -517,15 +517,10 @@ defmodule Fluffy do
   def set_input_files(%Session{} = session, locator_or_chooser, selection, options \\ []) do
     options = Fluffy.Options.validate_file_input!(options)
 
-    max_bytes =
-      Keyword.get(
-        options,
-        :max_bytes,
-        Keyword.fetch!(Fluffy.Options.config!(), :file_input_max_bytes)
-      )
+    {max_bytes, driver_options} =
+      Keyword.pop(options, :max_bytes, Keyword.fetch!(Fluffy.Options.config!(), :file_input_max_bytes))
 
-    {source, selected_files} = SelectedFile.prepare!(selection, max_bytes: max_bytes)
-    driver_options = Keyword.delete(options, :max_bytes)
+    {source, selected_files} = SelectedFile.prepare!(selection, max_bytes)
 
     target_session =
       case locator_or_chooser do
