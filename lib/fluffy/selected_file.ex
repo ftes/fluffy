@@ -18,12 +18,11 @@ defmodule Fluffy.SelectedFile do
 
   @type source :: {:local_paths, [String.t()]} | {:payloads, [FilePayload.t()]}
 
-  @spec prepare!(String.t() | FilePayload.t() | [String.t()] | [FilePayload.t()], keyword()) ::
+  # `max_bytes` is validated with the action's options (`Fluffy.Options.file_input_schema/0`)
+  # or `config :fluffy, file_input_max_bytes:`.
+  @spec prepare!(String.t() | FilePayload.t() | [String.t()] | [FilePayload.t()], non_neg_integer()) ::
           {source(), [t()]}
-  def prepare!(selection, options \\ []) do
-    max_bytes = Keyword.fetch!(Keyword.validate!(options, [:max_bytes]), :max_bytes)
-    validate_max_bytes!(max_bytes)
-
+  def prepare!(selection, max_bytes) do
     case selection do
       path when is_binary(path) ->
         prepare_paths!([path], max_bytes)
@@ -139,12 +138,6 @@ defmodule Fluffy.SelectedFile do
         raise ArgumentError,
               "#{@label}: could not read #{inspect(path)}: #{:file.format_error(reason)}"
     end
-  end
-
-  defp validate_max_bytes!(max_bytes) when is_integer(max_bytes) and max_bytes >= 0, do: :ok
-
-  defp validate_max_bytes!(max_bytes) do
-    raise ArgumentError, "#{@label}: :max_bytes must be a non-negative integer, got: #{inspect(max_bytes)}"
   end
 
   defp ensure_size_limit!(size, max_bytes) when size <= max_bytes, do: :ok
